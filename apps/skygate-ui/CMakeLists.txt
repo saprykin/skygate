@@ -10,6 +10,8 @@ endif()
 
 qt_add_executable(skygate-ui
     src/main.cpp
+    src/SkyContextController.cpp
+    src/SkyContextController.hpp
 )
 
 qt_add_qml_module(skygate-ui

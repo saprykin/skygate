@@ -17,12 +17,28 @@ ApplicationWindow {
 
             Button {
                 id: liveButton
-                text: "Live"
+                text: skyContext.live ? "Live (On)" : "Live (Off)"
                 anchors.verticalCenter: parent.verticalCenter
+                onClicked: skyContext.setLive(!skyContext.live)
             }
-            Button {
-                text: "Pause"
+            Label {
+                id: utcDateLabel
+                text: "UTC Date"
                 anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            TextField {
+                id: utcDateInput
+                width: 120
+                anchors.verticalCenter: parent.verticalCenter
+                placeholderText: "YYYY-MM-DD"
+                text: skyContext.utcDateText
+                onEditingFinished: skyContext.setUtcDateText(text)
+                onActiveFocusChanged: {
+                    if (!activeFocus) {
+                        text = skyContext.utcDateText
+                    }
+                }
             }
             Label {
                 id: utcTimeLabel
@@ -32,10 +48,43 @@ ApplicationWindow {
             }
             TextField {
                 id: utcTimeInput
-                width: 220
+                width: 96
                 anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "2026-02-06T22:00:00Z"
+                placeholderText: "HH:MM:SS"
+                text: skyContext.utcTimeText
+                onEditingFinished: skyContext.setUtcTimeText(text)
+                onActiveFocusChanged: {
+                    if (!activeFocus) {
+                        text = skyContext.utcTimeText
+                    }
+                }
             }
+            Label {
+                id: modeLabel
+                anchors.verticalCenter: parent.verticalCenter
+                text: skyContext.live ? "Mode: Live" : "Mode: Paused"
+                color: "#a9c4ff"
+            }
+        }
+    }
+
+    Connections {
+        target: skyContext
+        function onUtcDateTextChanged() {
+            if (!utcDateInput.activeFocus) {
+                utcDateInput.text = skyContext.utcDateText
+            }
+        }
+        function onUtcTimeTextChanged() {
+            if (!utcTimeInput.activeFocus) {
+                utcTimeInput.text = skyContext.utcTimeText
+            }
+        }
+        function onInvalidUtcDateInput(utcDateText) {
+            utcDateInput.text = skyContext.utcDateText
+        }
+        function onInvalidUtcTimeInput(utcTimeText) {
+            utcTimeInput.text = skyContext.utcTimeText
         }
     }
 
