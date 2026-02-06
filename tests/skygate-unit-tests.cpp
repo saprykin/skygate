@@ -114,16 +114,96 @@ bool runEphemerisEngineTests()
 
     const auto bodies = catalog->bodies();
     skygate::core::SkyContext context;
-    context.observer.latitudeDeg = 1.2;
-    context.observer.longitudeDeg = 3.4;
-    context.observer.elevationMeters = 5.6;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.observer.elevationMeters = 16.0;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
 
     const auto snapshot = engine->compute(context);
     success = expectTrue(snapshot.states.size() == bodies.size(), "Engine output body count should match catalog") && success;
     success = expectTrue(snapshot.context.observer.latitudeDeg == context.observer.latitudeDeg, "Engine should preserve input context latitude") && success;
 
-    if (!snapshot.states.empty() && !bodies.empty()) {
-        success = expectTrue(snapshot.states.front().body.id == bodies.front().id, "Engine state body ordering should match catalog") && success;
+    bool hasSunWithPosition = false;
+    bool hasMoonWithPosition = false;
+    bool hasSiriusWithFixedPosition = false;
+
+    for (const auto& state : snapshot.states) {
+        if (state.body.id == "sun") {
+            hasSunWithPosition = state.equatorial.rightAscensionHours > 0.0
+                && state.equatorial.rightAscensionHours < 24.0
+                && std::abs(state.equatorial.declinationDeg) <= 90.0
+                && std::abs(state.horizontal.altitudeDeg) <= 90.0
+                && state.horizontal.azimuthDeg >= 0.0
+                && state.horizontal.azimuthDeg < 360.0;
+        }
+
+        if (state.body.id == "moon") {
+            hasMoonWithPosition = state.equatorial.rightAscensionHours > 0.0
+                && state.equatorial.rightAscensionHours < 24.0
+                && std::abs(state.equatorial.declinationDeg) <= 90.0
+                && std::abs(state.horizontal.altitudeDeg) <= 90.0
+                && state.horizontal.azimuthDeg >= 0.0
+                && state.horizontal.azimuthDeg < 360.0;
+        }
+
+        if (state.body.id == "sirius") {
+            hasSiriusWithFixedPosition = expectNear(
+                state.equatorial.rightAscensionHours,
+                6.7525,
+                1e-4,
+                "Sirius RA should match bundled fixed-star baseline"
+            ) && expectNear(
+                state.equatorial.declinationDeg,
+                -16.7161,
+                1e-4,
+                "Sirius Dec should match bundled fixed-star baseline"
+            );
+        }
+    }
+
+    success = expectTrue(hasSunWithPosition, "Engine should compute baseline Sun position") && success;
+    success = expectTrue(hasMoonWithPosition, "Engine should compute baseline Moon position") && success;
+    success = expectTrue(hasSiriusWithFixedPosition, "Engine should compute fixed-star baseline coordinates") && success;
+
+    skygate::core::SkyContext nextDayContext = context;
+    nextDayContext.utcTime += std::chrono::seconds(86400);
+    const auto nextDaySnapshot = engine->compute(nextDayContext);
+
+    for (const auto& state : snapshot.states) {
+        for (const auto& nextDayState : nextDaySnapshot.states) {
+            if (state.body.id != nextDayState.body.id) {
+                continue;
+            }
+
+            if (state.body.id == "sirius") {
+                success = expectNear(
+                    state.equatorial.rightAscensionHours,
+                    nextDayState.equatorial.rightAscensionHours,
+                    1e-8,
+                    "Fixed star RA should remain stable across time"
+                ) && success;
+                success = expectNear(
+                    state.equatorial.declinationDeg,
+                    nextDayState.equatorial.declinationDeg,
+                    1e-8,
+                    "Fixed star Dec should remain stable across time"
+                ) && success;
+            }
+
+            if (state.body.id == "sun") {
+                success = expectTrue(
+                    std::abs(state.equatorial.rightAscensionHours - nextDayState.equatorial.rightAscensionHours) > 1e-5,
+                    "Sun RA should change over a day"
+                ) && success;
+            }
+
+            if (state.body.id == "moon") {
+                success = expectTrue(
+                    std::abs(state.equatorial.rightAscensionHours - nextDayState.equatorial.rightAscensionHours) > 1e-4,
+                    "Moon RA should change over a day"
+                ) && success;
+            }
+        }
     }
 
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> nullCatalogEngine =
