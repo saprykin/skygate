@@ -1,5 +1,7 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Window
 
 ApplicationWindow {
     id: root
@@ -8,130 +10,39 @@ ApplicationWindow {
     visible: true
     title: "Skygate"
 
-    header: ToolBar {
-        Row {
-            id: toolbarRow
-            anchors.left: parent.left
-            anchors.leftMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-            Label {
-                id: utcDateLabel
-                text: "UTC Date"
-                anchors.verticalCenter: parent.verticalCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            TextField {
-                id: utcDateInput
-                width: 120
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "YYYY-MM-DD"
-                text: skyContext.utcDateText
-                onEditingFinished: skyContext.setUtcDateText(text)
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        text = skyContext.utcDateText
-                    }
-                }
-            }
-            Label {
-                id: utcTimeLabel
-                text: "UTC Time"
-                anchors.verticalCenter: parent.verticalCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            TextField {
-                id: utcTimeInput
-                width: 96
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "HH:MM:SS"
-                text: skyContext.utcTimeText
-                onEditingFinished: skyContext.setUtcTimeText(text)
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        text = skyContext.utcTimeText
-                    }
-                }
-            }
-            Label {
-                id: latitudeLabel
-                text: "Lat"
-                anchors.verticalCenter: parent.verticalCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            TextField {
-                id: latitudeInput
-                width: 96
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "-90..90"
-                text: skyContext.latitudeText
-                validator: DoubleValidator {
-                    bottom: -90.0
-                    top: 90.0
-                    notation: DoubleValidator.StandardNotation
-                }
-                onEditingFinished: skyContext.setLatitudeText(text)
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        text = skyContext.latitudeText
-                    }
-                }
-            }
-            Label {
-                id: longitudeLabel
-                text: "Lon"
-                anchors.verticalCenter: parent.verticalCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            TextField {
-                id: longitudeInput
-                width: 96
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "-180..180"
-                text: skyContext.longitudeText
-                validator: DoubleValidator {
-                    bottom: -180.0
-                    top: 180.0
-                    notation: DoubleValidator.StandardNotation
-                }
-                onEditingFinished: skyContext.setLongitudeText(text)
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        text = skyContext.longitudeText
-                    }
-                }
-            }
-            Label {
-                id: elevationLabel
-                text: "Elev (m)"
-                anchors.verticalCenter: parent.verticalCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            TextField {
-                id: elevationInput
-                width: 96
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "meters"
-                text: skyContext.elevationText
-                validator: DoubleValidator {
-                    notation: DoubleValidator.StandardNotation
-                }
-                onEditingFinished: skyContext.setElevationText(text)
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        text = skyContext.elevationText
-                    }
-                }
-            }
-        }
+    function syncSettingsFormFromContext() {
+        liveCheckBox.checked = skyContext.live
+        utcDateInput.text = skyContext.utcDateText
+        utcTimeInput.text = skyContext.utcTimeText
+        latitudeInput.text = skyContext.latitudeText
+        longitudeInput.text = skyContext.longitudeText
+        elevationInput.text = skyContext.elevationText
+        projectionCombo.currentIndex = Math.max(0, projectionCombo.model.indexOf(skyContext.projectionTypeText))
+    }
 
-        Button {
-            id: liveButton
-            anchors.right: parent.right
-            anchors.rightMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
-            text: skyContext.live ? "Live (On)" : "Live (Off)"
-            onClicked: skyContext.setLive(!skyContext.live)
+    function applySettingsFormToContext() {
+        skyContext.setUtcDateText(utcDateInput.text)
+        skyContext.setUtcTimeText(utcTimeInput.text)
+        skyContext.setLatitudeText(latitudeInput.text)
+        skyContext.setLongitudeText(longitudeInput.text)
+        skyContext.setElevationText(elevationInput.text)
+        skyContext.setProjectionTypeText(projectionCombo.currentText)
+        skyContext.setLive(liveCheckBox.checked)
+        syncSettingsFormFromContext()
+    }
+
+    menuBar: MenuBar {
+        Menu {
+            title: "&App"
+            MenuItem {
+                text: "&Preferences..."
+                onTriggered: {
+                    root.syncSettingsFormFromContext()
+                    preferencesWindow.visible = true
+                    preferencesWindow.raise()
+                    preferencesWindow.requestActivate()
+                }
+            }
         }
     }
 
@@ -160,6 +71,7 @@ ApplicationWindow {
                 text: "Lat " + skyContext.latitudeText
                       + " | Lon " + skyContext.longitudeText
                       + " | Elev " + skyContext.elevationText + " m"
+                      + " | Proj " + skyContext.projectionTypeText
                 color: "#9ab0d6"
                 elide: Text.ElideRight
                 width: Math.max(120, statusLeftRow.width - 320)
@@ -179,47 +91,190 @@ ApplicationWindow {
         }
     }
 
-    Connections {
-        target: skyContext
-        function onUtcDateTextChanged() {
-            if (!utcDateInput.activeFocus) {
-                utcDateInput.text = skyContext.utcDateText
+    Window {
+        id: preferencesWindow
+        title: "Preferences"
+        width: 680
+        height: 520
+        visible: false
+        transientParent: root
+        flags: Qt.Dialog
+
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "#111a30" }
+                GradientStop { position: 1.0; color: "#060d1b" }
             }
-        }
-        function onUtcTimeTextChanged() {
-            if (!utcTimeInput.activeFocus) {
-                utcTimeInput.text = skyContext.utcTimeText
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 32, 620)
+                height: Math.min(parent.height - 32, 460)
+                radius: 20
+                color: "#13203d"
+                border.width: 1
+                border.color: "#2e436f"
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 16
+
+                    Label {
+                        text: "Sky Preferences"
+                        color: "#e8f0ff"
+                        font.family: "Avenir Next"
+                        font.pixelSize: 28
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        text: "Observer, time, and projection settings"
+                        color: "#9bb1d9"
+                        font.family: "Avenir Next"
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        radius: 14
+                        color: "#0e1830"
+                        border.width: 1
+                        border.color: "#243b67"
+
+                        GridLayout {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            columns: 2
+                            rowSpacing: 10
+                            columnSpacing: 12
+
+                            Label {
+                                text: "Live updates"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            CheckBox {
+                                id: liveCheckBox
+                            }
+
+                            Label {
+                                text: "UTC Date"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            TextField {
+                                id: utcDateInput
+                                Layout.fillWidth: true
+                                placeholderText: "YYYY-MM-DD"
+                            }
+
+                            Label {
+                                text: "UTC Time"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            TextField {
+                                id: utcTimeInput
+                                Layout.fillWidth: true
+                                placeholderText: "HH:MM:SS"
+                            }
+
+                            Label {
+                                text: "Latitude"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            TextField {
+                                id: latitudeInput
+                                Layout.fillWidth: true
+                                placeholderText: "-90..90"
+                                validator: DoubleValidator {
+                                    bottom: -90.0
+                                    top: 90.0
+                                    notation: DoubleValidator.StandardNotation
+                                }
+                            }
+
+                            Label {
+                                text: "Longitude"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            TextField {
+                                id: longitudeInput
+                                Layout.fillWidth: true
+                                placeholderText: "-180..180"
+                                validator: DoubleValidator {
+                                    bottom: -180.0
+                                    top: 180.0
+                                    notation: DoubleValidator.StandardNotation
+                                }
+                            }
+
+                            Label {
+                                text: "Elevation (m)"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            TextField {
+                                id: elevationInput
+                                Layout.fillWidth: true
+                                placeholderText: "meters"
+                                validator: DoubleValidator {
+                                    notation: DoubleValidator.StandardNotation
+                                }
+                            }
+
+                            Label {
+                                text: "Projection"
+                                color: "#cad9f7"
+                                font.family: "Avenir Next"
+                            }
+                            ComboBox {
+                                id: projectionCombo
+                                Layout.fillWidth: true
+                                model: ["Stereographic", "AzimuthalEquidistant"]
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Button {
+                            text: "Load Saved"
+                            onClicked: {
+                                skyContext.loadSettings()
+                                root.syncSettingsFormFromContext()
+                            }
+                        }
+                        Button {
+                            text: "Save Current"
+                            onClicked: {
+                                root.applySettingsFormToContext()
+                                skyContext.saveSettings()
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                        }
+
+                        Button {
+                            text: "Close"
+                            onClicked: preferencesWindow.visible = false
+                        }
+                        Button {
+                            text: "Apply"
+                            highlighted: true
+                            onClicked: root.applySettingsFormToContext()
+                        }
+                    }
+                }
             }
-        }
-        function onLatitudeTextChanged() {
-            if (!latitudeInput.activeFocus) {
-                latitudeInput.text = skyContext.latitudeText
-            }
-        }
-        function onLongitudeTextChanged() {
-            if (!longitudeInput.activeFocus) {
-                longitudeInput.text = skyContext.longitudeText
-            }
-        }
-        function onElevationTextChanged() {
-            if (!elevationInput.activeFocus) {
-                elevationInput.text = skyContext.elevationText
-            }
-        }
-        function onInvalidUtcDateInput(utcDateText) {
-            utcDateInput.text = skyContext.utcDateText
-        }
-        function onInvalidUtcTimeInput(utcTimeText) {
-            utcTimeInput.text = skyContext.utcTimeText
-        }
-        function onInvalidLatitudeInput(latitudeText) {
-            latitudeInput.text = skyContext.latitudeText
-        }
-        function onInvalidLongitudeInput(longitudeText) {
-            longitudeInput.text = skyContext.longitudeText
-        }
-        function onInvalidElevationInput(elevationText) {
-            elevationInput.text = skyContext.elevationText
         }
     }
 
@@ -229,9 +284,10 @@ ApplicationWindow {
 
         Text {
             anchors.centerIn: parent
-            text: "Sky rendering placeholder"
+            text: "Sky rendering placeholder\n" + skyContext.projectionSampleText
             color: "#d7e3ff"
             font.pixelSize: 22
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 }

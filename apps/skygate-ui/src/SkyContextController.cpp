@@ -2,10 +2,14 @@
 
 #include <Qt>
 #include <QCoreApplication>
+#include <QSettings>
 #include <QTimeZone>
+
+#include "skygate/core/ProjectionFactory.hpp"
 
 #include <cmath>
 #include <chrono>
+#include <optional>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -17,6 +21,7 @@
 namespace {
 constexpr auto kTickIntervalMs = 1000;
 constexpr auto kLocationUpdateTimeoutMs = 5000;
+constexpr auto kSettingsVersion = 1;
 
 QString formatCoordinate(double value)
 {
@@ -26,6 +31,32 @@ QString formatCoordinate(double value)
 QString formatElevation(double value)
 {
     return QString::number(value, 'f', 1);
+}
+
+QString projectionTypeToString(const skygate::core::ProjectionType projectionType)
+{
+    switch (projectionType) {
+    case skygate::core::ProjectionType::Stereographic:
+        return "Stereographic";
+    case skygate::core::ProjectionType::AzimuthalEquidistant:
+        return "AzimuthalEquidistant";
+    }
+
+    return "Unknown";
+}
+
+std::optional<skygate::core::ProjectionType> projectionTypeFromString(const QString& value)
+{
+    const QString normalized = value.trimmed().toLower();
+    if (normalized == "stereographic") {
+        return skygate::core::ProjectionType::Stereographic;
+    }
+
+    if (normalized == "azimuthalequidistant") {
+        return skygate::core::ProjectionType::AzimuthalEquidistant;
+    }
+
+    return std::nullopt;
 }
 
 QDateTime toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
@@ -38,12 +69,19 @@ skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcTime)
 {
     return skygate::core::UtcTimePoint(std::chrono::seconds(utcTime.toSecsSinceEpoch()));
 }
+
+QString settingsKey(const QString& name)
+{
+    return QString("skyContext/%1").arg(name);
+}
 }
 
 SkyContextController::SkyContextController(QObject* parent)
     : QObject(parent)
 {
+    m_projection = skygate::core::createProjection(m_projectionType);
     m_skyContext.utcTime = toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
+    loadSettings();
 
     m_timer.setInterval(kTickIntervalMs);
     m_timer.setTimerType(Qt::PreciseTimer);
@@ -83,6 +121,36 @@ QString SkyContextController::elevationText() const
     return formatElevation(m_skyContext.observer.elevationMeters);
 }
 
+QString SkyContextController::projectionTypeText() const
+{
+    return projectionTypeToString(m_projectionType);
+}
+
+QString SkyContextController::projectionSampleText() const
+{
+    if (m_projection == nullptr) {
+        return "Projection unavailable";
+    }
+
+    skygate::core::ProjectionParams params;
+    params.center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0};
+    params.fovDeg = 90.0;
+    params.rollDeg = 0.0;
+    params.viewportWidth = 1100.0;
+    params.viewportHeight = 760.0;
+
+    const auto projected = m_projection->project(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = 30.0, .azimuthDeg = 180.0},
+        params
+    );
+
+    return QString("Sample x=%1 y=%2 visible=%3").arg(
+        QString::number(projected.x, 'f', 1),
+        QString::number(projected.y, 'f', 1),
+        projected.isVisible ? "true" : "false"
+    );
+}
+
 QString SkyContextController::locationStatusText() const
 {
     return m_locationStatusText;
@@ -91,13 +159,14 @@ QString SkyContextController::locationStatusText() const
 QString SkyContextController::skyContextSummary() const
 {
     return QString(
-        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m"
+        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6"
     ).arg(
         utcDateText(),
         utcTimeText(),
         latitudeText(),
         longitudeText(),
-        elevationText()
+        elevationText(),
+        projectionTypeText()
     );
 }
 
@@ -217,6 +286,17 @@ void SkyContextController::setElevationText(const QString& elevationText)
     m_skyContext.observer = nextObserver;
     emit elevationTextChanged();
     emit skyContextChanged();
+}
+
+void SkyContextController::setProjectionTypeText(const QString& projectionTypeText)
+{
+    const auto parsedType = projectionTypeFromString(projectionTypeText);
+    if (!parsedType.has_value()) {
+        emit projectionTypeChanged();
+        return;
+    }
+
+    setProjectionType(parsedType.value());
 }
 
 void SkyContextController::tickUtcTime()
@@ -368,4 +448,75 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
 #else
     (void)positionInfo;
 #endif
+}
+
+void SkyContextController::setProjectionType(const skygate::core::ProjectionType projectionType)
+{
+    if (m_projectionType == projectionType) {
+        return;
+    }
+
+    std::unique_ptr<skygate::core::IProjection> projection = skygate::core::createProjection(projectionType);
+    if (projection == nullptr) {
+        emit projectionTypeChanged();
+        return;
+    }
+
+    m_projectionType = projectionType;
+    m_projection = std::move(projection);
+    emit projectionTypeChanged();
+    emit skyContextChanged();
+}
+
+bool SkyContextController::saveSettings() const
+{
+    QSettings settings;
+    settings.setValue(settingsKey("version"), kSettingsVersion);
+    settings.setValue(settingsKey("live"), m_live);
+    settings.setValue(settingsKey("utcEpochSeconds"), toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch());
+    settings.setValue(settingsKey("latitudeDeg"), m_skyContext.observer.latitudeDeg);
+    settings.setValue(settingsKey("longitudeDeg"), m_skyContext.observer.longitudeDeg);
+    settings.setValue(settingsKey("elevationMeters"), m_skyContext.observer.elevationMeters);
+    settings.setValue(settingsKey("projectionType"), projectionTypeText());
+    settings.sync();
+    return settings.status() == QSettings::NoError;
+}
+
+bool SkyContextController::loadSettings()
+{
+    QSettings settings;
+    if (!settings.contains(settingsKey("version"))) {
+        return false;
+    }
+
+    const bool live = settings.value(settingsKey("live"), m_live).toBool();
+    const qint64 utcEpochSeconds = settings.value(
+        settingsKey("utcEpochSeconds"),
+        toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
+    ).toLongLong();
+    const double latitudeDeg = settings.value(
+        settingsKey("latitudeDeg"),
+        m_skyContext.observer.latitudeDeg
+    ).toDouble();
+    const double longitudeDeg = settings.value(
+        settingsKey("longitudeDeg"),
+        m_skyContext.observer.longitudeDeg
+    ).toDouble();
+    const double elevationMeters = settings.value(
+        settingsKey("elevationMeters"),
+        m_skyContext.observer.elevationMeters
+    ).toDouble();
+    const QString projectionType = settings.value(
+        settingsKey("projectionType"),
+        projectionTypeText()
+    ).toString();
+
+    setLive(live);
+    setCurrentUtc(QDateTime::fromSecsSinceEpoch(utcEpochSeconds, QTimeZone::UTC));
+    setLatitudeText(QString::number(latitudeDeg, 'f', 6));
+    setLongitudeText(QString::number(longitudeDeg, 'f', 6));
+    setElevationText(QString::number(elevationMeters, 'f', 1));
+    setProjectionTypeText(projectionType);
+
+    return true;
 }

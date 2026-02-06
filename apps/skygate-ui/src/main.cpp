@@ -7,6 +7,10 @@
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
+    QCoreApplication::setOrganizationName("Skygate");
+    QCoreApplication::setOrganizationDomain("skygate.app");
+    QCoreApplication::setApplicationName("Skygate");
+
     SkyContextController skyContextController;
 
     QQmlApplicationEngine engine;

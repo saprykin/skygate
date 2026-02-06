@@ -1,5 +1,6 @@
 add_library(skygate-core STATIC
     src/GeoLocation.cpp
+    src/ProjectionFactory.cpp
 )
 
 target_include_directories(skygate-core
