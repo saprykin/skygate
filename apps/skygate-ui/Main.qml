@@ -10,15 +10,30 @@ ApplicationWindow {
 
     header: ToolBar {
         Row {
+            id: toolbarRow
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
             padding: 8
 
-            Button { text: "Live" }
-            Button { text: "Pause" }
-            Label { text: "UTC Time" }
+            Button {
+                id: liveButton
+                text: "Live"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Button {
+                text: "Pause"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Label {
+                id: utcTimeLabel
+                text: "UTC Time"
+                anchors.verticalCenter: parent.verticalCenter
+                verticalAlignment: Text.AlignVCenter
+            }
             TextField {
+                id: utcTimeInput
                 width: 220
+                anchors.verticalCenter: parent.verticalCenter
                 placeholderText: "2026-02-06T22:00:00Z"
             }
         }
