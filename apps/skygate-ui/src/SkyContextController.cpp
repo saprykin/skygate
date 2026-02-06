@@ -130,6 +130,16 @@ bool SkyContextController::live() const noexcept
     return m_live;
 }
 
+double SkyContextController::speedMultiplier() const noexcept
+{
+    return m_speedMultiplier;
+}
+
+int SkyContextController::stepSeconds() const noexcept
+{
+    return m_stepSeconds;
+}
+
 QString SkyContextController::utcTimeText() const
 {
     return toQDateTimeUtc(m_skyContext.utcTime).toString("HH:mm:ss");
@@ -267,7 +277,56 @@ void SkyContextController::setLive(bool live)
     }
 
     m_live = live;
+    m_speedRemainderSeconds = 0.0;
     emit liveChanged();
+}
+
+void SkyContextController::togglePlayPause()
+{
+    setLive(!m_live);
+}
+
+void SkyContextController::setSpeedMultiplier(const double speedMultiplier)
+{
+    if (!std::isfinite(speedMultiplier) || speedMultiplier <= 0.0) {
+        emit speedMultiplierChanged();
+        return;
+    }
+
+    if (std::abs(m_speedMultiplier - speedMultiplier) < 1e-9) {
+        return;
+    }
+
+    m_speedMultiplier = speedMultiplier;
+    m_speedRemainderSeconds = 0.0;
+    emit speedMultiplierChanged();
+}
+
+void SkyContextController::setStepSeconds(const int stepSeconds)
+{
+    if (stepSeconds <= 0) {
+        emit stepSecondsChanged();
+        return;
+    }
+
+    if (m_stepSeconds == stepSeconds) {
+        return;
+    }
+
+    m_stepSeconds = stepSeconds;
+    emit stepSecondsChanged();
+}
+
+void SkyContextController::stepForward()
+{
+    setLive(false);
+    stepBySeconds(m_stepSeconds);
+}
+
+void SkyContextController::stepBackward()
+{
+    setLive(false);
+    stepBySeconds(-m_stepSeconds);
 }
 
 void SkyContextController::setUtcDateText(const QString& utcDateText)
@@ -390,7 +449,27 @@ void SkyContextController::tickUtcTime()
         return;
     }
 
-    setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime).addSecs(1));
+    m_speedRemainderSeconds += m_speedMultiplier;
+    const int wholeSeconds = static_cast<int>(std::floor(m_speedRemainderSeconds));
+    if (wholeSeconds <= 0) {
+        return;
+    }
+
+    m_speedRemainderSeconds -= wholeSeconds;
+    stepBySeconds(wholeSeconds);
+}
+
+void SkyContextController::stepBySeconds(const int stepSeconds)
+{
+    if (stepSeconds == 0) {
+        return;
+    }
+
+    if (!m_live) {
+        m_speedRemainderSeconds = 0.0;
+    }
+
+    setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime).addSecs(stepSeconds));
 }
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
@@ -558,6 +637,8 @@ bool SkyContextController::saveSettings() const
     QSettings settings;
     settings.setValue(settingsKey("version"), kSettingsVersion);
     settings.setValue(settingsKey("live"), m_live);
+    settings.setValue(settingsKey("speedMultiplier"), m_speedMultiplier);
+    settings.setValue(settingsKey("stepSeconds"), m_stepSeconds);
     settings.setValue(settingsKey("utcEpochSeconds"), toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch());
     settings.setValue(settingsKey("latitudeDeg"), m_skyContext.observer.latitudeDeg);
     settings.setValue(settingsKey("longitudeDeg"), m_skyContext.observer.longitudeDeg);
@@ -575,6 +656,14 @@ bool SkyContextController::loadSettings()
     }
 
     const bool live = settings.value(settingsKey("live"), m_live).toBool();
+    const double speedMultiplier = settings.value(
+        settingsKey("speedMultiplier"),
+        m_speedMultiplier
+    ).toDouble();
+    const int stepSeconds = settings.value(
+        settingsKey("stepSeconds"),
+        m_stepSeconds
+    ).toInt();
     const qint64 utcEpochSeconds = settings.value(
         settingsKey("utcEpochSeconds"),
         toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
@@ -597,6 +686,8 @@ bool SkyContextController::loadSettings()
     ).toString();
 
     setLive(live);
+    setSpeedMultiplier(speedMultiplier);
+    setStepSeconds(stepSeconds);
     setCurrentUtc(QDateTime::fromSecsSinceEpoch(utcEpochSeconds, QTimeZone::UTC));
     setLatitudeText(QString::number(latitudeDeg, 'f', 6));
     setLongitudeText(QString::number(longitudeDeg, 'f', 6));

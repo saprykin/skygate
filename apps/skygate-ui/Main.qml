@@ -21,6 +21,19 @@ ApplicationWindow {
         projectionCombo.currentIndex = Math.max(0, projectionCombo.model.indexOf(skyContext.projectionTypeText))
     }
 
+    function nearestIndex(values, target) {
+        let nearest = 0
+        let nearestDistance = Math.abs(values[0] - target)
+        for (let i = 1; i < values.length; ++i) {
+            const distance = Math.abs(values[i] - target)
+            if (distance < nearestDistance) {
+                nearest = i
+                nearestDistance = distance
+            }
+        }
+        return nearest
+    }
+
     function applySettingsFormToContext() {
         skyContext.setUtcDateText(utcDateInput.text)
         skyContext.setUtcTimeText(utcTimeInput.text)
@@ -48,7 +61,7 @@ ApplicationWindow {
     }
 
     footer: Rectangle {
-        height: 40
+        height: 48
         color: "#0b1428"
 
         Row {
@@ -90,6 +103,33 @@ ApplicationWindow {
             color: "#d7e3ff"
             font.family: "monospace"
         }
+    }
+
+    Connections {
+        target: skyContext
+        function onSpeedMultiplierChanged() {
+            speedCombo.currentIndex = root.nearestIndex(
+                timelineToolbarRow.speedValues,
+                skyContext.speedMultiplier
+            )
+        }
+        function onStepSecondsChanged() {
+            stepCombo.currentIndex = root.nearestIndex(
+                timelineToolbarRow.stepValues,
+                skyContext.stepSeconds
+            )
+        }
+    }
+
+    Component.onCompleted: {
+        speedCombo.currentIndex = root.nearestIndex(
+            timelineToolbarRow.speedValues,
+            skyContext.speedMultiplier
+        )
+        stepCombo.currentIndex = root.nearestIndex(
+            timelineToolbarRow.stepValues,
+            skyContext.stepSeconds
+        )
     }
 
     Window {
@@ -312,6 +352,77 @@ ApplicationWindow {
                 text: skyContext.skyContextSummary
                 color: "#cbd9f6"
                 font.family: "Avenir Next"
+            }
+        }
+
+        Rectangle {
+            id: timelineToolbar
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: 14
+            width: timelineToolbarRow.implicitWidth + 16
+            height: timelineToolbarRow.implicitHeight + 14
+            radius: 10
+            color: "#7f0b1428"
+            border.width: 1
+            border.color: "#335177"
+
+            Row {
+                id: timelineToolbarRow
+                anchors.centerIn: parent
+                spacing: 6
+
+                property var speedValues: [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
+                property var stepValues: [1, 10, 60, 300, 3600]
+
+                Label {
+                    text: "Timeline"
+                    color: "#cad9f7"
+                    anchors.verticalCenter: parent.verticalCenter
+                    font.family: "Avenir Next"
+                }
+
+                Button {
+                    text: skyContext.live ? "Pause" : "Play"
+                    onClicked: skyContext.togglePlayPause()
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: skyContext.live
+                        ? "Pause live timeline updates"
+                        : "Resume live timeline updates"
+                }
+                Button {
+                    text: "<"
+                    onClicked: skyContext.stepBackward()
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Step backward by selected interval"
+                }
+                Button {
+                    text: ">"
+                    onClicked: skyContext.stepForward()
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Step forward by selected interval"
+                }
+                ComboBox {
+                    id: speedCombo
+                    model: ["0.25x", "0.5x", "1x", "2x", "4x", "8x"]
+                    implicitWidth: 78
+                    onActivated: skyContext.setSpeedMultiplier(timelineToolbarRow.speedValues[currentIndex])
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Set live timeline speed multiplier"
+                }
+                ComboBox {
+                    id: stepCombo
+                    model: ["1s", "10s", "1m", "5m", "1h"]
+                    implicitWidth: 74
+                    onActivated: skyContext.setStepSeconds(timelineToolbarRow.stepValues[currentIndex])
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Set manual step interval"
+                }
             }
         }
     }

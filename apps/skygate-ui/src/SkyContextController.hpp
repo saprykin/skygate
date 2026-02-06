@@ -19,6 +19,8 @@ class QGeoPositionInfoSource;
 class SkyContextController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool live READ live WRITE setLive NOTIFY liveChanged)
+    Q_PROPERTY(double speedMultiplier READ speedMultiplier WRITE setSpeedMultiplier NOTIFY speedMultiplierChanged)
+    Q_PROPERTY(int stepSeconds READ stepSeconds WRITE setStepSeconds NOTIFY stepSecondsChanged)
     Q_PROPERTY(QString utcDateText READ utcDateText NOTIFY utcDateTextChanged)
     Q_PROPERTY(QString utcTimeText READ utcTimeText NOTIFY utcTimeTextChanged)
     Q_PROPERTY(QString latitudeText READ latitudeText NOTIFY latitudeTextChanged)
@@ -45,6 +47,8 @@ public:
     );
 
     [[nodiscard]] bool live() const noexcept;
+    [[nodiscard]] double speedMultiplier() const noexcept;
+    [[nodiscard]] int stepSeconds() const noexcept;
     [[nodiscard]] QString utcDateText() const;
     [[nodiscard]] QString utcTimeText() const;
     [[nodiscard]] QString latitudeText() const;
@@ -61,6 +65,11 @@ public:
     ) const;
 
     Q_INVOKABLE void setLive(bool live);
+    Q_INVOKABLE void togglePlayPause();
+    Q_INVOKABLE void setSpeedMultiplier(double speedMultiplier);
+    Q_INVOKABLE void setStepSeconds(int stepSeconds);
+    Q_INVOKABLE void stepForward();
+    Q_INVOKABLE void stepBackward();
     Q_INVOKABLE void setUtcDateText(const QString& utcDateText);
     Q_INVOKABLE void setUtcTimeText(const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
@@ -72,6 +81,8 @@ public:
 
 signals:
     void liveChanged();
+    void speedMultiplierChanged();
+    void stepSecondsChanged();
     void utcDateTextChanged();
     void utcTimeTextChanged();
     void latitudeTextChanged();
@@ -88,6 +99,7 @@ signals:
 
 private:
     void tickUtcTime();
+    void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
     void initializeCurrentLocation();
     void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
@@ -95,6 +107,9 @@ private:
 
 private:
     bool m_live = true;
+    double m_speedMultiplier = 1.0;
+    double m_speedRemainderSeconds = 0.0;
+    int m_stepSeconds = 60;
     QTimer m_timer;
     skygate::core::SkyContext m_skyContext;
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
