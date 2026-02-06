@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <optional>
 
@@ -255,6 +256,10 @@ public:
         for (const auto& body : bodies) {
             CelestialBodyState state;
             state.body = body;
+            state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
+            state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
+            state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
+            state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
 
             if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
                 state.equatorial = *equatorial;

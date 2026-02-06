@@ -21,6 +21,9 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(bool live READ live WRITE setLive NOTIFY liveChanged)
     Q_PROPERTY(double speedMultiplier READ speedMultiplier WRITE setSpeedMultiplier NOTIFY speedMultiplierChanged)
     Q_PROPERTY(int stepSeconds READ stepSeconds WRITE setStepSeconds NOTIFY stepSecondsChanged)
+    Q_PROPERTY(double magnitudeCutoff READ magnitudeCutoff WRITE setMagnitudeCutoff NOTIFY magnitudeCutoffChanged)
+    Q_PROPERTY(double viewCenterAltitudeDeg READ viewCenterAltitudeDeg NOTIFY viewDirectionChanged)
+    Q_PROPERTY(double viewCenterAzimuthDeg READ viewCenterAzimuthDeg NOTIFY viewDirectionChanged)
     Q_PROPERTY(QString utcDateText READ utcDateText NOTIFY utcDateTextChanged)
     Q_PROPERTY(QString utcTimeText READ utcTimeText NOTIFY utcTimeTextChanged)
     Q_PROPERTY(QString latitudeText READ latitudeText NOTIFY latitudeTextChanged)
@@ -49,6 +52,9 @@ public:
     [[nodiscard]] bool live() const noexcept;
     [[nodiscard]] double speedMultiplier() const noexcept;
     [[nodiscard]] int stepSeconds() const noexcept;
+    [[nodiscard]] double magnitudeCutoff() const noexcept;
+    [[nodiscard]] double viewCenterAltitudeDeg() const noexcept;
+    [[nodiscard]] double viewCenterAzimuthDeg() const noexcept;
     [[nodiscard]] QString utcDateText() const;
     [[nodiscard]] QString utcTimeText() const;
     [[nodiscard]] QString latitudeText() const;
@@ -63,11 +69,20 @@ public:
         double viewportWidth,
         double viewportHeight
     ) const;
+    [[nodiscard]] skygate::core::ScreenPoint projectHorizontal(
+        const skygate::core::HorizontalCoordinate& coordinate,
+        double viewportWidth,
+        double viewportHeight
+    ) const noexcept;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void togglePlayPause();
     Q_INVOKABLE void setSpeedMultiplier(double speedMultiplier);
     Q_INVOKABLE void setStepSeconds(int stepSeconds);
+    Q_INVOKABLE void setMagnitudeCutoff(double magnitudeCutoff);
+    Q_INVOKABLE void setViewCenter(double altitudeDeg, double azimuthDeg);
+    Q_INVOKABLE void panViewBy(double deltaAzimuthDeg, double deltaAltitudeDeg);
+    Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
     Q_INVOKABLE void setUtcDateText(const QString& utcDateText);
@@ -78,11 +93,16 @@ public:
     Q_INVOKABLE void setProjectionTypeText(const QString& projectionTypeText);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
+    Q_INVOKABLE double projectedX(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
+    Q_INVOKABLE double projectedY(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
+    Q_INVOKABLE bool isProjectedVisible(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
 
 signals:
     void liveChanged();
     void speedMultiplierChanged();
     void stepSecondsChanged();
+    void magnitudeCutoffChanged();
+    void viewDirectionChanged();
     void utcDateTextChanged();
     void utcTimeTextChanged();
     void latitudeTextChanged();
@@ -110,6 +130,9 @@ private:
     double m_speedMultiplier = 1.0;
     double m_speedRemainderSeconds = 0.0;
     int m_stepSeconds = 60;
+    double m_magnitudeCutoff = 6.0;
+    double m_viewCenterAltitudeDeg = 45.0;
+    double m_viewCenterAzimuthDeg = 180.0;
     QTimer m_timer;
     skygate::core::SkyContext m_skyContext;
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;

@@ -25,9 +25,13 @@ namespace {
 constexpr auto kTickIntervalMs = 1000;
 constexpr auto kLocationUpdateTimeoutMs = 5000;
 constexpr auto kSettingsVersion = 1;
-constexpr double kViewportCenterAltitudeDeg = 45.0;
-constexpr double kViewportCenterAzimuthDeg = 180.0;
+constexpr double kDefaultViewportCenterAltitudeDeg = 45.0;
+constexpr double kDefaultViewportCenterAzimuthDeg = 180.0;
 constexpr double kViewportFieldOfViewDeg = 100.0;
+constexpr double kMagnitudeCutoffMin = -2.0;
+constexpr double kMagnitudeCutoffMax = 12.0;
+constexpr double kViewAltitudeMinDeg = -90.0;
+constexpr double kViewAltitudeMaxDeg = 90.0;
 
 QString formatCoordinate(double value)
 {
@@ -102,6 +106,40 @@ QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
 
     return QColor(220, 220, 240, 200);
 }
+
+double normalizeAzimuthDeg(double azimuthDeg)
+{
+    const double normalized = std::fmod(azimuthDeg, 360.0);
+    if (normalized < 0.0) {
+        return normalized + 360.0;
+    }
+
+    return normalized;
+}
+
+double clampAltitudeDeg(const double altitudeDeg)
+{
+    return std::clamp(altitudeDeg, kViewAltitudeMinDeg, kViewAltitudeMaxDeg);
+}
+
+skygate::core::ProjectionParams buildProjectionParams(
+    const double viewportWidth,
+    const double viewportHeight,
+    const double centerAltitudeDeg,
+    const double centerAzimuthDeg
+)
+{
+    skygate::core::ProjectionParams projectionParams;
+    projectionParams.center = {
+        .altitudeDeg = centerAltitudeDeg,
+        .azimuthDeg = centerAzimuthDeg
+    };
+    projectionParams.fovDeg = kViewportFieldOfViewDeg;
+    projectionParams.rollDeg = 0.0;
+    projectionParams.viewportWidth = viewportWidth;
+    projectionParams.viewportHeight = viewportHeight;
+    return projectionParams;
+}
 }
 
 SkyContextController::SkyContextController(
@@ -138,6 +176,21 @@ double SkyContextController::speedMultiplier() const noexcept
 int SkyContextController::stepSeconds() const noexcept
 {
     return m_stepSeconds;
+}
+
+double SkyContextController::magnitudeCutoff() const noexcept
+{
+    return m_magnitudeCutoff;
+}
+
+double SkyContextController::viewCenterAltitudeDeg() const noexcept
+{
+    return m_viewCenterAltitudeDeg;
+}
+
+double SkyContextController::viewCenterAzimuthDeg() const noexcept
+{
+    return m_viewCenterAzimuthDeg;
 }
 
 QString SkyContextController::utcTimeText() const
@@ -177,7 +230,7 @@ QString SkyContextController::projectionSampleText() const
     }
 
     skygate::core::ProjectionParams params;
-    params.center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0};
+    params.center = {.altitudeDeg = m_viewCenterAltitudeDeg, .azimuthDeg = m_viewCenterAzimuthDeg};
     params.fovDeg = 90.0;
     params.rollDeg = 0.0;
     params.viewportWidth = 1100.0;
@@ -209,7 +262,7 @@ QString SkyContextController::skyContextSummary() const
     }
 
     return QString(
-        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6 | Bodies %7"
+        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6 | View Alt %7 Az %8 | Bodies %9"
     ).arg(
         utcDateText(),
         utcTimeText(),
@@ -217,6 +270,8 @@ QString SkyContextController::skyContextSummary() const
         longitudeText(),
         elevationText(),
         projectionTypeText(),
+        QString::number(m_viewCenterAltitudeDeg, 'f', 1),
+        QString::number(m_viewCenterAzimuthDeg, 'f', 1),
         bodyCountText
     );
 }
@@ -239,21 +294,32 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
         return {};
     }
 
-    skygate::core::ProjectionParams projectionParams;
-    projectionParams.center = {
-        .altitudeDeg = kViewportCenterAltitudeDeg,
-        .azimuthDeg = kViewportCenterAzimuthDeg
-    };
-    projectionParams.fovDeg = kViewportFieldOfViewDeg;
-    projectionParams.rollDeg = 0.0;
-    projectionParams.viewportWidth = viewportWidth;
-    projectionParams.viewportHeight = viewportHeight;
+    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+        viewportWidth,
+        viewportHeight,
+        m_viewCenterAltitudeDeg,
+        m_viewCenterAzimuthDeg
+    );
 
     const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
     std::vector<SkyRenderPoint> points;
     points.reserve(snapshot.states.size());
 
     for (const auto& state : snapshot.states) {
+        if (
+            !std::isfinite(state.horizontal.altitudeDeg)
+            || !std::isfinite(state.horizontal.azimuthDeg)
+        ) {
+            continue;
+        }
+
+        if (
+            state.body.type == skygate::ephemeris::CelestialBodyType::Star
+            && state.body.visualMagnitude > m_magnitudeCutoff
+        ) {
+            continue;
+        }
+
         const auto projected = m_projection->project(state.horizontal, projectionParams);
         if (!projected.isVisible) {
             continue;
@@ -268,6 +334,25 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
     }
 
     return points;
+}
+
+skygate::core::ScreenPoint SkyContextController::projectHorizontal(
+    const skygate::core::HorizontalCoordinate& coordinate,
+    const double viewportWidth,
+    const double viewportHeight
+) const noexcept
+{
+    if (m_projection == nullptr || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return {};
+    }
+
+    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+        viewportWidth,
+        viewportHeight,
+        m_viewCenterAltitudeDeg,
+        m_viewCenterAzimuthDeg
+    );
+    return m_projection->project(coordinate, projectionParams);
 }
 
 void SkyContextController::setLive(bool live)
@@ -315,6 +400,63 @@ void SkyContextController::setStepSeconds(const int stepSeconds)
 
     m_stepSeconds = stepSeconds;
     emit stepSecondsChanged();
+}
+
+void SkyContextController::setMagnitudeCutoff(const double magnitudeCutoff)
+{
+    if (!std::isfinite(magnitudeCutoff)) {
+        emit magnitudeCutoffChanged();
+        return;
+    }
+
+    const double clamped = std::clamp(magnitudeCutoff, kMagnitudeCutoffMin, kMagnitudeCutoffMax);
+    if (std::abs(m_magnitudeCutoff - clamped) < 1e-9) {
+        return;
+    }
+
+    m_magnitudeCutoff = clamped;
+    emit magnitudeCutoffChanged();
+    emit skyContextChanged();
+}
+
+void SkyContextController::setViewCenter(const double altitudeDeg, const double azimuthDeg)
+{
+    if (!std::isfinite(altitudeDeg) || !std::isfinite(azimuthDeg)) {
+        emit viewDirectionChanged();
+        return;
+    }
+
+    const double nextAltitudeDeg = clampAltitudeDeg(altitudeDeg);
+    const double nextAzimuthDeg = normalizeAzimuthDeg(azimuthDeg);
+    if (
+        std::abs(m_viewCenterAltitudeDeg - nextAltitudeDeg) < 1e-9
+        && std::abs(m_viewCenterAzimuthDeg - nextAzimuthDeg) < 1e-9
+    ) {
+        return;
+    }
+
+    m_viewCenterAltitudeDeg = nextAltitudeDeg;
+    m_viewCenterAzimuthDeg = nextAzimuthDeg;
+    emit viewDirectionChanged();
+    emit skyContextChanged();
+}
+
+void SkyContextController::panViewBy(const double deltaAzimuthDeg, const double deltaAltitudeDeg)
+{
+    if (!std::isfinite(deltaAzimuthDeg) || !std::isfinite(deltaAltitudeDeg)) {
+        emit viewDirectionChanged();
+        return;
+    }
+
+    setViewCenter(
+        m_viewCenterAltitudeDeg + deltaAltitudeDeg,
+        m_viewCenterAzimuthDeg + deltaAzimuthDeg
+    );
+}
+
+void SkyContextController::resetViewDirection()
+{
+    setViewCenter(kDefaultViewportCenterAltitudeDeg, kDefaultViewportCenterAzimuthDeg);
 }
 
 void SkyContextController::stepForward()
@@ -639,6 +781,9 @@ bool SkyContextController::saveSettings() const
     settings.setValue(settingsKey("live"), m_live);
     settings.setValue(settingsKey("speedMultiplier"), m_speedMultiplier);
     settings.setValue(settingsKey("stepSeconds"), m_stepSeconds);
+    settings.setValue(settingsKey("magnitudeCutoff"), m_magnitudeCutoff);
+    settings.setValue(settingsKey("viewCenterAltitudeDeg"), m_viewCenterAltitudeDeg);
+    settings.setValue(settingsKey("viewCenterAzimuthDeg"), m_viewCenterAzimuthDeg);
     settings.setValue(settingsKey("utcEpochSeconds"), toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch());
     settings.setValue(settingsKey("latitudeDeg"), m_skyContext.observer.latitudeDeg);
     settings.setValue(settingsKey("longitudeDeg"), m_skyContext.observer.longitudeDeg);
@@ -664,6 +809,18 @@ bool SkyContextController::loadSettings()
         settingsKey("stepSeconds"),
         m_stepSeconds
     ).toInt();
+    const double magnitudeCutoff = settings.value(
+        settingsKey("magnitudeCutoff"),
+        m_magnitudeCutoff
+    ).toDouble();
+    const double viewCenterAltitudeDeg = settings.value(
+        settingsKey("viewCenterAltitudeDeg"),
+        m_viewCenterAltitudeDeg
+    ).toDouble();
+    const double viewCenterAzimuthDeg = settings.value(
+        settingsKey("viewCenterAzimuthDeg"),
+        m_viewCenterAzimuthDeg
+    ).toDouble();
     const qint64 utcEpochSeconds = settings.value(
         settingsKey("utcEpochSeconds"),
         toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
@@ -688,6 +845,8 @@ bool SkyContextController::loadSettings()
     setLive(live);
     setSpeedMultiplier(speedMultiplier);
     setStepSeconds(stepSeconds);
+    setMagnitudeCutoff(magnitudeCutoff);
+    setViewCenter(viewCenterAltitudeDeg, viewCenterAzimuthDeg);
     setCurrentUtc(QDateTime::fromSecsSinceEpoch(utcEpochSeconds, QTimeZone::UTC));
     setLatitudeText(QString::number(latitudeDeg, 'f', 6));
     setLongitudeText(QString::number(longitudeDeg, 'f', 6));
@@ -695,4 +854,46 @@ bool SkyContextController::loadSettings()
     setProjectionTypeText(projectionType);
 
     return true;
+}
+
+double SkyContextController::projectedX(
+    const double altitudeDeg,
+    const double azimuthDeg,
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    return projectHorizontal(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg},
+        viewportWidth,
+        viewportHeight
+    ).x;
+}
+
+double SkyContextController::projectedY(
+    const double altitudeDeg,
+    const double azimuthDeg,
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    return projectHorizontal(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg},
+        viewportWidth,
+        viewportHeight
+    ).y;
+}
+
+bool SkyContextController::isProjectedVisible(
+    const double altitudeDeg,
+    const double azimuthDeg,
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    return projectHorizontal(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg},
+        viewportWidth,
+        viewportHeight
+    ).isVisible;
 }

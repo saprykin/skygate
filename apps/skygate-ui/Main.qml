@@ -34,6 +34,28 @@ ApplicationWindow {
         return nearest
     }
 
+    function normalizeAzimuth(azimuthDeg) {
+        let normalized = azimuthDeg % 360.0
+        if (normalized < 0.0) {
+            normalized += 360.0
+        }
+        return normalized
+    }
+
+    function cardinalLabel(azimuthDeg) {
+        const normalized = normalizeAzimuth(azimuthDeg)
+        if (normalized >= 315.0 || normalized < 45.0) {
+            return "N"
+        }
+        if (normalized < 135.0) {
+            return "E"
+        }
+        if (normalized < 225.0) {
+            return "S"
+        }
+        return "W"
+    }
+
     function applySettingsFormToContext() {
         skyContext.setUtcDateText(utcDateInput.text)
         skyContext.setUtcTimeText(utcTimeInput.text)
@@ -86,6 +108,9 @@ ApplicationWindow {
                       + " | Lon " + skyContext.longitudeText
                       + " | Elev " + skyContext.elevationText + " m"
                       + " | Proj " + skyContext.projectionTypeText
+                      + " | View Alt " + Number(skyContext.viewCenterAltitudeDeg).toFixed(1)
+                      + " Az " + Number(skyContext.viewCenterAzimuthDeg).toFixed(1)
+                      + " | Mag ≤ " + Number(skyContext.magnitudeCutoff).toFixed(1)
                 color: "#9ab0d6"
                 elide: Text.ElideRight
                 width: Math.max(120, statusLeftRow.width - 320)
@@ -119,6 +144,12 @@ ApplicationWindow {
                 skyContext.stepSeconds
             )
         }
+        function onMagnitudeCutoffChanged() {
+            magnitudeCombo.currentIndex = root.nearestIndex(
+                timelineToolbarRow.magnitudeValues,
+                skyContext.magnitudeCutoff
+            )
+        }
     }
 
     Component.onCompleted: {
@@ -129,6 +160,10 @@ ApplicationWindow {
         stepCombo.currentIndex = root.nearestIndex(
             timelineToolbarRow.stepValues,
             skyContext.stepSeconds
+        )
+        magnitudeCombo.currentIndex = root.nearestIndex(
+            timelineToolbarRow.magnitudeValues,
+            skyContext.magnitudeCutoff
         )
     }
 
@@ -332,27 +367,48 @@ ApplicationWindow {
             skyContextController: skyContext
         }
 
-        Rectangle {
-            id: summaryBadge
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.margins: 14
-            width: summaryLabel.implicitWidth + 16
-            height: summaryLabel.implicitHeight + 16
-            radius: 10
-            color: "#7f0b1428"
-            border.width: 1
-            border.color: "#335177"
+        MouseArea {
+            id: viewPanArea
+            anchors.fill: skyViewport
+            hoverEnabled: true
+            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
-            Label {
-                id: summaryLabel
-                anchors.left: parent.left
-                anchors.leftMargin: 8
-                anchors.verticalCenter: parent.verticalCenter
-                text: skyContext.skyContextSummary
-                color: "#cbd9f6"
-                font.family: "Avenir Next"
+            property real lastX: 0
+            property real lastY: 0
+            readonly property real azimuthSensitivity: 0.18
+            readonly property real altitudeSensitivity: 0.18
+
+            onPressed: function(mouse) {
+                lastX = mouse.x
+                lastY = mouse.y
             }
+            onPositionChanged: function(mouse) {
+                if (!(mouse.buttons & Qt.LeftButton)) {
+                    return
+                }
+
+                const deltaX = mouse.x - lastX
+                const deltaY = mouse.y - lastY
+                skyContext.panViewBy(-deltaX * azimuthSensitivity, -deltaY * altitudeSensitivity)
+                lastX = mouse.x
+                lastY = mouse.y
+            }
+        }
+
+        Label {
+            id: horizonDirectionLabel
+            readonly property real viewAltitudeDeg: skyContext.viewCenterAltitudeDeg
+            readonly property real viewAzimuthDeg: skyContext.viewCenterAzimuthDeg
+            readonly property real markerX: skyContext.projectedX(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            readonly property real markerY: skyContext.projectedY(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+
+            text: root.cardinalLabel(viewAzimuthDeg)
+            color: "#c8ddff"
+            font.family: "Avenir Next"
+            font.bold: true
+            visible: skyContext.isProjectedVisible(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            x: markerX - (implicitWidth * 0.5)
+            y: markerY - implicitHeight - 6
         }
 
         Rectangle {
@@ -374,6 +430,7 @@ ApplicationWindow {
 
                 property var speedValues: [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
                 property var stepValues: [1, 10, 60, 300, 3600]
+                property var magnitudeValues: [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
 
                 Label {
                     text: "Timeline"
@@ -422,6 +479,22 @@ ApplicationWindow {
                     ToolTip.visible: hovered
                     ToolTip.delay: 250
                     ToolTip.text: "Set manual step interval"
+                }
+                Button {
+                    text: "Reset"
+                    onClicked: skyContext.resetViewDirection()
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Reset view direction to default south-up framing"
+                }
+                ComboBox {
+                    id: magnitudeCombo
+                    model: ["2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0"]
+                    implicitWidth: 70
+                    onActivated: skyContext.setMagnitudeCutoff(timelineToolbarRow.magnitudeValues[currentIndex])
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Set star visual magnitude limit (higher value shows more stars)"
                 }
             }
         }

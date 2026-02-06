@@ -8,7 +8,37 @@
 #include <QSGGeometryNode>
 #include <QSGNode>
 
+#include <algorithm>
+
 namespace {
+constexpr int kHorizonSampleCount = 96;
+
+void appendLineSegmentNode(
+    QSGNode* rootNode,
+    const float x1,
+    const float y1,
+    const float x2,
+    const float y2,
+    const QColor& color
+)
+{
+    QSGGeometryNode* node = new QSGGeometryNode();
+    QSGGeometry* geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), 2);
+    geometry->setDrawingMode(QSGGeometry::DrawLines);
+
+    auto* vertices = geometry->vertexDataAsPoint2D();
+    vertices[0].set(x1, y1);
+    vertices[1].set(x2, y2);
+
+    QSGFlatColorMaterial* material = new QSGFlatColorMaterial();
+    material->setColor(color);
+
+    node->setGeometry(geometry);
+    node->setMaterial(material);
+    node->setFlag(QSGNode::OwnsGeometry, true);
+    node->setFlag(QSGNode::OwnsMaterial, true);
+    rootNode->appendChildNode(node);
+}
 
 void clearChildNodes(QSGNode* rootNode)
 {
@@ -83,7 +113,51 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         return rootNode;
     }
 
-    const auto points = m_skyContextController->renderPoints(width(), height());
+    const double viewportWidth = width();
+    const double viewportHeight = height();
+    const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.30;
+    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
+    bool hasPreviousHorizonPoint = false;
+    auto previousHorizonPoint = m_skyContextController->projectHorizontal(
+        {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
+        viewportWidth,
+        viewportHeight
+    );
+
+    for (int index = 0; index <= kHorizonSampleCount; ++index) {
+        const double azimuthDeg = (360.0 * static_cast<double>(index)) / static_cast<double>(kHorizonSampleCount);
+        const auto projected = m_skyContextController->projectHorizontal(
+            {.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg},
+            viewportWidth,
+            viewportHeight
+        );
+
+        if (!projected.isVisible) {
+            hasPreviousHorizonPoint = false;
+            continue;
+        }
+
+        if (hasPreviousHorizonPoint) {
+            const double deltaX = projected.x - previousHorizonPoint.x;
+            const double deltaY = projected.y - previousHorizonPoint.y;
+            const double segmentLengthSquared = deltaX * deltaX + deltaY * deltaY;
+            if (segmentLengthSquared <= maxSegmentLengthSquared) {
+                appendLineSegmentNode(
+                    rootNode,
+                    static_cast<float>(previousHorizonPoint.x),
+                    static_cast<float>(previousHorizonPoint.y),
+                    static_cast<float>(projected.x),
+                    static_cast<float>(projected.y),
+                    QColor(110, 156, 216, 170)
+                );
+            }
+        }
+
+        previousHorizonPoint = projected;
+        hasPreviousHorizonPoint = true;
+    }
+
+    const auto points = m_skyContextController->renderPoints(viewportWidth, viewportHeight);
 
     for (const auto& point : points) {
         QSGGeometryNode* node = new QSGGeometryNode();
