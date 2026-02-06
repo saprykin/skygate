@@ -5,6 +5,7 @@
 #include <QTimeZone>
 
 #include <cmath>
+#include <chrono>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -26,12 +27,23 @@ QString formatElevation(double value)
 {
     return QString::number(value, 'f', 1);
 }
+
+QDateTime toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
+{
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(utcTime.time_since_epoch());
+    return QDateTime::fromSecsSinceEpoch(seconds.count(), QTimeZone::UTC);
+}
+
+skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcTime)
+{
+    return skygate::core::UtcTimePoint(std::chrono::seconds(utcTime.toSecsSinceEpoch()));
+}
 }
 
 SkyContextController::SkyContextController(QObject* parent)
     : QObject(parent)
 {
-    m_currentUtc = QDateTime::currentDateTimeUtc().toUTC();
+    m_skyContext.utcTime = toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
 
     m_timer.setInterval(kTickIntervalMs);
     m_timer.setTimerType(Qt::PreciseTimer);
@@ -48,32 +60,50 @@ bool SkyContextController::live() const noexcept
 
 QString SkyContextController::utcTimeText() const
 {
-    return m_currentUtc.toString("HH:mm:ss");
+    return toQDateTimeUtc(m_skyContext.utcTime).toString("HH:mm:ss");
 }
 
 QString SkyContextController::utcDateText() const
 {
-    return m_currentUtc.toString("yyyy-MM-dd");
+    return toQDateTimeUtc(m_skyContext.utcTime).toString("yyyy-MM-dd");
 }
 
 QString SkyContextController::latitudeText() const
 {
-    return formatCoordinate(m_observer.latitudeDeg);
+    return formatCoordinate(m_skyContext.observer.latitudeDeg);
 }
 
 QString SkyContextController::longitudeText() const
 {
-    return formatCoordinate(m_observer.longitudeDeg);
+    return formatCoordinate(m_skyContext.observer.longitudeDeg);
 }
 
 QString SkyContextController::elevationText() const
 {
-    return formatElevation(m_observer.elevationMeters);
+    return formatElevation(m_skyContext.observer.elevationMeters);
 }
 
 QString SkyContextController::locationStatusText() const
 {
     return m_locationStatusText;
+}
+
+QString SkyContextController::skyContextSummary() const
+{
+    return QString(
+        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m"
+    ).arg(
+        utcDateText(),
+        utcTimeText(),
+        latitudeText(),
+        longitudeText(),
+        elevationText()
+    );
+}
+
+const skygate::core::SkyContext& SkyContextController::skyContext() const noexcept
+{
+    return m_skyContext;
 }
 
 void SkyContextController::setLive(bool live)
@@ -95,9 +125,10 @@ void SkyContextController::setUtcDateText(const QString& utcDateText)
         return;
     }
 
+    const auto currentUtc = toQDateTimeUtc(m_skyContext.utcTime);
     const QDateTime nextUtc(
         date,
-        m_currentUtc.time(),
+        currentUtc.time(),
         QTimeZone::UTC
     );
 
@@ -114,8 +145,9 @@ void SkyContextController::setUtcTimeText(const QString& utcTimeText)
         return;
     }
 
+    const auto currentUtc = toQDateTimeUtc(m_skyContext.utcTime);
     const QDateTime nextUtc(
-        m_currentUtc.date(),
+        currentUtc.date(),
         time,
         QTimeZone::UTC
     );
@@ -128,7 +160,7 @@ void SkyContextController::setLatitudeText(const QString& latitudeText)
 {
     bool isValidNumber = false;
     const double latitude = latitudeText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_observer;
+    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.latitudeDeg = latitude;
     if (!isValidNumber || !nextObserver.isValid()) {
         emit invalidLatitudeInput(latitudeText);
@@ -136,19 +168,20 @@ void SkyContextController::setLatitudeText(const QString& latitudeText)
         return;
     }
 
-    if (m_observer.latitudeDeg == nextObserver.latitudeDeg) {
+    if (m_skyContext.observer.latitudeDeg == nextObserver.latitudeDeg) {
         return;
     }
 
-    m_observer = nextObserver;
+    m_skyContext.observer = nextObserver;
     emit latitudeTextChanged();
+    emit skyContextChanged();
 }
 
 void SkyContextController::setLongitudeText(const QString& longitudeText)
 {
     bool isValidNumber = false;
     const double longitude = longitudeText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_observer;
+    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.longitudeDeg = longitude;
     if (!isValidNumber || !nextObserver.isValid()) {
         emit invalidLongitudeInput(longitudeText);
@@ -156,19 +189,20 @@ void SkyContextController::setLongitudeText(const QString& longitudeText)
         return;
     }
 
-    if (m_observer.longitudeDeg == nextObserver.longitudeDeg) {
+    if (m_skyContext.observer.longitudeDeg == nextObserver.longitudeDeg) {
         return;
     }
 
-    m_observer = nextObserver;
+    m_skyContext.observer = nextObserver;
     emit longitudeTextChanged();
+    emit skyContextChanged();
 }
 
 void SkyContextController::setElevationText(const QString& elevationText)
 {
     bool isValidNumber = false;
     const double elevation = elevationText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_observer;
+    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.elevationMeters = elevation;
     if (!isValidNumber || !nextObserver.isValid()) {
         emit invalidElevationInput(elevationText);
@@ -176,12 +210,13 @@ void SkyContextController::setElevationText(const QString& elevationText)
         return;
     }
 
-    if (m_observer.elevationMeters == nextObserver.elevationMeters) {
+    if (m_skyContext.observer.elevationMeters == nextObserver.elevationMeters) {
         return;
     }
 
-    m_observer = nextObserver;
+    m_skyContext.observer = nextObserver;
     emit elevationTextChanged();
+    emit skyContextChanged();
 }
 
 void SkyContextController::tickUtcTime()
@@ -190,18 +225,20 @@ void SkyContextController::tickUtcTime()
         return;
     }
 
-    setCurrentUtc(m_currentUtc.addSecs(1));
+    setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime).addSecs(1));
 }
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
 {
-    if (m_currentUtc == utcTime) {
+    const auto nextUtc = toUtcTimePoint(utcTime);
+    if (m_skyContext.utcTime == nextUtc) {
         return;
     }
 
-    m_currentUtc = utcTime;
+    m_skyContext.utcTime = nextUtc;
     emit utcDateTextChanged();
     emit utcTimeTextChanged();
+    emit skyContextChanged();
 }
 
 void SkyContextController::initializeCurrentLocation()
@@ -295,7 +332,7 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
         return;
     }
 
-    skygate::core::GeoLocation nextObserver = m_observer;
+    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.latitudeDeg = coordinate.latitude();
     nextObserver.longitudeDeg = coordinate.longitude();
     if (std::isfinite(coordinate.altitude())) {
@@ -306,15 +343,15 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
         return;
     }
 
-    const bool latitudeChanged = m_observer.latitudeDeg != nextObserver.latitudeDeg;
-    const bool longitudeChanged = m_observer.longitudeDeg != nextObserver.longitudeDeg;
-    const bool elevationChanged = m_observer.elevationMeters != nextObserver.elevationMeters;
+    const bool latitudeChanged = m_skyContext.observer.latitudeDeg != nextObserver.latitudeDeg;
+    const bool longitudeChanged = m_skyContext.observer.longitudeDeg != nextObserver.longitudeDeg;
+    const bool elevationChanged = m_skyContext.observer.elevationMeters != nextObserver.elevationMeters;
 
     if (!latitudeChanged && !longitudeChanged && !elevationChanged) {
         return;
     }
 
-    m_observer = nextObserver;
+    m_skyContext.observer = nextObserver;
     m_locationStatusText = "Location: Using current location";
     emit locationStatusTextChanged();
 
@@ -327,6 +364,7 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
     if (elevationChanged) {
         emit elevationTextChanged();
     }
+    emit skyContextChanged();
 #else
     (void)positionInfo;
 #endif

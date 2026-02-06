@@ -18,6 +18,7 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString longitudeText READ longitudeText NOTIFY longitudeTextChanged)
     Q_PROPERTY(QString elevationText READ elevationText NOTIFY elevationTextChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
+    Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
     explicit SkyContextController(QObject* parent = nullptr);
@@ -29,6 +30,8 @@ public:
     [[nodiscard]] QString longitudeText() const;
     [[nodiscard]] QString elevationText() const;
     [[nodiscard]] QString locationStatusText() const;
+    [[nodiscard]] QString skyContextSummary() const;
+    [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void setUtcDateText(const QString& utcDateText);
@@ -50,6 +53,7 @@ signals:
     void invalidLongitudeInput(const QString& longitudeText);
     void invalidElevationInput(const QString& elevationText);
     void locationStatusTextChanged();
+    void skyContextChanged();
 
 private:
     void tickUtcTime();
@@ -59,9 +63,8 @@ private:
 
 private:
     bool m_live = true;
-    QDateTime m_currentUtc;
     QTimer m_timer;
-    skygate::core::GeoLocation m_observer;
+    skygate::core::SkyContext m_skyContext;
     QString m_locationStatusText;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

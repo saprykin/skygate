@@ -140,21 +140,42 @@ ApplicationWindow {
         color: "#0b1428"
 
         Row {
-            anchors.fill: parent
+            id: statusLeftRow
+            anchors.left: parent.left
             anchors.leftMargin: 12
+            anchors.right: statusTime.left
             anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 20
 
             Label {
-                anchors.verticalCenter: parent.verticalCenter
                 text: skyContext.live ? "Live: On" : "Live: Off"
                 color: skyContext.live ? "#7fe39f" : "#f2b0b0"
             }
             Label {
-                anchors.verticalCenter: parent.verticalCenter
                 text: skyContext.locationStatusText
                 color: "#a9c4ff"
             }
+            Label {
+                text: "Lat " + skyContext.latitudeText
+                      + " | Lon " + skyContext.longitudeText
+                      + " | Elev " + skyContext.elevationText + " m"
+                color: "#9ab0d6"
+                elide: Text.ElideRight
+                width: Math.max(120, statusLeftRow.width - 320)
+            }
+        }
+
+        Label {
+            id: statusTime
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            width: 210
+            horizontalAlignment: Text.AlignRight
+            text: skyContext.utcDateText + " " + skyContext.utcTimeText + " UTC"
+            color: "#d7e3ff"
+            font.family: "monospace"
         }
     }
 
