@@ -11,6 +11,7 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <utility>
 
@@ -329,6 +330,7 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
         point.x = projected.x;
         point.y = projected.y;
         point.sizePx = pointSizeForMagnitude(state.body.visualMagnitude);
+        point.displayName = QString::fromStdString(state.body.displayName);
         point.color = colorForBodyType(state.body.type);
         points.push_back(point);
     }
@@ -896,4 +898,41 @@ bool SkyContextController::isProjectedVisible(
         viewportWidth,
         viewportHeight
     ).isVisible;
+}
+
+QString SkyContextController::objectLabelAt(
+    const double x,
+    const double y,
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    const auto points = renderPoints(viewportWidth, viewportHeight);
+    if (points.empty()) {
+        return {};
+    }
+
+    double bestDistanceSquared = std::numeric_limits<double>::infinity();
+    QString bestLabel;
+
+    for (const auto& point : points) {
+        if (point.displayName.isEmpty()) {
+            continue;
+        }
+
+        const double deltaX = x - point.x;
+        const double deltaY = y - point.y;
+        const double distanceSquared = deltaX * deltaX + deltaY * deltaY;
+        const double hitRadius = std::max(10.0, point.sizePx + 5.0);
+        if (distanceSquared > hitRadius * hitRadius) {
+            continue;
+        }
+
+        if (distanceSquared < bestDistanceSquared) {
+            bestDistanceSquared = distanceSquared;
+            bestLabel = point.displayName;
+        }
+    }
+
+    return bestLabel;
 }

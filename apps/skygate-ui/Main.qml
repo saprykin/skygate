@@ -375,6 +375,9 @@ ApplicationWindow {
 
             property real lastX: 0
             property real lastY: 0
+            property real hoverX: 0
+            property real hoverY: 0
+            property string hoveredObjectLabel: ""
             readonly property real azimuthSensitivity: 0.18
             readonly property real altitudeSensitivity: 0.18
 
@@ -383,7 +386,16 @@ ApplicationWindow {
                 lastY = mouse.y
             }
             onPositionChanged: function(mouse) {
+                hoverX = mouse.x
+                hoverY = mouse.y
+
                 if (!(mouse.buttons & Qt.LeftButton)) {
+                    hoveredObjectLabel = skyContext.objectLabelAt(
+                        mouse.x,
+                        mouse.y,
+                        skyViewport.width,
+                        skyViewport.height
+                    )
                     return
                 }
 
@@ -392,6 +404,31 @@ ApplicationWindow {
                 skyContext.panViewBy(-deltaX * azimuthSensitivity, -deltaY * altitudeSensitivity)
                 lastX = mouse.x
                 lastY = mouse.y
+                hoveredObjectLabel = ""
+            }
+            onExited: hoveredObjectLabel = ""
+        }
+
+        Rectangle {
+            id: hoverObjectLabel
+            visible: viewPanArea.hoveredObjectLabel.length > 0
+            x: Math.min(viewPanArea.hoverX + 14, Math.max(0, parent.width - width - 8))
+            y: Math.min(viewPanArea.hoverY + 14, Math.max(0, parent.height - height - 8))
+            radius: 6
+            color: "#cc0a1222"
+            border.width: 1
+            border.color: "#6b8fc8"
+            z: 10
+            width: hoverLabelText.implicitWidth + 14
+            height: hoverLabelText.implicitHeight + 8
+
+            Label {
+                id: hoverLabelText
+                anchors.centerIn: parent
+                text: viewPanArea.hoveredObjectLabel
+                color: "#e6f0ff"
+                font.family: "Avenir Next"
+                font.pixelSize: 14
             }
         }
 

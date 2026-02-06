@@ -39,6 +39,7 @@ public:
         double x = 0.0;
         double y = 0.0;
         double sizePx = 2.0;
+        QString displayName;
         QColor color;
     };
 
@@ -96,6 +97,7 @@ public:
     Q_INVOKABLE double projectedX(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE double projectedY(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE bool isProjectedVisible(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
+    Q_INVOKABLE QString objectLabelAt(double x, double y, double viewportWidth, double viewportHeight) const;
 
 signals:
     void liveChanged();
