@@ -10,6 +10,7 @@
 #include <cmath>
 #include <chrono>
 #include <optional>
+#include <utility>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -76,8 +77,14 @@ QString settingsKey(const QString& name)
 }
 }
 
-SkyContextController::SkyContextController(QObject* parent)
+SkyContextController::SkyContextController(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
+    QObject* parent
+)
     : QObject(parent)
+    , m_starCatalog(std::move(starCatalog))
+    , m_ephemerisEngine(std::move(ephemerisEngine))
 {
     m_projection = skygate::core::createProjection(m_projectionType);
     m_skyContext.utcTime = toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
@@ -158,15 +165,22 @@ QString SkyContextController::locationStatusText() const
 
 QString SkyContextController::skyContextSummary() const
 {
+    QString bodyCountText = "n/a";
+    if (m_ephemerisEngine != nullptr) {
+        const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
+        bodyCountText = QString::number(snapshot.states.size());
+    }
+
     return QString(
-        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6"
+        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6 | Bodies %7"
     ).arg(
         utcDateText(),
         utcTimeText(),
         latitudeText(),
         longitudeText(),
         elevationText(),
-        projectionTypeText()
+        projectionTypeText(),
+        bodyCountText
     );
 }
 

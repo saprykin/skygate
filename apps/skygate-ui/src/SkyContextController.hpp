@@ -6,6 +6,8 @@
 
 #include "skygate/core/IProjection.hpp"
 #include "skygate/core/Types.hpp"
+#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <memory>
 
@@ -26,7 +28,11 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
-    explicit SkyContextController(QObject* parent = nullptr);
+    explicit SkyContextController(
+        std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
+        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine = nullptr,
+        QObject* parent = nullptr
+    );
 
     [[nodiscard]] bool live() const noexcept;
     [[nodiscard]] QString utcDateText() const;
@@ -79,6 +85,8 @@ private:
     skygate::core::SkyContext m_skyContext;
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
     std::unique_ptr<skygate::core::IProjection> m_projection;
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
     QString m_locationStatusText;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

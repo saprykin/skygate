@@ -4,6 +4,11 @@
 #include <QQmlContext>
 #include <QQmlApplicationEngine>
 
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/StarCatalogFactory.hpp"
+
+#include <utility>
+
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
@@ -11,7 +16,11 @@ int main(int argc, char* argv[])
     QCoreApplication::setOrganizationDomain("skygate.app");
     QCoreApplication::setApplicationName("Skygate");
 
-    SkyContextController skyContextController;
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog =
+        skygate::ephemeris::createBundledStarCatalog();
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
+        skygate::ephemeris::createEphemerisEngineStub(starCatalog.get());
+    SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);

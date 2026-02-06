@@ -1,4 +1,5 @@
 add_library(skygate-ephemeris STATIC
+    src/BundledStarCatalog.cpp
     src/EphemerisEngineStub.cpp
 )
 

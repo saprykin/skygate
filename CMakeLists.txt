@@ -7,10 +7,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(SKYGATE_BUILD_UI "Build Qt UI application" ON)
+option(SKYGATE_BUILD_TESTS "Build tests" ON)
 
 add_subdirectory(libs/skygate-core)
 add_subdirectory(libs/skygate-ephemeris)
 
 if(SKYGATE_BUILD_UI)
     add_subdirectory(apps/skygate-ui)
+endif()
+
+if(SKYGATE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
