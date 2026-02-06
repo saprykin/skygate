@@ -1,8 +1,10 @@
 #include "SkyContextController.hpp"
+#include "SkyViewportItem.hpp"
 
 #include <QGuiApplication>
 #include <QQmlContext>
 #include <QQmlApplicationEngine>
+#include <qqml.h>
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
@@ -21,6 +23,8 @@ int main(int argc, char* argv[])
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
         skygate::ephemeris::createEphemerisEngineStub(starCatalog.get());
     SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));
+
+    qmlRegisterType<SkyViewportItem>("com.skygate.app", 1, 0, "SkyViewportItem");
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);

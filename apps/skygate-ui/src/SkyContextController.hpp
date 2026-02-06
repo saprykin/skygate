@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QColor>
 #include <QDateTime>
 #include <QTimer>
 
@@ -10,6 +11,7 @@
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <memory>
+#include <vector>
 
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
@@ -26,6 +28,14 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString projectionSampleText READ projectionSampleText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
+
+public:
+    struct SkyRenderPoint {
+        double x = 0.0;
+        double y = 0.0;
+        double sizePx = 2.0;
+        QColor color;
+    };
 
 public:
     explicit SkyContextController(
@@ -45,6 +55,10 @@ public:
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
+    [[nodiscard]] std::vector<SkyRenderPoint> renderPoints(
+        double viewportWidth,
+        double viewportHeight
+    ) const;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void setUtcDateText(const QString& utcDateText);

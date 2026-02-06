@@ -4,11 +4,13 @@
 #include <QCoreApplication>
 #include <QSettings>
 #include <QTimeZone>
+#include <QColor>
 
 #include "skygate/core/ProjectionFactory.hpp"
 
 #include <cmath>
 #include <chrono>
+#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -23,6 +25,9 @@ namespace {
 constexpr auto kTickIntervalMs = 1000;
 constexpr auto kLocationUpdateTimeoutMs = 5000;
 constexpr auto kSettingsVersion = 1;
+constexpr double kViewportCenterAltitudeDeg = 45.0;
+constexpr double kViewportCenterAzimuthDeg = 180.0;
+constexpr double kViewportFieldOfViewDeg = 100.0;
 
 QString formatCoordinate(double value)
 {
@@ -74,6 +79,28 @@ skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcTime)
 QString settingsKey(const QString& name)
 {
     return QString("skyContext/%1").arg(name);
+}
+
+double pointSizeForMagnitude(const double magnitude)
+{
+    const double normalizedBrightness = std::clamp(1.0 - ((magnitude + 1.5) / 8.0), 0.2, 1.0);
+    return 1.8 + normalizedBrightness * 5.0;
+}
+
+QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
+{
+    switch (type) {
+    case skygate::ephemeris::CelestialBodyType::Sun:
+        return QColor(255, 214, 128, 230);
+    case skygate::ephemeris::CelestialBodyType::Moon:
+        return QColor(214, 224, 250, 220);
+    case skygate::ephemeris::CelestialBodyType::Planet:
+        return QColor(255, 188, 140, 220);
+    case skygate::ephemeris::CelestialBodyType::Star:
+        return QColor(188, 214, 255, 210);
+    }
+
+    return QColor(220, 220, 240, 200);
 }
 }
 
@@ -187,6 +214,50 @@ QString SkyContextController::skyContextSummary() const
 const skygate::core::SkyContext& SkyContextController::skyContext() const noexcept
 {
     return m_skyContext;
+}
+
+std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPoints(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return {};
+    }
+
+    if (m_ephemerisEngine == nullptr || m_projection == nullptr) {
+        return {};
+    }
+
+    skygate::core::ProjectionParams projectionParams;
+    projectionParams.center = {
+        .altitudeDeg = kViewportCenterAltitudeDeg,
+        .azimuthDeg = kViewportCenterAzimuthDeg
+    };
+    projectionParams.fovDeg = kViewportFieldOfViewDeg;
+    projectionParams.rollDeg = 0.0;
+    projectionParams.viewportWidth = viewportWidth;
+    projectionParams.viewportHeight = viewportHeight;
+
+    const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
+    std::vector<SkyRenderPoint> points;
+    points.reserve(snapshot.states.size());
+
+    for (const auto& state : snapshot.states) {
+        const auto projected = m_projection->project(state.horizontal, projectionParams);
+        if (!projected.isVisible) {
+            continue;
+        }
+
+        SkyRenderPoint point;
+        point.x = projected.x;
+        point.y = projected.y;
+        point.sizePx = pointSizeForMagnitude(state.body.visualMagnitude);
+        point.color = colorForBodyType(state.body.type);
+        points.push_back(point);
+    }
+
+    return points;
 }
 
 void SkyContextController::setLive(bool live)

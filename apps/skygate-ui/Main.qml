@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import com.skygate.app 1.0
 
 ApplicationWindow {
     id: root
@@ -280,14 +281,38 @@ ApplicationWindow {
 
     Rectangle {
         anchors.fill: parent
-        color: "#060c1a"
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: "#081022" }
+            GradientStop { position: 1.0; color: "#040912" }
+        }
 
-        Text {
-            anchors.centerIn: parent
-            text: "Sky rendering placeholder\n" + skyContext.projectionSampleText
-            color: "#d7e3ff"
-            font.pixelSize: 22
-            horizontalAlignment: Text.AlignHCenter
+        SkyViewportItem {
+            id: skyViewport
+            anchors.fill: parent
+            skyContextController: skyContext
+        }
+
+        Rectangle {
+            id: summaryBadge
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: 14
+            width: summaryLabel.implicitWidth + 16
+            height: summaryLabel.implicitHeight + 16
+            radius: 10
+            color: "#7f0b1428"
+            border.width: 1
+            border.color: "#335177"
+
+            Label {
+                id: summaryLabel
+                anchors.left: parent.left
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                text: skyContext.skyContextSummary
+                color: "#cbd9f6"
+                font.family: "Avenir Next"
+            }
         }
     }
 }

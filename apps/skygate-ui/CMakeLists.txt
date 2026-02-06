@@ -13,6 +13,8 @@ qt_add_executable(skygate-ui
     src/main.cpp
     src/SkyContextController.cpp
     src/SkyContextController.hpp
+    src/SkyViewportItem.cpp
+    src/SkyViewportItem.hpp
 )
 
 if(APPLE)
