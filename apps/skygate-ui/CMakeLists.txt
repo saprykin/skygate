@@ -101,4 +101,34 @@ if(APPLE)
         USES_TERMINAL
         COMMENT "Run skygate-ui bundle"
     )
+
+    set(skygateMacDeployQtExecutable "")
+    if(DEFINED MACDEPLOYQT_EXECUTABLE AND EXISTS "${MACDEPLOYQT_EXECUTABLE}")
+        set(skygateMacDeployQtExecutable "${MACDEPLOYQT_EXECUTABLE}")
+    endif()
+    if(NOT skygateMacDeployQtExecutable)
+        find_program(skygateMacDeployQtExecutable
+            NAMES macdeployqt
+            HINTS "${Qt6_DIR}/../../../bin"
+        )
+    endif()
+
+    if(skygateMacDeployQtExecutable)
+        set(skygateDmgStagingDir "${CMAKE_CURRENT_BINARY_DIR}/SkyGate-dmg")
+        set(skygateDmgPath "${CMAKE_CURRENT_BINARY_DIR}/SkyGate.dmg")
+
+        add_custom_target(package-skygate-ui-dmg
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "${skygateDmgStagingDir}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${skygateDmgStagingDir}"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:skygate-ui>" "${skygateDmgStagingDir}/SkyGate.app"
+            COMMAND ${CMAKE_COMMAND} -E create_symlink "/Applications" "${skygateDmgStagingDir}/Applications"
+            COMMAND "${skygateMacDeployQtExecutable}" "${skygateDmgStagingDir}/SkyGate.app" -qmldir="${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMAND hdiutil create -volname "SkyGate" -srcfolder "${skygateDmgStagingDir}" -ov -format UDZO "${skygateDmgPath}"
+            DEPENDS skygate-ui
+            USES_TERMINAL
+            COMMENT "Package SkyGate DMG with Applications shortcut"
+        )
+    else()
+        message(WARNING "macdeployqt not found; package-skygate-ui-dmg target is disabled.")
+    endif()
 endif()
