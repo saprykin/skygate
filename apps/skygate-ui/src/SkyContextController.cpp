@@ -34,7 +34,10 @@ constexpr auto kLocationUpdateTimeoutMs = 5000;
 constexpr auto kSettingsVersion = 1;
 constexpr double kDefaultViewportCenterAltitudeDeg = 45.0;
 constexpr double kDefaultViewportCenterAzimuthDeg = 180.0;
-constexpr double kViewportFieldOfViewDeg = 100.0;
+constexpr double kViewportFieldOfViewMinDeg = 20.0;
+constexpr double kViewportFieldOfViewMaxDeg = 150.0;
+constexpr double kWheelZoomStepScale = 0.90;
+constexpr double kWheelAngleDeltaStep = 120.0;
 constexpr double kMagnitudeCutoffMin = -2.0;
 constexpr double kMagnitudeCutoffMax = 12.0;
 constexpr double kViewAltitudeMinDeg = -90.0;
@@ -156,11 +159,17 @@ double clampAltitudeDeg(const double altitudeDeg)
     return std::clamp(altitudeDeg, kViewAltitudeMinDeg, kViewAltitudeMaxDeg);
 }
 
+double clampFieldOfViewDeg(const double fieldOfViewDeg)
+{
+    return std::clamp(fieldOfViewDeg, kViewportFieldOfViewMinDeg, kViewportFieldOfViewMaxDeg);
+}
+
 skygate::core::ProjectionParams buildProjectionParams(
     const double viewportWidth,
     const double viewportHeight,
     const double centerAltitudeDeg,
-    const double centerAzimuthDeg
+    const double centerAzimuthDeg,
+    const double fieldOfViewDeg
 )
 {
     skygate::core::ProjectionParams projectionParams;
@@ -168,7 +177,7 @@ skygate::core::ProjectionParams buildProjectionParams(
         .altitudeDeg = centerAltitudeDeg,
         .azimuthDeg = centerAzimuthDeg
     };
-    projectionParams.fovDeg = kViewportFieldOfViewDeg;
+    projectionParams.fovDeg = fieldOfViewDeg;
     projectionParams.rollDeg = 0.0;
     projectionParams.viewportWidth = viewportWidth;
     projectionParams.viewportHeight = viewportHeight;
@@ -283,7 +292,7 @@ QString SkyContextController::projectionSampleText() const
 
     skygate::core::ProjectionParams params;
     params.center = {.altitudeDeg = m_viewCenterAltitudeDeg, .azimuthDeg = m_viewCenterAzimuthDeg};
-    params.fovDeg = 90.0;
+    params.fovDeg = m_viewFieldOfViewDeg;
     params.rollDeg = 0.0;
     params.viewportWidth = 1100.0;
     params.viewportHeight = 760.0;
@@ -324,7 +333,7 @@ QString SkyContextController::skyContextSummary() const
     }
 
     return QString(
-        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6 | View Alt %7 Az %8 | Bodies %9"
+        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6 | View Alt %7 Az %8 | FOV %9 | Bodies %10"
     ).arg(
         utcDateText(),
         utcTimeText(),
@@ -334,6 +343,7 @@ QString SkyContextController::skyContextSummary() const
         projectionTypeText(),
         QString::number(m_viewCenterAltitudeDeg, 'f', 1),
         QString::number(m_viewCenterAzimuthDeg, 'f', 1),
+        QString::number(m_viewFieldOfViewDeg, 'f', 1),
         bodyCountText
     );
 }
@@ -360,7 +370,8 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
         viewportWidth,
         viewportHeight,
         m_viewCenterAltitudeDeg,
-        m_viewCenterAzimuthDeg
+        m_viewCenterAzimuthDeg,
+        m_viewFieldOfViewDeg
     );
 
     const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
@@ -416,7 +427,8 @@ skygate::core::ScreenPoint SkyContextController::projectHorizontal(
         viewportWidth,
         viewportHeight,
         m_viewCenterAltitudeDeg,
-        m_viewCenterAzimuthDeg
+        m_viewCenterAzimuthDeg,
+        m_viewFieldOfViewDeg
     );
     return m_projection->project(coordinate, projectionParams);
 }
@@ -518,6 +530,17 @@ void SkyContextController::panViewBy(const double deltaAzimuthDeg, const double 
         m_viewCenterAltitudeDeg + deltaAltitudeDeg,
         m_viewCenterAzimuthDeg + deltaAzimuthDeg
     );
+}
+
+void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
+{
+    if (wheelDeltaY == 0) {
+        return;
+    }
+
+    const double wheelSteps = static_cast<double>(wheelDeltaY) / kWheelAngleDeltaStep;
+    const double zoomMultiplier = std::pow(kWheelZoomStepScale, wheelSteps);
+    setViewFieldOfViewDeg(m_viewFieldOfViewDeg * zoomMultiplier);
 }
 
 void SkyContextController::resetViewDirection()
@@ -693,6 +716,21 @@ void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
     emit skyContextChanged();
 }
 
+void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg)
+{
+    if (!std::isfinite(viewFieldOfViewDeg)) {
+        return;
+    }
+
+    const double nextViewFieldOfViewDeg = clampFieldOfViewDeg(viewFieldOfViewDeg);
+    if (std::abs(m_viewFieldOfViewDeg - nextViewFieldOfViewDeg) < 1e-9) {
+        return;
+    }
+
+    m_viewFieldOfViewDeg = nextViewFieldOfViewDeg;
+    emit skyContextChanged();
+}
+
 void SkyContextController::initializeCurrentLocation()
 {
 #if SKYGATE_HAS_POSITIONING
@@ -850,6 +888,7 @@ bool SkyContextController::saveSettings() const
     settings.setValue(settingsKey("magnitudeCutoff"), m_magnitudeCutoff);
     settings.setValue(settingsKey("viewCenterAltitudeDeg"), m_viewCenterAltitudeDeg);
     settings.setValue(settingsKey("viewCenterAzimuthDeg"), m_viewCenterAzimuthDeg);
+    settings.setValue(settingsKey("viewFieldOfViewDeg"), m_viewFieldOfViewDeg);
     settings.setValue(settingsKey("utcEpochSeconds"), toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch());
     settings.setValue(settingsKey("latitudeDeg"), m_skyContext.observer.latitudeDeg);
     settings.setValue(settingsKey("longitudeDeg"), m_skyContext.observer.longitudeDeg);
@@ -887,6 +926,10 @@ bool SkyContextController::loadSettings()
         settingsKey("viewCenterAzimuthDeg"),
         m_viewCenterAzimuthDeg
     ).toDouble();
+    const double viewFieldOfViewDeg = settings.value(
+        settingsKey("viewFieldOfViewDeg"),
+        m_viewFieldOfViewDeg
+    ).toDouble();
     const qint64 utcEpochSeconds = settings.value(
         settingsKey("utcEpochSeconds"),
         toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
@@ -913,6 +956,7 @@ bool SkyContextController::loadSettings()
     setStepSeconds(stepSeconds);
     setMagnitudeCutoff(magnitudeCutoff);
     setViewCenter(viewCenterAltitudeDeg, viewCenterAzimuthDeg);
+    setViewFieldOfViewDeg(viewFieldOfViewDeg);
     setCurrentUtc(QDateTime::fromSecsSinceEpoch(utcEpochSeconds, QTimeZone::UTC));
     setLatitudeText(QString::number(latitudeDeg, 'f', 6));
     setLongitudeText(QString::number(longitudeDeg, 'f', 6));

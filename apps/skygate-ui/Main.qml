@@ -406,6 +406,16 @@ ApplicationWindow {
                 lastY = mouse.y
                 hoveredObjectLabel = ""
             }
+            onWheel: function(wheel) {
+                skyContext.zoomViewByWheelDelta(wheel.angleDelta.y)
+                hoveredObjectLabel = skyContext.objectLabelAt(
+                    wheel.x,
+                    wheel.y,
+                    skyViewport.width,
+                    skyViewport.height
+                )
+                wheel.accepted = true
+            }
             onExited: hoveredObjectLabel = ""
         }
 

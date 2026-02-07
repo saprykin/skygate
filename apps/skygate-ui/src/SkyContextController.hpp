@@ -91,6 +91,7 @@ public:
     Q_INVOKABLE void setMagnitudeCutoff(double magnitudeCutoff);
     Q_INVOKABLE void setViewCenter(double altitudeDeg, double azimuthDeg);
     Q_INVOKABLE void panViewBy(double deltaAzimuthDeg, double deltaAltitudeDeg);
+    Q_INVOKABLE void zoomViewByWheelDelta(int wheelDeltaY);
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
@@ -135,6 +136,7 @@ private:
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
+    void setViewFieldOfViewDeg(double viewFieldOfViewDeg);
     void initializeCurrentLocation();
     void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
     void setProjectionType(skygate::core::ProjectionType projectionType);
@@ -152,6 +154,7 @@ private:
     double m_magnitudeCutoff = 6.0;
     double m_viewCenterAltitudeDeg = 45.0;
     double m_viewCenterAzimuthDeg = 180.0;
+    double m_viewFieldOfViewDeg = 100.0;
     QTimer m_timer;
     skygate::core::SkyContext m_skyContext;
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
