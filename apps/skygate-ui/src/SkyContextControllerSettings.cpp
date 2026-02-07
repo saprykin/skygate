@@ -14,6 +14,8 @@
 using namespace skygate::ui::internal;
 
 namespace {
+constexpr std::size_t kExpectedHygConstellationCount = 88;
+
 QString stripSavedSuffixes(const QString& sourceLabel)
 {
     QString normalizedSourceLabel = sourceLabel.trimmed();
@@ -31,6 +33,18 @@ QString stripSavedSuffixes(const QString& sourceLabel)
         normalizedSourceLabel = normalizedSourceLabel.trimmed();
     }
     return normalizedSourceLabel;
+}
+
+bool isLikelyHygCatalogSource(const QString& sourceLabel, const QString& catalogUrlText)
+{
+    const QString normalizedSourceLabel = sourceLabel.trimmed().toLower();
+    if (normalizedSourceLabel.contains("hyg")) {
+        return true;
+    }
+
+    const QString normalizedCatalogUrlText = catalogUrlText.trimmed().toLower();
+    return normalizedCatalogUrlText.contains("hyg")
+        || normalizedCatalogUrlText.contains("astronexus.com/downloads/catalogs/hygdata");
 }
 } // namespace
 
@@ -53,6 +67,10 @@ bool SkyContextController::saveSettings() const
     settings.setValue(settingsKey("catalogSourceLabel"), m_catalogSourceLabel);
     settings.setValue(settingsKey("catalogPresetIndex"), m_catalogPresetIndex);
     settings.setValue(settingsKey("catalogUrlText"), m_catalogUrlText);
+    settings.setValue(
+        settingsKey("catalogConstellationCount"),
+        static_cast<qulonglong>(m_catalogConstellationCount)
+    );
     settings.sync();
     return settings.status() == QSettings::NoError;
 }
@@ -194,6 +212,10 @@ void SkyContextController::persistCatalogCache(
         settingsKey("catalogConstellationLineSchemaVersion"),
         kConstellationLineCacheSchemaVersion
     );
+    settings.setValue(
+        settingsKey("catalogConstellationCount"),
+        static_cast<qulonglong>(m_catalogConstellationCount)
+    );
     settings.sync();
 }
 
@@ -238,6 +260,16 @@ void SkyContextController::restoreCatalogCache()
     }
     applyCatalog(std::move(restoredCatalog), QString("%1 (saved)").arg(normalizedSourceLabel), false);
 
+    const bool hasPersistedConstellationCount = settings.contains(
+        settingsKey("catalogConstellationCount")
+    );
+    const std::size_t persistedConstellationCount = static_cast<std::size_t>(
+        settings.value(
+            settingsKey("catalogConstellationCount"),
+            static_cast<qulonglong>(m_catalogConstellationCount)
+        ).toULongLong()
+    );
+
     const QByteArray constellationLineRows = settings.value(
         settingsKey("catalogConstellationLineRefs")
     ).toByteArray();
@@ -259,7 +291,11 @@ void SkyContextController::restoreCatalogCache()
             )
         );
         if (!parsedLineRefs.empty()) {
+            const std::size_t parsedLineRefCount = parsedLineRefs.size();
             setConstellationLineRefs(std::move(parsedLineRefs));
+            std::size_t restoredConstellationCount = persistedConstellationCount;
+            const bool shouldUseLabelFallback =
+                !hasPersistedConstellationCount || restoredConstellationCount == 0;
             if (!constellationLabelRows.isEmpty()) {
                 auto parsedLabelRefs = parseConstellationLabelRows(
                     std::string_view(
@@ -267,9 +303,30 @@ void SkyContextController::restoreCatalogCache()
                         static_cast<std::size_t>(constellationLabelRows.size())
                     )
                 );
+                if (shouldUseLabelFallback && !parsedLabelRefs.empty()) {
+                    restoredConstellationCount = parsedLabelRefs.size();
+                }
                 setConstellationLabelRefs(std::move(parsedLabelRefs));
             } else {
                 setConstellationLabelRefs({});
+            }
+            const bool hasFullLineReferenceSet = parsedLineRefCount >= 200;
+            if (
+                hasFullLineReferenceSet
+                && restoredConstellationCount < kExpectedHygConstellationCount
+                && isLikelyHygCatalogSource(m_catalogSourceLabel, m_catalogUrlText)
+            ) {
+                restoredConstellationCount = kExpectedHygConstellationCount;
+            }
+            if (restoredConstellationCount != m_catalogConstellationCount) {
+                m_catalogConstellationCount = restoredConstellationCount;
+                m_catalogStatusText = QString("Catalog: %1 (%2 objects, %3 constellations)").arg(
+                    m_catalogSourceLabel,
+                    QString::number(static_cast<qulonglong>(m_catalogBodyCount)),
+                    QString::number(static_cast<qulonglong>(m_catalogConstellationCount))
+                );
+                emit catalogStatusTextChanged();
+                emit catalogDatasetInfoTextChanged();
             }
             emit skyContextChanged();
         }

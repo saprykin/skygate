@@ -28,7 +28,6 @@ Window {
 
 
     function syncFormFromContext() {
-        liveCheckBox.checked = skyContextController.live
         utcDateInput.text = skyContextController.utcDateText
         utcTimeInput.text = skyContextController.utcTimeText
         latitudeInput.text = skyContextController.latitudeText
@@ -51,7 +50,6 @@ Window {
         skyContextController.setProjectionTypeText(projectionCombo.currentText)
         skyContextController.setCatalogPresetIndex(catalogSection.catalogPresetCurrentIndex)
         skyContextController.setCatalogUrlText(catalogSection.catalogUrlText)
-        skyContextController.setLive(liveCheckBox.checked)
         syncFormFromContext()
     }
 
@@ -270,15 +268,6 @@ Window {
                                         columns: 2
                                         rowSpacing: 8
                                         columnSpacing: 12
-
-                                        Label {
-                                            text: "Live updates"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesCheckBox {
-                                            id: liveCheckBox
-                                        }
 
                                         Label {
                                             text: "UTC Date"
