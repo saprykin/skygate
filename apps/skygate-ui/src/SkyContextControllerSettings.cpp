@@ -13,6 +13,27 @@
 
 using namespace skygate::ui::internal;
 
+namespace {
+QString stripSavedSuffixes(const QString& sourceLabel)
+{
+    QString normalizedSourceLabel = sourceLabel.trimmed();
+    const QString spacedSavedSuffix = QStringLiteral(" (saved)");
+    const QString compactSavedSuffix = QStringLiteral("(saved)");
+    while (
+        normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)
+        || normalizedSourceLabel.endsWith(compactSavedSuffix, Qt::CaseInsensitive)
+    ) {
+        if (normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)) {
+            normalizedSourceLabel.chop(spacedSavedSuffix.size());
+        } else {
+            normalizedSourceLabel.chop(compactSavedSuffix.size());
+        }
+        normalizedSourceLabel = normalizedSourceLabel.trimmed();
+    }
+    return normalizedSourceLabel;
+}
+} // namespace
+
 bool SkyContextController::saveSettings() const
 {
     QSettings settings;
@@ -203,7 +224,11 @@ void SkyContextController::restoreCatalogCache()
         settingsKey("catalogSourceLabel"),
         QString("Saved")
     ).toString();
-    applyCatalog(std::move(restoredCatalog), QString("%1 (saved)").arg(sourceLabel), false);
+    QString normalizedSourceLabel = stripSavedSuffixes(sourceLabel);
+    if (normalizedSourceLabel.isEmpty()) {
+        normalizedSourceLabel = "Saved";
+    }
+    applyCatalog(std::move(restoredCatalog), QString("%1 (saved)").arg(normalizedSourceLabel), false);
 
     const QByteArray constellationLineRows = settings.value(
         settingsKey("catalogConstellationLineRefs")
