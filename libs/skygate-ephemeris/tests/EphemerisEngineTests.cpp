@@ -56,6 +56,11 @@ bool runEphemerisEngineBaselineTests()
 
     const auto* sunState = findStateById(snapshot, "sun");
     const auto* moonState = findStateById(snapshot, "moon");
+    const auto* mercuryState = findStateById(snapshot, "mercury");
+    const auto* venusState = findStateById(snapshot, "venus");
+    const auto* marsState = findStateById(snapshot, "mars");
+    const auto* jupiterState = findStateById(snapshot, "jupiter");
+    const auto* saturnState = findStateById(snapshot, "saturn");
     const auto* siriusState = findStateById(snapshot, "sirius");
 
     success = expectTrue(sunState != nullptr, "Engine snapshot should contain sun state") && success;
@@ -82,6 +87,36 @@ bool runEphemerisEngineBaselineTests()
             moonState->horizontal.azimuthDeg < 360.0,
             "Engine should compute baseline Moon position"
         ) && success;
+    }
+
+    success = expectTrue(mercuryState != nullptr, "Engine snapshot should contain mercury state") && success;
+    if (mercuryState != nullptr) {
+        success = expectFinite(mercuryState->equatorial.rightAscensionHours, "Mercury RA should be finite") && success;
+        success = expectFinite(mercuryState->equatorial.declinationDeg, "Mercury Dec should be finite") && success;
+    }
+
+    success = expectTrue(venusState != nullptr, "Engine snapshot should contain venus state") && success;
+    if (venusState != nullptr) {
+        success = expectFinite(venusState->equatorial.rightAscensionHours, "Venus RA should be finite") && success;
+        success = expectFinite(venusState->equatorial.declinationDeg, "Venus Dec should be finite") && success;
+    }
+
+    success = expectTrue(marsState != nullptr, "Engine snapshot should contain mars state") && success;
+    if (marsState != nullptr) {
+        success = expectFinite(marsState->equatorial.rightAscensionHours, "Mars RA should be finite") && success;
+        success = expectFinite(marsState->equatorial.declinationDeg, "Mars Dec should be finite") && success;
+    }
+
+    success = expectTrue(jupiterState != nullptr, "Engine snapshot should contain jupiter state") && success;
+    if (jupiterState != nullptr) {
+        success = expectFinite(jupiterState->equatorial.rightAscensionHours, "Jupiter RA should be finite") && success;
+        success = expectFinite(jupiterState->equatorial.declinationDeg, "Jupiter Dec should be finite") && success;
+    }
+
+    success = expectTrue(saturnState != nullptr, "Engine snapshot should contain saturn state") && success;
+    if (saturnState != nullptr) {
+        success = expectFinite(saturnState->equatorial.rightAscensionHours, "Saturn RA should be finite") && success;
+        success = expectFinite(saturnState->equatorial.declinationDeg, "Saturn Dec should be finite") && success;
     }
 
     success = expectTrue(siriusState != nullptr, "Engine snapshot should contain sirius state") && success;

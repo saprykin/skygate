@@ -562,8 +562,29 @@ QVariantList SkyContextController::constellationLabels(
     labels.reserve(static_cast<int>((snapshot.states.size() / 8U) + m_constellationLabelRefs.size()));
 
     constexpr double kEdgeMarginPx = 10.0;
+    const auto labelColorForBodyType = [](const skygate::ephemeris::CelestialBodyType type) -> QColor {
+        switch (type) {
+        case skygate::ephemeris::CelestialBodyType::Sun:
+            return QColor(255, 224, 135, 235);
+        case skygate::ephemeris::CelestialBodyType::Moon:
+            return QColor(152, 247, 255, 245);
+        case skygate::ephemeris::CelestialBodyType::Planet:
+            return QColor(255, 196, 148, 235);
+        case skygate::ephemeris::CelestialBodyType::Constellation:
+            return QColor(201, 220, 255, 230);
+        case skygate::ephemeris::CelestialBodyType::Star:
+            break;
+        }
+
+        return QColor(201, 220, 255, 230);
+    };
     for (const auto& state : snapshot.states) {
-        if (state.body.type != skygate::ephemeris::CelestialBodyType::Constellation) {
+        if (
+            state.body.type != skygate::ephemeris::CelestialBodyType::Constellation
+            && state.body.type != skygate::ephemeris::CelestialBodyType::Planet
+            && state.body.type != skygate::ephemeris::CelestialBodyType::Sun
+            && state.body.type != skygate::ephemeris::CelestialBodyType::Moon
+        ) {
             continue;
         }
 
@@ -597,6 +618,7 @@ QVariantList SkyContextController::constellationLabels(
         labelEntry.insert("x", projected.x);
         labelEntry.insert("y", projected.y);
         labelEntry.insert("text", QString::fromStdString(state.body.displayName));
+        labelEntry.insert("color", labelColorForBodyType(state.body.type));
         labels.push_back(labelEntry);
     }
 
@@ -647,6 +669,10 @@ QVariantList SkyContextController::constellationLabels(
         labelEntry.insert("x", labelX);
         labelEntry.insert("y", labelY);
         labelEntry.insert("text", QString::fromStdString(labelRef.first));
+        labelEntry.insert(
+            "color",
+            labelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation)
+        );
         labels.push_back(labelEntry);
     }
 

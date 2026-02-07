@@ -18,6 +18,14 @@ struct FixedStarCoordinate {
     core::EquatorialCoordinate equatorial;
 };
 
+struct PlanetApproximateOrbit {
+    const char* id;
+    double meanLongitudeDegAtJ2000;
+    double meanMotionDegPerDay;
+    double latitudeAmplitudeDeg;
+    double latitudePhaseDeg;
+};
+
 [[nodiscard]] double degreesToRadians(const double degrees)
 {
     return degrees * std::numbers::pi_v<double> / 180.0;
@@ -160,6 +168,42 @@ struct FixedStarCoordinate {
     );
 }
 
+[[nodiscard]] std::optional<core::EquatorialCoordinate> computePlanetEquatorialById(
+    const std::string& id,
+    const core::UtcTimePoint& utcTime
+)
+{
+    // Lightweight stub model: geocentric-looking ecliptic tracks with per-planet
+    // mean motion, intended for visualization rather than high-precision astronomy.
+    constexpr std::array<PlanetApproximateOrbit, 5> kPlanetApproximateOrbits = {{
+        {.id = "mercury", .meanLongitudeDegAtJ2000 = 252.25084, .meanMotionDegPerDay = 4.09233445, .latitudeAmplitudeDeg = 2.2, .latitudePhaseDeg = 20.0},
+        {.id = "venus", .meanLongitudeDegAtJ2000 = 181.97973, .meanMotionDegPerDay = 1.60213034, .latitudeAmplitudeDeg = 1.6, .latitudePhaseDeg = 60.0},
+        {.id = "mars", .meanLongitudeDegAtJ2000 = 355.43300, .meanMotionDegPerDay = 0.52402068, .latitudeAmplitudeDeg = 1.8, .latitudePhaseDeg = 140.0},
+        {.id = "jupiter", .meanLongitudeDegAtJ2000 = 34.35152, .meanMotionDegPerDay = 0.08308529, .latitudeAmplitudeDeg = 1.1, .latitudePhaseDeg = 210.0},
+        {.id = "saturn", .meanLongitudeDegAtJ2000 = 50.07744, .meanMotionDegPerDay = 0.03344414, .latitudeAmplitudeDeg = 1.0, .latitudePhaseDeg = 280.0},
+    }};
+
+    const double julianDay = julianDayFromUtc(utcTime);
+    const double daysSinceJ2000 = julianDay - kJ2000JulianDay;
+    const double obliquityDeg = meanObliquityDeg(daysSinceJ2000);
+
+    for (const auto& planet : kPlanetApproximateOrbits) {
+        if (id != planet.id) {
+            continue;
+        }
+
+        const double eclipticLongitudeDeg = normalizeDegrees(
+            planet.meanLongitudeDegAtJ2000 + planet.meanMotionDegPerDay * daysSinceJ2000
+        );
+        const double eclipticLatitudeDeg = planet.latitudeAmplitudeDeg * std::sin(
+            degreesToRadians(eclipticLongitudeDeg + planet.latitudePhaseDeg)
+        );
+        return eclipticToEquatorial(eclipticLongitudeDeg, eclipticLatitudeDeg, obliquityDeg);
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] std::optional<core::EquatorialCoordinate> fixedStarEquatorialById(const std::string& id)
 {
     constexpr std::array<FixedStarCoordinate, 8> kFixedStarCoordinates = {{
@@ -221,6 +265,10 @@ struct FixedStarCoordinate {
 
     if (body.type == CelestialBodyType::Moon || body.id == "moon") {
         return computeMoonEquatorial(utcTime);
+    }
+
+    if (body.type == CelestialBodyType::Planet) {
+        return computePlanetEquatorialById(body.id, utcTime);
     }
 
     if (body.type == CelestialBodyType::Star) {

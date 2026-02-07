@@ -933,7 +933,7 @@ QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
     case skygate::ephemeris::CelestialBodyType::Sun:
         return QColor(255, 214, 128, 230);
     case skygate::ephemeris::CelestialBodyType::Moon:
-        return QColor(214, 224, 250, 220);
+        return QColor(162, 245, 255, 235);
     case skygate::ephemeris::CelestialBodyType::Planet:
         return QColor(255, 188, 140, 220);
     case skygate::ephemeris::CelestialBodyType::Star:

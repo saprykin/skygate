@@ -260,13 +260,14 @@ ApplicationWindow {
 
             delegate: Rectangle {
                 required property var modelData
+                readonly property color labelColor: modelData.color ? modelData.color : "#c9dcff"
                 x: modelData.x - (width * 0.5)
                 y: modelData.y - height - 8
                 visible: !root.overlapsTimelinePanel(x, y, width, height)
                 radius: 5
                 color: "#aa071328"
                 border.width: 1
-                border.color: "#78a6d8"
+                border.color: labelColor
                 z: 8
                 width: constellationLabelText.implicitWidth + 12
                 height: constellationLabelText.implicitHeight + 6
@@ -275,7 +276,7 @@ ApplicationWindow {
                     id: constellationLabelText
                     anchors.centerIn: parent
                     text: modelData.text
-                    color: "#c9dcff"
+                    color: labelColor
                     font.family: "Avenir Next"
                     font.pixelSize: 11
                     font.bold: true
