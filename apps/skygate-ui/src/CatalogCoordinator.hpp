@@ -2,6 +2,7 @@
 
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 
@@ -18,8 +19,15 @@ public:
         QString errorText;
     };
 
+    struct RawDownloadResult {
+        QByteArray payload;
+        QString sourceUrl;
+        QString errorText;
+    };
+
     using StatusHandler = std::function<void(const QString&)>;
     using CompletionHandler = std::function<void(DownloadResult)>;
+    using RawCompletionHandler = std::function<void(RawDownloadResult)>;
 
 public:
     explicit CatalogCoordinator(QNetworkAccessManager* networkAccessManager);
@@ -33,6 +41,13 @@ public:
         QObject* callbackContext,
         StatusHandler statusHandler,
         CompletionHandler completionHandler
+    ) const;
+
+    void downloadRawDataFromUrls(
+        const QStringList& urlTexts,
+        QObject* callbackContext,
+        StatusHandler statusHandler,
+        RawCompletionHandler completionHandler
     ) const;
 
 private:

@@ -690,12 +690,14 @@ ApplicationWindow {
                                                         "Bundled (recommended)",
                                                         "Starter (bright objects)",
                                                         "Major constellations",
-                                                        "HYG v3 stars (Astronexus)"
+                                                        "HYG v3 stars + Stellarium lines",
+                                                        "Custom URL"
                                                     ]
                                                 }
 
                                                 PreferencesActionButton {
                                                     text: "Use Preset"
+                                                    enabled: catalogPresetCombo.currentIndex !== 4
                                                     onClicked: {
                                                         if (catalogPresetCombo.currentIndex === 0) {
                                                             skyContext.loadCatalogPreset("bundled")
@@ -703,7 +705,7 @@ ApplicationWindow {
                                                             skyContext.loadCatalogPreset("starter")
                                                         } else if (catalogPresetCombo.currentIndex === 2) {
                                                             skyContext.loadCatalogPreset("constellations_major")
-                                                        } else {
+                                                        } else if (catalogPresetCombo.currentIndex === 3) {
                                                             skyContext.loadCatalogPreset("hyg_v3")
                                                             catalogUrlInput.text = "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv"
                                                         }
@@ -712,19 +714,23 @@ ApplicationWindow {
                                             }
 
                                             Label {
+                                                visible: catalogPresetCombo.currentIndex === 4
+                                                Layout.preferredHeight: visible ? implicitHeight : 0
                                                 text: "Catalog URL"
                                                 color: "#cad9f7"
                                                 font.family: "Avenir Next"
                                             }
 
                                             RowLayout {
+                                                visible: catalogPresetCombo.currentIndex === 4
+                                                Layout.preferredHeight: visible ? implicitHeight : 0
                                                 Layout.fillWidth: true
                                                 spacing: 6
 
                                                 PreferencesTextField {
                                                     id: catalogUrlInput
                                                     Layout.fillWidth: true
-                                                    text: "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
+                                                    text: "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv"
                                                     placeholderText: "https://example.com/skygate-catalog.txt or HYG CSV URL"
                                                     Component.onCompleted: cursorPosition = 0
                                                     onActiveFocusChanged: {

@@ -95,6 +95,19 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> parseCatalogPayload(const QByt
     return downloadedCatalog;
 }
 
+QStringList normalizedCandidateUrls(const QStringList& urlTexts)
+{
+    QStringList candidateUrls;
+    candidateUrls.reserve(urlTexts.size());
+    for (const QString& urlText : urlTexts) {
+        const QString trimmed = urlText.trimmed();
+        if (!trimmed.isEmpty()) {
+            candidateUrls.push_back(trimmed);
+        }
+    }
+    return candidateUrls;
+}
+
 }  // namespace
 
 CatalogCoordinator::CatalogCoordinator(QNetworkAccessManager* networkAccessManager)
@@ -160,14 +173,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
     CompletionHandler completionHandler
 ) const
 {
-    QStringList candidateUrls;
-    candidateUrls.reserve(urlTexts.size());
-    for (const QString& urlText : urlTexts) {
-        const QString trimmed = urlText.trimmed();
-        if (!trimmed.isEmpty()) {
-            candidateUrls.push_back(trimmed);
-        }
-    }
+    const QStringList candidateUrls = normalizedCandidateUrls(urlTexts);
 
     if (candidateUrls.isEmpty()) {
         DownloadResult result;
@@ -274,6 +280,116 @@ void CatalogCoordinator::downloadCatalogFromUrls(
 
                 DownloadResult result;
                 result.catalog = std::move(downloadedCatalog);
+                completionHandler(std::move(result));
+            }
+        );
+    };
+
+    (*tryDownloadNextUrl)(0);
+}
+
+void CatalogCoordinator::downloadRawDataFromUrls(
+    const QStringList& urlTexts,
+    QObject* callbackContext,
+    StatusHandler statusHandler,
+    RawCompletionHandler completionHandler
+) const
+{
+    const QStringList candidateUrls = normalizedCandidateUrls(urlTexts);
+
+    if (candidateUrls.isEmpty()) {
+        RawDownloadResult result;
+        result.errorText = "Catalog: Invalid URL";
+        completionHandler(std::move(result));
+        return;
+    }
+
+    if (m_networkAccessManager == nullptr) {
+        RawDownloadResult result;
+        result.errorText = "Catalog: Network unavailable";
+        completionHandler(std::move(result));
+        return;
+    }
+
+    const auto lastErrorText = std::make_shared<QString>("Catalog: Download failed");
+    const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
+    *tryDownloadNextUrl = [this, candidateUrls, callbackContext, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl](const int index) {
+        if (index >= candidateUrls.size()) {
+            RawDownloadResult result;
+            result.errorText = *lastErrorText;
+            completionHandler(std::move(result));
+            return;
+        }
+
+        const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
+        if (!url.isValid() || url.scheme().isEmpty()) {
+            *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
+            (*tryDownloadNextUrl)(index + 1);
+            return;
+        }
+
+        if (statusHandler) {
+            statusHandler(QString("Catalog: Downloading %1 (%2/%3)").arg(
+                url.toString(),
+                QString::number(index + 1),
+                QString::number(candidateUrls.size())
+            ));
+        }
+
+        QNetworkRequest request(url);
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+        request.setTransferTimeout(300000);
+        request.setRawHeader("User-Agent", "Skygate/1.0");
+        request.setRawHeader("Accept", "text/plain,text/csv,application/gzip,application/octet-stream,*/*");
+
+        QNetworkReply* reply = m_networkAccessManager->get(request);
+        QObject* const contextObject = callbackContext != nullptr ? callbackContext : reply;
+        QObject::connect(
+            reply,
+            &QNetworkReply::finished,
+            contextObject,
+            [reply, index, candidateUrls, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl]() {
+                reply->deleteLater();
+
+                if (reply->error() != QNetworkReply::NoError) {
+                    const int httpStatusCode =
+                        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                    *lastErrorText = QString("Catalog: Source %1 failed (%2, HTTP %3)").arg(
+                        candidateUrls[index],
+                        reply->errorString(),
+                        QString::number(httpStatusCode)
+                    );
+                    if (statusHandler) {
+                        statusHandler(*lastErrorText);
+                    }
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                const QByteArray payload = reply->readAll();
+                if (payload.isEmpty()) {
+                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
+                    if (statusHandler) {
+                        statusHandler(*lastErrorText);
+                    }
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                if (static_cast<std::size_t>(payload.size()) > kMaxDownloadedCatalogBytes) {
+                    *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(
+                        candidateUrls[index]
+                    );
+                    if (statusHandler) {
+                        statusHandler(*lastErrorText);
+                    }
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                RawDownloadResult result;
+                result.payload = payload;
+                result.sourceUrl = candidateUrls[index];
                 completionHandler(std::move(result));
             }
         );

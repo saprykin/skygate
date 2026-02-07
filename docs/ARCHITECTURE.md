@@ -48,3 +48,5 @@
   same `id|name|type|magnitude` row format.
 - Runtime import supports major star catalogs in HYG CSV format (`ra`, `dec`,
   `mag`) and maps them to fixed-position stars.
+- UI preset `hyg_v3` also attempts to load Stellarium skyculture line data
+  (`western/index.json`, HIP-based) to render expanded constellation outlines.

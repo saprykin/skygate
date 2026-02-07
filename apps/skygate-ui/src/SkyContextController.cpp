@@ -11,6 +11,10 @@
 #include <QStandardPaths>
 #include <QTimeZone>
 #include <QColor>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QNetworkAccessManager>
 
 #include "skygate/core/ProjectionFactory.hpp"
@@ -21,12 +25,16 @@
 #include <chrono>
 #include <algorithm>
 #include <array>
+#include <charconv>
+#include <cctype>
 #include <cstddef>
 #include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
+#include <system_error>
 #include <utility>
 
 #if SKYGATE_HAS_POSITIONING
@@ -52,11 +60,17 @@ constexpr double kViewAltitudeMinDeg = -90.0;
 constexpr double kViewAltitudeMaxDeg = 90.0;
 constexpr const char* kCatalogCacheFileName = "catalog-cache-v1.txt";
 constexpr const char* kHygCatalogPrimaryUrl =
-    "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
-constexpr const char* kHygCatalogMirrorUrl =
-    "https://astronexus.com/downloads/catalogs/hygdata_v41.csv.gz";
-constexpr const char* kHygCatalogGithubMirrorUrl =
     "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv";
+constexpr const char* kHygCatalogMirrorUrl =
+    "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
+constexpr const char* kHygCatalogMirror2Url =
+    "https://astronexus.com/downloads/catalogs/hygdata_v41.csv.gz";
+constexpr const char* kStellariumConstellationLinesPrimaryUrl =
+    "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/master/western/index.json";
+constexpr const char* kStellariumConstellationLinesMirrorUrl =
+    "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/main/western/index.json";
+constexpr const char* kStellariumConstellationLinesCdnUrl =
+    "https://cdn.jsdelivr.net/gh/Stellarium/stellarium-skycultures@master/western/index.json";
 constexpr std::string_view kStarterCatalogRows =
     "sun|Sun|Sun|-26.74\n"
     "moon|Moon|Moon|-12.74\n"
@@ -90,7 +104,7 @@ struct ConstellationLineRef {
     std::string_view endId;
 };
 
-constexpr std::array<ConstellationLineRef, 57> kConstellationLineRefs = {{
+constexpr std::array<ConstellationLineRef, 57> kDefaultConstellationLineRefs = {{
     // Bundled fallback.
     {.startId = "sirius", .endId = "procyon"},
     {.startId = "procyon", .endId = "betelgeuse"},
@@ -160,6 +174,269 @@ constexpr std::array<ConstellationLineRef, 57> kConstellationLineRefs = {{
     {.startId = "hip_80763", .endId = "hip_85927"},
     {.startId = "hip_85927", .endId = "hip_86228"},
 }};
+
+std::vector<std::pair<std::string, std::string>> defaultConstellationLineRefs()
+{
+    std::vector<std::pair<std::string, std::string>> lineRefs;
+    lineRefs.reserve(kDefaultConstellationLineRefs.size());
+    for (const auto& lineRef : kDefaultConstellationLineRefs) {
+        lineRefs.emplace_back(std::string(lineRef.startId), std::string(lineRef.endId));
+    }
+    return lineRefs;
+}
+
+std::vector<std::string_view> splitWhitespaceColumns(std::string_view line)
+{
+    std::vector<std::string_view> columns;
+    std::size_t index = 0;
+    while (index < line.size()) {
+        while (
+            index < line.size()
+            && std::isspace(static_cast<unsigned char>(line[index]))
+        ) {
+            ++index;
+        }
+        if (index >= line.size()) {
+            break;
+        }
+
+        const std::size_t tokenStart = index;
+        while (
+            index < line.size()
+            && !std::isspace(static_cast<unsigned char>(line[index]))
+        ) {
+            ++index;
+        }
+        columns.push_back(line.substr(tokenStart, index - tokenStart));
+    }
+    return columns;
+}
+
+std::optional<int> parsePositiveInteger(const std::string_view value)
+{
+    if (value.empty()) {
+        return std::nullopt;
+    }
+
+    int parsedValue = 0;
+    const auto [parseEnd, errorCode] = std::from_chars(
+        value.data(),
+        value.data() + value.size(),
+        parsedValue
+    );
+    if (errorCode != std::errc() || parseEnd != value.data() + value.size() || parsedValue <= 0) {
+        return std::nullopt;
+    }
+
+    return parsedValue;
+}
+
+std::vector<std::pair<std::string, std::string>> parseStellariumConstellationLineRefs(
+    const std::string_view constellationLineRows
+)
+{
+    std::vector<std::pair<std::string, std::string>> lineRefs;
+    std::unordered_set<std::string> dedupKeys;
+
+    std::size_t cursor = 0;
+    while (cursor < constellationLineRows.size()) {
+        const std::size_t newline = constellationLineRows.find('\n', cursor);
+        const std::size_t lineEnd =
+            newline == std::string_view::npos ? constellationLineRows.size() : newline;
+        std::string_view line = constellationLineRows.substr(cursor, lineEnd - cursor);
+
+        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) {
+            line.remove_prefix(1);
+        }
+        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
+            line.remove_suffix(1);
+        }
+
+        if (!line.empty() && line.front() != '#') {
+            const std::vector<std::string_view> columns = splitWhitespaceColumns(line);
+            if (columns.size() >= 4) {
+                const auto segmentCount = parsePositiveInteger(columns[1]);
+                if (segmentCount.has_value()) {
+                    const std::size_t expectedColumnCount =
+                        2 + (static_cast<std::size_t>(*segmentCount) * 2U);
+                    if (columns.size() >= expectedColumnCount) {
+                        for (int segmentIndex = 0; segmentIndex < *segmentCount; ++segmentIndex) {
+                            const std::size_t startColumn = 2U + (static_cast<std::size_t>(segmentIndex) * 2U);
+                            const auto startHip = parsePositiveInteger(columns[startColumn]);
+                            const auto endHip = parsePositiveInteger(columns[startColumn + 1U]);
+                            if (!startHip.has_value() || !endHip.has_value()) {
+                                continue;
+                            }
+
+                            std::string startId = "hip_" + std::to_string(*startHip);
+                            std::string endId = "hip_" + std::to_string(*endHip);
+                            const std::string dedupKey = startId + "|" + endId;
+                            if (!dedupKeys.insert(dedupKey).second) {
+                                continue;
+                            }
+
+                            lineRefs.emplace_back(std::move(startId), std::move(endId));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (newline == std::string_view::npos) {
+            break;
+        }
+
+        cursor = newline + 1;
+    }
+
+    return lineRefs;
+}
+
+std::vector<std::pair<std::string, std::string>> parseStellariumIndexJsonConstellationLineRefs(
+    const QByteArray& jsonPayload
+)
+{
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(jsonPayload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        return {};
+    }
+
+    const QJsonValue constellationsValue = document.object().value("constellations");
+    std::vector<std::pair<std::string, std::string>> lineRefs;
+    std::unordered_set<std::string> dedupKeys;
+
+    const auto parseHipIdentifier = [](const QJsonValue& value) -> std::optional<int> {
+        if (value.isObject()) {
+            const QJsonObject object = value.toObject();
+            const QJsonValue hipValue = object.value("hip");
+            if (!hipValue.isUndefined()) {
+                if (hipValue.isDouble()) {
+                    const double numericValue = hipValue.toDouble();
+                    if (
+                        std::isfinite(numericValue)
+                        && numericValue > 0.0
+                        && std::floor(numericValue) == numericValue
+                    ) {
+                        return static_cast<int>(numericValue);
+                    }
+                } else if (hipValue.isString()) {
+                    QString hipText = hipValue.toString().trimmed();
+                    bool isOk = false;
+                    const int hipNumber = hipText.toInt(&isOk);
+                    if (isOk && hipNumber > 0) {
+                        return hipNumber;
+                    }
+                }
+            }
+            return std::nullopt;
+        }
+
+        if (value.isDouble()) {
+            const double numericValue = value.toDouble();
+            if (
+                std::isfinite(numericValue)
+                && numericValue > 0.0
+                && std::floor(numericValue) == numericValue
+            ) {
+                return static_cast<int>(numericValue);
+            }
+            return std::nullopt;
+        }
+
+        if (!value.isString()) {
+            return std::nullopt;
+        }
+
+        QString textValue = value.toString().trimmed();
+        if (textValue.startsWith("hip_", Qt::CaseInsensitive)) {
+            textValue.remove(0, 4);
+        } else if (textValue.startsWith("hip ", Qt::CaseInsensitive)) {
+            textValue.remove(0, 4);
+        }
+
+        QString digits;
+        digits.reserve(textValue.size());
+        for (int index = 0; index < textValue.size(); ++index) {
+            const QChar c = textValue.at(index);
+            if (c.isDigit()) {
+                digits.append(c);
+            } else if (!digits.isEmpty()) {
+                break;
+            }
+        }
+
+        if (digits.isEmpty()) {
+            return std::nullopt;
+        }
+
+        bool isOk = false;
+        const int parsedValue = digits.toInt(&isOk);
+        if (!isOk || parsedValue <= 0) {
+            return std::nullopt;
+        }
+        return parsedValue;
+    };
+
+    std::vector<std::vector<int>> hipSequences;
+    const auto collectHipSequences = [&](const auto& self, const QJsonValue& value) -> void {
+        if (value.isArray()) {
+            const QJsonArray array = value.toArray();
+            std::vector<int> directHips;
+            directHips.reserve(array.size());
+
+            bool hasNestedCollections = false;
+            for (const QJsonValue& child : array) {
+                if (const auto hip = parseHipIdentifier(child); hip.has_value()) {
+                    directHips.push_back(*hip);
+                }
+                if (child.isArray() || child.isObject()) {
+                    hasNestedCollections = true;
+                }
+            }
+
+            if (directHips.size() >= 2) {
+                hipSequences.push_back(std::move(directHips));
+            }
+
+            if (hasNestedCollections) {
+                for (const QJsonValue& child : array) {
+                    self(self, child);
+                }
+            }
+            return;
+        }
+
+        if (value.isObject()) {
+            const QJsonObject object = value.toObject();
+            for (auto it = object.begin(); it != object.end(); ++it) {
+                self(self, it.value());
+            }
+        }
+    };
+
+    if (!constellationsValue.isUndefined()) {
+        collectHipSequences(collectHipSequences, constellationsValue);
+    }
+    const QJsonValue asterismsValue = document.object().value("asterisms");
+    if (!asterismsValue.isUndefined()) {
+        collectHipSequences(collectHipSequences, asterismsValue);
+    }
+
+    for (const auto& sequence : hipSequences) {
+        for (std::size_t index = 1; index < sequence.size(); ++index) {
+            const std::string startId = "hip_" + std::to_string(sequence[index - 1]);
+            const std::string endId = "hip_" + std::to_string(sequence[index]);
+            const std::string dedupKey = startId + "|" + endId;
+            if (!dedupKeys.insert(dedupKey).second) {
+                continue;
+            }
+            lineRefs.emplace_back(startId, endId);
+        }
+    }
+
+    return lineRefs;
+}
 
 QString formatCoordinate(double value)
 {
@@ -278,6 +555,57 @@ QByteArray serializeCatalogRows(const std::vector<skygate::ephemeris::CelestialB
     return rows;
 }
 
+QByteArray serializeConstellationLineRows(
+    const std::vector<std::pair<std::string, std::string>>& lineRefs
+)
+{
+    QByteArray rows;
+    rows.reserve(static_cast<int>(lineRefs.size() * 24));
+    for (const auto& lineRef : lineRefs) {
+        if (lineRef.first.empty() || lineRef.second.empty()) {
+            continue;
+        }
+
+        rows.append(QByteArray::fromStdString(lineRef.first));
+        rows.append('|');
+        rows.append(QByteArray::fromStdString(lineRef.second));
+        rows.append('\n');
+    }
+    return rows;
+}
+
+std::vector<std::pair<std::string, std::string>> parseConstellationLineRows(
+    const std::string_view rows
+)
+{
+    std::vector<std::pair<std::string, std::string>> lineRefs;
+    std::size_t cursor = 0;
+    while (cursor < rows.size()) {
+        const std::size_t newline = rows.find('\n', cursor);
+        const std::size_t lineEnd =
+            newline == std::string_view::npos ? rows.size() : newline;
+        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
+
+        if (!line.empty()) {
+            const std::size_t delimiter = line.find('|');
+            if (delimiter != std::string_view::npos) {
+                const std::string_view startId = line.substr(0, delimiter);
+                const std::string_view endId = line.substr(delimiter + 1);
+                if (!startId.empty() && !endId.empty()) {
+                    lineRefs.emplace_back(std::string(startId), std::string(endId));
+                }
+            }
+        }
+
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        cursor = newline + 1;
+    }
+
+    return lineRefs;
+}
+
 double pointSizeForMagnitude(const double magnitude)
 {
     const double normalizedBrightness = std::clamp(1.0 - ((magnitude + 1.5) / 8.0), 0.2, 1.0);
@@ -368,6 +696,7 @@ SkyContextController::SkyContextController(
 {
     m_networkAccessManager = new QNetworkAccessManager(this);
     m_catalogCoordinator = std::make_unique<CatalogCoordinator>(m_networkAccessManager);
+    resetConstellationLineRefs();
 
     if (m_starCatalog == nullptr) {
         m_starCatalog = skygate::ephemeris::createBundledStarCatalog();
@@ -499,7 +828,7 @@ int SkyContextController::catalogPresetIndex() const noexcept
 
 void SkyContextController::setCatalogPresetIndex(int catalogPresetIndex)
 {
-    m_catalogPresetIndex = std::clamp(catalogPresetIndex, 0, 3);
+    m_catalogPresetIndex = std::clamp(catalogPresetIndex, 0, 4);
 }
 
 QString SkyContextController::catalogUrlText() const
@@ -670,11 +999,11 @@ std::vector<SkyContextController::SkyRenderLine> SkyContextController::renderCon
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
     std::vector<SkyRenderLine> lines;
-    lines.reserve(kConstellationLineRefs.size());
+    lines.reserve(m_constellationLineRefs.size());
 
-    for (const auto& lineRef : kConstellationLineRefs) {
-        const auto* startHorizontal = findHorizontal(lineRef.startId);
-        const auto* endHorizontal = findHorizontal(lineRef.endId);
+    for (const auto& lineRef : m_constellationLineRefs) {
+        const auto* startHorizontal = findHorizontal(lineRef.first);
+        const auto* endHorizontal = findHorizontal(lineRef.second);
         if (startHorizontal == nullptr || endHorizontal == nullptr) {
             continue;
         }
@@ -1319,6 +1648,10 @@ void SkyContextController::persistCatalogCache(
     settings.setValue(settingsKey("version"), kSettingsVersion);
     settings.setValue(settingsKey("catalogCachePath"), configuredPath);
     settings.setValue(settingsKey("catalogSourceLabel"), sourceLabel);
+    settings.setValue(
+        settingsKey("catalogConstellationLineRefs"),
+        serializeConstellationLineRows(m_constellationLineRefs)
+    );
     settings.sync();
 }
 
@@ -1358,6 +1691,22 @@ void SkyContextController::restoreCatalogCache()
         QString("Saved")
     ).toString();
     applyCatalog(std::move(restoredCatalog), QString("%1 (saved)").arg(sourceLabel), false);
+
+    const QByteArray constellationLineRows = settings.value(
+        settingsKey("catalogConstellationLineRefs")
+    ).toByteArray();
+    if (!constellationLineRows.isEmpty()) {
+        auto parsedLineRefs = parseConstellationLineRows(
+            std::string_view(
+                constellationLineRows.constData(),
+                static_cast<std::size_t>(constellationLineRows.size())
+            )
+        );
+        if (!parsedLineRefs.empty()) {
+            setConstellationLineRefs(std::move(parsedLineRefs));
+            emit skyContextChanged();
+        }
+    }
 }
 
 double SkyContextController::projectedX(
@@ -1448,12 +1797,14 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
     const QString normalizedPresetId = presetId.trimmed().toLower();
     if (normalizedPresetId == "bundled") {
         setCatalogPresetIndex(0);
+        resetConstellationLineRefs();
         applyCatalog(skygate::ephemeris::createBundledStarCatalog(), "Bundled");
         return;
     }
 
     if (normalizedPresetId == "starter") {
         setCatalogPresetIndex(1);
+        resetConstellationLineRefs();
         applyCatalog(
             skygate::ephemeris::createStarCatalogFromRows(kStarterCatalogRows),
             "Starter"
@@ -1463,6 +1814,7 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
 
     if (normalizedPresetId == "constellations_major") {
         setCatalogPresetIndex(2);
+        resetConstellationLineRefs();
         applyCatalog(
             skygate::ephemeris::createStarCatalogFromRows(kMajorConstellationsCatalogRows),
             "Major Constellations"
@@ -1472,14 +1824,19 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
 
     if (normalizedPresetId == "hyg_v3") {
         setCatalogPresetIndex(3);
-        setCatalogUrlText(QString::fromUtf8(kHygCatalogGithubMirrorUrl));
+        setCatalogUrlText(QString::fromUtf8(kHygCatalogPrimaryUrl));
         downloadCatalogFromUrls(
             QStringList {
                 QString::fromUtf8(kHygCatalogPrimaryUrl),
                 QString::fromUtf8(kHygCatalogMirrorUrl),
-                QString::fromUtf8(kHygCatalogGithubMirrorUrl)
+                QString::fromUtf8(kHygCatalogMirror2Url)
             },
-            "HYG v3"
+            "HYG v3",
+            QStringList {
+                QString::fromUtf8(kStellariumConstellationLinesPrimaryUrl),
+                QString::fromUtf8(kStellariumConstellationLinesMirrorUrl),
+                QString::fromUtf8(kStellariumConstellationLinesCdnUrl)
+            }
         );
         return;
     }
@@ -1494,7 +1851,11 @@ void SkyContextController::downloadCatalogFromUrl(const QString& urlText)
     downloadCatalogFromUrls(QStringList {urlText}, "Downloaded");
 }
 
-void SkyContextController::downloadCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel)
+void SkyContextController::downloadCatalogFromUrls(
+    const QStringList& urlTexts,
+    const QString& sourceLabel,
+    const QStringList& constellationLineUrlTexts
+)
 {
     if (m_downloadingCatalog) {
         return;
@@ -1516,19 +1877,111 @@ void SkyContextController::downloadCatalogFromUrls(const QStringList& urlTexts, 
             m_catalogStatusText = statusText;
             emit catalogStatusTextChanged();
         },
-        [this, sourceLabel](CatalogCoordinator::DownloadResult result) {
-            m_downloadingCatalog = false;
-            emit downloadingCatalogChanged();
-
+        [this, sourceLabel, constellationLineUrlTexts](CatalogCoordinator::DownloadResult result) {
             if (result.catalog == nullptr) {
+                m_downloadingCatalog = false;
+                emit downloadingCatalogChanged();
                 m_catalogStatusText = result.errorText;
                 emit catalogStatusTextChanged();
                 return;
             }
 
             applyCatalog(std::move(result.catalog), sourceLabel);
+            m_downloadingCatalog = false;
+            emit downloadingCatalogChanged();
+
+            if (constellationLineUrlTexts.isEmpty()) {
+                return;
+            }
+
+            resetConstellationLineRefs();
+            const QString catalogSummaryText = m_catalogStatusText;
+            m_catalogCoordinator->downloadRawDataFromUrls(
+                constellationLineUrlTexts,
+                this,
+                [this, catalogSummaryText](const QString& statusText) {
+                    QString normalizedStatusText = statusText;
+                    if (normalizedStatusText.startsWith("Catalog: ")) {
+                        normalizedStatusText.remove(0, 9);
+                    }
+                    m_catalogStatusText = QString("%1 | Constellation lines: %2").arg(
+                        catalogSummaryText,
+                        normalizedStatusText
+                    );
+                    emit catalogStatusTextChanged();
+                },
+                [this, catalogSummaryText](CatalogCoordinator::RawDownloadResult lineResult) {
+                    if (lineResult.payload.isEmpty()) {
+                        const QString reason = lineResult.errorText.isEmpty()
+                            ? QString("unavailable")
+                            : lineResult.errorText;
+                        m_catalogStatusText = QString("%1 | Constellation lines: fallback default (%2)").arg(
+                            catalogSummaryText,
+                            reason
+                        );
+                        emit catalogStatusTextChanged();
+                        if (m_starCatalog != nullptr) {
+                            persistCatalogCache(m_starCatalog->bodies(), m_catalogSourceLabel);
+                        }
+                        emit skyContextChanged();
+                        return;
+                    }
+
+                    const std::string_view rows(
+                        lineResult.payload.constData(),
+                        static_cast<std::size_t>(lineResult.payload.size())
+                    );
+                    auto parsedLineRefs = parseStellariumConstellationLineRefs(rows);
+                    if (parsedLineRefs.empty()) {
+                        parsedLineRefs = parseStellariumIndexJsonConstellationLineRefs(lineResult.payload);
+                    }
+                    if (parsedLineRefs.empty()) {
+                        QString payloadPreview = QString::fromUtf8(lineResult.payload.left(120)).simplified();
+                        if (payloadPreview.isEmpty()) {
+                            payloadPreview = "<empty>";
+                        }
+                        m_catalogStatusText = QString(
+                            "%1 | Constellation lines: fallback default (parse failed: %2)"
+                        ).arg(catalogSummaryText, payloadPreview);
+                        emit catalogStatusTextChanged();
+                        if (m_starCatalog != nullptr) {
+                            persistCatalogCache(m_starCatalog->bodies(), m_catalogSourceLabel);
+                        }
+                        emit skyContextChanged();
+                        return;
+                    }
+
+                    setConstellationLineRefs(std::move(parsedLineRefs));
+                    if (m_starCatalog != nullptr) {
+                        persistCatalogCache(m_starCatalog->bodies(), m_catalogSourceLabel);
+                    }
+                    m_catalogStatusText =
+                        QString("%1 | Constellation lines: %2 segments").arg(
+                            catalogSummaryText,
+                            QString::number(static_cast<qulonglong>(m_constellationLineRefs.size()))
+                        );
+                    emit catalogStatusTextChanged();
+                    emit skyContextChanged();
+                }
+            );
         }
     );
+}
+
+void SkyContextController::resetConstellationLineRefs()
+{
+    m_constellationLineRefs = defaultConstellationLineRefs();
+}
+
+void SkyContextController::setConstellationLineRefs(
+    std::vector<std::pair<std::string, std::string>> lineRefs
+)
+{
+    if (lineRefs.empty()) {
+        resetConstellationLineRefs();
+        return;
+    }
+    m_constellationLineRefs = std::move(lineRefs);
 }
 
 void SkyContextController::applyCatalog(

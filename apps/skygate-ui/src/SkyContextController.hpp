@@ -12,6 +12,8 @@
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 class QGeoPositionInfo;
@@ -161,7 +163,13 @@ private:
         const QString& sourceLabel,
         bool persistCatalog = true
     );
-    void downloadCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel);
+    void downloadCatalogFromUrls(
+        const QStringList& urlTexts,
+        const QString& sourceLabel,
+        const QStringList& constellationLineUrlTexts = {}
+    );
+    void resetConstellationLineRefs();
+    void setConstellationLineRefs(std::vector<std::pair<std::string, std::string>> lineRefs);
     void persistCatalogCache(
         const std::vector<skygate::ephemeris::CelestialBody>& bodies,
         const QString& sourceLabel
@@ -191,5 +199,6 @@ private:
     int m_catalogPresetIndex = 0;
     QString m_catalogUrlText;
     bool m_downloadingCatalog = false;
+    std::vector<std::pair<std::string, std::string>> m_constellationLineRefs;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };
