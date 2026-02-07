@@ -24,6 +24,27 @@ ApplicationWindow {
         return nearest
     }
 
+    function overlapsTimelinePanel(itemX, itemY, itemWidth, itemHeight) {
+        if (timelineToolbar.width <= 1 || timelineToolbar.opacity <= 0.05) {
+            return false
+        }
+
+        const margin = 4
+        const panelLeft = timelineToolbar.x - margin
+        const panelTop = timelineToolbar.y - margin
+        const panelRight = timelineToolbar.x + timelineToolbar.width + margin
+        const panelBottom = timelineToolbar.y + timelineToolbar.height + margin
+
+        const itemLeft = itemX
+        const itemTop = itemY
+        const itemRight = itemX + itemWidth
+        const itemBottom = itemY + itemHeight
+        return itemLeft < panelRight
+            && itemRight > panelLeft
+            && itemTop < panelBottom
+            && itemBottom > panelTop
+    }
+
     menuBar: MenuBar {
         Menu {
             title: "&App"
@@ -241,6 +262,7 @@ ApplicationWindow {
                 required property var modelData
                 x: modelData.x - (width * 0.5)
                 y: modelData.y - height - 8
+                visible: !root.overlapsTimelinePanel(x, y, width, height)
                 radius: 5
                 color: "#aa071328"
                 border.width: 1
@@ -317,17 +339,29 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.margins: 14
-            width: timelineToolbarRow.implicitWidth + 16
+            property bool collapsed: false
+            readonly property real expandedWidth: timelineToolbarRow.implicitWidth + 16
+            width: collapsed ? 0 : expandedWidth
             height: timelineToolbarRow.implicitHeight + 14
             radius: 10
             color: "#7f0b1428"
             border.width: 1
             border.color: "#335177"
+            opacity: collapsed ? 0.0 : 1.0
+
+            Behavior on width {
+                NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+            }
 
             Row {
                 id: timelineToolbarRow
                 anchors.centerIn: parent
                 spacing: 6
+                visible: !timelineToolbar.collapsed
+                enabled: !timelineToolbar.collapsed
 
                 property var speedValues: [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
                 property var stepValues: [1, 10, 60, 300, 3600]
@@ -491,6 +525,42 @@ ApplicationWindow {
                     ToolTip.delay: 250
                     ToolTip.text: "Set star visual magnitude limit (higher value shows more stars)"
                 }
+            }
+        }
+
+        ToolButton {
+            id: timelineToolbarToggle
+            anchors.verticalCenter: timelineToolbar.verticalCenter
+            anchors.right: timelineToolbar.left
+            anchors.rightMargin: 6
+            width: 30
+            height: 44
+            text: timelineToolbar.collapsed ? "\u25B6" : "\u25C0"
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+            z: 11
+            onClicked: timelineToolbar.collapsed = !timelineToolbar.collapsed
+            ToolTip.visible: hovered
+            ToolTip.delay: 250
+            ToolTip.text: timelineToolbar.collapsed
+                ? "Show timeline panel"
+                : "Hide timeline panel"
+
+            contentItem: Text {
+                text: timelineToolbarToggle.text
+                color: "#eaf7ff"
+                font: timelineToolbarToggle.font
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            background: Rectangle {
+                radius: 8
+                color: timelineToolbarToggle.down
+                    ? "#27476d"
+                    : (timelineToolbarToggle.hovered ? "#315881" : "#1a3352")
+                border.width: 1
+                border.color: "#6fbde6"
             }
         }
 
