@@ -24,28 +24,6 @@ ApplicationWindow {
         return nearest
     }
 
-    function normalizeAzimuth(azimuthDeg) {
-        let normalized = azimuthDeg % 360.0
-        if (normalized < 0.0) {
-            normalized += 360.0
-        }
-        return normalized
-    }
-
-    function cardinalLabel(azimuthDeg) {
-        const normalized = normalizeAzimuth(azimuthDeg)
-        if (normalized >= 315.0 || normalized < 45.0) {
-            return "N"
-        }
-        if (normalized < 135.0) {
-            return "E"
-        }
-        if (normalized < 225.0) {
-            return "S"
-        }
-        return "W"
-    }
-
     menuBar: MenuBar {
         Menu {
             title: "&App"
@@ -253,35 +231,6 @@ ApplicationWindow {
             }
         }
 
-        Label {
-            id: horizonDirectionLabel
-            readonly property real viewAltitudeDeg: skyContext.viewCenterAltitudeDeg
-            readonly property real viewAzimuthDeg: skyContext.viewCenterAzimuthDeg
-            readonly property string projectionTypeText: skyContext.projectionTypeText
-            readonly property real markerX: {
-                viewAltitudeDeg
-                projectionTypeText
-                return skyContext.projectedX(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
-            }
-            readonly property real markerY: {
-                viewAltitudeDeg
-                projectionTypeText
-                return skyContext.projectedY(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
-            }
-
-            text: root.cardinalLabel(viewAzimuthDeg)
-            color: "#c8ddff"
-            font.family: "Avenir Next"
-            font.bold: true
-            visible: {
-                viewAltitudeDeg
-                projectionTypeText
-                return skyContext.isProjectedVisible(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
-            }
-            x: markerX - (implicitWidth * 0.5)
-            y: markerY - implicitHeight - 6
-        }
-
         Repeater {
             model: [
                 { label: "N", azimuthDeg: 0.0, color: "#9ce7ff" },
@@ -292,26 +241,23 @@ ApplicationWindow {
 
             delegate: Rectangle {
                 required property var modelData
-                readonly property real viewAltitudeDeg: skyContext.viewCenterAltitudeDeg
-                readonly property real viewAzimuthDeg: skyContext.viewCenterAzimuthDeg
-                readonly property string projectionTypeText: skyContext.projectionTypeText
                 readonly property real markerX: {
-                    viewAltitudeDeg
-                    viewAzimuthDeg
-                    projectionTypeText
+                    skyContext.viewCenterAltitudeDeg
+                    skyContext.viewCenterAzimuthDeg
+                    skyContext.projectionTypeText
                     return skyContext.projectedX(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
                 readonly property real markerY: {
-                    viewAltitudeDeg
-                    viewAzimuthDeg
-                    projectionTypeText
+                    skyContext.viewCenterAltitudeDeg
+                    skyContext.viewCenterAzimuthDeg
+                    skyContext.projectionTypeText
                     return skyContext.projectedY(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
 
                 visible: {
-                    viewAltitudeDeg
-                    viewAzimuthDeg
-                    projectionTypeText
+                    skyContext.viewCenterAltitudeDeg
+                    skyContext.viewCenterAzimuthDeg
+                    skyContext.projectionTypeText
                     return skyContext.isProjectedVisible(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
                 x: markerX - (width * 0.5)
