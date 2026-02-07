@@ -17,8 +17,10 @@ qt_add_executable(skygate-ui
     src/SkyContextController.hpp
     src/SkyViewportItem.cpp
     src/SkyViewportItem.hpp
-    resources/icons.qrc
 )
+
+qt_add_resources(skygateUiIconSources resources/icons.qrc)
+target_sources(skygate-ui PRIVATE ${skygateUiIconSources})
 
 if(APPLE)
     set(SKYGATE_LOCATION_USAGE_DESCRIPTION "Skygate uses your location to prefill observer latitude, longitude, and elevation.")
@@ -33,6 +35,12 @@ if(APPLE)
     target_sources(skygate-ui PRIVATE resources/icons/Skygate.icns)
     set_target_properties(skygate-ui PROPERTIES
         MACOSX_BUNDLE TRUE
+        OUTPUT_NAME "StarGate"
+        MACOSX_BUNDLE_BUNDLE_NAME "StarGate"
+        MACOSX_BUNDLE_EXECUTABLE_NAME "StarGate"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.skygate.app"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_ICON_FILE Skygate
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/macos/Info.plist.in
     )
@@ -44,6 +52,8 @@ qt_add_qml_module(skygate-ui
     RESOURCE_PREFIX /qt/qml/
     QML_FILES
         Main.qml
+    RESOURCES
+        resources/icons/skygate-icon-512.png
 )
 
 target_link_libraries(skygate-ui
