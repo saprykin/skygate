@@ -15,6 +15,11 @@ qt_add_executable(skygate-ui
     src/CatalogCoordinator.hpp
     src/SkyContextController.cpp
     src/SkyContextController.hpp
+    src/SkyContextControllerCatalog.cpp
+    src/SkyContextControllerSettings.cpp
+    src/SkyContextControllerSupport.cpp
+    src/SkyContextControllerSupport.hpp
+    src/SkyContextControllerTimeline.cpp
     src/SkyViewportItem.cpp
     src/SkyViewportItem.hpp
 )
@@ -51,7 +56,14 @@ qt_add_qml_module(skygate-ui
     VERSION 1.0
     RESOURCE_PREFIX /qt/qml/
     QML_FILES
+        AboutWindow.qml
         Main.qml
+        PreferencesActionButton.qml
+        PreferencesCatalogSection.qml
+        PreferencesCheckBox.qml
+        PreferencesComboBox.qml
+        PreferencesTextField.qml
+        PreferencesWindow.qml
     RESOURCES
         resources/icons/skygate-icon-512.png
 )
