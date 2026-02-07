@@ -55,6 +55,28 @@ Item {
                 }
             }
 
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: false
+                Layout.preferredHeight: 82
+                Layout.minimumHeight: 82
+                radius: 9
+                color: "#0c1830"
+                border.width: 1
+                border.color: "#2b4a72"
+
+                Label {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    text: skyContextController.catalogDatasetInfoText
+                    color: "#9ab0d6"
+                    font.pixelSize: 12
+                    font.family: "Avenir Next"
+                    wrapMode: Text.Wrap
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+
             Label {
                 visible: catalogPresetCombo.currentIndex === 2
                 Layout.preferredHeight: visible ? implicitHeight : 0
@@ -92,6 +114,12 @@ Item {
                     enabled: !skyContextController.downloadingCatalog
                     onClicked: skyContextController.downloadCatalogFromUrl(catalogUrlInput.text)
                 }
+            }
+
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 0
             }
 
             Rectangle {
@@ -167,28 +195,6 @@ Item {
                             }
                         }
                     }
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: false
-                Layout.preferredHeight: 82
-                Layout.minimumHeight: 82
-                radius: 9
-                color: "#0c1830"
-                border.width: 1
-                border.color: "#2b4a72"
-
-                Label {
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    text: skyContextController.catalogDatasetInfoText
-                    color: "#9ab0d6"
-                    font.pixelSize: 12
-                    font.family: "Avenir Next"
-                    wrapMode: Text.Wrap
-                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }

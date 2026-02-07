@@ -396,6 +396,9 @@ Window {
 
                             PreferencesCatalogSection {
                                 id: catalogSection
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                Layout.alignment: Qt.AlignTop
                                 skyContextController: preferencesWindow.skyContextController
                             }
                         }
