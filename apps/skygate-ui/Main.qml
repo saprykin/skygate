@@ -198,7 +198,7 @@ ApplicationWindow {
                     spacing: 16
 
                     Label {
-                        text: "Sky Preferences"
+                        text: "Preferences"
                         color: "#e8f0ff"
                         font.family: "Avenir Next"
                         font.pixelSize: 28
@@ -206,7 +206,7 @@ ApplicationWindow {
                     }
 
                     Label {
-                        text: "Observer, time, and projection settings"
+                        text: "Observer settings and catalog management"
                         color: "#9bb1d9"
                         font.family: "Avenir Next"
                     }
@@ -219,99 +219,202 @@ ApplicationWindow {
                         border.width: 1
                         border.color: "#243b67"
 
-                        GridLayout {
+                        ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 16
-                            columns: 2
-                            rowSpacing: 10
-                            columnSpacing: 12
+                            spacing: 12
 
-                            Label {
-                                text: "Live updates"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            CheckBox {
-                                id: liveCheckBox
-                            }
-
-                            Label {
-                                text: "UTC Date"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            TextField {
-                                id: utcDateInput
+                            TabBar {
+                                id: preferencesTabBar
                                 Layout.fillWidth: true
-                                placeholderText: "YYYY-MM-DD"
-                            }
 
-                            Label {
-                                text: "UTC Time"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            TextField {
-                                id: utcTimeInput
-                                Layout.fillWidth: true
-                                placeholderText: "HH:MM:SS"
-                            }
+                                TabButton {
+                                    text: "Sky"
+                                }
 
-                            Label {
-                                text: "Latitude"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            TextField {
-                                id: latitudeInput
-                                Layout.fillWidth: true
-                                placeholderText: "-90..90"
-                                validator: DoubleValidator {
-                                    bottom: -90.0
-                                    top: 90.0
-                                    notation: DoubleValidator.StandardNotation
+                                TabButton {
+                                    text: "Catalog"
                                 }
                             }
 
-                            Label {
-                                text: "Longitude"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            TextField {
-                                id: longitudeInput
+                            StackLayout {
+                                currentIndex: preferencesTabBar.currentIndex
                                 Layout.fillWidth: true
-                                placeholderText: "-180..180"
-                                validator: DoubleValidator {
-                                    bottom: -180.0
-                                    top: 180.0
-                                    notation: DoubleValidator.StandardNotation
-                                }
-                            }
+                                Layout.fillHeight: true
 
-                            Label {
-                                text: "Elevation (m)"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            TextField {
-                                id: elevationInput
-                                Layout.fillWidth: true
-                                placeholderText: "meters"
-                                validator: DoubleValidator {
-                                    notation: DoubleValidator.StandardNotation
-                                }
-                            }
+                                Item {
+                                    GridLayout {
+                                        anchors.fill: parent
+                                        columns: 2
+                                        rowSpacing: 10
+                                        columnSpacing: 12
 
-                            Label {
-                                text: "Projection"
-                                color: "#cad9f7"
-                                font.family: "Avenir Next"
-                            }
-                            ComboBox {
-                                id: projectionCombo
-                                Layout.fillWidth: true
-                                model: ["Stereographic", "AzimuthalEquidistant"]
+                                        Label {
+                                            text: "Live updates"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        CheckBox {
+                                            id: liveCheckBox
+                                        }
+
+                                        Label {
+                                            text: "UTC Date"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        TextField {
+                                            id: utcDateInput
+                                            Layout.fillWidth: true
+                                            placeholderText: "YYYY-MM-DD"
+                                        }
+
+                                        Label {
+                                            text: "UTC Time"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        TextField {
+                                            id: utcTimeInput
+                                            Layout.fillWidth: true
+                                            placeholderText: "HH:MM:SS"
+                                        }
+
+                                        Label {
+                                            text: "Latitude"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        TextField {
+                                            id: latitudeInput
+                                            Layout.fillWidth: true
+                                            placeholderText: "-90..90"
+                                            validator: DoubleValidator {
+                                                bottom: -90.0
+                                                top: 90.0
+                                                notation: DoubleValidator.StandardNotation
+                                            }
+                                        }
+
+                                        Label {
+                                            text: "Longitude"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        TextField {
+                                            id: longitudeInput
+                                            Layout.fillWidth: true
+                                            placeholderText: "-180..180"
+                                            validator: DoubleValidator {
+                                                bottom: -180.0
+                                                top: 180.0
+                                                notation: DoubleValidator.StandardNotation
+                                            }
+                                        }
+
+                                        Label {
+                                            text: "Elevation (m)"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        TextField {
+                                            id: elevationInput
+                                            Layout.fillWidth: true
+                                            placeholderText: "meters"
+                                            validator: DoubleValidator {
+                                                notation: DoubleValidator.StandardNotation
+                                            }
+                                        }
+
+                                        Label {
+                                            text: "Projection"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+                                        ComboBox {
+                                            id: projectionCombo
+                                            Layout.fillWidth: true
+                                            model: ["Stereographic", "AzimuthalEquidistant"]
+                                        }
+                                    }
+                                }
+
+                                Item {
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        spacing: 10
+
+                                        Label {
+                                            text: "Catalog preset"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+
+                                            ComboBox {
+                                                id: catalogPresetCombo
+                                                Layout.fillWidth: true
+                                                model: [
+                                                    "Bundled (recommended)",
+                                                    "Starter (bright objects)",
+                                                    "Major constellations",
+                                                    "HYG v3 stars (Astronexus)"
+                                                ]
+                                            }
+
+                                            Button {
+                                                text: "Use Preset"
+                                                onClicked: {
+                                                    if (catalogPresetCombo.currentIndex === 0) {
+                                                        skyContext.loadCatalogPreset("bundled")
+                                                    } else if (catalogPresetCombo.currentIndex === 1) {
+                                                        skyContext.loadCatalogPreset("starter")
+                                                    } else if (catalogPresetCombo.currentIndex === 2) {
+                                                        skyContext.loadCatalogPreset("constellations_major")
+                                                    } else {
+                                                        skyContext.loadCatalogPreset("hyg_v3")
+                                                        catalogUrlInput.text = "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv"
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Label {
+                                            text: "Catalog URL"
+                                            color: "#cad9f7"
+                                            font.family: "Avenir Next"
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+
+                                            TextField {
+                                                id: catalogUrlInput
+                                                Layout.fillWidth: true
+                                                text: "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
+                                                placeholderText: "https://example.com/skygate-catalog.txt or HYG CSV URL"
+                                            }
+
+                                            Button {
+                                                text: skyContext.downloadingCatalog ? "Downloading..." : "Download"
+                                                enabled: !skyContext.downloadingCatalog
+                                                onClicked: skyContext.downloadCatalogFromUrl(catalogUrlInput.text)
+                                            }
+                                        }
+
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: skyContext.catalogStatusText
+                                            color: "#9ab0d6"
+                                            font.pixelSize: 12
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -546,86 +649,5 @@ ApplicationWindow {
             }
         }
 
-        Rectangle {
-            id: catalogToolbar
-            anchors.top: timelineToolbar.bottom
-            anchors.topMargin: 10
-            anchors.right: parent.right
-            anchors.rightMargin: 14
-            width: catalogToolbarColumn.implicitWidth + 16
-            height: catalogToolbarColumn.implicitHeight + 14
-            radius: 10
-            color: "#7f0b1428"
-            border.width: 1
-            border.color: "#335177"
-
-            Column {
-                id: catalogToolbarColumn
-                anchors.centerIn: parent
-                spacing: 6
-
-                Label {
-                    text: "Catalog"
-                    color: "#cad9f7"
-                    font.family: "Avenir Next"
-                }
-
-                Row {
-                    spacing: 6
-
-                    ComboBox {
-                        id: catalogPresetCombo
-                        width: 240
-                        model: [
-                            "Bundled (recommended)",
-                            "Starter (bright objects)",
-                            "Major constellations",
-                            "HYG v3 stars (Astronexus)"
-                        ]
-                    }
-
-                    Button {
-                        text: "Use Preset"
-                        onClicked: {
-                            if (catalogPresetCombo.currentIndex === 0) {
-                                skyContext.loadCatalogPreset("bundled")
-                            } else if (catalogPresetCombo.currentIndex === 1) {
-                                skyContext.loadCatalogPreset("starter")
-                            } else if (catalogPresetCombo.currentIndex === 2) {
-                                skyContext.loadCatalogPreset("constellations_major")
-                            } else {
-                                skyContext.loadCatalogPreset("hyg_v3")
-                                catalogUrlInput.text = "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv"
-                            }
-                        }
-                    }
-                }
-
-                Row {
-                    spacing: 6
-
-                    TextField {
-                        id: catalogUrlInput
-                        width: 320
-                        text: "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
-                        placeholderText: "https://example.com/skygate-catalog.txt or HYG CSV URL"
-                    }
-
-                    Button {
-                        text: skyContext.downloadingCatalog ? "Downloading..." : "Download"
-                        enabled: !skyContext.downloadingCatalog
-                        onClicked: skyContext.downloadCatalogFromUrl(catalogUrlInput.text)
-                    }
-                }
-
-                Label {
-                    text: skyContext.catalogStatusText
-                    color: "#9ab0d6"
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                    width: 420
-                }
-            }
-        }
     }
 }

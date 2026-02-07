@@ -3,7 +3,12 @@
 
 #include <Qt>
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QSaveFile>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QTimeZone>
 #include <QColor>
 #include <QNetworkAccessManager>
@@ -42,6 +47,7 @@ constexpr double kMagnitudeCutoffMin = -2.0;
 constexpr double kMagnitudeCutoffMax = 12.0;
 constexpr double kViewAltitudeMinDeg = -90.0;
 constexpr double kViewAltitudeMaxDeg = 90.0;
+constexpr const char* kCatalogCacheFileName = "catalog-cache-v1.txt";
 constexpr const char* kHygCatalogPrimaryUrl =
     "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
 constexpr const char* kHygCatalogMirrorUrl =
@@ -118,6 +124,71 @@ skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcTime)
 QString settingsKey(const QString& name)
 {
     return QString("skyContext/%1").arg(name);
+}
+
+QString bodyTypeToString(const skygate::ephemeris::CelestialBodyType type)
+{
+    switch (type) {
+    case skygate::ephemeris::CelestialBodyType::Star:
+        return "Star";
+    case skygate::ephemeris::CelestialBodyType::Planet:
+        return "Planet";
+    case skygate::ephemeris::CelestialBodyType::Moon:
+        return "Moon";
+    case skygate::ephemeris::CelestialBodyType::Sun:
+        return "Sun";
+    case skygate::ephemeris::CelestialBodyType::Constellation:
+        return "Constellation";
+    }
+
+    return "Star";
+}
+
+QString defaultCatalogCachePath()
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        return {};
+    }
+
+    return QDir(appDataPath).filePath(QString::fromUtf8(kCatalogCacheFileName));
+}
+
+QString sanitizeCatalogField(QString value)
+{
+    value.replace('|', '/');
+    value.replace('\n', ' ');
+    value.replace('\r', ' ');
+    return value.trimmed();
+}
+
+QByteArray serializeCatalogRows(const std::vector<skygate::ephemeris::CelestialBody>& bodies)
+{
+    QByteArray rows;
+    rows.reserve(static_cast<int>(bodies.size() * 64));
+    for (const auto& body : bodies) {
+        const QString id = sanitizeCatalogField(QString::fromStdString(body.id));
+        const QString displayName = sanitizeCatalogField(QString::fromStdString(body.displayName));
+        if (id.isEmpty() || displayName.isEmpty()) {
+            continue;
+        }
+
+        rows.append(id.toUtf8());
+        rows.append('|');
+        rows.append(displayName.toUtf8());
+        rows.append('|');
+        rows.append(bodyTypeToString(body.type).toUtf8());
+        rows.append('|');
+        rows.append(QByteArray::number(body.visualMagnitude, 'g', 17));
+        if (body.fixedEquatorial.has_value()) {
+            rows.append('|');
+            rows.append(QByteArray::number(body.fixedEquatorial->rightAscensionHours, 'g', 17));
+            rows.append('|');
+            rows.append(QByteArray::number(body.fixedEquatorial->declinationDeg, 'g', 17));
+        }
+        rows.append('\n');
+    }
+    return rows;
 }
 
 double pointSizeForMagnitude(const double magnitude)
@@ -205,7 +276,7 @@ SkyContextController::SkyContextController(
     }
 
     if (m_starCatalog != nullptr) {
-        applyCatalog(std::move(m_starCatalog), "Bundled");
+        applyCatalog(std::move(m_starCatalog), "Bundled", false);
     } else {
         m_catalogStatusText = "Catalog: Unavailable";
     }
@@ -894,6 +965,7 @@ bool SkyContextController::saveSettings() const
     settings.setValue(settingsKey("longitudeDeg"), m_skyContext.observer.longitudeDeg);
     settings.setValue(settingsKey("elevationMeters"), m_skyContext.observer.elevationMeters);
     settings.setValue(settingsKey("projectionType"), projectionTypeText());
+    settings.setValue(settingsKey("catalogSourceLabel"), m_catalogSourceLabel);
     settings.sync();
     return settings.status() == QSettings::NoError;
 }
@@ -901,69 +973,157 @@ bool SkyContextController::saveSettings() const
 bool SkyContextController::loadSettings()
 {
     QSettings settings;
-    if (!settings.contains(settingsKey("version"))) {
-        return false;
+    const bool hasSavedContext = settings.contains(settingsKey("version"));
+    if (hasSavedContext) {
+        const bool live = settings.value(settingsKey("live"), m_live).toBool();
+        const double speedMultiplier = settings.value(
+            settingsKey("speedMultiplier"),
+            m_speedMultiplier
+        ).toDouble();
+        const int stepSeconds = settings.value(
+            settingsKey("stepSeconds"),
+            m_stepSeconds
+        ).toInt();
+        const double magnitudeCutoff = settings.value(
+            settingsKey("magnitudeCutoff"),
+            m_magnitudeCutoff
+        ).toDouble();
+        const double viewCenterAltitudeDeg = settings.value(
+            settingsKey("viewCenterAltitudeDeg"),
+            m_viewCenterAltitudeDeg
+        ).toDouble();
+        const double viewCenterAzimuthDeg = settings.value(
+            settingsKey("viewCenterAzimuthDeg"),
+            m_viewCenterAzimuthDeg
+        ).toDouble();
+        const double viewFieldOfViewDeg = settings.value(
+            settingsKey("viewFieldOfViewDeg"),
+            m_viewFieldOfViewDeg
+        ).toDouble();
+        const qint64 utcEpochSeconds = settings.value(
+            settingsKey("utcEpochSeconds"),
+            toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
+        ).toLongLong();
+        const double latitudeDeg = settings.value(
+            settingsKey("latitudeDeg"),
+            m_skyContext.observer.latitudeDeg
+        ).toDouble();
+        const double longitudeDeg = settings.value(
+            settingsKey("longitudeDeg"),
+            m_skyContext.observer.longitudeDeg
+        ).toDouble();
+        const double elevationMeters = settings.value(
+            settingsKey("elevationMeters"),
+            m_skyContext.observer.elevationMeters
+        ).toDouble();
+        const QString projectionType = settings.value(
+            settingsKey("projectionType"),
+            projectionTypeText()
+        ).toString();
+
+        setLive(live);
+        setSpeedMultiplier(speedMultiplier);
+        setStepSeconds(stepSeconds);
+        setMagnitudeCutoff(magnitudeCutoff);
+        setViewCenter(viewCenterAltitudeDeg, viewCenterAzimuthDeg);
+        setViewFieldOfViewDeg(viewFieldOfViewDeg);
+        setCurrentUtc(QDateTime::fromSecsSinceEpoch(utcEpochSeconds, QTimeZone::UTC));
+        setLatitudeText(QString::number(latitudeDeg, 'f', 6));
+        setLongitudeText(QString::number(longitudeDeg, 'f', 6));
+        setElevationText(QString::number(elevationMeters, 'f', 1));
+        setProjectionTypeText(projectionType);
     }
 
-    const bool live = settings.value(settingsKey("live"), m_live).toBool();
-    const double speedMultiplier = settings.value(
-        settingsKey("speedMultiplier"),
-        m_speedMultiplier
-    ).toDouble();
-    const int stepSeconds = settings.value(
-        settingsKey("stepSeconds"),
-        m_stepSeconds
-    ).toInt();
-    const double magnitudeCutoff = settings.value(
-        settingsKey("magnitudeCutoff"),
-        m_magnitudeCutoff
-    ).toDouble();
-    const double viewCenterAltitudeDeg = settings.value(
-        settingsKey("viewCenterAltitudeDeg"),
-        m_viewCenterAltitudeDeg
-    ).toDouble();
-    const double viewCenterAzimuthDeg = settings.value(
-        settingsKey("viewCenterAzimuthDeg"),
-        m_viewCenterAzimuthDeg
-    ).toDouble();
-    const double viewFieldOfViewDeg = settings.value(
-        settingsKey("viewFieldOfViewDeg"),
-        m_viewFieldOfViewDeg
-    ).toDouble();
-    const qint64 utcEpochSeconds = settings.value(
-        settingsKey("utcEpochSeconds"),
-        toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
-    ).toLongLong();
-    const double latitudeDeg = settings.value(
-        settingsKey("latitudeDeg"),
-        m_skyContext.observer.latitudeDeg
-    ).toDouble();
-    const double longitudeDeg = settings.value(
-        settingsKey("longitudeDeg"),
-        m_skyContext.observer.longitudeDeg
-    ).toDouble();
-    const double elevationMeters = settings.value(
-        settingsKey("elevationMeters"),
-        m_skyContext.observer.elevationMeters
-    ).toDouble();
-    const QString projectionType = settings.value(
-        settingsKey("projectionType"),
-        projectionTypeText()
+    restoreCatalogCache();
+    return hasSavedContext;
+}
+
+void SkyContextController::persistCatalogCache(
+    const std::vector<skygate::ephemeris::CelestialBody>& bodies,
+    const QString& sourceLabel
+) const
+{
+    if (bodies.empty()) {
+        return;
+    }
+
+    QByteArray rows = serializeCatalogRows(bodies);
+    if (rows.isEmpty()) {
+        return;
+    }
+
+    QSettings settings;
+    const QString configuredPath = settings.value(
+        settingsKey("catalogCachePath"),
+        defaultCatalogCachePath()
     ).toString();
+    if (configuredPath.isEmpty()) {
+        return;
+    }
 
-    setLive(live);
-    setSpeedMultiplier(speedMultiplier);
-    setStepSeconds(stepSeconds);
-    setMagnitudeCutoff(magnitudeCutoff);
-    setViewCenter(viewCenterAltitudeDeg, viewCenterAzimuthDeg);
-    setViewFieldOfViewDeg(viewFieldOfViewDeg);
-    setCurrentUtc(QDateTime::fromSecsSinceEpoch(utcEpochSeconds, QTimeZone::UTC));
-    setLatitudeText(QString::number(latitudeDeg, 'f', 6));
-    setLongitudeText(QString::number(longitudeDeg, 'f', 6));
-    setElevationText(QString::number(elevationMeters, 'f', 1));
-    setProjectionTypeText(projectionType);
+    const QFileInfo targetInfo(configuredPath);
+    QDir targetDir(targetInfo.absolutePath());
+    if (!targetDir.mkpath(".")) {
+        return;
+    }
 
-    return true;
+    QSaveFile cacheFile(configuredPath);
+    if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return;
+    }
+
+    const qint64 writtenBytes = cacheFile.write(rows);
+    if (writtenBytes != rows.size()) {
+        cacheFile.cancelWriting();
+        return;
+    }
+
+    if (!cacheFile.commit()) {
+        return;
+    }
+
+    settings.setValue(settingsKey("version"), kSettingsVersion);
+    settings.setValue(settingsKey("catalogCachePath"), configuredPath);
+    settings.setValue(settingsKey("catalogSourceLabel"), sourceLabel);
+    settings.sync();
+}
+
+void SkyContextController::restoreCatalogCache()
+{
+    QSettings settings;
+    const QString configuredPath = settings.value(
+        settingsKey("catalogCachePath"),
+        defaultCatalogCachePath()
+    ).toString();
+    if (configuredPath.isEmpty()) {
+        return;
+    }
+
+    QFile cacheFile(configuredPath);
+    if (!cacheFile.exists() || !cacheFile.open(QIODevice::ReadOnly)) {
+        return;
+    }
+
+    const QByteArray rows = cacheFile.readAll();
+    if (rows.isEmpty()) {
+        return;
+    }
+
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> restoredCatalog =
+        skygate::ephemeris::createStarCatalogFromRows(
+            std::string_view(rows.constData(), static_cast<std::size_t>(rows.size()))
+        );
+    if (restoredCatalog == nullptr) {
+        m_catalogStatusText = "Catalog: Saved cache unreadable, using bundled";
+        emit catalogStatusTextChanged();
+        return;
+    }
+
+    const QString sourceLabel = settings.value(
+        settingsKey("catalogSourceLabel"),
+        QString("Saved")
+    ).toString();
+    applyCatalog(std::move(restoredCatalog), QString("%1 (saved)").arg(sourceLabel), false);
 }
 
 double SkyContextController::projectedX(
@@ -1133,7 +1293,8 @@ void SkyContextController::downloadCatalogFromUrls(const QStringList& urlTexts, 
 
 void SkyContextController::applyCatalog(
     std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-    const QString& sourceLabel
+    const QString& sourceLabel,
+    const bool persistCatalog
 )
 {
     catalog = CatalogCoordinator::ensureCoreSolarSystemBodies(std::move(catalog));
@@ -1153,11 +1314,15 @@ void SkyContextController::applyCatalog(
 
     m_starCatalog = std::move(catalog);
     m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
+    m_catalogSourceLabel = sourceLabel;
     m_catalogStatusText = QString("Catalog: %1 (%2 objects, %3 constellations)").arg(
         sourceLabel,
         QString::number(static_cast<qulonglong>(bodies.size())),
         QString::number(static_cast<qulonglong>(constellationCount))
     );
+    if (persistCatalog) {
+        persistCatalogCache(bodies, sourceLabel);
+    }
     emit catalogStatusTextChanged();
     emit skyContextChanged();
 }

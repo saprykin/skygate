@@ -142,9 +142,15 @@ private:
     void setProjectionType(skygate::core::ProjectionType projectionType);
     void applyCatalog(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-        const QString& sourceLabel
+        const QString& sourceLabel,
+        bool persistCatalog = true
     );
     void downloadCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel);
+    void persistCatalogCache(
+        const std::vector<skygate::ephemeris::CelestialBody>& bodies,
+        const QString& sourceLabel
+    ) const;
+    void restoreCatalogCache();
 
 private:
     bool m_live = true;
@@ -165,6 +171,7 @@ private:
     QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_locationStatusText;
     QString m_catalogStatusText;
+    QString m_catalogSourceLabel = "Bundled";
     bool m_downloadingCatalog = false;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };
