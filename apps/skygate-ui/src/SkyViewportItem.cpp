@@ -12,6 +12,10 @@
 
 namespace {
 constexpr int kHorizonSampleCount = 96;
+constexpr int kGridAltitudeStepDeg = 15;
+constexpr int kGridAzimuthStepDeg = 30;
+constexpr int kGridAltitudeSampleCount = 96;
+constexpr int kGridAzimuthSampleCount = 64;
 
 void appendLineSegmentNode(
     QSGNode* rootNode,
@@ -38,6 +42,62 @@ void appendLineSegmentNode(
     node->setFlag(QSGNode::OwnsGeometry, true);
     node->setFlag(QSGNode::OwnsMaterial, true);
     rootNode->appendChildNode(node);
+}
+
+template <typename CoordinateFn>
+void appendProjectedPolyline(
+    QSGNode* rootNode,
+    const SkyContextController* skyContextController,
+    const double viewportWidth,
+    const double viewportHeight,
+    const int sampleCount,
+    const double maxSegmentLengthSquared,
+    const QColor& color,
+    CoordinateFn coordinateFn
+)
+{
+    if (rootNode == nullptr || skyContextController == nullptr || sampleCount <= 0) {
+        return;
+    }
+
+    bool hasPreviousPoint = false;
+    auto previousPoint = skyContextController->projectHorizontal(
+        coordinateFn(0),
+        viewportWidth,
+        viewportHeight
+    );
+
+    for (int index = 0; index <= sampleCount; ++index) {
+        const auto projected = skyContextController->projectHorizontal(
+            coordinateFn(index),
+            viewportWidth,
+            viewportHeight
+        );
+
+        if (!projected.isVisible) {
+            hasPreviousPoint = false;
+            continue;
+        }
+
+        if (hasPreviousPoint) {
+            const double deltaX = projected.x - previousPoint.x;
+            const double deltaY = projected.y - previousPoint.y;
+            const double segmentLengthSquared = deltaX * deltaX + deltaY * deltaY;
+            if (segmentLengthSquared <= maxSegmentLengthSquared) {
+                appendLineSegmentNode(
+                    rootNode,
+                    static_cast<float>(previousPoint.x),
+                    static_cast<float>(previousPoint.y),
+                    static_cast<float>(projected.x),
+                    static_cast<float>(projected.y),
+                    color
+                );
+            }
+        }
+
+        previousPoint = projected;
+        hasPreviousPoint = true;
+    }
 }
 
 void clearChildNodes(QSGNode* rootNode)
@@ -117,45 +177,65 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     const double viewportHeight = height();
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.30;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
-    bool hasPreviousHorizonPoint = false;
-    auto previousHorizonPoint = m_skyContextController->projectHorizontal(
-        {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
-        viewportWidth,
-        viewportHeight
-    );
 
-    for (int index = 0; index <= kHorizonSampleCount; ++index) {
-        const double azimuthDeg = (360.0 * static_cast<double>(index)) / static_cast<double>(kHorizonSampleCount);
-        const auto projected = m_skyContextController->projectHorizontal(
-            {.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg},
-            viewportWidth,
-            viewportHeight
-        );
-
-        if (!projected.isVisible) {
-            hasPreviousHorizonPoint = false;
+    for (int altitudeDeg = -75; altitudeDeg <= 75; altitudeDeg += kGridAltitudeStepDeg) {
+        if (altitudeDeg == 0) {
             continue;
         }
 
-        if (hasPreviousHorizonPoint) {
-            const double deltaX = projected.x - previousHorizonPoint.x;
-            const double deltaY = projected.y - previousHorizonPoint.y;
-            const double segmentLengthSquared = deltaX * deltaX + deltaY * deltaY;
-            if (segmentLengthSquared <= maxSegmentLengthSquared) {
-                appendLineSegmentNode(
-                    rootNode,
-                    static_cast<float>(previousHorizonPoint.x),
-                    static_cast<float>(previousHorizonPoint.y),
-                    static_cast<float>(projected.x),
-                    static_cast<float>(projected.y),
-                    QColor(110, 156, 216, 170)
-                );
+        appendProjectedPolyline(
+            rootNode,
+            m_skyContextController,
+            viewportWidth,
+            viewportHeight,
+            kGridAltitudeSampleCount,
+            maxSegmentLengthSquared,
+            QColor(112, 146, 194, 70),
+            [altitudeDeg](const int index) {
+                const double azimuthDeg = (360.0 * static_cast<double>(index))
+                                          / static_cast<double>(kGridAltitudeSampleCount);
+                return skygate::core::HorizontalCoordinate {
+                    .altitudeDeg = static_cast<double>(altitudeDeg),
+                    .azimuthDeg = azimuthDeg
+                };
             }
-        }
-
-        previousHorizonPoint = projected;
-        hasPreviousHorizonPoint = true;
+        );
     }
+
+    for (int azimuthDeg = 0; azimuthDeg < 360; azimuthDeg += kGridAzimuthStepDeg) {
+        appendProjectedPolyline(
+            rootNode,
+            m_skyContextController,
+            viewportWidth,
+            viewportHeight,
+            kGridAzimuthSampleCount,
+            maxSegmentLengthSquared,
+            QColor(102, 138, 184, 58),
+            [azimuthDeg](const int index) {
+                const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
+                                                       / static_cast<double>(kGridAzimuthSampleCount);
+                return skygate::core::HorizontalCoordinate {
+                    .altitudeDeg = altitudeDeg,
+                    .azimuthDeg = static_cast<double>(azimuthDeg)
+                };
+            }
+        );
+    }
+
+    appendProjectedPolyline(
+        rootNode,
+        m_skyContextController,
+        viewportWidth,
+        viewportHeight,
+        kHorizonSampleCount,
+        maxSegmentLengthSquared,
+        QColor(110, 156, 216, 170),
+        [](const int index) {
+            const double azimuthDeg = (360.0 * static_cast<double>(index))
+                                      / static_cast<double>(kHorizonSampleCount);
+            return skygate::core::HorizontalCoordinate {.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg};
+        }
+    );
 
     const auto points = m_skyContextController->renderPoints(viewportWidth, viewportHeight);
 
