@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="app-icon-16.png">icons/skygate-icon-16.png</file>
+        <file alias="app-icon-32.png">icons/skygate-icon-32.png</file>
+        <file alias="app-icon-64.png">icons/skygate-icon-64.png</file>
+        <file alias="app-icon-128.png">icons/skygate-icon-128.png</file>
+        <file alias="app-icon-256.png">icons/skygate-icon-256.png</file>
+        <file alias="app-icon-512.png">icons/skygate-icon-512.png</file>
+        <file alias="app-icon-1024.png">icons/skygate-icon-1024.png</file>
+    </qresource>
+</RCC>

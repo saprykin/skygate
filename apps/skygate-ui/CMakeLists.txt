@@ -17,12 +17,23 @@ qt_add_executable(skygate-ui
     src/SkyContextController.hpp
     src/SkyViewportItem.cpp
     src/SkyViewportItem.hpp
+    resources/icons.qrc
 )
 
 if(APPLE)
     set(SKYGATE_LOCATION_USAGE_DESCRIPTION "Skygate uses your location to prefill observer latitude, longitude, and elevation.")
+    target_sources(skygate-ui PRIVATE
+        src/MacDockIcon.hpp
+        src/MacDockIcon.mm
+    )
+    set_source_files_properties(
+        resources/icons/Skygate.icns
+        PROPERTIES MACOSX_PACKAGE_LOCATION "Resources"
+    )
+    target_sources(skygate-ui PRIVATE resources/icons/Skygate.icns)
     set_target_properties(skygate-ui PROPERTIES
         MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_ICON_FILE Skygate
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/macos/Info.plist.in
     )
 endif()
@@ -58,3 +69,12 @@ add_custom_target(run-skygate-ui
     USES_TERMINAL
     COMMENT "Run skygate-ui"
 )
+
+if(APPLE)
+    add_custom_target(run-skygate-ui-bundle
+        COMMAND open $<TARGET_BUNDLE_DIR:skygate-ui>
+        DEPENDS skygate-ui
+        USES_TERMINAL
+        COMMENT "Run skygate-ui bundle"
+    )
+endif()
