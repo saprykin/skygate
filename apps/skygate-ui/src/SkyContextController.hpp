@@ -39,7 +39,13 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString projectionSampleText READ projectionSampleText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
+    Q_PROPERTY(
+        QString catalogDatasetInfoText
+        READ catalogDatasetInfoText
+        NOTIFY catalogDatasetInfoTextChanged
+    )
     Q_PROPERTY(bool downloadingCatalog READ downloadingCatalog NOTIFY downloadingCatalogChanged)
+    Q_PROPERTY(bool catalogProcessing READ catalogProcessing NOTIFY catalogProcessingChanged)
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
@@ -82,7 +88,9 @@ public:
     [[nodiscard]] QString projectionSampleText() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
+    [[nodiscard]] QString catalogDatasetInfoText() const;
     [[nodiscard]] bool downloadingCatalog() const noexcept;
+    [[nodiscard]] bool catalogProcessing() const noexcept;
     [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::vector<SkyRenderPoint> renderPoints(
@@ -148,7 +156,9 @@ signals:
     void projectionTypeChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
+    void catalogDatasetInfoTextChanged();
     void downloadingCatalogChanged();
+    void catalogProcessingChanged();
     void skyContextChanged();
 
 private:
@@ -200,7 +210,9 @@ private:
     int m_catalogPresetIndex = 0;
     QString m_catalogUrlText;
     bool m_downloadingCatalog = false;
+    bool m_catalogProcessing = false;
     std::size_t m_catalogBodyCount = 0;
+    std::size_t m_catalogConstellationCount = 0;
     std::vector<std::pair<std::string, std::string>> m_constellationLineRefs;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

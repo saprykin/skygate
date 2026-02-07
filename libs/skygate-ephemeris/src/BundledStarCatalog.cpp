@@ -4,9 +4,12 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -34,6 +37,29 @@ private:
 };
 
 constexpr std::size_t kMaxHygBodyCount = 25000;
+constexpr std::size_t kHygProgressCallbackInterval = 512;
+constexpr std::size_t kMinHygRowCountLimit = 2000000;
+constexpr std::size_t kMinPlausibleHygRowBytes = 6;
+constexpr std::size_t kMaxGunzipOutputBytes = 768U << 20;
+
+struct BrightnessSlotEntry {
+    double visualMagnitude = 0.0;
+    std::size_t slotIndex = 0;
+    std::uint64_t generation = 0;
+};
+
+struct DimmestFirstCompare {
+    [[nodiscard]] bool operator()(
+        const BrightnessSlotEntry& lhs,
+        const BrightnessSlotEntry& rhs
+    ) const noexcept
+    {
+        if (lhs.visualMagnitude == rhs.visualMagnitude) {
+            return lhs.slotIndex < rhs.slotIndex;
+        }
+        return lhs.visualMagnitude < rhs.visualMagnitude;
+    }
+};
 
 std::string_view trimAsciiWhitespace(std::string_view value)
 {
@@ -63,13 +89,14 @@ std::optional<double> parseFiniteDouble(std::string_view text)
         return std::nullopt;
     }
 
-    std::string buffer(normalized);
-    char* parseEnd = nullptr;
+    thread_local std::string buffer;
+    buffer.assign(normalized.data(), normalized.size());
+    char* parseEndPtr = nullptr;
     errno = 0;
-    const double value = std::strtod(buffer.c_str(), &parseEnd);
+    const double value = std::strtod(buffer.c_str(), &parseEndPtr);
     if (
-        errno != 0 || parseEnd == nullptr ||
-        parseEnd != buffer.c_str() + buffer.size() ||
+        errno != 0 || parseEndPtr == nullptr ||
+        parseEndPtr != buffer.c_str() + buffer.size() ||
         !std::isfinite(value)
     ) {
         return std::nullopt;
@@ -191,17 +218,20 @@ std::vector<CelestialBody> parseBodies(std::string_view catalogRows)
     return bodies;
 }
 
-std::vector<std::string> parseCsvColumns(const std::string_view line)
+void parseCsvColumnsRaw(
+    const std::string_view line,
+    std::vector<std::string_view>& columns
+)
 {
-    std::vector<std::string> columns;
-    std::string currentColumn;
+    columns.clear();
+    columns.reserve(32);
     bool insideQuotes = false;
+    std::size_t columnStart = 0;
 
     for (std::size_t i = 0; i < line.size(); ++i) {
         const char c = line[i];
         if (c == '"') {
             if (insideQuotes && i + 1 < line.size() && line[i + 1] == '"') {
-                currentColumn.push_back('"');
                 ++i;
                 continue;
             }
@@ -210,58 +240,176 @@ std::vector<std::string> parseCsvColumns(const std::string_view line)
         }
 
         if (c == ',' && !insideQuotes) {
-            columns.push_back(currentColumn);
-            currentColumn.clear();
-            continue;
+            columns.push_back(line.substr(columnStart, i - columnStart));
+            columnStart = i + 1;
         }
-
-        currentColumn.push_back(c);
     }
 
-    columns.push_back(currentColumn);
-    return columns;
+    columns.push_back(line.substr(columnStart));
 }
 
-std::vector<CelestialBody> parseBodiesFromHygCsv(std::string_view csvData)
+std::string_view decodeCsvField(std::string_view field, std::string& decodedStorage)
 {
+    field = trimAsciiWhitespace(field);
+    if (field.size() < 2 || field.front() != '"' || field.back() != '"') {
+        return field;
+    }
+
+    field.remove_prefix(1);
+    field.remove_suffix(1);
+    if (field.find("\"\"") == std::string_view::npos) {
+        return field;
+    }
+
+    decodedStorage.clear();
+    decodedStorage.reserve(field.size());
+    for (std::size_t i = 0; i < field.size(); ++i) {
+        const char c = field[i];
+        if (c == '"' && i + 1 < field.size() && field[i + 1] == '"') {
+            decodedStorage.push_back('"');
+            ++i;
+            continue;
+        }
+        decodedStorage.push_back(c);
+    }
+    return decodedStorage;
+}
+
+std::vector<CelestialBody> parseBodiesFromHygCsv(
+    std::string_view csvData,
+    const HygParseProgressCallback& progressCallback
+)
+{
+    constexpr std::size_t kMissingColumnIndex = std::numeric_limits<std::size_t>::max();
+
     std::vector<CelestialBody> bodies;
+    bodies.reserve(kMaxHygBodyCount);
+    std::vector<std::uint64_t> slotGenerations;
+    slotGenerations.reserve(kMaxHygBodyCount);
+    std::priority_queue<
+        BrightnessSlotEntry,
+        std::vector<BrightnessSlotEntry>,
+        DimmestFirstCompare
+    > dimmestSelectedStars;
+
+    const auto discardStaleHeapEntries = [&]() {
+        while (!dimmestSelectedStars.empty()) {
+            const BrightnessSlotEntry& topEntry = dimmestSelectedStars.top();
+            if (topEntry.slotIndex >= bodies.size()) {
+                dimmestSelectedStars.pop();
+                continue;
+            }
+            if (slotGenerations[topEntry.slotIndex] != topEntry.generation) {
+                dimmestSelectedStars.pop();
+                continue;
+            }
+            break;
+        }
+    };
+
     std::size_t cursor = 0;
+    const std::size_t maxAllowedRowCount = std::max(
+        kMinHygRowCountLimit,
+        (csvData.size() / kMinPlausibleHygRowBytes) + 1U
+    );
+    std::size_t autoGeneratedIdCounter = 1;
+    std::size_t parsedObjectCount = 0;
+    std::size_t processedRowCount = 0;
     bool hasHeader = false;
     std::unordered_map<std::string, std::size_t> headerIndex;
+    std::size_t idColumn = kMissingColumnIndex;
+    std::size_t hipColumn = kMissingColumnIndex;
+    std::size_t properColumn = kMissingColumnIndex;
+    std::size_t bayerFlamsteedColumn = kMissingColumnIndex;
+    std::size_t raColumn = kMissingColumnIndex;
+    std::size_t decColumn = kMissingColumnIndex;
+    std::size_t magColumn = kMissingColumnIndex;
+    std::vector<std::string_view> columns;
+    columns.reserve(32);
+    std::string decodeScratch;
+    std::string idScratch;
+    std::string hipScratch;
+    std::string properScratch;
+    std::string bayerFlamsteedScratch;
+    std::string raScratch;
+    std::string decScratch;
+    std::string magScratch;
 
-    while (cursor < csvData.size() && bodies.size() < kMaxHygBodyCount) {
+    while (cursor < csvData.size()) {
         const std::size_t newline = csvData.find('\n', cursor);
         const std::size_t lineEnd = newline == std::string_view::npos ? csvData.size() : newline;
         std::string_view line = csvData.substr(cursor, lineEnd - cursor);
         line = trimAsciiWhitespace(line);
 
         if (!line.empty()) {
-            const auto columns = parseCsvColumns(line);
+            parseCsvColumnsRaw(line, columns);
             if (!hasHeader) {
                 for (std::size_t i = 0; i < columns.size(); ++i) {
-                    const std::string header = toLowerAscii(trimAsciiWhitespace(columns[i]));
+                    const std::string_view headerField = decodeCsvField(columns[i], decodeScratch);
+                    const std::string header = toLowerAscii(trimAsciiWhitespace(headerField));
                     if (!header.empty()) {
                         headerIndex[header] = i;
                     }
                 }
-                hasHeader = true;
-            } else {
-                const auto findColumn = [&](const char* name) -> std::string_view {
+
+                const auto findColumnIndex = [&](const char* name) -> std::size_t {
                     const auto it = headerIndex.find(name);
-                    if (it == headerIndex.end() || it->second >= columns.size()) {
-                        return {};
+                    if (it == headerIndex.end()) {
+                        return kMissingColumnIndex;
                     }
-                    return trimAsciiWhitespace(columns[it->second]);
+                    return it->second;
                 };
 
-                const auto raHours = parseFiniteDouble(findColumn("ra"));
-                const auto decDeg = parseFiniteDouble(findColumn("dec"));
-                const auto magnitude = parseFiniteDouble(findColumn("mag"));
+                idColumn = findColumnIndex("id");
+                hipColumn = findColumnIndex("hip");
+                properColumn = findColumnIndex("proper");
+                bayerFlamsteedColumn = findColumnIndex("bf");
+                raColumn = findColumnIndex("ra");
+                decColumn = findColumnIndex("dec");
+                magColumn = findColumnIndex("mag");
+                if (
+                    raColumn == kMissingColumnIndex
+                    || decColumn == kMissingColumnIndex
+                    || magColumn == kMissingColumnIndex
+                ) {
+                    return {};
+                }
+                hasHeader = true;
+            } else {
+                ++processedRowCount;
+                if (processedRowCount > maxAllowedRowCount) {
+                    return {};
+                }
+
+                const auto decodeColumn = [&](
+                    const std::size_t columnIndex,
+                    std::string& scratch
+                ) -> std::string_view {
+                    if (columnIndex == kMissingColumnIndex || columnIndex >= columns.size()) {
+                        return {};
+                    }
+                    return trimAsciiWhitespace(decodeCsvField(columns[columnIndex], scratch));
+                };
+
+                const std::string_view raText = decodeColumn(raColumn, raScratch);
+                const std::string_view decText = decodeColumn(decColumn, decScratch);
+                const std::string_view magText = decodeColumn(magColumn, magScratch);
+                const auto raHours = parseFiniteDouble(raText);
+                const auto decDeg = parseFiniteDouble(decText);
+                const auto magnitude = parseFiniteDouble(magText);
                 if (raHours.has_value() && decDeg.has_value() && magnitude.has_value()) {
-                    const std::string_view idField = findColumn("id");
-                    const std::string_view properName = findColumn("proper");
-                    const std::string_view bayerFlamsteed = findColumn("bf");
-                    const std::string_view hip = findColumn("hip");
+                    ++parsedObjectCount;
+                    if (parsedObjectCount > maxAllowedRowCount) {
+                        return {};
+                    }
+                    if (progressCallback && (parsedObjectCount % kHygProgressCallbackInterval) == 0U) {
+                        progressCallback(parsedObjectCount);
+                    }
+
+                    const std::string_view idField = decodeColumn(idColumn, idScratch);
+                    const std::string_view properName = decodeColumn(properColumn, properScratch);
+                    const std::string_view bayerFlamsteed = decodeColumn(bayerFlamsteedColumn, bayerFlamsteedScratch);
+                    const std::string_view hip = decodeColumn(hipColumn, hipScratch);
 
                     CelestialBody body;
                     body.type = CelestialBodyType::Star;
@@ -276,7 +424,7 @@ std::vector<CelestialBody> parseBodiesFromHygCsv(std::string_view csvData)
                     } else if (!idField.empty()) {
                         body.id = "hyg_" + std::string(idField);
                     } else {
-                        body.id = "hyg_auto_" + std::to_string(bodies.size() + 1);
+                        body.id = "hyg_auto_" + std::to_string(autoGeneratedIdCounter++);
                     }
 
                     if (!properName.empty()) {
@@ -289,7 +437,39 @@ std::vector<CelestialBody> parseBodiesFromHygCsv(std::string_view csvData)
                         body.displayName = body.id;
                     }
 
-                    bodies.push_back(std::move(body));
+                    if (bodies.size() < kMaxHygBodyCount) {
+                        const std::size_t slotIndex = bodies.size();
+                        bodies.push_back(std::move(body));
+                        slotGenerations.push_back(0);
+                        dimmestSelectedStars.push(
+                            BrightnessSlotEntry {
+                                .visualMagnitude = bodies.back().visualMagnitude,
+                                .slotIndex = slotIndex,
+                                .generation = slotGenerations[slotIndex]
+                            }
+                        );
+                    } else {
+                        discardStaleHeapEntries();
+                        if (dimmestSelectedStars.empty()) {
+                            continue;
+                        }
+
+                        const BrightnessSlotEntry dimmestSelected = dimmestSelectedStars.top();
+                        if (body.visualMagnitude >= dimmestSelected.visualMagnitude) {
+                            continue;
+                        }
+
+                        dimmestSelectedStars.pop();
+                        bodies[dimmestSelected.slotIndex] = std::move(body);
+                        ++slotGenerations[dimmestSelected.slotIndex];
+                        dimmestSelectedStars.push(
+                            BrightnessSlotEntry {
+                                .visualMagnitude = bodies[dimmestSelected.slotIndex].visualMagnitude,
+                                .slotIndex = dimmestSelected.slotIndex,
+                                .generation = slotGenerations[dimmestSelected.slotIndex]
+                            }
+                        );
+                    }
                 }
             }
         }
@@ -297,6 +477,10 @@ std::vector<CelestialBody> parseBodiesFromHygCsv(std::string_view csvData)
             break;
         }
         cursor = newline + 1;
+    }
+
+    if (progressCallback) {
+        progressCallback(parsedObjectCount);
     }
 
     return bodies;
@@ -332,6 +516,10 @@ std::optional<std::string> gunzipData(const std::string_view gzipData)
 
         const std::size_t produced = buffer.size() - stream.avail_out;
         output.append(buffer.data(), produced);
+        if (output.size() > kMaxGunzipOutputBytes) {
+            inflateEnd(&stream);
+            return std::nullopt;
+        }
     }
 
     inflateEnd(&stream);
@@ -388,7 +576,15 @@ std::unique_ptr<IStarCatalog> createStarCatalogFromRows(const std::string_view c
 
 std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsv(const std::string_view csvData)
 {
-    const std::vector<CelestialBody> bodies = parseBodiesFromHygCsv(csvData);
+    return createStarCatalogFromHygCsv(csvData, {});
+}
+
+std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsv(
+    const std::string_view csvData,
+    const HygParseProgressCallback& progressCallback
+)
+{
+    const std::vector<CelestialBody> bodies = parseBodiesFromHygCsv(csvData, progressCallback);
     if (bodies.empty()) {
         return nullptr;
     }
@@ -398,12 +594,20 @@ std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsv(const std::string_view
 
 std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsvGzip(const std::string_view gzipData)
 {
+    return createStarCatalogFromHygCsvGzip(gzipData, {});
+}
+
+std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsvGzip(
+    const std::string_view gzipData,
+    const HygParseProgressCallback& progressCallback
+)
+{
     const auto uncompressedData = gunzipData(gzipData);
     if (!uncompressedData.has_value()) {
         return nullptr;
     }
 
-    return createStarCatalogFromHygCsv(*uncompressedData);
+    return createStarCatalogFromHygCsv(*uncompressedData, progressCallback);
 }
 
 }  // namespace skygate::ephemeris

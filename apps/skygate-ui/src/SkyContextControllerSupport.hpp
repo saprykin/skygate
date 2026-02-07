@@ -29,13 +29,9 @@ inline constexpr double kMagnitudeCutoffMin = -2.0;
 inline constexpr double kMagnitudeCutoffMax = 12.0;
 inline constexpr double kViewAltitudeMinDeg = -90.0;
 inline constexpr double kViewAltitudeMaxDeg = 90.0;
-inline constexpr const char* kCatalogCacheFileName = "catalog-cache-v1.txt";
+inline constexpr const char* kCatalogCacheFileName = "catalog-cache-v2.txt";
 inline constexpr const char* kHygCatalogPrimaryUrl =
-    "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv";
-inline constexpr const char* kHygCatalogMirrorUrl =
-    "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
-inline constexpr const char* kHygCatalogMirror2Url =
-    "https://astronexus.com/downloads/catalogs/hygdata_v41.csv.gz";
+    "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
 inline constexpr const char* kStellariumConstellationLinesPrimaryUrl =
     "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/master/western/index.json";
 inline constexpr const char* kStellariumConstellationLinesMirrorUrl =

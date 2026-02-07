@@ -6,7 +6,110 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
+#include <charconv>
+#include <cctype>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+
 using namespace skygate::ui::internal;
+
+namespace {
+std::optional<int> parsePositiveInteger(std::string_view value)
+{
+    if (value.empty()) {
+        return std::nullopt;
+    }
+
+    int parsedValue = 0;
+    const auto [parseEnd, errorCode] = std::from_chars(
+        value.data(),
+        value.data() + value.size(),
+        parsedValue
+    );
+    if (errorCode != std::errc() || parseEnd != value.data() + value.size() || parsedValue <= 0) {
+        return std::nullopt;
+    }
+
+    return parsedValue;
+}
+
+std::size_t inferConstellationCountFromRows(const std::string_view rows)
+{
+    std::unordered_set<std::string> constellationIds;
+
+    std::size_t cursor = 0;
+    while (cursor < rows.size()) {
+        const std::size_t newline = rows.find('\n', cursor);
+        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
+        std::string_view line = rows.substr(cursor, lineEnd - cursor);
+
+        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) {
+            line.remove_prefix(1);
+        }
+        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
+            line.remove_suffix(1);
+        }
+
+        if (!line.empty() && line.front() != '#') {
+            std::size_t firstSplit = 0;
+            while (firstSplit < line.size() && !std::isspace(static_cast<unsigned char>(line[firstSplit]))) {
+                ++firstSplit;
+            }
+            std::string_view constellationId = line.substr(0, firstSplit);
+
+            while (
+                firstSplit < line.size()
+                && std::isspace(static_cast<unsigned char>(line[firstSplit]))
+            ) {
+                ++firstSplit;
+            }
+            std::size_t secondSplit = firstSplit;
+            while (
+                secondSplit < line.size()
+                && !std::isspace(static_cast<unsigned char>(line[secondSplit]))
+            ) {
+                ++secondSplit;
+            }
+            const std::string_view segmentCountText = line.substr(firstSplit, secondSplit - firstSplit);
+
+            if (
+                !constellationId.empty()
+                && parsePositiveInteger(segmentCountText).has_value()
+            ) {
+                constellationIds.insert(std::string(constellationId));
+            }
+        }
+
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        cursor = newline + 1;
+    }
+
+    return constellationIds.size();
+}
+
+std::size_t inferConstellationCountFromPayload(const QByteArray& payload)
+{
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error == QJsonParseError::NoError && document.isObject()) {
+        const QJsonValue constellationsValue = document.object().value("constellations");
+        if (constellationsValue.isArray()) {
+            return static_cast<std::size_t>(constellationsValue.toArray().size());
+        }
+    }
+
+    const std::string_view rows(payload.constData(), static_cast<std::size_t>(payload.size()));
+    return inferConstellationCountFromRows(rows);
+}
+} // namespace
 
 void SkyContextController::loadCatalogPreset(const QString& presetId)
 {
@@ -22,36 +125,14 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
         return;
     }
 
-    if (normalizedPresetId == "starter") {
+    if (normalizedPresetId == "hyg_v42" || normalizedPresetId == "hyg_v3") {
         setCatalogPresetIndex(1);
-        resetConstellationLineRefs();
-        applyCatalog(
-            skygate::ephemeris::createStarCatalogFromRows(kStarterCatalogRows),
-            "Starter"
-        );
-        return;
-    }
-
-    if (normalizedPresetId == "constellations_major") {
-        setCatalogPresetIndex(2);
-        resetConstellationLineRefs();
-        applyCatalog(
-            skygate::ephemeris::createStarCatalogFromRows(kMajorConstellationsCatalogRows),
-            "Major Constellations"
-        );
-        return;
-    }
-
-    if (normalizedPresetId == "hyg_v3") {
-        setCatalogPresetIndex(3);
         setCatalogUrlText(QString::fromUtf8(kHygCatalogPrimaryUrl));
         downloadCatalogFromUrls(
             QStringList {
-                QString::fromUtf8(kHygCatalogPrimaryUrl),
-                QString::fromUtf8(kHygCatalogMirrorUrl),
-                QString::fromUtf8(kHygCatalogMirror2Url)
+                QString::fromUtf8(kHygCatalogPrimaryUrl)
             },
-            "HYG v3",
+            "HYG v4.2",
             QStringList {
                 QString::fromUtf8(kStellariumConstellationLinesPrimaryUrl),
                 QString::fromUtf8(kStellariumConstellationLinesMirrorUrl),
@@ -87,6 +168,11 @@ void SkyContextController::downloadCatalogFromUrls(
         return;
     }
 
+    if (m_catalogProcessing) {
+        m_catalogProcessing = false;
+        emit catalogProcessingChanged();
+    }
+
     m_downloadingCatalog = true;
     emit downloadingCatalogChanged();
 
@@ -96,8 +182,19 @@ void SkyContextController::downloadCatalogFromUrls(
         [this](const QString& statusText) {
             m_catalogStatusText = statusText;
             emit catalogStatusTextChanged();
+
+            const bool isProcessing = statusText.startsWith("Catalog: Processing", Qt::CaseInsensitive);
+            if (m_catalogProcessing != isProcessing) {
+                m_catalogProcessing = isProcessing;
+                emit catalogProcessingChanged();
+            }
         },
         [this, sourceLabel, constellationLineUrlTexts](CatalogCoordinator::DownloadResult result) {
+            if (m_catalogProcessing) {
+                m_catalogProcessing = false;
+                emit catalogProcessingChanged();
+            }
+
             if (result.catalog == nullptr) {
                 m_downloadingCatalog = false;
                 emit downloadingCatalogChanged();
@@ -172,6 +269,12 @@ void SkyContextController::downloadCatalogFromUrls(
                     }
 
                     setConstellationLineRefs(std::move(parsedLineRefs));
+                    const std::size_t inferredConstellationCount =
+                        inferConstellationCountFromPayload(lineResult.payload);
+                    if (inferredConstellationCount > 0) {
+                        m_catalogConstellationCount = inferredConstellationCount;
+                        emit catalogDatasetInfoTextChanged();
+                    }
                     if (m_starCatalog != nullptr) {
                         persistCatalogCache(m_starCatalog->bodies(), m_catalogSourceLabel);
                     }
@@ -213,8 +316,10 @@ void SkyContextController::applyCatalog(
     catalog = CatalogCoordinator::ensureCoreSolarSystemBodies(std::move(catalog));
     if (catalog == nullptr) {
         m_catalogBodyCount = 0;
+        m_catalogConstellationCount = 0;
         m_catalogStatusText = "Catalog: Failed to load";
         emit catalogStatusTextChanged();
+        emit catalogDatasetInfoTextChanged();
         return;
     }
 
@@ -229,6 +334,7 @@ void SkyContextController::applyCatalog(
     m_starCatalog = std::move(catalog);
     m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
     m_catalogBodyCount = bodies.size();
+    m_catalogConstellationCount = constellationCount;
     m_catalogSourceLabel = sourceLabel;
     m_catalogStatusText = QString("Catalog: %1 (%2 objects, %3 constellations)").arg(
         sourceLabel,
@@ -239,5 +345,6 @@ void SkyContextController::applyCatalog(
         persistCatalogCache(bodies, sourceLabel);
     }
     emit catalogStatusTextChanged();
+    emit catalogDatasetInfoTextChanged();
     emit skyContextChanged();
 }

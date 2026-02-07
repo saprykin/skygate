@@ -3,6 +3,7 @@
 #include "CatalogCoordinator.hpp"
 #include "SkyContextControllerSupport.hpp"
 
+#include <QLocale>
 #include <QNetworkAccessManager>
 
 #include "skygate/core/ProjectionFactory.hpp"
@@ -155,6 +156,15 @@ QString SkyContextController::catalogStatusText() const
     return m_catalogStatusText;
 }
 
+QString SkyContextController::catalogDatasetInfoText() const
+{
+    const QLocale locale = QLocale::system();
+    return QString("Objects: %1 | Constellations: %2").arg(
+        locale.toString(static_cast<qulonglong>(m_catalogBodyCount)),
+        locale.toString(static_cast<qulonglong>(m_catalogConstellationCount))
+    );
+}
+
 int SkyContextController::catalogPresetIndex() const noexcept
 {
     return m_catalogPresetIndex;
@@ -162,7 +172,25 @@ int SkyContextController::catalogPresetIndex() const noexcept
 
 void SkyContextController::setCatalogPresetIndex(int catalogPresetIndex)
 {
-    m_catalogPresetIndex = std::clamp(catalogPresetIndex, 0, 4);
+    if (catalogPresetIndex <= 0) {
+        m_catalogPresetIndex = 0;
+        return;
+    }
+    if (catalogPresetIndex == 1) {
+        m_catalogPresetIndex = 1;
+        return;
+    }
+    if (catalogPresetIndex == 2) {
+        m_catalogPresetIndex = 2;
+        return;
+    }
+
+    // Backward compatibility with persisted indices from the old 5-option list.
+    if (catalogPresetIndex == 3) {
+        m_catalogPresetIndex = 1;
+        return;
+    }
+    m_catalogPresetIndex = 2;
 }
 
 QString SkyContextController::catalogUrlText() const
@@ -181,6 +209,11 @@ void SkyContextController::setCatalogUrlText(const QString& catalogUrlText)
 bool SkyContextController::downloadingCatalog() const noexcept
 {
     return m_downloadingCatalog;
+}
+
+bool SkyContextController::catalogProcessing() const noexcept
+{
+    return m_catalogProcessing;
 }
 
 QString SkyContextController::skyContextSummary() const
