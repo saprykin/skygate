@@ -179,12 +179,10 @@ Window {
                     horizontalAlignment: Text.AlignHCenter
                 }
 
-                Item {
-                    Layout.fillHeight: true
-                }
-
                 Button {
+                    id: closeButton
                     Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
                     text: "Close"
                     font.family: "Avenir Next"
                     font.weight: Font.DemiBold
@@ -193,16 +191,16 @@ Window {
                     onClicked: aboutWindow.visible = false
 
                     contentItem: Text {
-                        text: parent.text
+                        text: closeButton.text
                         color: "#f4fbff"
-                        font: parent.font
+                        font: closeButton.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
 
                     background: Rectangle {
                         radius: 10
-                        color: parent.down ? "#296fa9" : (parent.hovered ? "#378ac8" : "#307fbf")
+                        color: closeButton.down ? "#296fa9" : (closeButton.hovered ? "#378ac8" : "#307fbf")
                         border.width: 1
                         border.color: "#b9ecff"
                     }
