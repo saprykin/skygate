@@ -1,4 +1,5 @@
 #include "SkyContextController.hpp"
+#include "CatalogCoordinator.hpp"
 
 #include <Qt>
 #include <QCoreApplication>
@@ -6,9 +7,6 @@
 #include <QTimeZone>
 #include <QColor>
 #include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QUrl>
 
 #include "skygate/core/ProjectionFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -17,9 +15,7 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
-#include <functional>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -43,7 +39,6 @@ constexpr double kMagnitudeCutoffMin = -2.0;
 constexpr double kMagnitudeCutoffMax = 12.0;
 constexpr double kViewAltitudeMinDeg = -90.0;
 constexpr double kViewAltitudeMaxDeg = 90.0;
-constexpr std::size_t kMaxDownloadedCatalogBytes = 128U << 20;
 constexpr const char* kHygCatalogPrimaryUrl =
     "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
 constexpr const char* kHygCatalogMirrorUrl =
@@ -179,87 +174,6 @@ skygate::core::ProjectionParams buildProjectionParams(
     projectionParams.viewportHeight = viewportHeight;
     return projectionParams;
 }
-
-class InMemoryStarCatalog final : public skygate::ephemeris::IStarCatalog {
-public:
-    explicit InMemoryStarCatalog(std::vector<skygate::ephemeris::CelestialBody> bodies)
-        : m_bodies(std::move(bodies))
-    {
-    }
-
-    [[nodiscard]] std::vector<skygate::ephemeris::CelestialBody> bodies() const override
-    {
-        return m_bodies;
-    }
-
-private:
-    std::vector<skygate::ephemeris::CelestialBody> m_bodies;
-};
-
-std::string toLowerId(const std::string& value)
-{
-    std::string lower = value;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return lower;
-}
-
-bool isSunOrMoonType(const skygate::ephemeris::CelestialBodyType type)
-{
-    return type == skygate::ephemeris::CelestialBodyType::Sun
-        || type == skygate::ephemeris::CelestialBodyType::Moon;
-}
-
-bool containsBodyIdCaseInsensitive(
-    const std::vector<skygate::ephemeris::CelestialBody>& bodies,
-    const std::string& id
-)
-{
-    const std::string loweredId = toLowerId(id);
-    return std::any_of(bodies.begin(), bodies.end(), [&loweredId](const auto& body) {
-        return toLowerId(body.id) == loweredId;
-    });
-}
-
-std::unique_ptr<skygate::ephemeris::IStarCatalog> ensureCoreSolarSystemBodies(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog
-)
-{
-    if (catalog == nullptr) {
-        return nullptr;
-    }
-
-    std::vector<skygate::ephemeris::CelestialBody> mergedBodies = catalog->bodies();
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledCatalog =
-        skygate::ephemeris::createBundledStarCatalog();
-    if (bundledCatalog == nullptr) {
-        return catalog;
-    }
-
-    bool injectedCoreBody = false;
-    for (const auto& body : bundledCatalog->bodies()) {
-        if (
-            !isSunOrMoonType(body.type)
-            && body.type != skygate::ephemeris::CelestialBodyType::Planet
-        ) {
-            continue;
-        }
-
-        if (containsBodyIdCaseInsensitive(mergedBodies, body.id)) {
-            continue;
-        }
-
-        mergedBodies.push_back(body);
-        injectedCoreBody = true;
-    }
-
-    if (!injectedCoreBody) {
-        return catalog;
-    }
-
-    return std::make_unique<InMemoryStarCatalog>(std::move(mergedBodies));
-}
 }
 
 SkyContextController::SkyContextController(
@@ -272,6 +186,7 @@ SkyContextController::SkyContextController(
     , m_ephemerisEngine(std::move(ephemerisEngine))
 {
     m_networkAccessManager = new QNetworkAccessManager(this);
+    m_catalogCoordinator = std::make_unique<CatalogCoordinator>(m_networkAccessManager);
 
     if (m_starCatalog == nullptr) {
         m_starCatalog = skygate::ephemeris::createBundledStarCatalog();
@@ -297,6 +212,8 @@ SkyContextController::SkyContextController(
 
     initializeCurrentLocation();
 }
+
+SkyContextController::~SkyContextController() = default;
 
 bool SkyContextController::live() const noexcept
 {
@@ -1139,129 +1056,35 @@ void SkyContextController::downloadCatalogFromUrls(const QStringList& urlTexts, 
         return;
     }
 
-    QStringList candidateUrls;
-    candidateUrls.reserve(urlTexts.size());
-    for (const QString& urlText : urlTexts) {
-        const QString trimmed = urlText.trimmed();
-        if (!trimmed.isEmpty()) {
-            candidateUrls.push_back(trimmed);
-        }
-    }
-
-    if (candidateUrls.isEmpty()) {
-        m_catalogStatusText = "Catalog: Invalid URL";
-        emit catalogStatusTextChanged();
-        return;
-    }
-
-    if (m_networkAccessManager == nullptr) {
+    if (m_catalogCoordinator == nullptr) {
         m_catalogStatusText = "Catalog: Network unavailable";
         emit catalogStatusTextChanged();
         return;
     }
 
-    const auto lastErrorText = std::make_shared<QString>();
-    const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
-    *lastErrorText = "Catalog: Download failed";
-    *tryDownloadNextUrl = [this, candidateUrls, sourceLabel, tryDownloadNextUrl, lastErrorText](const int index) {
-        if (index >= candidateUrls.size()) {
-            m_downloadingCatalog = false;
-            emit downloadingCatalogChanged();
-            m_catalogStatusText = *lastErrorText;
-            emit catalogStatusTextChanged();
-            return;
-        }
-
-        const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
-        if (!url.isValid() || url.scheme().isEmpty()) {
-            *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
-            (*tryDownloadNextUrl)(index + 1);
-            return;
-        }
-
-        m_catalogStatusText = QString("Catalog: Downloading %1 (%2/%3)").arg(
-            url.toString(),
-            QString::number(index + 1),
-            QString::number(candidateUrls.size())
-        );
-        emit catalogStatusTextChanged();
-
-        QNetworkRequest request(url);
-        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-        request.setTransferTimeout(300000);
-        request.setRawHeader("User-Agent", "Skygate/1.0");
-        request.setRawHeader("Accept", "text/plain,text/csv,application/gzip,application/octet-stream,*/*");
-
-        QNetworkReply* reply = m_networkAccessManager->get(request);
-        connect(
-            reply,
-            &QNetworkReply::finished,
-            this,
-            [this, reply, index, sourceLabel, tryDownloadNextUrl, candidateUrls, lastErrorText]() {
-                reply->deleteLater();
-
-                if (reply->error() != QNetworkReply::NoError) {
-                    const int httpStatusCode =
-                        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                    *lastErrorText = QString("Catalog: Source %1 failed (%2, HTTP %3)").arg(
-                        candidateUrls[index],
-                        reply->errorString(),
-                        QString::number(httpStatusCode)
-                    );
-                    m_catalogStatusText = *lastErrorText;
-                    emit catalogStatusTextChanged();
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
-                const QByteArray payload = reply->readAll();
-                if (payload.isEmpty()) {
-                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
-                    m_catalogStatusText = *lastErrorText;
-                    emit catalogStatusTextChanged();
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
-                if (static_cast<std::size_t>(payload.size()) > kMaxDownloadedCatalogBytes) {
-                    *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(
-                        candidateUrls[index]
-                    );
-                    m_catalogStatusText = *lastErrorText;
-                    emit catalogStatusTextChanged();
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
-                const std::string_view rows(payload.constData(), static_cast<std::size_t>(payload.size()));
-                std::unique_ptr<skygate::ephemeris::IStarCatalog> downloadedCatalog =
-                    skygate::ephemeris::createStarCatalogFromRows(rows);
-                if (downloadedCatalog == nullptr) {
-                    downloadedCatalog = skygate::ephemeris::createStarCatalogFromHygCsv(rows);
-                }
-                if (downloadedCatalog == nullptr) {
-                    downloadedCatalog = skygate::ephemeris::createStarCatalogFromHygCsvGzip(rows);
-                }
-                if (downloadedCatalog == nullptr) {
-                    *lastErrorText = QString(
-                        "Catalog: Source %1 parse failed (supported: pipe rows, HYG CSV, or HYG .csv.gz)"
-                    ).arg(candidateUrls[index]);
-                    m_catalogStatusText = *lastErrorText;
-                    emit catalogStatusTextChanged();
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
-                m_downloadingCatalog = false;
-                emit downloadingCatalogChanged();
-                applyCatalog(std::move(downloadedCatalog), sourceLabel);
-            }
-        );
-    };
-
     m_downloadingCatalog = true;
     emit downloadingCatalogChanged();
-    (*tryDownloadNextUrl)(0);
+
+    m_catalogCoordinator->downloadCatalogFromUrls(
+        urlTexts,
+        this,
+        [this](const QString& statusText) {
+            m_catalogStatusText = statusText;
+            emit catalogStatusTextChanged();
+        },
+        [this, sourceLabel](CatalogCoordinator::DownloadResult result) {
+            m_downloadingCatalog = false;
+            emit downloadingCatalogChanged();
+
+            if (result.catalog == nullptr) {
+                m_catalogStatusText = result.errorText;
+                emit catalogStatusTextChanged();
+                return;
+            }
+
+            applyCatalog(std::move(result.catalog), sourceLabel);
+        }
+    );
 }
 
 void SkyContextController::applyCatalog(
@@ -1269,7 +1092,7 @@ void SkyContextController::applyCatalog(
     const QString& sourceLabel
 )
 {
-    catalog = ensureCoreSolarSystemBodies(std::move(catalog));
+    catalog = CatalogCoordinator::ensureCoreSolarSystemBodies(std::move(catalog));
     if (catalog == nullptr) {
         m_catalogStatusText = "Catalog: Failed to load";
         emit catalogStatusTextChanged();

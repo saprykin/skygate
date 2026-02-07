@@ -11,6 +11,8 @@ endif()
 
 qt_add_executable(skygate-ui
     src/main.cpp
+    src/CatalogCoordinator.cpp
+    src/CatalogCoordinator.hpp
     src/SkyContextController.cpp
     src/SkyContextController.hpp
     src/SkyViewportItem.cpp

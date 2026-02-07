@@ -17,6 +17,7 @@
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
 class QNetworkAccessManager;
+class CatalogCoordinator;
 
 class SkyContextController final : public QObject {
     Q_OBJECT
@@ -53,6 +54,7 @@ public:
         std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine = nullptr,
         QObject* parent = nullptr
     );
+    ~SkyContextController() override;
 
     [[nodiscard]] bool live() const noexcept;
     [[nodiscard]] double speedMultiplier() const noexcept;
@@ -156,6 +158,7 @@ private:
     std::unique_ptr<skygate::core::IProjection> m_projection;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    std::unique_ptr<CatalogCoordinator> m_catalogCoordinator;
     QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_locationStatusText;
     QString m_catalogStatusText;
