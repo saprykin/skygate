@@ -40,9 +40,9 @@ if(APPLE)
     target_sources(skygate-ui PRIVATE resources/icons/Skygate.icns)
     set_target_properties(skygate-ui PROPERTIES
         MACOSX_BUNDLE TRUE
-        OUTPUT_NAME "StarGate"
-        MACOSX_BUNDLE_BUNDLE_NAME "StarGate"
-        MACOSX_BUNDLE_EXECUTABLE_NAME "StarGate"
+        OUTPUT_NAME "SkyGate"
+        MACOSX_BUNDLE_BUNDLE_NAME "SkyGate"
+        MACOSX_BUNDLE_EXECUTABLE_NAME "SkyGate"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.skygate.app"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"

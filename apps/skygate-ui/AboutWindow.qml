@@ -5,7 +5,7 @@ import QtQuick.Window
 
 Window {
     id: aboutWindow
-    title: "About StarGate"
+    title: "About SkyGate"
     width: 560
     height: 470
     minimumWidth: 520
@@ -137,7 +137,7 @@ Window {
 
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "StarGate"
+                    text: "SkyGate"
                     color: aboutWindow.textPrimary
                     font.family: "Avenir Next"
                     font.pixelSize: 58

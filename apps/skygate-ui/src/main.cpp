@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
     app.setFont(QFont(QStringLiteral("Avenir Next")));
     QCoreApplication::setOrganizationName("Skygate");
     QCoreApplication::setOrganizationDomain("skygate.app");
-    QCoreApplication::setApplicationName("StarGate");
+    QCoreApplication::setApplicationName("SkyGate");
     QIcon appIcon;
     appIcon.addFile(QStringLiteral(":/icons/app-icon-16.png"), QSize(16, 16));
     appIcon.addFile(QStringLiteral(":/icons/app-icon-32.png"), QSize(32, 32));

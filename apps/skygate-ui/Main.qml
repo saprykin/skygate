@@ -9,7 +9,7 @@ ApplicationWindow {
     width: 1100
     height: 760
     visible: true
-    title: "StarGate"
+    title: "SkyGate"
 
     function nearestIndex(values, target) {
         let nearest = 0
@@ -50,7 +50,7 @@ ApplicationWindow {
         Menu {
             title: "&App"
             MenuItem {
-                text: "&About StarGate"
+                text: "&About SkyGate"
                 onTriggered: {
                     aboutWindow.visible = true
                     aboutWindow.raise()
