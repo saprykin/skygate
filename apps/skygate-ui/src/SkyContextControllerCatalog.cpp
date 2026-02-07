@@ -212,6 +212,7 @@ void SkyContextController::applyCatalog(
 {
     catalog = CatalogCoordinator::ensureCoreSolarSystemBodies(std::move(catalog));
     if (catalog == nullptr) {
+        m_catalogBodyCount = 0;
         m_catalogStatusText = "Catalog: Failed to load";
         emit catalogStatusTextChanged();
         return;
@@ -227,6 +228,7 @@ void SkyContextController::applyCatalog(
 
     m_starCatalog = std::move(catalog);
     m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
+    m_catalogBodyCount = bodies.size();
     m_catalogSourceLabel = sourceLabel;
     m_catalogStatusText = QString("Catalog: %1 (%2 objects, %3 constellations)").arg(
         sourceLabel,

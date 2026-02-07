@@ -186,9 +186,8 @@ bool SkyContextController::downloadingCatalog() const noexcept
 QString SkyContextController::skyContextSummary() const
 {
     QString bodyCountText = "n/a";
-    if (m_ephemerisEngine != nullptr) {
-        const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-        bodyCountText = QString::number(snapshot.states.size());
+    if (m_catalogBodyCount > 0) {
+        bodyCountText = QString::number(static_cast<qulonglong>(m_catalogBodyCount));
     }
 
     return QString(

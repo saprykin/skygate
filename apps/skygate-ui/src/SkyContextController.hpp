@@ -11,6 +11,7 @@
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
@@ -199,6 +200,7 @@ private:
     int m_catalogPresetIndex = 0;
     QString m_catalogUrlText;
     bool m_downloadingCatalog = false;
+    std::size_t m_catalogBodyCount = 0;
     std::vector<std::pair<std::string, std::string>> m_constellationLineRefs;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

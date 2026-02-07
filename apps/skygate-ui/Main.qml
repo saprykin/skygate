@@ -257,13 +257,15 @@ ApplicationWindow {
             id: horizonDirectionLabel
             readonly property real viewAltitudeDeg: skyContext.viewCenterAltitudeDeg
             readonly property real viewAzimuthDeg: skyContext.viewCenterAzimuthDeg
-            readonly property string projectionState: skyContext.skyContextSummary
+            readonly property string projectionTypeText: skyContext.projectionTypeText
             readonly property real markerX: {
-                projectionState
+                viewAltitudeDeg
+                projectionTypeText
                 return skyContext.projectedX(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
             }
             readonly property real markerY: {
-                projectionState
+                viewAltitudeDeg
+                projectionTypeText
                 return skyContext.projectedY(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
             }
 
@@ -272,7 +274,8 @@ ApplicationWindow {
             font.family: "Avenir Next"
             font.bold: true
             visible: {
-                projectionState
+                viewAltitudeDeg
+                projectionTypeText
                 return skyContext.isProjectedVisible(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
             }
             x: markerX - (implicitWidth * 0.5)
@@ -289,18 +292,26 @@ ApplicationWindow {
 
             delegate: Rectangle {
                 required property var modelData
-                readonly property string projectionState: skyContext.skyContextSummary
+                readonly property real viewAltitudeDeg: skyContext.viewCenterAltitudeDeg
+                readonly property real viewAzimuthDeg: skyContext.viewCenterAzimuthDeg
+                readonly property string projectionTypeText: skyContext.projectionTypeText
                 readonly property real markerX: {
-                    projectionState
+                    viewAltitudeDeg
+                    viewAzimuthDeg
+                    projectionTypeText
                     return skyContext.projectedX(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
                 readonly property real markerY: {
-                    projectionState
+                    viewAltitudeDeg
+                    viewAzimuthDeg
+                    projectionTypeText
                     return skyContext.projectedY(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
 
                 visible: {
-                    projectionState
+                    viewAltitudeDeg
+                    viewAzimuthDeg
+                    projectionTypeText
                     return skyContext.isProjectedVisible(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
                 x: markerX - (width * 0.5)
