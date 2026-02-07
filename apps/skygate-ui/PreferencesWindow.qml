@@ -28,6 +28,8 @@ Window {
 
 
     function syncFormFromContext() {
+        utcDateTimeLockToggle.checked =
+            skyContextController.utcDateLocked || skyContextController.utcTimeLocked
         utcDateInput.text = skyContextController.utcDateText
         utcTimeInput.text = skyContextController.utcTimeText
         latitudeInput.text = skyContextController.latitudeText
@@ -42,6 +44,8 @@ Window {
     }
 
     function applyFormToContext() {
+        skyContextController.setUtcDateLocked(utcDateTimeLockToggle.checked)
+        skyContextController.setUtcTimeLocked(utcDateTimeLockToggle.checked)
         skyContextController.setUtcDateText(utcDateInput.text)
         skyContextController.setUtcTimeText(utcTimeInput.text)
         skyContextController.setLatitudeText(latitudeInput.text)
@@ -265,7 +269,7 @@ Window {
                                     GridLayout {
                                         anchors.fill: parent
                                         anchors.margins: 10
-                                        columns: 2
+                                        columns: 3
                                         rowSpacing: 8
                                         columnSpacing: 12
 
@@ -278,6 +282,40 @@ Window {
                                             id: utcDateInput
                                             Layout.fillWidth: true
                                             placeholderText: "YYYY-MM-DD"
+                                            enabled: !utcDateTimeLockToggle.checked
+                                        }
+                                        ToolButton {
+                                            id: utcDateTimeLockToggle
+                                            checkable: true
+                                            Layout.rowSpan: 2
+                                            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                                            width: 38
+                                            height: 30
+                                            text: checked ? "\uD83D\uDD12" : "\uD83D\uDD13"
+                                            font.pixelSize: 16
+                                            ToolTip.visible: hovered
+                                            ToolTip.text: checked
+                                                ? "Using current UTC date/time"
+                                                : "Using manual UTC date/time input"
+
+                                            contentItem: Text {
+                                                text: parent.text
+                                                color: "#eaf7ff"
+                                                font: parent.font
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
+
+                                            background: Rectangle {
+                                                radius: 8
+                                                color: utcDateTimeLockToggle.checked
+                                                    ? "#2f79b8"
+                                                    : (utcDateTimeLockToggle.down
+                                                        ? "#27476d"
+                                                        : (utcDateTimeLockToggle.hovered ? "#315881" : "#1a3352"))
+                                                border.width: 1
+                                                border.color: utcDateTimeLockToggle.checked ? "#9de2ff" : "#6fbde6"
+                                            }
                                         }
 
                                         Label {
@@ -289,6 +327,7 @@ Window {
                                             id: utcTimeInput
                                             Layout.fillWidth: true
                                             placeholderText: "HH:MM:SS"
+                                            enabled: !utcDateTimeLockToggle.checked
                                         }
 
                                         Label {
@@ -299,6 +338,7 @@ Window {
                                         PreferencesTextField {
                                             id: latitudeInput
                                             Layout.fillWidth: true
+                                            Layout.columnSpan: 2
                                             placeholderText: "-90..90"
                                             validator: DoubleValidator {
                                                 bottom: -90.0
@@ -315,6 +355,7 @@ Window {
                                         PreferencesTextField {
                                             id: longitudeInput
                                             Layout.fillWidth: true
+                                            Layout.columnSpan: 2
                                             placeholderText: "-180..180"
                                             validator: DoubleValidator {
                                                 bottom: -180.0
@@ -331,6 +372,7 @@ Window {
                                         PreferencesTextField {
                                             id: elevationInput
                                             Layout.fillWidth: true
+                                            Layout.columnSpan: 2
                                             placeholderText: "meters"
                                             validator: DoubleValidator {
                                                 notation: DoubleValidator.StandardNotation
@@ -345,6 +387,7 @@ Window {
                                         PreferencesComboBox {
                                             id: projectionCombo
                                             Layout.fillWidth: true
+                                            Layout.columnSpan: 2
                                             model: ["Stereographic", "Perspective"]
                                         }
                                     }

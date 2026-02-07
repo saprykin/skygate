@@ -26,6 +26,8 @@ class CatalogCoordinator;
 class SkyContextController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool live READ live WRITE setLive NOTIFY liveChanged)
+    Q_PROPERTY(bool utcDateLocked READ utcDateLocked WRITE setUtcDateLocked NOTIFY utcDateLockedChanged)
+    Q_PROPERTY(bool utcTimeLocked READ utcTimeLocked WRITE setUtcTimeLocked NOTIFY utcTimeLockedChanged)
     Q_PROPERTY(double speedMultiplier READ speedMultiplier WRITE setSpeedMultiplier NOTIFY speedMultiplierChanged)
     Q_PROPERTY(int stepSeconds READ stepSeconds WRITE setStepSeconds NOTIFY stepSecondsChanged)
     Q_PROPERTY(double magnitudeCutoff READ magnitudeCutoff WRITE setMagnitudeCutoff NOTIFY magnitudeCutoffChanged)
@@ -77,6 +79,8 @@ public:
     ~SkyContextController() override;
 
     [[nodiscard]] bool live() const noexcept;
+    [[nodiscard]] bool utcDateLocked() const noexcept;
+    [[nodiscard]] bool utcTimeLocked() const noexcept;
     [[nodiscard]] double speedMultiplier() const noexcept;
     [[nodiscard]] int stepSeconds() const noexcept;
     [[nodiscard]] double magnitudeCutoff() const noexcept;
@@ -111,6 +115,8 @@ public:
     ) const noexcept;
 
     Q_INVOKABLE void setLive(bool live);
+    Q_INVOKABLE void setUtcDateLocked(bool utcDateLocked);
+    Q_INVOKABLE void setUtcTimeLocked(bool utcTimeLocked);
     Q_INVOKABLE void togglePlayPause();
     Q_INVOKABLE void setSpeedMultiplier(double speedMultiplier);
     Q_INVOKABLE void setStepSeconds(int stepSeconds);
@@ -143,6 +149,8 @@ public:
 
 signals:
     void liveChanged();
+    void utcDateLockedChanged();
+    void utcTimeLockedChanged();
     void speedMultiplierChanged();
     void stepSecondsChanged();
     void magnitudeCutoffChanged();
@@ -194,6 +202,8 @@ private:
 
 private:
     bool m_live = true;
+    bool m_utcDateLocked = true;
+    bool m_utcTimeLocked = true;
     double m_speedMultiplier = 1.0;
     double m_speedRemainderSeconds = 0.0;
     int m_stepSeconds = 60;
