@@ -20,10 +20,13 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #if SKYGATE_HAS_POSITIONING
@@ -63,6 +66,14 @@ constexpr std::string_view kStarterCatalogRows =
     "vega|Vega|Star|0.03\n"
     "betelgeuse|Betelgeuse|Star|0.50\n";
 constexpr std::string_view kMajorConstellationsCatalogRows =
+    "sirius|Sirius|Star|-1.46\n"
+    "canopus|Canopus|Star|-0.74\n"
+    "arcturus|Arcturus|Star|-0.05\n"
+    "vega|Vega|Star|0.03\n"
+    "capella|Capella|Star|0.08\n"
+    "rigel|Rigel|Star|0.12\n"
+    "procyon|Procyon|Star|0.34\n"
+    "betelgeuse|Betelgeuse|Star|0.50\n"
     "orion|Orion|Constellation|1.6\n"
     "ursa_major|Ursa Major|Constellation|1.8\n"
     "ursa_minor|Ursa Minor|Constellation|2.1\n"
@@ -73,6 +84,82 @@ constexpr std::string_view kMajorConstellationsCatalogRows =
     "leo|Leo|Constellation|1.4\n"
     "gemini|Gemini|Constellation|1.6\n"
     "andromeda|Andromeda|Constellation|2.1\n";
+
+struct ConstellationLineRef {
+    std::string_view startId;
+    std::string_view endId;
+};
+
+constexpr std::array<ConstellationLineRef, 57> kConstellationLineRefs = {{
+    // Bundled fallback.
+    {.startId = "sirius", .endId = "procyon"},
+    {.startId = "procyon", .endId = "betelgeuse"},
+    {.startId = "betelgeuse", .endId = "rigel"},
+    {.startId = "rigel", .endId = "sirius"},
+    {.startId = "betelgeuse", .endId = "capella"},
+    {.startId = "capella", .endId = "vega"},
+    {.startId = "vega", .endId = "arcturus"},
+    // Orion.
+    {.startId = "hip_27989", .endId = "hip_25336"},
+    {.startId = "hip_27989", .endId = "hip_26727"},
+    {.startId = "hip_25336", .endId = "hip_25930"},
+    {.startId = "hip_25930", .endId = "hip_26311"},
+    {.startId = "hip_26311", .endId = "hip_26727"},
+    {.startId = "hip_26727", .endId = "hip_27366"},
+    {.startId = "hip_27366", .endId = "hip_24436"},
+    {.startId = "hip_24436", .endId = "hip_25930"},
+    {.startId = "hip_26207", .endId = "hip_25930"},
+    {.startId = "hip_26207", .endId = "hip_27989"},
+    // Ursa Major.
+    {.startId = "hip_67301", .endId = "hip_65378"},
+    {.startId = "hip_65378", .endId = "hip_62956"},
+    {.startId = "hip_62956", .endId = "hip_59774"},
+    {.startId = "hip_59774", .endId = "hip_54061"},
+    {.startId = "hip_54061", .endId = "hip_53910"},
+    {.startId = "hip_53910", .endId = "hip_58001"},
+    // Ursa Minor.
+    {.startId = "hip_11767", .endId = "hip_79822"},
+    {.startId = "hip_79822", .endId = "hip_77055"},
+    {.startId = "hip_77055", .endId = "hip_75097"},
+    {.startId = "hip_75097", .endId = "hip_72607"},
+    {.startId = "hip_72607", .endId = "hip_85822"},
+    {.startId = "hip_85822", .endId = "hip_82080"},
+    {.startId = "hip_82080", .endId = "hip_11767"},
+    // Cassiopeia.
+    {.startId = "hip_746", .endId = "hip_3179"},
+    {.startId = "hip_3179", .endId = "hip_4427"},
+    {.startId = "hip_4427", .endId = "hip_6686"},
+    {.startId = "hip_6686", .endId = "hip_8886"},
+    // Cygnus.
+    {.startId = "hip_102098", .endId = "hip_100453"},
+    {.startId = "hip_100453", .endId = "hip_95947"},
+    {.startId = "hip_100453", .endId = "hip_98110"},
+    {.startId = "hip_100453", .endId = "hip_97165"},
+    {.startId = "hip_98110", .endId = "hip_95947"},
+    // Taurus.
+    {.startId = "hip_20889", .endId = "hip_21421"},
+    {.startId = "hip_20889", .endId = "hip_25428"},
+    {.startId = "hip_21421", .endId = "hip_25428"},
+    // Gemini.
+    {.startId = "hip_31681", .endId = "hip_34088"},
+    {.startId = "hip_34088", .endId = "hip_35550"},
+    {.startId = "hip_37826", .endId = "hip_34088"},
+    {.startId = "hip_34088", .endId = "hip_32362"},
+    // Leo.
+    {.startId = "hip_49669", .endId = "hip_54872"},
+    {.startId = "hip_54872", .endId = "hip_57632"},
+    {.startId = "hip_54872", .endId = "hip_50583"},
+    // Andromeda.
+    {.startId = "hip_677", .endId = "hip_3092"},
+    {.startId = "hip_3092", .endId = "hip_5447"},
+    {.startId = "hip_5447", .endId = "hip_9640"},
+    // Scorpius.
+    {.startId = "hip_78265", .endId = "hip_78401"},
+    {.startId = "hip_78401", .endId = "hip_78820"},
+    {.startId = "hip_78820", .endId = "hip_80763"},
+    {.startId = "hip_80763", .endId = "hip_85927"},
+    {.startId = "hip_85927", .endId = "hip_86228"},
+}};
 
 QString formatCoordinate(double value)
 {
@@ -213,6 +300,20 @@ QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
     }
 
     return QColor(220, 220, 240, 200);
+}
+
+QColor constellationLineColor()
+{
+    return QColor(146, 205, 255, 132);
+}
+
+std::string_view hipSuffix(std::string_view value)
+{
+    constexpr std::string_view kHipPrefix = "hip_";
+    if (!value.starts_with(kHipPrefix)) {
+        return {};
+    }
+    return value.substr(kHipPrefix.size());
 }
 
 double normalizeAzimuthDeg(double azimuthDeg)
@@ -482,6 +583,101 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
     }
 
     return points;
+}
+
+std::vector<SkyContextController::SkyRenderLine> SkyContextController::renderConstellationLines(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return {};
+    }
+
+    if (m_ephemerisEngine == nullptr || m_projection == nullptr) {
+        return {};
+    }
+
+    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+        viewportWidth,
+        viewportHeight,
+        m_viewCenterAltitudeDeg,
+        m_viewCenterAzimuthDeg,
+        m_viewFieldOfViewDeg
+    );
+
+    const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
+    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalById;
+    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalByDisplayName;
+    horizontalById.reserve(snapshot.states.size());
+    horizontalByDisplayName.reserve(snapshot.states.size());
+
+    for (const auto& state : snapshot.states) {
+        if (
+            !std::isfinite(state.horizontal.altitudeDeg)
+            || !std::isfinite(state.horizontal.azimuthDeg)
+        ) {
+            continue;
+        }
+        horizontalById[state.body.id] = state.horizontal;
+        horizontalByDisplayName[state.body.displayName] = state.horizontal;
+    }
+
+    const auto findHorizontal = [&](const std::string_view lineRefId) -> const skygate::core::HorizontalCoordinate* {
+        if (const auto idIt = horizontalById.find(lineRefId); idIt != horizontalById.end()) {
+            return &idIt->second;
+        }
+
+        const std::string_view hipNumber = hipSuffix(lineRefId);
+        if (!hipNumber.empty()) {
+            std::string legacyHipDisplayName = "HIP ";
+            legacyHipDisplayName.append(hipNumber.data(), hipNumber.size());
+            if (
+                const auto displayNameIt = horizontalByDisplayName.find(legacyHipDisplayName);
+                displayNameIt != horizontalByDisplayName.end()
+            ) {
+                return &displayNameIt->second;
+            }
+        }
+
+        return nullptr;
+    };
+
+    const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
+    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
+    std::vector<SkyRenderLine> lines;
+    lines.reserve(kConstellationLineRefs.size());
+
+    for (const auto& lineRef : kConstellationLineRefs) {
+        const auto* startHorizontal = findHorizontal(lineRef.startId);
+        const auto* endHorizontal = findHorizontal(lineRef.endId);
+        if (startHorizontal == nullptr || endHorizontal == nullptr) {
+            continue;
+        }
+
+        const auto startProjected = m_projection->project(*startHorizontal, projectionParams);
+        const auto endProjected = m_projection->project(*endHorizontal, projectionParams);
+        if (!startProjected.isVisible || !endProjected.isVisible) {
+            continue;
+        }
+
+        const double deltaX = endProjected.x - startProjected.x;
+        const double deltaY = endProjected.y - startProjected.y;
+        const double lengthSquared = deltaX * deltaX + deltaY * deltaY;
+        if (lengthSquared > maxSegmentLengthSquared) {
+            continue;
+        }
+
+        SkyRenderLine line;
+        line.x1 = startProjected.x;
+        line.y1 = startProjected.y;
+        line.x2 = endProjected.x;
+        line.y2 = endProjected.y;
+        line.color = constellationLineColor();
+        lines.push_back(line);
+    }
+
+    return lines;
 }
 
 skygate::core::ScreenPoint SkyContextController::projectHorizontal(

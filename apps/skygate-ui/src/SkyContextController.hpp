@@ -48,6 +48,14 @@ public:
         QColor color;
     };
 
+    struct SkyRenderLine {
+        double x1 = 0.0;
+        double y1 = 0.0;
+        double x2 = 0.0;
+        double y2 = 0.0;
+        QColor color;
+    };
+
 public:
     explicit SkyContextController(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
@@ -75,6 +83,10 @@ public:
     [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::vector<SkyRenderPoint> renderPoints(
+        double viewportWidth,
+        double viewportHeight
+    ) const;
+    [[nodiscard]] std::vector<SkyRenderLine> renderConstellationLines(
         double viewportWidth,
         double viewportHeight
     ) const;

@@ -271,10 +271,10 @@ std::vector<CelestialBody> parseBodiesFromHygCsv(std::string_view csvData)
                         .declinationDeg = *decDeg
                     };
 
-                    if (!idField.empty()) {
-                        body.id = "hyg_" + std::string(idField);
-                    } else if (!hip.empty()) {
+                    if (!hip.empty()) {
                         body.id = "hip_" + std::string(hip);
+                    } else if (!idField.empty()) {
+                        body.id = "hyg_" + std::string(idField);
                     } else {
                         body.id = "hyg_auto_" + std::to_string(bodies.size() + 1);
                     }

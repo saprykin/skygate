@@ -9,6 +9,7 @@
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <functional>
 #include <memory>
@@ -48,6 +49,25 @@ bool isSunOrMoonType(const skygate::ephemeris::CelestialBodyType type)
 {
     return type == skygate::ephemeris::CelestialBodyType::Sun
         || type == skygate::ephemeris::CelestialBodyType::Moon;
+}
+
+bool isReferenceLineStarId(const std::string& id)
+{
+    constexpr std::array<std::string_view, 8> kReferenceLineStarIds = {{
+        "sirius",
+        "canopus",
+        "arcturus",
+        "vega",
+        "capella",
+        "rigel",
+        "procyon",
+        "betelgeuse",
+    }};
+
+    const std::string loweredId = toLowerId(id);
+    return std::any_of(kReferenceLineStarIds.begin(), kReferenceLineStarIds.end(), [&loweredId](const auto value) {
+        return loweredId == value;
+    });
 }
 
 bool containsBodyIdCaseInsensitive(
@@ -91,6 +111,14 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> CatalogCoordinator::ensureCore
     }
 
     std::vector<skygate::ephemeris::CelestialBody> mergedBodies = catalog->bodies();
+    const std::size_t starCount = static_cast<std::size_t>(std::count_if(
+        mergedBodies.begin(),
+        mergedBodies.end(),
+        [](const auto& body) {
+            return body.type == skygate::ephemeris::CelestialBodyType::Star;
+        }
+    ));
+
     std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledCatalog =
         skygate::ephemeris::createBundledStarCatalog();
     if (bundledCatalog == nullptr) {
@@ -99,9 +127,13 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> CatalogCoordinator::ensureCore
 
     bool injectedCoreBody = false;
     for (const auto& body : bundledCatalog->bodies()) {
+        const bool isReferenceLineStar = body.type == skygate::ephemeris::CelestialBodyType::Star
+            && isReferenceLineStarId(body.id)
+            && starCount == 0U;
         if (
             !isSunOrMoonType(body.type)
             && body.type != skygate::ephemeris::CelestialBodyType::Planet
+            && !isReferenceLineStar
         ) {
             continue;
         }

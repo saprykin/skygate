@@ -237,6 +237,18 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         }
     );
 
+    const auto lines = m_skyContextController->renderConstellationLines(viewportWidth, viewportHeight);
+    for (const auto& line : lines) {
+        appendLineSegmentNode(
+            rootNode,
+            static_cast<float>(line.x1),
+            static_cast<float>(line.y1),
+            static_cast<float>(line.x2),
+            static_cast<float>(line.y2),
+            line.color
+        );
+    }
+
     const auto points = m_skyContextController->renderPoints(viewportWidth, viewportHeight);
 
     for (const auto& point : points) {

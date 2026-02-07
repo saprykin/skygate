@@ -90,6 +90,27 @@ bool runCatalogLoaderTests()
             parsedBodies[0].fixedEquatorial.has_value(),
             "HYG CSV parser should attach fixed equatorial coordinates"
         ) && success;
+        success = expectTrue(
+            parsedBodies[0].id == "hip_32349",
+            "HYG CSV parser should prefer HIP-based IDs when available"
+        ) && success;
+    }
+
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> hygWithoutHipCatalog =
+        skygate::ephemeris::createStarCatalogFromHygCsv(
+            "id,proper,ra,dec,mag\n"
+            "77,NoHipStar,1.5,2.5,4.2\n"
+        );
+    success = expectTrue(hygWithoutHipCatalog != nullptr, "HYG CSV parser should support rows without HIP") && success;
+    if (hygWithoutHipCatalog != nullptr) {
+        const auto parsedBodies = hygWithoutHipCatalog->bodies();
+        success = expectTrue(parsedBodies.size() == 1, "HYG CSV parser should load row without HIP") && success;
+        if (!parsedBodies.empty()) {
+            success = expectTrue(
+                parsedBodies[0].id == "hyg_77",
+                "HYG CSV parser should fall back to HYG ID when HIP is missing"
+            ) && success;
+        }
     }
 
     return success;
