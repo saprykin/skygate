@@ -204,6 +204,9 @@ private:
     bool m_live = true;
     bool m_utcDateLocked = true;
     bool m_utcTimeLocked = true;
+    bool m_restoreUtcLockStateOnLiveResume = false;
+    bool m_restoreUtcDateLockedOnLiveResume = false;
+    bool m_restoreUtcTimeLockedOnLiveResume = false;
     double m_speedMultiplier = 1.0;
     double m_speedRemainderSeconds = 0.0;
     int m_stepSeconds = 60;

@@ -37,6 +37,23 @@ void SkyContextController::setLive(bool live)
     m_live = live;
     m_speedRemainderSeconds = 0.0;
 
+    if (m_live && m_restoreUtcLockStateOnLiveResume) {
+        const bool nextUtcDateLocked = m_restoreUtcDateLockedOnLiveResume;
+        const bool nextUtcTimeLocked = m_restoreUtcTimeLockedOnLiveResume;
+        m_restoreUtcLockStateOnLiveResume = false;
+        m_restoreUtcDateLockedOnLiveResume = false;
+        m_restoreUtcTimeLockedOnLiveResume = false;
+
+        if (m_utcDateLocked != nextUtcDateLocked) {
+            m_utcDateLocked = nextUtcDateLocked;
+            emit utcDateLockedChanged();
+        }
+        if (m_utcTimeLocked != nextUtcTimeLocked) {
+            m_utcTimeLocked = nextUtcTimeLocked;
+            emit utcTimeLockedChanged();
+        }
+    }
+
     if (m_live && (m_utcDateLocked || m_utcTimeLocked)) {
         // Jump to current UTC as soon as playback resumes in lock mode.
         setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
@@ -57,6 +74,8 @@ bool SkyContextController::utcTimeLocked() const noexcept
 
 void SkyContextController::setUtcDateLocked(const bool utcDateLocked)
 {
+    m_restoreUtcLockStateOnLiveResume = false;
+
     if (m_utcDateLocked == utcDateLocked) {
         return;
     }
@@ -70,6 +89,8 @@ void SkyContextController::setUtcDateLocked(const bool utcDateLocked)
 
 void SkyContextController::setUtcTimeLocked(const bool utcTimeLocked)
 {
+    m_restoreUtcLockStateOnLiveResume = false;
+
     if (m_utcTimeLocked == utcTimeLocked) {
         return;
     }
@@ -187,12 +208,40 @@ void SkyContextController::resetViewDirection()
 
 void SkyContextController::stepForward()
 {
+    if (m_utcDateLocked || m_utcTimeLocked) {
+        m_restoreUtcLockStateOnLiveResume = true;
+        m_restoreUtcDateLockedOnLiveResume = m_utcDateLocked;
+        m_restoreUtcTimeLockedOnLiveResume = m_utcTimeLocked;
+    }
+
+    if (m_utcDateLocked) {
+        m_utcDateLocked = false;
+        emit utcDateLockedChanged();
+    }
+    if (m_utcTimeLocked) {
+        m_utcTimeLocked = false;
+        emit utcTimeLockedChanged();
+    }
     setLive(false);
     stepBySeconds(m_stepSeconds);
 }
 
 void SkyContextController::stepBackward()
 {
+    if (m_utcDateLocked || m_utcTimeLocked) {
+        m_restoreUtcLockStateOnLiveResume = true;
+        m_restoreUtcDateLockedOnLiveResume = m_utcDateLocked;
+        m_restoreUtcTimeLockedOnLiveResume = m_utcTimeLocked;
+    }
+
+    if (m_utcDateLocked) {
+        m_utcDateLocked = false;
+        emit utcDateLockedChanged();
+    }
+    if (m_utcTimeLocked) {
+        m_utcTimeLocked = false;
+        emit utcTimeLockedChanged();
+    }
     setLive(false);
     stepBySeconds(-m_stepSeconds);
 }
