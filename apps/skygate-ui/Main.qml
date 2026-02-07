@@ -549,14 +549,24 @@ ApplicationWindow {
             id: horizonDirectionLabel
             readonly property real viewAltitudeDeg: skyContext.viewCenterAltitudeDeg
             readonly property real viewAzimuthDeg: skyContext.viewCenterAzimuthDeg
-            readonly property real markerX: skyContext.projectedX(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
-            readonly property real markerY: skyContext.projectedY(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            readonly property string projectionState: skyContext.skyContextSummary
+            readonly property real markerX: {
+                projectionState
+                return skyContext.projectedX(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            }
+            readonly property real markerY: {
+                projectionState
+                return skyContext.projectedY(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            }
 
             text: root.cardinalLabel(viewAzimuthDeg)
             color: "#c8ddff"
             font.family: "Avenir Next"
             font.bold: true
-            visible: skyContext.isProjectedVisible(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            visible: {
+                projectionState
+                return skyContext.isProjectedVisible(0.0, viewAzimuthDeg, skyViewport.width, skyViewport.height)
+            }
             x: markerX - (implicitWidth * 0.5)
             y: markerY - implicitHeight - 6
         }

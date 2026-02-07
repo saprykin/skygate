@@ -995,6 +995,7 @@ void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg
     }
 
     m_viewFieldOfViewDeg = nextViewFieldOfViewDeg;
+    emit viewDirectionChanged();
     emit skyContextChanged();
 }
 
@@ -1142,6 +1143,7 @@ void SkyContextController::setProjectionType(const skygate::core::ProjectionType
     m_projectionType = projectionType;
     m_projection = std::move(projection);
     emit projectionTypeChanged();
+    emit viewDirectionChanged();
     emit skyContextChanged();
 }
 
