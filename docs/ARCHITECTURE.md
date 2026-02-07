@@ -44,3 +44,7 @@
 - Projection strategies are isolated behind `IProjection`.
 - Ephemeris computation remains UI-independent.
 - Data sources can swap via `IStarCatalog` without changing UI code.
+- Catalog rows support bundled defaults and runtime-downloaded datasets via the
+  same `id|name|type|magnitude` row format.
+- Runtime import supports major star catalogs in HYG CSV format (`ra`, `dec`,
+  `mag`) and maps them to fixed-position stars.

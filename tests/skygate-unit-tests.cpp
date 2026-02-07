@@ -38,10 +38,11 @@ bool runCatalogLoaderTests()
 
     const auto bodies = catalog->bodies();
     success = expectTrue(!bodies.empty(), "Bundled catalog should include at least one body") && success;
-    success = expectTrue(bodies.size() == 15, "Bundled catalog should include expected initial body set") && success;
+    success = expectTrue(bodies.size() == 25, "Bundled catalog should include expected initial body set") && success;
 
     bool hasSun = false;
     bool hasSirius = false;
+    bool hasOrionConstellation = false;
     for (const auto& body : bodies) {
         if (body.id == "sun" && body.type == skygate::ephemeris::CelestialBodyType::Sun) {
             hasSun = true;
@@ -50,10 +51,47 @@ bool runCatalogLoaderTests()
         if (body.id == "sirius" && body.type == skygate::ephemeris::CelestialBodyType::Star) {
             hasSirius = true;
         }
+
+        if (body.id == "orion" && body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
+            hasOrionConstellation = true;
+        }
     }
 
     success = expectTrue(hasSun, "Bundled catalog should contain Sun") && success;
     success = expectTrue(hasSirius, "Bundled catalog should contain Sirius") && success;
+    success = expectTrue(hasOrionConstellation, "Bundled catalog should contain Orion constellation") && success;
+
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> downloadedLikeCatalog =
+        skygate::ephemeris::createStarCatalogFromRows(
+            "vega|Vega|Star|0.03|18.6156|38.7837\n"
+            "orion|Orion|Constellation|1.6\n"
+        );
+    success = expectTrue(downloadedLikeCatalog != nullptr, "Downloaded-like catalog text should parse") && success;
+    if (downloadedLikeCatalog != nullptr) {
+        const auto parsedBodies = downloadedLikeCatalog->bodies();
+        success = expectTrue(parsedBodies.size() == 2, "Downloaded-like catalog should contain two rows") && success;
+        success = expectTrue(
+            parsedBodies[0].fixedEquatorial.has_value(),
+            "Downloaded-like catalog should parse optional RA/Dec coordinates"
+        ) && success;
+    }
+
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> hygCatalog =
+        skygate::ephemeris::createStarCatalogFromHygCsv(
+            "id,hip,proper,ra,dec,mag\n"
+            "1,32349,Sirius,6.7525,-16.7161,-1.46\n"
+            "2,24608,Capella,5.2782,45.9979,0.08\n"
+        );
+    success = expectTrue(hygCatalog != nullptr, "HYG CSV catalog should parse") && success;
+    if (hygCatalog != nullptr) {
+        const auto parsedBodies = hygCatalog->bodies();
+        success = expectTrue(parsedBodies.size() == 2, "HYG CSV parser should load expected rows") && success;
+        success = expectTrue(
+            parsedBodies[0].fixedEquatorial.has_value(),
+            "HYG CSV parser should attach fixed equatorial coordinates"
+        ) && success;
+    }
+
     return success;
 }
 
@@ -212,6 +250,32 @@ bool runEphemerisEngineTests()
     if (nullCatalogEngine != nullptr) {
         const auto nullSnapshot = nullCatalogEngine->compute(context);
         success = expectTrue(nullSnapshot.states.empty(), "Engine with null catalog should emit no states") && success;
+    }
+
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> importedCatalog =
+        skygate::ephemeris::createStarCatalogFromRows(
+            "demo_star|Demo Star|Star|4.0|12.5|-30.0\n"
+        );
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> importedEngine =
+        skygate::ephemeris::createEphemerisEngineStub(importedCatalog.get());
+    success = expectTrue(importedEngine != nullptr, "Engine should support imported catalog stars") && success;
+    if (importedEngine != nullptr) {
+        const auto importedSnapshot = importedEngine->compute(context);
+        success = expectTrue(importedSnapshot.states.size() == 1, "Imported catalog should emit one state") && success;
+        if (!importedSnapshot.states.empty()) {
+            success = expectNear(
+                importedSnapshot.states[0].equatorial.rightAscensionHours,
+                12.5,
+                1e-8,
+                "Imported star RA should come from catalog fixed coordinates"
+            ) && success;
+            success = expectNear(
+                importedSnapshot.states[0].equatorial.declinationDeg,
+                -30.0,
+                1e-8,
+                "Imported star Dec should come from catalog fixed coordinates"
+            ) && success;
+        }
     }
 
     return success;

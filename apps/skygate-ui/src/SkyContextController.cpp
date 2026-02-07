@@ -5,14 +5,23 @@
 #include <QSettings>
 #include <QTimeZone>
 #include <QColor>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrl>
 
 #include "skygate/core/ProjectionFactory.hpp"
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/StarCatalogFactory.hpp"
 
 #include <cmath>
 #include <chrono>
 #include <algorithm>
+#include <cstddef>
+#include <functional>
 #include <limits>
 #include <optional>
+#include <string_view>
 #include <utility>
 
 #if SKYGATE_HAS_POSITIONING
@@ -33,6 +42,32 @@ constexpr double kMagnitudeCutoffMin = -2.0;
 constexpr double kMagnitudeCutoffMax = 12.0;
 constexpr double kViewAltitudeMinDeg = -90.0;
 constexpr double kViewAltitudeMaxDeg = 90.0;
+constexpr std::size_t kMaxDownloadedCatalogBytes = 128U << 20;
+constexpr const char* kHygCatalogPrimaryUrl =
+    "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
+constexpr const char* kHygCatalogMirrorUrl =
+    "https://astronexus.com/downloads/catalogs/hygdata_v41.csv.gz";
+constexpr const char* kHygCatalogGithubMirrorUrl =
+    "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv";
+constexpr std::string_view kStarterCatalogRows =
+    "sun|Sun|Sun|-26.74\n"
+    "moon|Moon|Moon|-12.74\n"
+    "venus|Venus|Planet|-4.92\n"
+    "jupiter|Jupiter|Planet|-2.94\n"
+    "sirius|Sirius|Star|-1.46\n"
+    "vega|Vega|Star|0.03\n"
+    "betelgeuse|Betelgeuse|Star|0.50\n";
+constexpr std::string_view kMajorConstellationsCatalogRows =
+    "orion|Orion|Constellation|1.6\n"
+    "ursa_major|Ursa Major|Constellation|1.8\n"
+    "ursa_minor|Ursa Minor|Constellation|2.1\n"
+    "cassiopeia|Cassiopeia|Constellation|2.2\n"
+    "scorpius|Scorpius|Constellation|1.7\n"
+    "cygnus|Cygnus|Constellation|1.3\n"
+    "taurus|Taurus|Constellation|1.7\n"
+    "leo|Leo|Constellation|1.4\n"
+    "gemini|Gemini|Constellation|1.6\n"
+    "andromeda|Andromeda|Constellation|2.1\n";
 
 QString formatCoordinate(double value)
 {
@@ -103,6 +138,8 @@ QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
         return QColor(255, 188, 140, 220);
     case skygate::ephemeris::CelestialBodyType::Star:
         return QColor(188, 214, 255, 210);
+    case skygate::ephemeris::CelestialBodyType::Constellation:
+        return QColor(160, 244, 200, 205);
     }
 
     return QColor(220, 220, 240, 200);
@@ -152,6 +189,21 @@ SkyContextController::SkyContextController(
     , m_starCatalog(std::move(starCatalog))
     , m_ephemerisEngine(std::move(ephemerisEngine))
 {
+    m_networkAccessManager = new QNetworkAccessManager(this);
+
+    if (m_starCatalog == nullptr) {
+        m_starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    }
+    if (m_ephemerisEngine == nullptr && m_starCatalog != nullptr) {
+        m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
+    }
+
+    if (m_starCatalog != nullptr) {
+        applyCatalog(std::move(m_starCatalog), "Bundled");
+    } else {
+        m_catalogStatusText = "Catalog: Unavailable";
+    }
+
     m_projection = skygate::core::createProjection(m_projectionType);
     m_skyContext.utcTime = toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
     loadSettings();
@@ -254,6 +306,16 @@ QString SkyContextController::locationStatusText() const
     return m_locationStatusText;
 }
 
+QString SkyContextController::catalogStatusText() const
+{
+    return m_catalogStatusText;
+}
+
+bool SkyContextController::downloadingCatalog() const noexcept
+{
+    return m_downloadingCatalog;
+}
+
 QString SkyContextController::skyContextSummary() const
 {
     QString bodyCountText = "n/a";
@@ -330,6 +392,9 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
         point.x = projected.x;
         point.y = projected.y;
         point.sizePx = pointSizeForMagnitude(state.body.visualMagnitude);
+        if (state.body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
+            point.sizePx = std::max(point.sizePx, 3.0);
+        }
         point.displayName = QString::fromStdString(state.body.displayName);
         point.color = colorForBodyType(state.body.type);
         points.push_back(point);
@@ -935,4 +1000,214 @@ QString SkyContextController::objectLabelAt(
     }
 
     return bestLabel;
+}
+
+void SkyContextController::loadCatalogPreset(const QString& presetId)
+{
+    if (m_downloadingCatalog) {
+        return;
+    }
+
+    const QString normalizedPresetId = presetId.trimmed().toLower();
+    if (normalizedPresetId == "bundled") {
+        applyCatalog(skygate::ephemeris::createBundledStarCatalog(), "Bundled");
+        return;
+    }
+
+    if (normalizedPresetId == "starter") {
+        applyCatalog(
+            skygate::ephemeris::createStarCatalogFromRows(kStarterCatalogRows),
+            "Starter"
+        );
+        return;
+    }
+
+    if (normalizedPresetId == "constellations_major") {
+        applyCatalog(
+            skygate::ephemeris::createStarCatalogFromRows(kMajorConstellationsCatalogRows),
+            "Major Constellations"
+        );
+        return;
+    }
+
+    if (normalizedPresetId == "hyg_v3") {
+        downloadCatalogFromUrls(
+            QStringList {
+                QString::fromUtf8(kHygCatalogPrimaryUrl),
+                QString::fromUtf8(kHygCatalogMirrorUrl),
+                QString::fromUtf8(kHygCatalogGithubMirrorUrl)
+            },
+            "HYG v3"
+        );
+        return;
+    }
+
+    m_catalogStatusText = QString("Catalog: Unknown preset '%1'").arg(presetId);
+    emit catalogStatusTextChanged();
+}
+
+void SkyContextController::downloadCatalogFromUrl(const QString& urlText)
+{
+    downloadCatalogFromUrls(QStringList {urlText}, "Downloaded");
+}
+
+void SkyContextController::downloadCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel)
+{
+    if (m_downloadingCatalog) {
+        return;
+    }
+
+    QStringList candidateUrls;
+    candidateUrls.reserve(urlTexts.size());
+    for (const QString& urlText : urlTexts) {
+        const QString trimmed = urlText.trimmed();
+        if (!trimmed.isEmpty()) {
+            candidateUrls.push_back(trimmed);
+        }
+    }
+
+    if (candidateUrls.isEmpty()) {
+        m_catalogStatusText = "Catalog: Invalid URL";
+        emit catalogStatusTextChanged();
+        return;
+    }
+
+    if (m_networkAccessManager == nullptr) {
+        m_catalogStatusText = "Catalog: Network unavailable";
+        emit catalogStatusTextChanged();
+        return;
+    }
+
+    const auto lastErrorText = std::make_shared<QString>();
+    const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
+    *lastErrorText = "Catalog: Download failed";
+    *tryDownloadNextUrl = [this, candidateUrls, sourceLabel, tryDownloadNextUrl, lastErrorText](const int index) {
+        if (index >= candidateUrls.size()) {
+            m_downloadingCatalog = false;
+            emit downloadingCatalogChanged();
+            m_catalogStatusText = *lastErrorText;
+            emit catalogStatusTextChanged();
+            return;
+        }
+
+        const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
+        if (!url.isValid() || url.scheme().isEmpty()) {
+            *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
+            (*tryDownloadNextUrl)(index + 1);
+            return;
+        }
+
+        m_catalogStatusText = QString("Catalog: Downloading %1 (%2/%3)").arg(
+            url.toString(),
+            QString::number(index + 1),
+            QString::number(candidateUrls.size())
+        );
+        emit catalogStatusTextChanged();
+
+        QNetworkRequest request(url);
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+        request.setTransferTimeout(300000);
+        request.setRawHeader("User-Agent", "Skygate/1.0");
+        request.setRawHeader("Accept", "text/plain,text/csv,application/gzip,application/octet-stream,*/*");
+
+        QNetworkReply* reply = m_networkAccessManager->get(request);
+        connect(
+            reply,
+            &QNetworkReply::finished,
+            this,
+            [this, reply, index, sourceLabel, tryDownloadNextUrl, candidateUrls, lastErrorText]() {
+                reply->deleteLater();
+
+                if (reply->error() != QNetworkReply::NoError) {
+                    const int httpStatusCode =
+                        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                    *lastErrorText = QString("Catalog: Source %1 failed (%2, HTTP %3)").arg(
+                        candidateUrls[index],
+                        reply->errorString(),
+                        QString::number(httpStatusCode)
+                    );
+                    m_catalogStatusText = *lastErrorText;
+                    emit catalogStatusTextChanged();
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                const QByteArray payload = reply->readAll();
+                if (payload.isEmpty()) {
+                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
+                    m_catalogStatusText = *lastErrorText;
+                    emit catalogStatusTextChanged();
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                if (static_cast<std::size_t>(payload.size()) > kMaxDownloadedCatalogBytes) {
+                    *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(
+                        candidateUrls[index]
+                    );
+                    m_catalogStatusText = *lastErrorText;
+                    emit catalogStatusTextChanged();
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                const std::string_view rows(payload.constData(), static_cast<std::size_t>(payload.size()));
+                std::unique_ptr<skygate::ephemeris::IStarCatalog> downloadedCatalog =
+                    skygate::ephemeris::createStarCatalogFromRows(rows);
+                if (downloadedCatalog == nullptr) {
+                    downloadedCatalog = skygate::ephemeris::createStarCatalogFromHygCsv(rows);
+                }
+                if (downloadedCatalog == nullptr) {
+                    downloadedCatalog = skygate::ephemeris::createStarCatalogFromHygCsvGzip(rows);
+                }
+                if (downloadedCatalog == nullptr) {
+                    *lastErrorText = QString(
+                        "Catalog: Source %1 parse failed (supported: pipe rows, HYG CSV, or HYG .csv.gz)"
+                    ).arg(candidateUrls[index]);
+                    m_catalogStatusText = *lastErrorText;
+                    emit catalogStatusTextChanged();
+                    (*tryDownloadNextUrl)(index + 1);
+                    return;
+                }
+
+                m_downloadingCatalog = false;
+                emit downloadingCatalogChanged();
+                applyCatalog(std::move(downloadedCatalog), sourceLabel);
+            }
+        );
+    };
+
+    m_downloadingCatalog = true;
+    emit downloadingCatalogChanged();
+    (*tryDownloadNextUrl)(0);
+}
+
+void SkyContextController::applyCatalog(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
+    const QString& sourceLabel
+)
+{
+    if (catalog == nullptr) {
+        m_catalogStatusText = "Catalog: Failed to load";
+        emit catalogStatusTextChanged();
+        return;
+    }
+
+    const auto bodies = catalog->bodies();
+    std::size_t constellationCount = 0;
+    for (const auto& body : bodies) {
+        if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
+            ++constellationCount;
+        }
+    }
+
+    m_starCatalog = std::move(catalog);
+    m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
+    m_catalogStatusText = QString("Catalog: %1 (%2 objects, %3 constellations)").arg(
+        sourceLabel,
+        QString::number(static_cast<qulonglong>(bodies.size())),
+        QString::number(static_cast<qulonglong>(constellationCount))
+    );
+    emit catalogStatusTextChanged();
+    emit skyContextChanged();
 }

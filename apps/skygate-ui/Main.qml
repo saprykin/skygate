@@ -535,5 +535,87 @@ ApplicationWindow {
                 }
             }
         }
+
+        Rectangle {
+            id: catalogToolbar
+            anchors.top: timelineToolbar.bottom
+            anchors.topMargin: 10
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            width: catalogToolbarColumn.implicitWidth + 16
+            height: catalogToolbarColumn.implicitHeight + 14
+            radius: 10
+            color: "#7f0b1428"
+            border.width: 1
+            border.color: "#335177"
+
+            Column {
+                id: catalogToolbarColumn
+                anchors.centerIn: parent
+                spacing: 6
+
+                Label {
+                    text: "Catalog"
+                    color: "#cad9f7"
+                    font.family: "Avenir Next"
+                }
+
+                Row {
+                    spacing: 6
+
+                    ComboBox {
+                        id: catalogPresetCombo
+                        width: 240
+                        model: [
+                            "Bundled (recommended)",
+                            "Starter (bright objects)",
+                            "Major constellations",
+                            "HYG v3 stars (Astronexus)"
+                        ]
+                    }
+
+                    Button {
+                        text: "Use Preset"
+                        onClicked: {
+                            if (catalogPresetCombo.currentIndex === 0) {
+                                skyContext.loadCatalogPreset("bundled")
+                            } else if (catalogPresetCombo.currentIndex === 1) {
+                                skyContext.loadCatalogPreset("starter")
+                            } else if (catalogPresetCombo.currentIndex === 2) {
+                                skyContext.loadCatalogPreset("constellations_major")
+                            } else {
+                                skyContext.loadCatalogPreset("hyg_v3")
+                                catalogUrlInput.text = "https://raw.githubusercontent.com/astronexus/HYG-Database/master/hygdata_v3.csv"
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    spacing: 6
+
+                    TextField {
+                        id: catalogUrlInput
+                        width: 320
+                        text: "https://astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
+                        placeholderText: "https://example.com/skygate-catalog.txt or HYG CSV URL"
+                    }
+
+                    Button {
+                        text: skyContext.downloadingCatalog ? "Downloading..." : "Download"
+                        enabled: !skyContext.downloadingCatalog
+                        onClicked: skyContext.downloadCatalogFromUrl(catalogUrlInput.text)
+                    }
+                }
+
+                Label {
+                    text: skyContext.catalogStatusText
+                    color: "#9ab0d6"
+                    font.pixelSize: 12
+                    elide: Text.ElideRight
+                    width: 420
+                }
+            }
+        }
     }
 }

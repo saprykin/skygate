@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QColor>
 #include <QDateTime>
+#include <QStringList>
 #include <QTimer>
 
 #include "skygate/core/IProjection.hpp"
@@ -15,6 +16,7 @@
 
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
+class QNetworkAccessManager;
 
 class SkyContextController final : public QObject {
     Q_OBJECT
@@ -32,6 +34,8 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString projectionTypeText READ projectionTypeText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString projectionSampleText READ projectionSampleText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
+    Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
+    Q_PROPERTY(bool downloadingCatalog READ downloadingCatalog NOTIFY downloadingCatalogChanged)
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
@@ -64,6 +68,8 @@ public:
     [[nodiscard]] QString projectionTypeText() const;
     [[nodiscard]] QString projectionSampleText() const;
     [[nodiscard]] QString locationStatusText() const;
+    [[nodiscard]] QString catalogStatusText() const;
+    [[nodiscard]] bool downloadingCatalog() const noexcept;
     [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::vector<SkyRenderPoint> renderPoints(
@@ -98,6 +104,8 @@ public:
     Q_INVOKABLE double projectedY(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE bool isProjectedVisible(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE QString objectLabelAt(double x, double y, double viewportWidth, double viewportHeight) const;
+    Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
+    Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
 
 signals:
     void liveChanged();
@@ -117,6 +125,8 @@ signals:
     void invalidElevationInput(const QString& elevationText);
     void projectionTypeChanged();
     void locationStatusTextChanged();
+    void catalogStatusTextChanged();
+    void downloadingCatalogChanged();
     void skyContextChanged();
 
 private:
@@ -126,6 +136,11 @@ private:
     void initializeCurrentLocation();
     void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
     void setProjectionType(skygate::core::ProjectionType projectionType);
+    void applyCatalog(
+        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
+        const QString& sourceLabel
+    );
+    void downloadCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel);
 
 private:
     bool m_live = true;
@@ -141,6 +156,9 @@ private:
     std::unique_ptr<skygate::core::IProjection> m_projection;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_locationStatusText;
+    QString m_catalogStatusText;
+    bool m_downloadingCatalog = false;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

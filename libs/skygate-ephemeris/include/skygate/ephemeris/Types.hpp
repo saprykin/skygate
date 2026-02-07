@@ -3,6 +3,7 @@
 #include "skygate/core/Types.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,7 +13,8 @@ enum class CelestialBodyType : std::uint8_t {
     Star,
     Planet,
     Moon,
-    Sun
+    Sun,
+    Constellation
 };
 
 struct CelestialBody {
@@ -20,6 +22,7 @@ struct CelestialBody {
     std::string displayName;
     CelestialBodyType type = CelestialBodyType::Star;
     double visualMagnitude = 0.0;
+    std::optional<core::EquatorialCoordinate> fixedEquatorial;
 };
 
 struct CelestialBodyState {

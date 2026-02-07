@@ -1,4 +1,4 @@
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick Network)
 find_package(Qt6 6.5 QUIET COMPONENTS Positioning)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -39,6 +39,7 @@ target_link_libraries(skygate-ui
         Qt6::Gui
         Qt6::Qml
         Qt6::Quick
+        Qt6::Network
         skygate::ephemeris
 )
 
