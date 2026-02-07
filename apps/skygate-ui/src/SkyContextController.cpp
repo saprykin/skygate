@@ -5,6 +5,7 @@
 
 #include <QLocale>
 #include <QNetworkAccessManager>
+#include <QVariantMap>
 
 #include "skygate/core/ProjectionFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -16,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 using namespace skygate::ui::internal;
@@ -496,4 +498,157 @@ QString SkyContextController::objectLabelAt(
     }
 
     return bestLabel;
+}
+
+QVariantList SkyContextController::constellationLabels(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return {};
+    }
+
+    if (m_ephemerisEngine == nullptr || m_projection == nullptr) {
+        return {};
+    }
+
+    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+        viewportWidth,
+        viewportHeight,
+        m_viewCenterAltitudeDeg,
+        m_viewCenterAzimuthDeg,
+        m_viewFieldOfViewDeg
+    );
+
+    const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
+    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalById;
+    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalByDisplayName;
+    horizontalById.reserve(snapshot.states.size());
+    horizontalByDisplayName.reserve(snapshot.states.size());
+    for (const auto& state : snapshot.states) {
+        if (
+            !std::isfinite(state.horizontal.altitudeDeg)
+            || !std::isfinite(state.horizontal.azimuthDeg)
+        ) {
+            continue;
+        }
+        horizontalById[state.body.id] = state.horizontal;
+        horizontalByDisplayName[state.body.displayName] = state.horizontal;
+    }
+
+    const auto findHorizontal = [&](const std::string_view lineRefId) -> const skygate::core::HorizontalCoordinate* {
+        if (const auto idIt = horizontalById.find(lineRefId); idIt != horizontalById.end()) {
+            return &idIt->second;
+        }
+
+        const std::string_view hipNumber = hipSuffix(lineRefId);
+        if (!hipNumber.empty()) {
+            std::string legacyHipDisplayName = "HIP ";
+            legacyHipDisplayName.append(hipNumber.data(), hipNumber.size());
+            if (
+                const auto displayNameIt = horizontalByDisplayName.find(legacyHipDisplayName);
+                displayNameIt != horizontalByDisplayName.end()
+            ) {
+                return &displayNameIt->second;
+            }
+        }
+
+        return nullptr;
+    };
+
+    std::unordered_set<std::string> seenLabels;
+    QVariantList labels;
+    labels.reserve(static_cast<int>((snapshot.states.size() / 8U) + m_constellationLabelRefs.size()));
+
+    constexpr double kEdgeMarginPx = 10.0;
+    for (const auto& state : snapshot.states) {
+        if (state.body.type != skygate::ephemeris::CelestialBodyType::Constellation) {
+            continue;
+        }
+
+        if (
+            !std::isfinite(state.horizontal.altitudeDeg)
+            || !std::isfinite(state.horizontal.azimuthDeg)
+            || state.body.displayName.empty()
+        ) {
+            continue;
+        }
+
+        if (!seenLabels.insert(state.body.displayName).second) {
+            continue;
+        }
+
+        const auto projected = m_projection->project(state.horizontal, projectionParams);
+        if (!projected.isVisible) {
+            continue;
+        }
+
+        if (
+            projected.x < kEdgeMarginPx
+            || projected.x > (viewportWidth - kEdgeMarginPx)
+            || projected.y < kEdgeMarginPx
+            || projected.y > (viewportHeight - kEdgeMarginPx)
+        ) {
+            continue;
+        }
+
+        QVariantMap labelEntry;
+        labelEntry.insert("x", projected.x);
+        labelEntry.insert("y", projected.y);
+        labelEntry.insert("text", QString::fromStdString(state.body.displayName));
+        labels.push_back(labelEntry);
+    }
+
+    for (const auto& labelRef : m_constellationLabelRefs) {
+        if (labelRef.first.empty() || labelRef.second.empty()) {
+            continue;
+        }
+
+        if (!seenLabels.insert(labelRef.first).second) {
+            continue;
+        }
+
+        double sumX = 0.0;
+        double sumY = 0.0;
+        int visiblePointCount = 0;
+        for (const std::string& hipId : labelRef.second) {
+            const auto* horizontal = findHorizontal(hipId);
+            if (horizontal == nullptr) {
+                continue;
+            }
+
+            const auto projected = m_projection->project(*horizontal, projectionParams);
+            if (!projected.isVisible) {
+                continue;
+            }
+
+            sumX += projected.x;
+            sumY += projected.y;
+            ++visiblePointCount;
+        }
+
+        if (visiblePointCount == 0) {
+            continue;
+        }
+
+        const double labelX = sumX / static_cast<double>(visiblePointCount);
+        const double labelY = sumY / static_cast<double>(visiblePointCount);
+        if (
+            labelX < kEdgeMarginPx
+            || labelX > (viewportWidth - kEdgeMarginPx)
+            || labelY < kEdgeMarginPx
+            || labelY > (viewportHeight - kEdgeMarginPx)
+        ) {
+            continue;
+        }
+
+        QVariantMap labelEntry;
+        labelEntry.insert("x", labelX);
+        labelEntry.insert("y", labelY);
+        labelEntry.insert("text", QString::fromStdString(labelRef.first));
+        labels.push_back(labelEntry);
+    }
+
+    return labels;
 }

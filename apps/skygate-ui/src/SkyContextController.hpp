@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QStringList>
 #include <QTimer>
+#include <QVariantList>
 
 #include "skygate/core/IProjection.hpp"
 #include "skygate/core/Types.hpp"
@@ -49,6 +50,8 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
+    using ConstellationLabelRef = std::pair<std::string, std::vector<std::string>>;
+
     struct SkyRenderPoint {
         double x = 0.0;
         double y = 0.0;
@@ -130,6 +133,7 @@ public:
     Q_INVOKABLE double projectedY(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE bool isProjectedVisible(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE QString objectLabelAt(double x, double y, double viewportWidth, double viewportHeight) const;
+    Q_INVOKABLE QVariantList constellationLabels(double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE int catalogPresetIndex() const noexcept;
@@ -181,6 +185,7 @@ private:
     );
     void resetConstellationLineRefs();
     void setConstellationLineRefs(std::vector<std::pair<std::string, std::string>> lineRefs);
+    void setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
     void persistCatalogCache(
         const std::vector<skygate::ephemeris::CelestialBody>& bodies,
         const QString& sourceLabel
@@ -214,5 +219,6 @@ private:
     std::size_t m_catalogBodyCount = 0;
     std::size_t m_catalogConstellationCount = 0;
     std::vector<std::pair<std::string, std::string>> m_constellationLineRefs;
+    std::vector<ConstellationLabelRef> m_constellationLabelRefs;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

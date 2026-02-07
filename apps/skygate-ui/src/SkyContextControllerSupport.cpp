@@ -18,6 +18,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -170,6 +171,234 @@ QString sanitizeCatalogField(QString value)
     value.replace('\r', ' ');
     return value.trimmed();
 }
+
+std::optional<int> parseStrictHipText(QString text)
+{
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return std::nullopt;
+    }
+
+    if (text.startsWith("hip_", Qt::CaseInsensitive)) {
+        text.remove(0, 4);
+    } else if (text.startsWith("hip", Qt::CaseInsensitive)) {
+        text.remove(0, 3);
+        while (!text.isEmpty() && (text.front().isSpace() || text.front() == '_')) {
+            text.remove(0, 1);
+        }
+    }
+
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return std::nullopt;
+    }
+
+    for (int index = 0; index < text.size(); ++index) {
+        if (!text.at(index).isDigit()) {
+            return std::nullopt;
+        }
+    }
+
+    bool isOk = false;
+    const int parsedValue = text.toInt(&isOk);
+    if (!isOk || parsedValue <= 0) {
+        return std::nullopt;
+    }
+
+    return parsedValue;
+}
+
+std::optional<int> parseHipIdentifierFromJsonValue(const QJsonValue& value)
+{
+    if (value.isDouble()) {
+        const double numericValue = value.toDouble();
+        if (
+            std::isfinite(numericValue)
+            && numericValue > 0.0
+            && std::floor(numericValue) == numericValue
+            && numericValue <= static_cast<double>(std::numeric_limits<int>::max())
+        ) {
+            return static_cast<int>(numericValue);
+        }
+        return std::nullopt;
+    }
+
+    if (value.isString()) {
+        return parseStrictHipText(value.toString());
+    }
+
+    if (!value.isObject()) {
+        return std::nullopt;
+    }
+
+    const QJsonObject object = value.toObject();
+    constexpr std::array<const char*, 4> kHipFieldCandidates = {{
+        "hip",
+        "HIP",
+        "id",
+        "star",
+    }};
+    for (const char* fieldName : kHipFieldCandidates) {
+        const QJsonValue fieldValue = object.value(fieldName);
+        if (fieldValue.isUndefined()) {
+            continue;
+        }
+
+        if (const auto parsed = parseHipIdentifierFromJsonValue(fieldValue); parsed.has_value()) {
+            return parsed;
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<std::vector<int>> parseHipPolyline(const QJsonArray& array)
+{
+    if (array.size() < 2) {
+        return std::nullopt;
+    }
+
+    std::vector<int> hips;
+    hips.reserve(array.size());
+    for (const QJsonValue& child : array) {
+        const auto hip = parseHipIdentifierFromJsonValue(child);
+        if (!hip.has_value()) {
+            return std::nullopt;
+        }
+        hips.push_back(*hip);
+    }
+
+    return hips;
+}
+
+void collectHipPolylines(const QJsonValue& value, std::vector<std::vector<int>>& polylines)
+{
+    if (value.isArray()) {
+        const QJsonArray array = value.toArray();
+        if (const auto polyline = parseHipPolyline(array); polyline.has_value()) {
+            polylines.push_back(*polyline);
+            return;
+        }
+
+        for (const QJsonValue& child : array) {
+            if (child.isArray() || child.isObject()) {
+                collectHipPolylines(child, polylines);
+            }
+        }
+        return;
+    }
+
+    if (!value.isObject()) {
+        return;
+    }
+
+    const QJsonObject object = value.toObject();
+    const QJsonValue linesValue = object.value("lines");
+    const QJsonValue lineValue = object.value("line");
+    if (!linesValue.isUndefined()) {
+        collectHipPolylines(linesValue, polylines);
+    }
+    if (!lineValue.isUndefined()) {
+        collectHipPolylines(lineValue, polylines);
+    }
+
+    if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
+        return;
+    }
+
+    for (auto it = object.begin(); it != object.end(); ++it) {
+        if (it.value().isArray() || it.value().isObject()) {
+            collectHipPolylines(it.value(), polylines);
+        }
+    }
+}
+
+QString prettifyConstellationId(QString id)
+{
+    id = id.trimmed();
+    id.replace('_', ' ');
+    id.replace('-', ' ');
+    id = id.simplified();
+    if (id.isEmpty()) {
+        return {};
+    }
+
+    const QString lower = id.toLower();
+    QString title;
+    title.reserve(lower.size());
+    bool wordStart = true;
+    for (const QChar c : lower) {
+        if (c.isSpace()) {
+            title.append(c);
+            wordStart = true;
+            continue;
+        }
+
+        title.append(wordStart ? c.toUpper() : c);
+        wordStart = false;
+    }
+
+    return title;
+}
+
+QString constellationLabelFromEntry(const QString& fallbackId, const QJsonObject& entry)
+{
+    constexpr std::array<const char*, 3> kDirectNameFields = {{
+        "name",
+        "label",
+        "english",
+    }};
+    for (const char* fieldName : kDirectNameFields) {
+        const QJsonValue fieldValue = entry.value(fieldName);
+        if (fieldValue.isString()) {
+            const QString text = fieldValue.toString().trimmed();
+            if (!text.isEmpty()) {
+                return text;
+            }
+        }
+    }
+
+    const QJsonValue commonNameValue = entry.value("common_name");
+    if (commonNameValue.isString()) {
+        const QString text = commonNameValue.toString().trimmed();
+        if (!text.isEmpty()) {
+            return text;
+        }
+    } else if (commonNameValue.isObject()) {
+        const QJsonObject commonNameObject = commonNameValue.toObject();
+        constexpr std::array<const char*, 4> kCommonNameFields = {{
+            "english",
+            "name",
+            "native",
+            "iau",
+        }};
+        for (const char* fieldName : kCommonNameFields) {
+            const QJsonValue fieldValue = commonNameObject.value(fieldName);
+            if (!fieldValue.isString()) {
+                continue;
+            }
+            const QString text = fieldValue.toString().trimmed();
+            if (!text.isEmpty()) {
+                return text;
+            }
+        }
+    }
+
+    const QJsonValue idValue = entry.value("id");
+    if (idValue.isString()) {
+        const QString prettified = prettifyConstellationId(idValue.toString());
+        if (!prettified.isEmpty()) {
+            return prettified;
+        }
+    }
+
+    return prettifyConstellationId(fallbackId);
+}
+
+QString normalizeLabelKey(const QString& label)
+{
+    return label.trimmed().toLower();
+}
 } // namespace
 
 namespace skygate::ui::internal {
@@ -181,6 +410,22 @@ std::vector<std::pair<std::string, std::string>> defaultConstellationLineRefs()
         lineRefs.emplace_back(std::string(lineRef.startId), std::string(lineRef.endId));
     }
     return lineRefs;
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> defaultConstellationLabelRefs()
+{
+    return {
+        {"Orion", {"hip_27989", "hip_25336", "hip_25930", "hip_26311", "hip_26727", "hip_24436"}},
+        {"Ursa Major", {"hip_67301", "hip_65378", "hip_62956", "hip_59774", "hip_54061", "hip_53910", "hip_58001"}},
+        {"Ursa Minor", {"hip_11767", "hip_79822", "hip_77055", "hip_75097", "hip_72607", "hip_85822", "hip_82080"}},
+        {"Cassiopeia", {"hip_746", "hip_3179", "hip_4427", "hip_6686", "hip_8886"}},
+        {"Cygnus", {"hip_102098", "hip_100453", "hip_95947", "hip_98110", "hip_97165"}},
+        {"Taurus", {"hip_20889", "hip_21421", "hip_25428"}},
+        {"Gemini", {"hip_31681", "hip_34088", "hip_35550", "hip_37826", "hip_32362"}},
+        {"Leo", {"hip_49669", "hip_54872", "hip_57632", "hip_50583"}},
+        {"Andromeda", {"hip_677", "hip_3092", "hip_5447", "hip_9640"}},
+        {"Scorpius", {"hip_78265", "hip_78401", "hip_78820", "hip_80763", "hip_85927", "hip_86228"}},
+    };
 }
 
 std::vector<std::pair<std::string, std::string>> parseStellariumConstellationLineRefs(
@@ -255,140 +500,184 @@ std::vector<std::pair<std::string, std::string>> parseStellariumIndexJsonConstel
         return {};
     }
 
-    const QJsonValue constellationsValue = document.object().value("constellations");
     std::vector<std::pair<std::string, std::string>> lineRefs;
     std::unordered_set<std::string> dedupKeys;
-
-    const auto parseHipIdentifier = [](const QJsonValue& value) -> std::optional<int> {
-        if (value.isObject()) {
-            const QJsonObject object = value.toObject();
-            const QJsonValue hipValue = object.value("hip");
-            if (!hipValue.isUndefined()) {
-                if (hipValue.isDouble()) {
-                    const double numericValue = hipValue.toDouble();
-                    if (
-                        std::isfinite(numericValue)
-                        && numericValue > 0.0
-                        && std::floor(numericValue) == numericValue
-                    ) {
-                        return static_cast<int>(numericValue);
-                    }
-                } else if (hipValue.isString()) {
-                    QString hipText = hipValue.toString().trimmed();
-                    bool isOk = false;
-                    const int hipNumber = hipText.toInt(&isOk);
-                    if (isOk && hipNumber > 0) {
-                        return hipNumber;
-                    }
-                }
-            }
-            return std::nullopt;
-        }
-
-        if (value.isDouble()) {
-            const double numericValue = value.toDouble();
-            if (
-                std::isfinite(numericValue)
-                && numericValue > 0.0
-                && std::floor(numericValue) == numericValue
-            ) {
-                return static_cast<int>(numericValue);
-            }
-            return std::nullopt;
-        }
-
-        if (!value.isString()) {
-            return std::nullopt;
-        }
-
-        QString textValue = value.toString().trimmed();
-        if (textValue.startsWith("hip_", Qt::CaseInsensitive)) {
-            textValue.remove(0, 4);
-        } else if (textValue.startsWith("hip ", Qt::CaseInsensitive)) {
-            textValue.remove(0, 4);
-        }
-
-        QString digits;
-        digits.reserve(textValue.size());
-        for (int index = 0; index < textValue.size(); ++index) {
-            const QChar c = textValue.at(index);
-            if (c.isDigit()) {
-                digits.append(c);
-            } else if (!digits.isEmpty()) {
-                break;
-            }
-        }
-
-        if (digits.isEmpty()) {
-            return std::nullopt;
-        }
-
-        bool isOk = false;
-        const int parsedValue = digits.toInt(&isOk);
-        if (!isOk || parsedValue <= 0) {
-            return std::nullopt;
-        }
-        return parsedValue;
-    };
-
-    std::vector<std::vector<int>> hipSequences;
-    const auto collectHipSequences = [&](const auto& self, const QJsonValue& value) -> void {
-        if (value.isArray()) {
-            const QJsonArray array = value.toArray();
-            std::vector<int> directHips;
-            directHips.reserve(array.size());
-
-            bool hasNestedCollections = false;
-            for (const QJsonValue& child : array) {
-                if (const auto hip = parseHipIdentifier(child); hip.has_value()) {
-                    directHips.push_back(*hip);
-                }
-                if (child.isArray() || child.isObject()) {
-                    hasNestedCollections = true;
-                }
-            }
-
-            if (directHips.size() >= 2) {
-                hipSequences.push_back(std::move(directHips));
-            }
-
-            if (hasNestedCollections) {
-                for (const QJsonValue& child : array) {
-                    self(self, child);
-                }
-            }
+    const auto appendSegment = [&lineRefs, &dedupKeys](const int startHip, const int endHip) {
+        if (startHip <= 0 || endHip <= 0 || startHip == endHip) {
             return;
         }
 
-        if (value.isObject()) {
-            const QJsonObject object = value.toObject();
-            for (auto it = object.begin(); it != object.end(); ++it) {
-                self(self, it.value());
+        const int dedupStart = std::min(startHip, endHip);
+        const int dedupEnd = std::max(startHip, endHip);
+        const std::string dedupKey = std::to_string(dedupStart) + "|" + std::to_string(dedupEnd);
+        if (!dedupKeys.insert(dedupKey).second) {
+            return;
+        }
+
+        lineRefs.emplace_back(
+            "hip_" + std::to_string(startHip),
+            "hip_" + std::to_string(endHip)
+        );
+    };
+    const auto appendPolylines = [&](const std::vector<std::vector<int>>& polylines) {
+        for (const auto& polyline : polylines) {
+            for (std::size_t index = 1; index < polyline.size(); ++index) {
+                appendSegment(polyline[index - 1], polyline[index]);
             }
         }
     };
 
-    if (!constellationsValue.isUndefined()) {
-        collectHipSequences(collectHipSequences, constellationsValue);
-    }
-    const QJsonValue asterismsValue = document.object().value("asterisms");
-    if (!asterismsValue.isUndefined()) {
-        collectHipSequences(collectHipSequences, asterismsValue);
-    }
-
-    for (const auto& sequence : hipSequences) {
-        for (std::size_t index = 1; index < sequence.size(); ++index) {
-            const std::string startId = "hip_" + std::to_string(sequence[index - 1]);
-            const std::string endId = "hip_" + std::to_string(sequence[index]);
-            const std::string dedupKey = startId + "|" + endId;
-            if (!dedupKeys.insert(dedupKey).second) {
-                continue;
+    const auto collectFromEntry = [&](const QJsonValue& entry) {
+        std::vector<std::vector<int>> polylines;
+        if (entry.isObject()) {
+            const QJsonObject object = entry.toObject();
+            const QJsonValue linesValue = object.value("lines");
+            const QJsonValue lineValue = object.value("line");
+            if (!linesValue.isUndefined()) {
+                collectHipPolylines(linesValue, polylines);
             }
-            lineRefs.emplace_back(startId, endId);
+            if (!lineValue.isUndefined()) {
+                collectHipPolylines(lineValue, polylines);
+            }
+        } else if (entry.isArray()) {
+            collectHipPolylines(entry, polylines);
+        }
+        appendPolylines(polylines);
+    };
+
+    const QJsonValue constellationsValue = document.object().value("constellations");
+    if (constellationsValue.isArray()) {
+        for (const QJsonValue& entry : constellationsValue.toArray()) {
+            collectFromEntry(entry);
+        }
+    } else if (constellationsValue.isObject()) {
+        const QJsonObject constellationsObject = constellationsValue.toObject();
+        const QJsonValue linesValue = constellationsObject.value("lines");
+        const QJsonValue lineValue = constellationsObject.value("line");
+        if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
+            if (!linesValue.isUndefined()) {
+                collectFromEntry(linesValue);
+            }
+            if (!lineValue.isUndefined()) {
+                collectFromEntry(lineValue);
+            }
+        } else {
+            for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
+                collectFromEntry(it.value());
+            }
         }
     }
 
     return lineRefs;
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> parseStellariumIndexJsonConstellationLabelRefs(
+    const QByteArray& jsonPayload
+)
+{
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(jsonPayload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        return {};
+    }
+
+    std::vector<std::pair<std::string, std::vector<std::string>>> labelRefs;
+    std::unordered_map<std::string, std::size_t> indexByLabelKey;
+
+    const auto addLabelEntry = [&](QString labelText, const std::vector<std::vector<int>>& polylines) {
+        labelText = labelText.trimmed();
+        if (labelText.isEmpty()) {
+            return;
+        }
+
+        std::unordered_set<int> uniqueHipSet;
+        std::vector<int> uniqueHips;
+        for (const auto& polyline : polylines) {
+            for (const int hip : polyline) {
+                if (hip > 0 && uniqueHipSet.insert(hip).second) {
+                    uniqueHips.push_back(hip);
+                }
+            }
+        }
+        if (uniqueHips.size() < 2U) {
+            return;
+        }
+        std::sort(uniqueHips.begin(), uniqueHips.end());
+
+        const QString labelKey = normalizeLabelKey(labelText);
+        const std::string labelKeyStd = labelKey.toStdString();
+        auto indexIt = indexByLabelKey.find(labelKeyStd);
+        if (indexIt == indexByLabelKey.end()) {
+            std::vector<std::string> hipIds;
+            hipIds.reserve(uniqueHips.size());
+            for (const int hip : uniqueHips) {
+                hipIds.push_back("hip_" + std::to_string(hip));
+            }
+            const std::size_t newIndex = labelRefs.size();
+            labelRefs.emplace_back(labelText.toStdString(), std::move(hipIds));
+            indexByLabelKey.insert({labelKeyStd, newIndex});
+            return;
+        }
+
+        std::unordered_set<std::string> existingIds(
+            labelRefs[indexIt->second].second.begin(),
+            labelRefs[indexIt->second].second.end()
+        );
+        for (const int hip : uniqueHips) {
+            const std::string hipId = "hip_" + std::to_string(hip);
+            if (existingIds.insert(hipId).second) {
+                labelRefs[indexIt->second].second.push_back(hipId);
+            }
+        }
+    };
+
+    const auto collectEntry = [&](const QJsonValue& entry, const QString& fallbackId) {
+        std::vector<std::vector<int>> polylines;
+        QString labelText;
+
+        if (entry.isObject()) {
+            const QJsonObject object = entry.toObject();
+            const QJsonValue linesValue = object.value("lines");
+            const QJsonValue lineValue = object.value("line");
+            if (!linesValue.isUndefined()) {
+                collectHipPolylines(linesValue, polylines);
+            }
+            if (!lineValue.isUndefined()) {
+                collectHipPolylines(lineValue, polylines);
+            }
+            labelText = constellationLabelFromEntry(fallbackId, object);
+        } else if (entry.isArray()) {
+            collectHipPolylines(entry, polylines);
+            labelText = prettifyConstellationId(fallbackId);
+        }
+
+        addLabelEntry(labelText, polylines);
+    };
+
+    const QJsonValue constellationsValue = document.object().value("constellations");
+    if (constellationsValue.isArray()) {
+        for (const QJsonValue& entry : constellationsValue.toArray()) {
+            collectEntry(entry, {});
+        }
+    } else if (constellationsValue.isObject()) {
+        const QJsonObject constellationsObject = constellationsValue.toObject();
+        const QJsonValue linesValue = constellationsObject.value("lines");
+        const QJsonValue lineValue = constellationsObject.value("line");
+        if (!linesValue.isUndefined() || !lineValue.isUndefined()) {
+            if (!linesValue.isUndefined()) {
+                collectEntry(linesValue, {});
+            }
+            if (!lineValue.isUndefined()) {
+                collectEntry(lineValue, {});
+            }
+        } else {
+            for (auto it = constellationsObject.begin(); it != constellationsObject.end(); ++it) {
+                collectEntry(it.value(), it.key());
+            }
+        }
+    }
+
+    return labelRefs;
 }
 
 QString formatCoordinate(const double value)
@@ -537,6 +826,99 @@ std::vector<std::pair<std::string, std::string>> parseConstellationLineRows(
     }
 
     return lineRefs;
+}
+
+QByteArray serializeConstellationLabelRows(
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
+)
+{
+    QByteArray rows;
+    rows.reserve(static_cast<int>(labelRefs.size() * 48));
+    for (const auto& labelRef : labelRefs) {
+        if (labelRef.first.empty() || labelRef.second.empty()) {
+            continue;
+        }
+        const int rowStartSize = rows.size();
+
+        QString sanitizedLabel = QString::fromStdString(labelRef.first);
+        sanitizedLabel.replace('|', '/');
+        sanitizedLabel.replace('\n', ' ');
+        sanitizedLabel.replace('\r', ' ');
+        sanitizedLabel = sanitizedLabel.trimmed();
+        if (sanitizedLabel.isEmpty()) {
+            continue;
+        }
+
+        rows.append(sanitizedLabel.toUtf8());
+        rows.append('|');
+        bool hasAnyHip = false;
+        for (const std::string& hipId : labelRef.second) {
+            if (hipId.empty()) {
+                continue;
+            }
+            if (hasAnyHip) {
+                rows.append(',');
+            }
+            rows.append(QByteArray::fromStdString(hipId));
+            hasAnyHip = true;
+        }
+        if (!hasAnyHip) {
+            rows.truncate(rowStartSize);
+            continue;
+        }
+        rows.append('\n');
+    }
+
+    return rows;
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> parseConstellationLabelRows(
+    const std::string_view rows
+)
+{
+    std::vector<std::pair<std::string, std::vector<std::string>>> labelRefs;
+    std::size_t cursor = 0;
+    while (cursor < rows.size()) {
+        const std::size_t newline = rows.find('\n', cursor);
+        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
+        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
+
+        if (!line.empty()) {
+            const std::size_t delimiter = line.find('|');
+            if (delimiter != std::string_view::npos) {
+                const std::string_view label = line.substr(0, delimiter);
+                const std::string_view hipList = line.substr(delimiter + 1);
+                if (!label.empty() && !hipList.empty()) {
+                    std::vector<std::string> hipIds;
+                    std::size_t hipCursor = 0;
+                    while (hipCursor < hipList.size()) {
+                        const std::size_t comma = hipList.find(',', hipCursor);
+                        const std::size_t hipEnd =
+                            comma == std::string_view::npos ? hipList.size() : comma;
+                        const std::string_view hipId = hipList.substr(hipCursor, hipEnd - hipCursor);
+                        if (!hipId.empty()) {
+                            hipIds.emplace_back(hipId);
+                        }
+                        if (comma == std::string_view::npos) {
+                            break;
+                        }
+                        hipCursor = comma + 1;
+                    }
+
+                    if (!hipIds.empty()) {
+                        labelRefs.emplace_back(std::string(label), std::move(hipIds));
+                    }
+                }
+            }
+        }
+
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        cursor = newline + 1;
+    }
+
+    return labelRefs;
 }
 
 double pointSizeForMagnitude(const double magnitude)

@@ -186,6 +186,14 @@ void SkyContextController::persistCatalogCache(
         settingsKey("catalogConstellationLineRefs"),
         serializeConstellationLineRows(m_constellationLineRefs)
     );
+    settings.setValue(
+        settingsKey("catalogConstellationLabelRefs"),
+        serializeConstellationLabelRows(m_constellationLabelRefs)
+    );
+    settings.setValue(
+        settingsKey("catalogConstellationLineSchemaVersion"),
+        kConstellationLineCacheSchemaVersion
+    );
     settings.sync();
 }
 
@@ -233,7 +241,17 @@ void SkyContextController::restoreCatalogCache()
     const QByteArray constellationLineRows = settings.value(
         settingsKey("catalogConstellationLineRefs")
     ).toByteArray();
-    if (!constellationLineRows.isEmpty()) {
+    const QByteArray constellationLabelRows = settings.value(
+        settingsKey("catalogConstellationLabelRefs")
+    ).toByteArray();
+    const int constellationLineSchemaVersion = settings.value(
+        settingsKey("catalogConstellationLineSchemaVersion"),
+        0
+    ).toInt();
+    if (
+        constellationLineSchemaVersion >= kConstellationLineCacheSchemaVersion
+        && !constellationLineRows.isEmpty()
+    ) {
         auto parsedLineRefs = parseConstellationLineRows(
             std::string_view(
                 constellationLineRows.constData(),
@@ -242,7 +260,21 @@ void SkyContextController::restoreCatalogCache()
         );
         if (!parsedLineRefs.empty()) {
             setConstellationLineRefs(std::move(parsedLineRefs));
+            if (!constellationLabelRows.isEmpty()) {
+                auto parsedLabelRefs = parseConstellationLabelRows(
+                    std::string_view(
+                        constellationLabelRows.constData(),
+                        static_cast<std::size_t>(constellationLabelRows.size())
+                    )
+                );
+                setConstellationLabelRefs(std::move(parsedLabelRefs));
+            } else {
+                setConstellationLabelRefs({});
+            }
             emit skyContextChanged();
         }
+    } else if (constellationLineSchemaVersion > 0) {
+        resetConstellationLineRefs();
+        emit skyContextChanged();
     }
 }

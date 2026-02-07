@@ -232,6 +232,36 @@ ApplicationWindow {
         }
 
         Repeater {
+            model: {
+                skyContext.skyContextSummary
+                return skyContext.constellationLabels(skyViewport.width, skyViewport.height)
+            }
+
+            delegate: Rectangle {
+                required property var modelData
+                x: modelData.x - (width * 0.5)
+                y: modelData.y - height - 8
+                radius: 5
+                color: "#aa071328"
+                border.width: 1
+                border.color: "#78a6d8"
+                z: 8
+                width: constellationLabelText.implicitWidth + 12
+                height: constellationLabelText.implicitHeight + 6
+
+                Label {
+                    id: constellationLabelText
+                    anchors.centerIn: parent
+                    text: modelData.text
+                    color: "#c9dcff"
+                    font.family: "Avenir Next"
+                    font.pixelSize: 11
+                    font.bold: true
+                }
+            }
+        }
+
+        Repeater {
             model: [
                 { label: "N", azimuthDeg: 0.0, color: "#9ce7ff" },
                 { label: "E", azimuthDeg: 90.0, color: "#ffcf9d" },

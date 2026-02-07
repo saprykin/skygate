@@ -109,6 +109,18 @@ std::size_t inferConstellationCountFromPayload(const QByteArray& payload)
     const std::string_view rows(payload.constData(), static_cast<std::size_t>(payload.size()));
     return inferConstellationCountFromRows(rows);
 }
+
+bool looksLikeJsonPayload(const QByteArray& payload)
+{
+    for (const char byte : payload) {
+        if (std::isspace(static_cast<unsigned char>(byte))) {
+            continue;
+        }
+        return byte == '{' || byte == '[';
+    }
+
+    return false;
+}
 } // namespace
 
 void SkyContextController::loadCatalogPreset(const QString& presetId)
@@ -248,9 +260,11 @@ void SkyContextController::downloadCatalogFromUrls(
                         lineResult.payload.constData(),
                         static_cast<std::size_t>(lineResult.payload.size())
                     );
-                    auto parsedLineRefs = parseStellariumConstellationLineRefs(rows);
-                    if (parsedLineRefs.empty()) {
-                        parsedLineRefs = parseStellariumIndexJsonConstellationLineRefs(lineResult.payload);
+                    const bool isJsonPayload = looksLikeJsonPayload(lineResult.payload);
+                    auto parsedLineRefs = parseStellariumIndexJsonConstellationLineRefs(lineResult.payload);
+                    auto parsedLabelRefs = parseStellariumIndexJsonConstellationLabelRefs(lineResult.payload);
+                    if (parsedLineRefs.empty() && !isJsonPayload) {
+                        parsedLineRefs = parseStellariumConstellationLineRefs(rows);
                     }
                     if (parsedLineRefs.empty()) {
                         QString payloadPreview = QString::fromUtf8(lineResult.payload.left(120)).simplified();
@@ -269,6 +283,7 @@ void SkyContextController::downloadCatalogFromUrls(
                     }
 
                     setConstellationLineRefs(std::move(parsedLineRefs));
+                    setConstellationLabelRefs(std::move(parsedLabelRefs));
                     const std::size_t inferredConstellationCount =
                         inferConstellationCountFromPayload(lineResult.payload);
                     if (inferredConstellationCount > 0) {
@@ -294,6 +309,7 @@ void SkyContextController::downloadCatalogFromUrls(
 void SkyContextController::resetConstellationLineRefs()
 {
     m_constellationLineRefs = defaultConstellationLineRefs();
+    m_constellationLabelRefs = defaultConstellationLabelRefs();
 }
 
 void SkyContextController::setConstellationLineRefs(
@@ -305,6 +321,13 @@ void SkyContextController::setConstellationLineRefs(
         return;
     }
     m_constellationLineRefs = std::move(lineRefs);
+}
+
+void SkyContextController::setConstellationLabelRefs(
+    std::vector<ConstellationLabelRef> labelRefs
+)
+{
+    m_constellationLabelRefs = std::move(labelRefs);
 }
 
 void SkyContextController::applyCatalog(

@@ -19,6 +19,7 @@ namespace skygate::ui::internal {
 inline constexpr int kTickIntervalMs = 1000;
 inline constexpr int kLocationUpdateTimeoutMs = 5000;
 inline constexpr int kSettingsVersion = 1;
+inline constexpr int kConstellationLineCacheSchemaVersion = 4;
 inline constexpr double kDefaultViewportCenterAltitudeDeg = 45.0;
 inline constexpr double kDefaultViewportCenterAzimuthDeg = 180.0;
 inline constexpr double kViewportFieldOfViewMinDeg = 20.0;
@@ -67,10 +68,14 @@ inline constexpr std::string_view kMajorConstellationsCatalogRows =
     "andromeda|Andromeda|Constellation|2.1\n";
 
 std::vector<std::pair<std::string, std::string>> defaultConstellationLineRefs();
+std::vector<std::pair<std::string, std::vector<std::string>>> defaultConstellationLabelRefs();
 std::vector<std::pair<std::string, std::string>> parseStellariumConstellationLineRefs(
     std::string_view constellationLineRows
 );
 std::vector<std::pair<std::string, std::string>> parseStellariumIndexJsonConstellationLineRefs(
+    const QByteArray& jsonPayload
+);
+std::vector<std::pair<std::string, std::vector<std::string>>> parseStellariumIndexJsonConstellationLabelRefs(
     const QByteArray& jsonPayload
 );
 
@@ -87,6 +92,12 @@ QByteArray serializeConstellationLineRows(
     const std::vector<std::pair<std::string, std::string>>& lineRefs
 );
 std::vector<std::pair<std::string, std::string>> parseConstellationLineRows(std::string_view rows);
+QByteArray serializeConstellationLabelRows(
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
+);
+std::vector<std::pair<std::string, std::vector<std::string>>> parseConstellationLabelRows(
+    std::string_view rows
+);
 
 double pointSizeForMagnitude(double magnitude);
 QColor colorForBodyType(skygate::ephemeris::CelestialBodyType type);
