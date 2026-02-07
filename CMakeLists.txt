@@ -18,5 +18,6 @@ endif()
 
 if(SKYGATE_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    add_subdirectory(libs/skygate-core/tests)
+    add_subdirectory(libs/skygate-ephemeris/tests)
 endif()
