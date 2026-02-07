@@ -9,6 +9,7 @@
 #include <QSGNode>
 
 #include <algorithm>
+#include <array>
 
 namespace {
 constexpr int kHorizonSampleCount = 96;
@@ -16,6 +17,27 @@ constexpr int kGridAltitudeStepDeg = 15;
 constexpr int kGridAzimuthStepDeg = 30;
 constexpr int kGridAltitudeSampleCount = 96;
 constexpr int kGridAzimuthSampleCount = 64;
+const QColor kHorizonLineColor(255, 170, 92, 220);
+const QColor kCardinalNorthLineColor(130, 216, 255, 132);
+const QColor kCardinalEastLineColor(255, 208, 136, 132);
+const QColor kCardinalSouthLineColor(255, 158, 158, 132);
+const QColor kCardinalWestLineColor(156, 232, 198, 132);
+
+[[nodiscard]] QColor cardinalMeridianColor(const int azimuthDeg)
+{
+    switch (azimuthDeg) {
+    case 0:
+        return kCardinalNorthLineColor;
+    case 90:
+        return kCardinalEastLineColor;
+    case 180:
+        return kCardinalSouthLineColor;
+    case 270:
+        return kCardinalWestLineColor;
+    default:
+        return QColor(140, 186, 236, 74);
+    }
+}
 
 void appendLineSegmentNode(
     QSGNode* rootNode,
@@ -203,6 +225,10 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     }
 
     for (int azimuthDeg = 0; azimuthDeg < 360; azimuthDeg += kGridAzimuthStepDeg) {
+        if (azimuthDeg % 90 == 0) {
+            continue;
+        }
+
         appendProjectedPolyline(
             rootNode,
             m_skyContextController,
@@ -222,6 +248,27 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         );
     }
 
+    constexpr std::array<int, 4> kCardinalAzimuths {0, 90, 180, 270};
+    for (const int cardinalAzimuthDeg : kCardinalAzimuths) {
+        appendProjectedPolyline(
+            rootNode,
+            m_skyContextController,
+            viewportWidth,
+            viewportHeight,
+            kGridAzimuthSampleCount,
+            maxSegmentLengthSquared,
+            cardinalMeridianColor(cardinalAzimuthDeg),
+            [cardinalAzimuthDeg](const int index) {
+                const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
+                                                       / static_cast<double>(kGridAzimuthSampleCount);
+                return skygate::core::HorizontalCoordinate {
+                    .altitudeDeg = altitudeDeg,
+                    .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
+                };
+            }
+        );
+    }
+
     appendProjectedPolyline(
         rootNode,
         m_skyContextController,
@@ -229,7 +276,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         viewportHeight,
         kHorizonSampleCount,
         maxSegmentLengthSquared,
-        QColor(110, 156, 216, 170),
+        kHorizonLineColor,
         [](const int index) {
             const double azimuthDeg = (360.0 * static_cast<double>(index))
                                       / static_cast<double>(kHorizonSampleCount);

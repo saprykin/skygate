@@ -279,6 +279,52 @@ ApplicationWindow {
             y: markerY - implicitHeight - 6
         }
 
+        Repeater {
+            model: [
+                { label: "N", azimuthDeg: 0.0, color: "#9ce7ff" },
+                { label: "E", azimuthDeg: 90.0, color: "#ffcf9d" },
+                { label: "S", azimuthDeg: 180.0, color: "#ffb0b0" },
+                { label: "W", azimuthDeg: 270.0, color: "#a8e9c8" }
+            ]
+
+            delegate: Rectangle {
+                required property var modelData
+                readonly property string projectionState: skyContext.skyContextSummary
+                readonly property real markerX: {
+                    projectionState
+                    return skyContext.projectedX(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
+                }
+                readonly property real markerY: {
+                    projectionState
+                    return skyContext.projectedY(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
+                }
+
+                visible: {
+                    projectionState
+                    return skyContext.isProjectedVisible(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
+                }
+                x: markerX - (width * 0.5)
+                y: markerY - height - 8
+                radius: 6
+                color: "#880a1222"
+                border.width: 1
+                border.color: modelData.color
+                z: 9
+                width: cardinalSectorLabel.implicitWidth + 12
+                height: cardinalSectorLabel.implicitHeight + 6
+
+                Label {
+                    id: cardinalSectorLabel
+                    anchors.centerIn: parent
+                    text: modelData.label
+                    color: modelData.color
+                    font.family: "Avenir Next"
+                    font.bold: true
+                    font.pixelSize: 14
+                }
+            }
+        }
+
         Rectangle {
             id: timelineToolbar
             anchors.top: parent.top
