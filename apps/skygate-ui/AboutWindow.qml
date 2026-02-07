@@ -146,7 +146,7 @@ Window {
 
                 Label {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "\u00A9 " + aboutWindow.currentYear
+                    text: "\u00A9 " + aboutWindow.currentYear + "  |  Version " + Qt.application.version
                     color: aboutWindow.textSecondary
                     font.family: "Avenir Next"
                     font.pixelSize: 20

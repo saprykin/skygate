@@ -78,6 +78,8 @@ target_link_libraries(skygate-ui
         skygate::ephemeris
 )
 
+target_compile_definitions(skygate-ui PRIVATE SKYGATE_APP_VERSION="${PROJECT_VERSION}")
+
 if(TARGET Qt6::Positioning)
     target_link_libraries(skygate-ui PRIVATE Qt6::Positioning)
     target_compile_definitions(skygate-ui PRIVATE SKYGATE_HAS_POSITIONING=1)

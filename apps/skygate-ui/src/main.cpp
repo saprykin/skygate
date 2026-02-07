@@ -17,6 +17,10 @@
 
 #include <utility>
 
+#ifndef SKYGATE_APP_VERSION
+#define SKYGATE_APP_VERSION "0.0.0"
+#endif
+
 int main(int argc, char* argv[])
 {
     // Prevent stale cached QML artifacts from surfacing outdated warnings at launch.
@@ -30,6 +34,7 @@ int main(int argc, char* argv[])
     QCoreApplication::setOrganizationName("Skygate");
     QCoreApplication::setOrganizationDomain("skygate.app");
     QCoreApplication::setApplicationName("SkyGate");
+    QCoreApplication::setApplicationVersion(QStringLiteral(SKYGATE_APP_VERSION));
     QIcon appIcon;
     appIcon.addFile(QStringLiteral(":/icons/app-icon-16.png"), QSize(16, 16));
     appIcon.addFile(QStringLiteral(":/icons/app-icon-32.png"), QSize(32, 32));
