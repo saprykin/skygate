@@ -17,6 +17,7 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <functional>
 #include <limits>
@@ -177,6 +178,87 @@ skygate::core::ProjectionParams buildProjectionParams(
     projectionParams.viewportWidth = viewportWidth;
     projectionParams.viewportHeight = viewportHeight;
     return projectionParams;
+}
+
+class InMemoryStarCatalog final : public skygate::ephemeris::IStarCatalog {
+public:
+    explicit InMemoryStarCatalog(std::vector<skygate::ephemeris::CelestialBody> bodies)
+        : m_bodies(std::move(bodies))
+    {
+    }
+
+    [[nodiscard]] std::vector<skygate::ephemeris::CelestialBody> bodies() const override
+    {
+        return m_bodies;
+    }
+
+private:
+    std::vector<skygate::ephemeris::CelestialBody> m_bodies;
+};
+
+std::string toLowerId(const std::string& value)
+{
+    std::string lower = value;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
+    return lower;
+}
+
+bool isSunOrMoonType(const skygate::ephemeris::CelestialBodyType type)
+{
+    return type == skygate::ephemeris::CelestialBodyType::Sun
+        || type == skygate::ephemeris::CelestialBodyType::Moon;
+}
+
+bool containsBodyIdCaseInsensitive(
+    const std::vector<skygate::ephemeris::CelestialBody>& bodies,
+    const std::string& id
+)
+{
+    const std::string loweredId = toLowerId(id);
+    return std::any_of(bodies.begin(), bodies.end(), [&loweredId](const auto& body) {
+        return toLowerId(body.id) == loweredId;
+    });
+}
+
+std::unique_ptr<skygate::ephemeris::IStarCatalog> ensureCoreSolarSystemBodies(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog
+)
+{
+    if (catalog == nullptr) {
+        return nullptr;
+    }
+
+    std::vector<skygate::ephemeris::CelestialBody> mergedBodies = catalog->bodies();
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledCatalog =
+        skygate::ephemeris::createBundledStarCatalog();
+    if (bundledCatalog == nullptr) {
+        return catalog;
+    }
+
+    bool injectedCoreBody = false;
+    for (const auto& body : bundledCatalog->bodies()) {
+        if (
+            !isSunOrMoonType(body.type)
+            && body.type != skygate::ephemeris::CelestialBodyType::Planet
+        ) {
+            continue;
+        }
+
+        if (containsBodyIdCaseInsensitive(mergedBodies, body.id)) {
+            continue;
+        }
+
+        mergedBodies.push_back(body);
+        injectedCoreBody = true;
+    }
+
+    if (!injectedCoreBody) {
+        return catalog;
+    }
+
+    return std::make_unique<InMemoryStarCatalog>(std::move(mergedBodies));
 }
 }
 
@@ -1187,6 +1269,7 @@ void SkyContextController::applyCatalog(
     const QString& sourceLabel
 )
 {
+    catalog = ensureCoreSolarSystemBodies(std::move(catalog));
     if (catalog == nullptr) {
         m_catalogStatusText = "Catalog: Failed to load";
         emit catalogStatusTextChanged();
