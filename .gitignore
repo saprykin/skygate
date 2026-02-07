@@ -3,3 +3,4 @@ build-make/
 .vscode/
 CMakeLists.txt.user
 CMakePresets.json
+.DS_Store
