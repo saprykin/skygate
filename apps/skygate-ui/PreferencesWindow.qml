@@ -356,7 +356,7 @@ Window {
                                         PreferencesComboBox {
                                             id: projectionCombo
                                             Layout.fillWidth: true
-                                            model: ["Stereographic", "AzimuthalEquidistant"]
+                                            model: ["Stereographic", "Perspective"]
                                         }
                                     }
                                 }

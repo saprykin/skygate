@@ -1,6 +1,7 @@
 #include "TestSupport.hpp"
 #include "skygate/core/ProjectionFactory.hpp"
 
+#include <cmath>
 #include <limits>
 #include <memory>
 
@@ -20,6 +21,18 @@ bool runProjectionTests()
     std::unique_ptr<skygate::core::IProjection> unsupportedProjection =
         skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     success = expectTrue(unsupportedProjection == nullptr, "Unsupported projection type should return null") && success;
+
+    std::unique_ptr<skygate::core::IProjection> perspectiveProjection =
+        skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
+    success = expectTrue(perspectiveProjection != nullptr, "Perspective projection should be created") && success;
+    if (perspectiveProjection == nullptr) {
+        return false;
+    }
+
+    success = expectTrue(
+        perspectiveProjection->type() == skygate::core::ProjectionType::Perspective,
+        "Perspective projection should report perspective type"
+    ) && success;
 
     success = expectTrue(
         projection->type() == skygate::core::ProjectionType::Stereographic,
@@ -134,6 +147,64 @@ bool runProjectionTests()
         1e-6,
         "Zenith center y should map to screen center"
     ) && success;
+
+    skygate::core::ProjectionParams perspectiveParams;
+    perspectiveParams.center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0};
+    perspectiveParams.fovDeg = 90.0;
+    perspectiveParams.rollDeg = 0.0;
+    perspectiveParams.viewportWidth = 1200.0;
+    perspectiveParams.viewportHeight = 600.0;
+
+    const auto perspectiveCenterPoint =
+        perspectiveProjection->project(perspectiveParams.center, perspectiveParams);
+    success = expectTrue(perspectiveCenterPoint.isVisible, "Perspective center direction should be visible") && success;
+    success = expectNear(
+        perspectiveCenterPoint.x,
+        perspectiveParams.viewportWidth * 0.5,
+        1e-6,
+        "Perspective center x should map to screen center"
+    ) && success;
+    success = expectNear(
+        perspectiveCenterPoint.y,
+        perspectiveParams.viewportHeight * 0.5,
+        1e-6,
+        "Perspective center y should map to screen center"
+    ) && success;
+
+    const double halfVerticalFovRad = (perspectiveParams.fovDeg * 0.5) * (3.14159265358979323846 / 180.0);
+    const double halfHorizontalFovDeg =
+        std::atan(std::tan(halfVerticalFovRad) * (perspectiveParams.viewportWidth / perspectiveParams.viewportHeight))
+        * (180.0 / 3.14159265358979323846);
+    const double insideHalfHorizontalFovDeg = halfHorizontalFovDeg - 0.5;
+    const double rightInsideAzimuthDeg = 360.0 - insideHalfHorizontalFovDeg;
+
+    const auto perspectiveRightInsidePoint = perspectiveProjection->project(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = 0.0, .azimuthDeg = rightInsideAzimuthDeg},
+        perspectiveParams
+    );
+    success = expectTrue(perspectiveRightInsidePoint.isVisible, "Perspective right-inside point should be visible") && success;
+    success = expectTrue(
+        perspectiveRightInsidePoint.x > (perspectiveParams.viewportWidth * 0.98),
+        "Perspective right-inside direction should map near viewport right edge"
+    ) && success;
+
+    const auto perspectiveTopEdgePoint = perspectiveProjection->project(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = perspectiveParams.fovDeg * 0.5, .azimuthDeg = 0.0},
+        perspectiveParams
+    );
+    success = expectTrue(perspectiveTopEdgePoint.isVisible, "Perspective top edge should be visible") && success;
+    success = expectNear(
+        perspectiveTopEdgePoint.y,
+        0.0,
+        1e-4,
+        "Perspective top-edge direction should map to viewport top edge"
+    ) && success;
+
+    const auto perspectiveOutsidePoint = perspectiveProjection->project(
+        skygate::core::HorizontalCoordinate {.altitudeDeg = 0.0, .azimuthDeg = 360.0 - (halfHorizontalFovDeg + 0.5)},
+        perspectiveParams
+    );
+    success = expectTrue(!perspectiveOutsidePoint.isVisible, "Perspective point outside horizontal FoV should be hidden") && success;
 
     return success;
 }

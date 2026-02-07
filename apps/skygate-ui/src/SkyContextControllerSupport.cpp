@@ -408,6 +408,8 @@ QString projectionTypeToString(const skygate::core::ProjectionType projectionTyp
         return "Stereographic";
     case skygate::core::ProjectionType::AzimuthalEquidistant:
         return "AzimuthalEquidistant";
+    case skygate::core::ProjectionType::Perspective:
+        return "Perspective";
     }
 
     return "Unknown";
@@ -422,6 +424,10 @@ std::optional<skygate::core::ProjectionType> projectionTypeFromString(const QStr
 
     if (normalized == "azimuthalequidistant") {
         return skygate::core::ProjectionType::AzimuthalEquidistant;
+    }
+
+    if (normalized == "perspective") {
+        return skygate::core::ProjectionType::Perspective;
     }
 
     return std::nullopt;

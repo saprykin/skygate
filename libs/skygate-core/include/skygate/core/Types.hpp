@@ -34,7 +34,8 @@ struct SkyContext {
 
 enum class ProjectionType : std::uint8_t {
     Stereographic,
-    AzimuthalEquidistant
+    AzimuthalEquidistant,
+    Perspective
 };
 
 }  // namespace skygate::core

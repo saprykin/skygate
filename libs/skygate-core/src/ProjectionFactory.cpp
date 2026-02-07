@@ -72,6 +72,31 @@ struct Vec3 {
     };
 }
 
+[[nodiscard]] bool tryBuildProjectionBasis(
+    const HorizontalCoordinate& centerCoordinate,
+    Vec3& center,
+    Vec3& right,
+    Vec3& up
+) noexcept
+{
+    center = horizontalToUnitVector(centerCoordinate);
+
+    constexpr Vec3 zenithAxis {0.0, 0.0, 1.0};
+    constexpr Vec3 northAxis {0.0, 1.0, 0.0};
+
+    right = cross(zenithAxis, center);
+    if (length(right) <= kEpsilon) {
+        right = cross(northAxis, center);
+    }
+    right = normalize(right);
+    if (length(right) <= kEpsilon) {
+        return false;
+    }
+
+    up = normalize(cross(center, right));
+    return length(up) > kEpsilon;
+}
+
 class StereographicProjection final : public IProjection {
 public:
     [[nodiscard]] ProjectionType type() const noexcept override
@@ -93,25 +118,14 @@ public:
             return point;
         }
 
-        const Vec3 center = horizontalToUnitVector(params.center);
+        Vec3 center;
+        Vec3 right;
+        Vec3 up;
+        if (!tryBuildProjectionBasis(params.center, center, right, up)) {
+            return point;
+        }
+
         const Vec3 target = horizontalToUnitVector(coordinate);
-
-        constexpr Vec3 zenithAxis {0.0, 0.0, 1.0};
-        constexpr Vec3 northAxis {0.0, 1.0, 0.0};
-
-        Vec3 right = cross(zenithAxis, center);
-        if (length(right) <= kEpsilon) {
-            right = cross(northAxis, center);
-        }
-        right = normalize(right);
-        if (length(right) <= kEpsilon) {
-            return point;
-        }
-
-        const Vec3 up = normalize(cross(center, right));
-        if (length(up) <= kEpsilon) {
-            return point;
-        }
 
         const double centerDotTarget = std::clamp(dot(target, center), -1.0, 1.0);
         const double denominator = 1.0 + centerDotTarget;
@@ -147,6 +161,74 @@ public:
     }
 };
 
+class PerspectiveProjection final : public IProjection {
+public:
+    [[nodiscard]] ProjectionType type() const noexcept override
+    {
+        return ProjectionType::Perspective;
+    }
+
+    [[nodiscard]] ScreenPoint project(
+        const HorizontalCoordinate& coordinate,
+        const ProjectionParams& params
+    ) const noexcept override
+    {
+        ScreenPoint point;
+
+        if (!isFinite(params.fovDeg) || !isFinite(params.rollDeg) ||
+            !isFinite(params.viewportWidth) || !isFinite(params.viewportHeight) ||
+            params.viewportWidth <= 0.0 || params.viewportHeight <= 0.0 ||
+            params.fovDeg <= 0.0 || params.fovDeg >= 179.0) {
+            return point;
+        }
+
+        Vec3 center;
+        Vec3 right;
+        Vec3 up;
+        if (!tryBuildProjectionBasis(params.center, center, right, up)) {
+            return point;
+        }
+
+        const Vec3 target = horizontalToUnitVector(coordinate);
+        const double forward = dot(target, center);
+        if (forward <= kEpsilon) {
+            return point;
+        }
+
+        double projectedX = dot(target, right) / forward;
+        double projectedY = dot(target, up) / forward;
+
+        const double rollRad = toRadians(params.rollDeg);
+        const double cosRoll = std::cos(rollRad);
+        const double sinRoll = std::sin(rollRad);
+        const double rotatedX = (projectedX * cosRoll) - (projectedY * sinRoll);
+        const double rotatedY = (projectedX * sinRoll) + (projectedY * cosRoll);
+
+        const double halfVerticalFovRad = toRadians(params.fovDeg) * 0.5;
+        const double tanHalfVerticalFov = std::tan(halfVerticalFovRad);
+        if (tanHalfVerticalFov <= kEpsilon || !isFinite(tanHalfVerticalFov)) {
+            return point;
+        }
+
+        const double aspectRatio = params.viewportWidth / params.viewportHeight;
+        const double tanHalfHorizontalFov = tanHalfVerticalFov * aspectRatio;
+        if (tanHalfHorizontalFov <= kEpsilon || !isFinite(tanHalfHorizontalFov)) {
+            return point;
+        }
+
+        if (std::abs(rotatedX) > tanHalfHorizontalFov || std::abs(rotatedY) > tanHalfVerticalFov) {
+            return point;
+        }
+
+        const double normalizedX = rotatedX / tanHalfHorizontalFov;
+        const double normalizedY = rotatedY / tanHalfVerticalFov;
+        point.x = ((normalizedX + 1.0) * 0.5) * params.viewportWidth;
+        point.y = ((1.0 - normalizedY) * 0.5) * params.viewportHeight;
+        point.isVisible = isFinite(point.x) && isFinite(point.y);
+        return point;
+    }
+};
+
 }  // namespace
 
 std::unique_ptr<IProjection> createProjection(const ProjectionType type)
@@ -156,6 +238,8 @@ std::unique_ptr<IProjection> createProjection(const ProjectionType type)
         return std::make_unique<StereographicProjection>();
     case ProjectionType::AzimuthalEquidistant:
         return nullptr;
+    case ProjectionType::Perspective:
+        return std::make_unique<PerspectiveProjection>();
     }
 
     return nullptr;
