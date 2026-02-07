@@ -121,6 +121,10 @@ public:
     Q_INVOKABLE QString objectLabelAt(double x, double y, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
+    Q_INVOKABLE int catalogPresetIndex() const noexcept;
+    Q_INVOKABLE void setCatalogPresetIndex(int catalogPresetIndex);
+    Q_INVOKABLE QString catalogUrlText() const;
+    Q_INVOKABLE void setCatalogUrlText(const QString& catalogUrlText);
 
 signals:
     void liveChanged();
@@ -184,6 +188,8 @@ private:
     QString m_locationStatusText;
     QString m_catalogStatusText;
     QString m_catalogSourceLabel = "Bundled";
+    int m_catalogPresetIndex = 0;
+    QString m_catalogUrlText;
     bool m_downloadingCatalog = false;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };

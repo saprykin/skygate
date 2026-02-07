@@ -383,6 +383,7 @@ SkyContextController::SkyContextController(
     }
 
     m_projection = skygate::core::createProjection(m_projectionType);
+    m_catalogUrlText = QString::fromUtf8(kHygCatalogPrimaryUrl);
     m_skyContext.utcTime = toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
     loadSettings();
 
@@ -489,6 +490,29 @@ QString SkyContextController::locationStatusText() const
 QString SkyContextController::catalogStatusText() const
 {
     return m_catalogStatusText;
+}
+
+int SkyContextController::catalogPresetIndex() const noexcept
+{
+    return m_catalogPresetIndex;
+}
+
+void SkyContextController::setCatalogPresetIndex(int catalogPresetIndex)
+{
+    m_catalogPresetIndex = std::clamp(catalogPresetIndex, 0, 3);
+}
+
+QString SkyContextController::catalogUrlText() const
+{
+    return m_catalogUrlText;
+}
+
+void SkyContextController::setCatalogUrlText(const QString& catalogUrlText)
+{
+    const QString normalizedCatalogUrlText = catalogUrlText.trimmed();
+    m_catalogUrlText = normalizedCatalogUrlText.isEmpty()
+        ? QString::fromUtf8(kHygCatalogPrimaryUrl)
+        : normalizedCatalogUrlText;
 }
 
 bool SkyContextController::downloadingCatalog() const noexcept
@@ -1164,6 +1188,8 @@ bool SkyContextController::saveSettings() const
     settings.setValue(settingsKey("elevationMeters"), m_skyContext.observer.elevationMeters);
     settings.setValue(settingsKey("projectionType"), projectionTypeText());
     settings.setValue(settingsKey("catalogSourceLabel"), m_catalogSourceLabel);
+    settings.setValue(settingsKey("catalogPresetIndex"), m_catalogPresetIndex);
+    settings.setValue(settingsKey("catalogUrlText"), m_catalogUrlText);
     settings.sync();
     return settings.status() == QSettings::NoError;
 }
@@ -1218,6 +1244,14 @@ bool SkyContextController::loadSettings()
             settingsKey("projectionType"),
             projectionTypeText()
         ).toString();
+        const int catalogPresetIndex = settings.value(
+            settingsKey("catalogPresetIndex"),
+            m_catalogPresetIndex
+        ).toInt();
+        const QString catalogUrlText = settings.value(
+            settingsKey("catalogUrlText"),
+            m_catalogUrlText
+        ).toString();
 
         setLive(live);
         setSpeedMultiplier(speedMultiplier);
@@ -1230,6 +1264,8 @@ bool SkyContextController::loadSettings()
         setLongitudeText(QString::number(longitudeDeg, 'f', 6));
         setElevationText(QString::number(elevationMeters, 'f', 1));
         setProjectionTypeText(projectionType);
+        setCatalogPresetIndex(catalogPresetIndex);
+        setCatalogUrlText(catalogUrlText);
     }
 
     restoreCatalogCache();
@@ -1411,11 +1447,13 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
 
     const QString normalizedPresetId = presetId.trimmed().toLower();
     if (normalizedPresetId == "bundled") {
+        setCatalogPresetIndex(0);
         applyCatalog(skygate::ephemeris::createBundledStarCatalog(), "Bundled");
         return;
     }
 
     if (normalizedPresetId == "starter") {
+        setCatalogPresetIndex(1);
         applyCatalog(
             skygate::ephemeris::createStarCatalogFromRows(kStarterCatalogRows),
             "Starter"
@@ -1424,6 +1462,7 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
     }
 
     if (normalizedPresetId == "constellations_major") {
+        setCatalogPresetIndex(2);
         applyCatalog(
             skygate::ephemeris::createStarCatalogFromRows(kMajorConstellationsCatalogRows),
             "Major Constellations"
@@ -1432,6 +1471,8 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
     }
 
     if (normalizedPresetId == "hyg_v3") {
+        setCatalogPresetIndex(3);
+        setCatalogUrlText(QString::fromUtf8(kHygCatalogGithubMirrorUrl));
         downloadCatalogFromUrls(
             QStringList {
                 QString::fromUtf8(kHygCatalogPrimaryUrl),
@@ -1449,6 +1490,7 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
 
 void SkyContextController::downloadCatalogFromUrl(const QString& urlText)
 {
+    setCatalogUrlText(urlText);
     downloadCatalogFromUrls(QStringList {urlText}, "Downloaded");
 }
 
