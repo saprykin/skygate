@@ -355,7 +355,7 @@ void SkyContextController::applyCatalog(
     }
 
     m_starCatalog = std::move(catalog);
-    m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
+    m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(m_starCatalog.get());
     m_catalogBodyCount = bodies.size();
     m_catalogConstellationCount = constellationCount;
     m_catalogSourceLabel = sourceLabel;

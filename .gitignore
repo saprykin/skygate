@@ -1,5 +1,6 @@
 build/
 build-make/
+build-codex/
 .vscode/
 CMakeLists.txt.user
 CMakePresets.json

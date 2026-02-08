@@ -23,5 +23,6 @@ endfunction()
 
 add_skygate_core_qtest(skygate-core-geolocation-tests GeoLocationTests.cpp)
 add_skygate_core_qtest(skygate-core-projection-factory-tests ProjectionFactoryTests.cpp)
+add_skygate_core_qtest(skygate-core-azimuthal-equidistant-projection-tests AzimuthalEquidistantProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-stereographic-projection-tests StereographicProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-perspective-projection-tests PerspectiveProjectionTests.cpp)

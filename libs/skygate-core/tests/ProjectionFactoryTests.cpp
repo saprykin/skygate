@@ -7,7 +7,7 @@ class ProjectionFactoryTests final : public QObject {
 
 private slots:
     void supportedProjectionsAreCreated();
-    void unsupportedProjectionReturnsNull();
+    void azimuthalProjectionIsCreated();
     void createdProjectionReportsItsType();
 };
 
@@ -20,13 +20,17 @@ void ProjectionFactoryTests::supportedProjectionsAreCreated()
     const auto perspectiveProjection =
         skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
     QVERIFY(perspectiveProjection != nullptr);
+
+    const auto azimuthalProjection =
+        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    QVERIFY(azimuthalProjection != nullptr);
 }
 
-void ProjectionFactoryTests::unsupportedProjectionReturnsNull()
+void ProjectionFactoryTests::azimuthalProjectionIsCreated()
 {
-    const auto unsupportedProjection =
+    const auto azimuthalProjection =
         skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
-    QVERIFY(unsupportedProjection == nullptr);
+    QVERIFY(azimuthalProjection != nullptr);
 }
 
 void ProjectionFactoryTests::createdProjectionReportsItsType()
@@ -40,6 +44,11 @@ void ProjectionFactoryTests::createdProjectionReportsItsType()
         skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
     QVERIFY(perspectiveProjection != nullptr);
     QCOMPARE(perspectiveProjection->type(), skygate::core::ProjectionType::Perspective);
+
+    const auto azimuthalProjection =
+        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    QVERIFY(azimuthalProjection != nullptr);
+    QCOMPARE(azimuthalProjection->type(), skygate::core::ProjectionType::AzimuthalEquidistant);
 }
 
 QTEST_APPLESS_MAIN(ProjectionFactoryTests)

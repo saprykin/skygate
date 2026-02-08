@@ -7,6 +7,9 @@
 
 namespace skygate::ephemeris {
 
+[[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine(
+    const IStarCatalog* catalog
+);
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngineStub(
     const IStarCatalog* catalog
 );

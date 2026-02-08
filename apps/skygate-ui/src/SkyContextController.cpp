@@ -39,7 +39,7 @@ SkyContextController::SkyContextController(
         m_starCatalog = skygate::ephemeris::createBundledStarCatalog();
     }
     if (m_ephemerisEngine == nullptr && m_starCatalog != nullptr) {
-        m_ephemerisEngine = skygate::ephemeris::createEphemerisEngineStub(m_starCatalog.get());
+        m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(m_starCatalog.get());
     }
 
     if (m_starCatalog != nullptr) {

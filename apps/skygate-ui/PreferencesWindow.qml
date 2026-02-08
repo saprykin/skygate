@@ -388,7 +388,7 @@ Window {
                                             id: projectionCombo
                                             Layout.fillWidth: true
                                             Layout.columnSpan: 2
-                                            model: ["Stereographic", "Perspective"]
+                                            model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]
                                         }
                                     }
                                 }

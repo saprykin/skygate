@@ -1,18 +1,30 @@
-add_executable(skygate-ephemeris-unit-tests
-    main.cpp
-    StarCatalogTests.cpp
-    EphemerisEngineTests.cpp
-)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
-target_link_libraries(skygate-ephemeris-unit-tests
-    PRIVATE
-        skygate::core
-        skygate::ephemeris
-)
+function(add_skygate_ephemeris_qtest target_name source_file)
+    add_executable(${target_name}
+        ${source_file}
+    )
 
-target_compile_features(skygate-ephemeris-unit-tests PRIVATE cxx_std_20)
+    set_target_properties(${target_name} PROPERTIES AUTOMOC ON)
 
-add_test(
-    NAME skygate-ephemeris-unit-tests
-    COMMAND $<TARGET_FILE:skygate-ephemeris-unit-tests>
-)
+    target_link_libraries(${target_name}
+        PRIVATE
+            Qt6::Test
+            skygate::ephemeris
+            skygate::core
+    )
+
+    target_compile_features(${target_name} PRIVATE cxx_std_20)
+
+    add_test(
+        NAME ${target_name}
+        COMMAND $<TARGET_FILE:${target_name}>
+    )
+endfunction()
+
+add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-rows-tests CatalogRowsTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-catalog-tests HygCatalogParserTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-gzip-tests HygCatalogGzipTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-factory-tests CatalogFactoryTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-engine-baseline-tests EphemerisEngineBaselineTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-engine-fallback-tests EphemerisEngineFallbackTests.cpp)
