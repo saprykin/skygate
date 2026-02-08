@@ -2,18 +2,24 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core)
 find_package(ZLIB REQUIRED)
 
 add_library(skygate-ephemeris STATIC
+    include/skygate/ephemeris/CatalogPayloadParser.hpp
+    include/skygate/ephemeris/ConstellationData.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
     include/skygate/ephemeris/IStarCatalog.hpp
     include/skygate/ephemeris/StarCatalogFactory.hpp
+    include/skygate/ephemeris/StellariumConstellationParser.hpp
     include/skygate/ephemeris/Types.hpp
     src/catalog/BundledCatalogParser.hpp
+    src/catalog/CatalogPayloadParser.cpp
     src/catalog/CatalogRowParser.hpp
+    src/catalog/BundledConstellationData.cpp
     src/catalog/CsvRowTokenizer.hpp
     src/catalog/GzipCodec.hpp
     src/catalog/HygCatalogParser.hpp
     src/catalog/HygGzipCatalogParser.hpp
     src/catalog/InMemoryStarCatalog.hpp
+    src/catalog/StellariumConstellationParser.cpp
     src/engine/CoordinateTransform.hpp
     src/engine/JulianDateTime.hpp
     src/engine/KnownConstellationLookup.hpp

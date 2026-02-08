@@ -11,6 +11,8 @@
 
 class QNetworkAccessManager;
 class QObject;
+class CatalogDownloadService;
+class CatalogPayloadParseService;
 
 class CatalogCoordinator final {
 public:
@@ -31,6 +33,7 @@ public:
 
 public:
     explicit CatalogCoordinator(QNetworkAccessManager* networkAccessManager);
+    ~CatalogCoordinator();
 
     [[nodiscard]] static std::unique_ptr<skygate::ephemeris::IStarCatalog> ensureCoreSolarSystemBodies(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog
@@ -51,5 +54,7 @@ public:
     ) const;
 
 private:
+    std::unique_ptr<CatalogDownloadService> m_downloadService;
+    std::unique_ptr<CatalogPayloadParseService> m_parseService;
     QNetworkAccessManager* m_networkAccessManager = nullptr;
 };

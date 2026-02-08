@@ -13,9 +13,15 @@ qt_add_executable(skygate-ui
     src/main.cpp
     src/CatalogCoordinator.cpp
     src/CatalogCoordinator.hpp
+    src/catalog/CatalogDownloadService.cpp
+    src/catalog/CatalogDownloadService.hpp
+    src/catalog/CatalogPayloadParseService.cpp
+    src/catalog/CatalogPayloadParseService.hpp
     src/SkyContextController.cpp
     src/SkyContextController.hpp
     src/SkyContextControllerCatalog.cpp
+    src/SkyRenderBuilders.cpp
+    src/SkyRenderBuilders.hpp
     src/SkyContextControllerSettings.cpp
     src/SkyContextControllerSupport.cpp
     src/SkyContextControllerSupport.hpp
@@ -62,6 +68,8 @@ qt_add_qml_module(skygate-ui
         PreferencesCatalogSection.qml
         PreferencesCheckBox.qml
         PreferencesComboBox.qml
+        PreferencesSectionButton.qml
+        PreferencesSkySection.qml
         PreferencesTextField.qml
         PreferencesWindow.qml
     RESOURCES

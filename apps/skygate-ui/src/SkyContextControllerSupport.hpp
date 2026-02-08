@@ -67,18 +67,6 @@ inline constexpr std::string_view kMajorConstellationsCatalogRows =
     "gemini|Gemini|Constellation|1.6\n"
     "andromeda|Andromeda|Constellation|2.1\n";
 
-std::vector<std::pair<std::string, std::string>> defaultConstellationLineRefs();
-std::vector<std::pair<std::string, std::vector<std::string>>> defaultConstellationLabelRefs();
-std::vector<std::pair<std::string, std::string>> parseStellariumConstellationLineRefs(
-    std::string_view constellationLineRows
-);
-std::vector<std::pair<std::string, std::string>> parseStellariumIndexJsonConstellationLineRefs(
-    const QByteArray& jsonPayload
-);
-std::vector<std::pair<std::string, std::vector<std::string>>> parseStellariumIndexJsonConstellationLabelRefs(
-    const QByteArray& jsonPayload
-);
-
 QString formatCoordinate(double value);
 QString formatElevation(double value);
 QString projectionTypeToString(skygate::core::ProjectionType projectionType);

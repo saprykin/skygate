@@ -3,125 +3,16 @@
 #include "CatalogCoordinator.hpp"
 #include "SkyContextControllerSupport.hpp"
 
+#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/StellariumConstellationParser.hpp"
 
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-
-#include <charconv>
-#include <cctype>
-#include <optional>
-#include <string>
+#include <cstddef>
 #include <string_view>
-#include <unordered_set>
+#include <utility>
 
 using namespace skygate::ui::internal;
-
-namespace {
-std::optional<int> parsePositiveInteger(std::string_view value)
-{
-    if (value.empty()) {
-        return std::nullopt;
-    }
-
-    int parsedValue = 0;
-    const auto [parseEnd, errorCode] = std::from_chars(
-        value.data(),
-        value.data() + value.size(),
-        parsedValue
-    );
-    if (errorCode != std::errc() || parseEnd != value.data() + value.size() || parsedValue <= 0) {
-        return std::nullopt;
-    }
-
-    return parsedValue;
-}
-
-std::size_t inferConstellationCountFromRows(const std::string_view rows)
-{
-    std::unordered_set<std::string> constellationIds;
-
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) {
-            line.remove_prefix(1);
-        }
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
-            line.remove_suffix(1);
-        }
-
-        if (!line.empty() && line.front() != '#') {
-            std::size_t firstSplit = 0;
-            while (firstSplit < line.size() && !std::isspace(static_cast<unsigned char>(line[firstSplit]))) {
-                ++firstSplit;
-            }
-            std::string_view constellationId = line.substr(0, firstSplit);
-
-            while (
-                firstSplit < line.size()
-                && std::isspace(static_cast<unsigned char>(line[firstSplit]))
-            ) {
-                ++firstSplit;
-            }
-            std::size_t secondSplit = firstSplit;
-            while (
-                secondSplit < line.size()
-                && !std::isspace(static_cast<unsigned char>(line[secondSplit]))
-            ) {
-                ++secondSplit;
-            }
-            const std::string_view segmentCountText = line.substr(firstSplit, secondSplit - firstSplit);
-
-            if (
-                !constellationId.empty()
-                && parsePositiveInteger(segmentCountText).has_value()
-            ) {
-                constellationIds.insert(std::string(constellationId));
-            }
-        }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
-    }
-
-    return constellationIds.size();
-}
-
-std::size_t inferConstellationCountFromPayload(const QByteArray& payload)
-{
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
-    if (parseError.error == QJsonParseError::NoError && document.isObject()) {
-        const QJsonValue constellationsValue = document.object().value("constellations");
-        if (constellationsValue.isArray()) {
-            return static_cast<std::size_t>(constellationsValue.toArray().size());
-        }
-    }
-
-    const std::string_view rows(payload.constData(), static_cast<std::size_t>(payload.size()));
-    return inferConstellationCountFromRows(rows);
-}
-
-bool looksLikeJsonPayload(const QByteArray& payload)
-{
-    for (const char byte : payload) {
-        if (std::isspace(static_cast<unsigned char>(byte))) {
-            continue;
-        }
-        return byte == '{' || byte == '[';
-    }
-
-    return false;
-}
-} // namespace
 
 void SkyContextController::loadCatalogPreset(const QString& presetId)
 {
@@ -256,17 +147,13 @@ void SkyContextController::downloadCatalogFromUrls(
                         return;
                     }
 
-                    const std::string_view rows(
+                    const std::string_view payloadView(
                         lineResult.payload.constData(),
                         static_cast<std::size_t>(lineResult.payload.size())
                     );
-                    const bool isJsonPayload = looksLikeJsonPayload(lineResult.payload);
-                    auto parsedLineRefs = parseStellariumIndexJsonConstellationLineRefs(lineResult.payload);
-                    auto parsedLabelRefs = parseStellariumIndexJsonConstellationLabelRefs(lineResult.payload);
-                    if (parsedLineRefs.empty() && !isJsonPayload) {
-                        parsedLineRefs = parseStellariumConstellationLineRefs(rows);
-                    }
-                    if (parsedLineRefs.empty()) {
+                    const skygate::ephemeris::StellariumConstellationParser parser;
+                    auto parsedData = parser.parse(payloadView);
+                    if (parsedData.lineRefs.empty()) {
                         QString payloadPreview = QString::fromUtf8(lineResult.payload.left(120)).simplified();
                         if (payloadPreview.isEmpty()) {
                             payloadPreview = "<empty>";
@@ -282,12 +169,10 @@ void SkyContextController::downloadCatalogFromUrls(
                         return;
                     }
 
-                    setConstellationLineRefs(std::move(parsedLineRefs));
-                    setConstellationLabelRefs(std::move(parsedLabelRefs));
-                    const std::size_t inferredConstellationCount =
-                        inferConstellationCountFromPayload(lineResult.payload);
-                    if (inferredConstellationCount > 0) {
-                        m_catalogConstellationCount = inferredConstellationCount;
+                    setConstellationLineRefs(std::move(parsedData.lineRefs));
+                    setConstellationLabelRefs(std::move(parsedData.labelRefs));
+                    if (parsedData.constellationCount > 0U) {
+                        m_catalogConstellationCount = parsedData.constellationCount;
                         emit catalogDatasetInfoTextChanged();
                     }
                     if (m_starCatalog != nullptr) {
@@ -308,12 +193,13 @@ void SkyContextController::downloadCatalogFromUrls(
 
 void SkyContextController::resetConstellationLineRefs()
 {
-    m_constellationLineRefs = defaultConstellationLineRefs();
-    m_constellationLabelRefs = defaultConstellationLabelRefs();
+    const skygate::ephemeris::BundledConstellationData bundledConstellationData;
+    m_constellationLineRefs = bundledConstellationData.lineRefs();
+    m_constellationLabelRefs = bundledConstellationData.labelRefs();
 }
 
 void SkyContextController::setConstellationLineRefs(
-    std::vector<std::pair<std::string, std::string>> lineRefs
+    std::vector<ConstellationLineRef> lineRefs
 )
 {
     if (lineRefs.empty()) {

@@ -28,14 +28,17 @@ Window {
 
 
     function syncFormFromContext() {
-        utcDateTimeLockToggle.checked =
+        skySection.utcDateTimeLockToggle.checked =
             skyContextController.utcDateLocked || skyContextController.utcTimeLocked
-        utcDateInput.text = skyContextController.utcDateText
-        utcTimeInput.text = skyContextController.utcTimeText
-        latitudeInput.text = skyContextController.latitudeText
-        longitudeInput.text = skyContextController.longitudeText
-        elevationInput.text = skyContextController.elevationText
-        projectionCombo.currentIndex = Math.max(0, projectionCombo.model.indexOf(skyContextController.projectionTypeText))
+        skySection.utcDateInput.text = skyContextController.utcDateText
+        skySection.utcTimeInput.text = skyContextController.utcTimeText
+        skySection.latitudeInput.text = skyContextController.latitudeText
+        skySection.longitudeInput.text = skyContextController.longitudeText
+        skySection.elevationInput.text = skyContextController.elevationText
+        skySection.projectionCombo.currentIndex = Math.max(
+            0,
+            skySection.projectionCombo.model.indexOf(skyContextController.projectionTypeText)
+        )
         catalogSection.catalogPresetCurrentIndex = Math.max(
             0,
             Math.min(catalogSection.catalogPresetCount - 1, skyContextController.catalogPresetIndex())
@@ -44,14 +47,14 @@ Window {
     }
 
     function applyFormToContext() {
-        skyContextController.setUtcDateLocked(utcDateTimeLockToggle.checked)
-        skyContextController.setUtcTimeLocked(utcDateTimeLockToggle.checked)
-        skyContextController.setUtcDateText(utcDateInput.text)
-        skyContextController.setUtcTimeText(utcTimeInput.text)
-        skyContextController.setLatitudeText(latitudeInput.text)
-        skyContextController.setLongitudeText(longitudeInput.text)
-        skyContextController.setElevationText(elevationInput.text)
-        skyContextController.setProjectionTypeText(projectionCombo.currentText)
+        skyContextController.setUtcDateLocked(skySection.utcDateTimeLockToggle.checked)
+        skyContextController.setUtcTimeLocked(skySection.utcDateTimeLockToggle.checked)
+        skyContextController.setUtcDateText(skySection.utcDateInput.text)
+        skyContextController.setUtcTimeText(skySection.utcTimeInput.text)
+        skyContextController.setLatitudeText(skySection.latitudeInput.text)
+        skyContextController.setLongitudeText(skySection.longitudeInput.text)
+        skyContextController.setElevationText(skySection.elevationInput.text)
+        skyContextController.setProjectionTypeText(skySection.projectionCombo.currentText)
         skyContextController.setCatalogPresetIndex(catalogSection.catalogPresetCurrentIndex)
         skyContextController.setCatalogUrlText(catalogSection.catalogUrlText)
         syncFormFromContext()
@@ -178,62 +181,16 @@ Window {
                                     font.weight: Font.DemiBold
                                 }
 
-                                Rectangle {
-                                    id: skySectionButton
-                                    Layout.fillWidth: true
-                                    implicitHeight: 38
-                                    radius: 10
-                                    readonly property bool active: preferencesWindow.selectedPage === 0
-                                    color: active
-                                           ? "#2f79b8"
-                                           : (skySectionMouse.pressed ? "#213c5b" : (skySectionMouse.containsMouse ? "#1c3452" : "#142943"))
-                                    border.width: 1
-                                    border.color: active ? "#9de2ff" : "#4f769e"
-
-                                    Label {
-                                        anchors.centerIn: parent
-                                        text: "Sky"
-                                        color: skySectionButton.active ? "#ecf8ff" : "#bdd4f4"
-                                        font.family: "Avenir Next"
-                                        font.weight: Font.DemiBold
-                                    }
-
-                                    MouseArea {
-                                        id: skySectionMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: preferencesWindow.selectedPage = 0
-                                    }
+                                PreferencesSectionButton {
+                                    label: "Sky"
+                                    active: preferencesWindow.selectedPage === 0
+                                    onClicked: preferencesWindow.selectedPage = 0
                                 }
 
-                                Rectangle {
-                                    id: catalogSectionButton
-                                    Layout.fillWidth: true
-                                    implicitHeight: 38
-                                    radius: 10
-                                    readonly property bool active: preferencesWindow.selectedPage === 1
-                                    color: active
-                                           ? "#2f79b8"
-                                           : (catalogSectionMouse.pressed ? "#213c5b" : (catalogSectionMouse.containsMouse ? "#1c3452" : "#142943"))
-                                    border.width: 1
-                                    border.color: active ? "#9de2ff" : "#4f769e"
-
-                                    Label {
-                                        anchors.centerIn: parent
-                                        text: "Catalog"
-                                        color: catalogSectionButton.active ? "#ecf8ff" : "#bdd4f4"
-                                        font.family: "Avenir Next"
-                                        font.weight: Font.DemiBold
-                                    }
-
-                                    MouseArea {
-                                        id: catalogSectionMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: preferencesWindow.selectedPage = 1
-                                    }
+                                PreferencesSectionButton {
+                                    label: "Catalog"
+                                    active: preferencesWindow.selectedPage === 1
+                                    onClicked: preferencesWindow.selectedPage = 1
                                 }
 
                                 Item {
@@ -258,140 +215,10 @@ Window {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
 
-                            Item {
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 12
-                                    color: preferencesWindow.sectionBackground
-                                    border.width: 1
-                                    border.color: "#2b4b74"
-
-                                    GridLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 10
-                                        columns: 3
-                                        rowSpacing: 8
-                                        columnSpacing: 12
-
-                                        Label {
-                                            text: "UTC Date"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesTextField {
-                                            id: utcDateInput
-                                            Layout.fillWidth: true
-                                            placeholderText: "YYYY-MM-DD"
-                                            enabled: !utcDateTimeLockToggle.checked
-                                        }
-                                        ToolButton {
-                                            id: utcDateTimeLockToggle
-                                            checkable: true
-                                            Layout.rowSpan: 2
-                                            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                                            width: 38
-                                            height: 30
-                                            text: checked ? "\uD83D\uDD12" : "\uD83D\uDD13"
-                                            font.pixelSize: 16
-                                            ToolTip.visible: hovered
-                                            ToolTip.text: checked
-                                                ? "Using current UTC date/time"
-                                                : "Using manual UTC date/time input"
-
-                                            contentItem: Text {
-                                                text: parent.text
-                                                color: "#eaf7ff"
-                                                font: parent.font
-                                                horizontalAlignment: Text.AlignHCenter
-                                                verticalAlignment: Text.AlignVCenter
-                                            }
-
-                                            background: Rectangle {
-                                                radius: 8
-                                                color: utcDateTimeLockToggle.checked
-                                                    ? "#2f79b8"
-                                                    : (utcDateTimeLockToggle.down
-                                                        ? "#27476d"
-                                                        : (utcDateTimeLockToggle.hovered ? "#315881" : "#1a3352"))
-                                                border.width: 1
-                                                border.color: utcDateTimeLockToggle.checked ? "#9de2ff" : "#6fbde6"
-                                            }
-                                        }
-
-                                        Label {
-                                            text: "UTC Time"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesTextField {
-                                            id: utcTimeInput
-                                            Layout.fillWidth: true
-                                            placeholderText: "HH:MM:SS"
-                                            enabled: !utcDateTimeLockToggle.checked
-                                        }
-
-                                        Label {
-                                            text: "Latitude"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesTextField {
-                                            id: latitudeInput
-                                            Layout.fillWidth: true
-                                            Layout.columnSpan: 2
-                                            placeholderText: "-90..90"
-                                            validator: DoubleValidator {
-                                                bottom: -90.0
-                                                top: 90.0
-                                                notation: DoubleValidator.StandardNotation
-                                            }
-                                        }
-
-                                        Label {
-                                            text: "Longitude"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesTextField {
-                                            id: longitudeInput
-                                            Layout.fillWidth: true
-                                            Layout.columnSpan: 2
-                                            placeholderText: "-180..180"
-                                            validator: DoubleValidator {
-                                                bottom: -180.0
-                                                top: 180.0
-                                                notation: DoubleValidator.StandardNotation
-                                            }
-                                        }
-
-                                        Label {
-                                            text: "Elevation (m)"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesTextField {
-                                            id: elevationInput
-                                            Layout.fillWidth: true
-                                            Layout.columnSpan: 2
-                                            placeholderText: "meters"
-                                            validator: DoubleValidator {
-                                                notation: DoubleValidator.StandardNotation
-                                            }
-                                        }
-
-                                        Label {
-                                            text: "Projection"
-                                            color: "#cad9f7"
-                                            font.family: "Avenir Next"
-                                        }
-                                        PreferencesComboBox {
-                                            id: projectionCombo
-                                            Layout.fillWidth: true
-                                            Layout.columnSpan: 2
-                                            model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]
-                                        }
-                                    }
-                                }
+                            PreferencesSkySection {
+                                id: skySection
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
                             }
 
                             PreferencesCatalogSection {

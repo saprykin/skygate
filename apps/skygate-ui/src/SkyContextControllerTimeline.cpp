@@ -24,7 +24,7 @@ using namespace skygate::ui::internal;
 namespace {
 QDateTime currentUtcDateTime()
 {
-    return QDateTime::currentDateTimeUtc().toUTC();
+    return QDateTime::currentDateTimeUtc();
 }
 } // namespace
 

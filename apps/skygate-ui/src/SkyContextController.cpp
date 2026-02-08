@@ -1,11 +1,11 @@
 #include "SkyContextController.hpp"
 
 #include "CatalogCoordinator.hpp"
+#include "SkyRenderBuilders.hpp"
 #include "SkyContextControllerSupport.hpp"
 
 #include <QLocale>
 #include <QNetworkAccessManager>
-#include <QVariantMap>
 
 #include "skygate/core/ProjectionFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -15,9 +15,6 @@
 #include <cmath>
 #include <limits>
 #include <string>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 
 using namespace skygate::ui::internal;
@@ -268,42 +265,13 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
     );
 
     const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-    std::vector<SkyRenderPoint> points;
-    points.reserve(snapshot.states.size());
-
-    for (const auto& state : snapshot.states) {
-        if (
-            !std::isfinite(state.horizontal.altitudeDeg)
-            || !std::isfinite(state.horizontal.azimuthDeg)
-        ) {
-            continue;
-        }
-
-        if (
-            state.body.type == skygate::ephemeris::CelestialBodyType::Star
-            && state.body.visualMagnitude > m_magnitudeCutoff
-        ) {
-            continue;
-        }
-
-        const auto projected = m_projection->project(state.horizontal, projectionParams);
-        if (!projected.isVisible) {
-            continue;
-        }
-
-        SkyRenderPoint point;
-        point.x = projected.x;
-        point.y = projected.y;
-        point.sizePx = pointSizeForMagnitude(state.body.visualMagnitude);
-        if (state.body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
-            point.sizePx = std::max(point.sizePx, 3.0);
-        }
-        point.displayName = QString::fromStdString(state.body.displayName);
-        point.color = colorForBodyType(state.body.type);
-        points.push_back(point);
-    }
-
-    return points;
+    const SkyRenderPointBuilder renderPointBuilder;
+    return renderPointBuilder.buildPoints(
+        snapshot,
+        *m_projection,
+        projectionParams,
+        m_magnitudeCutoff
+    );
 }
 
 std::vector<SkyContextController::SkyRenderLine> SkyContextController::renderConstellationLines(
@@ -328,77 +296,15 @@ std::vector<SkyContextController::SkyRenderLine> SkyContextController::renderCon
     );
 
     const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalById;
-    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalByDisplayName;
-    horizontalById.reserve(snapshot.states.size());
-    horizontalByDisplayName.reserve(snapshot.states.size());
-
-    for (const auto& state : snapshot.states) {
-        if (
-            !std::isfinite(state.horizontal.altitudeDeg)
-            || !std::isfinite(state.horizontal.azimuthDeg)
-        ) {
-            continue;
-        }
-        horizontalById[state.body.id] = state.horizontal;
-        horizontalByDisplayName[state.body.displayName] = state.horizontal;
-    }
-
-    const auto findHorizontal = [&](const std::string_view lineRefId) -> const skygate::core::HorizontalCoordinate* {
-        if (const auto idIt = horizontalById.find(lineRefId); idIt != horizontalById.end()) {
-            return &idIt->second;
-        }
-
-        const std::string_view hipNumber = hipSuffix(lineRefId);
-        if (!hipNumber.empty()) {
-            std::string legacyHipDisplayName = "HIP ";
-            legacyHipDisplayName.append(hipNumber.data(), hipNumber.size());
-            if (
-                const auto displayNameIt = horizontalByDisplayName.find(legacyHipDisplayName);
-                displayNameIt != horizontalByDisplayName.end()
-            ) {
-                return &displayNameIt->second;
-            }
-        }
-
-        return nullptr;
-    };
-
-    const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
-    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
-    std::vector<SkyRenderLine> lines;
-    lines.reserve(m_constellationLineRefs.size());
-
-    for (const auto& lineRef : m_constellationLineRefs) {
-        const auto* startHorizontal = findHorizontal(lineRef.first);
-        const auto* endHorizontal = findHorizontal(lineRef.second);
-        if (startHorizontal == nullptr || endHorizontal == nullptr) {
-            continue;
-        }
-
-        const auto startProjected = m_projection->project(*startHorizontal, projectionParams);
-        const auto endProjected = m_projection->project(*endHorizontal, projectionParams);
-        if (!startProjected.isVisible || !endProjected.isVisible) {
-            continue;
-        }
-
-        const double deltaX = endProjected.x - startProjected.x;
-        const double deltaY = endProjected.y - startProjected.y;
-        const double lengthSquared = deltaX * deltaX + deltaY * deltaY;
-        if (lengthSquared > maxSegmentLengthSquared) {
-            continue;
-        }
-
-        SkyRenderLine line;
-        line.x1 = startProjected.x;
-        line.y1 = startProjected.y;
-        line.x2 = endProjected.x;
-        line.y2 = endProjected.y;
-        line.color = constellationLineColor();
-        lines.push_back(line);
-    }
-
-    return lines;
+    const SkyConstellationRenderBuilder renderBuilder;
+    return renderBuilder.buildLines(
+        snapshot,
+        *m_projection,
+        projectionParams,
+        m_constellationLineRefs,
+        viewportWidth,
+        viewportHeight
+    );
 }
 
 skygate::core::ScreenPoint SkyContextController::projectHorizontal(
@@ -522,159 +428,13 @@ QVariantList SkyContextController::constellationLabels(
     );
 
     const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalById;
-    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> horizontalByDisplayName;
-    horizontalById.reserve(snapshot.states.size());
-    horizontalByDisplayName.reserve(snapshot.states.size());
-    for (const auto& state : snapshot.states) {
-        if (
-            !std::isfinite(state.horizontal.altitudeDeg)
-            || !std::isfinite(state.horizontal.azimuthDeg)
-        ) {
-            continue;
-        }
-        horizontalById[state.body.id] = state.horizontal;
-        horizontalByDisplayName[state.body.displayName] = state.horizontal;
-    }
-
-    const auto findHorizontal = [&](const std::string_view lineRefId) -> const skygate::core::HorizontalCoordinate* {
-        if (const auto idIt = horizontalById.find(lineRefId); idIt != horizontalById.end()) {
-            return &idIt->second;
-        }
-
-        const std::string_view hipNumber = hipSuffix(lineRefId);
-        if (!hipNumber.empty()) {
-            std::string legacyHipDisplayName = "HIP ";
-            legacyHipDisplayName.append(hipNumber.data(), hipNumber.size());
-            if (
-                const auto displayNameIt = horizontalByDisplayName.find(legacyHipDisplayName);
-                displayNameIt != horizontalByDisplayName.end()
-            ) {
-                return &displayNameIt->second;
-            }
-        }
-
-        return nullptr;
-    };
-
-    std::unordered_set<std::string> seenLabels;
-    QVariantList labels;
-    labels.reserve(static_cast<int>((snapshot.states.size() / 8U) + m_constellationLabelRefs.size()));
-
-    constexpr double kEdgeMarginPx = 10.0;
-    const auto labelColorForBodyType = [](const skygate::ephemeris::CelestialBodyType type) -> QColor {
-        switch (type) {
-        case skygate::ephemeris::CelestialBodyType::Sun:
-            return QColor(255, 224, 135, 235);
-        case skygate::ephemeris::CelestialBodyType::Moon:
-            return QColor(152, 247, 255, 245);
-        case skygate::ephemeris::CelestialBodyType::Planet:
-            return QColor(255, 196, 148, 235);
-        case skygate::ephemeris::CelestialBodyType::Constellation:
-            return QColor(201, 220, 255, 230);
-        case skygate::ephemeris::CelestialBodyType::Star:
-            break;
-        }
-
-        return QColor(201, 220, 255, 230);
-    };
-    for (const auto& state : snapshot.states) {
-        if (
-            state.body.type != skygate::ephemeris::CelestialBodyType::Constellation
-            && state.body.type != skygate::ephemeris::CelestialBodyType::Planet
-            && state.body.type != skygate::ephemeris::CelestialBodyType::Sun
-            && state.body.type != skygate::ephemeris::CelestialBodyType::Moon
-        ) {
-            continue;
-        }
-
-        if (
-            !std::isfinite(state.horizontal.altitudeDeg)
-            || !std::isfinite(state.horizontal.azimuthDeg)
-            || state.body.displayName.empty()
-        ) {
-            continue;
-        }
-
-        if (!seenLabels.insert(state.body.displayName).second) {
-            continue;
-        }
-
-        const auto projected = m_projection->project(state.horizontal, projectionParams);
-        if (!projected.isVisible) {
-            continue;
-        }
-
-        if (
-            projected.x < kEdgeMarginPx
-            || projected.x > (viewportWidth - kEdgeMarginPx)
-            || projected.y < kEdgeMarginPx
-            || projected.y > (viewportHeight - kEdgeMarginPx)
-        ) {
-            continue;
-        }
-
-        QVariantMap labelEntry;
-        labelEntry.insert("x", projected.x);
-        labelEntry.insert("y", projected.y);
-        labelEntry.insert("text", QString::fromStdString(state.body.displayName));
-        labelEntry.insert("color", labelColorForBodyType(state.body.type));
-        labels.push_back(labelEntry);
-    }
-
-    for (const auto& labelRef : m_constellationLabelRefs) {
-        if (labelRef.first.empty() || labelRef.second.empty()) {
-            continue;
-        }
-
-        if (!seenLabels.insert(labelRef.first).second) {
-            continue;
-        }
-
-        double sumX = 0.0;
-        double sumY = 0.0;
-        int visiblePointCount = 0;
-        for (const std::string& hipId : labelRef.second) {
-            const auto* horizontal = findHorizontal(hipId);
-            if (horizontal == nullptr) {
-                continue;
-            }
-
-            const auto projected = m_projection->project(*horizontal, projectionParams);
-            if (!projected.isVisible) {
-                continue;
-            }
-
-            sumX += projected.x;
-            sumY += projected.y;
-            ++visiblePointCount;
-        }
-
-        if (visiblePointCount == 0) {
-            continue;
-        }
-
-        const double labelX = sumX / static_cast<double>(visiblePointCount);
-        const double labelY = sumY / static_cast<double>(visiblePointCount);
-        if (
-            labelX < kEdgeMarginPx
-            || labelX > (viewportWidth - kEdgeMarginPx)
-            || labelY < kEdgeMarginPx
-            || labelY > (viewportHeight - kEdgeMarginPx)
-        ) {
-            continue;
-        }
-
-        QVariantMap labelEntry;
-        labelEntry.insert("x", labelX);
-        labelEntry.insert("y", labelY);
-        labelEntry.insert("text", QString::fromStdString(labelRef.first));
-        labelEntry.insert(
-            "color",
-            labelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation)
-        );
-        labels.push_back(labelEntry);
-    }
-
-    return labels;
+    const SkyConstellationRenderBuilder renderBuilder;
+    return renderBuilder.buildLabels(
+        snapshot,
+        *m_projection,
+        projectionParams,
+        m_constellationLabelRefs,
+        viewportWidth,
+        viewportHeight
+    );
 }

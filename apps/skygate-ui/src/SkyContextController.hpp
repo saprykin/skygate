@@ -9,6 +9,7 @@
 
 #include "skygate/core/IProjection.hpp"
 #include "skygate/core/Types.hpp"
+#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
@@ -52,7 +53,8 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
-    using ConstellationLabelRef = std::pair<std::string, std::vector<std::string>>;
+    using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
+    using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
 
     struct SkyRenderPoint {
         double x = 0.0;
@@ -192,7 +194,7 @@ private:
         const QStringList& constellationLineUrlTexts = {}
     );
     void resetConstellationLineRefs();
-    void setConstellationLineRefs(std::vector<std::pair<std::string, std::string>> lineRefs);
+    void setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
     void setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
     void persistCatalogCache(
         const std::vector<skygate::ephemeris::CelestialBody>& bodies,
@@ -231,7 +233,7 @@ private:
     bool m_catalogProcessing = false;
     std::size_t m_catalogBodyCount = 0;
     std::size_t m_catalogConstellationCount = 0;
-    std::vector<std::pair<std::string, std::string>> m_constellationLineRefs;
+    std::vector<ConstellationLineRef> m_constellationLineRefs;
     std::vector<ConstellationLabelRef> m_constellationLabelRefs;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };
