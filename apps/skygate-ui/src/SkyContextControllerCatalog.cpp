@@ -30,16 +30,16 @@ void SkyContextController::loadCatalogPreset(const QString& presetId)
 
     if (normalizedPresetId == "hyg_v42" || normalizedPresetId == "hyg_v3") {
         setCatalogPresetIndex(1);
-        setCatalogUrlText(QString::fromUtf8(kHygCatalogPrimaryUrl));
+        setCatalogUrlText(QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl));
         downloadCatalogFromUrls(
             QStringList {
-                QString::fromUtf8(kHygCatalogPrimaryUrl)
+                QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl)
             },
             "HYG v4.2",
             QStringList {
-                QString::fromUtf8(kStellariumConstellationLinesPrimaryUrl),
-                QString::fromUtf8(kStellariumConstellationLinesMirrorUrl),
-                QString::fromUtf8(kStellariumConstellationLinesCdnUrl)
+                QString::fromUtf8(SkyContextControllerConstants::kStellariumConstellationLinesPrimaryUrl),
+                QString::fromUtf8(SkyContextControllerConstants::kStellariumConstellationLinesMirrorUrl),
+                QString::fromUtf8(SkyContextControllerConstants::kStellariumConstellationLinesCdnUrl)
             }
         );
         return;

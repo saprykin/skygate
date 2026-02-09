@@ -8,6 +8,7 @@
 #include <QVariantList>
 
 #include "skygate/core/IProjection.hpp"
+#include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
@@ -213,8 +214,8 @@ private:
     double m_speedRemainderSeconds = 0.0;
     int m_stepSeconds = 60;
     double m_magnitudeCutoff = 6.0;
-    double m_viewCenterAltitudeDeg = 45.0;
-    double m_viewCenterAzimuthDeg = 180.0;
+    double m_viewCenterAltitudeDeg = skygate::core::ViewportMath::kDefaultCenterAltitudeDeg;
+    double m_viewCenterAzimuthDeg = skygate::core::ViewportMath::kDefaultCenterAzimuthDeg;
     double m_viewFieldOfViewDeg = 100.0;
     QTimer m_timer;
     skygate::core::SkyContext m_skyContext;

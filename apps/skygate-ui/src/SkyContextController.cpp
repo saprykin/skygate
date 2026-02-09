@@ -8,6 +8,7 @@
 #include <QNetworkAccessManager>
 
 #include "skygate/core/ProjectionFactory.hpp"
+#include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
@@ -46,11 +47,11 @@ SkyContextController::SkyContextController(
     }
 
     m_projection = skygate::core::createProjection(m_projectionType);
-    m_catalogUrlText = QString::fromUtf8(kHygCatalogPrimaryUrl);
-    m_skyContext.utcTime = toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
+    m_catalogUrlText = QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl);
+    m_skyContext.utcTime = SkyContextTimeCodec::toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
     loadSettings();
 
-    m_timer.setInterval(kTickIntervalMs);
+    m_timer.setInterval(SkyContextControllerConstants::kTickIntervalMs);
     m_timer.setTimerType(Qt::PreciseTimer);
     connect(&m_timer, &QTimer::timeout, this, &SkyContextController::tickUtcTime);
     m_timer.start();
@@ -92,32 +93,32 @@ double SkyContextController::viewCenterAzimuthDeg() const noexcept
 
 QString SkyContextController::utcTimeText() const
 {
-    return toQDateTimeUtc(m_skyContext.utcTime).toString("HH:mm:ss");
+    return SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toString("HH:mm:ss");
 }
 
 QString SkyContextController::utcDateText() const
 {
-    return toQDateTimeUtc(m_skyContext.utcTime).toString("yyyy-MM-dd");
+    return SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toString("yyyy-MM-dd");
 }
 
 QString SkyContextController::latitudeText() const
 {
-    return formatCoordinate(m_skyContext.observer.latitudeDeg);
+    return SkyContextTextFormatter::formatCoordinate(m_skyContext.observer.latitudeDeg);
 }
 
 QString SkyContextController::longitudeText() const
 {
-    return formatCoordinate(m_skyContext.observer.longitudeDeg);
+    return SkyContextTextFormatter::formatCoordinate(m_skyContext.observer.longitudeDeg);
 }
 
 QString SkyContextController::elevationText() const
 {
-    return formatElevation(m_skyContext.observer.elevationMeters);
+    return SkyContextTextFormatter::formatElevation(m_skyContext.observer.elevationMeters);
 }
 
 QString SkyContextController::projectionTypeText() const
 {
-    return projectionTypeToString(m_projectionType);
+    return SkyContextProjectionTypeCodec::toString(m_projectionType);
 }
 
 QString SkyContextController::projectionSampleText() const
@@ -201,7 +202,7 @@ void SkyContextController::setCatalogUrlText(const QString& catalogUrlText)
 {
     const QString normalizedCatalogUrlText = catalogUrlText.trimmed();
     m_catalogUrlText = normalizedCatalogUrlText.isEmpty()
-        ? QString::fromUtf8(kHygCatalogPrimaryUrl)
+        ? QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl)
         : normalizedCatalogUrlText;
 }
 
@@ -256,7 +257,7 @@ std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPo
         return {};
     }
 
-    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
         viewportWidth,
         viewportHeight,
         m_viewCenterAltitudeDeg,
@@ -287,7 +288,7 @@ std::vector<SkyContextController::SkyRenderLine> SkyContextController::renderCon
         return {};
     }
 
-    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
         viewportWidth,
         viewportHeight,
         m_viewCenterAltitudeDeg,
@@ -317,7 +318,7 @@ skygate::core::ScreenPoint SkyContextController::projectHorizontal(
         return {};
     }
 
-    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
         viewportWidth,
         viewportHeight,
         m_viewCenterAltitudeDeg,
@@ -419,7 +420,7 @@ QVariantList SkyContextController::constellationLabels(
         return {};
     }
 
-    const skygate::core::ProjectionParams projectionParams = buildProjectionParams(
+    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
         viewportWidth,
         viewportHeight,
         m_viewCenterAltitudeDeg,

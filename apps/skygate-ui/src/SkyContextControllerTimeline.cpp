@@ -8,6 +8,7 @@
 #include <QTimeZone>
 
 #include "skygate/core/ProjectionFactory.hpp"
+#include "skygate/core/math/ViewportMath.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -56,7 +57,7 @@ void SkyContextController::setLive(bool live)
 
     if (m_live && (m_utcDateLocked || m_utcTimeLocked)) {
         // Jump to current UTC as soon as playback resumes in lock mode.
-        setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
+        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
     }
 
     emit liveChanged();
@@ -83,7 +84,7 @@ void SkyContextController::setUtcDateLocked(const bool utcDateLocked)
     m_utcDateLocked = utcDateLocked;
     emit utcDateLockedChanged();
     if (m_utcDateLocked || m_utcTimeLocked) {
-        setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
+        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
     }
 }
 
@@ -98,7 +99,7 @@ void SkyContextController::setUtcTimeLocked(const bool utcTimeLocked)
     m_utcTimeLocked = utcTimeLocked;
     emit utcTimeLockedChanged();
     if (m_utcDateLocked || m_utcTimeLocked) {
-        setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
+        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
     }
 }
 
@@ -145,7 +146,11 @@ void SkyContextController::setMagnitudeCutoff(const double magnitudeCutoff)
         return;
     }
 
-    const double clamped = std::clamp(magnitudeCutoff, kMagnitudeCutoffMin, kMagnitudeCutoffMax);
+    const double clamped = std::clamp(
+        magnitudeCutoff,
+        SkyContextControllerConstants::kMagnitudeCutoffMin,
+        SkyContextControllerConstants::kMagnitudeCutoffMax
+    );
     if (std::abs(m_magnitudeCutoff - clamped) < 1e-9) {
         return;
     }
@@ -162,8 +167,8 @@ void SkyContextController::setViewCenter(const double altitudeDeg, const double 
         return;
     }
 
-    const double nextAltitudeDeg = clampAltitudeDeg(altitudeDeg);
-    const double nextAzimuthDeg = normalizeAzimuthDeg(azimuthDeg);
+    const double nextAltitudeDeg = skygate::core::ViewportMath::clampAltitudeDeg(altitudeDeg);
+    const double nextAzimuthDeg = skygate::core::ViewportMath::normalizeAzimuthDeg(azimuthDeg);
     if (
         std::abs(m_viewCenterAltitudeDeg - nextAltitudeDeg) < 1e-9
         && std::abs(m_viewCenterAzimuthDeg - nextAzimuthDeg) < 1e-9
@@ -196,14 +201,21 @@ void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
         return;
     }
 
-    const double wheelSteps = static_cast<double>(wheelDeltaY) / kWheelAngleDeltaStep;
-    const double zoomMultiplier = std::pow(kWheelZoomStepScale, wheelSteps);
+    const double wheelSteps =
+        static_cast<double>(wheelDeltaY) / SkyContextControllerConstants::kWheelAngleDeltaStep;
+    const double zoomMultiplier = std::pow(
+        SkyContextControllerConstants::kWheelZoomStepScale,
+        wheelSteps
+    );
     setViewFieldOfViewDeg(m_viewFieldOfViewDeg * zoomMultiplier);
 }
 
 void SkyContextController::resetViewDirection()
 {
-    setViewCenter(kDefaultViewportCenterAltitudeDeg, kDefaultViewportCenterAzimuthDeg);
+    setViewCenter(
+        skygate::core::ViewportMath::kDefaultCenterAltitudeDeg,
+        skygate::core::ViewportMath::kDefaultCenterAzimuthDeg
+    );
 }
 
 void SkyContextController::stepForward()
@@ -249,7 +261,7 @@ void SkyContextController::stepBackward()
 void SkyContextController::setUtcDateText(const QString& utcDateText)
 {
     if (m_utcDateLocked) {
-        setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
+        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
         return;
     }
 
@@ -260,7 +272,7 @@ void SkyContextController::setUtcDateText(const QString& utcDateText)
         return;
     }
 
-    const auto currentUtc = toQDateTimeUtc(m_skyContext.utcTime);
+    const auto currentUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
     const QDateTime nextUtc(
         date,
         currentUtc.time(),
@@ -274,7 +286,7 @@ void SkyContextController::setUtcDateText(const QString& utcDateText)
 void SkyContextController::setUtcTimeText(const QString& utcTimeText)
 {
     if (m_utcTimeLocked) {
-        setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
+        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
         return;
     }
 
@@ -285,7 +297,7 @@ void SkyContextController::setUtcTimeText(const QString& utcTimeText)
         return;
     }
 
-    const auto currentUtc = toQDateTimeUtc(m_skyContext.utcTime);
+    const auto currentUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
     const QDateTime nextUtc(
         currentUtc.date(),
         time,
@@ -361,7 +373,7 @@ void SkyContextController::setElevationText(const QString& elevationText)
 
 void SkyContextController::setProjectionTypeText(const QString& projectionTypeText)
 {
-    const auto parsedType = projectionTypeFromString(projectionTypeText);
+    const auto parsedType = SkyContextProjectionTypeCodec::fromString(projectionTypeText);
     if (!parsedType.has_value()) {
         emit projectionTypeChanged();
         return;
@@ -379,7 +391,7 @@ void SkyContextController::tickUtcTime()
     const bool hasUtcLock = m_utcDateLocked || m_utcTimeLocked;
     if (hasUtcLock) {
         // In lock mode, live updates follow current UTC rather than timeline speed.
-        setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime));
+        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
         return;
     }
 
@@ -403,7 +415,7 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
         m_speedRemainderSeconds = 0.0;
     }
 
-    setCurrentUtc(toQDateTimeUtc(m_skyContext.utcTime).addSecs(stepSeconds));
+    setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).addSecs(stepSeconds));
 }
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
@@ -419,7 +431,7 @@ void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
         }
     }
 
-    const auto nextUtc = toUtcTimePoint(normalizedUtc);
+    const auto nextUtc = SkyContextTimeCodec::toUtcTimePoint(normalizedUtc);
     if (m_skyContext.utcTime == nextUtc) {
         return;
     }
@@ -436,7 +448,8 @@ void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg
         return;
     }
 
-    const double nextViewFieldOfViewDeg = clampFieldOfViewDeg(viewFieldOfViewDeg);
+    const double nextViewFieldOfViewDeg =
+        skygate::core::ViewportMath::clampFieldOfViewDeg(viewFieldOfViewDeg);
     if (std::abs(m_viewFieldOfViewDeg - nextViewFieldOfViewDeg) < 1e-9) {
         return;
     }
@@ -480,7 +493,7 @@ void SkyContextController::initializeCurrentLocation()
     permission.setAvailability(QLocationPermission::WhenInUse);
 
     auto startLocationUpdate = [this] {
-        m_positionSource->requestUpdate(kLocationUpdateTimeoutMs);
+        m_positionSource->requestUpdate(SkyContextControllerConstants::kLocationUpdateTimeoutMs);
     };
 
     QCoreApplication* app = QCoreApplication::instance();

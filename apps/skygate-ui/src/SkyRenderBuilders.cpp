@@ -45,7 +45,7 @@ public:
             return &idIt->second;
         }
 
-        const std::string_view hipNumber = hipSuffix(bodyId);
+        const std::string_view hipNumber = SkyContextRenderStyle::hipSuffix(bodyId);
         if (!hipNumber.empty()) {
             std::string legacyHipDisplayName = "HIP ";
             legacyHipDisplayName.append(hipNumber.data(), hipNumber.size());
@@ -118,12 +118,12 @@ std::vector<SkyContextController::SkyRenderPoint> SkyRenderPointBuilder::buildPo
         SkyContextController::SkyRenderPoint point;
         point.x = projected.x;
         point.y = projected.y;
-        point.sizePx = pointSizeForMagnitude(state.body.visualMagnitude);
+        point.sizePx = SkyContextRenderStyle::pointSizeForMagnitude(state.body.visualMagnitude);
         if (state.body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
             point.sizePx = std::max(point.sizePx, 3.0);
         }
         point.displayName = QString::fromStdString(state.body.displayName);
-        point.color = colorForBodyType(state.body.type);
+        point.color = SkyContextRenderStyle::colorForBodyType(state.body.type);
         points.push_back(std::move(point));
     }
 
@@ -172,7 +172,7 @@ std::vector<SkyContextController::SkyRenderLine> SkyConstellationRenderBuilder::
         line.y1 = startProjected.y;
         line.x2 = endProjected.x;
         line.y2 = endProjected.y;
-        line.color = constellationLineColor();
+        line.color = SkyContextRenderStyle::constellationLineColor();
         lines.push_back(std::move(line));
     }
 

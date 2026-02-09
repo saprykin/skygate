@@ -5,52 +5,53 @@
 #include <QTimeZone>
 
 #include <algorithm>
-#include <cmath>
-#include <string_view>
 
 namespace {
 
-QString bodyTypeToString(const skygate::ephemeris::CelestialBodyType type)
-{
-    switch (type) {
-    case skygate::ephemeris::CelestialBodyType::Star:
+class CatalogRowFieldCodec final {
+public:
+    [[nodiscard]] static QString bodyTypeToString(const skygate::ephemeris::CelestialBodyType type)
+    {
+        switch (type) {
+        case skygate::ephemeris::CelestialBodyType::Star:
+            return "Star";
+        case skygate::ephemeris::CelestialBodyType::Planet:
+            return "Planet";
+        case skygate::ephemeris::CelestialBodyType::Moon:
+            return "Moon";
+        case skygate::ephemeris::CelestialBodyType::Sun:
+            return "Sun";
+        case skygate::ephemeris::CelestialBodyType::Constellation:
+            return "Constellation";
+        }
+
         return "Star";
-    case skygate::ephemeris::CelestialBodyType::Planet:
-        return "Planet";
-    case skygate::ephemeris::CelestialBodyType::Moon:
-        return "Moon";
-    case skygate::ephemeris::CelestialBodyType::Sun:
-        return "Sun";
-    case skygate::ephemeris::CelestialBodyType::Constellation:
-        return "Constellation";
     }
 
-    return "Star";
-}
-
-QString sanitizeCatalogField(QString value)
-{
-    value.replace('|', '/');
-    value.replace('\n', ' ');
-    value.replace('\r', ' ');
-    return value.trimmed();
-}
+    [[nodiscard]] static QString sanitizeCatalogField(QString value)
+    {
+        value.replace('|', '/');
+        value.replace('\n', ' ');
+        value.replace('\r', ' ');
+        return value.trimmed();
+    }
+};
 
 }  // namespace
 
 namespace skygate::ui::internal {
 
-QString formatCoordinate(const double value)
+QString SkyContextTextFormatter::formatCoordinate(const double value)
 {
     return QString::number(value, 'f', 6);
 }
 
-QString formatElevation(const double value)
+QString SkyContextTextFormatter::formatElevation(const double value)
 {
     return QString::number(value, 'f', 1);
 }
 
-QString projectionTypeToString(const skygate::core::ProjectionType projectionType)
+QString SkyContextProjectionTypeCodec::toString(const skygate::core::ProjectionType projectionType)
 {
     switch (projectionType) {
     case skygate::core::ProjectionType::Stereographic:
@@ -64,7 +65,9 @@ QString projectionTypeToString(const skygate::core::ProjectionType projectionTyp
     return "Unknown";
 }
 
-std::optional<skygate::core::ProjectionType> projectionTypeFromString(const QString& value)
+std::optional<skygate::core::ProjectionType> SkyContextProjectionTypeCodec::fromString(
+    const QString& value
+)
 {
     const QString normalized = value.trimmed().toLower();
     if (normalized == "stereographic") {
@@ -82,39 +85,45 @@ std::optional<skygate::core::ProjectionType> projectionTypeFromString(const QStr
     return std::nullopt;
 }
 
-QDateTime toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
+QDateTime SkyContextTimeCodec::toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
 {
     const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(utcTime.time_since_epoch());
     return QDateTime::fromSecsSinceEpoch(seconds.count(), QTimeZone::UTC);
 }
 
-skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcTime)
+skygate::core::UtcTimePoint SkyContextTimeCodec::toUtcTimePoint(const QDateTime& utcTime)
 {
     return skygate::core::UtcTimePoint(std::chrono::seconds(utcTime.toSecsSinceEpoch()));
 }
 
-QString settingsKey(const QString& name)
+QString SkyContextSettings::key(const QString& name)
 {
     return QString("skyContext/%1").arg(name);
 }
 
-QString defaultCatalogCachePath()
+QString SkyContextSettings::defaultCatalogCachePath()
 {
     const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (appDataPath.isEmpty()) {
         return {};
     }
 
-    return QDir(appDataPath).filePath(QString::fromUtf8(kCatalogCacheFileName));
+    return QDir(appDataPath).filePath(
+        QString::fromUtf8(SkyContextControllerConstants::kCatalogCacheFileName)
+    );
 }
 
-QByteArray serializeCatalogRows(const std::vector<skygate::ephemeris::CelestialBody>& bodies)
+QByteArray SkyContextCatalogCodec::serializeCatalogRows(
+    const std::vector<skygate::ephemeris::CelestialBody>& bodies
+)
 {
     QByteArray rows;
     rows.reserve(static_cast<int>(bodies.size() * 64));
     for (const auto& body : bodies) {
-        const QString id = sanitizeCatalogField(QString::fromStdString(body.id));
-        const QString displayName = sanitizeCatalogField(QString::fromStdString(body.displayName));
+        const QString id = CatalogRowFieldCodec::sanitizeCatalogField(QString::fromStdString(body.id));
+        const QString displayName = CatalogRowFieldCodec::sanitizeCatalogField(
+            QString::fromStdString(body.displayName)
+        );
         if (id.isEmpty() || displayName.isEmpty()) {
             continue;
         }
@@ -123,7 +132,7 @@ QByteArray serializeCatalogRows(const std::vector<skygate::ephemeris::CelestialB
         rows.append('|');
         rows.append(displayName.toUtf8());
         rows.append('|');
-        rows.append(bodyTypeToString(body.type).toUtf8());
+        rows.append(CatalogRowFieldCodec::bodyTypeToString(body.type).toUtf8());
         rows.append('|');
         rows.append(QByteArray::number(body.visualMagnitude, 'g', 17));
         if (body.fixedEquatorial.has_value()) {
@@ -137,7 +146,7 @@ QByteArray serializeCatalogRows(const std::vector<skygate::ephemeris::CelestialB
     return rows;
 }
 
-QByteArray serializeConstellationLineRows(
+QByteArray SkyContextCatalogCodec::serializeConstellationLineRows(
     const std::vector<std::pair<std::string, std::string>>& lineRefs
 )
 {
@@ -156,7 +165,7 @@ QByteArray serializeConstellationLineRows(
     return rows;
 }
 
-std::vector<std::pair<std::string, std::string>> parseConstellationLineRows(
+std::vector<std::pair<std::string, std::string>> SkyContextCatalogCodec::parseConstellationLineRows(
     const std::string_view rows
 )
 {
@@ -188,7 +197,7 @@ std::vector<std::pair<std::string, std::string>> parseConstellationLineRows(
     return lineRefs;
 }
 
-QByteArray serializeConstellationLabelRows(
+QByteArray SkyContextCatalogCodec::serializeConstellationLabelRows(
     const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
 )
 {
@@ -232,9 +241,8 @@ QByteArray serializeConstellationLabelRows(
     return rows;
 }
 
-std::vector<std::pair<std::string, std::vector<std::string>>> parseConstellationLabelRows(
-    const std::string_view rows
-)
+std::vector<std::pair<std::string, std::vector<std::string>>>
+SkyContextCatalogCodec::parseConstellationLabelRows(const std::string_view rows)
 {
     std::vector<std::pair<std::string, std::vector<std::string>>> labelRefs;
     std::size_t cursor = 0;
@@ -281,13 +289,13 @@ std::vector<std::pair<std::string, std::vector<std::string>>> parseConstellation
     return labelRefs;
 }
 
-double pointSizeForMagnitude(const double magnitude)
+double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)
 {
     const double normalizedBrightness = std::clamp(1.0 - ((magnitude + 1.5) / 8.0), 0.2, 1.0);
     return 1.8 + normalizedBrightness * 5.0;
 }
 
-QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
+QColor SkyContextRenderStyle::colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
 {
     switch (type) {
     case skygate::ephemeris::CelestialBodyType::Sun:
@@ -305,58 +313,18 @@ QColor colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
     return QColor(220, 220, 240, 200);
 }
 
-QColor constellationLineColor()
+QColor SkyContextRenderStyle::constellationLineColor()
 {
     return QColor(146, 205, 255, 132);
 }
 
-std::string_view hipSuffix(std::string_view value)
+std::string_view SkyContextRenderStyle::hipSuffix(std::string_view value)
 {
     constexpr std::string_view kHipPrefix = "hip_";
     if (!value.starts_with(kHipPrefix)) {
         return {};
     }
     return value.substr(kHipPrefix.size());
-}
-
-double normalizeAzimuthDeg(const double azimuthDeg)
-{
-    const double normalized = std::fmod(azimuthDeg, 360.0);
-    if (normalized < 0.0) {
-        return normalized + 360.0;
-    }
-
-    return normalized;
-}
-
-double clampAltitudeDeg(const double altitudeDeg)
-{
-    return std::clamp(altitudeDeg, kViewAltitudeMinDeg, kViewAltitudeMaxDeg);
-}
-
-double clampFieldOfViewDeg(const double fieldOfViewDeg)
-{
-    return std::clamp(fieldOfViewDeg, kViewportFieldOfViewMinDeg, kViewportFieldOfViewMaxDeg);
-}
-
-skygate::core::ProjectionParams buildProjectionParams(
-    const double viewportWidth,
-    const double viewportHeight,
-    const double centerAltitudeDeg,
-    const double centerAzimuthDeg,
-    const double fieldOfViewDeg
-)
-{
-    skygate::core::ProjectionParams projectionParams;
-    projectionParams.center = {
-        .altitudeDeg = centerAltitudeDeg,
-        .azimuthDeg = centerAzimuthDeg
-    };
-    projectionParams.fovDeg = fieldOfViewDeg;
-    projectionParams.rollDeg = 0.0;
-    projectionParams.viewportWidth = viewportWidth;
-    projectionParams.viewportHeight = viewportHeight;
-    return projectionParams;
 }
 
 }  // namespace skygate::ui::internal

@@ -51,26 +51,26 @@ bool isLikelyHygCatalogSource(const QString& sourceLabel, const QString& catalog
 bool SkyContextController::saveSettings() const
 {
     QSettings settings;
-    settings.setValue(settingsKey("version"), kSettingsVersion);
-    settings.setValue(settingsKey("live"), m_live);
-    settings.setValue(settingsKey("utcDateLocked"), m_utcDateLocked);
-    settings.setValue(settingsKey("utcTimeLocked"), m_utcTimeLocked);
-    settings.setValue(settingsKey("speedMultiplier"), m_speedMultiplier);
-    settings.setValue(settingsKey("stepSeconds"), m_stepSeconds);
-    settings.setValue(settingsKey("magnitudeCutoff"), m_magnitudeCutoff);
-    settings.setValue(settingsKey("viewCenterAltitudeDeg"), m_viewCenterAltitudeDeg);
-    settings.setValue(settingsKey("viewCenterAzimuthDeg"), m_viewCenterAzimuthDeg);
-    settings.setValue(settingsKey("viewFieldOfViewDeg"), m_viewFieldOfViewDeg);
-    settings.setValue(settingsKey("utcEpochSeconds"), toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch());
-    settings.setValue(settingsKey("latitudeDeg"), m_skyContext.observer.latitudeDeg);
-    settings.setValue(settingsKey("longitudeDeg"), m_skyContext.observer.longitudeDeg);
-    settings.setValue(settingsKey("elevationMeters"), m_skyContext.observer.elevationMeters);
-    settings.setValue(settingsKey("projectionType"), projectionTypeText());
-    settings.setValue(settingsKey("catalogSourceLabel"), m_catalogSourceLabel);
-    settings.setValue(settingsKey("catalogPresetIndex"), m_catalogPresetIndex);
-    settings.setValue(settingsKey("catalogUrlText"), m_catalogUrlText);
+    settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
+    settings.setValue(SkyContextSettings::key("live"), m_live);
+    settings.setValue(SkyContextSettings::key("utcDateLocked"), m_utcDateLocked);
+    settings.setValue(SkyContextSettings::key("utcTimeLocked"), m_utcTimeLocked);
+    settings.setValue(SkyContextSettings::key("speedMultiplier"), m_speedMultiplier);
+    settings.setValue(SkyContextSettings::key("stepSeconds"), m_stepSeconds);
+    settings.setValue(SkyContextSettings::key("magnitudeCutoff"), m_magnitudeCutoff);
+    settings.setValue(SkyContextSettings::key("viewCenterAltitudeDeg"), m_viewCenterAltitudeDeg);
+    settings.setValue(SkyContextSettings::key("viewCenterAzimuthDeg"), m_viewCenterAzimuthDeg);
+    settings.setValue(SkyContextSettings::key("viewFieldOfViewDeg"), m_viewFieldOfViewDeg);
+    settings.setValue(SkyContextSettings::key("utcEpochSeconds"), SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch());
+    settings.setValue(SkyContextSettings::key("latitudeDeg"), m_skyContext.observer.latitudeDeg);
+    settings.setValue(SkyContextSettings::key("longitudeDeg"), m_skyContext.observer.longitudeDeg);
+    settings.setValue(SkyContextSettings::key("elevationMeters"), m_skyContext.observer.elevationMeters);
+    settings.setValue(SkyContextSettings::key("projectionType"), projectionTypeText());
+    settings.setValue(SkyContextSettings::key("catalogSourceLabel"), m_catalogSourceLabel);
+    settings.setValue(SkyContextSettings::key("catalogPresetIndex"), m_catalogPresetIndex);
+    settings.setValue(SkyContextSettings::key("catalogUrlText"), m_catalogUrlText);
     settings.setValue(
-        settingsKey("catalogConstellationCount"),
+        SkyContextSettings::key("catalogConstellationCount"),
         static_cast<qulonglong>(m_catalogConstellationCount)
     );
     settings.sync();
@@ -80,67 +80,67 @@ bool SkyContextController::saveSettings() const
 bool SkyContextController::loadSettings()
 {
     QSettings settings;
-    const bool hasSavedContext = settings.contains(settingsKey("version"));
+    const bool hasSavedContext = settings.contains(SkyContextSettings::key("version"));
     if (hasSavedContext) {
-        const bool live = settings.value(settingsKey("live"), m_live).toBool();
+        const bool live = settings.value(SkyContextSettings::key("live"), m_live).toBool();
         const bool utcDateLocked = settings.value(
-            settingsKey("utcDateLocked"),
+            SkyContextSettings::key("utcDateLocked"),
             m_utcDateLocked
         ).toBool();
         const bool utcTimeLocked = settings.value(
-            settingsKey("utcTimeLocked"),
+            SkyContextSettings::key("utcTimeLocked"),
             m_utcTimeLocked
         ).toBool();
         const double speedMultiplier = settings.value(
-            settingsKey("speedMultiplier"),
+            SkyContextSettings::key("speedMultiplier"),
             m_speedMultiplier
         ).toDouble();
         const int stepSeconds = settings.value(
-            settingsKey("stepSeconds"),
+            SkyContextSettings::key("stepSeconds"),
             m_stepSeconds
         ).toInt();
         const double magnitudeCutoff = settings.value(
-            settingsKey("magnitudeCutoff"),
+            SkyContextSettings::key("magnitudeCutoff"),
             m_magnitudeCutoff
         ).toDouble();
         const double viewCenterAltitudeDeg = settings.value(
-            settingsKey("viewCenterAltitudeDeg"),
+            SkyContextSettings::key("viewCenterAltitudeDeg"),
             m_viewCenterAltitudeDeg
         ).toDouble();
         const double viewCenterAzimuthDeg = settings.value(
-            settingsKey("viewCenterAzimuthDeg"),
+            SkyContextSettings::key("viewCenterAzimuthDeg"),
             m_viewCenterAzimuthDeg
         ).toDouble();
         const double viewFieldOfViewDeg = settings.value(
-            settingsKey("viewFieldOfViewDeg"),
+            SkyContextSettings::key("viewFieldOfViewDeg"),
             m_viewFieldOfViewDeg
         ).toDouble();
         const qint64 utcEpochSeconds = settings.value(
-            settingsKey("utcEpochSeconds"),
-            toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
+            SkyContextSettings::key("utcEpochSeconds"),
+            SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch()
         ).toLongLong();
         const double latitudeDeg = settings.value(
-            settingsKey("latitudeDeg"),
+            SkyContextSettings::key("latitudeDeg"),
             m_skyContext.observer.latitudeDeg
         ).toDouble();
         const double longitudeDeg = settings.value(
-            settingsKey("longitudeDeg"),
+            SkyContextSettings::key("longitudeDeg"),
             m_skyContext.observer.longitudeDeg
         ).toDouble();
         const double elevationMeters = settings.value(
-            settingsKey("elevationMeters"),
+            SkyContextSettings::key("elevationMeters"),
             m_skyContext.observer.elevationMeters
         ).toDouble();
         const QString projectionType = settings.value(
-            settingsKey("projectionType"),
+            SkyContextSettings::key("projectionType"),
             projectionTypeText()
         ).toString();
         const int catalogPresetIndex = settings.value(
-            settingsKey("catalogPresetIndex"),
+            SkyContextSettings::key("catalogPresetIndex"),
             m_catalogPresetIndex
         ).toInt();
         const QString catalogUrlText = settings.value(
-            settingsKey("catalogUrlText"),
+            SkyContextSettings::key("catalogUrlText"),
             m_catalogUrlText
         ).toString();
 
@@ -174,15 +174,15 @@ void SkyContextController::persistCatalogCache(
         return;
     }
 
-    QByteArray rows = serializeCatalogRows(bodies);
+    QByteArray rows = SkyContextCatalogCodec::serializeCatalogRows(bodies);
     if (rows.isEmpty()) {
         return;
     }
 
     QSettings settings;
     const QString configuredPath = settings.value(
-        settingsKey("catalogCachePath"),
-        defaultCatalogCachePath()
+        SkyContextSettings::key("catalogCachePath"),
+        SkyContextSettings::defaultCatalogCachePath()
     ).toString();
     if (configuredPath.isEmpty()) {
         return;
@@ -209,23 +209,23 @@ void SkyContextController::persistCatalogCache(
         return;
     }
 
-    settings.setValue(settingsKey("version"), kSettingsVersion);
-    settings.setValue(settingsKey("catalogCachePath"), configuredPath);
-    settings.setValue(settingsKey("catalogSourceLabel"), sourceLabel);
+    settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
+    settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
+    settings.setValue(SkyContextSettings::key("catalogSourceLabel"), sourceLabel);
     settings.setValue(
-        settingsKey("catalogConstellationLineRefs"),
-        serializeConstellationLineRows(m_constellationLineRefs)
+        SkyContextSettings::key("catalogConstellationLineRefs"),
+        SkyContextCatalogCodec::serializeConstellationLineRows(m_constellationLineRefs)
     );
     settings.setValue(
-        settingsKey("catalogConstellationLabelRefs"),
-        serializeConstellationLabelRows(m_constellationLabelRefs)
+        SkyContextSettings::key("catalogConstellationLabelRefs"),
+        SkyContextCatalogCodec::serializeConstellationLabelRows(m_constellationLabelRefs)
     );
     settings.setValue(
-        settingsKey("catalogConstellationLineSchemaVersion"),
-        kConstellationLineCacheSchemaVersion
+        SkyContextSettings::key("catalogConstellationLineSchemaVersion"),
+        SkyContextControllerConstants::kConstellationLineCacheSchemaVersion
     );
     settings.setValue(
-        settingsKey("catalogConstellationCount"),
+        SkyContextSettings::key("catalogConstellationCount"),
         static_cast<qulonglong>(m_catalogConstellationCount)
     );
     settings.sync();
@@ -235,8 +235,8 @@ void SkyContextController::restoreCatalogCache()
 {
     QSettings settings;
     const QString configuredPath = settings.value(
-        settingsKey("catalogCachePath"),
-        defaultCatalogCachePath()
+        SkyContextSettings::key("catalogCachePath"),
+        SkyContextSettings::defaultCatalogCachePath()
     ).toString();
     if (configuredPath.isEmpty()) {
         return;
@@ -263,7 +263,7 @@ void SkyContextController::restoreCatalogCache()
     }
 
     const QString sourceLabel = settings.value(
-        settingsKey("catalogSourceLabel"),
+        SkyContextSettings::key("catalogSourceLabel"),
         QString("Saved")
     ).toString();
     QString normalizedSourceLabel = stripSavedSuffixes(sourceLabel);
@@ -273,30 +273,30 @@ void SkyContextController::restoreCatalogCache()
     applyCatalog(std::move(restoredCatalog), QString("%1 (saved)").arg(normalizedSourceLabel), false);
 
     const bool hasPersistedConstellationCount = settings.contains(
-        settingsKey("catalogConstellationCount")
+        SkyContextSettings::key("catalogConstellationCount")
     );
     const std::size_t persistedConstellationCount = static_cast<std::size_t>(
         settings.value(
-            settingsKey("catalogConstellationCount"),
+            SkyContextSettings::key("catalogConstellationCount"),
             static_cast<qulonglong>(m_catalogConstellationCount)
         ).toULongLong()
     );
 
     const QByteArray constellationLineRows = settings.value(
-        settingsKey("catalogConstellationLineRefs")
+        SkyContextSettings::key("catalogConstellationLineRefs")
     ).toByteArray();
     const QByteArray constellationLabelRows = settings.value(
-        settingsKey("catalogConstellationLabelRefs")
+        SkyContextSettings::key("catalogConstellationLabelRefs")
     ).toByteArray();
     const int constellationLineSchemaVersion = settings.value(
-        settingsKey("catalogConstellationLineSchemaVersion"),
+        SkyContextSettings::key("catalogConstellationLineSchemaVersion"),
         0
     ).toInt();
     if (
-        constellationLineSchemaVersion >= kConstellationLineCacheSchemaVersion
+        constellationLineSchemaVersion >= SkyContextControllerConstants::kConstellationLineCacheSchemaVersion
         && !constellationLineRows.isEmpty()
     ) {
-        auto parsedLineRefs = parseConstellationLineRows(
+        auto parsedLineRefs = SkyContextCatalogCodec::parseConstellationLineRows(
             std::string_view(
                 constellationLineRows.constData(),
                 static_cast<std::size_t>(constellationLineRows.size())
@@ -309,7 +309,7 @@ void SkyContextController::restoreCatalogCache()
             const bool shouldUseLabelFallback =
                 !hasPersistedConstellationCount || restoredConstellationCount == 0;
             if (!constellationLabelRows.isEmpty()) {
-                auto parsedLabelRefs = parseConstellationLabelRows(
+                auto parsedLabelRefs = SkyContextCatalogCodec::parseConstellationLabelRows(
                     std::string_view(
                         constellationLabelRows.constData(),
                         static_cast<std::size_t>(constellationLabelRows.size())
