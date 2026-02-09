@@ -12,6 +12,8 @@ repository.
 - Use `const` correctness consistently.
 - Use `override` for overridden virtual functions.
 - Prefer `nullptr` over `0`/`NULL`.
+- Avoid non-class/free function declarations in headers. Prefer class static
+  methods, interfaces, or implementation-only source functions.
 
 ## Naming Conventions
 - Types/classes: `PascalCase`.
