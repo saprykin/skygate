@@ -390,7 +390,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.margins: 14
-            property bool collapsed: false
+            property bool collapsed: skyContext.timelineToolbarCollapsed
             readonly property real expandedWidth: timelineToolbarRow.implicitWidth + 16
             width: collapsed ? 0 : expandedWidth
             height: timelineToolbarRow.implicitHeight + 14
@@ -590,7 +590,7 @@ ApplicationWindow {
             font.pixelSize: 12
             font.weight: Font.DemiBold
             z: 11
-            onClicked: timelineToolbar.collapsed = !timelineToolbar.collapsed
+            onClicked: skyContext.setTimelineToolbarCollapsed(!skyContext.timelineToolbarCollapsed)
             ToolTip.visible: hovered
             ToolTip.delay: 250
             ToolTip.text: timelineToolbar.collapsed

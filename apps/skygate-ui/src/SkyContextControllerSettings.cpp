@@ -55,6 +55,7 @@ bool SkyContextController::saveSettings() const
     settings.setValue(SkyContextSettings::key("live"), m_live);
     settings.setValue(SkyContextSettings::key("utcDateLocked"), m_utcDateLocked);
     settings.setValue(SkyContextSettings::key("utcTimeLocked"), m_utcTimeLocked);
+    settings.setValue(SkyContextSettings::key("timelineToolbarCollapsed"), m_timelineToolbarCollapsed);
     settings.setValue(SkyContextSettings::key("speedMultiplier"), m_speedMultiplier);
     settings.setValue(SkyContextSettings::key("stepSeconds"), m_stepSeconds);
     settings.setValue(SkyContextSettings::key("magnitudeCutoff"), m_magnitudeCutoff);
@@ -90,6 +91,10 @@ bool SkyContextController::loadSettings()
         const bool utcTimeLocked = settings.value(
             SkyContextSettings::key("utcTimeLocked"),
             m_utcTimeLocked
+        ).toBool();
+        const bool timelineToolbarCollapsed = settings.value(
+            SkyContextSettings::key("timelineToolbarCollapsed"),
+            m_timelineToolbarCollapsed
         ).toBool();
         const double speedMultiplier = settings.value(
             SkyContextSettings::key("speedMultiplier"),
@@ -147,6 +152,7 @@ bool SkyContextController::loadSettings()
         setLive(live);
         setUtcDateLocked(utcDateLocked);
         setUtcTimeLocked(utcTimeLocked);
+        setTimelineToolbarCollapsed(timelineToolbarCollapsed);
         setSpeedMultiplier(speedMultiplier);
         setStepSeconds(stepSeconds);
         setMagnitudeCutoff(magnitudeCutoff);

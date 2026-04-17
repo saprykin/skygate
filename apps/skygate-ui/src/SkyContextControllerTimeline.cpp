@@ -73,6 +73,11 @@ bool SkyContextController::utcTimeLocked() const noexcept
     return m_utcTimeLocked;
 }
 
+bool SkyContextController::timelineToolbarCollapsed() const noexcept
+{
+    return m_timelineToolbarCollapsed;
+}
+
 void SkyContextController::setUtcDateLocked(const bool utcDateLocked)
 {
     m_restoreUtcLockStateOnLiveResume = false;
@@ -101,6 +106,16 @@ void SkyContextController::setUtcTimeLocked(const bool utcTimeLocked)
     if (m_utcDateLocked || m_utcTimeLocked) {
         setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
     }
+}
+
+void SkyContextController::setTimelineToolbarCollapsed(const bool timelineToolbarCollapsed)
+{
+    if (m_timelineToolbarCollapsed == timelineToolbarCollapsed) {
+        return;
+    }
+
+    m_timelineToolbarCollapsed = timelineToolbarCollapsed;
+    emit timelineToolbarCollapsedChanged();
 }
 
 void SkyContextController::togglePlayPause()
