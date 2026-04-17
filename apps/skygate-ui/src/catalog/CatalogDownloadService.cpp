@@ -93,7 +93,10 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
         request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
         request.setTransferTimeout(300000);
         request.setRawHeader("User-Agent", "Skygate/1.0");
-        request.setRawHeader("Accept", "text/plain,text/csv,application/gzip,application/octet-stream,*/*");
+        request.setRawHeader(
+            "Accept",
+            "text/plain,text/csv,application/gzip,application/zip,application/octet-stream,*/*"
+        );
 
         QNetworkReply* reply = m_networkAccessManager->get(request);
         QObject* const contextObject = callbackContext != nullptr

@@ -138,6 +138,7 @@ public:
     Q_INVOKABLE void setProjectionTypeText(const QString& projectionTypeText);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
+    Q_INVOKABLE bool clearCatalogCache();
     Q_INVOKABLE double projectedX(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE double projectedY(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE bool isProjectedVisible(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;

@@ -13,6 +13,7 @@ enum class CatalogPayloadFormat : std::uint8_t {
     PipeRows,
     HygCsv,
     HygCsvGzip,
+    HygCsvZip,
     Unknown
 };
 

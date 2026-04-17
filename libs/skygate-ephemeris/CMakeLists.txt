@@ -19,6 +19,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/HygCatalogParser.hpp
     src/catalog/HygGzipCatalogParser.hpp
     src/catalog/InMemoryStarCatalog.hpp
+    src/catalog/ZipCodec.hpp
     src/catalog/StellariumConstellationParser.cpp
     src/engine/CoordinateTransform.hpp
     src/engine/JulianDateTime.hpp
@@ -36,6 +37,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/HygCatalogParser.cpp
     src/catalog/HygGzipCatalogParser.cpp
     src/catalog/InMemoryStarCatalog.cpp
+    src/catalog/ZipCodec.cpp
     src/engine/CoordinateTransform.cpp
     src/engine/JulianDateTime.cpp
     src/engine/KnownConstellationLookup.cpp

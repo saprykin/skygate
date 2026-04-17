@@ -77,6 +77,22 @@ Item {
                 }
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                PreferencesActionButton {
+                    text: "Clear Catalog Cache"
+                    enabled: !skyContextController.downloadingCatalog
+                             && !skyContextController.catalogProcessing
+                    onClicked: skyContextController.clearCatalogCache()
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+            }
+
             Label {
                 visible: catalogPresetCombo.currentIndex === 2
                 Layout.preferredHeight: visible ? implicitHeight : 0

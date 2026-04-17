@@ -165,6 +165,69 @@ bool SkyContextController::loadSettings()
     return hasSavedContext;
 }
 
+bool SkyContextController::clearCatalogCache()
+{
+    if (m_downloadingCatalog || m_catalogProcessing) {
+        m_catalogStatusText = "Catalog: Cannot clear cache while download is in progress";
+        emit catalogStatusTextChanged();
+        return false;
+    }
+
+    QSettings settings;
+    const QString configuredPath = settings.value(
+        SkyContextSettings::key("catalogCachePath"),
+        SkyContextSettings::defaultCatalogCachePath()
+    ).toString();
+    const QString defaultPath = SkyContextSettings::defaultCatalogCachePath();
+
+    QStringList cachePaths;
+    const auto appendCachePath = [&cachePaths](const QString& path) {
+        if (!path.isEmpty() && !cachePaths.contains(path)) {
+            cachePaths.push_back(path);
+        }
+    };
+
+    appendCachePath(configuredPath);
+    appendCachePath(defaultPath);
+
+    if (!defaultPath.isEmpty()) {
+        const QFileInfo defaultInfo(defaultPath);
+        const QDir defaultDir(defaultInfo.absolutePath());
+        const QStringList matchingEntries = defaultDir.entryList(
+            QStringList {"catalog-cache*.txt"},
+            QDir::Files | QDir::Readable
+        );
+        for (const QString& entryName : matchingEntries) {
+            appendCachePath(defaultDir.filePath(entryName));
+        }
+    }
+
+    bool removedAllCacheFiles = true;
+    for (const QString& cachePath : cachePaths) {
+        QFile cacheFile(cachePath);
+        if (cacheFile.exists() && !cacheFile.remove()) {
+            removedAllCacheFiles = false;
+        }
+    }
+
+    settings.remove(SkyContextSettings::key("catalogCachePath"));
+    settings.remove(SkyContextSettings::key("catalogSourceLabel"));
+    settings.remove(SkyContextSettings::key("catalogConstellationLineRefs"));
+    settings.remove(SkyContextSettings::key("catalogConstellationLabelRefs"));
+    settings.remove(SkyContextSettings::key("catalogConstellationLineSchemaVersion"));
+    settings.remove(SkyContextSettings::key("catalogConstellationCount"));
+    settings.sync();
+    const bool settingsCleared = settings.status() == QSettings::NoError;
+    const bool cacheCleared = removedAllCacheFiles && settingsCleared;
+
+    m_catalogStatusText = cacheCleared
+        ? "Catalog: Cache cleared"
+        : "Catalog: Cache clear failed";
+    emit catalogStatusTextChanged();
+
+    return cacheCleared;
+}
+
 void SkyContextController::persistCatalogCache(
     const std::vector<skygate::ephemeris::CelestialBody>& bodies,
     const QString& sourceLabel

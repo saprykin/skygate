@@ -204,7 +204,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     if (downloadedCatalog == nullptr) {
                         DownloadResult result;
                         result.errorText = QString(
-                            "Catalog: Source %1 parse failed (supported: pipe rows, HYG CSV, or HYG .csv.gz)"
+                            "Catalog: Source %1 parse failed (supported: pipe rows, HYG CSV, HYG .csv.gz, or HYG .zip)"
                         ).arg(sourceUrl);
                         if (statusHandler) {
                             statusHandler(result.errorText);

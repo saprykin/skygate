@@ -3,12 +3,15 @@
 
 #include <QtTest/QtTest>
 
+#include <string>
+
 class HygCatalogParserTests final : public QObject {
     Q_OBJECT
 
 private slots:
     void parsesBasicRows();
     void supportsFallbackIdsAndQuotedFields();
+    void keepsBrightestSelectionStableForLargeCatalogs();
     void rejectsMalformedInput();
 };
 
@@ -64,6 +67,46 @@ void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
     QVERIFY(escapedQuoteBody != nullptr);
     QVERIFY(escapedQuoteBody->displayName == "Quote \"Star\"");
     QVERIFY(escapedQuoteBody->fixedEquatorial.has_value());
+}
+
+void HygCatalogParserTests::keepsBrightestSelectionStableForLargeCatalogs()
+{
+    std::string csv = "hip,id,proper,bf,ra,dec,mag\n";
+    csv.reserve(1024U * 1024U);
+
+    for (int index = 1; index <= 30000; ++index) {
+        csv += std::to_string(index);
+        csv += ",";
+        csv += std::to_string(index);
+        csv += ",Star ";
+        csv += std::to_string(index);
+        csv += ",,";
+        csv += std::to_string(index % 24);
+        csv += ",";
+        csv += std::to_string((index % 180) - 90);
+        csv += ",";
+        csv += std::to_string(index);
+        csv += "\n";
+    }
+
+    std::size_t lastProgress = 0;
+    const auto catalog = skygate::ephemeris::createStarCatalogFromHygCsv(
+        csv,
+        [&lastProgress](const std::size_t parsedObjectCount) {
+            lastProgress = parsedObjectCount;
+        }
+    );
+    QVERIFY(catalog != nullptr);
+    QVERIFY(lastProgress == 30000U);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 25000U);
+
+    using namespace skygate::ephemeris::tests;
+    QVERIFY(findBodyById(bodies, "hip_1") != nullptr);
+    QVERIFY(findBodyById(bodies, "hip_25000") != nullptr);
+    QVERIFY(findBodyById(bodies, "hip_25001") == nullptr);
+    QVERIFY(findBodyById(bodies, "hip_30000") == nullptr);
 }
 
 void HygCatalogParserTests::rejectsMalformedInput()

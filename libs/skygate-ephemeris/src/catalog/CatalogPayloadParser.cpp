@@ -1,5 +1,7 @@
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 
+#include "catalog/ZipCodec.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <string>
@@ -68,6 +70,23 @@ CatalogPayloadFormat CatalogPayloadParser::detectFormat(const std::string_view p
         }
     }
 
+    if (payload.size() >= 4) {
+        const auto firstByte = static_cast<unsigned char>(payload[0]);
+        const auto secondByte = static_cast<unsigned char>(payload[1]);
+        const auto thirdByte = static_cast<unsigned char>(payload[2]);
+        const auto fourthByte = static_cast<unsigned char>(payload[3]);
+        const bool isZipSignature = firstByte == 0x50U
+            && secondByte == 0x4bU
+            && (
+                (thirdByte == 0x03U && fourthByte == 0x04U)
+                || (thirdByte == 0x05U && fourthByte == 0x06U)
+                || (thirdByte == 0x07U && fourthByte == 0x08U)
+            );
+        if (isZipSignature) {
+            return CatalogPayloadFormat::HygCsvZip;
+        }
+    }
+
     const std::string_view headerLine = firstNonEmptyLine(payload);
     if (headerLine.empty()) {
         return CatalogPayloadFormat::Unknown;
@@ -101,6 +120,14 @@ std::unique_ptr<IStarCatalog> CatalogPayloadParser::parse(
         return createStarCatalogFromHygCsv(payload, progressCallback);
     case CatalogPayloadFormat::HygCsvGzip:
         return createStarCatalogFromHygCsvGzip(payload, progressCallback);
+    case CatalogPayloadFormat::HygCsvZip: {
+        const ZipCodec zipCodec;
+        const auto extractedCsv = zipCodec.extractFirstCsvEntry(payload);
+        if (extractedCsv.has_value()) {
+            return createStarCatalogFromHygCsv(*extractedCsv, progressCallback);
+        }
+        break;
+    }
     case CatalogPayloadFormat::Unknown:
         break;
     }
@@ -117,6 +144,15 @@ std::unique_ptr<IStarCatalog> CatalogPayloadParser::parse(
     parsedCatalog = createStarCatalogFromHygCsvGzip(payload, progressCallback);
     if (parsedCatalog != nullptr) {
         return parsedCatalog;
+    }
+
+    const ZipCodec zipCodec;
+    const auto extractedCsv = zipCodec.extractFirstCsvEntry(payload);
+    if (extractedCsv.has_value()) {
+        parsedCatalog = createStarCatalogFromHygCsv(*extractedCsv, progressCallback);
+        if (parsedCatalog != nullptr) {
+            return parsedCatalog;
+        }
     }
 
     return createStarCatalogFromRows(payload);
