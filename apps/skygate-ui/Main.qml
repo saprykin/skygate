@@ -24,25 +24,73 @@ ApplicationWindow {
         return nearest
     }
 
+    function rectsOverlap(firstX, firstY, firstWidth, firstHeight, secondX, secondY, secondWidth, secondHeight) {
+        const firstRight = firstX + firstWidth
+        const firstBottom = firstY + firstHeight
+        const secondRight = secondX + secondWidth
+        const secondBottom = secondY + secondHeight
+        return firstX < secondRight
+            && firstRight > secondX
+            && firstY < secondBottom
+            && firstBottom > secondY
+    }
+
     function overlapsTimelinePanel(itemX, itemY, itemWidth, itemHeight) {
-        if (timelineToolbar.width <= 1 || timelineToolbar.opacity <= 0.05) {
-            return false
+        const margin = 4
+        if (timelineToolbar.width > 1 && timelineToolbar.opacity > 0.05) {
+            if (
+                root.rectsOverlap(
+                    itemX,
+                    itemY,
+                    itemWidth,
+                    itemHeight,
+                    timelineToolbar.x - margin,
+                    timelineToolbar.y - margin,
+                    timelineToolbar.width + (margin * 2),
+                    timelineToolbar.height + (margin * 2)
+                )
+            ) {
+                return true
+            }
         }
 
-        const margin = 4
-        const panelLeft = timelineToolbar.x - margin
-        const panelTop = timelineToolbar.y - margin
-        const panelRight = timelineToolbar.x + timelineToolbar.width + margin
-        const panelBottom = timelineToolbar.y + timelineToolbar.height + margin
+        return timelineToolbarToggle.visible
+            && root.rectsOverlap(
+                itemX,
+                itemY,
+                itemWidth,
+                itemHeight,
+                timelineToolbarToggle.x - margin,
+                timelineToolbarToggle.y - margin,
+                timelineToolbarToggle.width + (margin * 2),
+                timelineToolbarToggle.height + (margin * 2)
+            )
+    }
 
-        const itemLeft = itemX
-        const itemTop = itemY
-        const itemRight = itemX + itemWidth
-        const itemBottom = itemY + itemHeight
-        return itemLeft < panelRight
-            && itemRight > panelLeft
-            && itemTop < panelBottom
-            && itemBottom > panelTop
+    function adjustedYToAvoidTimelinePanel(itemX, itemY, itemWidth, itemHeight) {
+        let adjustedY = itemY
+        const margin = 4
+
+        if (timelineToolbar.width > 1 && timelineToolbar.opacity > 0.05) {
+            const toolbarX = timelineToolbar.x - margin
+            const toolbarY = timelineToolbar.y - margin
+            const toolbarWidth = timelineToolbar.width + (margin * 2)
+            const toolbarHeight = timelineToolbar.height + (margin * 2)
+            if (root.rectsOverlap(itemX, adjustedY, itemWidth, itemHeight, toolbarX, toolbarY, toolbarWidth, toolbarHeight)) {
+                adjustedY = toolbarY + toolbarHeight
+            }
+        }
+
+        const toggleX = timelineToolbarToggle.x - margin
+        const toggleY = timelineToolbarToggle.y - margin
+        const toggleWidth = timelineToolbarToggle.width + (margin * 2)
+        const toggleHeight = timelineToolbarToggle.height + (margin * 2)
+        if (timelineToolbarToggle.visible
+            && root.rectsOverlap(itemX, adjustedY, itemWidth, itemHeight, toggleX, toggleY, toggleWidth, toggleHeight)) {
+            adjustedY = toggleY + toggleHeight
+        }
+
+        return adjustedY
     }
 
     menuBar: MenuBar {
@@ -313,8 +361,10 @@ ApplicationWindow {
                     skyContext.projectionTypeText
                     return skyContext.isProjectedVisible(0.0, modelData.azimuthDeg, skyViewport.width, skyViewport.height)
                 }
-                x: markerX - (width * 0.5)
-                y: markerY - height - 8
+                readonly property real labelX: markerX - (width * 0.5)
+                readonly property real preferredY: markerY - height - 8
+                x: labelX
+                y: root.adjustedYToAvoidTimelinePanel(labelX, preferredY, width, height)
                 radius: 6
                 color: "#880a1222"
                 border.width: 1
