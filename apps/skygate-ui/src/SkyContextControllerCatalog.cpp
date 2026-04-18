@@ -8,6 +8,8 @@
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 #include "skygate/ephemeris/StellariumConstellationParser.hpp"
 
+#include <QLocale>
+
 #include <cstddef>
 #include <string_view>
 #include <utility>
@@ -107,6 +109,15 @@ void SkyContextController::downloadCatalogFromUrls(
             }
 
             applyCatalog(std::move(result.catalog), sourceLabel);
+            if (result.diagnostics.truncatedBodyCount > 0U) {
+                const QLocale locale = QLocale::system();
+                m_catalogStatusText = QString("%1 | Brightness filter kept %2 of %3 objects").arg(
+                    m_catalogStatusText,
+                    locale.toString(static_cast<qulonglong>(result.diagnostics.selectedBodyCount)),
+                    locale.toString(static_cast<qulonglong>(result.diagnostics.parsedBodyCount))
+                );
+                emit catalogStatusTextChanged();
+            }
             m_downloadingCatalog = false;
             emit downloadingCatalogChanged();
 
@@ -222,7 +233,9 @@ void SkyContextController::applyCatalog(
     const bool persistCatalog
 )
 {
-    catalog = CatalogCoordinator::ensureCoreSolarSystemBodies(std::move(catalog));
+    if (catalog != nullptr) {
+        catalog = skygate::ephemeris::createCatalogWithCoreSolarSystemBodies(*catalog);
+    }
     if (catalog == nullptr) {
         m_catalogBodyCount = 0;
         m_catalogConstellationCount = 0;
@@ -241,7 +254,7 @@ void SkyContextController::applyCatalog(
     }
 
     m_starCatalog = std::move(catalog);
-    m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(m_starCatalog.get());
+    m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*m_starCatalog);
     m_catalogBodyCount = bodies.size();
     m_catalogConstellationCount = constellationCount;
     m_catalogSourceLabel = sourceLabel;

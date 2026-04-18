@@ -108,54 +108,93 @@ CatalogPayloadFormat CatalogPayloadParser::detectFormat(const std::string_view p
     return CatalogPayloadFormat::Unknown;
 }
 
-std::unique_ptr<IStarCatalog> CatalogPayloadParser::parse(
-    const std::string_view payload,
-    const HygParseProgressCallback& progressCallback
-) const
+CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& request) const
 {
-    switch (detectFormat(payload)) {
+    CatalogLoadResult result;
+    if (request.payload.empty()) {
+        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorDetail = "Catalog payload is empty.";
+        return result;
+    }
+
+    result.detectedFormat = detectFormat(request.payload);
+    switch (result.detectedFormat) {
     case CatalogPayloadFormat::PipeRows:
-        return createStarCatalogFromRows(payload);
+        result = loadStarCatalog(
+            CatalogSourceType::Rows,
+            request.payload,
+            request.progressCallback,
+            request.selectionOptions
+        );
+        result.detectedFormat = CatalogPayloadFormat::PipeRows;
+        return result;
     case CatalogPayloadFormat::HygCsv:
-        return createStarCatalogFromHygCsv(payload, progressCallback);
+        result = loadStarCatalog(
+            CatalogSourceType::HygCsv,
+            request.payload,
+            request.progressCallback,
+            request.selectionOptions
+        );
+        result.detectedFormat = CatalogPayloadFormat::HygCsv;
+        return result;
     case CatalogPayloadFormat::HygCsvGzip:
-        return createStarCatalogFromHygCsvGzip(payload, progressCallback);
+        result = loadStarCatalog(
+            CatalogSourceType::HygCsvGzip,
+            request.payload,
+            request.progressCallback,
+            request.selectionOptions
+        );
+        result.detectedFormat = CatalogPayloadFormat::HygCsvGzip;
+        return result;
     case CatalogPayloadFormat::HygCsvZip: {
         const ZipCodec zipCodec;
-        const auto extractedCsv = zipCodec.extractFirstCsvEntry(payload);
+        const auto extractedCsv = zipCodec.extractFirstCsvEntry(request.payload);
         if (extractedCsv.has_value()) {
-            return createStarCatalogFromHygCsv(*extractedCsv, progressCallback);
+            result = loadStarCatalog(
+                CatalogSourceType::HygCsv,
+                *extractedCsv,
+                request.progressCallback,
+                request.selectionOptions
+            );
+            result.detectedFormat = CatalogPayloadFormat::HygCsvZip;
+            return result;
         }
-        break;
+        result.errorCode = CatalogLoadErrorCode::InvalidZipData;
+        result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
+        return result;
     }
     case CatalogPayloadFormat::Unknown:
         break;
     }
 
-    // Fallback path for ambiguous payloads.
-    std::unique_ptr<IStarCatalog> parsedCatalog = createStarCatalogFromHygCsv(
-        payload,
-        progressCallback
-    );
-    if (parsedCatalog != nullptr) {
-        return parsedCatalog;
-    }
+    result.errorCode = CatalogLoadErrorCode::UnsupportedFormat;
+    result.errorDetail = "Catalog payload format is not recognized.";
+    return result;
+}
 
-    parsedCatalog = createStarCatalogFromHygCsvGzip(payload, progressCallback);
-    if (parsedCatalog != nullptr) {
-        return parsedCatalog;
-    }
-
-    const ZipCodec zipCodec;
-    const auto extractedCsv = zipCodec.extractFirstCsvEntry(payload);
-    if (extractedCsv.has_value()) {
-        parsedCatalog = createStarCatalogFromHygCsv(*extractedCsv, progressCallback);
-        if (parsedCatalog != nullptr) {
-            return parsedCatalog;
+CatalogLoadResult CatalogPayloadParser::parseResult(
+    const std::string_view payload,
+    const HygParseProgressCallback& progressCallback,
+    const CatalogSelectionOptions& selectionOptions
+) const
+{
+    return parseResult(
+        CatalogParseRequest {
+            .payload = payload,
+            .progressCallback = progressCallback,
+            .selectionOptions = selectionOptions
         }
-    }
+    );
+}
 
-    return createStarCatalogFromRows(payload);
+std::unique_ptr<IStarCatalog> CatalogPayloadParser::parse(
+    const std::string_view payload,
+    const HygParseProgressCallback& progressCallback,
+    const CatalogSelectionOptions& selectionOptions
+) const
+{
+    CatalogLoadResult result = parseResult(payload, progressCallback, selectionOptions);
+    return std::move(result.catalog);
 }
 
 }  // namespace skygate::ephemeris

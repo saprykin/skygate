@@ -17,10 +17,21 @@ enum class CelestialBodyType : std::uint8_t {
     Constellation
 };
 
+enum class CelestialBodyEphemerisSource : std::uint8_t {
+    Unresolved,
+    FixedEquatorial,
+    Sun,
+    Moon,
+    Planet,
+    Star,
+    Constellation
+};
+
 struct CelestialBody {
     std::string id;
     std::string displayName;
     CelestialBodyType type = CelestialBodyType::Star;
+    CelestialBodyEphemerisSource ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
     double visualMagnitude = 0.0;
     std::optional<core::EquatorialCoordinate> fixedEquatorial;
 };

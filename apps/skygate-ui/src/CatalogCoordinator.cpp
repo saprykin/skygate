@@ -7,80 +7,53 @@
 #include <QNetworkAccessManager>
 #include <QObject>
 
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
-
-#include <algorithm>
-#include <array>
-#include <cctype>
+#include <cstddef>
 #include <memory>
-#include <string>
-#include <string_view>
 #include <utility>
-#include <vector>
 
 namespace {
 
-class InMemoryStarCatalog final : public skygate::ephemeris::IStarCatalog {
-public:
-    explicit InMemoryStarCatalog(std::vector<skygate::ephemeris::CelestialBody> bodies)
-        : m_bodies(std::move(bodies))
-    {
+QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCode errorCode)
+{
+    switch (errorCode) {
+    case skygate::ephemeris::CatalogLoadErrorCode::None:
+        return "Unknown parse failure";
+    case skygate::ephemeris::CatalogLoadErrorCode::EmptyInput:
+        return "empty payload";
+    case skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat:
+        return "unsupported format";
+    case skygate::ephemeris::CatalogLoadErrorCode::InvalidRows:
+        return "invalid pipe-row catalog";
+    case skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns:
+        return "missing required HYG columns";
+    case skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv:
+        return "invalid HYG CSV payload";
+    case skygate::ephemeris::CatalogLoadErrorCode::InvalidGzipData:
+        return "invalid gzip payload";
+    case skygate::ephemeris::CatalogLoadErrorCode::InvalidZipData:
+        return "invalid ZIP payload";
+    case skygate::ephemeris::CatalogLoadErrorCode::NoBodies:
+        return "catalog contains no usable bodies";
     }
 
-    [[nodiscard]] std::vector<skygate::ephemeris::CelestialBody> bodies() const override
-    {
-        return m_bodies;
-    }
-
-private:
-    std::vector<skygate::ephemeris::CelestialBody> m_bodies;
-};
-
-std::string toLowerId(const std::string& value)
-{
-    std::string lower = value;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return lower;
+    return "unknown parse failure";
 }
 
-bool isSunOrMoonType(const skygate::ephemeris::CelestialBodyType type)
-{
-    return type == skygate::ephemeris::CelestialBodyType::Sun
-        || type == skygate::ephemeris::CelestialBodyType::Moon;
-}
-
-bool isReferenceLineStarId(const std::string& id)
-{
-    constexpr std::array<std::string_view, 8> kReferenceLineStarIds = {{
-        "sirius",
-        "canopus",
-        "arcturus",
-        "vega",
-        "capella",
-        "rigel",
-        "procyon",
-        "betelgeuse",
-    }};
-
-    const std::string loweredId = toLowerId(id);
-    return std::any_of(kReferenceLineStarIds.begin(), kReferenceLineStarIds.end(), [&loweredId](const auto value) {
-        return loweredId == value;
-    });
-}
-
-bool containsBodyIdCaseInsensitive(
-    const std::vector<skygate::ephemeris::CelestialBody>& bodies,
-    const std::string& id
+QString catalogLoadErrorText(
+    const skygate::ephemeris::CatalogLoadResult& loadResult,
+    const QString& sourceUrl
 )
 {
-    const std::string loweredId = toLowerId(id);
-    return std::any_of(bodies.begin(), bodies.end(), [&loweredId](const auto& body) {
-        return toLowerId(body.id) == loweredId;
-    });
-}
+    QString description = catalogLoadErrorDescription(loadResult.errorCode);
+    if (!loadResult.errorDetail.empty()) {
+        description = QString("%1 (%2)").arg(
+            description,
+            QString::fromStdString(loadResult.errorDetail)
+        );
+    }
 
+    return QString("Catalog: Source %1 parse failed: %2").arg(sourceUrl, description);
+}
 }  // namespace
 
 CatalogCoordinator::CatalogCoordinator(QNetworkAccessManager* networkAccessManager)
@@ -91,57 +64,6 @@ CatalogCoordinator::CatalogCoordinator(QNetworkAccessManager* networkAccessManag
 }
 
 CatalogCoordinator::~CatalogCoordinator() = default;
-
-std::unique_ptr<skygate::ephemeris::IStarCatalog> CatalogCoordinator::ensureCoreSolarSystemBodies(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog
-)
-{
-    if (catalog == nullptr) {
-        return nullptr;
-    }
-
-    std::vector<skygate::ephemeris::CelestialBody> mergedBodies = catalog->bodies();
-    const std::size_t starCount = static_cast<std::size_t>(std::count_if(
-        mergedBodies.begin(),
-        mergedBodies.end(),
-        [](const auto& body) {
-            return body.type == skygate::ephemeris::CelestialBodyType::Star;
-        }
-    ));
-
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledCatalog =
-        skygate::ephemeris::createBundledStarCatalog();
-    if (bundledCatalog == nullptr) {
-        return catalog;
-    }
-
-    bool injectedCoreBody = false;
-    for (const auto& body : bundledCatalog->bodies()) {
-        const bool isReferenceLineStar = body.type == skygate::ephemeris::CelestialBodyType::Star
-            && isReferenceLineStarId(body.id)
-            && starCount == 0U;
-        if (
-            !isSunOrMoonType(body.type)
-            && body.type != skygate::ephemeris::CelestialBodyType::Planet
-            && !isReferenceLineStar
-        ) {
-            continue;
-        }
-
-        if (containsBodyIdCaseInsensitive(mergedBodies, body.id)) {
-            continue;
-        }
-
-        mergedBodies.push_back(body);
-        injectedCoreBody = true;
-    }
-
-    if (!injectedCoreBody) {
-        return catalog;
-    }
-
-    return std::make_unique<InMemoryStarCatalog>(std::move(mergedBodies));
-}
 
 void CatalogCoordinator::downloadCatalogFromUrls(
     const QStringList& urlTexts,
@@ -189,6 +111,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             m_parseService->parseAsync(
                 downloadResult.payload,
                 contextObject,
+                {},
                 [statusHandler](const std::size_t parsedObjectCount) {
                     if (!statusHandler) {
                         return;
@@ -199,13 +122,11 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     statusHandler(QString("Catalog: Processing... %1 objects parsed").arg(countText));
                 },
                 [sourceUrl, statusHandler, completionHandler = std::move(completionHandler)](
-                    std::unique_ptr<skygate::ephemeris::IStarCatalog> downloadedCatalog
+                    skygate::ephemeris::CatalogLoadResult loadResult
                 ) mutable {
-                    if (downloadedCatalog == nullptr) {
+                    if (!loadResult.isSuccess()) {
                         DownloadResult result;
-                        result.errorText = QString(
-                            "Catalog: Source %1 parse failed (supported: pipe rows, HYG CSV, HYG .csv.gz, or HYG .zip)"
-                        ).arg(sourceUrl);
+                        result.errorText = catalogLoadErrorText(loadResult, sourceUrl);
                         if (statusHandler) {
                             statusHandler(result.errorText);
                         }
@@ -214,7 +135,8 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     }
 
                     DownloadResult result;
-                    result.catalog = std::move(downloadedCatalog);
+                    result.catalog = std::move(loadResult.catalog);
+                    result.diagnostics = loadResult.diagnostics;
                     completionHandler(std::move(result));
                 }
             );

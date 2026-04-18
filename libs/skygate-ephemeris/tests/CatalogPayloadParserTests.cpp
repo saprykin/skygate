@@ -13,6 +13,7 @@ private slots:
     void parsesPipeRowsPayload();
     void parsesHygGzipPayload();
     void parsesHygZipPayload();
+    void reportsUnsupportedPayload();
 };
 
 void CatalogPayloadParserTests::detectsPayloadFormats()
@@ -128,6 +129,17 @@ void CatalogPayloadParserTests::parsesHygZipPayload()
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
     QVERIFY(bodies[0].id == "hip_42");
+}
+
+void CatalogPayloadParserTests::reportsUnsupportedPayload()
+{
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    auto parseResult = parser.parseResult("just some plain text");
+
+    QVERIFY(!parseResult.isSuccess());
+    QVERIFY(
+        parseResult.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat
+    );
 }
 
 QTEST_APPLESS_MAIN(CatalogPayloadParserTests)

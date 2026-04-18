@@ -1,5 +1,6 @@
 #pragma once
 
+#include "skygate/ephemeris/CatalogLoadResult.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <QByteArray>
@@ -18,6 +19,7 @@ class CatalogCoordinator final {
 public:
     struct DownloadResult {
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
+        skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
         QString errorText;
     };
 
@@ -34,10 +36,6 @@ public:
 public:
     explicit CatalogCoordinator(QNetworkAccessManager* networkAccessManager);
     ~CatalogCoordinator();
-
-    [[nodiscard]] static std::unique_ptr<skygate::ephemeris::IStarCatalog> ensureCoreSolarSystemBodies(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog
-    );
 
     void downloadCatalogFromUrls(
         const QStringList& urlTexts,

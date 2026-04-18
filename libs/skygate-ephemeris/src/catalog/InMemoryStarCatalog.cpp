@@ -9,7 +9,7 @@ InMemoryStarCatalog::InMemoryStarCatalog(std::vector<CelestialBody> bodies)
 {
 }
 
-std::vector<CelestialBody> InMemoryStarCatalog::bodies() const
+std::span<const CelestialBody> InMemoryStarCatalog::bodies() const
 {
     return m_bodies;
 }

@@ -22,7 +22,7 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     const auto catalog = skygate::ephemeris::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(catalog.get());
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -97,7 +97,7 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDaysWhileFixedStarsSt
     const auto catalog = skygate::ephemeris::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(catalog.get());
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -146,7 +146,7 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
 
-    const auto nullCatalogEngine = skygate::ephemeris::createEphemerisEngine(nullptr);
+    const auto nullCatalogEngine = skygate::ephemeris::createEphemerisEngine();
     QVERIFY(nullCatalogEngine != nullptr);
     QVERIFY(nullCatalogEngine->compute(context).states.empty());
 
@@ -155,7 +155,7 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     );
     QVERIFY(importedCatalog != nullptr);
 
-    const auto importedEngine = skygate::ephemeris::createEphemerisEngine(importedCatalog.get());
+    const auto importedEngine = skygate::ephemeris::createEphemerisEngine(*importedCatalog);
     QVERIFY(importedEngine != nullptr);
     const auto importedSnapshot = importedEngine->compute(context);
     QVERIFY(importedSnapshot.states.size() == 1U);

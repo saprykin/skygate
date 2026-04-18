@@ -5,15 +5,24 @@
 
 namespace skygate::ephemeris {
 
-std::vector<CelestialBody> HygGzipCatalogParser::parse(
+CatalogBodyParseResult HygGzipCatalogParser::parse(
     const std::string_view gzipData,
     const HygParseProgressCallback& progressCallback
 ) const
 {
+    CatalogBodyParseResult result;
+    if (gzipData.empty()) {
+        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorDetail = "Gzip catalog payload is empty.";
+        return result;
+    }
+
     const GzipCodec gzipCodec;
     const auto uncompressedData = gzipCodec.gunzip(gzipData);
     if (!uncompressedData.has_value()) {
-        return {};
+        result.errorCode = CatalogLoadErrorCode::InvalidGzipData;
+        result.errorDetail = "Gzip catalog payload could not be decompressed.";
+        return result;
     }
 
     const HygCatalogParser hygParser;

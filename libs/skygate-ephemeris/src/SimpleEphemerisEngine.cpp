@@ -10,13 +10,16 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
+#include <utility>
+#include <vector>
 
 namespace skygate::ephemeris {
 
 class SimpleEphemerisEngine final : public IEphemerisEngine {
 public:
-    explicit SimpleEphemerisEngine(const IStarCatalog* catalog)
-        : m_catalog(catalog)
+    explicit SimpleEphemerisEngine(std::span<const CelestialBody> bodies)
+        : m_bodies(bodies.begin(), bodies.end())
     {
     }
 
@@ -25,13 +28,8 @@ public:
         SkySnapshot snapshot;
         snapshot.context = context;
 
-        if (m_catalog == nullptr) {
-            return snapshot;
-        }
-
-        const auto bodies = m_catalog->bodies();
-        snapshot.states.reserve(bodies.size());
-        for (const CelestialBody& body : bodies) {
+        snapshot.states.reserve(m_bodies.size());
+        for (const CelestialBody& body : m_bodies) {
             CelestialBodyState state;
             state.body = body;
             state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
@@ -62,30 +60,27 @@ private:
         const core::UtcTimePoint& utcTime
     ) const
     {
-        if (body.fixedEquatorial.has_value()) {
+        switch (body.ephemerisSource) {
+        case CelestialBodyEphemerisSource::FixedEquatorial:
             return body.fixedEquatorial;
-        }
-
-        if (body.type == CelestialBodyType::Sun || body.id == "sun") {
+        case CelestialBodyEphemerisSource::Sun:
             return m_sunCalculator.compute(utcTime);
-        }
-        if (body.type == CelestialBodyType::Moon || body.id == "moon") {
+        case CelestialBodyEphemerisSource::Moon:
             return m_moonCalculator.compute(utcTime);
-        }
-        if (body.type == CelestialBodyType::Planet) {
+        case CelestialBodyEphemerisSource::Planet:
             return m_planetCalculator.compute(body.id, utcTime);
-        }
-        if (body.type == CelestialBodyType::Star) {
+        case CelestialBodyEphemerisSource::Star:
             return m_starCalculator.compute(body.id);
-        }
-        if (body.type == CelestialBodyType::Constellation) {
+        case CelestialBodyEphemerisSource::Constellation:
             return m_knownConstellationLookup.equatorialById(body.id);
+        case CelestialBodyEphemerisSource::Unresolved:
+            break;
         }
 
         return std::nullopt;
     }
 
-    const IStarCatalog* m_catalog = nullptr;
+    std::vector<CelestialBody> m_bodies;
     SunEquatorialCalculator m_sunCalculator;
     MoonEquatorialCalculator m_moonCalculator;
     PlanetEquatorialCalculator m_planetCalculator;
@@ -93,14 +88,19 @@ private:
     KnownConstellationLookup m_knownConstellationLookup;
 };
 
-std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog* catalog)
+std::unique_ptr<IEphemerisEngine> createEphemerisEngine()
 {
-    return std::make_unique<SimpleEphemerisEngine>(catalog);
+    return std::make_unique<SimpleEphemerisEngine>(std::span<const CelestialBody> {});
 }
 
-std::unique_ptr<IEphemerisEngine> createEphemerisEngineStub(const IStarCatalog* catalog)
+std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog)
 {
-    return createEphemerisEngine(catalog);
+    return createEphemerisEngine(catalog.bodies());
+}
+
+std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const CelestialBody> bodies)
+{
+    return std::make_unique<SimpleEphemerisEngine>(bodies);
 }
 
 }  // namespace skygate::ephemeris

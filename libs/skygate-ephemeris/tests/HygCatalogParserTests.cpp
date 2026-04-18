@@ -11,7 +11,7 @@ class HygCatalogParserTests final : public QObject {
 private slots:
     void parsesBasicRows();
     void supportsFallbackIdsAndQuotedFields();
-    void keepsBrightestSelectionStableForLargeCatalogs();
+    void keepsWholeCatalogByDefault();
     void rejectsMalformedInput();
 };
 
@@ -69,7 +69,7 @@ void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
     QVERIFY(escapedQuoteBody->fixedEquatorial.has_value());
 }
 
-void HygCatalogParserTests::keepsBrightestSelectionStableForLargeCatalogs()
+void HygCatalogParserTests::keepsWholeCatalogByDefault()
 {
     std::string csv = "hip,id,proper,bf,ra,dec,mag\n";
     csv.reserve(1024U * 1024U);
@@ -90,23 +90,27 @@ void HygCatalogParserTests::keepsBrightestSelectionStableForLargeCatalogs()
     }
 
     std::size_t lastProgress = 0;
-    const auto catalog = skygate::ephemeris::createStarCatalogFromHygCsv(
+    auto loadResult = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
         csv,
         [&lastProgress](const std::size_t parsedObjectCount) {
             lastProgress = parsedObjectCount;
         }
     );
-    QVERIFY(catalog != nullptr);
+    QVERIFY(loadResult.isSuccess());
     QVERIFY(lastProgress == 30000U);
+    QVERIFY(loadResult.diagnostics.parsedBodyCount == 30000U);
+    QVERIFY(loadResult.diagnostics.selectedBodyCount == 30000U);
+    QVERIFY(loadResult.diagnostics.truncatedBodyCount == 0U);
 
-    const auto bodies = catalog->bodies();
-    QVERIFY(bodies.size() == 25000U);
+    const auto bodies = loadResult.catalog->bodies();
+    QVERIFY(bodies.size() == 30000U);
 
     using namespace skygate::ephemeris::tests;
     QVERIFY(findBodyById(bodies, "hip_1") != nullptr);
     QVERIFY(findBodyById(bodies, "hip_25000") != nullptr);
-    QVERIFY(findBodyById(bodies, "hip_25001") == nullptr);
-    QVERIFY(findBodyById(bodies, "hip_30000") == nullptr);
+    QVERIFY(findBodyById(bodies, "hip_25001") != nullptr);
+    QVERIFY(findBodyById(bodies, "hip_30000") != nullptr);
 }
 
 void HygCatalogParserTests::rejectsMalformedInput()

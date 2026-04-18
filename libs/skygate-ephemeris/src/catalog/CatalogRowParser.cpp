@@ -84,28 +84,42 @@ std::optional<CelestialBody> parseBodyRow(const QStringView rowText)
 
 }  // namespace
 
-std::vector<CelestialBody> CatalogRowParser::parse(const std::string_view catalogRows) const
+CatalogBodyParseResult CatalogRowParser::parse(const std::string_view catalogRows) const
 {
+    CatalogBodyParseResult result;
+    if (catalogRows.empty()) {
+        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorDetail = "Catalog rows payload is empty.";
+        return result;
+    }
+
     const QString rows = QString::fromUtf8(
         catalogRows.data(),
         static_cast<qsizetype>(catalogRows.size())
     );
 
-    std::vector<CelestialBody> bodies;
     const QStringList lines = rows.split('\n', Qt::KeepEmptyParts);
-    bodies.reserve(static_cast<std::size_t>(lines.size()));
+    result.bodies.reserve(static_cast<std::size_t>(lines.size()));
     for (const QString& rawLine : lines) {
         const QString line = rawLine.trimmed();
         if (line.isEmpty() || line.startsWith('#')) {
             continue;
         }
+        ++result.diagnostics.processedRowCount;
 
         if (const auto parsedBody = parseBodyRow(QStringView {line}); parsedBody.has_value()) {
-            bodies.push_back(*parsedBody);
+            result.bodies.push_back(*parsedBody);
         }
     }
 
-    return bodies;
+    if (result.bodies.empty()) {
+        result.errorCode = CatalogLoadErrorCode::InvalidRows;
+        result.errorDetail = "Catalog rows payload does not contain any valid rows.";
+        return result;
+    }
+
+    result.diagnostics.parsedBodyCount = result.bodies.size();
+    return result;
 }
 
 }  // namespace skygate::ephemeris

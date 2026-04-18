@@ -3,8 +3,8 @@
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cmath>
+#include <span>
 #include <string_view>
-#include <vector>
 
 namespace skygate::ephemeris::tests {
 
@@ -18,7 +18,7 @@ namespace skygate::ephemeris::tests {
 }
 
 [[nodiscard]] inline const CelestialBody* findBodyById(
-    const std::vector<CelestialBody>& bodies,
+    const std::span<const CelestialBody> bodies,
     const std::string_view id
 )
 {

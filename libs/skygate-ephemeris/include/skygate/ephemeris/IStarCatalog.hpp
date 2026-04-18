@@ -2,14 +2,14 @@
 
 #include "skygate/ephemeris/Types.hpp"
 
-#include <vector>
+#include <span>
 
 namespace skygate::ephemeris {
 
 class IStarCatalog {
 public:
     virtual ~IStarCatalog() = default;
-    [[nodiscard]] virtual std::vector<CelestialBody> bodies() const = 0;
+    [[nodiscard]] virtual std::span<const CelestialBody> bodies() const = 0;
 };
 
 }  // namespace skygate::ephemeris

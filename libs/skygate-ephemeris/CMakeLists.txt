@@ -2,6 +2,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core)
 find_package(ZLIB REQUIRED)
 
 add_library(skygate-ephemeris STATIC
+    include/skygate/ephemeris/CatalogLoadResult.hpp
     include/skygate/ephemeris/CatalogPayloadParser.hpp
     include/skygate/ephemeris/ConstellationData.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
@@ -10,7 +11,10 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/StarCatalogFactory.hpp
     include/skygate/ephemeris/StellariumConstellationParser.hpp
     include/skygate/ephemeris/Types.hpp
+    src/catalog/CatalogBodyNormalization.hpp
+    src/catalog/CatalogBodyParseResult.hpp
     src/catalog/BundledCatalogParser.hpp
+    src/catalog/CatalogBodyNormalization.cpp
     src/catalog/CatalogPayloadParser.cpp
     src/catalog/CatalogRowParser.hpp
     src/catalog/BundledConstellationData.cpp

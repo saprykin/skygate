@@ -38,7 +38,7 @@ constexpr std::string_view kBundledCatalogRows =
 
 }  // namespace
 
-std::vector<CelestialBody> BundledCatalogParser::parse() const
+CatalogBodyParseResult BundledCatalogParser::parse() const
 {
     const CatalogRowParser parser;
     return parser.parse(kBundledCatalogRows);

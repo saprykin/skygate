@@ -13,6 +13,7 @@
 void CatalogPayloadParseService::parseAsync(
     QByteArray payload,
     QObject* callbackContext,
+    skygate::ephemeris::CatalogSelectionOptions selectionOptions,
     ProgressHandler progressHandler,
     CompletionHandler completionHandler
 ) const
@@ -21,6 +22,7 @@ void CatalogPayloadParseService::parseAsync(
     std::thread([
         payload = std::move(payload),
         safeContext,
+        selectionOptions,
         progressHandler = std::move(progressHandler),
         completionHandler = std::move(completionHandler)
     ]() mutable {
@@ -48,27 +50,28 @@ void CatalogPayloadParseService::parseAsync(
             static_cast<std::size_t>(payload.size())
         );
         const skygate::ephemeris::CatalogPayloadParser parser;
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> parsedCatalog = parser.parse(
+        auto* parsedResultRaw = new skygate::ephemeris::CatalogLoadResult(parser.parseResult(
             payloadView,
-            reportProgress
-        );
+            reportProgress,
+            selectionOptions
+        ));
 
         QObject* const contextObject = safeContext.data();
         if (contextObject == nullptr) {
+            delete parsedResultRaw;
             return;
         }
 
-        auto* parsedCatalogRaw = parsedCatalog.release();
         const bool scheduled = QMetaObject::invokeMethod(
             contextObject,
-            [completionHandler = std::move(completionHandler), parsedCatalogRaw]() mutable {
-                std::unique_ptr<skygate::ephemeris::IStarCatalog> parsedCatalogGuard(parsedCatalogRaw);
-                completionHandler(std::move(parsedCatalogGuard));
+            [completionHandler = std::move(completionHandler), parsedResultRaw]() mutable {
+                std::unique_ptr<skygate::ephemeris::CatalogLoadResult> parsedResultGuard(parsedResultRaw);
+                completionHandler(std::move(*parsedResultGuard));
             },
             Qt::QueuedConnection
         );
         if (!scheduled) {
-            delete parsedCatalogRaw;
+            delete parsedResultRaw;
         }
     }).detach();
 }

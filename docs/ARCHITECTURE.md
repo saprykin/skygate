@@ -27,10 +27,17 @@
 - `IEphemerisEngine`:
   - Single entry-point for sky computations.
   - `compute(SkyContext)` returns `SkySnapshot`.
+  - Engines own an immutable snapshot of catalog bodies so compute does not
+    depend on external catalog lifetime.
 - `IStarCatalog`:
   - Source abstraction for bundled and future external catalogs.
+  - Exposes immutable body views instead of copying the full catalog on access.
 - `SkySnapshot`:
   - Output payload containing computed celestial body states.
+- `CatalogLoadResult`:
+  - Structured catalog load outcome with diagnostics and explicit error codes.
+- `CatalogSelectionOptions`:
+  - Optional caller-controlled selection policy for large imported catalogs.
 
 ## Planned Runtime Flow
 1. UI gathers `GeoLocation`, current/specified UTC time, and projection
@@ -48,5 +55,9 @@
   same `id|name|type|magnitude` row format.
 - Runtime import supports major star catalogs in HYG CSV format (`ra`, `dec`,
   `mag`) and maps them to fixed-position stars.
+- Large catalog selection is explicit at load time instead of being baked into
+  the raw HYG parser.
+- Body computation uses explicit ephemeris source metadata rather than inferring
+  runtime behavior inside the engine from mixed `type` and `id` checks.
 - UI preset `hyg_v3` also attempts to load Stellarium skyculture line data
   (`western/index.json`, HIP-based) to render expanded constellation outlines.

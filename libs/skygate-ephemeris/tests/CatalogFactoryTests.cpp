@@ -12,6 +12,7 @@ private slots:
     void createsBundledCatalogBySourceType();
     void createsRowsCatalogBySourceRequest();
     void createsHygCatalogBySourceTypeWithProgress();
+    void reportsDiagnosticsForSelectionAndErrors();
 };
 
 void CatalogFactoryTests::createsBundledCatalogBySourceType()
@@ -54,6 +55,35 @@ void CatalogFactoryTests::createsHygCatalogBySourceTypeWithProgress()
     QVERIFY(catalog != nullptr);
     QVERIFY(catalog->bodies().size() == 2U);
     QVERIFY(callbackLastCount == 2U);
+}
+
+void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
+{
+    const auto selectedCatalog = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag\n"
+        "1,11,Alpha,1.0,2.0,3.0\n"
+        "2,22,Beta,4.0,5.0,6.0\n",
+        {},
+        skygate::ephemeris::CatalogSelectionOptions {
+            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude,
+            .maxBodyCount = 1U
+        }
+    );
+    QVERIFY(selectedCatalog.isSuccess());
+    QVERIFY(selectedCatalog.diagnostics.parsedBodyCount == 2U);
+    QVERIFY(selectedCatalog.diagnostics.selectedBodyCount == 1U);
+    QVERIFY(selectedCatalog.diagnostics.truncatedBodyCount == 1U);
+
+    const auto invalidCatalog = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,name\n"
+        "1,NoCoordinates\n"
+    );
+    QVERIFY(!invalidCatalog.isSuccess());
+    QVERIFY(
+        invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns
+    );
 }
 
 QTEST_APPLESS_MAIN(CatalogFactoryTests)

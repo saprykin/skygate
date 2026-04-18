@@ -114,7 +114,7 @@ QString SkyContextSettings::defaultCatalogCachePath()
 }
 
 QByteArray SkyContextCatalogCodec::serializeCatalogRows(
-    const std::vector<skygate::ephemeris::CelestialBody>& bodies
+    const std::span<const skygate::ephemeris::CelestialBody> bodies
 )
 {
     QByteArray rows;

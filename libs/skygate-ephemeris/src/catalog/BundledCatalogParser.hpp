@@ -1,14 +1,12 @@
 #pragma once
 
-#include "skygate/ephemeris/Types.hpp"
-
-#include <vector>
+#include "catalog/CatalogBodyParseResult.hpp"
 
 namespace skygate::ephemeris {
 
 class BundledCatalogParser final {
 public:
-    [[nodiscard]] std::vector<CelestialBody> parse() const;
+    [[nodiscard]] CatalogBodyParseResult parse() const;
 };
 
 }  // namespace skygate::ephemeris

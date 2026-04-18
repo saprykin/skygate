@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog =
         skygate::ephemeris::createBundledStarCatalog();
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
-        skygate::ephemeris::createEphemerisEngine(starCatalog.get());
+        skygate::ephemeris::createEphemerisEngine(*starCatalog);
     SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));
     QObject::connect(
         &app,

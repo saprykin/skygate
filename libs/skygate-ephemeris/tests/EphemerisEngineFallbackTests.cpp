@@ -28,7 +28,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     );
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(catalog.get());
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -85,7 +85,7 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
     );
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(catalog.get());
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;

@@ -235,7 +235,7 @@ bool SkyContextController::clearCatalogCache()
 }
 
 void SkyContextController::persistCatalogCache(
-    const std::vector<skygate::ephemeris::CelestialBody>& bodies,
+    const std::span<const skygate::ephemeris::CelestialBody> bodies,
     const QString& sourceLabel
 ) const
 {

@@ -16,6 +16,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -208,7 +209,7 @@ private:
     void setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
     void setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
     void persistCatalogCache(
-        const std::vector<skygate::ephemeris::CelestialBody>& bodies,
+        std::span<const skygate::ephemeris::CelestialBody> bodies,
         const QString& sourceLabel
     ) const;
     void restoreCatalogCache();
