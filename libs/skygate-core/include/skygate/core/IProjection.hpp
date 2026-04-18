@@ -1,22 +1,8 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/ProjectionTypes.hpp"
 
 namespace skygate::core {
-
-struct ScreenPoint {
-    double x = 0.0;
-    double y = 0.0;
-    bool isVisible = false;
-};
-
-struct ProjectionParams {
-    HorizontalCoordinate center;
-    double fovDeg = 90.0;
-    double rollDeg = 0.0;
-    double viewportWidth = 1.0;
-    double viewportHeight = 1.0;
-};
 
 class IProjection {
 public:

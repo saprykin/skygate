@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/IProjection.hpp"
+#include "skygate/core/ProjectionTypes.hpp"
 
 namespace skygate::core {
 
@@ -8,10 +8,10 @@ class ViewportMath final {
 public:
     static constexpr double kDefaultCenterAltitudeDeg = 45.0;
     static constexpr double kDefaultCenterAzimuthDeg = 180.0;
-    static constexpr double kAltitudeMinDeg = -90.0;
-    static constexpr double kAltitudeMaxDeg = 90.0;
-    static constexpr double kFieldOfViewMinDeg = 20.0;
-    static constexpr double kFieldOfViewMaxDeg = 150.0;
+    static constexpr double kAltitudeMinDeg = HorizontalCoordinate::kAltitudeMinDeg;
+    static constexpr double kAltitudeMaxDeg = HorizontalCoordinate::kAltitudeMaxDeg;
+    static constexpr double kFieldOfViewMinDeg = ProjectionParams::kFieldOfViewMinDeg;
+    static constexpr double kFieldOfViewMaxDeg = ProjectionParams::kFieldOfViewMaxDeg;
 
     [[nodiscard]] static double normalizeAzimuthDeg(double azimuthDeg) noexcept;
     [[nodiscard]] static double clampAltitudeDeg(double altitudeDeg) noexcept;

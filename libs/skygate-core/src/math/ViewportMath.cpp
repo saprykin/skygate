@@ -31,10 +31,10 @@ ProjectionParams ViewportMath::buildProjectionParams(
 {
     ProjectionParams projectionParams;
     projectionParams.center = {
-        .altitudeDeg = centerAltitudeDeg,
-        .azimuthDeg = centerAzimuthDeg
+        .altitudeDeg = clampAltitudeDeg(centerAltitudeDeg),
+        .azimuthDeg = normalizeAzimuthDeg(centerAzimuthDeg)
     };
-    projectionParams.fovDeg = fieldOfViewDeg;
+    projectionParams.fovDeg = clampFieldOfViewDeg(fieldOfViewDeg);
     projectionParams.rollDeg = 0.0;
     projectionParams.viewportWidth = viewportWidth;
     projectionParams.viewportHeight = viewportHeight;

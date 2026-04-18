@@ -9,7 +9,7 @@ private slots:
     void normalizeAzimuthWrapsAngles();
     void clampAltitudeEnforcesRange();
     void clampFieldOfViewEnforcesRange();
-    void buildProjectionParamsCopiesInputs();
+    void buildProjectionParamsNormalizesAndClampsInputs();
 };
 
 void ViewportMathTests::normalizeAzimuthWrapsAngles()
@@ -32,19 +32,19 @@ void ViewportMathTests::clampFieldOfViewEnforcesRange()
     QCOMPARE(skygate::core::ViewportMath::clampFieldOfViewDeg(170.0), 150.0);
 }
 
-void ViewportMathTests::buildProjectionParamsCopiesInputs()
+void ViewportMathTests::buildProjectionParamsNormalizesAndClampsInputs()
 {
     const skygate::core::ProjectionParams params = skygate::core::ViewportMath::buildProjectionParams(
         1200.0,
         800.0,
-        33.0,
-        210.0,
-        70.0
+        120.0,
+        -150.0,
+        5.0
     );
 
-    QCOMPARE(params.center.altitudeDeg, 33.0);
+    QCOMPARE(params.center.altitudeDeg, 90.0);
     QCOMPARE(params.center.azimuthDeg, 210.0);
-    QCOMPARE(params.fovDeg, 70.0);
+    QCOMPARE(params.fovDeg, 20.0);
     QCOMPARE(params.rollDeg, 0.0);
     QCOMPARE(params.viewportWidth, 1200.0);
     QCOMPARE(params.viewportHeight, 800.0);

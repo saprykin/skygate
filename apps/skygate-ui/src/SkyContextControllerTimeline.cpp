@@ -8,6 +8,7 @@
 #include <QTimeZone>
 
 #include "skygate/core/ProjectionFactory.hpp"
+#include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 
 #include <algorithm>
@@ -25,7 +26,8 @@ using namespace skygate::ui::internal;
 namespace {
 QDateTime currentUtcDateTime()
 {
-    return QDateTime::currentDateTimeUtc();
+    const skygate::core::SystemTimeSource systemTimeSource;
+    return SkyContextTimeCodec::toQDateTimeUtc(systemTimeSource.nowUtc());
 }
 } // namespace
 

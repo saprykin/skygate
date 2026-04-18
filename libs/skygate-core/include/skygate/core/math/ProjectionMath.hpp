@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/IProjection.hpp"
+#include "skygate/core/ProjectionTypes.hpp"
 
 #include <array>
 

@@ -47,6 +47,7 @@ void AzimuthalEquidistantProjectionTests::centerDirectionMapsToScreenCenter()
     const auto projectedCenter = projection->project(params.center, params);
 
     QVERIFY(projectedCenter.isVisible);
+    QCOMPARE(projectedCenter.status, skygate::core::ProjectionStatus::Visible);
     QVERIFY(isNear(projectedCenter.x, params.viewportWidth * 0.5, 1e-6));
     QVERIFY(isNear(projectedCenter.y, params.viewportHeight * 0.5, 1e-6));
 }
@@ -91,6 +92,7 @@ void AzimuthalEquidistantProjectionTests::oppositeDirectionIsHidden()
     );
 
     QVERIFY(!oppositePoint.isVisible);
+    QCOMPARE(oppositePoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void AzimuthalEquidistantProjectionTests::invalidParamsAreRejected()
@@ -101,24 +103,34 @@ void AzimuthalEquidistantProjectionTests::invalidParamsAreRejected()
 
     skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
 
-    params.fovDeg = 0.0;
-    QVERIFY(!projection->project(params.center, params).isVisible);
+    params.fovDeg = 19.9;
+    const auto tooSmallFov = projection->project(params.center, params);
+    QVERIFY(!tooSmallFov.isVisible);
+    QCOMPARE(tooSmallFov.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultAzimuthalParams();
-    params.fovDeg = 179.0;
-    QVERIFY(!projection->project(params.center, params).isVisible);
+    params.fovDeg = 150.1;
+    const auto tooLargeFov = projection->project(params.center, params);
+    QVERIFY(!tooLargeFov.isVisible);
+    QCOMPARE(tooLargeFov.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultAzimuthalParams();
     params.viewportWidth = 0.0;
-    QVERIFY(!projection->project(params.center, params).isVisible);
+    const auto zeroWidth = projection->project(params.center, params);
+    QVERIFY(!zeroWidth.isVisible);
+    QCOMPARE(zeroWidth.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultAzimuthalParams();
     params.viewportHeight = -1.0;
-    QVERIFY(!projection->project(params.center, params).isVisible);
+    const auto negativeHeight = projection->project(params.center, params);
+    QVERIFY(!negativeHeight.isVisible);
+    QCOMPARE(negativeHeight.status, skygate::core::ProjectionStatus::InvalidParameters);
 
     params = makeDefaultAzimuthalParams();
     params.rollDeg = std::numeric_limits<double>::quiet_NaN();
-    QVERIFY(!projection->project(params.center, params).isVisible);
+    const auto nanRoll = projection->project(params.center, params);
+    QVERIFY(!nanRoll.isVisible);
+    QCOMPARE(nanRoll.status, skygate::core::ProjectionStatus::InvalidParameters);
 }
 
 void AzimuthalEquidistantProjectionTests::directionOutsideFovIsHidden()
@@ -129,7 +141,7 @@ void AzimuthalEquidistantProjectionTests::directionOutsideFovIsHidden()
 
     const skygate::core::ProjectionParams params {
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
-        .fovDeg = 10.0,
+        .fovDeg = 20.0,
         .rollDeg = 0.0,
         .viewportWidth = 1000.0,
         .viewportHeight = 1000.0,
@@ -140,6 +152,7 @@ void AzimuthalEquidistantProjectionTests::directionOutsideFovIsHidden()
         params
     );
     QVERIFY(!outsideFovPoint.isVisible);
+    QCOMPARE(outsideFovPoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void AzimuthalEquidistantProjectionTests::rollRotatesProjectedPoint()

@@ -2,6 +2,7 @@
 
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/core/math/ProjectionMath.hpp"
+#include "ProjectionPipeline.hpp"
 
 #include <cmath>
 
@@ -17,50 +18,40 @@ ScreenPoint PerspectiveProjection::project(
     const ProjectionParams& params
 ) const noexcept
 {
-    ScreenPoint point;
-    if (!ProjectionMath::areValidProjectionParams(params)) {
-        return point;
+    ProjectionPipeline::PreparedProjection prepared;
+    ScreenPoint failurePoint;
+    if (!ProjectionPipeline::tryPrepare(coordinate, params, prepared, failurePoint)) {
+        return failurePoint;
     }
 
-    ProjectionMath::Vec3 center;
-    ProjectionMath::Vec3 right;
-    ProjectionMath::Vec3 up;
-    if (!ProjectionMath::tryBuildProjectionBasis(params.center, center, right, up)) {
-        return point;
-    }
-
-    const ProjectionMath::Vec3 target = ProjectionMath::horizontalToUnitVector(coordinate);
-    const double forward = ProjectionMath::dot(target, center);
+    const double forward = ProjectionMath::dot(prepared.target, prepared.center);
     if (forward <= MathConstants::kEpsilon) {
-        return point;
+        return ProjectionPipeline::culledPoint();
     }
 
-    double projectedX = ProjectionMath::dot(target, right) / forward;
-    double projectedY = ProjectionMath::dot(target, up) / forward;
-    ProjectionMath::applyRoll(projectedX, projectedY, params.rollDeg);
+    double projectedX = ProjectionMath::dot(prepared.target, prepared.right) / forward;
+    double projectedY = ProjectionMath::dot(prepared.target, prepared.up) / forward;
+    ProjectionMath::applyRoll(projectedX, projectedY, prepared.params.rollDeg);
 
-    const double halfVerticalFovRad = ProjectionMath::toRadians(params.fovDeg) * 0.5;
+    const double halfVerticalFovRad = ProjectionMath::toRadians(prepared.params.fovDeg) * 0.5;
     const double tanHalfVerticalFov = std::tan(halfVerticalFovRad);
     if (tanHalfVerticalFov <= MathConstants::kEpsilon || !ProjectionMath::isFinite(tanHalfVerticalFov)) {
-        return point;
+        return ProjectionPipeline::invalidParametersPoint();
     }
 
-    const double aspectRatio = params.viewportWidth / params.viewportHeight;
+    const double aspectRatio = prepared.params.viewportWidth / prepared.params.viewportHeight;
     const double tanHalfHorizontalFov = tanHalfVerticalFov * aspectRatio;
     if (tanHalfHorizontalFov <= MathConstants::kEpsilon || !ProjectionMath::isFinite(tanHalfHorizontalFov)) {
-        return point;
+        return ProjectionPipeline::invalidParametersPoint();
     }
 
-    if (std::abs(projectedX) > tanHalfHorizontalFov || std::abs(projectedY) > tanHalfVerticalFov) {
-        return point;
-    }
-
-    const double normalizedX = projectedX / tanHalfHorizontalFov;
-    const double normalizedY = projectedY / tanHalfVerticalFov;
-    point.x = ((normalizedX + 1.0) * 0.5) * params.viewportWidth;
-    point.y = ((1.0 - normalizedY) * 0.5) * params.viewportHeight;
-    point.isVisible = ProjectionMath::isFinite(point.x) && ProjectionMath::isFinite(point.y);
-    return point;
+    return ProjectionPipeline::finishRectangular(
+        projectedX,
+        projectedY,
+        prepared.params,
+        tanHalfHorizontalFov,
+        tanHalfVerticalFov
+    );
 }
 
 }  // namespace skygate::core

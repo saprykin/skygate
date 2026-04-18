@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/SkyTypes.hpp"
 
 namespace skygate::core {
 

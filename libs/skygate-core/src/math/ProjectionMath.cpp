@@ -1,5 +1,6 @@
 #include "skygate/core/math/ProjectionMath.hpp"
 
+#include "skygate/core/math/AngleMath.hpp"
 #include "skygate/core/math/MathConstants.hpp"
 
 #include <cmath>
@@ -11,9 +12,6 @@ constexpr std::size_t kXIndex = 0;
 constexpr std::size_t kYIndex = 1;
 constexpr std::size_t kZIndex = 2;
 
-constexpr ProjectionMath::Vec3 kZenithAxis {0.0, 0.0, 1.0};
-constexpr ProjectionMath::Vec3 kNorthAxis {0.0, 1.0, 0.0};
-
 }  // namespace
 
 bool ProjectionMath::isFinite(const double value) noexcept
@@ -23,15 +21,12 @@ bool ProjectionMath::isFinite(const double value) noexcept
 
 bool ProjectionMath::areValidProjectionParams(const ProjectionParams& params) noexcept
 {
-    return isFinite(params.fovDeg) && isFinite(params.rollDeg)
-        && isFinite(params.viewportWidth) && isFinite(params.viewportHeight)
-        && params.viewportWidth > 0.0 && params.viewportHeight > 0.0
-        && params.fovDeg > 0.0 && params.fovDeg < 179.0;
+    return params.isProjectable();
 }
 
 double ProjectionMath::toRadians(const double degrees) noexcept
 {
-    return degrees * MathConstants::kDegreesToRadians;
+    return AngleMath::toRadians(degrees);
 }
 
 double ProjectionMath::dot(const Vec3& lhs, const Vec3& rhs) noexcept
@@ -89,19 +84,35 @@ bool ProjectionMath::tryBuildProjectionBasis(
     Vec3& up
 ) noexcept
 {
-    center = horizontalToUnitVector(centerCoordinate);
-
-    right = cross(kZenithAxis, center);
-    if (length(right) <= MathConstants::kEpsilon) {
-        right = cross(kNorthAxis, center);
-    }
-    right = normalize(right);
-    if (length(right) <= MathConstants::kEpsilon) {
+    if (!centerCoordinate.isValid()) {
         return false;
     }
 
-    up = normalize(cross(center, right));
-    return length(up) > MathConstants::kEpsilon;
+    const HorizontalCoordinate normalizedCoordinate = centerCoordinate.normalizedAzimuth();
+    const double altitudeRad = toRadians(normalizedCoordinate.altitudeDeg);
+    const double azimuthRad = toRadians(normalizedCoordinate.azimuthDeg);
+
+    const double sinAltitude = std::sin(altitudeRad);
+    const double cosAltitude = std::cos(altitudeRad);
+    const double sinAzimuth = std::sin(azimuthRad);
+    const double cosAzimuth = std::cos(azimuthRad);
+
+    center = {
+        cosAltitude * sinAzimuth,
+        cosAltitude * cosAzimuth,
+        sinAltitude
+    };
+    right = {
+        -cosAzimuth,
+        sinAzimuth,
+        0.0
+    };
+    up = {
+        -sinAltitude * sinAzimuth,
+        -sinAltitude * cosAzimuth,
+        cosAltitude
+    };
+    return true;
 }
 
 void ProjectionMath::applyRoll(double& x, double& y, const double rollDeg) noexcept

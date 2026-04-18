@@ -8,6 +8,7 @@
 #include <QNetworkAccessManager>
 
 #include "skygate/core/ProjectionFactory.hpp"
+#include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
@@ -48,7 +49,8 @@ SkyContextController::SkyContextController(
 
     m_projection = skygate::core::createProjection(m_projectionType);
     m_catalogUrlText = QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl);
-    m_skyContext.utcTime = SkyContextTimeCodec::toUtcTimePoint(QDateTime::currentDateTimeUtc().toUTC());
+    const skygate::core::SystemTimeSource systemTimeSource;
+    m_skyContext.utcTime = systemTimeSource.nowUtc();
     loadSettings();
 
     m_timer.setInterval(SkyContextControllerConstants::kTickIntervalMs);
