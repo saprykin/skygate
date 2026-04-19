@@ -42,6 +42,26 @@ Window {
         skyContextController: preferencesWindow.skyContextController
     }
 
+    Connections {
+        target: preferencesWindow.skyContextController
+
+        function onLatitudeTextChanged() {
+            settingsDraft.syncDeviceLocationFromContext()
+        }
+
+        function onLongitudeTextChanged() {
+            settingsDraft.syncDeviceLocationFromContext()
+        }
+
+        function onElevationTextChanged() {
+            settingsDraft.syncDeviceLocationFromContext()
+        }
+
+        function onLocationSourceTextChanged() {
+            settingsDraft.syncDeviceLocationFromContext()
+        }
+    }
+
     function syncFormFromContext() {
         settingsDraft.resetFromContext()
     }

@@ -58,6 +58,16 @@ QtObject {
         catalogUrlText = skyContextController.catalogUrlText()
     }
 
+    function syncDeviceLocationFromContext() {
+        if (locationSourceText !== "Current Device") {
+            return
+        }
+
+        latitudeText = skyContextController.latitudeText
+        longitudeText = skyContextController.longitudeText
+        elevationText = skyContextController.elevationText
+    }
+
     function applyToContext() {
         skyContextController.setUtcDateLocked(utcDateLocked)
         skyContextController.setUtcTimeLocked(utcTimeLocked)
