@@ -218,10 +218,14 @@ Item {
                 id: speedCombo
                 model: ["0.25x", "0.5x", "1x", "2x", "4x", "8x"]
                 implicitWidth: 78
+                enabled: !skyContextController.utcDateLocked && !skyContextController.utcTimeLocked
+                opacity: enabled ? 1.0 : 0.45
                 onActivated: skyContextController.setSpeedMultiplier(toolbarRoot.speedValues[currentIndex])
                 ToolTip.visible: hovered
                 ToolTip.delay: 250
-                ToolTip.text: "Set live timeline speed multiplier"
+                ToolTip.text: enabled
+                    ? "Set live timeline speed multiplier"
+                    : "Unavailable while UTC date or time is locked"
             }
 
             TimelineToolbarCombo {
