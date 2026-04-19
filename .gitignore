@@ -4,5 +4,5 @@ build-codex/
 build-codex-ui/
 .vscode/
 CMakeLists.txt.user
-CMakePresets.json
+CMakeUserPresets.json
 .DS_Store
