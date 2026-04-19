@@ -9,10 +9,13 @@ if(COMMAND qt_policy)
     qt_policy(SET QTP0004 NEW)
 endif()
 
-qt_add_executable(skygate-ui
-    src/main.cpp
+qt_add_library(skygate-ui-lib STATIC
     src/CatalogCoordinator.cpp
     src/CatalogCoordinator.hpp
+    src/SkyCatalogManager.cpp
+    src/SkyCatalogManager.hpp
+    src/SkySceneModel.cpp
+    src/SkySceneModel.hpp
     src/catalog/CatalogDownloadService.cpp
     src/catalog/CatalogDownloadService.hpp
     src/catalog/CatalogPayloadParseService.cpp
@@ -26,16 +29,17 @@ qt_add_executable(skygate-ui
     src/SkyContextControllerSupport.cpp
     src/SkyContextControllerSupport.hpp
     src/SkyContextControllerTimeline.cpp
+    src/SkySettingsStore.cpp
+    src/SkySettingsStore.hpp
     src/SkyViewportItem.cpp
     src/SkyViewportItem.hpp
 )
 
-qt_add_resources(skygateUiIconSources resources/icons.qrc)
-target_sources(skygate-ui PRIVATE ${skygateUiIconSources})
+target_include_directories(skygate-ui-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(APPLE)
     set(SKYGATE_LOCATION_USAGE_DESCRIPTION "Skygate uses your location to prefill observer latitude, longitude, and elevation.")
-    target_sources(skygate-ui PRIVATE
+    target_sources(skygate-ui-lib PRIVATE
         src/MacDockIcon.hpp
         src/MacDockIcon.mm
     )
@@ -43,6 +47,18 @@ if(APPLE)
         resources/icons/Skygate.icns
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources"
     )
+endif()
+
+add_library(skygate::uiapp ALIAS skygate-ui-lib)
+
+qt_add_executable(skygate-ui
+    src/main.cpp
+)
+
+qt_add_resources(skygateUiIconSources resources/icons.qrc)
+target_sources(skygate-ui PRIVATE ${skygateUiIconSources})
+
+if(APPLE)
     target_sources(skygate-ui PRIVATE resources/icons/Skygate.icns)
     set_target_properties(skygate-ui PROPERTIES
         MACOSX_BUNDLE TRUE
@@ -69,6 +85,11 @@ qt_add_qml_module(skygate-ui
         PreferencesCheckBox.qml
         PreferencesComboBox.qml
         PreferencesSectionButton.qml
+        SkyInteractionLayer.qml
+        SkyOverlayLayer.qml
+        SkySettingsDraft.qml
+        StatusFooter.qml
+        TimelineToolbar.qml
         PreferencesSkySection.qml
         PreferencesTextField.qml
         PreferencesWindow.qml
@@ -76,23 +97,35 @@ qt_add_qml_module(skygate-ui
         resources/icons/skygate-icon-512.png
 )
 
-target_link_libraries(skygate-ui
-    PRIVATE
+target_link_libraries(skygate-ui-lib
+    PUBLIC
         Qt6::Core
         Qt6::Gui
-        Qt6::Qml
-        Qt6::Quick
         Qt6::Network
         skygate::ephemeris
 )
 
+target_link_libraries(skygate-ui-lib
+    PUBLIC
+        Qt6::Qml
+        Qt6::Quick
+)
+
+target_link_libraries(skygate-ui
+    PRIVATE
+        skygate::uiapp
+)
+
 target_compile_definitions(skygate-ui PRIVATE SKYGATE_APP_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(skygate-ui-lib PRIVATE SKYGATE_APP_VERSION="${PROJECT_VERSION}")
 
 if(TARGET Qt6::Positioning)
-    target_link_libraries(skygate-ui PRIVATE Qt6::Positioning)
+    target_link_libraries(skygate-ui-lib PUBLIC Qt6::Positioning)
     target_compile_definitions(skygate-ui PRIVATE SKYGATE_HAS_POSITIONING=1)
+    target_compile_definitions(skygate-ui-lib PRIVATE SKYGATE_HAS_POSITIONING=1)
 else()
     target_compile_definitions(skygate-ui PRIVATE SKYGATE_HAS_POSITIONING=0)
+    target_compile_definitions(skygate-ui-lib PRIVATE SKYGATE_HAS_POSITIONING=0)
 endif()
 
 add_custom_target(run-skygate-ui

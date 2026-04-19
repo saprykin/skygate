@@ -8,6 +8,7 @@
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
+#include <span>
 #include <vector>
 
 struct SkyRenderPoint final {
@@ -37,8 +38,8 @@ public:
     [[nodiscard]] SkyRenderFrame buildFrame(
         const skygate::ephemeris::SkySnapshot& snapshot,
         const skygate::core::PreparedProjection& projection,
-        const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs,
-        const std::vector<skygate::ephemeris::ConstellationLabelRef>& labelRefs,
+        std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
+        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
         double magnitudeCutoff,
         double viewportWidth,
         double viewportHeight

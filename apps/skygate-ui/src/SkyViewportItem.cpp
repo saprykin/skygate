@@ -1,6 +1,6 @@
 #include "SkyViewportItem.hpp"
 
-#include "SkyContextController.hpp"
+#include "SkySceneModel.hpp"
 
 #include <QColor>
 #include <QSGFlatColorMaterial>
@@ -109,10 +109,10 @@ void clearChildNodes(QSGNode* rootNode)
 
     QSGNode* child = rootNode->firstChild();
     while (child != nullptr) {
-        QSGNode* next = child->nextSibling();
+        QSGNode* nextChild = child->nextSibling();
         rootNode->removeChildNode(child);
         delete child;
-        child = next;
+        child = nextChild;
     }
 }
 
@@ -303,38 +303,32 @@ SkyViewportItem::SkyViewportItem(QQuickItem* parent)
     setFlag(ItemHasContents, true);
 }
 
-QObject* SkyViewportItem::skyContextController() const noexcept
+QObject* SkyViewportItem::skySceneModel() const noexcept
 {
-    return m_skyContextController;
+    return m_skySceneModel;
 }
 
-void SkyViewportItem::setSkyContextController(QObject* skyContextController)
+void SkyViewportItem::setSkySceneModel(QObject* skySceneModel)
 {
-    SkyContextController* controller = qobject_cast<SkyContextController*>(skyContextController);
-    if (m_skyContextController == controller) {
+    SkySceneModel* model = qobject_cast<SkySceneModel*>(skySceneModel);
+    if (m_skySceneModel == model) {
         return;
     }
 
-    disconnectFromContextController();
-    m_skyContextController = controller;
+    disconnectFromSceneModel();
+    m_skySceneModel = model;
 
-    if (m_skyContextController != nullptr) {
-        m_skyContextChangedConnection = connect(
-            m_skyContextController,
-            &SkyContextController::skyContextChanged,
+    if (m_skySceneModel != nullptr) {
+        m_sceneFrameChangedConnection = connect(
+            m_skySceneModel,
+            &SkySceneModel::sceneFrameChanged,
             this,
             &SkyViewportItem::synchronizeRenderData
         );
-
-        m_projectionTypeChangedConnection = connect(
-            m_skyContextController,
-            &SkyContextController::projectionTypeChanged,
-            this,
-            &SkyViewportItem::synchronizeRenderData
-        );
+        m_skySceneModel->setViewportSize(width(), height());
     }
 
-    emit skyContextControllerChanged();
+    emit skySceneModelChanged();
     synchronizeRenderData();
 }
 
@@ -469,17 +463,13 @@ void SkyViewportItem::geometryChange(const QRectF& newGeometry, const QRectF& ol
     synchronizeRenderData();
 }
 
-void SkyViewportItem::disconnectFromContextController()
+void SkyViewportItem::disconnectFromSceneModel()
 {
-    if (m_skyContextChangedConnection) {
-        disconnect(m_skyContextChangedConnection);
-    }
-    if (m_projectionTypeChangedConnection) {
-        disconnect(m_projectionTypeChangedConnection);
+    if (m_sceneFrameChangedConnection) {
+        disconnect(m_sceneFrameChangedConnection);
     }
 
-    m_skyContextChangedConnection = {};
-    m_projectionTypeChangedConnection = {};
+    m_sceneFrameChangedConnection = {};
 }
 
 void SkyViewportItem::synchronizeRenderData()
@@ -489,25 +479,20 @@ void SkyViewportItem::synchronizeRenderData()
     nextRenderData->viewportHeight = height();
 
     if (
-        m_skyContextController != nullptr
+        m_skySceneModel != nullptr
         && nextRenderData->viewportWidth > 0.0
         && nextRenderData->viewportHeight > 0.0
     ) {
-        nextRenderData->preparedProjection = m_skyContextController->buildPreparedProjection(
+        m_skySceneModel->setViewportSize(
             nextRenderData->viewportWidth,
             nextRenderData->viewportHeight
         );
+        nextRenderData->preparedProjection = m_skySceneModel->preparedProjection();
         if (nextRenderData->preparedProjection.has_value()) {
-            const auto lines = m_skyContextController->renderConstellationLineSpan(
-                nextRenderData->viewportWidth,
-                nextRenderData->viewportHeight
-            );
+            const auto lines = m_skySceneModel->renderLineSpan();
             nextRenderData->lines.assign(lines.begin(), lines.end());
 
-            const auto points = m_skyContextController->renderPointSpan(
-                nextRenderData->viewportWidth,
-                nextRenderData->viewportHeight
-            );
+            const auto points = m_skySceneModel->renderPointSpan();
             nextRenderData->points.assign(points.begin(), points.end());
         }
     }

@@ -198,8 +198,8 @@ void appendLabel(
 SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const skygate::ephemeris::SkySnapshot& snapshot,
     const skygate::core::PreparedProjection& projection,
-    const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs,
-    const std::vector<skygate::ephemeris::ConstellationLabelRef>& labelRefs,
+    const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
+    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
     const double magnitudeCutoff,
     const double viewportWidth,
     const double viewportHeight

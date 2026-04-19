@@ -1,4 +1,5 @@
 #include "SkyContextController.hpp"
+#include "SkySceneModel.hpp"
 #include "SkyViewportItem.hpp"
 #include "MacDockIcon.hpp"
 
@@ -62,6 +63,8 @@ int main(int argc, char* argv[])
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
         skygate::ephemeris::createEphemerisEngine(*starCatalog);
     SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));
+    SkySceneModel skySceneModel;
+    skySceneModel.setSkyContextController(&skyContextController);
     QObject::connect(
         &app,
         &QCoreApplication::aboutToQuit,
@@ -75,6 +78,7 @@ int main(int argc, char* argv[])
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);
+    engine.rootContext()->setContextProperty("skyScene", &skySceneModel);
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,

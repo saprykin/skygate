@@ -3,11 +3,12 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
+#include <QThreadPool>
 
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 
+#include <memory>
 #include <string_view>
-#include <thread>
 #include <utility>
 
 void CatalogPayloadParseService::parseAsync(
@@ -19,7 +20,7 @@ void CatalogPayloadParseService::parseAsync(
 ) const
 {
     QPointer<QObject> safeContext(callbackContext);
-    std::thread([
+    auto task = QRunnable::create([
         payload = std::move(payload),
         safeContext,
         selectionOptions,
@@ -50,28 +51,23 @@ void CatalogPayloadParseService::parseAsync(
             static_cast<std::size_t>(payload.size())
         );
         const skygate::ephemeris::CatalogPayloadParser parser;
-        auto* parsedResultRaw = new skygate::ephemeris::CatalogLoadResult(parser.parseResult(
-            payloadView,
-            reportProgress,
-            selectionOptions
-        ));
+        const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(
+            parser.parseResult(payloadView, reportProgress, selectionOptions)
+        );
 
         QObject* const contextObject = safeContext.data();
         if (contextObject == nullptr) {
-            delete parsedResultRaw;
             return;
         }
 
-        const bool scheduled = QMetaObject::invokeMethod(
+        QMetaObject::invokeMethod(
             contextObject,
-            [completionHandler = std::move(completionHandler), parsedResultRaw]() mutable {
-                std::unique_ptr<skygate::ephemeris::CatalogLoadResult> parsedResultGuard(parsedResultRaw);
-                completionHandler(std::move(*parsedResultGuard));
+            [completionHandler, parsedResult]() mutable {
+                completionHandler(std::move(*parsedResult));
             },
             Qt::QueuedConnection
         );
-        if (!scheduled) {
-            delete parsedResultRaw;
-        }
-    }).detach();
+    });
+    task->setAutoDelete(true);
+    QThreadPool::globalInstance()->start(task);
 }

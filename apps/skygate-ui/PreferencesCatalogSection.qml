@@ -5,9 +5,7 @@ import QtQuick.Layouts
 Item {
     id: catalogSection
     required property var skyContextController
-    property alias catalogPresetCurrentIndex: catalogPresetCombo.currentIndex
-    readonly property int catalogPresetCount: catalogPresetCombo.count
-    property alias catalogUrlText: catalogUrlInput.text
+    required property var settingsDraft
 
     Rectangle {
         anchors.fill: parent
@@ -39,17 +37,25 @@ Item {
                         "HYG v4.2 stars + Stellarium lines",
                         "Custom URL"
                     ]
+
+                    Binding on currentIndex {
+                        value: Math.max(0, Math.min(catalogPresetCombo.count - 1, settingsDraft.catalogPresetIndex))
+                    }
+
+                    onActivated: settingsDraft.catalogPresetIndex = currentIndex
                 }
 
                 PreferencesActionButton {
                     text: "Use Preset"
                     enabled: catalogPresetCombo.currentIndex !== 2
                     onClicked: {
+                        settingsDraft.catalogPresetIndex = catalogPresetCombo.currentIndex
                         if (catalogPresetCombo.currentIndex === 0) {
                             skyContextController.loadCatalogPreset("bundled")
                         } else if (catalogPresetCombo.currentIndex === 1) {
+                            settingsDraft.catalogUrlText =
+                                "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
                             skyContextController.loadCatalogPreset("hyg_v42")
-                            catalogUrlInput.text = "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
                         }
                     }
                 }
@@ -57,9 +63,7 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.fillHeight: false
                 Layout.preferredHeight: 82
-                Layout.minimumHeight: 82
                 radius: 9
                 color: "#0c1830"
                 border.width: 1
@@ -110,9 +114,15 @@ Item {
                 PreferencesTextField {
                     id: catalogUrlInput
                     Layout.fillWidth: true
-                    text: "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
                     placeholderText: "https://example.com/skygate-catalog.txt or HYG CSV URL"
                     Component.onCompleted: cursorPosition = 0
+
+                    Binding on text {
+                        when: !catalogUrlInput.activeFocus
+                        value: settingsDraft.catalogUrlText
+                    }
+
+                    onTextEdited: settingsDraft.catalogUrlText = text
                     onActiveFocusChanged: {
                         if (!activeFocus) {
                             cursorPosition = 0
@@ -128,7 +138,10 @@ Item {
                 PreferencesActionButton {
                     text: skyContextController.downloadingCatalog ? "Downloading..." : "Download"
                     enabled: !skyContextController.downloadingCatalog
-                    onClicked: skyContextController.downloadCatalogFromUrl(catalogUrlInput.text)
+                    onClicked: {
+                        settingsDraft.catalogPresetIndex = 2
+                        skyContextController.downloadCatalogFromUrl(settingsDraft.catalogUrlText)
+                    }
                 }
             }
 

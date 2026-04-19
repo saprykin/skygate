@@ -4,7 +4,6 @@ import QtQuick.Controls
 Rectangle {
     id: actionButton
     property string text: ""
-    property bool enabled: true
     signal clicked()
 
     implicitWidth: 160

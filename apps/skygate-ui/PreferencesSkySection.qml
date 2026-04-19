@@ -4,14 +4,7 @@ import QtQuick.Layouts
 
 Item {
     id: root
-
-    property alias utcDateInput: utcDateInput
-    property alias utcTimeInput: utcTimeInput
-    property alias latitudeInput: latitudeInput
-    property alias longitudeInput: longitudeInput
-    property alias elevationInput: elevationInput
-    property alias projectionCombo: projectionCombo
-    property alias utcDateTimeLockToggle: utcDateTimeLockToggle
+    required property var settingsDraft
 
     Rectangle {
         anchors.fill: parent
@@ -23,53 +16,54 @@ Item {
         GridLayout {
             anchors.fill: parent
             anchors.margins: 10
-            columns: 3
-            rowSpacing: 8
+            columns: 4
+            rowSpacing: 10
             columnSpacing: 12
+
+            Label {
+                text: "Lock UTC Date"
+                color: "#cad9f7"
+                font.family: "Avenir Next"
+            }
+
+            PreferencesCheckBox {
+                Binding on checked {
+                    value: root.settingsDraft.utcDateLocked
+                }
+                onToggled: root.settingsDraft.utcDateLocked = checked
+            }
 
             Label {
                 text: "UTC Date"
                 color: "#cad9f7"
                 font.family: "Avenir Next"
             }
+
             PreferencesTextField {
                 id: utcDateInput
                 Layout.fillWidth: true
                 placeholderText: "YYYY-MM-DD"
-                enabled: !utcDateTimeLockToggle.checked
+                enabled: !root.settingsDraft.utcDateLocked
+
+                Binding on text {
+                    when: !utcDateInput.activeFocus
+                    value: root.settingsDraft.utcDateText
+                }
+
+                onTextEdited: root.settingsDraft.utcDateText = text
             }
-            ToolButton {
-                id: utcDateTimeLockToggle
-                checkable: true
-                Layout.rowSpan: 2
-                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                width: 38
-                height: 30
-                text: checked ? "\uD83D\uDD12" : "\uD83D\uDD13"
-                font.pixelSize: 16
-                ToolTip.visible: hovered
-                ToolTip.text: checked
-                    ? "Using current UTC date/time"
-                    : "Using manual UTC date/time input"
 
-                contentItem: Text {
-                    text: parent.text
-                    color: "#eaf7ff"
-                    font: parent.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
+            Label {
+                text: "Lock UTC Time"
+                color: "#cad9f7"
+                font.family: "Avenir Next"
+            }
 
-                background: Rectangle {
-                    radius: 8
-                    color: utcDateTimeLockToggle.checked
-                        ? "#2f79b8"
-                        : (utcDateTimeLockToggle.down
-                            ? "#27476d"
-                            : (utcDateTimeLockToggle.hovered ? "#315881" : "#1a3352"))
-                    border.width: 1
-                    border.color: utcDateTimeLockToggle.checked ? "#9de2ff" : "#6fbde6"
+            PreferencesCheckBox {
+                Binding on checked {
+                    value: root.settingsDraft.utcTimeLocked
                 }
+                onToggled: root.settingsDraft.utcTimeLocked = checked
             }
 
             Label {
@@ -77,11 +71,19 @@ Item {
                 color: "#cad9f7"
                 font.family: "Avenir Next"
             }
+
             PreferencesTextField {
                 id: utcTimeInput
                 Layout.fillWidth: true
                 placeholderText: "HH:MM:SS"
-                enabled: !utcDateTimeLockToggle.checked
+                enabled: !root.settingsDraft.utcTimeLocked
+
+                Binding on text {
+                    when: !utcTimeInput.activeFocus
+                    value: root.settingsDraft.utcTimeText
+                }
+
+                onTextEdited: root.settingsDraft.utcTimeText = text
             }
 
             Label {
@@ -89,16 +91,24 @@ Item {
                 color: "#cad9f7"
                 font.family: "Avenir Next"
             }
+
             PreferencesTextField {
                 id: latitudeInput
                 Layout.fillWidth: true
-                Layout.columnSpan: 2
+                Layout.columnSpan: 3
                 placeholderText: "-90..90"
                 validator: DoubleValidator {
                     bottom: -90.0
                     top: 90.0
                     notation: DoubleValidator.StandardNotation
                 }
+
+                Binding on text {
+                    when: !latitudeInput.activeFocus
+                    value: root.settingsDraft.latitudeText
+                }
+
+                onTextEdited: root.settingsDraft.latitudeText = text
             }
 
             Label {
@@ -106,16 +116,24 @@ Item {
                 color: "#cad9f7"
                 font.family: "Avenir Next"
             }
+
             PreferencesTextField {
                 id: longitudeInput
                 Layout.fillWidth: true
-                Layout.columnSpan: 2
+                Layout.columnSpan: 3
                 placeholderText: "-180..180"
                 validator: DoubleValidator {
                     bottom: -180.0
                     top: 180.0
                     notation: DoubleValidator.StandardNotation
                 }
+
+                Binding on text {
+                    when: !longitudeInput.activeFocus
+                    value: root.settingsDraft.longitudeText
+                }
+
+                onTextEdited: root.settingsDraft.longitudeText = text
             }
 
             Label {
@@ -123,14 +141,22 @@ Item {
                 color: "#cad9f7"
                 font.family: "Avenir Next"
             }
+
             PreferencesTextField {
                 id: elevationInput
                 Layout.fillWidth: true
-                Layout.columnSpan: 2
+                Layout.columnSpan: 3
                 placeholderText: "meters"
                 validator: DoubleValidator {
                     notation: DoubleValidator.StandardNotation
                 }
+
+                Binding on text {
+                    when: !elevationInput.activeFocus
+                    value: root.settingsDraft.elevationText
+                }
+
+                onTextEdited: root.settingsDraft.elevationText = text
             }
 
             Label {
@@ -138,11 +164,18 @@ Item {
                 color: "#cad9f7"
                 font.family: "Avenir Next"
             }
+
             PreferencesComboBox {
                 id: projectionCombo
                 Layout.fillWidth: true
-                Layout.columnSpan: 2
+                Layout.columnSpan: 3
                 model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]
+
+                Binding on currentIndex {
+                    value: Math.max(0, projectionCombo.model.indexOf(root.settingsDraft.projectionTypeText))
+                }
+
+                onActivated: root.settingsDraft.projectionTypeText = currentText
             }
         }
     }

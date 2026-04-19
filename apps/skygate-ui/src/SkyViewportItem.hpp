@@ -12,21 +12,21 @@
 #include <mutex>
 #include <optional>
 
-class SkyContextController;
+class SkySceneModel;
 class QSGNode;
 
 class SkyViewportItem : public QQuickItem {
     Q_OBJECT
-    Q_PROPERTY(QObject* skyContextController READ skyContextController WRITE setSkyContextController NOTIFY skyContextControllerChanged)
+    Q_PROPERTY(QObject* skySceneModel READ skySceneModel WRITE setSkySceneModel NOTIFY skySceneModelChanged)
 
 public:
     explicit SkyViewportItem(QQuickItem* parent = nullptr);
 
-    [[nodiscard]] QObject* skyContextController() const noexcept;
-    void setSkyContextController(QObject* skyContextController);
+    [[nodiscard]] QObject* skySceneModel() const noexcept;
+    void setSkySceneModel(QObject* skySceneModel);
 
 signals:
-    void skyContextControllerChanged();
+    void skySceneModelChanged();
 
 protected:
     [[nodiscard]] QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* updatePaintNodeData) override;
@@ -35,13 +35,12 @@ protected:
 private:
     struct ViewportRenderData;
 
-    void disconnectFromContextController();
+    void disconnectFromSceneModel();
     void synchronizeRenderData();
 
 private:
-    QPointer<SkyContextController> m_skyContextController;
-    QMetaObject::Connection m_skyContextChangedConnection;
-    QMetaObject::Connection m_projectionTypeChangedConnection;
+    QPointer<SkySceneModel> m_skySceneModel;
+    QMetaObject::Connection m_sceneFrameChangedConnection;
     std::mutex m_renderDataMutex;
     std::shared_ptr<const ViewportRenderData> m_renderData;
 };

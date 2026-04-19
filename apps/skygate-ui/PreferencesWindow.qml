@@ -20,44 +20,29 @@ Window {
 
     property color frameBackground: "#0d162c"
     property color panelBackground: "#122243"
-    property color sectionBackground: "#0f1d39"
     property color borderColor: "#345984"
     property color textPrimary: "#ecf4ff"
     property color textSecondary: "#9fb8dd"
     property int selectedPage: 0
 
+    SkySettingsDraft {
+        id: settingsDraft
+        skyContextController: preferencesWindow.skyContextController
+    }
 
     function syncFormFromContext() {
-        skySection.utcDateTimeLockToggle.checked =
-            skyContextController.utcDateLocked || skyContextController.utcTimeLocked
-        skySection.utcDateInput.text = skyContextController.utcDateText
-        skySection.utcTimeInput.text = skyContextController.utcTimeText
-        skySection.latitudeInput.text = skyContextController.latitudeText
-        skySection.longitudeInput.text = skyContextController.longitudeText
-        skySection.elevationInput.text = skyContextController.elevationText
-        skySection.projectionCombo.currentIndex = Math.max(
-            0,
-            skySection.projectionCombo.model.indexOf(skyContextController.projectionTypeText)
-        )
-        catalogSection.catalogPresetCurrentIndex = Math.max(
-            0,
-            Math.min(catalogSection.catalogPresetCount - 1, skyContextController.catalogPresetIndex())
-        )
-        catalogSection.catalogUrlText = skyContextController.catalogUrlText()
+        settingsDraft.resetFromContext()
     }
 
     function applyFormToContext() {
-        skyContextController.setUtcDateLocked(skySection.utcDateTimeLockToggle.checked)
-        skyContextController.setUtcTimeLocked(skySection.utcDateTimeLockToggle.checked)
-        skyContextController.setUtcDateText(skySection.utcDateInput.text)
-        skyContextController.setUtcTimeText(skySection.utcTimeInput.text)
-        skyContextController.setLatitudeText(skySection.latitudeInput.text)
-        skyContextController.setLongitudeText(skySection.longitudeInput.text)
-        skyContextController.setElevationText(skySection.elevationInput.text)
-        skyContextController.setProjectionTypeText(skySection.projectionCombo.currentText)
-        skyContextController.setCatalogPresetIndex(catalogSection.catalogPresetCurrentIndex)
-        skyContextController.setCatalogUrlText(catalogSection.catalogUrlText)
+        settingsDraft.applyToContext()
+    }
+
+    function openWindow() {
         syncFormFromContext()
+        visible = true
+        raise()
+        requestActivate()
     }
 
     Shortcut {
@@ -125,7 +110,6 @@ Window {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
 
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -145,7 +129,6 @@ Window {
                             font.family: "Avenir Next"
                         }
                     }
-
                 }
 
                 Rectangle {
@@ -200,7 +183,7 @@ Window {
                                 Label {
                                     Layout.fillWidth: true
                                     text: preferencesWindow.selectedPage === 0
-                                          ? "Observer location and projection"
+                                          ? "Observer location, time, and projection"
                                           : "Catalog source and download settings"
                                     color: "#89a8d2"
                                     font.family: "Avenir Next"
@@ -216,17 +199,17 @@ Window {
                             Layout.fillHeight: true
 
                             PreferencesSkySection {
-                                id: skySection
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
+                                settingsDraft: settingsDraft
                             }
 
                             PreferencesCatalogSection {
-                                id: catalogSection
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 Layout.alignment: Qt.AlignTop
                                 skyContextController: preferencesWindow.skyContextController
+                                settingsDraft: settingsDraft
                             }
                         }
                     }
@@ -235,8 +218,6 @@ Window {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 52
-                    Layout.minimumHeight: 52
-                    implicitHeight: 52
                     radius: 12
                     color: "#0f1c35"
                     border.width: 1
@@ -245,7 +226,6 @@ Window {
                     RowLayout {
                         anchors.fill: parent
                         anchors.margins: 10
-                        spacing: 8
 
                         Item {
                             Layout.fillWidth: true
@@ -256,7 +236,9 @@ Window {
                             Layout.preferredWidth: 112
                             Layout.fillHeight: true
                             radius: 10
-                            color: applyMouse.pressed ? "#296fa9" : (applyMouse.containsMouse ? "#378ac8" : "#307fbf")
+                            color: applyMouse.pressed
+                                ? "#296fa9"
+                                : (applyMouse.containsMouse ? "#378ac8" : "#307fbf")
                             border.width: 1
                             border.color: "#b9ecff"
 
@@ -305,7 +287,9 @@ Window {
 
                 background: Rectangle {
                     radius: 17
-                    color: closeIconButton.down ? "#27476d" : (closeIconButton.hovered ? "#315881" : "#1a3352")
+                    color: closeIconButton.down
+                        ? "#27476d"
+                        : (closeIconButton.hovered ? "#315881" : "#1a3352")
                     border.width: 1
                     border.color: "#6fbde6"
                 }

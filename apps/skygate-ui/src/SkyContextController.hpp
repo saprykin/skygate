@@ -1,35 +1,27 @@
 #pragma once
 
 #include <QObject>
-#include <QColor>
-#include <QDateTime>
 #include <QStringList>
 #include <QTimer>
-#include <QVariantList>
-
-#include "SkyRenderBuilders.hpp"
 
 #include "skygate/core/IProjection.hpp"
-#include "skygate/core/PreparedProjection.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
-#include <atomic>
 #include <cstdint>
-#include <cstddef>
 #include <memory>
-#include <optional>
 #include <span>
 #include <utility>
 #include <vector>
 
+class QDateTime;
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
-class QNetworkAccessManager;
-class CatalogCoordinator;
+class SkyCatalogManager;
+class SkySettingsStore;
 
 class SkyContextController final : public QObject {
     Q_OBJECT
@@ -70,10 +62,21 @@ public:
     using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
 
 public:
+    struct InitializationOptions final {
+        bool loadSettings;
+        bool initializeLocation;
+    };
+
     explicit SkyContextController(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
         std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine = nullptr,
         QObject* parent = nullptr
+    );
+    SkyContextController(
+        std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
+        InitializationOptions initializationOptions,
+        QObject* parent
     );
     ~SkyContextController() override;
 
@@ -100,31 +103,12 @@ public:
     [[nodiscard]] bool catalogProcessing() const noexcept;
     [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
-    [[nodiscard]] std::vector<SkyRenderPoint> renderPoints(
-        double viewportWidth,
-        double viewportHeight
-    ) const;
-    [[nodiscard]] std::vector<SkyRenderLine> renderConstellationLines(
-        double viewportWidth,
-        double viewportHeight
-    ) const;
-    [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan(
-        double viewportWidth,
-        double viewportHeight
-    ) const;
-    [[nodiscard]] std::span<const SkyRenderLine> renderConstellationLineSpan(
-        double viewportWidth,
-        double viewportHeight
-    ) const;
-    [[nodiscard]] std::optional<skygate::core::PreparedProjection> buildPreparedProjection(
-        double viewportWidth,
-        double viewportHeight
-    ) const;
-    [[nodiscard]] skygate::core::ScreenPoint projectHorizontal(
-        const skygate::core::HorizontalCoordinate& coordinate,
-        double viewportWidth,
-        double viewportHeight
-    ) const noexcept;
+    [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
+    [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
+    [[nodiscard]] skygate::core::ProjectionType projectionType() const noexcept;
+    [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
+    [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
+    [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void setUtcDateLocked(bool utcDateLocked);
@@ -149,11 +133,6 @@ public:
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
     Q_INVOKABLE bool clearCatalogCache();
-    Q_INVOKABLE double projectedX(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
-    Q_INVOKABLE double projectedY(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
-    Q_INVOKABLE bool isProjectedVisible(double altitudeDeg, double azimuthDeg, double viewportWidth, double viewportHeight) const;
-    Q_INVOKABLE QString objectLabelAt(double x, double y, double viewportWidth, double viewportHeight) const;
-    Q_INVOKABLE QVariantList constellationLabels(double viewportWidth, double viewportHeight) const;
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE int catalogPresetIndex() const noexcept;
@@ -189,8 +168,6 @@ signals:
     void skyContextChanged();
 
 private:
-    struct RenderCacheState;
-
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
@@ -198,29 +175,6 @@ private:
     void initializeCurrentLocation();
     void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
     void setProjectionType(skygate::core::ProjectionType projectionType);
-    void applyCatalog(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-        const QString& sourceLabel,
-        bool persistCatalog = true
-    );
-    void downloadCatalogFromUrls(
-        const QStringList& urlTexts,
-        const QString& sourceLabel,
-        const QStringList& constellationLineUrlTexts = {}
-    );
-    void resetConstellationLineRefs();
-    void setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
-    void setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
-    void persistCatalogCache(
-        std::span<const skygate::ephemeris::CelestialBody> bodies,
-        const QString& sourceLabel
-    ) const;
-    void restoreCatalogCache();
-    void invalidateRenderCaches() noexcept;
-    [[nodiscard]] const RenderCacheState& renderCache(
-        double viewportWidth,
-        double viewportHeight
-    ) const;
 
 private:
     bool m_live = true;
@@ -241,22 +195,8 @@ private:
     skygate::core::SkyContext m_skyContext;
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
     std::unique_ptr<skygate::core::IProjection> m_projection;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
-    std::unique_ptr<CatalogCoordinator> m_catalogCoordinator;
-    QNetworkAccessManager* m_networkAccessManager = nullptr;
+    std::unique_ptr<SkySettingsStore> m_settingsStore;
+    std::unique_ptr<SkyCatalogManager> m_catalogManager;
     QString m_locationStatusText;
-    QString m_catalogStatusText;
-    QString m_catalogSourceLabel = "Bundled";
-    int m_catalogPresetIndex = 0;
-    QString m_catalogUrlText;
-    std::atomic<std::uint64_t> m_catalogRevision {0};
-    std::atomic<std::uint64_t> m_renderCacheGeneration {1};
-    bool m_downloadingCatalog = false;
-    bool m_catalogProcessing = false;
-    std::size_t m_catalogBodyCount = 0;
-    std::size_t m_catalogConstellationCount = 0;
-    std::vector<ConstellationLineRef> m_constellationLineRefs;
-    std::vector<ConstellationLabelRef> m_constellationLabelRefs;
     QGeoPositionInfoSource* m_positionSource = nullptr;
 };
