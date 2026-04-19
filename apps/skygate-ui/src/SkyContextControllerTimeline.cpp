@@ -39,6 +39,7 @@ void SkyContextController::setLive(bool live)
 
     m_live = live;
     m_speedRemainderSeconds = 0.0;
+    m_catchingUpToCurrentUtc = false;
 
     if (m_live && m_restoreUtcLockStateOnLiveResume) {
         const bool nextUtcDateLocked = m_restoreUtcDateLockedOnLiveResume;
@@ -60,6 +61,12 @@ void SkyContextController::setLive(bool live)
     if (m_live && (m_utcDateLocked || m_utcTimeLocked)) {
         // Jump to current UTC as soon as playback resumes in lock mode.
         setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
+    }
+
+    if (m_live && !m_utcDateLocked && !m_utcTimeLocked) {
+        const QDateTime currentUtc = currentUtcDateTime();
+        const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
+        m_catchingUpToCurrentUtc = timelineUtc < currentUtc;
     }
 
     emit liveChanged();
@@ -419,18 +426,40 @@ void SkyContextController::tickUtcTime()
     const bool hasUtcLock = m_utcDateLocked || m_utcTimeLocked;
     if (hasUtcLock) {
         // In lock mode, live updates follow current UTC rather than timeline speed.
+        m_catchingUpToCurrentUtc = false;
         setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
         return;
     }
 
-    m_speedRemainderSeconds += m_speedMultiplier;
-    const int wholeSeconds = static_cast<int>(std::floor(m_speedRemainderSeconds));
-    if (wholeSeconds <= 0) {
+    const QDateTime currentUtc = currentUtcDateTime();
+    const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
+    const bool catchingUpToCurrentUtc = m_catchingUpToCurrentUtc && timelineUtc < currentUtc;
+    if (catchingUpToCurrentUtc) {
+        m_speedRemainderSeconds += m_speedMultiplier * static_cast<double>(m_stepSeconds);
+        const int wholeSeconds = static_cast<int>(std::floor(m_speedRemainderSeconds));
+        if (wholeSeconds <= 0) {
+            return;
+        }
+
+        m_speedRemainderSeconds -= wholeSeconds;
+        int appliedStepSeconds = wholeSeconds;
+        const qint64 secondsUntilCurrentUtc = timelineUtc.secsTo(currentUtc);
+        appliedStepSeconds = std::min(
+            appliedStepSeconds,
+            static_cast<int>(secondsUntilCurrentUtc)
+        );
+        m_catchingUpToCurrentUtc = appliedStepSeconds < secondsUntilCurrentUtc;
+        if (!m_catchingUpToCurrentUtc) {
+            m_speedRemainderSeconds = 0.0;
+        }
+
+        stepBySeconds(appliedStepSeconds);
         return;
     }
 
-    m_speedRemainderSeconds -= wholeSeconds;
-    stepBySeconds(wholeSeconds);
+    m_catchingUpToCurrentUtc = false;
+    m_speedRemainderSeconds = 0.0;
+    stepBySeconds(1);
 }
 
 void SkyContextController::stepBySeconds(const int stepSeconds)

@@ -220,6 +220,7 @@ private:
     bool m_restoreUtcLockStateOnLiveResume = false;
     bool m_restoreUtcDateLockedOnLiveResume = false;
     bool m_restoreUtcTimeLockedOnLiveResume = false;
+    bool m_catchingUpToCurrentUtc = false;
     double m_speedMultiplier = 1.0;
     double m_speedRemainderSeconds = 0.0;
     int m_stepSeconds = 60;

@@ -7,7 +7,9 @@
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
@@ -47,6 +49,11 @@ std::unique_ptr<SkyContextController> createController(bool loadSettings = false
     );
 }
 
+QDateTime controllerUtcTime(const SkyContextController& controller)
+{
+    return skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(controller.skyContext().utcTime);
+}
+
 }  // namespace
 
 class SkyContextControllerTests final : public QObject {
@@ -61,6 +68,9 @@ private slots:
     void manualCoordinateEditSwitchesToCustom();
     void invalidSavedCityFallsBackToCustom();
     void defaultsLocationSourceByPositioningAvailability();
+    void livePlaybackUsesManualStepWhileCatchingUp();
+    void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
+    void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -172,10 +182,93 @@ void SkyContextControllerTests::defaultsLocationSourceByPositioningAvailability(
     const auto controller = createController();
 
     if (controller->locationSourceOptions().contains("Current Device")) {
-    QCOMPARE(controller->locationSourceText(), QString("Current Device"));
+        QCOMPARE(controller->locationSourceText(), QString("Current Device"));
     } else {
-    QCOMPARE(controller->locationSourceText(), QString("Custom"));
+        QCOMPARE(controller->locationSourceText(), QString("Custom"));
     }
+}
+
+void SkyContextControllerTests::livePlaybackUsesManualStepWhileCatchingUp()
+{
+    const auto controller = createController();
+    controller->setUtcDateLocked(false);
+    controller->setUtcTimeLocked(false);
+    controller->setLive(false);
+    controller->setStepSeconds(60);
+    controller->setSpeedMultiplier(2.0);
+
+    const QDateTime startUtc = QDateTime::currentDateTimeUtc().addSecs(-5 * 60);
+    controller->setUtcDateText(startUtc.toString("yyyy-MM-dd"));
+    controller->setUtcTimeText(startUtc.toString("HH:mm:ss"));
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    skyContextChangedSpy.clear();
+
+    const qint64 beforeSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    controller->setLive(true);
+
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+
+    const qint64 afterSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QVERIFY(afterSeconds - beforeSeconds >= 120);
+
+    controller->setLive(false);
+}
+
+void SkyContextControllerTests::livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp()
+{
+    const auto controller = createController();
+    controller->setUtcDateLocked(false);
+    controller->setUtcTimeLocked(false);
+    controller->setLive(false);
+    controller->setStepSeconds(60);
+    controller->setSpeedMultiplier(2.0);
+
+    const QDateTime startUtc = QDateTime::currentDateTimeUtc().addSecs(-30);
+    controller->setUtcDateText(startUtc.toString("yyyy-MM-dd"));
+    controller->setUtcTimeText(startUtc.toString("HH:mm:ss"));
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    skyContextChangedSpy.clear();
+
+    controller->setLive(true);
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+
+    const qint64 currentTimelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    const qint64 currentUtcSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
+    QVERIFY(currentTimelineSeconds <= currentUtcSeconds);
+
+    controller->setLive(false);
+}
+
+void SkyContextControllerTests::livePlaybackFallsBackToOneSecondTicksAfterCatchUp()
+{
+    const auto controller = createController();
+    controller->setUtcDateLocked(false);
+    controller->setUtcTimeLocked(false);
+    controller->setLive(false);
+    controller->setStepSeconds(60);
+    controller->setSpeedMultiplier(4.0);
+
+    const QDateTime startUtc = QDateTime::currentDateTimeUtc().addSecs(-2);
+    controller->setUtcDateText(startUtc.toString("yyyy-MM-dd"));
+    controller->setUtcTimeText(startUtc.toString("HH:mm:ss"));
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    skyContextChangedSpy.clear();
+
+    controller->setLive(true);
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+
+    const qint64 afterCatchUpSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    skyContextChangedSpy.clear();
+
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+
+    const qint64 afterLiveTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QCOMPARE(afterLiveTickSeconds - afterCatchUpSeconds, 1);
+
+    controller->setLive(false);
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerTests)
