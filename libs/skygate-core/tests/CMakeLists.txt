@@ -27,4 +27,5 @@ add_skygate_core_qtest(skygate-core-projection-factory-tests ProjectionFactoryTe
 add_skygate_core_qtest(skygate-core-azimuthal-equidistant-projection-tests AzimuthalEquidistantProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-stereographic-projection-tests StereographicProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-perspective-projection-tests PerspectiveProjectionTests.cpp)
+add_skygate_core_qtest(skygate-core-prepared-projection-tests PreparedProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-viewport-math-tests ViewportMathTests.cpp)

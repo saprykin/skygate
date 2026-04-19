@@ -7,17 +7,22 @@
 #include <QTimer>
 #include <QVariantList>
 
+#include "SkyRenderBuilders.hpp"
+
 #include "skygate/core/IProjection.hpp"
+#include "skygate/core/PreparedProjection.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
+#include <atomic>
+#include <cstdint>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <span>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -64,22 +69,6 @@ public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
     using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
 
-    struct SkyRenderPoint {
-        double x = 0.0;
-        double y = 0.0;
-        double sizePx = 2.0;
-        QString displayName;
-        QColor color;
-    };
-
-    struct SkyRenderLine {
-        double x1 = 0.0;
-        double y1 = 0.0;
-        double x2 = 0.0;
-        double y2 = 0.0;
-        QColor color;
-    };
-
 public:
     explicit SkyContextController(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
@@ -116,6 +105,18 @@ public:
         double viewportHeight
     ) const;
     [[nodiscard]] std::vector<SkyRenderLine> renderConstellationLines(
+        double viewportWidth,
+        double viewportHeight
+    ) const;
+    [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan(
+        double viewportWidth,
+        double viewportHeight
+    ) const;
+    [[nodiscard]] std::span<const SkyRenderLine> renderConstellationLineSpan(
+        double viewportWidth,
+        double viewportHeight
+    ) const;
+    [[nodiscard]] std::optional<skygate::core::PreparedProjection> buildPreparedProjection(
         double viewportWidth,
         double viewportHeight
     ) const;
@@ -188,6 +189,8 @@ signals:
     void skyContextChanged();
 
 private:
+    struct RenderCacheState;
+
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
@@ -213,6 +216,11 @@ private:
         const QString& sourceLabel
     ) const;
     void restoreCatalogCache();
+    void invalidateRenderCaches() noexcept;
+    [[nodiscard]] const RenderCacheState& renderCache(
+        double viewportWidth,
+        double viewportHeight
+    ) const;
 
 private:
     bool m_live = true;
@@ -242,6 +250,8 @@ private:
     QString m_catalogSourceLabel = "Bundled";
     int m_catalogPresetIndex = 0;
     QString m_catalogUrlText;
+    std::atomic<std::uint64_t> m_catalogRevision {0};
+    std::atomic<std::uint64_t> m_renderCacheGeneration {1};
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
     std::size_t m_catalogBodyCount = 0;

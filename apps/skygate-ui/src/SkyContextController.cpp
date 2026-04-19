@@ -1,7 +1,6 @@
 #include "SkyContextController.hpp"
 
 #include "CatalogCoordinator.hpp"
-#include "SkyRenderBuilders.hpp"
 #include "SkyContextControllerSupport.hpp"
 
 #include <QLocale>
@@ -15,11 +14,93 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
-#include <string>
+#include <memory>
+#include <unordered_map>
 #include <utility>
 
 using namespace skygate::ui::internal;
+
+namespace {
+
+constexpr double kHoverLookupCellSizePx = 24.0;
+
+struct SnapshotCacheKey final {
+    std::uint64_t catalogRevision = 0;
+    skygate::core::UtcTimePoint utcTime {};
+    skygate::core::GeoLocation observer;
+
+    [[nodiscard]] bool matches(
+        const std::uint64_t nextCatalogRevision,
+        const skygate::core::SkyContext& context
+    ) const noexcept
+    {
+        return catalogRevision == nextCatalogRevision
+            && utcTime == context.utcTime
+            && observer.latitudeDeg == context.observer.latitudeDeg
+            && observer.longitudeDeg == context.observer.longitudeDeg
+            && observer.elevationMeters == context.observer.elevationMeters;
+    }
+};
+
+struct RenderFrameKey final {
+    std::uint64_t snapshotGeneration = 0;
+    skygate::core::ProjectionType projectionType = skygate::core::ProjectionType::Stereographic;
+    std::int32_t viewportWidthPx = 0;
+    std::int32_t viewportHeightPx = 0;
+    double centerAltitudeDeg = 0.0;
+    double centerAzimuthDeg = 0.0;
+    double fieldOfViewDeg = 0.0;
+    double magnitudeCutoff = 0.0;
+
+    [[nodiscard]] bool matches(
+        const std::uint64_t nextSnapshotGeneration,
+        const skygate::core::ProjectionType nextProjectionType,
+        const double viewportWidth,
+        const double viewportHeight,
+        const double nextCenterAltitudeDeg,
+        const double nextCenterAzimuthDeg,
+        const double nextFieldOfViewDeg,
+        const double nextMagnitudeCutoff
+    ) const noexcept
+    {
+        return snapshotGeneration == nextSnapshotGeneration
+            && projectionType == nextProjectionType
+            && viewportWidthPx == static_cast<std::int32_t>(std::lround(viewportWidth))
+            && viewportHeightPx == static_cast<std::int32_t>(std::lround(viewportHeight))
+            && centerAltitudeDeg == nextCenterAltitudeDeg
+            && centerAzimuthDeg == nextCenterAzimuthDeg
+            && fieldOfViewDeg == nextFieldOfViewDeg
+            && magnitudeCutoff == nextMagnitudeCutoff;
+    }
+};
+
+[[nodiscard]] std::uint64_t hoverCellKey(
+    const double x,
+    const double y,
+    const double cellSizePx
+) noexcept
+{
+    const std::uint32_t cellX = static_cast<std::uint32_t>(std::floor(x / cellSizePx));
+    const std::uint32_t cellY = static_cast<std::uint32_t>(std::floor(y / cellSizePx));
+    return (static_cast<std::uint64_t>(cellX) << 32U) | static_cast<std::uint64_t>(cellY);
+}
+
+}  // namespace
+
+struct SkyContextController::RenderCacheState final {
+    std::uint64_t cacheGeneration = 0;
+    SnapshotCacheKey snapshotKey;
+    bool snapshotValid = false;
+    std::uint64_t snapshotGeneration = 0;
+    skygate::ephemeris::SkySnapshot snapshot;
+
+    RenderFrameKey frameKey;
+    bool frameValid = false;
+    SkyRenderFrame frame;
+    std::unordered_map<std::uint64_t, std::vector<std::size_t>> hoverPointIndicesByCell;
+};
 
 SkyContextController::SkyContextController(
     std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
@@ -246,68 +327,58 @@ const skygate::core::SkyContext& SkyContextController::skyContext() const noexce
     return m_skyContext;
 }
 
-std::vector<SkyContextController::SkyRenderPoint> SkyContextController::renderPoints(
+std::vector<SkyRenderPoint> SkyContextController::renderPoints(
     const double viewportWidth,
     const double viewportHeight
 ) const
 {
-    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
-        return {};
-    }
-
-    if (m_ephemerisEngine == nullptr || m_projection == nullptr) {
-        return {};
-    }
-
-    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
-        viewportWidth,
-        viewportHeight,
-        m_viewCenterAltitudeDeg,
-        m_viewCenterAzimuthDeg,
-        m_viewFieldOfViewDeg
-    );
-
-    const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-    const SkyRenderPointBuilder renderPointBuilder;
-    return renderPointBuilder.buildPoints(
-        snapshot,
-        *m_projection,
-        projectionParams,
-        m_magnitudeCutoff
-    );
+    const auto points = renderPointSpan(viewportWidth, viewportHeight);
+    return std::vector<SkyRenderPoint>(points.begin(), points.end());
 }
 
-std::vector<SkyContextController::SkyRenderLine> SkyContextController::renderConstellationLines(
+std::vector<SkyRenderLine> SkyContextController::renderConstellationLines(
     const double viewportWidth,
     const double viewportHeight
 ) const
 {
-    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
-        return {};
+    const auto lines = renderConstellationLineSpan(viewportWidth, viewportHeight);
+    return std::vector<SkyRenderLine>(lines.begin(), lines.end());
+}
+
+std::span<const SkyRenderPoint> SkyContextController::renderPointSpan(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    return std::span<const SkyRenderPoint>(renderCache(viewportWidth, viewportHeight).frame.points);
+}
+
+std::span<const SkyRenderLine> SkyContextController::renderConstellationLineSpan(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    return std::span<const SkyRenderLine>(renderCache(viewportWidth, viewportHeight).frame.lines);
+}
+
+std::optional<skygate::core::PreparedProjection> SkyContextController::buildPreparedProjection(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    if (m_projection == nullptr || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return std::nullopt;
     }
 
-    if (m_ephemerisEngine == nullptr || m_projection == nullptr) {
-        return {};
-    }
-
-    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
-        viewportWidth,
-        viewportHeight,
-        m_viewCenterAltitudeDeg,
-        m_viewCenterAzimuthDeg,
-        m_viewFieldOfViewDeg
-    );
-
-    const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-    const SkyConstellationRenderBuilder renderBuilder;
-    return renderBuilder.buildLines(
-        snapshot,
-        *m_projection,
-        projectionParams,
-        m_constellationLineRefs,
-        viewportWidth,
-        viewportHeight
-    );
+    const skygate::core::ProjectionParams projectionParams =
+        skygate::core::ViewportMath::buildProjectionParams(
+            viewportWidth,
+            viewportHeight,
+            m_viewCenterAltitudeDeg,
+            m_viewCenterAzimuthDeg,
+            m_viewFieldOfViewDeg
+        );
+    return skygate::core::PreparedProjection::create(m_projectionType, projectionParams);
 }
 
 skygate::core::ScreenPoint SkyContextController::projectHorizontal(
@@ -316,18 +387,12 @@ skygate::core::ScreenPoint SkyContextController::projectHorizontal(
     const double viewportHeight
 ) const noexcept
 {
-    if (m_projection == nullptr || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+    const auto preparedProjection = buildPreparedProjection(viewportWidth, viewportHeight);
+    if (!preparedProjection.has_value()) {
         return {};
     }
 
-    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
-        viewportWidth,
-        viewportHeight,
-        m_viewCenterAltitudeDeg,
-        m_viewCenterAzimuthDeg,
-        m_viewFieldOfViewDeg
-    );
-    return m_projection->project(coordinate, projectionParams);
+    return preparedProjection->project(coordinate);
 }
 
 double SkyContextController::projectedX(
@@ -379,34 +444,61 @@ QString SkyContextController::objectLabelAt(
     const double viewportHeight
 ) const
 {
-    const auto points = renderPoints(viewportWidth, viewportHeight);
-    if (points.empty()) {
+    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return {};
+    }
+
+    const auto& cache = renderCache(viewportWidth, viewportHeight);
+    if (cache.frame.points.empty() || cache.snapshot.catalogBodies == nullptr) {
         return {};
     }
 
     double bestDistanceSquared = std::numeric_limits<double>::infinity();
-    QString bestLabel;
+    std::size_t bestPointIndex = cache.frame.points.size();
+    const std::int32_t cellX = static_cast<std::int32_t>(std::floor(x / kHoverLookupCellSizePx));
+    const std::int32_t cellY = static_cast<std::int32_t>(std::floor(y / kHoverLookupCellSizePx));
 
-    for (const auto& point : points) {
-        if (point.displayName.isEmpty()) {
-            continue;
-        }
+    for (int deltaY = -1; deltaY <= 1; ++deltaY) {
+        for (int deltaX = -1; deltaX <= 1; ++deltaX) {
+            const auto cellIt = cache.hoverPointIndicesByCell.find(
+                (static_cast<std::uint64_t>(static_cast<std::uint32_t>(cellX + deltaX)) << 32U)
+                | static_cast<std::uint64_t>(static_cast<std::uint32_t>(cellY + deltaY))
+            );
+            if (cellIt == cache.hoverPointIndicesByCell.end()) {
+                continue;
+            }
 
-        const double deltaX = x - point.x;
-        const double deltaY = y - point.y;
-        const double distanceSquared = deltaX * deltaX + deltaY * deltaY;
-        const double hitRadius = std::max(10.0, point.sizePx + 5.0);
-        if (distanceSquared > hitRadius * hitRadius) {
-            continue;
-        }
+            for (const std::size_t pointIndex : cellIt->second) {
+                const auto& point = cache.frame.points[pointIndex];
+                const auto& body = cache.snapshot.bodyAt(point.bodyIndex);
+                if (body.displayName.empty()) {
+                    continue;
+                }
 
-        if (distanceSquared < bestDistanceSquared) {
-            bestDistanceSquared = distanceSquared;
-            bestLabel = point.displayName;
+                const double deltaPointX = x - point.x;
+                const double deltaPointY = y - point.y;
+                const double distanceSquared =
+                    (deltaPointX * deltaPointX) + (deltaPointY * deltaPointY);
+                const double hitRadius = std::max(10.0, point.sizePx + 5.0);
+                if (distanceSquared > (hitRadius * hitRadius)) {
+                    continue;
+                }
+
+                if (distanceSquared < bestDistanceSquared) {
+                    bestDistanceSquared = distanceSquared;
+                    bestPointIndex = pointIndex;
+                }
+            }
         }
     }
 
-    return bestLabel;
+    if (bestPointIndex >= cache.frame.points.size()) {
+        return {};
+    }
+
+    return QString::fromStdString(
+        cache.snapshot.bodyAt(cache.frame.points[bestPointIndex].bodyIndex).displayName
+    );
 }
 
 QVariantList SkyContextController::constellationLabels(
@@ -414,30 +506,106 @@ QVariantList SkyContextController::constellationLabels(
     const double viewportHeight
 ) const
 {
-    if (viewportWidth <= 0.0 || viewportHeight <= 0.0) {
-        return {};
+    return renderCache(viewportWidth, viewportHeight).frame.labels;
+}
+
+const SkyContextController::RenderCacheState& SkyContextController::renderCache(
+    const double viewportWidth,
+    const double viewportHeight
+) const
+{
+    static thread_local std::unordered_map<
+        const SkyContextController*,
+        std::unique_ptr<RenderCacheState>
+    > cachesByController;
+
+    auto& cacheEntry = cachesByController[this];
+    if (cacheEntry == nullptr) {
+        cacheEntry = std::make_unique<RenderCacheState>();
     }
 
-    if (m_ephemerisEngine == nullptr || m_projection == nullptr) {
-        return {};
+    auto& cache = *cacheEntry;
+    const std::uint64_t cacheGeneration = m_renderCacheGeneration.load(std::memory_order_relaxed);
+    if (cache.cacheGeneration != cacheGeneration) {
+        cache = {};
+        cache.cacheGeneration = cacheGeneration;
     }
 
-    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
-        viewportWidth,
-        viewportHeight,
-        m_viewCenterAltitudeDeg,
-        m_viewCenterAzimuthDeg,
-        m_viewFieldOfViewDeg
-    );
+    const std::uint64_t catalogRevision = m_catalogRevision.load(std::memory_order_relaxed);
+    if (m_ephemerisEngine != nullptr) {
+        if (!cache.snapshotKey.matches(catalogRevision, m_skyContext) || !cache.snapshotValid) {
+            cache.snapshot = m_ephemerisEngine->compute(m_skyContext);
+            cache.snapshotKey.catalogRevision = catalogRevision;
+            cache.snapshotKey.utcTime = m_skyContext.utcTime;
+            cache.snapshotKey.observer = m_skyContext.observer;
+            cache.snapshotValid = true;
+            ++cache.snapshotGeneration;
+            cache.frameValid = false;
+        }
+    } else if (!cache.snapshotValid) {
+        cache.snapshot = {};
+        cache.snapshotValid = true;
+        ++cache.snapshotGeneration;
+        cache.frameValid = false;
+    }
 
-    const auto snapshot = m_ephemerisEngine->compute(m_skyContext);
-    const SkyConstellationRenderBuilder renderBuilder;
-    return renderBuilder.buildLabels(
-        snapshot,
-        *m_projection,
-        projectionParams,
-        m_constellationLabelRefs,
-        viewportWidth,
-        viewportHeight
-    );
+    if (
+        cache.frameValid
+        && cache.frameKey.matches(
+            cache.snapshotGeneration,
+            m_projectionType,
+            viewportWidth,
+            viewportHeight,
+            m_viewCenterAltitudeDeg,
+            m_viewCenterAzimuthDeg,
+            m_viewFieldOfViewDeg,
+            m_magnitudeCutoff
+        )
+    ) {
+        return cache;
+    }
+
+    cache.frame = {};
+    cache.hoverPointIndicesByCell.clear();
+    if (const auto preparedProjection = buildPreparedProjection(viewportWidth, viewportHeight);
+        preparedProjection.has_value()) {
+        const SkyRenderFrameBuilder frameBuilder;
+        cache.frame = frameBuilder.buildFrame(
+            cache.snapshot,
+            *preparedProjection,
+            m_constellationLineRefs,
+            m_constellationLabelRefs,
+            m_magnitudeCutoff,
+            viewportWidth,
+            viewportHeight
+        );
+
+        cache.hoverPointIndicesByCell.reserve((cache.frame.points.size() / 4U) + 1U);
+        for (std::size_t pointIndex = 0; pointIndex < cache.frame.points.size(); ++pointIndex) {
+            const auto& point = cache.frame.points[pointIndex];
+            const auto& body = cache.snapshot.bodyAt(point.bodyIndex);
+            if (body.displayName.empty()) {
+                continue;
+            }
+
+            cache.hoverPointIndicesByCell[hoverCellKey(point.x, point.y, kHoverLookupCellSizePx)]
+                .push_back(pointIndex);
+        }
+    }
+
+    cache.frameKey.snapshotGeneration = cache.snapshotGeneration;
+    cache.frameKey.projectionType = m_projectionType;
+    cache.frameKey.viewportWidthPx = static_cast<std::int32_t>(std::lround(viewportWidth));
+    cache.frameKey.viewportHeightPx = static_cast<std::int32_t>(std::lround(viewportHeight));
+    cache.frameKey.centerAltitudeDeg = m_viewCenterAltitudeDeg;
+    cache.frameKey.centerAzimuthDeg = m_viewCenterAzimuthDeg;
+    cache.frameKey.fieldOfViewDeg = m_viewFieldOfViewDeg;
+    cache.frameKey.magnitudeCutoff = m_magnitudeCutoff;
+    cache.frameValid = true;
+    return cache;
+}
+
+void SkyContextController::invalidateRenderCaches() noexcept
+{
+    m_renderCacheGeneration.fetch_add(1U, std::memory_order_relaxed);
 }

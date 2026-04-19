@@ -2,16 +2,17 @@
 
 #include "SkyContextControllerSupport.hpp"
 
-#include <QColor>
 #include <QVariantMap>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 using namespace skygate::ui::internal;
 
@@ -21,8 +22,8 @@ class HorizontalLookup final {
 public:
     explicit HorizontalLookup(const skygate::ephemeris::SkySnapshot& snapshot)
     {
-        m_horizontalById.reserve(snapshot.states.size());
         m_horizontalByDisplayName.reserve(snapshot.states.size());
+        m_horizontalByBodyId.reserve(snapshot.states.size());
 
         for (const auto& state : snapshot.states) {
             if (
@@ -32,8 +33,9 @@ public:
                 continue;
             }
 
-            m_horizontalById[state.body.id] = state.horizontal;
-            m_horizontalByDisplayName[state.body.displayName] = state.horizontal;
+            const auto& body = snapshot.bodyAt(state.bodyIndex);
+            m_horizontalByBodyId[body.id] = state.horizontal;
+            m_horizontalByDisplayName[body.displayName] = state.horizontal;
         }
     }
 
@@ -41,7 +43,7 @@ public:
         const std::string_view bodyId
     ) const
     {
-        if (const auto idIt = m_horizontalById.find(bodyId); idIt != m_horizontalById.end()) {
+        if (const auto idIt = m_horizontalByBodyId.find(bodyId); idIt != m_horizontalByBodyId.end()) {
             return &idIt->second;
         }
 
@@ -61,11 +63,17 @@ public:
     }
 
 private:
-    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> m_horizontalById;
+    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> m_horizontalByBodyId;
     std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> m_horizontalByDisplayName;
 };
 
-QColor labelColorForBodyType(const skygate::ephemeris::CelestialBodyType type)
+struct DecimatedStarPoint final {
+    SkyRenderPoint point;
+    double visualMagnitude = 0.0;
+    double distanceToCellCenterSquared = 0.0;
+};
+
+[[nodiscard]] QColor labelColorForBodyType(const skygate::ephemeris::CelestialBodyType type)
 {
     switch (type) {
     case skygate::ephemeris::CelestialBodyType::Sun:
@@ -83,17 +91,136 @@ QColor labelColorForBodyType(const skygate::ephemeris::CelestialBodyType type)
     return QColor(201, 220, 255, 230);
 }
 
+[[nodiscard]] double starDecimationCellSizePx(
+    const skygate::core::ProjectionParams& projectionParams,
+    const std::size_t stateCount,
+    const double viewportWidth,
+    const double viewportHeight
+)
+{
+    if (stateCount < 30000U || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
+        return 0.0;
+    }
+
+    if (projectionParams.fovDeg <= 35.0) {
+        return 0.0;
+    }
+
+    const double normalizedFov = std::clamp((projectionParams.fovDeg - 35.0) / 95.0, 0.0, 1.0);
+    const double baseCellSize = 2.5 + (normalizedFov * 4.5);
+    const double viewportScale = std::clamp(
+        std::sqrt((viewportWidth * viewportHeight) / (1100.0 * 760.0)),
+        0.85,
+        1.35
+    );
+    return baseCellSize * viewportScale;
+}
+
+[[nodiscard]] std::uint64_t screenCellKey(
+    const double x,
+    const double y,
+    const double cellSizePx
+)
+{
+    const std::uint32_t cellX = static_cast<std::uint32_t>(std::floor(x / cellSizePx));
+    const std::uint32_t cellY = static_cast<std::uint32_t>(std::floor(y / cellSizePx));
+    return (static_cast<std::uint64_t>(cellX) << 32U) | static_cast<std::uint64_t>(cellY);
+}
+
+[[nodiscard]] double distanceToCellCenterSquared(
+    const double x,
+    const double y,
+    const double cellSizePx
+)
+{
+    const double cellX = std::floor(x / cellSizePx);
+    const double cellY = std::floor(y / cellSizePx);
+    const double centerX = (cellX * cellSizePx) + (cellSizePx * 0.5);
+    const double centerY = (cellY * cellSizePx) + (cellSizePx * 0.5);
+    const double deltaX = x - centerX;
+    const double deltaY = y - centerY;
+    return (deltaX * deltaX) + (deltaY * deltaY);
+}
+
+[[nodiscard]] bool shouldReplaceStarPoint(
+    const DecimatedStarPoint& existingPoint,
+    const double visualMagnitude,
+    const double nextDistanceToCellCenterSquared
+)
+{
+    if (visualMagnitude < existingPoint.visualMagnitude) {
+        return true;
+    }
+
+    if (std::abs(visualMagnitude - existingPoint.visualMagnitude) <= 1e-6) {
+        return nextDistanceToCellCenterSquared < existingPoint.distanceToCellCenterSquared;
+    }
+
+    return false;
+}
+
+[[nodiscard]] SkyRenderPoint makeRenderPoint(
+    const skygate::ephemeris::CelestialBody& body,
+    const std::uint32_t bodyIndex,
+    const skygate::core::ScreenPoint& projected
+)
+{
+    SkyRenderPoint point;
+    point.x = projected.x;
+    point.y = projected.y;
+    point.bodyIndex = bodyIndex;
+    point.sizePx = SkyContextRenderStyle::pointSizeForMagnitude(body.visualMagnitude);
+    if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
+        point.sizePx = std::max(point.sizePx, 3.0);
+    }
+    point.color = SkyContextRenderStyle::colorForBodyType(body.type);
+    return point;
+}
+
+void appendLabel(
+    QVariantList& labels,
+    const double x,
+    const double y,
+    const std::string_view text,
+    const QColor& color
+)
+{
+    QVariantMap labelEntry;
+    labelEntry.insert("x", x);
+    labelEntry.insert("y", y);
+    labelEntry.insert("text", QString::fromStdString(std::string(text)));
+    labelEntry.insert("color", color);
+    labels.push_back(std::move(labelEntry));
+}
+
 }  // namespace
 
-std::vector<SkyContextController::SkyRenderPoint> SkyRenderPointBuilder::buildPoints(
+SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const skygate::ephemeris::SkySnapshot& snapshot,
-    const skygate::core::IProjection& projection,
-    const skygate::core::ProjectionParams& projectionParams,
-    const double magnitudeCutoff
+    const skygate::core::PreparedProjection& projection,
+    const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs,
+    const std::vector<skygate::ephemeris::ConstellationLabelRef>& labelRefs,
+    const double magnitudeCutoff,
+    const double viewportWidth,
+    const double viewportHeight
 ) const
 {
-    std::vector<SkyContextController::SkyRenderPoint> points;
-    points.reserve(snapshot.states.size());
+    SkyRenderFrame frame;
+    frame.lines.reserve(lineRefs.size());
+
+    const double starCellSizePx = starDecimationCellSizePx(
+        projection.params(),
+        snapshot.states.size(),
+        viewportWidth,
+        viewportHeight
+    );
+    std::unordered_map<std::uint64_t, std::size_t> starPointIndexByCell;
+    std::vector<DecimatedStarPoint> decimatedStarPoints;
+    frame.points.reserve(snapshot.states.size() / 8U);
+    if (starCellSizePx > 0.0) {
+        starPointIndexByCell.reserve(snapshot.states.size() / 6U);
+        decimatedStarPoints.reserve(snapshot.states.size() / 6U);
+    }
 
     for (const auto& state : snapshot.states) {
         if (
@@ -103,49 +230,68 @@ std::vector<SkyContextController::SkyRenderPoint> SkyRenderPointBuilder::buildPo
             continue;
         }
 
+        const auto& body = snapshot.bodyAt(state.bodyIndex);
         if (
-            state.body.type == skygate::ephemeris::CelestialBodyType::Star
-            && state.body.visualMagnitude > magnitudeCutoff
+            body.type == skygate::ephemeris::CelestialBodyType::Star
+            && body.visualMagnitude > magnitudeCutoff
         ) {
             continue;
         }
 
-        const auto projected = projection.project(state.horizontal, projectionParams);
+        const auto projected = projection.project(state.horizontal);
         if (!projected.isVisible) {
             continue;
         }
 
-        SkyContextController::SkyRenderPoint point;
-        point.x = projected.x;
-        point.y = projected.y;
-        point.sizePx = SkyContextRenderStyle::pointSizeForMagnitude(state.body.visualMagnitude);
-        if (state.body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
-            point.sizePx = std::max(point.sizePx, 3.0);
+        if (
+            body.type == skygate::ephemeris::CelestialBodyType::Star
+            && starCellSizePx > 0.0
+        ) {
+            const std::uint64_t cellKey = screenCellKey(projected.x, projected.y, starCellSizePx);
+            const double cellCenterDistanceSquared = distanceToCellCenterSquared(
+                projected.x,
+                projected.y,
+                starCellSizePx
+            );
+            if (const auto pointIndexIt = starPointIndexByCell.find(cellKey);
+                pointIndexIt != starPointIndexByCell.end()) {
+                auto& existingPoint = decimatedStarPoints[pointIndexIt->second];
+                if (!shouldReplaceStarPoint(
+                        existingPoint,
+                        body.visualMagnitude,
+                        cellCenterDistanceSquared
+                    )) {
+                    continue;
+                }
+
+                existingPoint.point = makeRenderPoint(body, state.bodyIndex, projected);
+                existingPoint.visualMagnitude = body.visualMagnitude;
+                existingPoint.distanceToCellCenterSquared = cellCenterDistanceSquared;
+                continue;
+            }
+
+            starPointIndexByCell.emplace(cellKey, decimatedStarPoints.size());
+            decimatedStarPoints.push_back(DecimatedStarPoint {
+                .point = makeRenderPoint(body, state.bodyIndex, projected),
+                .visualMagnitude = body.visualMagnitude,
+                .distanceToCellCenterSquared = cellCenterDistanceSquared
+            });
+            continue;
         }
-        point.displayName = QString::fromStdString(state.body.displayName);
-        point.color = SkyContextRenderStyle::colorForBodyType(state.body.type);
-        points.push_back(std::move(point));
+
+        frame.points.push_back(makeRenderPoint(body, state.bodyIndex, projected));
     }
 
-    return points;
-}
+    if (!decimatedStarPoints.empty()) {
+        frame.points.reserve(frame.points.size() + decimatedStarPoints.size());
+        for (auto& starPoint : decimatedStarPoints) {
+            frame.points.push_back(std::move(starPoint.point));
+        }
+    }
 
-std::vector<SkyContextController::SkyRenderLine> SkyConstellationRenderBuilder::buildLines(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const skygate::core::IProjection& projection,
-    const skygate::core::ProjectionParams& projectionParams,
-    const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs,
-    const double viewportWidth,
-    const double viewportHeight
-) const
-{
     const HorizontalLookup lookup(snapshot);
-
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
-
-    std::vector<SkyContextController::SkyRenderLine> lines;
-    lines.reserve(lineRefs.size());
 
     for (const auto& lineRef : lineRefs) {
         const auto* startHorizontal = lookup.findHorizontal(lineRef.first);
@@ -154,8 +300,8 @@ std::vector<SkyContextController::SkyRenderLine> SkyConstellationRenderBuilder::
             continue;
         }
 
-        const auto startProjected = projection.project(*startHorizontal, projectionParams);
-        const auto endProjected = projection.project(*endHorizontal, projectionParams);
+        const auto startProjected = projection.project(*startHorizontal);
+        const auto endProjected = projection.project(*endHorizontal);
         if (!startProjected.isVisible || !endProjected.isVisible) {
             continue;
         }
@@ -167,77 +313,50 @@ std::vector<SkyContextController::SkyRenderLine> SkyConstellationRenderBuilder::
             continue;
         }
 
-        SkyContextController::SkyRenderLine line;
-        line.x1 = startProjected.x;
-        line.y1 = startProjected.y;
-        line.x2 = endProjected.x;
-        line.y2 = endProjected.y;
-        line.color = SkyContextRenderStyle::constellationLineColor();
-        lines.push_back(std::move(line));
+        frame.lines.push_back(SkyRenderLine {
+            .x1 = startProjected.x,
+            .y1 = startProjected.y,
+            .x2 = endProjected.x,
+            .y2 = endProjected.y,
+            .color = SkyContextRenderStyle::constellationLineColor()
+        });
     }
 
-    return lines;
-}
-
-QVariantList SkyConstellationRenderBuilder::buildLabels(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const skygate::core::IProjection& projection,
-    const skygate::core::ProjectionParams& projectionParams,
-    const std::vector<skygate::ephemeris::ConstellationLabelRef>& labelRefs,
-    const double viewportWidth,
-    const double viewportHeight
-) const
-{
-    const HorizontalLookup lookup(snapshot);
-
-    std::unordered_set<std::string> seenLabels;
-    QVariantList labels;
-    labels.reserve(static_cast<int>((snapshot.states.size() / 8U) + labelRefs.size()));
-
+    std::unordered_set<std::string_view> seenLabels;
+    frame.labels.reserve(static_cast<int>(labelRefs.size() + 16U));
     constexpr double kEdgeMarginPx = 10.0;
 
-    for (const auto& state : snapshot.states) {
+    for (const auto& point : frame.points) {
+        const auto& body = snapshot.bodyAt(point.bodyIndex);
         if (
-            state.body.type != skygate::ephemeris::CelestialBodyType::Constellation
-            && state.body.type != skygate::ephemeris::CelestialBodyType::Planet
-            && state.body.type != skygate::ephemeris::CelestialBodyType::Sun
-            && state.body.type != skygate::ephemeris::CelestialBodyType::Moon
+            body.type != skygate::ephemeris::CelestialBodyType::Constellation
+            && body.type != skygate::ephemeris::CelestialBodyType::Planet
+            && body.type != skygate::ephemeris::CelestialBodyType::Sun
+            && body.type != skygate::ephemeris::CelestialBodyType::Moon
         ) {
             continue;
         }
 
-        if (
-            !std::isfinite(state.horizontal.altitudeDeg)
-            || !std::isfinite(state.horizontal.azimuthDeg)
-            || state.body.displayName.empty()
-        ) {
-            continue;
-        }
-
-        if (!seenLabels.insert(state.body.displayName).second) {
-            continue;
-        }
-
-        const auto projected = projection.project(state.horizontal, projectionParams);
-        if (!projected.isVisible) {
+        if (body.displayName.empty() || !seenLabels.insert(body.displayName).second) {
             continue;
         }
 
         if (
-            projected.x < kEdgeMarginPx
-            || projected.x > (viewportWidth - kEdgeMarginPx)
-            || projected.y < kEdgeMarginPx
-            || projected.y > (viewportHeight - kEdgeMarginPx)
+            point.x < kEdgeMarginPx
+            || point.x > (viewportWidth - kEdgeMarginPx)
+            || point.y < kEdgeMarginPx
+            || point.y > (viewportHeight - kEdgeMarginPx)
         ) {
             continue;
         }
 
-        QVariantMap labelEntry;
-        labelEntry.insert("x", projected.x);
-        labelEntry.insert("y", projected.y);
-        labelEntry.insert("text", QString::fromStdString(state.body.displayName));
-        labelEntry.insert("color", labelColorForBodyType(state.body.type));
-        labels.push_back(labelEntry);
+        appendLabel(
+            frame.labels,
+            point.x,
+            point.y,
+            body.displayName,
+            labelColorForBodyType(body.type)
+        );
     }
 
     for (const auto& labelRef : labelRefs) {
@@ -258,7 +377,7 @@ QVariantList SkyConstellationRenderBuilder::buildLabels(
                 continue;
             }
 
-            const auto projected = projection.project(*horizontal, projectionParams);
+            const auto projected = projection.project(*horizontal);
             if (!projected.isVisible) {
                 continue;
             }
@@ -283,16 +402,14 @@ QVariantList SkyConstellationRenderBuilder::buildLabels(
             continue;
         }
 
-        QVariantMap labelEntry;
-        labelEntry.insert("x", labelX);
-        labelEntry.insert("y", labelY);
-        labelEntry.insert("text", QString::fromStdString(labelRef.first));
-        labelEntry.insert(
-            "color",
+        appendLabel(
+            frame.labels,
+            labelX,
+            labelY,
+            labelRef.first,
             labelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation)
         );
-        labels.push_back(labelEntry);
     }
 
-    return labels;
+    return frame;
 }

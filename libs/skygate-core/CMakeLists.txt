@@ -1,5 +1,6 @@
 add_library(skygate-core STATIC
     include/skygate/core/IProjection.hpp
+    include/skygate/core/PreparedProjection.hpp
     include/skygate/core/ITimeSource.hpp
     include/skygate/core/ProjectionFactory.hpp
     include/skygate/core/ProjectionTypes.hpp
@@ -14,6 +15,7 @@ add_library(skygate-core STATIC
     include/skygate/core/projections/PerspectiveProjection.hpp
     include/skygate/core/projections/StereographicProjection.hpp
     src/GeoLocation.cpp
+    src/PreparedProjection.cpp
     src/ProjectionTypes.cpp
     src/SystemTimeSource.cpp
     src/math/AngleMath.cpp

@@ -1,42 +1,45 @@
 #pragma once
 
+#include <QColor>
 #include <QVariantList>
 
-#include "SkyContextController.hpp"
-
-#include "skygate/core/IProjection.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/PreparedProjection.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
+#include <cstdint>
 #include <vector>
 
-class SkyRenderPointBuilder final {
-public:
-    [[nodiscard]] std::vector<SkyContextController::SkyRenderPoint> buildPoints(
-        const skygate::ephemeris::SkySnapshot& snapshot,
-        const skygate::core::IProjection& projection,
-        const skygate::core::ProjectionParams& projectionParams,
-        double magnitudeCutoff
-    ) const;
+struct SkyRenderPoint final {
+    double x = 0.0;
+    double y = 0.0;
+    double sizePx = 2.0;
+    std::uint32_t bodyIndex = 0;
+    QColor color;
 };
 
-class SkyConstellationRenderBuilder final {
-public:
-    [[nodiscard]] std::vector<SkyContextController::SkyRenderLine> buildLines(
-        const skygate::ephemeris::SkySnapshot& snapshot,
-        const skygate::core::IProjection& projection,
-        const skygate::core::ProjectionParams& projectionParams,
-        const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs,
-        double viewportWidth,
-        double viewportHeight
-    ) const;
+struct SkyRenderLine final {
+    double x1 = 0.0;
+    double y1 = 0.0;
+    double x2 = 0.0;
+    double y2 = 0.0;
+    QColor color;
+};
 
-    [[nodiscard]] QVariantList buildLabels(
+struct SkyRenderFrame final {
+    std::vector<SkyRenderPoint> points;
+    std::vector<SkyRenderLine> lines;
+    QVariantList labels;
+};
+
+class SkyRenderFrameBuilder final {
+public:
+    [[nodiscard]] SkyRenderFrame buildFrame(
         const skygate::ephemeris::SkySnapshot& snapshot,
-        const skygate::core::IProjection& projection,
-        const skygate::core::ProjectionParams& projectionParams,
+        const skygate::core::PreparedProjection& projection,
+        const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs,
         const std::vector<skygate::ephemeris::ConstellationLabelRef>& labelRefs,
+        double magnitudeCutoff,
         double viewportWidth,
         double viewportHeight
     ) const;

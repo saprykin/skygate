@@ -36,7 +36,7 @@ namespace skygate::ephemeris::tests {
 )
 {
     for (const CelestialBodyState& state : snapshot.states) {
-        if (state.body.id == id) {
+        if (snapshot.bodyAt(state.bodyIndex).id == id) {
             return &state;
         }
     }

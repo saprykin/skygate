@@ -34,6 +34,8 @@
   - Exposes immutable body views instead of copying the full catalog on access.
 - `SkySnapshot`:
   - Output payload containing computed celestial body states.
+  - Shares immutable catalog bodies and stores state body indices instead of
+    copying full body metadata into every frame.
 - `CatalogLoadResult`:
   - Structured catalog load outcome with diagnostics and explicit error codes.
 - `CatalogSelectionOptions`:
@@ -46,9 +48,13 @@
 3. UI calls `ephemeris::IEphemerisEngine::compute`.
 4. Snapshot body coordinates are projected through selected `core::IProjection`.
 5. Render layer draws visible objects using Qt GPU-backed scene graph.
+6. UI caches the last ephemeris snapshot and projected render frame separately
+   so pan/zoom/hover reuse work instead of recomputing the full catalog.
 
 ## Extensibility Notes
 - Projection strategies are isolated behind `IProjection`.
+- `PreparedProjection` precomputes per-frame projection basis data so large
+  render passes do not rebuild it for every star.
 - Ephemeris computation remains UI-independent.
 - Data sources can swap via `IStarCatalog` without changing UI code.
 - Catalog rows support bundled defaults and runtime-downloaded datasets via the
@@ -61,3 +67,6 @@
   runtime behavior inside the engine from mixed `type` and `id` checks.
 - UI preset `hyg_v3` also attempts to load Stellarium skyculture line data
   (`western/index.json`, HIP-based) to render expanded constellation outlines.
+- Large downloaded catalogs stay intact at load time, while the render layer
+  applies screen-space star decimation when density would otherwise overwhelm
+  frame time.

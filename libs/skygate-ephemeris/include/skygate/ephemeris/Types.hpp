@@ -3,7 +3,9 @@
 #include "skygate/core/Types.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -37,14 +39,29 @@ struct CelestialBody {
 };
 
 struct CelestialBodyState {
-    CelestialBody body;
+    std::uint32_t bodyIndex = 0;
     core::EquatorialCoordinate equatorial;
     core::HorizontalCoordinate horizontal;
 };
 
 struct SkySnapshot {
     core::SkyContext context;
+    std::shared_ptr<const std::vector<CelestialBody>> catalogBodies;
     std::vector<CelestialBodyState> states;
+
+    [[nodiscard]] std::span<const CelestialBody> bodies() const noexcept
+    {
+        if (catalogBodies == nullptr) {
+            return {};
+        }
+
+        return std::span<const CelestialBody>(*catalogBodies);
+    }
+
+    [[nodiscard]] const CelestialBody& bodyAt(const std::size_t bodyIndex) const noexcept
+    {
+        return (*catalogBodies)[bodyIndex];
+    }
 };
 
 }  // namespace skygate::ephemeris

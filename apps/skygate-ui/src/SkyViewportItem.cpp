@@ -11,7 +11,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <unordered_map>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <span>
 #include <vector>
 
 namespace {
@@ -37,6 +40,31 @@ struct LineSegment final {
 struct VertexBucket final {
     QColor color;
     std::vector<float> coordinates;
+};
+
+class SkySceneRootNode final : public QSGNode {
+public:
+    SkySceneRootNode()
+    {
+        m_lineRoot = new QSGNode();
+        m_pointRoot = new QSGNode();
+        appendChildNode(m_lineRoot);
+        appendChildNode(m_pointRoot);
+    }
+
+    [[nodiscard]] QSGNode* lineRoot() const noexcept
+    {
+        return m_lineRoot;
+    }
+
+    [[nodiscard]] QSGNode* pointRoot() const noexcept
+    {
+        return m_pointRoot;
+    }
+
+private:
+    QSGNode* m_lineRoot = nullptr;
+    QSGNode* m_pointRoot = nullptr;
 };
 
 [[nodiscard]] QColor cardinalMeridianColor(const int azimuthDeg)
@@ -73,36 +101,42 @@ void appendLineSegment(
     });
 }
 
-// Batch scene graph work by color so downloaded HYG catalogs do not create
-// one node and one draw call per star.
-void appendBatchedLineNodes(
+void clearChildNodes(QSGNode* rootNode)
+{
+    if (rootNode == nullptr) {
+        return;
+    }
+
+    QSGNode* child = rootNode->firstChild();
+    while (child != nullptr) {
+        QSGNode* next = child->nextSibling();
+        rootNode->removeChildNode(child);
+        delete child;
+        child = next;
+    }
+}
+
+void syncBatchedLineNodes(
     QSGNode* rootNode,
     const std::vector<LineSegment>& lineSegments
 )
 {
-    if (rootNode == nullptr || lineSegments.empty()) {
+    if (rootNode == nullptr) {
         return;
     }
 
-    std::unordered_map<std::uint32_t, VertexBucket> buckets;
-    buckets.reserve(lineSegments.size());
-
+    std::map<std::uint32_t, VertexBucket> buckets;
     for (const auto& lineSegment : lineSegments) {
         const std::uint32_t colorKey = static_cast<std::uint32_t>(lineSegment.color.rgba());
-        auto [bucketIt, inserted] = buckets.try_emplace(colorKey);
-        if (inserted) {
-            bucketIt->second.color = lineSegment.color;
-            bucketIt->second.coordinates.reserve(32U);
-        }
-
-        auto& coordinates = bucketIt->second.coordinates;
-        coordinates.push_back(lineSegment.x1);
-        coordinates.push_back(lineSegment.y1);
-        coordinates.push_back(lineSegment.x2);
-        coordinates.push_back(lineSegment.y2);
+        auto& bucket = buckets[colorKey];
+        bucket.color = lineSegment.color;
+        bucket.coordinates.push_back(lineSegment.x1);
+        bucket.coordinates.push_back(lineSegment.y1);
+        bucket.coordinates.push_back(lineSegment.x2);
+        bucket.coordinates.push_back(lineSegment.y2);
     }
 
-    for (auto& [colorKey, bucket] : buckets) {
+    for (const auto& [colorKey, bucket] : buckets) {
         (void) colorKey;
 
         const int vertexCount = static_cast<int>(bucket.coordinates.size() / 2U);
@@ -111,7 +145,10 @@ void appendBatchedLineNodes(
         }
 
         QSGGeometryNode* node = new QSGGeometryNode();
-        QSGGeometry* geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), vertexCount);
+        QSGGeometry* geometry = new QSGGeometry(
+            QSGGeometry::defaultAttributes_Point2D(),
+            vertexCount
+        );
         geometry->setDrawingMode(QSGGeometry::DrawLines);
 
         auto* vertices = geometry->vertexDataAsPoint2D();
@@ -134,25 +171,20 @@ void appendBatchedLineNodes(
     }
 }
 
-void appendBatchedPointNodes(
+void syncBatchedPointNodes(
     QSGNode* rootNode,
-    const std::vector<SkyContextController::SkyRenderPoint>& points
+    const std::span<const SkyRenderPoint> points
 )
 {
-    if (rootNode == nullptr || points.empty()) {
+    if (rootNode == nullptr) {
         return;
     }
 
-    std::unordered_map<std::uint32_t, VertexBucket> buckets;
-    buckets.reserve(points.size());
-
+    std::map<std::uint32_t, VertexBucket> buckets;
     for (const auto& point : points) {
         const std::uint32_t colorKey = static_cast<std::uint32_t>(point.color.rgba());
-        auto [bucketIt, inserted] = buckets.try_emplace(colorKey);
-        if (inserted) {
-            bucketIt->second.color = point.color;
-            bucketIt->second.coordinates.reserve(96U);
-        }
+        auto& bucket = buckets[colorKey];
+        bucket.color = point.color;
 
         const float halfSize = static_cast<float>(point.sizePx * 0.5);
         const float left = static_cast<float>(point.x) - halfSize;
@@ -160,23 +192,22 @@ void appendBatchedPointNodes(
         const float top = static_cast<float>(point.y) - halfSize;
         const float bottom = static_cast<float>(point.y) + halfSize;
 
-        auto& coordinates = bucketIt->second.coordinates;
-        coordinates.push_back(left);
-        coordinates.push_back(top);
-        coordinates.push_back(right);
-        coordinates.push_back(top);
-        coordinates.push_back(left);
-        coordinates.push_back(bottom);
+        bucket.coordinates.push_back(left);
+        bucket.coordinates.push_back(top);
+        bucket.coordinates.push_back(right);
+        bucket.coordinates.push_back(top);
+        bucket.coordinates.push_back(left);
+        bucket.coordinates.push_back(bottom);
 
-        coordinates.push_back(left);
-        coordinates.push_back(bottom);
-        coordinates.push_back(right);
-        coordinates.push_back(top);
-        coordinates.push_back(right);
-        coordinates.push_back(bottom);
+        bucket.coordinates.push_back(left);
+        bucket.coordinates.push_back(bottom);
+        bucket.coordinates.push_back(right);
+        bucket.coordinates.push_back(top);
+        bucket.coordinates.push_back(right);
+        bucket.coordinates.push_back(bottom);
     }
 
-    for (auto& [colorKey, bucket] : buckets) {
+    for (const auto& [colorKey, bucket] : buckets) {
         (void) colorKey;
 
         const int vertexCount = static_cast<int>(bucket.coordinates.size() / 2U);
@@ -185,7 +216,10 @@ void appendBatchedPointNodes(
         }
 
         QSGGeometryNode* node = new QSGGeometryNode();
-        QSGGeometry* geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), vertexCount);
+        QSGGeometry* geometry = new QSGGeometry(
+            QSGGeometry::defaultAttributes_Point2D(),
+            vertexCount
+        );
         geometry->setDrawingMode(QSGGeometry::DrawTriangles);
 
         auto* vertices = geometry->vertexDataAsPoint2D();
@@ -211,33 +245,22 @@ void appendBatchedPointNodes(
 template <typename CoordinateFn>
 void appendProjectedPolyline(
     std::vector<LineSegment>& lineSegments,
-    const SkyContextController* skyContextController,
-    const double viewportWidth,
-    const double viewportHeight,
+    const skygate::core::PreparedProjection& projection,
     const int sampleCount,
     const double maxSegmentLengthSquared,
     const QColor& color,
     CoordinateFn coordinateFn
 )
 {
-    if (skyContextController == nullptr || sampleCount <= 0) {
+    if (sampleCount <= 0) {
         return;
     }
 
     bool hasPreviousPoint = false;
-    auto previousPoint = skyContextController->projectHorizontal(
-        coordinateFn(0),
-        viewportWidth,
-        viewportHeight
-    );
+    auto previousPoint = projection.project(coordinateFn(0));
 
     for (int index = 0; index <= sampleCount; ++index) {
-        const auto projected = skyContextController->projectHorizontal(
-            coordinateFn(index),
-            viewportWidth,
-            viewportHeight
-        );
-
+        const auto projected = projection.project(coordinateFn(index));
         if (!projected.isVisible) {
             hasPreviousPoint = false;
             continue;
@@ -246,7 +269,7 @@ void appendProjectedPolyline(
         if (hasPreviousPoint) {
             const double deltaX = projected.x - previousPoint.x;
             const double deltaY = projected.y - previousPoint.y;
-            const double segmentLengthSquared = deltaX * deltaX + deltaY * deltaY;
+            const double segmentLengthSquared = (deltaX * deltaX) + (deltaY * deltaY);
             if (segmentLengthSquared <= maxSegmentLengthSquared) {
                 appendLineSegment(
                     lineSegments,
@@ -264,22 +287,15 @@ void appendProjectedPolyline(
     }
 }
 
-void clearChildNodes(QSGNode* rootNode)
-{
-    if (rootNode == nullptr) {
-        return;
-    }
-
-    QSGNode* child = rootNode->firstChild();
-    while (child != nullptr) {
-        QSGNode* next = child->nextSibling();
-        rootNode->removeChildNode(child);
-        delete child;
-        child = next;
-    }
-}
-
 }  // namespace
+
+struct SkyViewportItem::ViewportRenderData final {
+    double viewportWidth = 0.0;
+    double viewportHeight = 0.0;
+    std::optional<skygate::core::PreparedProjection> preparedProjection;
+    std::vector<SkyRenderLine> lines;
+    std::vector<SkyRenderPoint> points;
+};
 
 SkyViewportItem::SkyViewportItem(QQuickItem* parent)
     : QQuickItem(parent)
@@ -307,42 +323,52 @@ void SkyViewportItem::setSkyContextController(QObject* skyContextController)
             m_skyContextController,
             &SkyContextController::skyContextChanged,
             this,
-            &SkyViewportItem::update
+            &SkyViewportItem::synchronizeRenderData
         );
 
         m_projectionTypeChangedConnection = connect(
             m_skyContextController,
             &SkyContextController::projectionTypeChanged,
             this,
-            &SkyViewportItem::update
+            &SkyViewportItem::synchronizeRenderData
         );
     }
 
     emit skyContextControllerChanged();
-    update();
+    synchronizeRenderData();
 }
 
 QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* updatePaintNodeData)
 {
     (void)updatePaintNodeData;
 
-    QSGNode* rootNode = oldNode;
+    auto* rootNode = static_cast<SkySceneRootNode*>(oldNode);
     if (rootNode == nullptr) {
-        rootNode = new QSGNode();
+        rootNode = new SkySceneRootNode();
     }
 
-    clearChildNodes(rootNode);
+    std::shared_ptr<const ViewportRenderData> renderData;
+    {
+        std::scoped_lock<std::mutex> lock(m_renderDataMutex);
+        renderData = m_renderData;
+    }
 
-    if (m_skyContextController == nullptr) {
+    if (renderData == nullptr || !renderData->preparedProjection.has_value()) {
+        clearChildNodes(rootNode->lineRoot());
+        clearChildNodes(rootNode->pointRoot());
+        syncBatchedLineNodes(rootNode->lineRoot(), {});
+        syncBatchedPointNodes(rootNode->pointRoot(), {});
         return rootNode;
     }
 
-    const double viewportWidth = width();
-    const double viewportHeight = height();
+    const double viewportWidth = renderData->viewportWidth;
+    const double viewportHeight = renderData->viewportHeight;
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.30;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
     std::vector<LineSegment> lineSegments;
     lineSegments.reserve(4096U);
+    clearChildNodes(rootNode->lineRoot());
+    clearChildNodes(rootNode->pointRoot());
 
     for (int altitudeDeg = -75; altitudeDeg <= 75; altitudeDeg += kGridAltitudeStepDeg) {
         if (altitudeDeg == 0) {
@@ -351,9 +377,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
 
         appendProjectedPolyline(
             lineSegments,
-            m_skyContextController,
-            viewportWidth,
-            viewportHeight,
+            *renderData->preparedProjection,
             kGridAltitudeSampleCount,
             maxSegmentLengthSquared,
             QColor(112, 146, 194, 70),
@@ -375,9 +399,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
 
         appendProjectedPolyline(
             lineSegments,
-            m_skyContextController,
-            viewportWidth,
-            viewportHeight,
+            *renderData->preparedProjection,
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
             QColor(102, 138, 184, 58),
@@ -396,9 +418,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     for (const int cardinalAzimuthDeg : kCardinalAzimuths) {
         appendProjectedPolyline(
             lineSegments,
-            m_skyContextController,
-            viewportWidth,
-            viewportHeight,
+            *renderData->preparedProjection,
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
             cardinalMeridianColor(cardinalAzimuthDeg),
@@ -415,9 +435,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
 
     appendProjectedPolyline(
         lineSegments,
-        m_skyContextController,
-        viewportWidth,
-        viewportHeight,
+        *renderData->preparedProjection,
         kHorizonSampleCount,
         maxSegmentLengthSquared,
         kHorizonLineColor,
@@ -428,8 +446,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         }
     );
 
-    const auto lines = m_skyContextController->renderConstellationLines(viewportWidth, viewportHeight);
-    for (const auto& line : lines) {
+    for (const auto& line : renderData->lines) {
         appendLineSegment(
             lineSegments,
             static_cast<float>(line.x1),
@@ -439,10 +456,9 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             line.color
         );
     }
-    appendBatchedLineNodes(rootNode, lineSegments);
 
-    const auto points = m_skyContextController->renderPoints(viewportWidth, viewportHeight);
-    appendBatchedPointNodes(rootNode, points);
+    syncBatchedLineNodes(rootNode->lineRoot(), lineSegments);
+    syncBatchedPointNodes(rootNode->pointRoot(), renderData->points);
 
     return rootNode;
 }
@@ -450,7 +466,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
 void SkyViewportItem::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry)
 {
     QQuickItem::geometryChange(newGeometry, oldGeometry);
-    update();
+    synchronizeRenderData();
 }
 
 void SkyViewportItem::disconnectFromContextController()
@@ -464,4 +480,42 @@ void SkyViewportItem::disconnectFromContextController()
 
     m_skyContextChangedConnection = {};
     m_projectionTypeChangedConnection = {};
+}
+
+void SkyViewportItem::synchronizeRenderData()
+{
+    auto nextRenderData = std::make_shared<ViewportRenderData>();
+    nextRenderData->viewportWidth = width();
+    nextRenderData->viewportHeight = height();
+
+    if (
+        m_skyContextController != nullptr
+        && nextRenderData->viewportWidth > 0.0
+        && nextRenderData->viewportHeight > 0.0
+    ) {
+        nextRenderData->preparedProjection = m_skyContextController->buildPreparedProjection(
+            nextRenderData->viewportWidth,
+            nextRenderData->viewportHeight
+        );
+        if (nextRenderData->preparedProjection.has_value()) {
+            const auto lines = m_skyContextController->renderConstellationLineSpan(
+                nextRenderData->viewportWidth,
+                nextRenderData->viewportHeight
+            );
+            nextRenderData->lines.assign(lines.begin(), lines.end());
+
+            const auto points = m_skyContextController->renderPointSpan(
+                nextRenderData->viewportWidth,
+                nextRenderData->viewportHeight
+            );
+            nextRenderData->points.assign(points.begin(), points.end());
+        }
+    }
+
+    {
+        std::scoped_lock<std::mutex> lock(m_renderDataMutex);
+        m_renderData = std::move(nextRenderData);
+    }
+
+    update();
 }

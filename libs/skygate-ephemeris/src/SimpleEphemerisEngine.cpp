@@ -19,7 +19,7 @@ namespace skygate::ephemeris {
 class SimpleEphemerisEngine final : public IEphemerisEngine {
 public:
     explicit SimpleEphemerisEngine(std::span<const CelestialBody> bodies)
-        : m_bodies(bodies.begin(), bodies.end())
+        : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end()))
     {
     }
 
@@ -27,11 +27,13 @@ public:
     {
         SkySnapshot snapshot;
         snapshot.context = context;
+        snapshot.catalogBodies = m_bodies;
 
-        snapshot.states.reserve(m_bodies.size());
-        for (const CelestialBody& body : m_bodies) {
+        snapshot.states.reserve(m_bodies->size());
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            const CelestialBody& body = (*m_bodies)[bodyIndex];
             CelestialBodyState state;
-            state.body = body;
+            state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
             state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
             state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
             state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
@@ -80,7 +82,7 @@ private:
         return std::nullopt;
     }
 
-    std::vector<CelestialBody> m_bodies;
+    std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
     SunEquatorialCalculator m_sunCalculator;
     MoonEquatorialCalculator m_moonCalculator;
     PlanetEquatorialCalculator m_planetCalculator;

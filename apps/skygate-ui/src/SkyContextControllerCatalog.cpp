@@ -207,6 +207,7 @@ void SkyContextController::resetConstellationLineRefs()
     const skygate::ephemeris::BundledConstellationData bundledConstellationData;
     m_constellationLineRefs = bundledConstellationData.lineRefs();
     m_constellationLabelRefs = bundledConstellationData.labelRefs();
+    invalidateRenderCaches();
 }
 
 void SkyContextController::setConstellationLineRefs(
@@ -218,6 +219,7 @@ void SkyContextController::setConstellationLineRefs(
         return;
     }
     m_constellationLineRefs = std::move(lineRefs);
+    invalidateRenderCaches();
 }
 
 void SkyContextController::setConstellationLabelRefs(
@@ -225,6 +227,7 @@ void SkyContextController::setConstellationLabelRefs(
 )
 {
     m_constellationLabelRefs = std::move(labelRefs);
+    invalidateRenderCaches();
 }
 
 void SkyContextController::applyCatalog(
@@ -255,6 +258,8 @@ void SkyContextController::applyCatalog(
 
     m_starCatalog = std::move(catalog);
     m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*m_starCatalog);
+    m_catalogRevision.fetch_add(1U, std::memory_order_relaxed);
+    invalidateRenderCaches();
     m_catalogBodyCount = bodies.size();
     m_catalogConstellationCount = constellationCount;
     m_catalogSourceLabel = sourceLabel;
