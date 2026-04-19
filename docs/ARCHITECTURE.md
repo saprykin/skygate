@@ -1,72 +1,391 @@
-# Skygate Architecture (Initial)
+# Skygate Architecture
 
-## Module Layout
-- `apps/skygate-ui`: Qt Quick application shell and user interaction.
-- `libs/skygate-core`: domain contracts for time/location/projection and shared
-  types.
-- `libs/skygate-ephemeris`: astronomy computation contracts and catalog
-  integration.
+## Overview
+Skygate is an in-process Qt 6 desktop application for rendering an interactive
+sky view. The codebase is organized into three CMake modules with clear
+dependency direction:
 
-## API Contracts
+- `apps/skygate-ui`
+  - Qt Quick application shell, QML views, presentation state, catalog
+    download/import workflow, persistence, and scene-graph rendering.
+- `libs/skygate-core`
+  - UI-independent domain types, projection contracts, projection
+    implementations, viewport math, and time abstractions.
+- `libs/skygate-ephemeris`
+  - Star catalog loading/parsing, catalog normalization, constellation data,
+    astronomical coordinate calculation, and snapshot generation.
+
+Dependency flow is one-way:
+
+```mermaid
+flowchart LR
+    UI["skygate-ui"] --> EPH["skygate-ephemeris"]
+    UI --> CORE["skygate-core"]
+    EPH --> CORE
+```
+
+`skygate-core` is the lowest-level reusable library. `skygate-ephemeris` builds
+on it. `skygate-ui` composes both and owns Qt-specific behavior.
+
+## High-Level Runtime Flow
+At startup, `apps/skygate-ui/src/main.cpp` creates a bundled star catalog,
+constructs an ephemeris engine from that catalog, and wires the UI object graph:
+
+1. `SkyContextController` owns the mutable application state exposed to QML.
+2. `SkySceneModel` listens to the controller and derives renderable scene data.
+3. `SkyViewportItem` consumes the scene model and renders the sky with Qt Quick
+   scene graph nodes.
+4. QML overlays and toolbars provide interaction, labels, preferences, and
+   status surfaces around the custom viewport.
+
+Normal frame production works like this:
+
+1. User input, timer ticks, settings restore, location updates, or catalog
+   changes mutate `SkyContextController`.
+2. The controller emits `skyContextChanged()`.
+3. `SkySceneModel` decides whether it must recompute an ephemeris snapshot,
+   rebuild projected render data, or both.
+4. `SkyRenderFrameBuilder` converts snapshot data into render points, lines, and
+   overlay labels.
+5. `SkyViewportItem` copies the derived frame into render data and rebuilds
+   batched `QSGNode` geometry.
+6. QML overlay components render hover labels and scene annotations on top of
+   the viewport.
+
+## Module Details
+
+### `skygate-ui`
+This module is the application layer and the most stateful part of the system.
+
+#### Main presentation objects
+- `SkyContextController`
+  - Primary QML-facing controller (`QObject` with `Q_PROPERTY` and
+    `Q_INVOKABLE` API).
+  - Owns the current `skygate::core::SkyContext`, projection selection, view
+    center/FOV, playback state, timeline settings, and location status.
+  - Owns `SkySettingsStore` and `SkyCatalogManager`.
+  - Uses a `QTimer` for live timeline updates.
+  - Optionally initializes observer location through Qt Positioning when that
+    module is available.
+  - Loads persisted settings and restored catalog cache during initialization.
+- `SkySceneModel`
+  - Read-model / derived-state layer between controller state and rendering.
+  - Listens to `SkyContextController::skyContextChanged()`.
+  - Produces:
+    - cached `skygate::ephemeris::SkySnapshot`
+    - cached `skygate::core::PreparedProjection`
+    - `SkyRenderFrame` with projected points, constellation segments, and
+      labels
+    - `overlayItems` for QML overlays
+  - Also builds a spatial hover lookup for hit-testing object labels.
+- `SkyViewportItem`
+  - Custom `QQuickItem` responsible for drawing the sky in the Qt scene graph.
+  - Renders:
+    - projected celestial points
+    - projected constellation segments
+    - horizon line
+    - altitude/azimuth grid
+    - highlighted cardinal meridians
+  - Uses a mutex-protected shared render-data snapshot to bridge scene-model
+    data into `updatePaintNode()`.
+
+#### QML composition
+`apps/skygate-ui/Main.qml` composes several layers:
+
+- `SkyViewportItem`
+  - Base rendered star field and line work.
+- `SkyInteractionLayer`
+  - Mouse drag pan, wheel zoom, and hover hit-testing.
+- `SkyOverlayLayer`
+  - Text labels for objects and cardinal directions, plus collision avoidance
+    with the timeline toolbar.
+- `TimelineToolbar`
+  - Playback, stepping, speed, magnitude cutoff, and view reset controls.
+- `PreferencesWindow`
+  - Settings and catalog management UI.
+  - Uses `SkySettingsDraft.qml` as a staged edit buffer before applying changes
+    back to `SkyContextController`.
+- `StatusFooter`
+  - Current context and catalog status summary.
+
+This is intentionally a hybrid UI architecture: heavy drawing happens in C++
+scene graph code, while transient UI and chrome stay in QML.
+
+#### Catalog and settings subsystem
+- `SkyCatalogManager`
+  - Owns the active `IStarCatalog`, `IEphemerisEngine`, current catalog source
+    metadata, cached constellation references, and revision counter.
+  - Restores and persists catalog cache through `SkySettingsStore`.
+  - Rebuilds the ephemeris engine whenever the catalog changes.
+- `CatalogCoordinator`
+  - Orchestrates the download and parse workflow.
+  - Separates transport concerns from parse concerns.
+- `CatalogDownloadService`
+  - Tries multiple URLs until the first successful download.
+  - Applies request headers, timeout, and maximum payload size checks.
+- `CatalogPayloadParseService`
+  - Parses downloaded payloads on `QThreadPool::globalInstance()`.
+  - Marshals progress and completion callbacks back onto the UI thread.
+- `SkySettingsStore`
+  - Persists controller state in `QSettings`.
+  - Persists downloaded/imported catalog rows in an app-data cache file and
+    stores related metadata in `QSettings`.
 
 ### `skygate-core`
-- `GeoLocation`:
-  - Observer coordinates and elevation.
-  - `isValid()` for bounds and finite value checks.
-- `SkyContext`:
-  - Full input context for sky computation.
-  - Includes observer location and UTC timestamp.
-- `IProjection`:
-  - Projection abstraction to support future projection types.
-  - `project(HorizontalCoordinate, ProjectionParams)` returns a visibility-aware
-    screen point.
-- `ITimeSource`:
-  - Injectable time provider for deterministic tests and live mode.
+This module provides stable, UI-independent core types and projection logic.
+
+#### Core types
+- `GeoLocation`
+- `UtcTimePoint`
+- `EquatorialCoordinate`
+- `HorizontalCoordinate`
+- `SkyContext`
+- `ProjectionType`
+- `ProjectionParams`
+- `ScreenPoint`
+
+These types are intentionally small value types so they can move cheaply across
+module boundaries.
+
+#### Projection subsystem
+- `IProjection`
+  - Runtime strategy interface for projections.
+- `createProjection(ProjectionType)`
+  - Factory for selecting a concrete projection implementation.
+- Concrete strategies:
+  - `StereographicProjection`
+  - `AzimuthalEquidistantProjection`
+  - `PerspectiveProjection`
+- `PreparedProjection`
+  - Per-frame precomputation object used by the render path.
+  - Stores the normalized center basis and projection-specific constants so
+    large render passes do not repeat setup work for every star.
+- `ProjectionPipeline`
+  - Shared helper for parameter validation, basis preparation, culling status,
+    and viewport mapping.
+
+`PreparedProjection` is the preferred high-throughput path in the current UI.
+The `IProjection` strategies still exist as a clean abstraction boundary and are
+used by the controller for projection selection and sample output.
+
+#### Time abstraction
+- `ITimeSource`
+  - Small interface used to make time acquisition replaceable and testable.
+- `SystemTimeSource`
+  - Default production implementation.
 
 ### `skygate-ephemeris`
-- `IEphemerisEngine`:
-  - Single entry-point for sky computations.
-  - `compute(SkyContext)` returns `SkySnapshot`.
-  - Engines own an immutable snapshot of catalog bodies so compute does not
-    depend on external catalog lifetime.
-- `IStarCatalog`:
-  - Source abstraction for bundled and future external catalogs.
-  - Exposes immutable body views instead of copying the full catalog on access.
-- `SkySnapshot`:
-  - Output payload containing computed celestial body states.
-  - Shares immutable catalog bodies and stores state body indices instead of
-    copying full body metadata into every frame.
-- `CatalogLoadResult`:
-  - Structured catalog load outcome with diagnostics and explicit error codes.
-- `CatalogSelectionOptions`:
-  - Optional caller-controlled selection policy for large imported catalogs.
+This module owns celestial body metadata, catalog parsing, and runtime sky
+computation.
 
-## Planned Runtime Flow
-1. UI gathers `GeoLocation`, current/specified UTC time, and projection
-   settings.
-2. UI builds `core::SkyContext`.
-3. UI calls `ephemeris::IEphemerisEngine::compute`.
-4. Snapshot body coordinates are projected through selected `core::IProjection`.
-5. Render layer draws visible objects using Qt GPU-backed scene graph.
-6. UI caches the last ephemeris snapshot and projected render frame separately
-   so pan/zoom/hover reuse work instead of recomputing the full catalog.
+#### Catalog model
+- `IStarCatalog`
+  - Abstract read-only catalog interface.
+- `InMemoryStarCatalog`
+  - Current concrete catalog implementation backed by a `std::vector`.
+- `CelestialBody`
+  - Body metadata, type, magnitude, and optional fixed equatorial coordinates.
+- `CelestialBodyEphemerisSource`
+  - Explicit dispatch key describing how runtime coordinates should be
+    produced.
 
-## Extensibility Notes
-- Projection strategies are isolated behind `IProjection`.
-- `PreparedProjection` precomputes per-frame projection basis data so large
-  render passes do not rebuild it for every star.
-- Ephemeris computation remains UI-independent.
-- Data sources can swap via `IStarCatalog` without changing UI code.
-- Catalog rows support bundled defaults and runtime-downloaded datasets via the
-  same `id|name|type|magnitude` row format.
-- Runtime import supports major star catalogs in HYG CSV format (`ra`, `dec`,
-  `mag`) and maps them to fixed-position stars.
-- Large catalog selection is explicit at load time instead of being baked into
-  the raw HYG parser.
-- Body computation uses explicit ephemeris source metadata rather than inferring
-  runtime behavior inside the engine from mixed `type` and `id` checks.
-- UI preset `hyg_v3` also attempts to load Stellarium skyculture line data
-  (`western/index.json`, HIP-based) to render expanded constellation outlines.
-- Large downloaded catalogs stay intact at load time, while the render layer
-  applies screen-space star decimation when density would otherwise overwhelm
-  frame time.
+#### Snapshot model
+- `IEphemerisEngine`
+  - Computes a `SkySnapshot` from a `core::SkyContext`.
+- `SkySnapshot`
+  - Current context
+  - shared immutable catalog body vector
+  - per-frame body states that reference catalog bodies by index
+
+This immutable/shared snapshot shape avoids copying full body metadata into each
+frame and keeps rendering decoupled from catalog ownership.
+
+#### Engine implementation
+The current engine is `SimpleEphemerisEngine`, created through
+`createEphemerisEngine(...)`.
+
+Its responsibilities are:
+
+- keep an immutable copy of the current catalog bodies
+- dispatch coordinate generation by `CelestialBodyEphemerisSource`
+- delegate to focused calculators/lookups:
+  - `SunEquatorialCalculator`
+  - `MoonEquatorialCalculator`
+  - `PlanetEquatorialCalculator`
+  - `StarEquatorialCalculator`
+  - `KnownConstellationLookup`
+- convert equatorial coordinates to horizontal coordinates via
+  `CoordinateTransform`
+
+#### Catalog ingestion pipeline
+Catalog import supports multiple payload shapes:
+
+- bundled starter rows
+- saved pipe-row cache format
+- HYG CSV
+- gzip-compressed HYG CSV
+- zip archives containing HYG CSV
+
+The pipeline is:
+
+1. `CatalogPayloadParser` detects payload format.
+2. `StarCatalogFactory` routes to the correct parser implementation.
+3. Parsed bodies are normalized by `CatalogBodyNormalization`.
+4. Optional selection/truncation can keep only the brightest bodies.
+5. The final catalog is materialized as `InMemoryStarCatalog`.
+
+When an external catalog is activated, `createCatalogWithCoreSolarSystemBodies`
+merges bundled Sun, Moon, and planetary bodies back into the imported dataset.
+If the imported catalog has no stars, a small set of bundled reference stars is
+also retained so constellation line rendering still has anchor points.
+
+#### Constellation data
+Constellation lines and label anchors have two sources:
+
+- bundled fallback data via `BundledConstellationData`
+- optional downloaded Stellarium skyculture data parsed by
+  `StellariumConstellationParser`
+
+`SkyCatalogManager` prefers downloaded constellation data when available and
+persists it with the catalog cache.
+
+## Caching and Performance Model
+The current application uses several lightweight caches instead of a global
+render cache.
+
+### Snapshot cache
+`SkySceneModel` caches `SkySnapshot` by:
+
+- catalog revision
+- observer location
+- UTC timestamp
+- ephemeris engine identity
+
+If only view parameters change, the expensive ephemeris compute step is skipped.
+
+### Render-frame cache
+`SkySceneModel` separately caches projected render output by:
+
+- snapshot generation
+- projection type
+- viewport size
+- view center
+- field of view
+- magnitude cutoff
+
+This keeps pan/zoom/projection changes separate from catalog/time recomputation.
+
+### Prepared projection cache
+`PreparedProjection` precomputes per-frame projection basis data and constants.
+It is rebuilt when viewport or view parameters change, not per object.
+
+### Large-catalog star decimation
+`SkyRenderFrameBuilder` performs screen-space star decimation for dense star
+catalogs. For large HYG-driven datasets and wider fields of view, only the most
+relevant star per screen cell is kept, favoring brighter stars and then
+proximity to the cell center.
+
+### Persistent cache
+Downloaded/imported catalogs are serialized into a pipe-row cache file and
+accompanying `QSettings` metadata. This allows the last imported dataset to be
+restored on the next launch without a network round trip.
+
+## Concurrency and Threading
+The concurrency model is intentionally narrow:
+
+- asynchronous:
+  - catalog download (`QNetworkAccessManager`)
+  - catalog parsing (`QThreadPool`)
+- synchronous on the UI object graph:
+  - ephemeris compute
+  - prepared projection creation
+  - render-frame construction
+- scene graph update path:
+  - `SkyViewportItem` copies render data behind a mutex and rebuilds `QSGNode`
+    geometry in `updatePaintNode()`
+
+This means large catalog import work is backgrounded, but normal scene rebuilds
+still happen in-process and close to the UI layer.
+
+## Design Patterns in Use
+The current codebase consistently uses a small set of practical patterns.
+
+### Layered architecture
+- `skygate-ui` for application and presentation concerns
+- `skygate-ephemeris` for astronomy/data concerns
+- `skygate-core` for reusable domain/math concerns
+
+### Strategy + factory
+- `IProjection` + `createProjection(...)`
+- `IEphemerisEngine` + `createEphemerisEngine(...)`
+- `IStarCatalog` + catalog factory helpers
+
+### Read-model / derived-state model
+- `SkySceneModel` derives render data from controller state and caches the
+  results instead of mixing rendering logic into the controller.
+
+### Coordinator + service split
+- `SkyCatalogManager` owns long-lived catalog state.
+- `CatalogCoordinator` orchestrates operations.
+- download and parsing are delegated to focused services.
+
+### Immutable snapshot pattern
+- `SkySnapshot` shares immutable catalog bodies and stores per-frame state
+  separately.
+
+### Builder / pipeline pattern
+- `SkyRenderFrameBuilder` transforms snapshots into render primitives.
+- `ProjectionPipeline` centralizes shared projection mechanics.
+- catalog parsing flows through format detection, parser selection,
+  normalization, and catalog construction.
+
+### Cache-oriented view model
+- cache keys are explicit and local to `SkySceneModel`
+- revision counters are used to invalidate derived work when catalog data
+  changes
+
+## Extension Points
+The current architecture is designed to grow by adding new implementations
+behind existing seams.
+
+### Adding a projection
+Update:
+
+- `ProjectionType`
+- `createProjection(...)`
+- `PreparedProjection::create(...)`
+- `PreparedProjection::project(...)`
+- projection-specific tests
+
+### Adding a new catalog payload format
+Update:
+
+- `CatalogPayloadParser::detectFormat(...)`
+- `CatalogPayloadFormat`
+- `StarCatalogFactory` routing
+- parser implementation in `libs/skygate-ephemeris/src/catalog`
+- parser tests
+
+### Replacing the ephemeris engine
+Provide another `IEphemerisEngine` implementation and construct it in
+`SkyCatalogManager` / startup wiring. The UI layers depend only on the
+interface.
+
+### Evolving the rendering path
+The scene model already isolates render preparation from drawing. Alternate
+renderers can reuse `SkySceneModel`, `PreparedProjection`, and the snapshot
+types while changing only the final presentation adapter.
+
+## Tests
+The repository keeps tests close to each module:
+
+- `libs/skygate-core/tests`
+  - projection math, viewport math, type validation, prepared projections
+- `libs/skygate-ephemeris/tests`
+  - catalog parsing, gzip/zip handling, constellation parsing, catalog factory,
+    engine baselines/fallbacks
+- `apps/skygate-ui/tests`
+  - scene-model behavior and settings persistence
+
+This mirrors the architectural split and keeps rendering-independent logic
+testable without a running UI.
