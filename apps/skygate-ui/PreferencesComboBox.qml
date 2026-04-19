@@ -4,15 +4,16 @@ import QtQuick.Controls
 ComboBox {
     id: comboControl
     font.family: "Avenir Next"
-    implicitHeight: 36
-    leftPadding: 10
-    rightPadding: 30
-    topPadding: 5
-    bottomPadding: 5
+    font.pixelSize: 11
+    implicitHeight: 32
+    leftPadding: 9
+    rightPadding: 26
+    topPadding: 4
+    bottomPadding: 4
 
     contentItem: Text {
         text: comboControl.displayText
-        color: "#ecf4ff"
+        color: "#f1f3ff"
         font: comboControl.font
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
@@ -20,18 +21,18 @@ ComboBox {
 
     indicator: Text {
         text: "\u25BE"
-        color: "#a4c5eb"
-        font.pixelSize: 12
+        color: "#9ca3c5"
+        font.pixelSize: 8
         anchors.verticalCenter: parent.verticalCenter
         anchors.right: parent.right
-        anchors.rightMargin: 10
+        anchors.rightMargin: 9
     }
 
     background: Rectangle {
-        radius: 9
-        color: "#102544"
+        radius: 8
+        color: comboControl.enabled ? "#232742" : "#1b1e33"
         border.width: 1
-        border.color: comboControl.activeFocus ? "#8fd9ff" : "#3f648d"
+        border.color: comboControl.activeFocus ? "#628fd9" : "#4d5378"
     }
 
     popup: Popup {
@@ -48,10 +49,10 @@ ComboBox {
         }
 
         background: Rectangle {
-            radius: 10
-            color: "#112949"
+            radius: 9
+            color: "#1d2138"
             border.width: 1
-            border.color: "#4e79a8"
+            border.color: "#4b5278"
         }
     }
 
@@ -62,7 +63,7 @@ ComboBox {
 
         contentItem: Text {
             text: modelData
-            color: highlighted ? "#ecf8ff" : "#bfd6f5"
+            color: highlighted ? "#f2f4ff" : "#c1c7e4"
             font: comboControl.font
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -70,7 +71,7 @@ ComboBox {
 
         background: Rectangle {
             radius: 8
-            color: highlighted ? "#2f5f94" : (preferencesComboDelegate.hovered ? "#1e3d60" : "transparent")
+            color: highlighted ? "#365e9c" : (preferencesComboDelegate.hovered ? "#272c46" : "transparent")
         }
     }
 }

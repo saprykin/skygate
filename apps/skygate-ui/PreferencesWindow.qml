@@ -7,23 +7,32 @@ import com.skygate.app 1.0
 Window {
     id: preferencesWindow
     title: "Preferences"
-    width: 760
-    height: 560
-    minimumWidth: 700
-    minimumHeight: 520
+    width: 534
+    height: 360
+    minimumWidth: 502
+    minimumHeight: 329
     visible: false
+    color: "#171b30"
     required property var skyContextController
     property Window transientParentWindow
     transientParent: transientParentWindow
     flags: Qt.Dialog
     modality: Qt.WindowModal
 
-    property color frameBackground: "#0d162c"
-    property color panelBackground: "#122243"
-    property color borderColor: "#345984"
-    property color textPrimary: "#ecf4ff"
-    property color textSecondary: "#9fb8dd"
+    property color cardBackground: "#1d2138"
+    property color cardBackgroundBottom: "#1a1e33"
+    property color cardBorder: "#474d70"
+    property color dividerColor: "#343955"
+    property color textPrimary: "#f2f4ff"
+    property color textSecondary: "#9ca3c5"
+    property color textMuted: "#878dad"
     property int selectedPage: 0
+    readonly property bool catalogBusy: skyContextController !== null
+                                        && (skyContextController.downloadingCatalog
+                                            || skyContextController.catalogProcessing)
+    readonly property string currentSectionDescription: selectedPage === 0
+                                                      ? "Observer location, time, and projection"
+                                                      : "Catalog source and download settings"
 
     SkySettingsDraft {
         id: settingsDraft
@@ -57,141 +66,159 @@ Window {
 
     Rectangle {
         anchors.fill: parent
+        radius: 16
+        clip: true
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#13284a" }
-            GradientStop { position: 0.5; color: "#0d1f3a" }
-            GradientStop { position: 1.0; color: "#091326" }
+            GradientStop { position: 0.0; color: preferencesWindow.cardBackground }
+            GradientStop { position: 1.0; color: preferencesWindow.cardBackgroundBottom }
         }
+        border.width: 1
+        border.color: preferencesWindow.cardBorder
 
         Rectangle {
-            width: 320
-            height: 320
-            radius: 160
-            anchors.top: parent.top
             anchors.left: parent.left
-            anchors.topMargin: -120
-            anchors.leftMargin: -90
-            color: "#4ec8ef22"
-        }
-
-        Rectangle {
-            width: 220
-            height: 220
-            radius: 110
-            anchors.bottom: parent.bottom
             anchors.right: parent.right
-            anchors.bottomMargin: -80
-            anchors.rightMargin: -50
-            color: "#2f82c422"
+            anchors.top: parent.top
+            height: 82
+            color: "transparent"
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "#111731" }
+                GradientStop { position: 1.0; color: "#00111731" }
+            }
         }
 
-        Rectangle {
-            anchors.centerIn: parent
-            width: Math.min(parent.width - 40, 710)
-            height: Math.min(parent.height - 40, 530)
-            radius: 22
-            color: preferencesWindow.frameBackground
-            border.width: 1
-            border.color: preferencesWindow.borderColor
-            opacity: preferencesWindow.visible ? 1.0 : 0.0
-            scale: preferencesWindow.visible ? 1.0 : 0.985
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
 
-            Behavior on opacity {
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 64
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 44
+                    anchors.topMargin: 10
+                    anchors.bottomMargin: 9
+                    spacing: 1
+
+                    Label {
+                        text: "Preferences"
+                        color: preferencesWindow.textPrimary
+                        font.family: "Avenir Next"
+                        font.pixelSize: 24
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        text: preferencesWindow.currentSectionDescription
+                        color: preferencesWindow.textSecondary
+                        font.family: "Avenir Next"
+                        font.pixelSize: 11
+                    }
+                }
+
+                ToolButton {
+                    id: closeIconButton
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.topMargin: 9
+                    anchors.rightMargin: 9
+                    width: 30
+                    height: 30
+                    text: "\u2715"
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    onClicked: preferencesWindow.visible = false
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Close"
+
+                    contentItem: Text {
+                        text: closeIconButton.text
+                        color: "#edf1ff"
+                        font: closeIconButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    background: Rectangle {
+                        radius: 15
+                        color: closeIconButton.down
+                            ? "#232843"
+                            : (closeIconButton.hovered ? "#292f4c" : "#1f2339")
+                        border.width: 1
+                        border.color: "#596084"
+                    }
+                }
             }
-            Behavior on scale {
-                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: preferencesWindow.dividerColor
             }
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 22
-                spacing: 14
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 0
 
-                RowLayout {
-                    Layout.fillWidth: true
+                Item {
+                    Layout.preferredWidth: 132
+                    Layout.fillHeight: true
 
                     ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        anchors.topMargin: 10
+                        anchors.bottomMargin: 8
+                        spacing: 6
 
                         Label {
-                            text: "Preferences"
-                            color: preferencesWindow.textPrimary
+                            text: "Sections"
+                            color: "#d8dcf2"
                             font.family: "Avenir Next"
-                            font.pixelSize: 30
+                            font.pixelSize: 12
                             font.weight: Font.DemiBold
                         }
 
-                        Label {
-                            text: "Observer settings and catalog management"
-                            color: preferencesWindow.textSecondary
-                            font.family: "Avenir Next"
+                        PreferencesSectionButton {
+                            label: "Sky"
+                            active: preferencesWindow.selectedPage === 0
+                            onClicked: preferencesWindow.selectedPage = 0
+                        }
+
+                        PreferencesSectionButton {
+                            label: "Catalog"
+                            active: preferencesWindow.selectedPage === 1
+                            onClicked: preferencesWindow.selectedPage = 1
+                        }
+
+                        Item {
+                            Layout.fillHeight: true
                         }
                     }
                 }
 
                 Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.fillHeight: true
+                    color: preferencesWindow.dividerColor
+                }
+
+                Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    radius: 16
-                    color: preferencesWindow.panelBackground
-                    border.width: 1
-                    border.color: preferencesWindow.borderColor
 
-                    RowLayout {
+                    ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 16
-                        spacing: 12
-
-                        Rectangle {
-                            Layout.preferredWidth: 170
-                            Layout.fillHeight: true
-                            radius: 12
-                            color: "#0e1d38"
-                            border.width: 1
-                            border.color: "#2f517a"
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 10
-                                spacing: 8
-
-                                Label {
-                                    text: "Sections"
-                                    color: preferencesWindow.textSecondary
-                                    font.family: "Avenir Next"
-                                    font.weight: Font.DemiBold
-                                }
-
-                                PreferencesSectionButton {
-                                    label: "Sky"
-                                    active: preferencesWindow.selectedPage === 0
-                                    onClicked: preferencesWindow.selectedPage = 0
-                                }
-
-                                PreferencesSectionButton {
-                                    label: "Catalog"
-                                    active: preferencesWindow.selectedPage === 1
-                                    onClicked: preferencesWindow.selectedPage = 1
-                                }
-
-                                Item {
-                                    Layout.fillHeight: true
-                                }
-
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: preferencesWindow.selectedPage === 0
-                                          ? "Observer location, time, and projection"
-                                          : "Catalog source and download settings"
-                                    color: "#89a8d2"
-                                    font.family: "Avenir Next"
-                                    font.pixelSize: 12
-                                    wrapMode: Text.Wrap
-                                }
-                            }
-                        }
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        anchors.topMargin: 6
+                        anchors.bottomMargin: 6
+                        spacing: 4
 
                         StackLayout {
                             currentIndex: preferencesWindow.selectedPage
@@ -207,91 +234,112 @@ Window {
                             PreferencesCatalogSection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                Layout.alignment: Qt.AlignTop
                                 skyContextController: preferencesWindow.skyContextController
                                 settingsDraft: settingsDraft
                             }
                         }
                     }
                 }
+            }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 52
-                    radius: 12
-                    color: "#0f1c35"
-                    border.width: 1
-                    border.color: "#2f5078"
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 1
+                color: preferencesWindow.dividerColor
+            }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 10
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 42
 
-                        Item {
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    anchors.topMargin: 5
+                    anchors.bottomMargin: 5
+                    spacing: 8
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 3
+                        visible: preferencesWindow.selectedPage === 1 && preferencesWindow.catalogBusy
+
+                        Label {
                             Layout.fillWidth: true
+                            text: {
+                                const statusText = preferencesWindow.skyContextController.catalogStatusText || ""
+                                return statusText.startsWith("Catalog: ")
+                                    ? statusText.substring(9)
+                                    : statusText
+                            }
+                            color: preferencesWindow.textSecondary
+                            font.family: "Avenir Next"
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
                         }
 
-                        Rectangle {
-                            id: applyButton
-                            Layout.preferredWidth: 112
-                            Layout.fillHeight: true
-                            radius: 10
-                            color: applyMouse.pressed
-                                ? "#296fa9"
-                                : (applyMouse.containsMouse ? "#378ac8" : "#307fbf")
-                            border.width: 1
-                            border.color: "#b9ecff"
+                        ProgressBar {
+                            id: footerCatalogProgressBar
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 6
+                            from: 0
+                            to: 1
+                            value: 0
+                            indeterminate: true
 
-                            Label {
-                                anchors.centerIn: parent
-                                text: "Apply"
-                                color: "#f4fbff"
-                                font.family: "Avenir Next"
-                                font.weight: Font.DemiBold
+                            background: Rectangle {
+                                radius: 3
+                                color: "#181b2d"
+                                border.width: 1
+                                border.color: "#3b4060"
                             }
 
-                            MouseArea {
-                                id: applyMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: preferencesWindow.applyFormToContext()
+                            contentItem: Item {
+                                id: footerProgressContent
+                                clip: true
+
+                                Rectangle {
+                                    id: footerProgressSweep
+                                    width: Math.max(48, footerProgressContent.width * 0.24)
+                                    height: footerProgressContent.height
+                                    radius: height * 0.5
+                                    x: -width
+                                    gradient: Gradient {
+                                        GradientStop { position: 0.0; color: "#4a82df00" }
+                                        GradientStop { position: 0.5; color: "#4a82df" }
+                                        GradientStop { position: 1.0; color: "#4a82df22" }
+                                    }
+
+                                    SequentialAnimation on x {
+                                        running: footerCatalogProgressBar.visible
+                                        loops: Animation.Infinite
+                                        NumberAnimation {
+                                            from: -footerProgressSweep.width
+                                            to: footerProgressContent.width
+                                            duration: 1050
+                                            easing.type: Easing.InOutCubic
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
 
-            ToolButton {
-                id: closeIconButton
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.topMargin: 12
-                anchors.rightMargin: 12
-                width: 34
-                height: 34
-                text: "\u2715"
-                font.pixelSize: 16
-                font.weight: Font.DemiBold
-                onClicked: preferencesWindow.visible = false
-                ToolTip.visible: hovered
-                ToolTip.text: "Close"
+                    Item {
+                        Layout.preferredWidth: preferencesWindow.selectedPage === 1
+                                               && preferencesWindow.catalogBusy ? 0 : 1
+                        Layout.fillWidth: !(preferencesWindow.selectedPage === 1
+                                            && preferencesWindow.catalogBusy)
+                    }
 
-                contentItem: Text {
-                    text: closeIconButton.text
-                    color: "#eaf7ff"
-                    font: closeIconButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                background: Rectangle {
-                    radius: 17
-                    color: closeIconButton.down
-                        ? "#27476d"
-                        : (closeIconButton.hovered ? "#315881" : "#1a3352")
-                    border.width: 1
-                    border.color: "#6fbde6"
+                    PreferencesActionButton {
+                        Layout.preferredWidth: 116
+                        Layout.preferredHeight: 32
+                        primary: true
+                        text: "Apply"
+                        onClicked: preferencesWindow.applyFormToContext()
+                    }
                 }
             }
         }

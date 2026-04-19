@@ -4,21 +4,22 @@ import QtQuick.Controls
 TextField {
     id: textControl
     font.family: "Avenir Next"
-    implicitHeight: 36
-    color: "#ecf4ff"
+    font.pixelSize: 11
+    implicitHeight: 32
+    color: "#f1f3ff"
     horizontalAlignment: Text.AlignLeft
-    placeholderTextColor: "#86a7cf"
-    selectedTextColor: "#f4fbff"
-    selectionColor: "#4f90cd"
-    leftPadding: 10
-    rightPadding: 10
-    topPadding: 6
-    bottomPadding: 6
+    placeholderTextColor: "#8187ab"
+    selectedTextColor: "#f4f6ff"
+    selectionColor: "#4068b4"
+    leftPadding: 9
+    rightPadding: 9
+    topPadding: 5
+    bottomPadding: 5
 
     background: Rectangle {
-        radius: 9
-        color: "#102544"
+        radius: 8
+        color: textControl.enabled ? "#232742" : "#1b1e33"
         border.width: 1
-        border.color: textControl.activeFocus ? "#8fd9ff" : "#3f648d"
+        border.color: textControl.activeFocus ? "#628fd9" : "#4d5378"
     }
 }

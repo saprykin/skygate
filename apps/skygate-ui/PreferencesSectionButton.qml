@@ -9,19 +9,37 @@ Rectangle {
     signal clicked()
 
     Layout.fillWidth: true
-    implicitHeight: 38
-    radius: 10
-    color: active
-           ? "#2f79b8"
-           : (buttonMouse.pressed ? "#213c5b" : (buttonMouse.containsMouse ? "#1c3452" : "#142943"))
+    implicitHeight: 30
+    radius: 8
+    gradient: Gradient {
+        GradientStop {
+            position: 0.0
+            color: root.active
+                   ? (buttonMouse.pressed ? "#355f9f"
+                                          : (buttonMouse.containsMouse ? "#3e70b8" : "#3867a9"))
+                   : (buttonMouse.pressed ? "#20233a"
+                                          : (buttonMouse.containsMouse ? "#242943" : "#20243d"))
+        }
+        GradientStop {
+            position: 1.0
+            color: root.active
+                   ? (buttonMouse.pressed ? "#2c548f"
+                                          : (buttonMouse.containsMouse ? "#365f9d" : "#30598f"))
+                   : (buttonMouse.pressed ? "#1a1d31"
+                                          : (buttonMouse.containsMouse ? "#1f2237" : "#1b1f33"))
+        }
+    }
     border.width: 1
-    border.color: active ? "#9de2ff" : "#4f769e"
+    border.color: root.active ? "#5d91dc" : "#242843"
 
     Label {
-        anchors.centerIn: parent
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: parent.left
+        anchors.leftMargin: 11
         text: root.label
-        color: root.active ? "#ecf8ff" : "#bdd4f4"
+        color: root.active ? "#f3f5ff" : "#eef0fd"
         font.family: "Avenir Next"
+        font.pixelSize: 11
         font.weight: Font.DemiBold
     }
 
