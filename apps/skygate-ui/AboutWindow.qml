@@ -7,11 +7,11 @@ Window {
     id: aboutWindow
     title: "About SkyGate"
     width: 420
-    height: 334
+    height: 356
     minimumWidth: 420
-    minimumHeight: 334
+    minimumHeight: 356
     maximumWidth: 420
-    maximumHeight: 334
+    maximumHeight: 356
     visible: false
     color: "#171b30"
     property Window transientParentWindow
@@ -184,6 +184,17 @@ Window {
                     color: "#9ca3c5"
                     font.family: "Avenir Next"
                     font.pixelSize: 13
+                }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: "Git " + skygateGitHash + "  |  Built " + skygateBuildDateTime
+                    color: "#7f87ad"
+                    font.family: "Menlo"
+                    font.pixelSize: 11
                 }
 
                 Rectangle {

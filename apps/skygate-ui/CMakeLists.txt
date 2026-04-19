@@ -80,7 +80,7 @@ endif()
 
 qt_add_qml_module(skygate-ui
     URI com.skygate.app
-    VERSION 1.0
+    VERSION ${SKYGATE_QML_MODULE_VERSION}
     RESOURCE_PREFIX /qt/qml/
     QML_FILES
         AboutWindow.qml
@@ -122,8 +122,10 @@ target_link_libraries(skygate-ui
         skygate::uiapp
 )
 
-target_compile_definitions(skygate-ui PRIVATE SKYGATE_APP_VERSION="${PROJECT_VERSION}")
-target_compile_definitions(skygate-ui-lib PRIVATE SKYGATE_APP_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(skygate-ui PRIVATE
+    SKYGATE_APP_VERSION="${PROJECT_VERSION}"
+    SKYGATE_GIT_HASH="${SKYGATE_GIT_HASH}"
+)
 
 if(TARGET Qt6::Positioning)
     target_link_libraries(skygate-ui-lib PUBLIC Qt6::Positioning)
@@ -149,7 +151,7 @@ if(APPLE)
         COMMENT "Run skygate-ui bundle"
     )
 
-    set(skygateMacDeployQtExecutable "")
+    unset(skygateMacDeployQtExecutable)
     if(DEFINED MACDEPLOYQT_EXECUTABLE AND EXISTS "${MACDEPLOYQT_EXECUTABLE}")
         set(skygateMacDeployQtExecutable "${MACDEPLOYQT_EXECUTABLE}")
     endif()
@@ -162,7 +164,8 @@ if(APPLE)
 
     if(skygateMacDeployQtExecutable)
         set(skygateDmgStagingDir "${CMAKE_CURRENT_BINARY_DIR}/SkyGate-dmg")
-        set(skygateDmgPath "${CMAKE_CURRENT_BINARY_DIR}/SkyGate.dmg")
+        set(skygateDmgFileName "SkyGate-${PROJECT_VERSION}-${SKYGATE_GIT_HASH}.dmg")
+        set(skygateDmgPath "${CMAKE_CURRENT_BINARY_DIR}/${skygateDmgFileName}")
 
         add_custom_target(package-skygate-ui-dmg
             COMMAND ${CMAKE_COMMAND} -E rm -rf "${skygateDmgStagingDir}"
@@ -173,7 +176,7 @@ if(APPLE)
             COMMAND hdiutil create -volname "SkyGate" -srcfolder "${skygateDmgStagingDir}" -ov -format UDZO "${skygateDmgPath}"
             DEPENDS skygate-ui
             USES_TERMINAL
-            COMMENT "Package SkyGate DMG with Applications shortcut"
+            COMMENT "Package ${skygateDmgFileName} with Applications shortcut"
         )
     else()
         message(WARNING "macdeployqt not found; package-skygate-ui-dmg target is disabled.")

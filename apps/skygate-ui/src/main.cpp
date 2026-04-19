@@ -22,6 +22,14 @@
 #define SKYGATE_APP_VERSION "0.0.0"
 #endif
 
+#ifndef SKYGATE_GIT_HASH
+#define SKYGATE_GIT_HASH "unknown"
+#endif
+
+#ifndef SKYGATE_BUILD_DATE_TIME
+#define SKYGATE_BUILD_DATE_TIME __DATE__ " " __TIME__
+#endif
+
 int main(int argc, char* argv[])
 {
     // Prevent stale cached QML artifacts from surfacing outdated warnings at launch.
@@ -79,6 +87,11 @@ int main(int argc, char* argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);
     engine.rootContext()->setContextProperty("skyScene", &skySceneModel);
+    engine.rootContext()->setContextProperty(
+        "skygateBuildDateTime",
+        QStringLiteral(SKYGATE_BUILD_DATE_TIME)
+    );
+    engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral(SKYGATE_GIT_HASH));
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
