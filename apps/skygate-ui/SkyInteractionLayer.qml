@@ -49,5 +49,14 @@ MouseArea {
         wheel.accepted = true
     }
 
+    PinchHandler {
+        target: null
+
+        onScaleChanged: function(delta) {
+            interactionLayer.skyContextController.zoomViewByScaleDelta(delta)
+            interactionLayer.hoveredObjectLabel = ""
+        }
+    }
+
     onExited: hoveredObjectLabel = ""
 }

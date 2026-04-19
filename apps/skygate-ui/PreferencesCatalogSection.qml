@@ -99,6 +99,7 @@ Item {
 
                 Binding on text {
                     when: !catalogUrlInput.activeFocus
+                    restoreMode: Binding.RestoreNone
                     value: settingsDraft.catalogUrlText
                 }
 

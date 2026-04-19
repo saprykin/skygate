@@ -4,6 +4,7 @@
 #include <QColor>
 #include <QDateTime>
 #include <QString>
+#include <QStringList>
 
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/Types.hpp"
@@ -17,11 +18,17 @@
 
 namespace skygate::ui::internal {
 
+enum class SkyContextLocationSource {
+    CurrentDevice,
+    City,
+    Custom,
+};
+
 class SkyContextControllerConstants final {
 public:
     static constexpr int kTickIntervalMs = 1000;
     static constexpr int kLocationUpdateTimeoutMs = 5000;
-    static constexpr int kSettingsVersion = 1;
+    static constexpr int kSettingsVersion = 2;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
     static constexpr double kWheelZoomStepScale = 0.90;
     static constexpr double kWheelAngleDeltaStep = 120.0;
@@ -77,6 +84,17 @@ public:
     [[nodiscard]] static std::optional<skygate::core::ProjectionType> fromString(
         const QString& value
     );
+};
+
+class SkyContextLocationSourceCodec final {
+public:
+    [[nodiscard]] static QString toString(SkyContextLocationSource locationSource);
+    [[nodiscard]] static std::optional<SkyContextLocationSource> fromString(
+        const QString& value
+    );
+    [[nodiscard]] static QStringList availableOptions();
+    [[nodiscard]] static SkyContextLocationSource defaultSource();
+    [[nodiscard]] static bool isAvailable(SkyContextLocationSource locationSource);
 };
 
 class SkyContextTimeCodec final {

@@ -7,6 +7,7 @@ TextField {
     font.pixelSize: 11
     implicitHeight: 32
     color: "#f1f3ff"
+    selectByMouse: true
     horizontalAlignment: Text.AlignLeft
     placeholderTextColor: "#8187ab"
     selectedTextColor: "#f4f6ff"

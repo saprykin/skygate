@@ -7,10 +7,10 @@ import com.skygate.app 1.0
 Window {
     id: preferencesWindow
     title: "Preferences"
-    width: 534
-    height: 360
+    width: 588
+    height: 430
     minimumWidth: 502
-    minimumHeight: 329
+    minimumHeight: 400
     visible: false
     color: "#171b30"
     required property var skyContextController
@@ -30,6 +30,9 @@ Window {
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
+    readonly property bool applyEnabled: !(selectedPage === 0
+                                           && settingsDraft.locationSourceText === "City"
+                                           && settingsDraft.selectedCityId === "")
     readonly property string currentSectionDescription: selectedPage === 0
                                                       ? "Observer location, time, and projection"
                                                       : "Catalog source and download settings"
@@ -337,6 +340,7 @@ Window {
                         Layout.preferredWidth: 116
                         Layout.preferredHeight: 32
                         primary: true
+                        enabled: preferencesWindow.applyEnabled
                         text: "Apply"
                         onClicked: preferencesWindow.applyFormToContext()
                     }

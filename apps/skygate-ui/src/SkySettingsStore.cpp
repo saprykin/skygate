@@ -44,6 +44,11 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
     settings.setValue(SkyContextSettings::key("longitudeDeg"), snapshot.longitudeDeg);
     settings.setValue(SkyContextSettings::key("elevationMeters"), snapshot.elevationMeters);
     settings.setValue(
+        SkyContextSettings::key("locationSource"),
+        snapshot.locationSourceText
+    );
+    settings.setValue(SkyContextSettings::key("selectedCityId"), snapshot.selectedCityId);
+    settings.setValue(
         SkyContextSettings::key("projectionType"),
         snapshot.projectionTypeText
     );
@@ -117,6 +122,14 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
         SkyContextSettings::key("elevationMeters"),
         snapshot.elevationMeters
     ).toDouble();
+    snapshot.locationSourceText = settings.value(
+        SkyContextSettings::key("locationSource"),
+        snapshot.locationSourceText
+    ).toString();
+    snapshot.selectedCityId = settings.value(
+        SkyContextSettings::key("selectedCityId"),
+        snapshot.selectedCityId
+    ).toString();
     snapshot.projectionTypeText = settings.value(
         SkyContextSettings::key("projectionType"),
         snapshot.projectionTypeText

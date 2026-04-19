@@ -11,6 +11,8 @@
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
+#include "SkyContextControllerSupport.hpp"
+
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -18,8 +20,10 @@
 #include <vector>
 
 class QDateTime;
+class QAbstractItemModel;
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
+class LocationCatalogModel;
 class SkyCatalogManager;
 class SkySettingsStore;
 
@@ -44,6 +48,20 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString latitudeText READ latitudeText NOTIFY latitudeTextChanged)
     Q_PROPERTY(QString longitudeText READ longitudeText NOTIFY longitudeTextChanged)
     Q_PROPERTY(QString elevationText READ elevationText NOTIFY elevationTextChanged)
+    Q_PROPERTY(
+        QString locationSourceText
+        READ locationSourceText
+        WRITE setLocationSourceText
+        NOTIFY locationSourceTextChanged
+    )
+    Q_PROPERTY(QStringList locationSourceOptions READ locationSourceOptions CONSTANT)
+    Q_PROPERTY(QString selectedCityId READ selectedCityId WRITE setSelectedCityId NOTIFY selectedCityIdChanged)
+    Q_PROPERTY(
+        QString selectedCityDisplayText
+        READ selectedCityDisplayText
+        NOTIFY selectedCityDisplayTextChanged
+    )
+    Q_PROPERTY(QAbstractItemModel* cityCatalogModel READ cityCatalogModel CONSTANT)
     Q_PROPERTY(QString projectionTypeText READ projectionTypeText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString projectionSampleText READ projectionSampleText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
@@ -94,6 +112,11 @@ public:
     [[nodiscard]] QString latitudeText() const;
     [[nodiscard]] QString longitudeText() const;
     [[nodiscard]] QString elevationText() const;
+    [[nodiscard]] QString locationSourceText() const;
+    [[nodiscard]] QStringList locationSourceOptions() const;
+    [[nodiscard]] QString selectedCityId() const;
+    [[nodiscard]] QString selectedCityDisplayText() const;
+    [[nodiscard]] QAbstractItemModel* cityCatalogModel() const noexcept;
     [[nodiscard]] QString projectionTypeText() const;
     [[nodiscard]] QString projectionSampleText() const;
     [[nodiscard]] QString locationStatusText() const;
@@ -121,6 +144,7 @@ public:
     Q_INVOKABLE void setViewCenter(double altitudeDeg, double azimuthDeg);
     Q_INVOKABLE void panViewBy(double deltaAzimuthDeg, double deltaAltitudeDeg);
     Q_INVOKABLE void zoomViewByWheelDelta(int wheelDeltaY);
+    Q_INVOKABLE void zoomViewByScaleDelta(double scaleDelta);
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
@@ -129,6 +153,9 @@ public:
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);
     Q_INVOKABLE void setElevationText(const QString& elevationText);
+    Q_INVOKABLE void setLocationSourceText(const QString& locationSourceText);
+    Q_INVOKABLE void setSelectedCityId(const QString& selectedCityId);
+    Q_INVOKABLE void refreshCurrentLocation();
     Q_INVOKABLE void setProjectionTypeText(const QString& projectionTypeText);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
@@ -154,6 +181,9 @@ signals:
     void latitudeTextChanged();
     void longitudeTextChanged();
     void elevationTextChanged();
+    void locationSourceTextChanged();
+    void selectedCityIdChanged();
+    void selectedCityDisplayTextChanged();
     void invalidUtcDateInput(const QString& utcDateText);
     void invalidUtcTimeInput(const QString& utcTimeText);
     void invalidLatitudeInput(const QString& latitudeText);
@@ -172,8 +202,14 @@ private:
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
     void setViewFieldOfViewDeg(double viewFieldOfViewDeg);
+    void applyObserverLocation(const skygate::core::GeoLocation& observer);
     void initializeCurrentLocation();
     void applyCurrentLocation(const QGeoPositionInfo& positionInfo);
+    void setLocationSource(skygate::ui::internal::SkyContextLocationSource locationSource);
+    void clearSelectedCity();
+    [[nodiscard]] bool applySelectedCityId(const QString& cityId);
+    void setLocationStatusText(const QString& locationStatusText);
+    void updateLocationStatusText();
     void setProjectionType(skygate::core::ProjectionType projectionType);
 
 private:
@@ -193,10 +229,16 @@ private:
     double m_viewFieldOfViewDeg = 100.0;
     QTimer m_timer;
     skygate::core::SkyContext m_skyContext;
+    skygate::ui::internal::SkyContextLocationSource m_locationSource =
+        skygate::ui::internal::SkyContextLocationSourceCodec::defaultSource();
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
     std::unique_ptr<skygate::core::IProjection> m_projection;
+    std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     QString m_locationStatusText;
+    QString m_selectedCityId;
+    QString m_selectedCityDisplayText;
     QGeoPositionInfoSource* m_positionSource = nullptr;
+    bool m_positionSourceConnected = false;
 };

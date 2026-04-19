@@ -22,4 +22,6 @@ function(add_skygate_ui_qtest target_name source_file)
 endfunction()
 
 add_skygate_ui_qtest(skygate-ui-scene-model-tests SkySceneModelTests.cpp)
+add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests LocationCatalogModelTests.cpp)
+add_skygate_ui_qtest(skygate-ui-context-controller-tests SkyContextControllerTests.cpp)
 add_skygate_ui_qtest(skygate-ui-settings-store-tests SkySettingsStoreTests.cpp)

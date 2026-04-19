@@ -46,6 +46,7 @@ Item {
 
             Binding on text {
                 when: !utcDateInput.activeFocus
+                restoreMode: Binding.RestoreNone
                 value: root.settingsDraft.utcDateText
             }
 
@@ -84,10 +85,58 @@ Item {
 
             Binding on text {
                 when: !utcTimeInput.activeFocus
+                restoreMode: Binding.RestoreNone
                 value: root.settingsDraft.utcTimeText
             }
 
             onTextEdited: root.settingsDraft.utcTimeText = text
+        }
+
+        Label {
+            text: "Location Source"
+            color: "#d4d8ee"
+            font.family: "Avenir Next"
+            font.pixelSize: 11
+            Layout.alignment: Qt.AlignVCenter
+        }
+
+        PreferencesComboBox {
+            id: locationSourceCombo
+            Layout.fillWidth: true
+            Layout.columnSpan: 3
+            model: root.settingsDraft.skyContextController.locationSourceOptions
+
+            Binding on currentIndex {
+                value: Math.max(
+                    0,
+                    locationSourceCombo.model.indexOf(root.settingsDraft.locationSourceText)
+                )
+            }
+
+            onActivated: root.settingsDraft.setLocationSource(currentText)
+        }
+
+        Label {
+            text: "City"
+            color: "#d4d8ee"
+            font.family: "Avenir Next"
+            font.pixelSize: 11
+            Layout.alignment: Qt.AlignVCenter
+            visible: root.settingsDraft.locationSourceText === "City"
+        }
+
+        PreferencesCityPicker {
+            Layout.fillWidth: true
+            Layout.columnSpan: 3
+            visible: root.settingsDraft.locationSourceText === "City"
+            enabled: visible
+            placeholderText: "Choose a city"
+            catalogModel: root.settingsDraft.skyContextController.cityCatalogModel
+            selectedCityId: root.settingsDraft.selectedCityId
+            selectedText: root.settingsDraft.selectedCityDisplayText
+            onCityChosen: function(cityId, displayText, latitudeDeg, longitudeDeg) {
+                root.settingsDraft.selectCity(cityId, displayText, latitudeDeg, longitudeDeg)
+            }
         }
 
         Label {
@@ -111,10 +160,14 @@ Item {
 
             Binding on text {
                 when: !latitudeInput.activeFocus
+                restoreMode: Binding.RestoreNone
                 value: root.settingsDraft.latitudeText
             }
 
-            onTextEdited: root.settingsDraft.latitudeText = text
+            onTextEdited: {
+                root.settingsDraft.useCustomCoordinates()
+                root.settingsDraft.latitudeText = text
+            }
         }
 
         Label {
@@ -138,10 +191,14 @@ Item {
 
             Binding on text {
                 when: !longitudeInput.activeFocus
+                restoreMode: Binding.RestoreNone
                 value: root.settingsDraft.longitudeText
             }
 
-            onTextEdited: root.settingsDraft.longitudeText = text
+            onTextEdited: {
+                root.settingsDraft.useCustomCoordinates()
+                root.settingsDraft.longitudeText = text
+            }
         }
 
         Label {
@@ -163,6 +220,7 @@ Item {
 
             Binding on text {
                 when: !elevationInput.activeFocus
+                restoreMode: Binding.RestoreNone
                 value: root.settingsDraft.elevationText
             }
 

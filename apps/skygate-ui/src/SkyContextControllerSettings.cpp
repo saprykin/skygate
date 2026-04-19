@@ -31,6 +31,8 @@ bool SkyContextController::saveSettings() const
     snapshot.latitudeDeg = m_skyContext.observer.latitudeDeg;
     snapshot.longitudeDeg = m_skyContext.observer.longitudeDeg;
     snapshot.elevationMeters = m_skyContext.observer.elevationMeters;
+    snapshot.locationSourceText = locationSourceText();
+    snapshot.selectedCityId = m_selectedCityId;
     snapshot.projectionTypeText = projectionTypeText();
     snapshot.catalogPresetIndex = catalogPresetIndex();
     snapshot.catalogUrlText = catalogUrlText();
@@ -59,9 +61,34 @@ bool SkyContextController::loadSettings()
             stateSnapshot->utcEpochSeconds,
             QTimeZone::UTC
         ));
-        setLatitudeText(QString::number(stateSnapshot->latitudeDeg, 'f', 6));
-        setLongitudeText(QString::number(stateSnapshot->longitudeDeg, 'f', 6));
-        setElevationText(QString::number(stateSnapshot->elevationMeters, 'f', 1));
+
+        skygate::core::GeoLocation observer = m_skyContext.observer;
+        observer.latitudeDeg = stateSnapshot->latitudeDeg;
+        observer.longitudeDeg = stateSnapshot->longitudeDeg;
+        observer.elevationMeters = stateSnapshot->elevationMeters;
+        if (observer.isValid()) {
+            applyObserverLocation(observer);
+        }
+
+        const auto parsedLocationSource = SkyContextLocationSourceCodec::fromString(
+            stateSnapshot->locationSourceText
+        );
+        SkyContextLocationSource locationSource = parsedLocationSource.has_value()
+            ? parsedLocationSource.value()
+            : SkyContextLocationSourceCodec::defaultSource();
+        if (!SkyContextLocationSourceCodec::isAvailable(locationSource)) {
+            locationSource = SkyContextLocationSource::Custom;
+        }
+
+        if (
+            locationSource == SkyContextLocationSource::City
+            && !applySelectedCityId(stateSnapshot->selectedCityId)
+        ) {
+            setLocationSource(SkyContextLocationSource::Custom);
+        } else {
+            setLocationSource(locationSource);
+        }
+
         setProjectionTypeText(stateSnapshot->projectionTypeText);
         setCatalogPresetIndex(stateSnapshot->catalogPresetIndex);
         setCatalogUrlText(stateSnapshot->catalogUrlText);

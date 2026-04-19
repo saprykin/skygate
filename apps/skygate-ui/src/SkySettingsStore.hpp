@@ -24,6 +24,8 @@ public:
         double latitudeDeg = 0.0;
         double longitudeDeg = 0.0;
         double elevationMeters = 0.0;
+        QString locationSourceText;
+        QString selectedCityId;
         QString projectionTypeText;
         int catalogPresetIndex = 0;
         QString catalogUrlText;

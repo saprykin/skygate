@@ -50,6 +50,8 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.latitudeDeg = 47.0;
     savedSnapshot.longitudeDeg = 8.0;
     savedSnapshot.elevationMeters = 409.0;
+    savedSnapshot.locationSourceText = "City";
+    savedSnapshot.selectedCityId = "ch-zurich";
     savedSnapshot.projectionTypeText = "Perspective";
     savedSnapshot.catalogPresetIndex = 2;
     savedSnapshot.catalogUrlText = "https://example.com/catalog.csv";
@@ -62,6 +64,8 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->timelineToolbarCollapsed, savedSnapshot.timelineToolbarCollapsed);
     QCOMPARE(loadedSnapshot->speedMultiplier, savedSnapshot.speedMultiplier);
     QCOMPARE(loadedSnapshot->stepSeconds, savedSnapshot.stepSeconds);
+    QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);
+    QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);

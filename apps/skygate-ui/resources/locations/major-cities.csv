@@ -1,0 +1,206 @@
+id,countryName,cityName,latitudeDeg,longitudeDeg
+ae-abu-dhabi,United Arab Emirates,Abu Dhabi,24.4539,54.3773
+ae-dubai,United Arab Emirates,Dubai,25.2048,55.2708
+ae-sharjah,United Arab Emirates,Sharjah,25.3463,55.4209
+ar-buenos-aires,Argentina,Buenos Aires,-34.6037,-58.3816
+ar-cordoba,Argentina,Cordoba,-31.4201,-64.1888
+ar-mendoza,Argentina,Mendoza,-32.8895,-68.8458
+at-salzburg,Austria,Salzburg,47.8095,13.0550
+at-vienna,Austria,Vienna,48.2082,16.3738
+au-adelaide,Australia,Adelaide,-34.9285,138.6007
+au-brisbane,Australia,Brisbane,-27.4698,153.0251
+au-melbourne,Australia,Melbourne,-37.8136,144.9631
+au-perth,Australia,Perth,-31.9523,115.8613
+au-sydney,Australia,Sydney,-33.8688,151.2093
+be-antwerp,Belgium,Antwerp,51.2194,4.4025
+be-brussels,Belgium,Brussels,50.8503,4.3517
+bg-sofia,Bulgaria,Sofia,42.6977,23.3219
+bg-varna,Bulgaria,Varna,43.2141,27.9147
+by-minsk,Belarus,Minsk,53.9006,27.5590
+br-brasilia,Brazil,Brasilia,-15.7939,-47.8828
+br-porto-alegre,Brazil,Porto Alegre,-30.0346,-51.2177
+br-recife,Brazil,Recife,-8.0476,-34.8770
+br-rio-de-janeiro,Brazil,Rio de Janeiro,-22.9068,-43.1729
+br-sao-paulo,Brazil,Sao Paulo,-23.5558,-46.6396
+ca-calgary,Canada,Calgary,51.0447,-114.0719
+ca-halifax,Canada,Halifax,44.6488,-63.5752
+ca-montreal,Canada,Montreal,45.5017,-73.5673
+ca-ottawa,Canada,Ottawa,45.4215,-75.6972
+ca-toronto,Canada,Toronto,43.6532,-79.3832
+ca-vancouver,Canada,Vancouver,49.2827,-123.1207
+ch-basel,Switzerland,Basel,47.5596,7.5886
+ch-bern,Switzerland,Bern,46.9480,7.4474
+ch-geneva,Switzerland,Geneva,46.2044,6.1432
+ch-lausanne,Switzerland,Lausanne,46.5197,6.6323
+ch-zurich,Switzerland,Zurich,47.3769,8.5417
+cl-santiago,Chile,Santiago,-33.4489,-70.6693
+cl-valparaiso,Chile,Valparaiso,-33.0472,-71.6127
+cn-beijing,China,Beijing,39.9042,116.4074
+cn-chengdu,China,Chengdu,30.5728,104.0668
+cn-guangzhou,China,Guangzhou,23.1291,113.2644
+cn-hong-kong,China,Hong Kong,22.3193,114.1694
+cn-shanghai,China,Shanghai,31.2304,121.4737
+cn-shenzhen,China,Shenzhen,22.5431,114.0579
+co-bogota,Colombia,Bogota,4.7110,-74.0721
+co-cartagena,Colombia,Cartagena,10.3910,-75.4794
+co-medellin,Colombia,Medellin,6.2442,-75.5812
+cr-san-jose,Costa Rica,San Jose,9.9281,-84.0907
+hr-split,Croatia,Split,43.5081,16.4402
+hr-zagreb,Croatia,Zagreb,45.8150,15.9819
+cz-brno,Czech Republic,Brno,49.1951,16.6068
+cz-prague,Czech Republic,Prague,50.0755,14.4378
+de-berlin,Germany,Berlin,52.5200,13.4050
+de-cologne,Germany,Cologne,50.9375,6.9603
+de-frankfurt,Germany,Frankfurt,50.1109,8.6821
+de-hamburg,Germany,Hamburg,53.5511,9.9937
+de-munich,Germany,Munich,48.1351,11.5820
+dk-aarhus,Denmark,Aarhus,56.1629,10.2039
+dk-copenhagen,Denmark,Copenhagen,55.6761,12.5683
+ee-tallinn,Estonia,Tallinn,59.4370,24.7536
+eg-alexandria,Egypt,Alexandria,31.2001,29.9187
+eg-cairo,Egypt,Cairo,30.0444,31.2357
+es-barcelona,Spain,Barcelona,41.3874,2.1686
+es-bilbao,Spain,Bilbao,43.2630,-2.9350
+es-madrid,Spain,Madrid,40.4168,-3.7038
+es-seville,Spain,Seville,37.3891,-5.9845
+es-valencia,Spain,Valencia,39.4699,-0.3763
+et-addis-ababa,Ethiopia,Addis Ababa,8.9806,38.7578
+fi-helsinki,Finland,Helsinki,60.1699,24.9384
+fi-oulu,Finland,Oulu,65.0121,25.4651
+fr-lyon,France,Lyon,45.7640,4.8357
+fr-marseille,France,Marseille,43.2965,5.3698
+fr-paris,France,Paris,48.8566,2.3522
+fr-toulouse,France,Toulouse,43.6047,1.4442
+gb-belfast,United Kingdom,Belfast,54.5973,-5.9301
+gb-birmingham,United Kingdom,Birmingham,52.4862,-1.8904
+gb-bristol,United Kingdom,Bristol,51.4545,-2.5879
+gb-edinburgh,United Kingdom,Edinburgh,55.9533,-3.1883
+gb-london,United Kingdom,London,51.5074,-0.1278
+gb-manchester,United Kingdom,Manchester,53.4808,-2.2426
+gh-accra,Ghana,Accra,5.6037,-0.1870
+gr-athens,Greece,Athens,37.9838,23.7275
+gr-thessaloniki,Greece,Thessaloniki,40.6401,22.9444
+hu-budapest,Hungary,Budapest,47.4979,19.0402
+id-denpasar,Indonesia,Denpasar,-8.6500,115.2167
+id-jakarta,Indonesia,Jakarta,-6.2088,106.8456
+id-surabaya,Indonesia,Surabaya,-7.2575,112.7521
+ie-cork,Ireland,Cork,51.8985,-8.4756
+ie-dublin,Ireland,Dublin,53.3498,-6.2603
+il-haifa,Israel,Haifa,32.7940,34.9896
+il-jerusalem,Israel,Jerusalem,31.7683,35.2137
+il-tel-aviv,Israel,Tel Aviv,32.0853,34.7818
+in-bangalore,India,Bangalore,12.9716,77.5946
+in-chennai,India,Chennai,13.0827,80.2707
+in-delhi,India,Delhi,28.6139,77.2090
+in-hyderabad,India,Hyderabad,17.3850,78.4867
+in-kolkata,India,Kolkata,22.5726,88.3639
+in-mumbai,India,Mumbai,19.0760,72.8777
+is-reykjavik,Iceland,Reykjavik,64.1466,-21.9426
+it-milan,Italy,Milan,45.4642,9.1900
+it-naples,Italy,Naples,40.8518,14.2681
+it-palermo,Italy,Palermo,38.1157,13.3615
+it-rome,Italy,Rome,41.9028,12.4964
+it-turin,Italy,Turin,45.0703,7.6869
+jp-fukuoka,Japan,Fukuoka,33.5902,130.4017
+jp-nagoya,Japan,Nagoya,35.1815,136.9066
+jp-osaka,Japan,Osaka,34.6937,135.5023
+jp-sapporo,Japan,Sapporo,43.0618,141.3545
+jp-tokyo,Japan,Tokyo,35.6762,139.6503
+ke-mombasa,Kenya,Mombasa,-4.0435,39.6682
+ke-nairobi,Kenya,Nairobi,-1.2921,36.8219
+kz-almaty,Kazakhstan,Almaty,43.2389,76.8897
+kz-astana,Kazakhstan,Astana,51.1694,71.4491
+kr-busan,South Korea,Busan,35.1796,129.0756
+kr-incheon,South Korea,Incheon,37.4563,126.7052
+kr-seoul,South Korea,Seoul,37.5665,126.9780
+lt-vilnius,Lithuania,Vilnius,54.6872,25.2797
+lu-luxembourg,Luxembourg,Luxembourg,49.6116,6.1319
+lv-riga,Latvia,Riga,56.9496,24.1052
+ma-casablanca,Morocco,Casablanca,33.5731,-7.5898
+ma-marrakech,Morocco,Marrakech,31.6295,-7.9811
+ma-rabat,Morocco,Rabat,34.0209,-6.8416
+mx-guadalajara,Mexico,Guadalajara,20.6597,-103.3496
+mx-merida,Mexico,Merida,20.9674,-89.5926
+mx-mexico-city,Mexico,Mexico City,19.4326,-99.1332
+mx-monterrey,Mexico,Monterrey,25.6866,-100.3161
+my-george-town,Malaysia,George Town,5.4141,100.3288
+my-kota-kinabalu,Malaysia,Kota Kinabalu,5.9804,116.0735
+my-kuala-lumpur,Malaysia,Kuala Lumpur,3.1390,101.6869
+ng-abuja,Nigeria,Abuja,9.0765,7.3986
+ng-lagos,Nigeria,Lagos,6.5244,3.3792
+nl-amsterdam,Netherlands,Amsterdam,52.3676,4.9041
+nl-eindhoven,Netherlands,Eindhoven,51.4416,5.4697
+nl-rotterdam,Netherlands,Rotterdam,51.9244,4.4777
+no-bergen,Norway,Bergen,60.3913,5.3221
+no-oslo,Norway,Oslo,59.9139,10.7522
+no-tromso,Norway,Tromso,69.6492,18.9553
+nz-auckland,New Zealand,Auckland,-36.8509,174.7645
+nz-christchurch,New Zealand,Christchurch,-43.5321,172.6362
+nz-wellington,New Zealand,Wellington,-41.2866,174.7756
+pe-cusco,Peru,Cusco,-13.5319,-71.9675
+pe-lima,Peru,Lima,-12.0464,-77.0428
+ph-cebu-city,Philippines,Cebu City,10.3157,123.8854
+ph-davao,Philippines,Davao,7.1907,125.4553
+ph-manila,Philippines,Manila,14.5995,120.9842
+pk-islamabad,Pakistan,Islamabad,33.6844,73.0479
+pk-karachi,Pakistan,Karachi,24.8607,67.0011
+pk-lahore,Pakistan,Lahore,31.5204,74.3587
+pl-gdansk,Poland,Gdansk,54.3520,18.6466
+pl-krakow,Poland,Krakow,50.0647,19.9450
+pl-warsaw,Poland,Warsaw,52.2297,21.0122
+pl-wroclaw,Poland,Wroclaw,51.1079,17.0385
+pt-faro,Portugal,Faro,37.0194,-7.9304
+pt-lisbon,Portugal,Lisbon,38.7223,-9.1393
+pt-porto,Portugal,Porto,41.1579,-8.6291
+ro-bucharest,Romania,Bucharest,44.4268,26.1025
+ro-cluj-napoca,Romania,Cluj-Napoca,46.7712,23.6236
+rs-belgrade,Serbia,Belgrade,44.7866,20.4489
+rs-novi-sad,Serbia,Novi Sad,45.2671,19.8335
+ru-kazan,Russia,Kazan,55.7903,49.1125
+ru-moscow,Russia,Moscow,55.7558,37.6173
+ru-novosibirsk,Russia,Novosibirsk,55.0084,82.9357
+ru-saint-petersburg,Russia,Saint Petersburg,59.9311,30.3609
+ru-sochi,Russia,Sochi,43.6028,39.7342
+ru-vladivostok,Russia,Vladivostok,43.1155,131.8855
+ru-yekaterinburg,Russia,Yekaterinburg,56.8389,60.6057
+sa-jeddah,Saudi Arabia,Jeddah,21.4858,39.1925
+sa-riyadh,Saudi Arabia,Riyadh,24.7136,46.6753
+se-gothenburg,Sweden,Gothenburg,57.7089,11.9746
+se-malmo,Sweden,Malmo,55.6050,13.0038
+se-stockholm,Sweden,Stockholm,59.3293,18.0686
+sg-singapore,Singapore,Singapore,1.3521,103.8198
+si-ljubljana,Slovenia,Ljubljana,46.0569,14.5058
+sk-bratislava,Slovakia,Bratislava,48.1486,17.1077
+th-bangkok,Thailand,Bangkok,13.7563,100.5018
+th-chiang-mai,Thailand,Chiang Mai,18.7883,98.9853
+th-phuket,Thailand,Phuket,7.8804,98.3923
+tr-ankara,Turkey,Ankara,39.9334,32.8597
+tr-antalya,Turkey,Antalya,36.8969,30.7133
+tr-istanbul,Turkey,Istanbul,41.0082,28.9784
+tr-izmir,Turkey,Izmir,38.4237,27.1428
+tz-dar-es-salaam,Tanzania,Dar es Salaam,-6.7924,39.2083
+tn-tunis,Tunisia,Tunis,36.8065,10.1815
+ua-kyiv,Ukraine,Kyiv,50.4501,30.5234
+ua-lviv,Ukraine,Lviv,49.8397,24.0297
+ua-odesa,Ukraine,Odesa,46.4825,30.7233
+ug-kampala,Uganda,Kampala,0.3476,32.5825
+us-atlanta,United States,Atlanta,33.7490,-84.3880
+us-boston,United States,Boston,42.3601,-71.0589
+us-chicago,United States,Chicago,41.8781,-87.6298
+us-denver,United States,Denver,39.7392,-104.9903
+us-houston,United States,Houston,29.7604,-95.3698
+us-los-angeles,United States,Los Angeles,34.0522,-118.2437
+us-miami,United States,Miami,25.7617,-80.1918
+us-new-york,United States,New York,40.7128,-74.0060
+us-san-francisco,United States,San Francisco,37.7749,-122.4194
+us-seattle,United States,Seattle,47.6062,-122.3321
+us-washington-dc,United States,Washington DC,38.9072,-77.0369
+uy-montevideo,Uruguay,Montevideo,-34.9011,-56.1645
+uz-samarkand,Uzbekistan,Samarkand,39.6542,66.9597
+uz-tashkent,Uzbekistan,Tashkent,41.2995,69.2401
+vn-da-nang,Vietnam,Da Nang,16.0544,108.2022
+vn-hanoi,Vietnam,Hanoi,21.0278,105.8342
+vn-ho-chi-minh-city,Vietnam,Ho Chi Minh City,10.8231,106.6297
+za-cape-town,South Africa,Cape Town,-33.9249,18.4241
+za-durban,South Africa,Durban,-29.8587,31.0218
+za-johannesburg,South Africa,Johannesburg,-26.2041,28.0473

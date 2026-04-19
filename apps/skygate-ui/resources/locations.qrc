@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/locations">
+        <file alias="major-cities.csv">locations/major-cities.csv</file>
+    </qresource>
+</RCC>

@@ -227,6 +227,15 @@ void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
     setViewFieldOfViewDeg(m_viewFieldOfViewDeg * zoomMultiplier);
 }
 
+void SkyContextController::zoomViewByScaleDelta(const double scaleDelta)
+{
+    if (!std::isfinite(scaleDelta) || scaleDelta <= 0.0 || std::abs(scaleDelta - 1.0) < 1e-9) {
+        return;
+    }
+
+    setViewFieldOfViewDeg(m_viewFieldOfViewDeg / scaleDelta);
+}
+
 void SkyContextController::resetViewDirection()
 {
     setViewCenter(
@@ -341,9 +350,11 @@ void SkyContextController::setLatitudeText(const QString& latitudeText)
         return;
     }
 
-    m_skyContext.observer = nextObserver;
-    emit latitudeTextChanged();
-    emit skyContextChanged();
+    if (m_locationSource != SkyContextLocationSource::Custom) {
+        setLocationSource(SkyContextLocationSource::Custom);
+    }
+
+    applyObserverLocation(nextObserver);
 }
 
 void SkyContextController::setLongitudeText(const QString& longitudeText)
@@ -362,9 +373,11 @@ void SkyContextController::setLongitudeText(const QString& longitudeText)
         return;
     }
 
-    m_skyContext.observer = nextObserver;
-    emit longitudeTextChanged();
-    emit skyContextChanged();
+    if (m_locationSource != SkyContextLocationSource::Custom) {
+        setLocationSource(SkyContextLocationSource::Custom);
+    }
+
+    applyObserverLocation(nextObserver);
 }
 
 void SkyContextController::setElevationText(const QString& elevationText)
@@ -383,9 +396,7 @@ void SkyContextController::setElevationText(const QString& elevationText)
         return;
     }
 
-    m_skyContext.observer = nextObserver;
-    emit elevationTextChanged();
-    emit skyContextChanged();
+    applyObserverLocation(nextObserver);
 }
 
 void SkyContextController::setProjectionTypeText(const QString& projectionTypeText)
@@ -476,88 +487,136 @@ void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg
     emit skyContextChanged();
 }
 
-void SkyContextController::initializeCurrentLocation()
+void SkyContextController::applyObserverLocation(const skygate::core::GeoLocation& observer)
 {
-#if SKYGATE_HAS_POSITIONING
-    m_locationStatusText = "Location: Initializing";
-    emit locationStatusTextChanged();
-
-    m_positionSource = QGeoPositionInfoSource::createDefaultSource(this);
-    if (m_positionSource == nullptr) {
-        m_locationStatusText = "Location: Device source unavailable";
-        emit locationStatusTextChanged();
+    if (!observer.isValid()) {
         return;
     }
 
-    connect(
-        m_positionSource,
-        &QGeoPositionInfoSource::positionUpdated,
-        this,
-        &SkyContextController::applyCurrentLocation
-    );
-    connect(
-        m_positionSource,
-        &QGeoPositionInfoSource::errorOccurred,
-        this,
-        [this](QGeoPositionInfoSource::Error) {
-            m_locationStatusText = "Location: Update failed";
-            emit locationStatusTextChanged();
-        }
-    );
+    const bool latitudeChanged = m_skyContext.observer.latitudeDeg != observer.latitudeDeg;
+    const bool longitudeChanged = m_skyContext.observer.longitudeDeg != observer.longitudeDeg;
+    const bool elevationChanged = m_skyContext.observer.elevationMeters != observer.elevationMeters;
+    if (!latitudeChanged && !longitudeChanged && !elevationChanged) {
+        return;
+    }
+
+    m_skyContext.observer = observer;
+    if (latitudeChanged) {
+        emit latitudeTextChanged();
+    }
+    if (longitudeChanged) {
+        emit longitudeTextChanged();
+    }
+    if (elevationChanged) {
+        emit elevationTextChanged();
+    }
+    emit skyContextChanged();
+}
+
+void SkyContextController::refreshCurrentLocation()
+{
+    if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+        return;
+    }
+
+    initializeCurrentLocation();
+}
+
+void SkyContextController::initializeCurrentLocation()
+{
+    if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+        updateLocationStatusText();
+        return;
+    }
+
+#if SKYGATE_HAS_POSITIONING
+    setLocationStatusText("Location: Initializing");
+
+    if (m_positionSource == nullptr) {
+        m_positionSource = QGeoPositionInfoSource::createDefaultSource(this);
+    }
+    if (m_positionSource == nullptr) {
+        setLocationStatusText("Location: Device source unavailable");
+        return;
+    }
+
+    if (!m_positionSourceConnected) {
+        connect(
+            m_positionSource,
+            &QGeoPositionInfoSource::positionUpdated,
+            this,
+            &SkyContextController::applyCurrentLocation
+        );
+        connect(
+            m_positionSource,
+            &QGeoPositionInfoSource::errorOccurred,
+            this,
+            [this](QGeoPositionInfoSource::Error) {
+                if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+                    return;
+                }
+
+                setLocationStatusText("Location: Update failed");
+            }
+        );
+        m_positionSourceConnected = true;
+    }
 
     QLocationPermission permission;
     permission.setAccuracy(QLocationPermission::Precise);
     permission.setAvailability(QLocationPermission::WhenInUse);
 
     auto startLocationUpdate = [this] {
+        setLocationStatusText("Location: Locating");
         m_positionSource->requestUpdate(SkyContextControllerConstants::kLocationUpdateTimeoutMs);
     };
 
     QCoreApplication* app = QCoreApplication::instance();
     if (app == nullptr) {
+        setLocationStatusText("Location: Positioning unavailable");
         return;
     }
 
     const Qt::PermissionStatus permissionStatus = app->checkPermission(permission);
     if (permissionStatus == Qt::PermissionStatus::Granted) {
-        m_locationStatusText = "Location: Locating";
-        emit locationStatusTextChanged();
         startLocationUpdate();
         return;
     }
 
     if (permissionStatus == Qt::PermissionStatus::Undetermined) {
-        m_locationStatusText = "Location: Waiting for permission";
-        emit locationStatusTextChanged();
+        setLocationStatusText("Location: Waiting for permission");
         app->requestPermission(
             permission,
             this,
             [this, startLocationUpdate](const QPermission& requestPermission) {
+                if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+                    return;
+                }
+
                 if (requestPermission.status() == Qt::PermissionStatus::Granted) {
-                    m_locationStatusText = "Location: Locating";
-                    emit locationStatusTextChanged();
                     startLocationUpdate();
                     return;
                 }
 
-                m_locationStatusText = "Location: Permission denied";
-                emit locationStatusTextChanged();
+                setLocationStatusText("Location: Permission denied");
             }
         );
         return;
     }
 
-    m_locationStatusText = "Location: Permission denied";
-    emit locationStatusTextChanged();
+    setLocationStatusText("Location: Permission denied");
 #else
-    m_locationStatusText = "Location: Positioning unavailable";
-    emit locationStatusTextChanged();
+    setLocationStatusText("Location: Positioning unavailable");
 #endif
 }
 
 void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& positionInfo)
 {
 #if SKYGATE_HAS_POSITIONING
+    if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+        return;
+    }
+
     if (!positionInfo.isValid()) {
         return;
     }
@@ -578,28 +637,8 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
         return;
     }
 
-    const bool latitudeChanged = m_skyContext.observer.latitudeDeg != nextObserver.latitudeDeg;
-    const bool longitudeChanged = m_skyContext.observer.longitudeDeg != nextObserver.longitudeDeg;
-    const bool elevationChanged = m_skyContext.observer.elevationMeters != nextObserver.elevationMeters;
-
-    if (!latitudeChanged && !longitudeChanged && !elevationChanged) {
-        return;
-    }
-
-    m_skyContext.observer = nextObserver;
-    m_locationStatusText = "Location: Using current location";
-    emit locationStatusTextChanged();
-
-    if (latitudeChanged) {
-        emit latitudeTextChanged();
-    }
-    if (longitudeChanged) {
-        emit longitudeTextChanged();
-    }
-    if (elevationChanged) {
-        emit elevationTextChanged();
-    }
-    emit skyContextChanged();
+    applyObserverLocation(nextObserver);
+    setLocationStatusText("Location: Using current location");
 #else
     (void)positionInfo;
 #endif

@@ -62,11 +62,13 @@ This module is the application layer and the most stateful part of the system.
   - Primary QML-facing controller (`QObject` with `Q_PROPERTY` and
     `Q_INVOKABLE` API).
   - Owns the current `skygate::core::SkyContext`, projection selection, view
-    center/FOV, playback state, timeline settings, and location status.
-  - Owns `SkySettingsStore` and `SkyCatalogManager`.
+    center/FOV, playback state, timeline settings, location source selection,
+    and location status.
+  - Owns `SkySettingsStore`, `SkyCatalogManager`, and the bundled city catalog
+    model used by Preferences.
   - Uses a `QTimer` for live timeline updates.
-  - Optionally initializes observer location through Qt Positioning when that
-    module is available.
+  - Optionally requests a one-shot observer location update through Qt
+    Positioning when the persisted location source is `Current Device`.
   - Loads persisted settings and restored catalog cache during initialization.
 - `SkySceneModel`
   - Read-model / derived-state layer between controller state and rendering.
@@ -95,7 +97,7 @@ This module is the application layer and the most stateful part of the system.
 - `SkyViewportItem`
   - Base rendered star field and line work.
 - `SkyInteractionLayer`
-  - Mouse drag pan, wheel zoom, and hover hit-testing.
+  - Mouse drag pan, wheel or pinch zoom, and hover hit-testing.
 - `SkyOverlayLayer`
   - Text labels for objects and cardinal directions, plus collision avoidance
     with the timeline toolbar.
@@ -105,6 +107,9 @@ This module is the application layer and the most stateful part of the system.
   - Settings and catalog management UI.
   - Uses `SkySettingsDraft.qml` as a staged edit buffer before applying changes
     back to `SkyContextController`.
+  - Includes a source-aware location workflow with `Current Device`, `City`,
+    and `Custom` modes plus a searchable city picker backed by the bundled
+    catalog model.
 - `StatusFooter`
   - Current context and catalog status summary.
 
@@ -128,8 +133,14 @@ scene graph code, while transient UI and chrome stay in QML.
   - Marshals progress and completion callbacks back onto the UI thread.
 - `SkySettingsStore`
   - Persists controller state in `QSettings`.
+  - Persists location source and selected city id alongside raw observer
+    coordinates so device/city/custom modes survive relaunch.
   - Persists downloaded/imported catalog rows in an app-data cache file and
     stores related metadata in `QSettings`.
+- `LocationCatalogModel`
+  - Loads a bundled CSV of major cities from Qt resources.
+  - Exposes a flat, filterable `QAbstractListModel` with country headers and
+    city rows for the Preferences location picker.
 
 ### `skygate-core`
 This module provides stable, UI-independent core types and projection logic.

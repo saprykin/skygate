@@ -7,11 +7,11 @@ Window {
     id: aboutWindow
     title: "About SkyGate"
     width: 420
-    height: 344
+    height: 334
     minimumWidth: 420
-    minimumHeight: 344
+    minimumHeight: 334
     maximumWidth: 420
-    maximumHeight: 344
+    maximumHeight: 334
     visible: false
     color: "#171b30"
     property Window transientParentWindow
@@ -99,7 +99,7 @@ Window {
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
                 Layout.topMargin: 2
-                Layout.bottomMargin: 24
+                Layout.bottomMargin: 14
                 spacing: 8
 
                 Item {

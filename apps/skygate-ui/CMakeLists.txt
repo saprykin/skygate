@@ -12,6 +12,8 @@ endif()
 qt_add_library(skygate-ui-lib STATIC
     src/CatalogCoordinator.cpp
     src/CatalogCoordinator.hpp
+    src/LocationCatalogModel.cpp
+    src/LocationCatalogModel.hpp
     src/SkyCatalogManager.cpp
     src/SkyCatalogManager.hpp
     src/SkySceneModel.cpp
@@ -58,6 +60,9 @@ qt_add_executable(skygate-ui
 qt_add_resources(skygateUiIconSources resources/icons.qrc)
 target_sources(skygate-ui PRIVATE ${skygateUiIconSources})
 
+qt_add_resources(skygateUiLocationSources resources/locations.qrc)
+target_sources(skygate-ui-lib PRIVATE ${skygateUiLocationSources})
+
 if(APPLE)
     target_sources(skygate-ui PRIVATE resources/icons/Skygate.icns)
     set_target_properties(skygate-ui PROPERTIES
@@ -83,6 +88,7 @@ qt_add_qml_module(skygate-ui
         PreferencesActionButton.qml
         PreferencesCatalogSection.qml
         PreferencesCheckBox.qml
+        PreferencesCityPicker.qml
         PreferencesComboBox.qml
         PreferencesSectionButton.qml
         SkyInteractionLayer.qml
