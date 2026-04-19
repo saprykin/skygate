@@ -7,13 +7,20 @@ repository.
 ## General Coding Style (C++)
 - Use 4-space indentation.
 - Use UTF-8 and prefer ASCII in source unless non-ASCII is required.
+- Prefer `.hpp` headers and `#pragma once`.
 - Prefer one class per header/source pair where practical.
 - Keep functions short and focused.
 - Use `const` correctness consistently.
 - Use `override` for overridden virtual functions.
 - Prefer `nullptr` over `0`/`NULL`.
-- Avoid non-class/free function declarations in headers. Prefer class static
-  methods, interfaces, or implementation-only source functions.
+- Prefer `[[nodiscard]]` on query/factory APIs when ignoring the result is
+  likely a bug.
+- Namespace-level factory/helper APIs in public headers are acceptable when
+  they are part of the intended module interface. Avoid ad-hoc public free
+  functions that do not define a clear API boundary.
+- Prefer unnamed-namespace helpers for `.cpp`-local and test-local functions.
+- Keep public library headers under `libs/*/include/skygate/...`. Keep
+  internal-only helpers in `src/` where practical.
 
 ## Naming Conventions
 - Types/classes: `PascalCase`.
@@ -36,25 +43,36 @@ repository.
   - Be focused on a single responsibility.
 
 ## Qt/CMake Expectations
-- Target Qt 6.
+- Target Qt 6.5+ and C++20.
 - Use CMake for all build configuration.
+- Prefer the existing CMake presets and build targets when possible:
+  `core-debug`, `ui-debug`, and `ui-run`.
+- Preserve the one-way dependency direction:
+  `skygate-ui -> skygate-ephemeris -> skygate-core`.
 - Keep platform-specific code isolated behind interfaces.
 - Favor Qt abstractions when they preserve portability.
+- For QML-facing types, follow the established `QObject`/`Q_PROPERTY`/
+  `Q_INVOKABLE` pattern instead of inventing alternate UI binding layers.
 
 ## Error Handling and Logging
 - Validate external inputs.
 - Fail fast on programmer errors in debug builds.
 - Return explicit error states where recovery is possible.
-- Use consistent logging categories for diagnostics.
+- If adding diagnostics, use consistent Qt logging categories. Do not assume a
+  pre-existing project-wide category scheme where none exists yet.
 
 ## Testing
-- Add unit tests for core logic, especially math/transform code.
+- Add or adjust Qt Test coverage for new logic, especially math/transform code.
 - Keep rendering-independent calculations testable without UI.
 - Prefer deterministic tests (fixed time/location inputs).
+- Register tests through the existing per-module CMake helpers / CTest flow.
 
 ## Agent Workflow
 - Make minimal, focused changes.
 - Do not rewrite unrelated files.
-- Update documentation when behavior/contracts change.
+- Prefer existing presets and build trees over inventing new local workflow
+  instructions.
+- Update documentation when behavior, contracts, or architecture meaningfully
+  change.
 - If a rule conflicts with explicit user instruction, follow the user
   instruction.
