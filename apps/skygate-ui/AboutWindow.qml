@@ -7,11 +7,11 @@ Window {
     id: aboutWindow
     title: "About SkyGate"
     width: 420
-    height: 320
+    height: 344
     minimumWidth: 420
-    minimumHeight: 320
+    minimumHeight: 344
     maximumWidth: 420
-    maximumHeight: 320
+    maximumHeight: 344
     visible: false
     color: "#171b30"
     property Window transientParentWindow
@@ -99,32 +99,62 @@ Window {
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
                 Layout.topMargin: 2
-                Layout.bottomMargin: 14
+                Layout.bottomMargin: 24
                 spacing: 8
 
                 Item {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 64
-                    Layout.preferredHeight: 64
+                    Layout.preferredWidth: 76
+                    Layout.preferredHeight: 76
+                    clip: true
                     property var aboutLogoSources: [
-                        "resources/icons/skygate-icon-512.png",
                         "qrc:/icons/app-icon-512.png",
-                        "qrc:/qt/qml/com/skygate/app/resources/icons/skygate-icon-512.png"
+                        "qrc:/qt/qml/com/skygate/app/resources/icons/skygate-icon-512.png",
+                        "resources/icons/skygate-icon-512.png"
                     ]
                     property int aboutLogoSourceIndex: 0
+                    readonly property rect aboutLogoVisibleRect: Qt.rect(42, 37, 427, 437)
+                    readonly property real aboutLogoRenderSize: Math.ceil(
+                        (width * 512) / aboutLogoVisibleRect.height
+                    )
+                    readonly property real aboutLogoVisibleWidth: (
+                        aboutLogoRenderSize * aboutLogoVisibleRect.width
+                    ) / 512
+                    readonly property real aboutLogoVisibleHeight: (
+                        aboutLogoRenderSize * aboutLogoVisibleRect.height
+                    ) / 512
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 14
-                        color: "#232742"
+                        radius: 18
+                        color: "#151a36"
+                        opacity: 0.62
                         border.width: 1
-                        border.color: "#4c5278"
+                        border.color: "#6676ab"
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        radius: 17
+                        color: "transparent"
+                        border.width: 1
+                        border.color: "#9dafeb"
+                        opacity: 0.72
                     }
 
                     Image {
                         id: aboutLogoImage
-                        anchors.fill: parent
-                        anchors.margins: 10
+                        width: parent.aboutLogoRenderSize
+                        height: parent.aboutLogoRenderSize
+                        x: Math.round(
+                            ((parent.width - parent.aboutLogoVisibleWidth) * 0.5)
+                            - ((parent.aboutLogoRenderSize * parent.aboutLogoVisibleRect.x) / 512)
+                        )
+                        y: Math.round(
+                            ((parent.height - parent.aboutLogoVisibleHeight) * 0.5)
+                            - ((parent.aboutLogoRenderSize * parent.aboutLogoVisibleRect.y) / 512)
+                        )
                         source: parent.aboutLogoSources[parent.aboutLogoSourceIndex]
                         fillMode: Image.PreserveAspectFit
                         smooth: true
@@ -201,7 +231,8 @@ Window {
 
                 PreferencesActionButton {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 2
+                    Layout.topMargin: 4
+                    Layout.bottomMargin: 8
                     Layout.preferredWidth: 112
                     Layout.preferredHeight: 32
                     primary: true
