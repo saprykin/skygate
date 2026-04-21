@@ -6,6 +6,31 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
+#include <cmath>
+#include <optional>
+#include <string>
+
+namespace {
+
+skygate::ephemeris::CelestialBody makeBody(
+    std::string id,
+    std::string displayName,
+    const skygate::ephemeris::CelestialBodyType type,
+    const double visualMagnitude,
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
+)
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.type = type;
+    body.visualMagnitude = visualMagnitude;
+    body.fixedEquatorial = fixedEquatorial;
+    return body;
+}
+
+}  // namespace
+
 class SkySceneModelTests final : public QObject {
     Q_OBJECT
 
@@ -16,7 +41,18 @@ private slots:
 
 void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
 {
-    auto starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_planet",
+            "Demo Planet",
+            skygate::ephemeris::CelestialBodyType::Planet,
+            -1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
     QVERIFY(starCatalog != nullptr);
 
     auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
@@ -40,6 +76,21 @@ void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
     controller.setLatitudeText("47.3769");
     controller.setLongitudeText("8.5417");
     controller.setElevationText("408.0");
+    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
+    const skygate::ephemeris::CelestialBodyState* demoPlanetState = nullptr;
+    for (const auto& state : snapshot.states) {
+        if (snapshot.bodyAt(state.bodyIndex).id == "demo_planet") {
+            demoPlanetState = &state;
+            break;
+        }
+    }
+    QVERIFY(demoPlanetState != nullptr);
+    QVERIFY(std::isfinite(demoPlanetState->horizontal.altitudeDeg));
+    QVERIFY(std::isfinite(demoPlanetState->horizontal.azimuthDeg));
+    controller.setViewCenter(
+        demoPlanetState->horizontal.altitudeDeg,
+        demoPlanetState->horizontal.azimuthDeg
+    );
 
     SkySceneModel sceneModel;
     sceneModel.setSkyContextController(&controller);
@@ -49,8 +100,17 @@ void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
     const auto points = sceneModel.renderPointSpan();
     QVERIFY(!points.empty());
 
-    const QString label = sceneModel.objectLabelAt(points.front().x, points.front().y);
-    QVERIFY(!label.isEmpty());
+    const SkyRenderPoint* demoPlanetPoint = nullptr;
+    for (const auto& point : points) {
+        if (point.bodyIndex == demoPlanetState->bodyIndex) {
+            demoPlanetPoint = &point;
+            break;
+        }
+    }
+    QVERIFY(demoPlanetPoint != nullptr);
+
+    const QString label = sceneModel.objectLabelAt(demoPlanetPoint->x, demoPlanetPoint->y);
+    QCOMPARE(label, QString("Demo Planet"));
     QVERIFY(!sceneModel.overlayItems().isEmpty());
 }
 
