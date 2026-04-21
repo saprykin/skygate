@@ -1,8 +1,7 @@
-build/
-build-make/
-build-codex/
-build-codex-ui/
+.DS_Store
 .vscode/
+.qtcreator/
+build/
+build-*/
 CMakeLists.txt.user
 CMakeUserPresets.json
-.DS_Store
