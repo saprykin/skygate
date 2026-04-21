@@ -19,8 +19,6 @@ using namespace skygate::ui::internal;
 
 namespace {
 
-constexpr std::size_t kExpectedHygConstellationCount = 88;
-
 QString stripSavedSuffixes(const QString& sourceLabel)
 {
     QString normalizedSourceLabel = sourceLabel.trimmed();
@@ -38,18 +36,6 @@ QString stripSavedSuffixes(const QString& sourceLabel)
         normalizedSourceLabel = normalizedSourceLabel.trimmed();
     }
     return normalizedSourceLabel;
-}
-
-bool isLikelyHygCatalogSource(const QString& sourceLabel, const QString& catalogUrlText)
-{
-    const QString normalizedSourceLabel = sourceLabel.trimmed().toLower();
-    if (normalizedSourceLabel.contains("hyg")) {
-        return true;
-    }
-
-    const QString normalizedCatalogUrlText = catalogUrlText.trimmed().toLower();
-    return normalizedCatalogUrlText.contains("hyg")
-        || normalizedCatalogUrlText.contains("astronexus.com/downloads/catalogs/hygdata");
 }
 
 }  // namespace
@@ -302,12 +288,8 @@ bool SkyCatalogManager::restoreCatalogCache()
             )
         );
         if (!parsedLineRefs.empty()) {
-            const std::size_t parsedLineRefCount = parsedLineRefs.size();
             setConstellationLineRefs(std::move(parsedLineRefs));
 
-            std::size_t restoredConstellationCount = cacheSnapshot->constellationCount;
-            const bool shouldUseLabelFallback =
-                !cacheSnapshot->hasPersistedConstellationCount || restoredConstellationCount == 0;
             if (!cacheSnapshot->constellationLabelRows.isEmpty()) {
                 auto parsedLabelRefs = SkyContextCatalogCodec::parseConstellationLabelRows(
                     std::string_view(
@@ -315,23 +297,12 @@ bool SkyCatalogManager::restoreCatalogCache()
                         static_cast<std::size_t>(cacheSnapshot->constellationLabelRows.size())
                     )
                 );
-                if (shouldUseLabelFallback && !parsedLabelRefs.empty()) {
-                    restoredConstellationCount = parsedLabelRefs.size();
-                }
                 setConstellationLabelRefs(std::move(parsedLabelRefs));
             } else {
                 setConstellationLabelRefs({});
             }
 
-            const bool hasFullLineReferenceSet = parsedLineRefCount >= 200;
-            if (
-                hasFullLineReferenceSet
-                && restoredConstellationCount < kExpectedHygConstellationCount
-                && isLikelyHygCatalogSource(m_sourceLabel, m_catalogUrlText)
-            ) {
-                restoredConstellationCount = kExpectedHygConstellationCount;
-            }
-
+            const std::size_t restoredConstellationCount = cacheSnapshot->constellationCount;
             if (restoredConstellationCount != m_constellationCount) {
                 m_constellationCount = restoredConstellationCount;
                 emit datasetInfoTextChanged();

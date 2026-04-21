@@ -382,13 +382,4 @@ QColor SkyContextRenderStyle::constellationLineColor()
     return QColor(146, 205, 255, 132);
 }
 
-std::string_view SkyContextRenderStyle::hipSuffix(std::string_view value)
-{
-    constexpr std::string_view kHipPrefix = "hip_";
-    if (!value.starts_with(kHipPrefix)) {
-        return {};
-    }
-    return value.substr(kHipPrefix.size());
-}
-
 }  // namespace skygate::ui::internal

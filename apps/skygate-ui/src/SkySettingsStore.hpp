@@ -37,7 +37,6 @@ public:
         QByteArray constellationLineRows;
         QByteArray constellationLabelRows;
         int constellationLineSchemaVersion = 0;
-        bool hasPersistedConstellationCount = false;
         std::size_t constellationCount = 0;
     };
 

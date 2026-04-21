@@ -10,14 +10,11 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cmath>
-#include <cctype>
 #include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -26,98 +23,10 @@
 namespace skygate::ephemeris {
 namespace {
 
-std::vector<std::string_view> splitWhitespaceColumns(const std::string_view line)
-{
-    std::vector<std::string_view> columns;
-    std::size_t index = 0;
-    while (index < line.size()) {
-        while (index < line.size() && std::isspace(static_cast<unsigned char>(line[index]))) {
-            ++index;
-        }
-        if (index >= line.size()) {
-            break;
-        }
-
-        const std::size_t tokenStart = index;
-        while (index < line.size() && !std::isspace(static_cast<unsigned char>(line[index]))) {
-            ++index;
-        }
-        columns.push_back(line.substr(tokenStart, index - tokenStart));
-    }
-
-    return columns;
-}
-
-std::optional<int> parsePositiveInteger(const std::string_view value)
-{
-    if (value.empty()) {
-        return std::nullopt;
-    }
-
-    int parsedValue = 0;
-    const auto [parseEnd, errorCode] = std::from_chars(
-        value.data(),
-        value.data() + value.size(),
-        parsedValue
-    );
-    if (errorCode != std::errc() || parseEnd != value.data() + value.size() || parsedValue <= 0) {
-        return std::nullopt;
-    }
-
-    return parsedValue;
-}
-
-std::size_t inferConstellationCountFromRows(const std::string_view rows)
-{
-    std::unordered_set<std::string> constellationIds;
-
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) {
-            line.remove_prefix(1);
-        }
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
-            line.remove_suffix(1);
-        }
-
-        if (!line.empty() && line.front() != '#') {
-            std::size_t firstSplit = 0;
-            while (firstSplit < line.size() && !std::isspace(static_cast<unsigned char>(line[firstSplit]))) {
-                ++firstSplit;
-            }
-            const std::string_view constellationId = line.substr(0, firstSplit);
-
-            while (firstSplit < line.size() && std::isspace(static_cast<unsigned char>(line[firstSplit]))) {
-                ++firstSplit;
-            }
-            std::size_t secondSplit = firstSplit;
-            while (secondSplit < line.size() && !std::isspace(static_cast<unsigned char>(line[secondSplit]))) {
-                ++secondSplit;
-            }
-            const std::string_view segmentCountText = line.substr(firstSplit, secondSplit - firstSplit);
-
-            if (!constellationId.empty() && parsePositiveInteger(segmentCountText).has_value()) {
-                constellationIds.insert(std::string(constellationId));
-            }
-        }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
-    }
-
-    return constellationIds.size();
-}
-
 bool looksLikeJsonPayload(const std::string_view payload)
 {
     for (const char byte : payload) {
-        if (std::isspace(static_cast<unsigned char>(byte))) {
+        if (byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r') {
             continue;
         }
         return byte == '{' || byte == '[';
@@ -354,64 +263,6 @@ QString normalizeLabelKey(const QString& label)
     return label.trimmed().toLower();
 }
 
-std::vector<ConstellationLineRef> parseStellariumRowLineRefs(const std::string_view rows)
-{
-    std::vector<ConstellationLineRef> lineRefs;
-    std::unordered_set<std::string> dedupKeys;
-
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) {
-            line.remove_prefix(1);
-        }
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
-            line.remove_suffix(1);
-        }
-
-        if (!line.empty() && line.front() != '#') {
-            const std::vector<std::string_view> columns = splitWhitespaceColumns(line);
-            if (columns.size() >= 4) {
-                const auto segmentCount = parsePositiveInteger(columns[1]);
-                if (segmentCount.has_value()) {
-                    const std::size_t expectedColumnCount =
-                        2 + (static_cast<std::size_t>(*segmentCount) * 2U);
-                    if (columns.size() >= expectedColumnCount) {
-                        for (int segmentIndex = 0; segmentIndex < *segmentCount; ++segmentIndex) {
-                            const std::size_t startColumn =
-                                2U + (static_cast<std::size_t>(segmentIndex) * 2U);
-                            const auto startHip = parsePositiveInteger(columns[startColumn]);
-                            const auto endHip = parsePositiveInteger(columns[startColumn + 1U]);
-                            if (!startHip.has_value() || !endHip.has_value()) {
-                                continue;
-                            }
-
-                            std::string startId = "hip_" + std::to_string(*startHip);
-                            std::string endId = "hip_" + std::to_string(*endHip);
-                            const std::string dedupKey = startId + "|" + endId;
-                            if (!dedupKeys.insert(dedupKey).second) {
-                                continue;
-                            }
-
-                            lineRefs.emplace_back(std::move(startId), std::move(endId));
-                        }
-                    }
-                }
-            }
-        }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
-    }
-
-    return lineRefs;
-}
-
 std::vector<ConstellationLineRef> parseStellariumJsonLineRefs(const QJsonObject& rootObject)
 {
     std::vector<ConstellationLineRef> lineRefs;
@@ -609,10 +460,7 @@ StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(
         return result;
     }
 
-    result.isJsonPayload = looksLikeJsonPayload(payload);
-    if (!result.isJsonPayload) {
-        result.lineRefs = parseStellariumRowLineRefs(payload);
-        result.constellationCount = inferConstellationCountFromRows(payload);
+    if (!looksLikeJsonPayload(payload)) {
         return result;
     }
 

@@ -3,19 +3,18 @@
 
 #include <QtTest/QtTest>
 
-#include <algorithm>
 #include <string>
 
 class StellariumConstellationParserTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void parsesLegacyRowsPayload();
+    void rejectsLegacyRowsPayload();
     void parsesIndexJsonPayload();
     void providesBundledFallbackData();
 };
 
-void StellariumConstellationParserTests::parsesLegacyRowsPayload()
+void StellariumConstellationParserTests::rejectsLegacyRowsPayload()
 {
     const skygate::ephemeris::StellariumConstellationParser parser;
     const auto result = parser.parse(
@@ -23,19 +22,9 @@ void StellariumConstellationParserTests::parsesLegacyRowsPayload()
         "uma 1 67301 65378\n"
     );
 
-    QVERIFY(!result.isJsonPayload);
-    QVERIFY(result.constellationCount == 2U);
-    QVERIFY(result.lineRefs.size() == 3U);
-
-    const auto hasLine = [&result](const std::string& startId, const std::string& endId) {
-        return std::any_of(result.lineRefs.begin(), result.lineRefs.end(), [&](const auto& lineRef) {
-            return lineRef.first == startId && lineRef.second == endId;
-        });
-    };
-
-    QVERIFY(hasLine("hip_24436", "hip_25930"));
-    QVERIFY(hasLine("hip_25930", "hip_26727"));
-    QVERIFY(hasLine("hip_67301", "hip_65378"));
+    QVERIFY(result.constellationCount == 0U);
+    QVERIFY(result.lineRefs.empty());
+    QVERIFY(result.labelRefs.empty());
 }
 
 void StellariumConstellationParserTests::parsesIndexJsonPayload()
@@ -53,7 +42,6 @@ void StellariumConstellationParserTests::parsesIndexJsonPayload()
     const skygate::ephemeris::StellariumConstellationParser parser;
     const auto result = parser.parse(kJsonPayload);
 
-    QVERIFY(result.isJsonPayload);
     QVERIFY(result.constellationCount == 1U);
     QVERIFY(result.lineRefs.size() == 2U);
     QVERIFY(result.labelRefs.size() == 1U);

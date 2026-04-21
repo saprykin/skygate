@@ -14,7 +14,6 @@ public:
         std::vector<ConstellationLineRef> lineRefs;
         std::vector<ConstellationLabelRef> labelRefs;
         std::size_t constellationCount = 0;
-        bool isJsonPayload = false;
     };
 
     [[nodiscard]] ParseResult parse(std::string_view payload) const;

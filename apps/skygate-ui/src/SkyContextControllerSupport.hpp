@@ -43,33 +43,6 @@ public:
         "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/main/western/index.json";
     static constexpr const char* kStellariumConstellationLinesCdnUrl =
         "https://cdn.jsdelivr.net/gh/Stellarium/stellarium-skycultures@master/western/index.json";
-    static constexpr std::string_view kStarterCatalogRows =
-        "sun|Sun|Sun|-26.74\n"
-        "moon|Moon|Moon|-12.74\n"
-        "venus|Venus|Planet|-4.92\n"
-        "jupiter|Jupiter|Planet|-2.94\n"
-        "sirius|Sirius|Star|-1.46\n"
-        "vega|Vega|Star|0.03\n"
-        "betelgeuse|Betelgeuse|Star|0.50\n";
-    static constexpr std::string_view kMajorConstellationsCatalogRows =
-        "sirius|Sirius|Star|-1.46\n"
-        "canopus|Canopus|Star|-0.74\n"
-        "arcturus|Arcturus|Star|-0.05\n"
-        "vega|Vega|Star|0.03\n"
-        "capella|Capella|Star|0.08\n"
-        "rigel|Rigel|Star|0.12\n"
-        "procyon|Procyon|Star|0.34\n"
-        "betelgeuse|Betelgeuse|Star|0.50\n"
-        "orion|Orion|Constellation|1.6\n"
-        "ursa_major|Ursa Major|Constellation|1.8\n"
-        "ursa_minor|Ursa Minor|Constellation|2.1\n"
-        "cassiopeia|Cassiopeia|Constellation|2.2\n"
-        "scorpius|Scorpius|Constellation|1.7\n"
-        "cygnus|Cygnus|Constellation|1.3\n"
-        "taurus|Taurus|Constellation|1.7\n"
-        "leo|Leo|Constellation|1.4\n"
-        "gemini|Gemini|Constellation|1.6\n"
-        "andromeda|Andromeda|Constellation|2.1\n";
 };
 
 class SkyContextTextFormatter final {
@@ -133,7 +106,6 @@ public:
     [[nodiscard]] static double pointSizeForMagnitude(double magnitude);
     [[nodiscard]] static QColor colorForBodyType(skygate::ephemeris::CelestialBodyType type);
     [[nodiscard]] static QColor constellationLineColor();
-    [[nodiscard]] static std::string_view hipSuffix(std::string_view value);
 };
 
 }  // namespace skygate::ui::internal

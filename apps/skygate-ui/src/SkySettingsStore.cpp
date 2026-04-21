@@ -295,9 +295,6 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
         SkyContextSettings::key("catalogConstellationLineSchemaVersion"),
         0
     ).toInt();
-    snapshot.hasPersistedConstellationCount = settings.contains(
-        SkyContextSettings::key("catalogConstellationCount")
-    );
     snapshot.constellationCount = static_cast<std::size_t>(
         settings.value(
             SkyContextSettings::key("catalogConstellationCount"),
