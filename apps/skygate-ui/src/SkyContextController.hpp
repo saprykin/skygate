@@ -145,6 +145,7 @@ public:
     Q_INVOKABLE void panViewBy(double deltaAzimuthDeg, double deltaAltitudeDeg);
     Q_INVOKABLE void zoomViewByWheelDelta(int wheelDeltaY);
     Q_INVOKABLE void zoomViewByScaleDelta(double scaleDelta);
+    Q_INVOKABLE void goLiveNow();
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
@@ -217,9 +218,6 @@ private:
     bool m_utcDateLocked = true;
     bool m_utcTimeLocked = true;
     bool m_timelineToolbarCollapsed = false;
-    bool m_restoreUtcLockStateOnLiveResume = false;
-    bool m_restoreUtcDateLockedOnLiveResume = false;
-    bool m_restoreUtcTimeLockedOnLiveResume = false;
     bool m_catchingUpToCurrentUtc = false;
     double m_speedMultiplier = 1.0;
     double m_speedRemainderSeconds = 0.0;

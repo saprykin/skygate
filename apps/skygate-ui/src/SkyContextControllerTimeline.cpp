@@ -41,29 +41,7 @@ void SkyContextController::setLive(bool live)
     m_speedRemainderSeconds = 0.0;
     m_catchingUpToCurrentUtc = false;
 
-    if (m_live && m_restoreUtcLockStateOnLiveResume) {
-        const bool nextUtcDateLocked = m_restoreUtcDateLockedOnLiveResume;
-        const bool nextUtcTimeLocked = m_restoreUtcTimeLockedOnLiveResume;
-        m_restoreUtcLockStateOnLiveResume = false;
-        m_restoreUtcDateLockedOnLiveResume = false;
-        m_restoreUtcTimeLockedOnLiveResume = false;
-
-        if (m_utcDateLocked != nextUtcDateLocked) {
-            m_utcDateLocked = nextUtcDateLocked;
-            emit utcDateLockedChanged();
-        }
-        if (m_utcTimeLocked != nextUtcTimeLocked) {
-            m_utcTimeLocked = nextUtcTimeLocked;
-            emit utcTimeLockedChanged();
-        }
-    }
-
-    if (m_live && (m_utcDateLocked || m_utcTimeLocked)) {
-        // Jump to current UTC as soon as playback resumes in lock mode.
-        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
-    }
-
-    if (m_live && !m_utcDateLocked && !m_utcTimeLocked) {
+    if (m_live) {
         const QDateTime currentUtc = currentUtcDateTime();
         const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
         m_catchingUpToCurrentUtc = timelineUtc < currentUtc;
@@ -89,32 +67,22 @@ bool SkyContextController::timelineToolbarCollapsed() const noexcept
 
 void SkyContextController::setUtcDateLocked(const bool utcDateLocked)
 {
-    m_restoreUtcLockStateOnLiveResume = false;
-
     if (m_utcDateLocked == utcDateLocked) {
         return;
     }
 
     m_utcDateLocked = utcDateLocked;
     emit utcDateLockedChanged();
-    if (m_utcDateLocked || m_utcTimeLocked) {
-        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
-    }
 }
 
 void SkyContextController::setUtcTimeLocked(const bool utcTimeLocked)
 {
-    m_restoreUtcLockStateOnLiveResume = false;
-
     if (m_utcTimeLocked == utcTimeLocked) {
         return;
     }
 
     m_utcTimeLocked = utcTimeLocked;
     emit utcTimeLockedChanged();
-    if (m_utcDateLocked || m_utcTimeLocked) {
-        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
-    }
 }
 
 void SkyContextController::setTimelineToolbarCollapsed(const bool timelineToolbarCollapsed)
@@ -251,42 +219,22 @@ void SkyContextController::resetViewDirection()
     );
 }
 
+void SkyContextController::goLiveNow()
+{
+    setCurrentUtc(currentUtcDateTime());
+    m_speedRemainderSeconds = 0.0;
+    m_catchingUpToCurrentUtc = false;
+    setLive(true);
+}
+
 void SkyContextController::stepForward()
 {
-    if (m_utcDateLocked || m_utcTimeLocked) {
-        m_restoreUtcLockStateOnLiveResume = true;
-        m_restoreUtcDateLockedOnLiveResume = m_utcDateLocked;
-        m_restoreUtcTimeLockedOnLiveResume = m_utcTimeLocked;
-    }
-
-    if (m_utcDateLocked) {
-        m_utcDateLocked = false;
-        emit utcDateLockedChanged();
-    }
-    if (m_utcTimeLocked) {
-        m_utcTimeLocked = false;
-        emit utcTimeLockedChanged();
-    }
     setLive(false);
     stepBySeconds(m_stepSeconds);
 }
 
 void SkyContextController::stepBackward()
 {
-    if (m_utcDateLocked || m_utcTimeLocked) {
-        m_restoreUtcLockStateOnLiveResume = true;
-        m_restoreUtcDateLockedOnLiveResume = m_utcDateLocked;
-        m_restoreUtcTimeLockedOnLiveResume = m_utcTimeLocked;
-    }
-
-    if (m_utcDateLocked) {
-        m_utcDateLocked = false;
-        emit utcDateLockedChanged();
-    }
-    if (m_utcTimeLocked) {
-        m_utcTimeLocked = false;
-        emit utcTimeLockedChanged();
-    }
     setLive(false);
     stepBySeconds(-m_stepSeconds);
 }
@@ -423,14 +371,6 @@ void SkyContextController::tickUtcTime()
         return;
     }
 
-    const bool hasUtcLock = m_utcDateLocked || m_utcTimeLocked;
-    if (hasUtcLock) {
-        // In lock mode, live updates follow current UTC rather than timeline speed.
-        m_catchingUpToCurrentUtc = false;
-        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
-        return;
-    }
-
     const QDateTime currentUtc = currentUtcDateTime();
     const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
     const bool catchingUpToCurrentUtc = m_catchingUpToCurrentUtc && timelineUtc < currentUtc;
@@ -477,18 +417,7 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
 {
-    QDateTime normalizedUtc = utcTime.toUTC();
-    if (m_utcDateLocked || m_utcTimeLocked) {
-        const QDateTime currentUtc = currentUtcDateTime();
-        if (m_utcDateLocked) {
-            normalizedUtc.setDate(currentUtc.date());
-        }
-        if (m_utcTimeLocked) {
-            normalizedUtc.setTime(currentUtc.time());
-        }
-    }
-
-    const auto nextUtc = SkyContextTimeCodec::toUtcTimePoint(normalizedUtc);
+    const auto nextUtc = SkyContextTimeCodec::toUtcTimePoint(utcTime.toUTC());
     if (m_skyContext.utcTime == nextUtc) {
         return;
     }

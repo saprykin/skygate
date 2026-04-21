@@ -15,7 +15,7 @@ Item {
         columnSpacing: 6
 
         Label {
-            text: "Lock UTC Date"
+            text: "Lock UTC Date Edit"
             color: "#d4d8ee"
             font.family: "Avenir Next"
             font.pixelSize: 11
@@ -28,6 +28,10 @@ Item {
                 value: root.settingsDraft.utcDateLocked
             }
             onToggled: root.settingsDraft.utcDateLocked = checked
+
+            ToolTip.visible: hovered
+            ToolTip.delay: 250
+            ToolTip.text: "Prevents changing the UTC date field in Preferences"
         }
 
         Label {
@@ -54,7 +58,7 @@ Item {
         }
 
         Label {
-            text: "Lock UTC Time"
+            text: "Lock UTC Time Edit"
             color: "#d4d8ee"
             font.family: "Avenir Next"
             font.pixelSize: 11
@@ -67,6 +71,10 @@ Item {
                 value: root.settingsDraft.utcTimeLocked
             }
             onToggled: root.settingsDraft.utcTimeLocked = checked
+
+            ToolTip.visible: hovered
+            ToolTip.delay: 250
+            ToolTip.text: "Prevents changing the UTC time field in Preferences"
         }
 
         Label {

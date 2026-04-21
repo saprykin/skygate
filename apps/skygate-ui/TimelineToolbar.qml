@@ -195,7 +195,7 @@ Item {
                 ToolTip.delay: 250
                 ToolTip.text: skyContextController.live
                     ? "Pause live timeline updates"
-                    : "Resume live timeline updates"
+                    : "Resume timeline playback from the current position"
             }
 
             TimelineToolbarButton {
@@ -218,14 +218,10 @@ Item {
                 id: speedCombo
                 model: ["0.25x", "0.5x", "1x", "2x", "4x", "8x"]
                 implicitWidth: 78
-                enabled: !skyContextController.utcDateLocked && !skyContextController.utcTimeLocked
-                opacity: enabled ? 1.0 : 0.45
                 onActivated: skyContextController.setSpeedMultiplier(toolbarRoot.speedValues[currentIndex])
                 ToolTip.visible: hovered
                 ToolTip.delay: 250
-                ToolTip.text: enabled
-                    ? "Set live timeline speed multiplier"
-                    : "Unavailable while UTC date or time is locked"
+                ToolTip.text: "Set catch-up playback speed multiplier"
             }
 
             TimelineToolbarCombo {
@@ -239,7 +235,15 @@ Item {
             }
 
             TimelineToolbarButton {
-                text: "Reset"
+                text: "Live Now"
+                onClicked: skyContextController.goLiveNow()
+                ToolTip.visible: hovered
+                ToolTip.delay: 250
+                ToolTip.text: "Jump to current UTC and enable live playback"
+            }
+
+            TimelineToolbarButton {
+                text: "Reset View"
                 onClicked: skyContextController.resetViewDirection()
                 ToolTip.visible: hovered
                 ToolTip.delay: 250
