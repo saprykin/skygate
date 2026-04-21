@@ -4,6 +4,7 @@
 #include <QtTest/QtTest>
 
 #include <cstddef>
+#include <algorithm>
 
 class CatalogFactoryTests final : public QObject {
     Q_OBJECT
@@ -21,7 +22,14 @@ void CatalogFactoryTests::createsBundledCatalogBySourceType()
         skygate::ephemeris::CatalogSourceType::Bundled
     );
     QVERIFY(catalog != nullptr);
-    QVERIFY(catalog->bodies().size() == 27U);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 9U);
+    QVERIFY(std::all_of(bodies.begin(), bodies.end(), [](const auto& body) {
+        return body.type == skygate::ephemeris::CelestialBodyType::Sun
+            || body.type == skygate::ephemeris::CelestialBodyType::Moon
+            || body.type == skygate::ephemeris::CelestialBodyType::Planet;
+    }));
 }
 
 void CatalogFactoryTests::createsHygCatalogBySourceRequest()

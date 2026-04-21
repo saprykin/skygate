@@ -36,7 +36,7 @@ class EphemerisEngineBaselineTests final : public QObject {
 
 private slots:
     void computesFiniteSolarSystemCoordinates();
-    void movingBodiesChangeAcrossDaysWhileFixedStarsStayStable();
+    void movingBodiesChangeAcrossDays();
     void supportsNullCatalogAndImportedFixedCoordinates();
 };
 
@@ -68,7 +68,6 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     const auto* saturn = findStateById(snapshot, "saturn");
     const auto* uranus = findStateById(snapshot, "uranus");
     const auto* neptune = findStateById(snapshot, "neptune");
-    const auto* sirius = findStateById(snapshot, "sirius");
 
     QVERIFY(sun != nullptr);
     QVERIFY(sun->equatorial.rightAscensionHours > 0.0 && sun->equatorial.rightAscensionHours < 24.0);
@@ -109,13 +108,9 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     QVERIFY(neptune != nullptr);
     QVERIFY(std::isfinite(neptune->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(neptune->equatorial.declinationDeg));
-
-    QVERIFY(sirius != nullptr);
-    QVERIFY(isNear(sirius->equatorial.rightAscensionHours, 6.7525, 1e-4));
-    QVERIFY(isNear(sirius->equatorial.declinationDeg, -16.7161, 1e-4));
 }
 
-void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDaysWhileFixedStarsStayStable()
+void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
 {
     const auto catalog = skygate::ephemeris::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
@@ -135,10 +130,8 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDaysWhileFixedStarsSt
     using namespace skygate::ephemeris::tests;
     const auto* sun = findStateById(baselineSnapshot, "sun");
     const auto* moon = findStateById(baselineSnapshot, "moon");
-    const auto* sirius = findStateById(baselineSnapshot, "sirius");
     const auto* nextSun = findStateById(nextDaySnapshot, "sun");
     const auto* nextMoon = findStateById(nextDaySnapshot, "moon");
-    const auto* nextSirius = findStateById(nextDaySnapshot, "sirius");
 
     QVERIFY(sun != nullptr);
     QVERIFY(nextSun != nullptr);
@@ -147,19 +140,6 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDaysWhileFixedStarsSt
     QVERIFY(moon != nullptr);
     QVERIFY(nextMoon != nullptr);
     QVERIFY(std::abs(moon->equatorial.rightAscensionHours - nextMoon->equatorial.rightAscensionHours) > 1e-4);
-
-    QVERIFY(sirius != nullptr);
-    QVERIFY(nextSirius != nullptr);
-    QVERIFY(isNear(
-        sirius->equatorial.rightAscensionHours,
-        nextSirius->equatorial.rightAscensionHours,
-        1e-8
-    ));
-    QVERIFY(isNear(
-        sirius->equatorial.declinationDeg,
-        nextSirius->equatorial.declinationDeg,
-        1e-8
-    ));
 }
 
 void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinates()
