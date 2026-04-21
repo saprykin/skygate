@@ -20,22 +20,32 @@ namespace {
 
 class HorizontalLookup final {
 public:
-    explicit HorizontalLookup(const skygate::ephemeris::SkySnapshot& snapshot)
+    HorizontalLookup(
+        const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
+        const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+    )
     {
-        m_horizontalByDisplayName.reserve(snapshot.states.size());
-        m_horizontalByBodyId.reserve(snapshot.states.size());
+        for (const auto& lineRef : lineRefs) {
+            trackBodyId(lineRef.first);
+            trackBodyId(lineRef.second);
+        }
 
-        for (const auto& state : snapshot.states) {
-            if (
-                !std::isfinite(state.horizontal.altitudeDeg)
-                || !std::isfinite(state.horizontal.azimuthDeg)
-            ) {
-                continue;
+        for (const auto& labelRef : labelRefs) {
+            for (const std::string& hipId : labelRef.second) {
+                trackBodyId(hipId);
             }
+        }
 
-            const auto& body = snapshot.bodyAt(state.bodyIndex);
-            m_horizontalByBodyId[body.id] = state.horizontal;
-            m_horizontalByDisplayName[body.displayName] = state.horizontal;
+        m_horizontalByBodyId.reserve(m_requiredBodyIds.size());
+    }
+
+    void capture(
+        const skygate::ephemeris::CelestialBody& body,
+        const skygate::core::HorizontalCoordinate& horizontal
+    )
+    {
+        if (!m_requiredBodyIds.empty() && m_requiredBodyIds.contains(body.id)) {
+            m_horizontalByBodyId.try_emplace(body.id, horizontal);
         }
     }
 
@@ -47,24 +57,22 @@ public:
             return &idIt->second;
         }
 
-        const std::string_view hipNumber = SkyContextRenderStyle::hipSuffix(bodyId);
-        if (!hipNumber.empty()) {
-            std::string legacyHipDisplayName = "HIP ";
-            legacyHipDisplayName.append(hipNumber.data(), hipNumber.size());
-            if (
-                const auto displayNameIt = m_horizontalByDisplayName.find(legacyHipDisplayName);
-                displayNameIt != m_horizontalByDisplayName.end()
-            ) {
-                return &displayNameIt->second;
-            }
-        }
-
         return nullptr;
     }
 
 private:
+    void trackBodyId(const std::string_view bodyId)
+    {
+        if (bodyId.empty()) {
+            return;
+        }
+
+        m_requiredBodyIds.emplace(bodyId);
+    }
+
+private:
+    std::unordered_set<std::string> m_requiredBodyIds;
     std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> m_horizontalByBodyId;
-    std::unordered_map<std::string_view, skygate::core::HorizontalCoordinate> m_horizontalByDisplayName;
 };
 
 struct DecimatedStarPoint final {
@@ -221,6 +229,10 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
         starPointIndexByCell.reserve(snapshot.states.size() / 6U);
         decimatedStarPoints.reserve(snapshot.states.size() / 6U);
     }
+    std::optional<HorizontalLookup> lookup;
+    if (!lineRefs.empty() || !labelRefs.empty()) {
+        lookup.emplace(lineRefs, labelRefs);
+    }
 
     for (const auto& state : snapshot.states) {
         if (
@@ -231,6 +243,10 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
         }
 
         const auto& body = snapshot.bodyAt(state.bodyIndex);
+        if (lookup.has_value()) {
+            lookup->capture(body, state.horizontal);
+        }
+
         if (
             body.type == skygate::ephemeris::CelestialBodyType::Star
             && body.visualMagnitude > magnitudeCutoff
@@ -289,37 +305,38 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
         }
     }
 
-    const HorizontalLookup lookup(snapshot);
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
 
-    for (const auto& lineRef : lineRefs) {
-        const auto* startHorizontal = lookup.findHorizontal(lineRef.first);
-        const auto* endHorizontal = lookup.findHorizontal(lineRef.second);
-        if (startHorizontal == nullptr || endHorizontal == nullptr) {
-            continue;
-        }
+    if (lookup.has_value()) {
+        for (const auto& lineRef : lineRefs) {
+            const auto* startHorizontal = lookup->findHorizontal(lineRef.first);
+            const auto* endHorizontal = lookup->findHorizontal(lineRef.second);
+            if (startHorizontal == nullptr || endHorizontal == nullptr) {
+                continue;
+            }
 
-        const auto startProjected = projection.project(*startHorizontal);
-        const auto endProjected = projection.project(*endHorizontal);
-        if (!startProjected.isVisible || !endProjected.isVisible) {
-            continue;
-        }
+            const auto startProjected = projection.project(*startHorizontal);
+            const auto endProjected = projection.project(*endHorizontal);
+            if (!startProjected.isVisible || !endProjected.isVisible) {
+                continue;
+            }
 
-        const double deltaX = endProjected.x - startProjected.x;
-        const double deltaY = endProjected.y - startProjected.y;
-        const double lengthSquared = deltaX * deltaX + deltaY * deltaY;
-        if (lengthSquared > maxSegmentLengthSquared) {
-            continue;
-        }
+            const double deltaX = endProjected.x - startProjected.x;
+            const double deltaY = endProjected.y - startProjected.y;
+            const double lengthSquared = deltaX * deltaX + deltaY * deltaY;
+            if (lengthSquared > maxSegmentLengthSquared) {
+                continue;
+            }
 
-        frame.lines.push_back(SkyRenderLine {
-            .x1 = startProjected.x,
-            .y1 = startProjected.y,
-            .x2 = endProjected.x,
-            .y2 = endProjected.y,
-            .color = SkyContextRenderStyle::constellationLineColor()
-        });
+            frame.lines.push_back(SkyRenderLine {
+                .x1 = startProjected.x,
+                .y1 = startProjected.y,
+                .x2 = endProjected.x,
+                .y2 = endProjected.y,
+                .color = SkyContextRenderStyle::constellationLineColor()
+            });
+        }
     }
 
     std::unordered_set<std::string_view> seenLabels;
@@ -359,56 +376,58 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
         );
     }
 
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty() || labelRef.second.empty()) {
-            continue;
-        }
-
-        if (!seenLabels.insert(labelRef.first).second) {
-            continue;
-        }
-
-        double sumX = 0.0;
-        double sumY = 0.0;
-        int visiblePointCount = 0;
-        for (const std::string& hipId : labelRef.second) {
-            const auto* horizontal = lookup.findHorizontal(hipId);
-            if (horizontal == nullptr) {
+    if (lookup.has_value()) {
+        for (const auto& labelRef : labelRefs) {
+            if (labelRef.first.empty() || labelRef.second.empty()) {
                 continue;
             }
 
-            const auto projected = projection.project(*horizontal);
-            if (!projected.isVisible) {
+            if (!seenLabels.insert(labelRef.first).second) {
                 continue;
             }
 
-            sumX += projected.x;
-            sumY += projected.y;
-            ++visiblePointCount;
-        }
+            double sumX = 0.0;
+            double sumY = 0.0;
+            int visiblePointCount = 0;
+            for (const std::string& hipId : labelRef.second) {
+                const auto* horizontal = lookup->findHorizontal(hipId);
+                if (horizontal == nullptr) {
+                    continue;
+                }
 
-        if (visiblePointCount == 0) {
-            continue;
-        }
+                const auto projected = projection.project(*horizontal);
+                if (!projected.isVisible) {
+                    continue;
+                }
 
-        const double labelX = sumX / static_cast<double>(visiblePointCount);
-        const double labelY = sumY / static_cast<double>(visiblePointCount);
-        if (
-            labelX < kEdgeMarginPx
-            || labelX > (viewportWidth - kEdgeMarginPx)
-            || labelY < kEdgeMarginPx
-            || labelY > (viewportHeight - kEdgeMarginPx)
-        ) {
-            continue;
-        }
+                sumX += projected.x;
+                sumY += projected.y;
+                ++visiblePointCount;
+            }
 
-        appendLabel(
-            frame.labels,
-            labelX,
-            labelY,
-            labelRef.first,
-            labelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation)
-        );
+            if (visiblePointCount == 0) {
+                continue;
+            }
+
+            const double labelX = sumX / static_cast<double>(visiblePointCount);
+            const double labelY = sumY / static_cast<double>(visiblePointCount);
+            if (
+                labelX < kEdgeMarginPx
+                || labelX > (viewportWidth - kEdgeMarginPx)
+                || labelY < kEdgeMarginPx
+                || labelY > (viewportHeight - kEdgeMarginPx)
+            ) {
+                continue;
+            }
+
+            appendLabel(
+                frame.labels,
+                labelX,
+                labelY,
+                labelRef.first,
+                labelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation)
+            );
+        }
     }
 
     return frame;
