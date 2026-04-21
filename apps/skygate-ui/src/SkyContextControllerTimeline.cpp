@@ -50,39 +50,9 @@ void SkyContextController::setLive(bool live)
     emit liveChanged();
 }
 
-bool SkyContextController::utcDateLocked() const noexcept
-{
-    return m_utcDateLocked;
-}
-
-bool SkyContextController::utcTimeLocked() const noexcept
-{
-    return m_utcTimeLocked;
-}
-
 bool SkyContextController::timelineToolbarCollapsed() const noexcept
 {
     return m_timelineToolbarCollapsed;
-}
-
-void SkyContextController::setUtcDateLocked(const bool utcDateLocked)
-{
-    if (m_utcDateLocked == utcDateLocked) {
-        return;
-    }
-
-    m_utcDateLocked = utcDateLocked;
-    emit utcDateLockedChanged();
-}
-
-void SkyContextController::setUtcTimeLocked(const bool utcTimeLocked)
-{
-    if (m_utcTimeLocked == utcTimeLocked) {
-        return;
-    }
-
-    m_utcTimeLocked = utcTimeLocked;
-    emit utcTimeLockedChanged();
 }
 
 void SkyContextController::setTimelineToolbarCollapsed(const bool timelineToolbarCollapsed)
@@ -239,54 +209,30 @@ void SkyContextController::stepBackward()
     stepBySeconds(-m_stepSeconds);
 }
 
-void SkyContextController::setUtcDateText(const QString& utcDateText)
+bool SkyContextController::setUtcDateTimeText(
+    const QString& utcDateText,
+    const QString& utcTimeText
+)
 {
-    if (m_utcDateLocked) {
-        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
-        return;
-    }
-
-    const auto date = QDate::fromString(utcDateText, "yyyy-MM-dd");
+    const auto date = QDate::fromString(utcDateText.trimmed(), "yyyy-MM-dd");
     if (!date.isValid()) {
-        emit invalidUtcDateInput(utcDateText);
-        emit utcDateTextChanged();
-        return;
+        return false;
     }
 
-    const auto currentUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
+    const auto time = QTime::fromString(utcTimeText.trimmed(), "HH:mm:ss");
+    if (!time.isValid()) {
+        return false;
+    }
+
     const QDateTime nextUtc(
         date,
-        currentUtc.time(),
-        QTimeZone::UTC
-    );
-
-    setCurrentUtc(nextUtc);
-    setLive(false);
-}
-
-void SkyContextController::setUtcTimeText(const QString& utcTimeText)
-{
-    if (m_utcTimeLocked) {
-        setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime));
-        return;
-    }
-
-    const auto time = QTime::fromString(utcTimeText, "HH:mm:ss");
-    if (!time.isValid()) {
-        emit invalidUtcTimeInput(utcTimeText);
-        emit utcTimeTextChanged();
-        return;
-    }
-
-    const auto currentUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
-    const QDateTime nextUtc(
-        currentUtc.date(),
         time,
         QTimeZone::UTC
     );
 
     setCurrentUtc(nextUtc);
     setLive(false);
+    return true;
 }
 
 void SkyContextController::setLatitudeText(const QString& latitudeText)

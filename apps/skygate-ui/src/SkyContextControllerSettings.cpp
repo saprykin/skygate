@@ -17,8 +17,6 @@ bool SkyContextController::saveSettings() const
 
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.live = m_live;
-    snapshot.utcDateLocked = m_utcDateLocked;
-    snapshot.utcTimeLocked = m_utcTimeLocked;
     snapshot.timelineToolbarCollapsed = m_timelineToolbarCollapsed;
     snapshot.speedMultiplier = m_speedMultiplier;
     snapshot.stepSeconds = m_stepSeconds;
@@ -46,8 +44,6 @@ bool SkyContextController::loadSettings()
         : std::optional<SkySettingsStore::StateSnapshot> {};
     if (stateSnapshot.has_value()) {
         setLive(stateSnapshot->live);
-        setUtcDateLocked(stateSnapshot->utcDateLocked);
-        setUtcTimeLocked(stateSnapshot->utcTimeLocked);
         setTimelineToolbarCollapsed(stateSnapshot->timelineToolbarCollapsed);
         setSpeedMultiplier(stateSnapshot->speedMultiplier);
         setStepSeconds(stateSnapshot->stepSeconds);

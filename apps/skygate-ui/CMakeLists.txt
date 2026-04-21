@@ -94,6 +94,7 @@ qt_add_qml_module(skygate-ui
         SkyInteractionLayer.qml
         SkyOverlayLayer.qml
         SkySettingsDraft.qml
+        StatusDateTimePopup.qml
         StatusFooter.qml
         TimelineToolbar.qml
         PreferencesSkySection.qml

@@ -34,7 +34,7 @@ Window {
                                            && settingsDraft.locationSourceText === "City"
                                            && settingsDraft.selectedCityId === "")
     readonly property string currentSectionDescription: selectedPage === 0
-                                                      ? "Observer location, time, and projection"
+                                                      ? "Observer location and projection"
                                                       : "Catalog source and download settings"
 
     SkySettingsDraft {

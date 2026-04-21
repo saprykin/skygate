@@ -33,12 +33,12 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
 {
     QSettings settings;
     settings.clear();
+    settings.setValue("skyContext/utcDateLocked", true);
+    settings.setValue("skyContext/utcTimeLocked", false);
 
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot savedSnapshot;
     savedSnapshot.live = false;
-    savedSnapshot.utcDateLocked = false;
-    savedSnapshot.utcTimeLocked = true;
     savedSnapshot.timelineToolbarCollapsed = true;
     savedSnapshot.speedMultiplier = 4.0;
     savedSnapshot.stepSeconds = 300;
@@ -60,15 +60,19 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->live, savedSnapshot.live);
-    QCOMPARE(loadedSnapshot->utcDateLocked, savedSnapshot.utcDateLocked);
     QCOMPARE(loadedSnapshot->timelineToolbarCollapsed, savedSnapshot.timelineToolbarCollapsed);
     QCOMPARE(loadedSnapshot->speedMultiplier, savedSnapshot.speedMultiplier);
     QCOMPARE(loadedSnapshot->stepSeconds, savedSnapshot.stepSeconds);
+    QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
     QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);
     QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
+
+    QSettings verifySettings;
+    QVERIFY(!verifySettings.contains("skyContext/utcDateLocked"));
+    QVERIFY(!verifySettings.contains("skyContext/utcTimeLocked"));
 }
 
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()

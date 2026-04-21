@@ -18,8 +18,8 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         SkyContextControllerConstants::kSettingsVersion
     );
     settings.setValue(SkyContextSettings::key("live"), snapshot.live);
-    settings.setValue(SkyContextSettings::key("utcDateLocked"), snapshot.utcDateLocked);
-    settings.setValue(SkyContextSettings::key("utcTimeLocked"), snapshot.utcTimeLocked);
+    settings.remove(SkyContextSettings::key("utcDateLocked"));
+    settings.remove(SkyContextSettings::key("utcTimeLocked"));
     settings.setValue(
         SkyContextSettings::key("timelineToolbarCollapsed"),
         snapshot.timelineToolbarCollapsed
@@ -70,14 +70,6 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
 
     StateSnapshot snapshot;
     snapshot.live = settings.value(SkyContextSettings::key("live"), snapshot.live).toBool();
-    snapshot.utcDateLocked = settings.value(
-        SkyContextSettings::key("utcDateLocked"),
-        snapshot.utcDateLocked
-    ).toBool();
-    snapshot.utcTimeLocked = settings.value(
-        SkyContextSettings::key("utcTimeLocked"),
-        snapshot.utcTimeLocked
-    ).toBool();
     snapshot.timelineToolbarCollapsed = settings.value(
         SkyContextSettings::key("timelineToolbarCollapsed"),
         snapshot.timelineToolbarCollapsed
