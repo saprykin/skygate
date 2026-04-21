@@ -196,7 +196,7 @@ bool SkySettingsStore::clearCatalogCache() const
 
 bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) const
 {
-    if (snapshot.catalogRows.isEmpty()) {
+    if (snapshot.catalogPayload.isEmpty()) {
         return false;
     }
 
@@ -220,8 +220,8 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
         return false;
     }
 
-    const qint64 writtenBytes = cacheFile.write(snapshot.catalogRows);
-    if (writtenBytes != snapshot.catalogRows.size()) {
+    const qint64 writtenBytes = cacheFile.write(snapshot.catalogPayload);
+    if (writtenBytes != snapshot.catalogPayload.size()) {
         cacheFile.cancelWriting();
         return false;
     }
@@ -276,8 +276,8 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
     }
 
     CatalogCacheSnapshot snapshot;
-    snapshot.catalogRows = cacheFile.readAll();
-    if (snapshot.catalogRows.isEmpty()) {
+    snapshot.catalogPayload = cacheFile.readAll();
+    if (snapshot.catalogPayload.isEmpty()) {
         return std::nullopt;
     }
 

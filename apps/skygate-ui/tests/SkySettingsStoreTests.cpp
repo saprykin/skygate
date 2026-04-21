@@ -83,7 +83,9 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()
     SkySettingsStore store;
     SkySettingsStore::CatalogCacheSnapshot savedSnapshot;
     savedSnapshot.sourceLabel = "Saved";
-    savedSnapshot.catalogRows = "sirius|Sirius|Star|-1.46\n";
+    savedSnapshot.catalogPayload =
+        "id,hip,proper,ra,dec,mag\n"
+        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
     savedSnapshot.constellationLineRows = "a|b\n";
     savedSnapshot.constellationLabelRows = "Orion|hip1,hip2\n";
     savedSnapshot.constellationLineSchemaVersion = 4;
@@ -93,7 +95,7 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()
     const auto loadedSnapshot = store.loadCatalogCache();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->sourceLabel, savedSnapshot.sourceLabel);
-    QCOMPARE(loadedSnapshot->catalogRows, savedSnapshot.catalogRows);
+    QCOMPARE(loadedSnapshot->catalogPayload, savedSnapshot.catalogPayload);
     QCOMPARE(loadedSnapshot->constellationLineRows, savedSnapshot.constellationLineRows);
     QCOMPARE(
         loadedSnapshot->constellationLineSchemaVersion,

@@ -32,7 +32,6 @@ struct CatalogSelectionOptions {
 
 enum class CatalogSourceType : std::uint8_t {
     Bundled,
-    Rows,
     HygCsv,
     HygCsvGzip
 };
@@ -60,7 +59,6 @@ struct CatalogSourceRequest {
 );
 [[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromBodies(std::vector<CelestialBody> bodies);
 [[nodiscard]] std::unique_ptr<IStarCatalog> createBundledStarCatalog();
-[[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromRows(std::string_view catalogRows);
 [[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsv(std::string_view csvData);
 [[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsv(
     std::string_view csvData,

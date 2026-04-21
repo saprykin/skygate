@@ -18,6 +18,7 @@ class CatalogPayloadParseService;
 class CatalogCoordinator final {
 public:
     struct DownloadResult {
+        QByteArray payload;
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
         skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
         QString errorText;

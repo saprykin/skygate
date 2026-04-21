@@ -10,7 +10,6 @@
 #include "skygate/ephemeris/Types.hpp"
 
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -84,10 +83,6 @@ public:
 
 class SkyContextCatalogCodec final {
 public:
-    [[nodiscard]] static QByteArray serializeCatalogRows(
-        std::span<const skygate::ephemeris::CelestialBody> bodies
-    );
-
     [[nodiscard]] static QByteArray serializeConstellationLineRows(
         const std::vector<std::pair<std::string, std::string>>& lineRefs
     );

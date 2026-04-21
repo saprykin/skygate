@@ -92,10 +92,6 @@ CatalogPayloadFormat CatalogPayloadParser::detectFormat(const std::string_view p
         return CatalogPayloadFormat::Unknown;
     }
 
-    if (headerLine.find('|') != std::string_view::npos) {
-        return CatalogPayloadFormat::PipeRows;
-    }
-
     if (
         headerLine.find(',') != std::string_view::npos
         && containsCaseInsensitiveToken(headerLine, "ra")
@@ -119,15 +115,6 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
 
     result.detectedFormat = detectFormat(request.payload);
     switch (result.detectedFormat) {
-    case CatalogPayloadFormat::PipeRows:
-        result = loadStarCatalog(
-            CatalogSourceType::Rows,
-            request.payload,
-            request.progressCallback,
-            request.selectionOptions
-        );
-        result.detectedFormat = CatalogPayloadFormat::PipeRows;
-        return result;
     case CatalogPayloadFormat::HygCsv:
         result = loadStarCatalog(
             CatalogSourceType::HygCsv,

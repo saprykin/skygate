@@ -33,7 +33,7 @@ public:
 
     struct CatalogCacheSnapshot final {
         QString sourceLabel;
-        QByteArray catalogRows;
+        QByteArray catalogPayload;
         QByteArray constellationLineRows;
         QByteArray constellationLabelRows;
         int constellationLineSchemaVersion = 0;

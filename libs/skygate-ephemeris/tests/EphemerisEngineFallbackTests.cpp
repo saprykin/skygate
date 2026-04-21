@@ -6,6 +6,30 @@
 
 #include <chrono>
 #include <cmath>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace {
+
+skygate::ephemeris::CelestialBody makeBody(
+    std::string id,
+    std::string displayName,
+    const skygate::ephemeris::CelestialBodyType type,
+    const double visualMagnitude,
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
+)
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.type = type;
+    body.visualMagnitude = visualMagnitude;
+    body.fixedEquatorial = fixedEquatorial;
+    return body;
+}
+
+}  // namespace
 
 class EphemerisEngineFallbackTests final : public QObject {
     Q_OBJECT
@@ -17,15 +41,29 @@ private slots:
 
 void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePriority()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalogFromRows(
-        "sun|SunById|Star|0.0\n"
-        "moon|MoonById|Planet|0.0\n"
-        "fixed_sun|Fixed Sun|Sun|0.0|1.5|2.5\n"
-        "unknown_star|Unknown Star|Star|0.0\n"
-        "planet_x|Planet X|Planet|0.0\n"
-        "orion|Orion|Constellation|1.0\n"
-        "unknown_constellation|Unknown Constellation|Constellation|1.0\n"
-    );
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody("sun", "SunById", skygate::ephemeris::CelestialBodyType::Star, 0.0),
+        makeBody("moon", "MoonById", skygate::ephemeris::CelestialBodyType::Planet, 0.0),
+        makeBody(
+            "fixed_sun",
+            "Fixed Sun",
+            skygate::ephemeris::CelestialBodyType::Sun,
+            0.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+        makeBody("unknown_star", "Unknown Star", skygate::ephemeris::CelestialBodyType::Star, 0.0),
+        makeBody("planet_x", "Planet X", skygate::ephemeris::CelestialBodyType::Planet, 0.0),
+        makeBody("orion", "Orion", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+        makeBody(
+            "unknown_constellation",
+            "Unknown Constellation",
+            skygate::ephemeris::CelestialBodyType::Constellation,
+            1.0
+        ),
+    });
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
@@ -80,9 +118,9 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
 
 void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalogFromRows(
-        "sun|Sun|Sun|0.0\n"
-    );
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, 0.0),
+    });
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);

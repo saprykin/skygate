@@ -1,4 +1,3 @@
-#include "TestHelpers.hpp"
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 
 #include <QtTest/QtTest>
@@ -10,7 +9,7 @@ class CatalogPayloadParserTests final : public QObject {
 
 private slots:
     void detectsPayloadFormats();
-    void parsesPipeRowsPayload();
+    void rejectsPipeRowsPayload();
     void parsesHygGzipPayload();
     void parsesHygZipPayload();
     void reportsUnsupportedPayload();
@@ -22,7 +21,7 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
 
     QVERIFY(
         parser.detectFormat("alpha|Alpha|Star|1.0\n")
-        == skygate::ephemeris::CatalogPayloadFormat::PipeRows
+        == skygate::ephemeris::CatalogPayloadFormat::Unknown
     );
     QVERIFY(
         parser.detectFormat("id,hip,proper,ra,dec,mag\n")
@@ -55,19 +54,17 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
     );
 }
 
-void CatalogPayloadParserTests::parsesPipeRowsPayload()
+void CatalogPayloadParserTests::rejectsPipeRowsPayload()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
-    const auto catalog = parser.parse(
+    const auto parseResult = parser.parseResult(
         "demo_star|Demo Star|Star|1.0|12.5|-30.0\n"
         "demo_constellation|Demo Constellation|Constellation|2.0\n"
     );
-    QVERIFY(catalog != nullptr);
-
-    const auto bodies = catalog->bodies();
-    QVERIFY(bodies.size() == 2U);
-    QVERIFY(skygate::ephemeris::tests::findBodyById(bodies, "demo_star") != nullptr);
-    QVERIFY(skygate::ephemeris::tests::findBodyById(bodies, "demo_constellation") != nullptr);
+    QVERIFY(!parseResult.isSuccess());
+    QVERIFY(
+        parseResult.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat
+    );
 }
 
 void CatalogPayloadParserTests::parsesHygGzipPayload()

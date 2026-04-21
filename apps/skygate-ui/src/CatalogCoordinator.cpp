@@ -22,8 +22,6 @@ QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCo
         return "empty payload";
     case skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat:
         return "unsupported format";
-    case skygate::ephemeris::CatalogLoadErrorCode::InvalidRows:
-        return "invalid pipe-row catalog";
     case skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns:
         return "missing required HYG columns";
     case skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv:
@@ -108,8 +106,9 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             }
 
             const QString sourceUrl = downloadResult.sourceUrl;
+            const QByteArray payload = downloadResult.payload;
             m_parseService->parseAsync(
-                downloadResult.payload,
+                payload,
                 contextObject,
                 {},
                 [statusHandler](const std::size_t parsedObjectCount) {
@@ -121,7 +120,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                         QLocale::system().toString(static_cast<qulonglong>(parsedObjectCount));
                     statusHandler(QString("Catalog: Processing... %1 objects parsed").arg(countText));
                 },
-                [sourceUrl, statusHandler, completionHandler = std::move(completionHandler)](
+                [sourceUrl, payload, statusHandler, completionHandler = std::move(completionHandler)](
                     skygate::ephemeris::CatalogLoadResult loadResult
                 ) mutable {
                     if (!loadResult.isSuccess()) {
@@ -135,6 +134,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     }
 
                     DownloadResult result;
+                    result.payload = payload;
                     result.catalog = std::move(loadResult.catalog);
                     result.diagnostics = loadResult.diagnostics;
                     completionHandler(std::move(result));

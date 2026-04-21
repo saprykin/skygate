@@ -2,7 +2,6 @@
 
 #include "catalog/BundledCatalogParser.hpp"
 #include "catalog/CatalogBodyNormalization.hpp"
-#include "catalog/CatalogRowParser.hpp"
 #include "catalog/HygCatalogParser.hpp"
 #include "catalog/HygGzipCatalogParser.hpp"
 #include "catalog/InMemoryStarCatalog.hpp"
@@ -121,10 +120,6 @@ CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request)
         const BundledCatalogParser parser;
         return finalizeCatalogLoad(parser.parse(), request.selectionOptions);
     }
-    case CatalogSourceType::Rows: {
-        const CatalogRowParser parser;
-        return finalizeCatalogLoad(parser.parse(request.data), request.selectionOptions);
-    }
     case CatalogSourceType::HygCsv: {
         const HygCatalogParser parser;
         return finalizeCatalogLoad(
@@ -189,11 +184,6 @@ std::unique_ptr<IStarCatalog> createStarCatalogFromBodies(std::vector<CelestialB
 std::unique_ptr<IStarCatalog> createBundledStarCatalog()
 {
     return createStarCatalog(CatalogSourceType::Bundled);
-}
-
-std::unique_ptr<IStarCatalog> createStarCatalogFromRows(const std::string_view catalogRows)
-{
-    return createStarCatalog(CatalogSourceType::Rows, catalogRows);
 }
 
 std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsv(const std::string_view csvData)

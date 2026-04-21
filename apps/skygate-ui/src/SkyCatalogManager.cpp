@@ -6,6 +6,7 @@
 #include <QLocale>
 #include <QNetworkAccessManager>
 
+#include "skygate/ephemeris/CatalogPayloadParser.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
@@ -188,6 +189,7 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
     const QString normalizedPresetId = presetId.trimmed().toLower();
     if (normalizedPresetId == "bundled") {
         setCatalogPresetIndex(0);
+        m_cachedCatalogPayload.clear();
         resetConstellationLineRefs();
         applyCatalog(skygate::ephemeris::createBundledStarCatalog(), "Bundled");
         return;
@@ -222,6 +224,7 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
 
 void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
 {
+    setCatalogPresetIndex(2);
     setCatalogUrlText(urlText);
     downloadCatalogFromUrls(QStringList {urlText}, "Downloaded");
 }
@@ -235,6 +238,9 @@ bool SkyCatalogManager::clearCatalogCache()
     }
 
     const bool cacheCleared = m_settingsStore != nullptr && m_settingsStore->clearCatalogCache();
+    if (cacheCleared) {
+        m_cachedCatalogPayload.clear();
+    }
     m_statusText = cacheCleared
         ? "Catalog: Cache cleared"
         : "Catalog: Cache clear failed";
@@ -247,31 +253,35 @@ bool SkyCatalogManager::restoreCatalogCache()
     if (m_settingsStore == nullptr) {
         return false;
     }
+    if (m_catalogPresetIndex == 0) {
+        return false;
+    }
 
     const auto cacheSnapshot = m_settingsStore->loadCatalogCache();
     if (!cacheSnapshot.has_value()) {
         return false;
     }
 
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> restoredCatalog =
-        skygate::ephemeris::createStarCatalogFromRows(
-            std::string_view(
-                cacheSnapshot->catalogRows.constData(),
-                static_cast<std::size_t>(cacheSnapshot->catalogRows.size())
-            )
-        );
-    if (restoredCatalog == nullptr) {
+    const std::string_view payloadView(
+        cacheSnapshot->catalogPayload.constData(),
+        static_cast<std::size_t>(cacheSnapshot->catalogPayload.size())
+    );
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    auto restoredCatalogResult = parser.parseResult(payloadView);
+    if (!restoredCatalogResult.isSuccess() || restoredCatalogResult.catalog == nullptr) {
+        m_cachedCatalogPayload.clear();
         m_statusText = "Catalog: Saved cache unreadable, using bundled";
         emit statusTextChanged();
         return false;
     }
 
+    m_cachedCatalogPayload = cacheSnapshot->catalogPayload;
     QString normalizedSourceLabel = stripSavedSuffixes(cacheSnapshot->sourceLabel);
     if (normalizedSourceLabel.isEmpty()) {
         normalizedSourceLabel = "Saved";
     }
     applyCatalog(
-        std::move(restoredCatalog),
+        std::move(restoredCatalogResult.catalog),
         QString("%1 (saved)").arg(normalizedSourceLabel),
         false
     );
@@ -373,6 +383,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
                 return;
             }
 
+            m_cachedCatalogPayload = std::move(result.payload);
             applyCatalog(std::move(result.catalog), sourceLabel);
             if (result.diagnostics.truncatedBodyCount > 0U) {
                 const QLocale locale = QLocale::system();
@@ -499,7 +510,11 @@ void SkyCatalogManager::setConstellationLabelRefs(
 
 void SkyCatalogManager::persistCatalogCache() const
 {
-    if (m_settingsStore == nullptr || m_starCatalog == nullptr) {
+    if (
+        m_settingsStore == nullptr
+        || m_starCatalog == nullptr
+        || m_cachedCatalogPayload.isEmpty()
+    ) {
         return;
     }
 
@@ -510,7 +525,7 @@ void SkyCatalogManager::persistCatalogCache() const
 
     SkySettingsStore::CatalogCacheSnapshot snapshot;
     snapshot.sourceLabel = m_sourceLabel;
-    snapshot.catalogRows = SkyContextCatalogCodec::serializeCatalogRows(bodies);
+    snapshot.catalogPayload = m_cachedCatalogPayload;
     snapshot.constellationLineRows = SkyContextCatalogCodec::serializeConstellationLineRows(
         m_constellationLineRefs
     );

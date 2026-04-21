@@ -2,6 +2,7 @@
 
 #include "SkySettingsStore.hpp"
 
+#include <QByteArray>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -94,6 +95,7 @@ private:
     bool m_catalogProcessing = false;
     std::size_t m_bodyCount = 0;
     std::size_t m_constellationCount = 0;
+    QByteArray m_cachedCatalogPayload;
     std::vector<ConstellationLineRef> m_constellationLineRefs;
     std::vector<ConstellationLabelRef> m_constellationLabelRefs;
 };

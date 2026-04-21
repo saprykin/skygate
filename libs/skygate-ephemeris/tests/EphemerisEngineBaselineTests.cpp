@@ -7,6 +7,29 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <optional>
+#include <string>
+
+namespace {
+
+skygate::ephemeris::CelestialBody makeBody(
+    std::string id,
+    std::string displayName,
+    const skygate::ephemeris::CelestialBodyType type,
+    const double visualMagnitude,
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
+)
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.type = type;
+    body.visualMagnitude = visualMagnitude;
+    body.fixedEquatorial = fixedEquatorial;
+    return body;
+}
+
+}  // namespace
 
 class EphemerisEngineBaselineTests final : public QObject {
     Q_OBJECT
@@ -150,9 +173,18 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     QVERIFY(nullCatalogEngine != nullptr);
     QVERIFY(nullCatalogEngine->compute(context).states.empty());
 
-    const auto importedCatalog = skygate::ephemeris::createStarCatalogFromRows(
-        "demo_star|Demo Star|Star|4.0|12.5|-30.0\n"
-    );
+    const auto importedCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            4.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 12.5,
+                .declinationDeg = -30.0
+            }
+        ),
+    });
     QVERIFY(importedCatalog != nullptr);
 
     const auto importedEngine = skygate::ephemeris::createEphemerisEngine(*importedCatalog);

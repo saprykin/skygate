@@ -10,7 +10,6 @@
 namespace skygate::ephemeris {
 
 enum class CatalogPayloadFormat : std::uint8_t {
-    PipeRows,
     HygCsv,
     HygCsvGzip,
     HygCsvZip,
@@ -21,7 +20,6 @@ enum class CatalogLoadErrorCode : std::uint8_t {
     None,
     EmptyInput,
     UnsupportedFormat,
-    InvalidRows,
     MissingRequiredColumns,
     InvalidHygCsv,
     InvalidGzipData,

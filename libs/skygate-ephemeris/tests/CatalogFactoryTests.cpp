@@ -10,7 +10,7 @@ class CatalogFactoryTests final : public QObject {
 
 private slots:
     void createsBundledCatalogBySourceType();
-    void createsRowsCatalogBySourceRequest();
+    void createsHygCatalogBySourceRequest();
     void createsHygCatalogBySourceTypeWithProgress();
     void reportsDiagnosticsForSelectionAndErrors();
 };
@@ -24,19 +24,21 @@ void CatalogFactoryTests::createsBundledCatalogBySourceType()
     QVERIFY(catalog->bodies().size() == 27U);
 }
 
-void CatalogFactoryTests::createsRowsCatalogBySourceRequest()
+void CatalogFactoryTests::createsHygCatalogBySourceRequest()
 {
     const auto catalog = skygate::ephemeris::createStarCatalog(
         skygate::ephemeris::CatalogSourceRequest {
-            .type = skygate::ephemeris::CatalogSourceType::Rows,
-            .data = "demo_star|Demo Star|Star|4.0|12.5|-30.0\n"
+            .type = skygate::ephemeris::CatalogSourceType::HygCsv,
+            .data =
+                "id,hip,proper,ra,dec,mag\n"
+                "1,11,Alpha,12.5,-30.0,4.0\n"
         }
     );
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].id == "demo_star");
+    QVERIFY(bodies[0].id == "hip_11");
     QVERIFY(bodies[0].fixedEquatorial.has_value());
 }
 

@@ -6,39 +6,6 @@
 
 #include <algorithm>
 
-namespace {
-
-class CatalogRowFieldCodec final {
-public:
-    [[nodiscard]] static QString bodyTypeToString(const skygate::ephemeris::CelestialBodyType type)
-    {
-        switch (type) {
-        case skygate::ephemeris::CelestialBodyType::Star:
-            return "Star";
-        case skygate::ephemeris::CelestialBodyType::Planet:
-            return "Planet";
-        case skygate::ephemeris::CelestialBodyType::Moon:
-            return "Moon";
-        case skygate::ephemeris::CelestialBodyType::Sun:
-            return "Sun";
-        case skygate::ephemeris::CelestialBodyType::Constellation:
-            return "Constellation";
-        }
-
-        return "Star";
-    }
-
-    [[nodiscard]] static QString sanitizeCatalogField(QString value)
-    {
-        value.replace('|', '/');
-        value.replace('\n', ' ');
-        value.replace('\r', ' ');
-        return value.trimmed();
-    }
-};
-
-}  // namespace
-
 namespace skygate::ui::internal {
 
 QString SkyContextTextFormatter::formatCoordinate(const double value)
@@ -175,39 +142,6 @@ QString SkyContextSettings::defaultCatalogCachePath()
     return QDir(appDataPath).filePath(
         QString::fromUtf8(SkyContextControllerConstants::kCatalogCacheFileName)
     );
-}
-
-QByteArray SkyContextCatalogCodec::serializeCatalogRows(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies
-)
-{
-    QByteArray rows;
-    rows.reserve(static_cast<int>(bodies.size() * 64));
-    for (const auto& body : bodies) {
-        const QString id = CatalogRowFieldCodec::sanitizeCatalogField(QString::fromStdString(body.id));
-        const QString displayName = CatalogRowFieldCodec::sanitizeCatalogField(
-            QString::fromStdString(body.displayName)
-        );
-        if (id.isEmpty() || displayName.isEmpty()) {
-            continue;
-        }
-
-        rows.append(id.toUtf8());
-        rows.append('|');
-        rows.append(displayName.toUtf8());
-        rows.append('|');
-        rows.append(CatalogRowFieldCodec::bodyTypeToString(body.type).toUtf8());
-        rows.append('|');
-        rows.append(QByteArray::number(body.visualMagnitude, 'g', 17));
-        if (body.fixedEquatorial.has_value()) {
-            rows.append('|');
-            rows.append(QByteArray::number(body.fixedEquatorial->rightAscensionHours, 'g', 17));
-            rows.append('|');
-            rows.append(QByteArray::number(body.fixedEquatorial->declinationDeg, 'g', 17));
-        }
-        rows.append('\n');
-    }
-    return rows;
 }
 
 QByteArray SkyContextCatalogCodec::serializeConstellationLineRows(

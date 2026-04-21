@@ -16,7 +16,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/BundledCatalogParser.hpp
     src/catalog/CatalogBodyNormalization.cpp
     src/catalog/CatalogPayloadParser.cpp
-    src/catalog/CatalogRowParser.hpp
     src/catalog/BundledConstellationData.cpp
     src/catalog/CsvRowTokenizer.hpp
     src/catalog/GzipCodec.hpp
@@ -35,7 +34,6 @@ add_library(skygate-ephemeris STATIC
     src/BundledStarCatalog.cpp
     src/SimpleEphemerisEngine.cpp
     src/catalog/BundledCatalogParser.cpp
-    src/catalog/CatalogRowParser.cpp
     src/catalog/CsvRowTokenizer.cpp
     src/catalog/GzipCodec.cpp
     src/catalog/HygCatalogParser.cpp
