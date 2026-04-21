@@ -1,0 +1,56 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 24,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build-make/${presetName}",
+            "cacheVariables": {
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_EXTENSIONS": "OFF"
+            }
+        },
+        {
+            "name": "core-debug",
+            "inherits": "base",
+            "displayName": "Core Debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF"
+            }
+        },
+        {
+            "name": "ui-debug",
+            "inherits": "base",
+            "displayName": "UI Debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "core-debug",
+            "configurePreset": "core-debug"
+        },
+        {
+            "name": "ui-debug",
+            "configurePreset": "ui-debug"
+        },
+        {
+            "name": "ui-run",
+            "configurePreset": "ui-debug",
+            "targets": [
+                "run-skygate-ui"
+            ]
+        }
+    ]
+}
