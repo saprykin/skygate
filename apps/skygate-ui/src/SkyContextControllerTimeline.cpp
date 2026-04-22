@@ -242,7 +242,6 @@ void SkyContextController::setLatitudeText(const QString& latitudeText)
     skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.latitudeDeg = latitude;
     if (!isValidNumber || !nextObserver.isValid()) {
-        emit invalidLatitudeInput(latitudeText);
         emit latitudeTextChanged();
         return;
     }
@@ -265,7 +264,6 @@ void SkyContextController::setLongitudeText(const QString& longitudeText)
     skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.longitudeDeg = longitude;
     if (!isValidNumber || !nextObserver.isValid()) {
-        emit invalidLongitudeInput(longitudeText);
         emit longitudeTextChanged();
         return;
     }
@@ -288,7 +286,6 @@ void SkyContextController::setElevationText(const QString& elevationText)
     skygate::core::GeoLocation nextObserver = m_skyContext.observer;
     nextObserver.elevationMeters = elevation;
     if (!isValidNumber || !nextObserver.isValid()) {
-        emit invalidElevationInput(elevationText);
         emit elevationTextChanged();
         return;
     }

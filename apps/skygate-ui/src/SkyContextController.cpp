@@ -79,7 +79,6 @@ SkyContextController::SkyContextController(
         this,
         [this] {
             refreshObjectSearchModel();
-            emit catalogDataChanged();
             emit skyContextChanged();
         }
     );
@@ -213,31 +212,6 @@ QString SkyContextController::projectionTypeText() const
     return SkyContextProjectionTypeCodec::toString(m_projectionType);
 }
 
-QString SkyContextController::projectionSampleText() const
-{
-    if (m_projection == nullptr) {
-        return "Projection unavailable";
-    }
-
-    skygate::core::ProjectionParams params;
-    params.center = {.altitudeDeg = m_viewCenterAltitudeDeg, .azimuthDeg = m_viewCenterAzimuthDeg};
-    params.fovDeg = m_viewFieldOfViewDeg;
-    params.rollDeg = 0.0;
-    params.viewportWidth = 1100.0;
-    params.viewportHeight = 760.0;
-
-    const auto projected = m_projection->project(
-        skygate::core::HorizontalCoordinate {.altitudeDeg = 30.0, .azimuthDeg = 180.0},
-        params
-    );
-
-    return QString("Sample x=%1 y=%2 visible=%3").arg(
-        QString::number(projected.x, 'f', 1),
-        QString::number(projected.y, 'f', 1),
-        projected.isVisible ? "true" : "false"
-    );
-}
-
 QString SkyContextController::locationStatusText() const
 {
     return m_locationStatusText;
@@ -320,31 +294,6 @@ bool SkyContextController::downloadingCatalog() const noexcept
 bool SkyContextController::catalogProcessing() const noexcept
 {
     return m_catalogManager != nullptr && m_catalogManager->catalogProcessing();
-}
-
-QString SkyContextController::skyContextSummary() const
-{
-    QString bodyCountText = "n/a";
-    if (m_catalogManager != nullptr && m_catalogManager->bodyCount() > 0U) {
-        bodyCountText = QString::number(
-            static_cast<qulonglong>(m_catalogManager->bodyCount())
-        );
-    }
-
-    return QString(
-        "UTC %1 %2 | Lat %3 | Lon %4 | Elev %5 m | Proj %6 | View Alt %7 Az %8 | FOV %9 | Bodies %10"
-    ).arg(
-        utcDateText(),
-        utcTimeText(),
-        latitudeText(),
-        longitudeText(),
-        elevationText(),
-        projectionTypeText(),
-        QString::number(m_viewCenterAltitudeDeg, 'f', 1),
-        QString::number(m_viewCenterAzimuthDeg, 'f', 1),
-        QString::number(m_viewFieldOfViewDeg, 'f', 1),
-        bodyCountText
-    );
 }
 
 const skygate::core::SkyContext& SkyContextController::skyContext() const noexcept

@@ -33,8 +33,6 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
 {
     QSettings settings;
     settings.clear();
-    settings.setValue("skyContext/utcDateLocked", true);
-    settings.setValue("skyContext/utcTimeLocked", false);
 
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot savedSnapshot;
@@ -71,10 +69,6 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
-
-    QSettings verifySettings;
-    QVERIFY(!verifySettings.contains("skyContext/utcDateLocked"));
-    QVERIFY(!verifySettings.contains("skyContext/utcTimeLocked"));
 }
 
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()

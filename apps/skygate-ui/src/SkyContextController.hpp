@@ -68,7 +68,6 @@ class SkyContextController final : public QObject {
     )
     Q_PROPERTY(QAbstractItemModel* cityCatalogModel READ cityCatalogModel CONSTANT)
     Q_PROPERTY(QString projectionTypeText READ projectionTypeText NOTIFY projectionTypeChanged)
-    Q_PROPERTY(QString projectionSampleText READ projectionSampleText NOTIFY projectionTypeChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
     Q_PROPERTY(
@@ -89,7 +88,6 @@ class SkyContextController final : public QObject {
         READ selectedSearchTargetId
         NOTIFY selectedSearchTargetChanged
     )
-    Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
@@ -133,7 +131,6 @@ public:
     [[nodiscard]] QString selectedCityDisplayText() const;
     [[nodiscard]] QAbstractItemModel* cityCatalogModel() const noexcept;
     [[nodiscard]] QString projectionTypeText() const;
-    [[nodiscard]] QString projectionSampleText() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
@@ -142,7 +139,6 @@ public:
     [[nodiscard]] bool catalogProcessing() const noexcept;
     [[nodiscard]] QString selectedSearchTargetKind() const;
     [[nodiscard]] QString selectedSearchTargetId() const;
-    [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
@@ -203,9 +199,6 @@ signals:
     void locationSourceTextChanged();
     void selectedCityIdChanged();
     void selectedCityDisplayTextChanged();
-    void invalidLatitudeInput(const QString& latitudeText);
-    void invalidLongitudeInput(const QString& longitudeText);
-    void invalidElevationInput(const QString& elevationText);
     void projectionTypeChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
@@ -213,7 +206,6 @@ signals:
     void downloadingCatalogChanged();
     void catalogProcessingChanged();
     void selectedSearchTargetChanged();
-    void catalogDataChanged();
     void skyContextChanged();
 
 private:
