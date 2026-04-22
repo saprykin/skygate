@@ -107,10 +107,7 @@ const skygate::ephemeris::CelestialBodyState* findStateById(
 void configureFocusTestContext(SkyContextController& controller)
 {
     controller.setLive(false);
-    controller.setUtcDateLocked(false);
-    controller.setUtcTimeLocked(false);
-    controller.setUtcDateText("2024-06-01");
-    controller.setUtcTimeText("22:00:00");
+    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
     controller.setLongitudeText("8.5417");
     controller.setElevationText("408.0");
