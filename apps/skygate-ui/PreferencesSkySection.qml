@@ -16,7 +16,7 @@ Item {
 
         Label {
             text: "Location Source"
-            color: "#d4d8ee"
+            color: skyContext.theme.formLabelText
             font.family: "Avenir Next"
             font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
@@ -40,7 +40,7 @@ Item {
 
         Label {
             text: "City"
-            color: "#d4d8ee"
+            color: skyContext.theme.formLabelText
             font.family: "Avenir Next"
             font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
@@ -63,7 +63,7 @@ Item {
 
         Label {
             text: "Latitude"
-            color: "#d4d8ee"
+            color: skyContext.theme.formLabelText
             font.family: "Avenir Next"
             font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
@@ -94,7 +94,7 @@ Item {
 
         Label {
             text: "Longitude"
-            color: "#d4d8ee"
+            color: skyContext.theme.formLabelText
             font.family: "Avenir Next"
             font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
@@ -125,7 +125,7 @@ Item {
 
         Label {
             text: "Elevation (m)"
-            color: "#d4d8ee"
+            color: skyContext.theme.formLabelText
             font.family: "Avenir Next"
             font.pixelSize: 10
             Layout.alignment: Qt.AlignVCenter
@@ -151,7 +151,7 @@ Item {
 
         Label {
             text: "Projection"
-            color: "#d4d8ee"
+            color: skyContext.theme.formLabelText
             font.family: "Avenir Next"
             font.pixelSize: 10
             Layout.alignment: Qt.AlignVCenter

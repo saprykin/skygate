@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    readonly property var theme: skyContext.theme
     property string label: ""
     property bool active: false
     signal clicked()
@@ -15,29 +16,45 @@ Rectangle {
         GradientStop {
             position: 0.0
             color: root.active
-                   ? (buttonMouse.pressed ? "#355f9f"
-                                          : (buttonMouse.containsMouse ? "#3e70b8" : "#3867a9"))
-                   : (buttonMouse.pressed ? "#20233a"
-                                          : (buttonMouse.containsMouse ? "#242943" : "#20243d"))
+                   ? (buttonMouse.pressed
+                          ? root.theme.sectionButtonActiveTopPressed
+                          : (buttonMouse.containsMouse
+                                 ? root.theme.sectionButtonActiveTopHover
+                                 : root.theme.sectionButtonActiveTop))
+                   : (buttonMouse.pressed
+                          ? root.theme.sectionButtonInactiveTopPressed
+                          : (buttonMouse.containsMouse
+                                 ? root.theme.sectionButtonInactiveTopHover
+                                 : root.theme.sectionButtonInactiveTop))
         }
         GradientStop {
             position: 1.0
             color: root.active
-                   ? (buttonMouse.pressed ? "#2c548f"
-                                          : (buttonMouse.containsMouse ? "#365f9d" : "#30598f"))
-                   : (buttonMouse.pressed ? "#1a1d31"
-                                          : (buttonMouse.containsMouse ? "#1f2237" : "#1b1f33"))
+                   ? (buttonMouse.pressed
+                          ? root.theme.sectionButtonActiveBottomPressed
+                          : (buttonMouse.containsMouse
+                                 ? root.theme.sectionButtonActiveBottomHover
+                                 : root.theme.sectionButtonActiveBottom))
+                   : (buttonMouse.pressed
+                          ? root.theme.sectionButtonInactiveBottomPressed
+                          : (buttonMouse.containsMouse
+                                 ? root.theme.sectionButtonInactiveBottomHover
+                                 : root.theme.sectionButtonInactiveBottom))
         }
     }
     border.width: 1
-    border.color: root.active ? "#5d91dc" : "#242843"
+    border.color: root.active
+        ? root.theme.sectionButtonActiveBorder
+        : root.theme.sectionButtonInactiveBorder
 
     Label {
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
         anchors.leftMargin: 11
         text: root.label
-        color: root.active ? "#f3f5ff" : "#eef0fd"
+        color: root.active
+            ? root.theme.sectionButtonTextActive
+            : root.theme.sectionButtonTextInactive
         font.family: "Avenir Next"
         font.pixelSize: 11
         font.weight: Font.DemiBold

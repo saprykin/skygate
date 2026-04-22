@@ -82,6 +82,7 @@ private:
         double viewCenterAzimuthDeg = 0.0;
         double viewFieldOfViewDeg = 0.0;
         double magnitudeCutoff = 0.0;
+        QString themeId;
 
         [[nodiscard]] bool equals(const RenderFrameKey& other) const noexcept
         {
@@ -92,7 +93,8 @@ private:
                 && viewCenterAltitudeDeg == other.viewCenterAltitudeDeg
                 && viewCenterAzimuthDeg == other.viewCenterAzimuthDeg
                 && viewFieldOfViewDeg == other.viewFieldOfViewDeg
-                && magnitudeCutoff == other.magnitudeCutoff;
+                && magnitudeCutoff == other.magnitudeCutoff
+                && themeId == other.themeId;
         }
     };
 
@@ -117,6 +119,7 @@ private:
     QPointer<SkyContextController> m_skyContextController;
     QMetaObject::Connection m_skyContextChangedConnection;
     QMetaObject::Connection m_selectedSearchTargetChangedConnection;
+    QMetaObject::Connection m_themeChangedConnection;
     double m_viewportWidth = 0.0;
     double m_viewportHeight = 0.0;
     const skygate::ephemeris::IEphemerisEngine* m_cachedEphemerisEngine = nullptr;

@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 FocusScope {
     id: dateTimePopup
+    readonly property var theme: skyContextController.theme
     required property var skyContextController
     property bool opened: false
     property string stagedDateText: ""
@@ -68,9 +69,9 @@ FocusScope {
         anchors.bottomMargin: dateTimePopup.popupBottomMargin
         width: 348
         radius: 10
-        color: "#1d2138"
+        color: theme.cardBackground
         border.width: 1
-        border.color: "#4b5278"
+        border.color: theme.toolbarDropdownBorder
 
         implicitHeight: popupLayout.implicitHeight + 20
 
@@ -88,7 +89,7 @@ FocusScope {
             Label {
                 Layout.fillWidth: true
                 text: "Set UTC Date/Time"
-                color: "#f2f4ff"
+                color: theme.textPrimary
                 font.family: "Avenir Next"
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
@@ -97,7 +98,7 @@ FocusScope {
             Label {
                 Layout.fillWidth: true
                 text: "Applies a fixed UTC until you jump back to Now. BCE dates use proleptic Gregorian years."
-                color: "#9ca3c5"
+                color: theme.textSecondary
                 font.family: "Avenir Next"
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap
@@ -105,7 +106,7 @@ FocusScope {
 
             Label {
                 text: "UTC Date"
-                color: "#d4d8ee"
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
             }
@@ -129,7 +130,7 @@ FocusScope {
 
             Label {
                 text: "UTC Time"
-                color: "#d4d8ee"
+                color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
             }
@@ -158,7 +159,7 @@ FocusScope {
                 Layout.fillWidth: true
                 visible: dateTimePopup.errorText !== ""
                 text: dateTimePopup.errorText
-                color: "#f2b0b0"
+                color: theme.errorText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
                 wrapMode: Text.WordWrap

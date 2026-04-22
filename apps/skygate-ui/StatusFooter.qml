@@ -3,12 +3,13 @@ import QtQuick.Controls
 
 Rectangle {
     id: footerRoot
+    readonly property var theme: skyContextController.theme
     required property var skyContextController
     property bool dateTimePopupOpen: false
     signal dateTimeClicked()
 
     height: 48
-    color: "#0b1428"
+    color: theme.footerBackground
 
     Row {
         id: statusLeftRow
@@ -21,11 +22,11 @@ Rectangle {
 
         Label {
             text: footerRoot.skyContextController.live ? "Live: On" : "Live: Off"
-            color: footerRoot.skyContextController.live ? "#7fe39f" : "#f2b0b0"
+            color: footerRoot.skyContextController.live ? theme.footerLiveText : theme.footerPausedText
         }
         Label {
             text: footerRoot.skyContextController.locationStatusText
-            color: "#a9c4ff"
+            color: theme.footerLocationText
         }
         Label {
             text: "Lat " + footerRoot.skyContextController.latitudeText
@@ -38,7 +39,7 @@ Rectangle {
                   + Number(footerRoot.skyContextController.viewCenterAzimuthDeg).toFixed(1)
                   + " | Mag ≤ "
                   + Number(footerRoot.skyContextController.magnitudeCutoff).toFixed(1)
-            color: "#9ab0d6"
+            color: theme.footerInfoText
             elide: Text.ElideRight
             width: Math.max(120, statusLeftRow.width - 320)
         }
@@ -61,7 +62,7 @@ Rectangle {
                   + " "
                   + footerRoot.skyContextController.utcTimeText
                   + " UTC"
-            color: "#d7e3ff"
+            color: theme.footerTimeText
             font.family: "Menlo"
             elide: Text.ElideLeft
             z: 1
@@ -75,10 +76,10 @@ Rectangle {
             width: statusTimeLabel.implicitWidth + 20
             height: statusTimeLabel.implicitHeight + 8
             radius: 8
-            color: statusTimeMouse.containsMouse ? "#10203d" : "transparent"
+            color: statusTimeMouse.containsMouse ? theme.footerTimeHoverBackground : "transparent"
             border.width: 1
             border.color: (statusTimeMouse.containsMouse || footerRoot.dateTimePopupOpen)
-                ? "#3a5885"
+                ? theme.footerTimeHoverBorder
                 : "transparent"
             z: 0
         }

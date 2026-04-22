@@ -6,6 +6,7 @@
 #include <QString>
 #include <QStringList>
 
+#include "SkyTheme.hpp"
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
@@ -27,7 +28,7 @@ class SkyContextControllerConstants final {
 public:
     static constexpr int kTickIntervalMs = 1000;
     static constexpr int kLocationUpdateTimeoutMs = 5000;
-    static constexpr int kSettingsVersion = 2;
+    static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
     static constexpr double kWheelZoomStepScale = 0.90;
     static constexpr double kWheelAngleDeltaStep = 120.0;
@@ -115,8 +116,13 @@ public:
 class SkyContextRenderStyle final {
 public:
     [[nodiscard]] static double pointSizeForMagnitude(double magnitude);
-    [[nodiscard]] static QColor colorForBodyType(skygate::ephemeris::CelestialBodyType type);
-    [[nodiscard]] static QColor constellationLineColor();
+    [[nodiscard]] static QColor colorForBodyType(
+        skygate::ephemeris::CelestialBodyType type,
+        const SkyThemeRenderPalette& renderPalette
+    );
+    [[nodiscard]] static QColor constellationLineColor(
+        const SkyThemeRenderPalette& renderPalette
+    );
 };
 
 }  // namespace skygate::ui::internal

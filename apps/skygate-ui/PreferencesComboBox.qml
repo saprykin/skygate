@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 ComboBox {
     id: comboControl
+    readonly property var theme: skyContext.theme
     font.family: "Avenir Next"
     font.pixelSize: 11
     implicitHeight: 32
@@ -13,7 +14,7 @@ ComboBox {
 
     contentItem: Text {
         text: comboControl.displayText
-        color: "#f1f3ff"
+        color: comboControl.theme.inputText
         font: comboControl.font
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
@@ -21,7 +22,7 @@ ComboBox {
 
     indicator: Text {
         text: "\u25BE"
-        color: "#9ca3c5"
+        color: comboControl.theme.inputIndicator
         font.pixelSize: 8
         anchors.verticalCenter: parent.verticalCenter
         anchors.right: parent.right
@@ -30,9 +31,13 @@ ComboBox {
 
     background: Rectangle {
         radius: 8
-        color: comboControl.enabled ? "#232742" : "#1b1e33"
+        color: comboControl.enabled
+            ? comboControl.theme.inputBackground
+            : comboControl.theme.inputBackgroundDisabled
         border.width: 1
-        border.color: comboControl.activeFocus ? "#628fd9" : "#4d5378"
+        border.color: comboControl.activeFocus
+            ? comboControl.theme.inputBorderFocus
+            : comboControl.theme.inputBorder
     }
 
     popup: Popup {
@@ -50,9 +55,9 @@ ComboBox {
 
         background: Rectangle {
             radius: 9
-            color: "#1d2138"
+            color: comboControl.theme.cardBackground
             border.width: 1
-            border.color: "#4b5278"
+            border.color: comboControl.theme.toolbarDropdownBorder
         }
     }
 
@@ -63,7 +68,9 @@ ComboBox {
 
         contentItem: Text {
             text: modelData
-            color: highlighted ? "#f2f4ff" : "#c1c7e4"
+            color: highlighted
+                ? comboControl.theme.textPrimary
+                : comboControl.theme.listItemPrimaryText
             font: comboControl.font
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
@@ -71,7 +78,11 @@ ComboBox {
 
         background: Rectangle {
             radius: 8
-            color: highlighted ? "#365e9c" : (preferencesComboDelegate.hovered ? "#272c46" : "transparent")
+            color: highlighted
+                ? comboControl.theme.listItemBackgroundSelected
+                : (preferencesComboDelegate.hovered
+                       ? comboControl.theme.listItemBackgroundHover
+                       : "transparent")
         }
     }
 }

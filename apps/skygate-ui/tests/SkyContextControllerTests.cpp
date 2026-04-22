@@ -133,6 +133,10 @@ private slots:
     void manualCoordinateEditSwitchesToCustom();
     void invalidSavedCityFallsBackToCustom();
     void defaultsLocationSourceByPositioningAvailability();
+    void defaultsThemeToBundledDefault();
+    void restoresSavedThemeId();
+    void invalidSavedThemeFallsBackToDefault();
+    void setThemeIdUpdatesPaletteAndEmitsSignals();
     void setUtcDateTimeTextAppliesAtomically();
     void setUtcDateTimeTextAcceptsBceInput();
     void bceAliasesResolveToTheSameInstant();
@@ -264,6 +268,62 @@ void SkyContextControllerTests::defaultsLocationSourceByPositioningAvailability(
     } else {
         QCOMPARE(controller->locationSourceText(), QString("Custom"));
     }
+}
+
+void SkyContextControllerTests::defaultsThemeToBundledDefault()
+{
+    const auto controller = createController(true);
+
+    QCOMPARE(controller->themeId(), QString("default"));
+    QCOMPARE(
+        controller->theme()->property("windowBackground").value<QColor>(),
+        QColor("#171b30")
+    );
+}
+
+void SkyContextControllerTests::restoresSavedThemeId()
+{
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.themeId = "night-vision";
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+    QCOMPARE(controller->themeId(), QString("night-vision"));
+    QCOMPARE(
+        controller->theme()->property("windowBackground").value<QColor>(),
+        QColor("#150707")
+    );
+}
+
+void SkyContextControllerTests::invalidSavedThemeFallsBackToDefault()
+{
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.themeId = "missing-theme";
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+    QCOMPARE(controller->themeId(), QString("default"));
+}
+
+void SkyContextControllerTests::setThemeIdUpdatesPaletteAndEmitsSignals()
+{
+    const auto controller = createController();
+    QSignalSpy controllerThemeSpy(controller.get(), &SkyContextController::themeChanged);
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    QSignalSpy themePaletteSpy(controller->theme(), SIGNAL(themeChanged()));
+
+    controller->setThemeId("night-vision");
+
+    QCOMPARE(controller->themeId(), QString("night-vision"));
+    QCOMPARE(controllerThemeSpy.count(), 1);
+    QCOMPARE(themePaletteSpy.count(), 1);
+    QCOMPARE(skyContextChangedSpy.count(), 1);
+    QCOMPARE(
+        controller->theme()->property("windowBackground").value<QColor>(),
+        QColor("#150707")
+    );
 }
 
 void SkyContextControllerTests::setUtcDateTimeTextAppliesAtomically()

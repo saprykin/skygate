@@ -38,6 +38,7 @@ private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
     void showsSearchSelectionMarkerForFocusedBody();
+    void themeChangesUpdateRenderedColors();
 };
 
 void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
@@ -195,6 +196,93 @@ void SkySceneModelTests::showsSearchSelectionMarkerForFocusedBody()
     QCOMPARE(selectionMarker.value("kind").toString(), QString("searchSelection"));
     QVERIFY(selectionMarker.contains("x"));
     QVERIFY(selectionMarker.contains("y"));
+}
+
+void SkySceneModelTests::themeChangesUpdateRenderedColors()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_planet",
+            "Demo Planet",
+            skygate::ephemeris::CelestialBodyType::Planet,
+            -1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
+    const skygate::ephemeris::CelestialBodyState* demoPlanetState = nullptr;
+    for (const auto& state : snapshot.states) {
+        if (snapshot.bodyAt(state.bodyIndex).id == "demo_planet") {
+            demoPlanetState = &state;
+            break;
+        }
+    }
+    QVERIFY(demoPlanetState != nullptr);
+    controller.setViewCenter(
+        demoPlanetState->horizontal.altitudeDeg,
+        demoPlanetState->horizontal.azimuthDeg
+    );
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QColor defaultPointColor;
+    for (const auto& point : sceneModel.renderPointSpan()) {
+        if (point.bodyIndex == demoPlanetState->bodyIndex) {
+            defaultPointColor = point.color;
+            break;
+        }
+    }
+    QVERIFY(defaultPointColor.isValid());
+
+    const QVariantList defaultOverlayItems = sceneModel.overlayItems();
+    QVERIFY(!defaultOverlayItems.isEmpty());
+    const QColor defaultOverlayColor =
+        defaultOverlayItems.first().toMap().value("color").value<QColor>();
+    QVERIFY(defaultOverlayColor.isValid());
+
+    controller.setThemeId("night-vision");
+
+    QColor nightPointColor;
+    for (const auto& point : sceneModel.renderPointSpan()) {
+        if (point.bodyIndex == demoPlanetState->bodyIndex) {
+            nightPointColor = point.color;
+            break;
+        }
+    }
+    QVERIFY(nightPointColor.isValid());
+    QVERIFY(defaultPointColor != nightPointColor);
+
+    const QVariantList nightOverlayItems = sceneModel.overlayItems();
+    QVERIFY(!nightOverlayItems.isEmpty());
+    const QColor nightOverlayColor =
+        nightOverlayItems.first().toMap().value("color").value<QColor>();
+    QVERIFY(nightOverlayColor.isValid());
+    QVERIFY(defaultOverlayColor != nightOverlayColor);
 }
 
 QTEST_GUILESS_MAIN(SkySceneModelTests)

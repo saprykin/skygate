@@ -26,3 +26,4 @@ add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests LocationCatalogMode
 add_skygate_ui_qtest(skygate-ui-context-controller-tests SkyContextControllerTests.cpp)
 add_skygate_ui_qtest(skygate-ui-settings-store-tests SkySettingsStoreTests.cpp)
 add_skygate_ui_qtest(skygate-ui-object-search-model-tests SkyObjectSearchModelTests.cpp)
+add_skygate_ui_qtest(skygate-ui-theme-repository-tests SkyThemeRepositoryTests.cpp)

@@ -26,6 +26,7 @@ public:
         QString locationSourceText;
         QString selectedCityId;
         QString projectionTypeText;
+        QString themeId;
         int catalogPresetIndex = 0;
         QString catalogUrlText;
     };

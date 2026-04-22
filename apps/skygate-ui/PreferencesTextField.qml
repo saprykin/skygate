@@ -3,15 +3,16 @@ import QtQuick.Controls
 
 TextField {
     id: textControl
+    readonly property var theme: skyContext.theme
     font.family: "Avenir Next"
     font.pixelSize: 11
     implicitHeight: 32
-    color: "#f1f3ff"
+    color: theme.inputText
     selectByMouse: true
     horizontalAlignment: Text.AlignLeft
-    placeholderTextColor: "#8187ab"
-    selectedTextColor: "#f4f6ff"
-    selectionColor: "#4068b4"
+    placeholderTextColor: theme.inputPlaceholderText
+    selectedTextColor: theme.inputSelectionText
+    selectionColor: theme.inputSelection
     leftPadding: 9
     rightPadding: 9
     topPadding: 5
@@ -19,8 +20,8 @@ TextField {
 
     background: Rectangle {
         radius: 8
-        color: textControl.enabled ? "#232742" : "#1b1e33"
+        color: textControl.enabled ? theme.inputBackground : theme.inputBackgroundDisabled
         border.width: 1
-        border.color: textControl.activeFocus ? "#628fd9" : "#4d5378"
+        border.color: textControl.activeFocus ? theme.inputBorderFocus : theme.inputBorder
     }
 }

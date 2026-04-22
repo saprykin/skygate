@@ -5,6 +5,7 @@ import QtQuick.Window
 
 Item {
     id: root
+    readonly property var theme: skyContext.theme
     property var catalogModel
     property string placeholderText: "Choose a city"
     property string selectedCityId: ""
@@ -35,9 +36,9 @@ Item {
         id: buttonBackground
         anchors.fill: parent
         radius: 8
-        color: root.enabled ? "#232742" : "#1b1e33"
+        color: root.enabled ? root.theme.inputBackground : root.theme.inputBackgroundDisabled
         border.width: 1
-        border.color: cityPopup.opened ? "#628fd9" : "#4d5378"
+        border.color: cityPopup.opened ? root.theme.inputBorderFocus : root.theme.inputBorder
         opacity: root.enabled ? 1.0 : 0.72
 
         Text {
@@ -47,7 +48,9 @@ Item {
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             text: root.selectedText !== "" ? root.selectedText : root.placeholderText
-            color: root.selectedText !== "" ? "#f1f3ff" : "#8187ab"
+            color: root.selectedText !== ""
+                ? root.theme.inputText
+                : root.theme.inputPlaceholderText
             font.family: "Avenir Next"
             font.pixelSize: 11
             verticalAlignment: Text.AlignVCenter
@@ -60,7 +63,7 @@ Item {
             anchors.rightMargin: 9
             anchors.verticalCenter: parent.verticalCenter
             text: "\u25BE"
-            color: "#9ca3c5"
+            color: root.theme.inputIndicator
             font.pixelSize: 8
         }
 
@@ -154,10 +157,12 @@ Item {
                             }
 
                             if (root.selectedCityId === cityId) {
-                                return "#365e9c"
+                                return root.theme.listItemBackgroundSelected
                             }
 
-                            return delegateMouse.containsMouse ? "#272c46" : "transparent"
+                            return delegateMouse.containsMouse
+                                ? root.theme.listItemBackgroundHover
+                                : "transparent"
                         }
 
                         Column {
@@ -170,7 +175,9 @@ Item {
 
                             Text {
                                 text: displayText
-                                color: selectable ? "#eef2ff" : "#9ca3c5"
+                                color: selectable
+                                    ? root.theme.listItemPrimaryText
+                                    : root.theme.listItemSectionText
                                 font.family: "Avenir Next"
                                 font.pixelSize: selectable ? 11 : 10
                                 font.weight: selectable ? Font.Normal : Font.DemiBold
@@ -180,7 +187,7 @@ Item {
                             Text {
                                 visible: selectable
                                 text: detailText
-                                color: "#9ca3c5"
+                                color: root.theme.listItemSecondaryText
                                 font.family: "Avenir Next"
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
@@ -210,7 +217,7 @@ Item {
                     anchors.centerIn: parent
                     visible: cityListView.count === 0
                     text: "No matching cities"
-                    color: "#9ca3c5"
+                    color: root.theme.emptyStateText
                     font.family: "Avenir Next"
                     font.pixelSize: 11
                 }
@@ -219,9 +226,9 @@ Item {
 
         background: Rectangle {
             radius: 9
-            color: "#1d2138"
+            color: root.theme.cardBackground
             border.width: 1
-            border.color: "#4b5278"
+            border.color: root.theme.toolbarDropdownBorder
         }
     }
 }

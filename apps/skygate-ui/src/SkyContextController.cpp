@@ -40,6 +40,8 @@ SkyContextController::SkyContextController(
 )
     : QObject(parent)
     , m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this))
+    , m_themePalette(std::make_unique<SkyThemePalette>(this))
+    , m_themeRepository(std::make_unique<SkyThemeRepository>())
     , m_settingsStore(std::make_unique<SkySettingsStore>())
     , m_catalogManager(std::make_unique<SkyCatalogManager>(
           m_settingsStore.get(),
@@ -49,6 +51,9 @@ SkyContextController::SkyContextController(
       ))
     , m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
+    m_themeOptions = m_themeRepository->themeOptions();
+    m_themePalette->setDefinition(m_themeRepository->defaultTheme());
+
     connect(
         m_catalogManager.get(),
         &SkyCatalogManager::statusTextChanged,
@@ -157,6 +162,11 @@ skygate::core::ProjectionType SkyContextController::projectionType() const noexc
     return m_projectionType;
 }
 
+const SkyThemeRenderPalette& SkyContextController::renderTheme() const noexcept
+{
+    return m_themePalette->definition().render;
+}
+
 QString SkyContextController::utcTimeText() const
 {
     return SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toString("HH:mm:ss");
@@ -212,6 +222,21 @@ QAbstractItemModel* SkyContextController::cityCatalogModel() const noexcept
 QString SkyContextController::projectionTypeText() const
 {
     return SkyContextProjectionTypeCodec::toString(m_projectionType);
+}
+
+QString SkyContextController::themeId() const
+{
+    return m_themePalette != nullptr ? m_themePalette->id() : QString();
+}
+
+QVariantList SkyContextController::themeOptions() const
+{
+    return m_themeOptions;
+}
+
+QObject* SkyContextController::theme() const noexcept
+{
+    return m_themePalette.get();
 }
 
 QString SkyContextController::locationStatusText() const
@@ -356,6 +381,22 @@ void SkyContextController::setCatalogPresetIndex(const int catalogPresetIndex)
     if (m_catalogManager != nullptr) {
         m_catalogManager->setCatalogPresetIndex(catalogPresetIndex);
     }
+}
+
+void SkyContextController::setThemeId(const QString& themeId)
+{
+    if (m_themePalette == nullptr || m_themeRepository == nullptr) {
+        return;
+    }
+
+    const SkyThemeDefinition& resolvedTheme = m_themeRepository->themeById(themeId);
+    if (m_themePalette->id() == resolvedTheme.id) {
+        return;
+    }
+
+    m_themePalette->setDefinition(resolvedTheme);
+    emit themeChanged();
+    emit skyContextChanged();
 }
 
 QString SkyContextController::catalogUrlText() const

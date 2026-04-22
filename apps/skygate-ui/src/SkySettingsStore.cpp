@@ -54,6 +54,7 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         SkyContextSettings::key("projectionType"),
         snapshot.projectionTypeText
     );
+    settings.setValue(SkyContextSettings::key("themeId"), snapshot.themeId);
     settings.setValue(
         SkyContextSettings::key("catalogPresetIndex"),
         snapshot.catalogPresetIndex
@@ -131,6 +132,10 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
     snapshot.projectionTypeText = settings.value(
         SkyContextSettings::key("projectionType"),
         snapshot.projectionTypeText
+    ).toString();
+    snapshot.themeId = settings.value(
+        SkyContextSettings::key("themeId"),
+        snapshot.themeId
     ).toString();
     snapshot.catalogPresetIndex = settings.value(
         SkyContextSettings::key("catalogPresetIndex"),

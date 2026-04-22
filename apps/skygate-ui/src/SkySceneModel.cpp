@@ -46,18 +46,21 @@ QVariantMap overlayEntry(
     return entry;
 }
 
-QColor cardinalColor(const double azimuthDeg)
+QColor cardinalColor(
+    const double azimuthDeg,
+    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
+)
 {
     if (azimuthDeg == 0.0) {
-        return QColor(156, 231, 255);
+        return renderTheme.cardinalNorthLine;
     }
     if (azimuthDeg == 90.0) {
-        return QColor(255, 207, 157);
+        return renderTheme.cardinalEastLine;
     }
     if (azimuthDeg == 180.0) {
-        return QColor(255, 176, 176);
+        return renderTheme.cardinalSouthLine;
     }
-    return QColor(168, 233, 200);
+    return renderTheme.cardinalWestLine;
 }
 
 QString normalizedLookupKey(const QString& value)
@@ -223,6 +226,12 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             this,
             &SkySceneModel::rebuildSceneFrame
         );
+        m_themeChangedConnection = connect(
+            m_skyContextController,
+            &SkyContextController::themeChanged,
+            this,
+            &SkySceneModel::rebuildSceneFrame
+        );
     }
 
     emit skyContextControllerChanged();
@@ -340,9 +349,13 @@ void SkySceneModel::disconnectFromContextController()
     if (m_selectedSearchTargetChangedConnection) {
         disconnect(m_selectedSearchTargetChangedConnection);
     }
+    if (m_themeChangedConnection) {
+        disconnect(m_themeChangedConnection);
+    }
 
     m_skyContextChangedConnection = {};
     m_selectedSearchTargetChangedConnection = {};
+    m_themeChangedConnection = {};
 }
 
 bool SkySceneModel::clearSceneFrame()
@@ -438,7 +451,8 @@ void SkySceneModel::rebuildSceneFrame()
         .viewCenterAltitudeDeg = m_skyContextController->viewCenterAltitudeDeg(),
         .viewCenterAzimuthDeg = m_skyContextController->viewCenterAzimuthDeg(),
         .viewFieldOfViewDeg = m_skyContextController->viewFieldOfViewDeg(),
-        .magnitudeCutoff = m_skyContextController->magnitudeCutoff()
+        .magnitudeCutoff = m_skyContextController->magnitudeCutoff(),
+        .themeId = m_skyContextController->themeId()
     };
     if (!m_renderFrameKey.has_value() || !m_renderFrameKey.value().equals(renderFrameKey)) {
         const SkyRenderFrameBuilder frameBuilder;
@@ -449,7 +463,8 @@ void SkySceneModel::rebuildSceneFrame()
             m_skyContextController->constellationLabelRefs(),
             m_skyContextController->magnitudeCutoff(),
             m_viewportWidth,
-            m_viewportHeight
+            m_viewportHeight,
+            m_skyContextController->renderTheme()
         );
 
         m_sceneFrame.hoverPointIndicesByCell.clear();
@@ -489,6 +504,7 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
 
     constexpr std::array<const char*, 4> kCardinalLabels {"N", "E", "S", "W"};
     constexpr std::array<double, 4> kCardinalAzimuths {0.0, 90.0, 180.0, 270.0};
+    const auto& renderTheme = m_skyContextController->renderTheme();
     for (std::size_t index = 0; index < kCardinalLabels.size(); ++index) {
         const auto projected = sceneFrame.preparedProjection->project(
             skygate::core::HorizontalCoordinate {
@@ -505,7 +521,7 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
             projected.x,
             projected.y,
             QString::fromUtf8(kCardinalLabels[index]),
-            cardinalColor(kCardinalAzimuths[index])
+            cardinalColor(kCardinalAzimuths[index], renderTheme)
         ));
     }
 

@@ -401,27 +401,32 @@ double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)
     return 1.8 + normalizedBrightness * 5.0;
 }
 
-QColor SkyContextRenderStyle::colorForBodyType(const skygate::ephemeris::CelestialBodyType type)
+QColor SkyContextRenderStyle::colorForBodyType(
+    const skygate::ephemeris::CelestialBodyType type,
+    const SkyThemeRenderPalette& renderPalette
+)
 {
     switch (type) {
     case skygate::ephemeris::CelestialBodyType::Sun:
-        return QColor(255, 214, 128, 230);
+        return renderPalette.bodySun;
     case skygate::ephemeris::CelestialBodyType::Moon:
-        return QColor(162, 245, 255, 235);
+        return renderPalette.bodyMoon;
     case skygate::ephemeris::CelestialBodyType::Planet:
-        return QColor(255, 188, 140, 220);
+        return renderPalette.bodyPlanet;
     case skygate::ephemeris::CelestialBodyType::Star:
-        return QColor(188, 214, 255, 210);
+        return renderPalette.bodyStar;
     case skygate::ephemeris::CelestialBodyType::Constellation:
-        return QColor(160, 244, 200, 205);
+        return renderPalette.bodyConstellation;
     }
 
-    return QColor(220, 220, 240, 200);
+    return renderPalette.bodyStar;
 }
 
-QColor SkyContextRenderStyle::constellationLineColor()
+QColor SkyContextRenderStyle::constellationLineColor(
+    const SkyThemeRenderPalette& renderPalette
+)
 {
-    return QColor(146, 205, 255, 132);
+    return renderPalette.constellationLine;
 }
 
 }  // namespace skygate::ui::internal

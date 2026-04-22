@@ -12,20 +12,20 @@ Window {
     minimumWidth: 502
     minimumHeight: 400
     visible: false
-    color: "#171b30"
+    color: skyContext.theme.windowBackground
     required property var skyContextController
     property Window transientParentWindow
     transientParent: transientParentWindow
     flags: Qt.Dialog
     modality: Qt.WindowModal
 
-    property color cardBackground: "#1d2138"
-    property color cardBackgroundBottom: "#1a1e33"
-    property color cardBorder: "#474d70"
-    property color dividerColor: "#343955"
-    property color textPrimary: "#f2f4ff"
-    property color textSecondary: "#9ca3c5"
-    property color textMuted: "#878dad"
+    property color cardBackground: skyContext.theme.cardBackground
+    property color cardBackgroundBottom: skyContext.theme.cardBackgroundBottom
+    property color cardBorder: skyContext.theme.cardBorder
+    property color dividerColor: skyContext.theme.dividerColor
+    property color textPrimary: skyContext.theme.textPrimary
+    property color textSecondary: skyContext.theme.textSecondary
+    property color textMuted: skyContext.theme.textMuted
     property int selectedPage: 0
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
@@ -33,9 +33,15 @@ Window {
     readonly property bool applyEnabled: !(selectedPage === 0
                                            && settingsDraft.locationSourceText === "City"
                                            && settingsDraft.selectedCityId === "")
-    readonly property string currentSectionDescription: selectedPage === 0
-                                                      ? "Observer location and projection"
-                                                      : "Catalog source and download settings"
+    readonly property string currentSectionDescription: {
+        if (selectedPage === 0) {
+            return "Observer location and projection"
+        }
+        if (selectedPage === 1) {
+            return "Theme and visual presentation"
+        }
+        return "Catalog source and download settings"
+    }
 
     SkySettingsDraft {
         id: settingsDraft
@@ -105,8 +111,8 @@ Window {
             height: 82
             color: "transparent"
             gradient: Gradient {
-                GradientStop { position: 0.0; color: "#111731" }
-                GradientStop { position: 1.0; color: "#00111731" }
+                GradientStop { position: 0.0; color: skyContext.theme.headerGradientStart }
+                GradientStop { position: 1.0; color: skyContext.theme.headerGradientEnd }
             }
         }
 
@@ -159,7 +165,7 @@ Window {
 
                     contentItem: Text {
                         text: closeIconButton.text
-                        color: "#edf1ff"
+                        color: skyContext.theme.closeButtonText
                         font: closeIconButton.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -168,10 +174,12 @@ Window {
                     background: Rectangle {
                         radius: 15
                         color: closeIconButton.down
-                            ? "#232843"
-                            : (closeIconButton.hovered ? "#292f4c" : "#1f2339")
+                            ? skyContext.theme.closeButtonBackgroundPressed
+                            : (closeIconButton.hovered
+                                   ? skyContext.theme.closeButtonBackgroundHover
+                                   : skyContext.theme.closeButtonBackground)
                         border.width: 1
-                        border.color: "#596084"
+                        border.color: skyContext.theme.closeButtonBorder
                     }
                 }
             }
@@ -201,7 +209,7 @@ Window {
 
                         Label {
                             text: "Sections"
-                            color: "#d8dcf2"
+                            color: skyContext.theme.sectionTitleText
                             font.family: "Avenir Next"
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -214,9 +222,15 @@ Window {
                         }
 
                         PreferencesSectionButton {
-                            label: "Catalog"
+                            label: "Appearance"
                             active: preferencesWindow.selectedPage === 1
                             onClicked: preferencesWindow.selectedPage = 1
+                        }
+
+                        PreferencesSectionButton {
+                            label: "Catalog"
+                            active: preferencesWindow.selectedPage === 2
+                            onClicked: preferencesWindow.selectedPage = 2
                         }
 
                         Item {
@@ -254,6 +268,12 @@ Window {
                                 settingsDraft: settingsDraft
                             }
 
+                            PreferencesAppearanceSection {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                settingsDraft: settingsDraft
+                            }
+
                             PreferencesCatalogSection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
@@ -286,7 +306,7 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 3
-                        visible: preferencesWindow.selectedPage === 1 && preferencesWindow.catalogBusy
+                        visible: preferencesWindow.selectedPage === 2 && preferencesWindow.catalogBusy
 
                         Label {
                             Layout.fillWidth: true
@@ -313,9 +333,9 @@ Window {
 
                             background: Rectangle {
                                 radius: 3
-                                color: "#181b2d"
+                                color: skyContext.theme.progressBarTrack
                                 border.width: 1
-                                border.color: "#3b4060"
+                                border.color: skyContext.theme.progressBarTrackBorder
                             }
 
                             contentItem: Item {
@@ -329,9 +349,9 @@ Window {
                                     radius: height * 0.5
                                     x: -width
                                     gradient: Gradient {
-                                        GradientStop { position: 0.0; color: "#4a82df00" }
-                                        GradientStop { position: 0.5; color: "#4a82df" }
-                                        GradientStop { position: 1.0; color: "#4a82df22" }
+                                        GradientStop { position: 0.0; color: skyContext.theme.progressBarSweepStart }
+                                        GradientStop { position: 0.5; color: skyContext.theme.progressBarSweepMid }
+                                        GradientStop { position: 1.0; color: skyContext.theme.progressBarSweepEnd }
                                     }
 
                                     SequentialAnimation on x {
@@ -350,9 +370,9 @@ Window {
                     }
 
                     Item {
-                        Layout.preferredWidth: preferencesWindow.selectedPage === 1
+                        Layout.preferredWidth: preferencesWindow.selectedPage === 2
                                                && preferencesWindow.catalogBusy ? 0 : 1
-                        Layout.fillWidth: !(preferencesWindow.selectedPage === 1
+                        Layout.fillWidth: !(preferencesWindow.selectedPage === 2
                                             && preferencesWindow.catalogBusy)
                     }
 

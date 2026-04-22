@@ -53,6 +53,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.locationSourceText = "City";
     savedSnapshot.selectedCityId = "ch-zurich";
     savedSnapshot.projectionTypeText = "Perspective";
+    savedSnapshot.themeId = "night-vision";
     savedSnapshot.catalogPresetIndex = 2;
     savedSnapshot.catalogUrlText = "https://example.com/catalog.csv";
 
@@ -68,6 +69,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);
     QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
+    QCOMPARE(loadedSnapshot->themeId, savedSnapshot.themeId);
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
 }

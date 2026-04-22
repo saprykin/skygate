@@ -68,6 +68,9 @@ class SkyContextController final : public QObject {
     )
     Q_PROPERTY(QAbstractItemModel* cityCatalogModel READ cityCatalogModel CONSTANT)
     Q_PROPERTY(QString projectionTypeText READ projectionTypeText NOTIFY projectionTypeChanged)
+    Q_PROPERTY(QString themeId READ themeId WRITE setThemeId NOTIFY themeChanged)
+    Q_PROPERTY(QVariantList themeOptions READ themeOptions NOTIFY themeOptionsChanged)
+    Q_PROPERTY(QObject* theme READ theme CONSTANT)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
     Q_PROPERTY(
@@ -131,6 +134,9 @@ public:
     [[nodiscard]] QString selectedCityDisplayText() const;
     [[nodiscard]] QAbstractItemModel* cityCatalogModel() const noexcept;
     [[nodiscard]] QString projectionTypeText() const;
+    [[nodiscard]] QString themeId() const;
+    [[nodiscard]] QVariantList themeOptions() const;
+    [[nodiscard]] QObject* theme() const noexcept;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
@@ -143,6 +149,7 @@ public:
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
     [[nodiscard]] skygate::core::ProjectionType projectionType() const noexcept;
+    [[nodiscard]] const skygate::ui::internal::SkyThemeRenderPalette& renderTheme() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
     [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
@@ -175,6 +182,7 @@ public:
     Q_INVOKABLE void setSelectedCityId(const QString& selectedCityId);
     Q_INVOKABLE void refreshCurrentLocation();
     Q_INVOKABLE void setProjectionTypeText(const QString& projectionTypeText);
+    Q_INVOKABLE void setThemeId(const QString& themeId);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
     Q_INVOKABLE bool clearCatalogCache();
@@ -204,6 +212,8 @@ signals:
     void selectedCityIdChanged();
     void selectedCityDisplayTextChanged();
     void projectionTypeChanged();
+    void themeChanged();
+    void themeOptionsChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
     void catalogDatasetInfoTextChanged();
@@ -248,9 +258,12 @@ private:
     skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
     std::unique_ptr<skygate::core::IProjection> m_projection;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
+    std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
+    std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
+    QVariantList m_themeOptions;
     QString m_locationStatusText;
     QString m_selectedCityId;
     QString m_selectedCityDisplayText;

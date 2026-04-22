@@ -1,5 +1,6 @@
 #include "SkyViewportItem.hpp"
 
+#include "SkyContextController.hpp"
 #include "SkySceneModel.hpp"
 
 #include <QColor>
@@ -23,12 +24,6 @@ constexpr int kGridAltitudeStepDeg = 15;
 constexpr int kGridAzimuthStepDeg = 30;
 constexpr int kGridAltitudeSampleCount = 96;
 constexpr int kGridAzimuthSampleCount = 64;
-const QColor kHorizonLineColor(255, 170, 92, 220);
-const QColor kCardinalNorthLineColor(130, 216, 255, 132);
-const QColor kCardinalEastLineColor(255, 208, 136, 132);
-const QColor kCardinalSouthLineColor(255, 158, 158, 132);
-const QColor kCardinalWestLineColor(156, 232, 198, 132);
-
 struct LineSegment final {
     float x1 = 0.0F;
     float y1 = 0.0F;
@@ -67,19 +62,22 @@ private:
     QSGNode* m_pointRoot = nullptr;
 };
 
-[[nodiscard]] QColor cardinalMeridianColor(const int azimuthDeg)
+[[nodiscard]] QColor cardinalMeridianColor(
+    const int azimuthDeg,
+    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
+)
 {
     switch (azimuthDeg) {
     case 0:
-        return kCardinalNorthLineColor;
+        return renderTheme.cardinalNorthLine;
     case 90:
-        return kCardinalEastLineColor;
+        return renderTheme.cardinalEastLine;
     case 180:
-        return kCardinalSouthLineColor;
+        return renderTheme.cardinalSouthLine;
     case 270:
-        return kCardinalWestLineColor;
+        return renderTheme.cardinalWestLine;
     default:
-        return QColor(140, 186, 236, 74);
+        return renderTheme.gridAzimuthLine;
     }
 }
 
@@ -293,6 +291,7 @@ struct SkyViewportItem::ViewportRenderData final {
     double viewportWidth = 0.0;
     double viewportHeight = 0.0;
     std::optional<skygate::core::PreparedProjection> preparedProjection;
+    skygate::ui::internal::SkyThemeRenderPalette renderTheme;
     std::vector<SkyRenderLine> lines;
     std::vector<SkyRenderPoint> points;
 };
@@ -374,7 +373,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             *renderData->preparedProjection,
             kGridAltitudeSampleCount,
             maxSegmentLengthSquared,
-            QColor(112, 146, 194, 70),
+            renderData->renderTheme.gridAltitudeLine,
             [altitudeDeg](const int index) {
                 const double azimuthDeg = (360.0 * static_cast<double>(index))
                                           / static_cast<double>(kGridAltitudeSampleCount);
@@ -396,7 +395,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             *renderData->preparedProjection,
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
-            QColor(102, 138, 184, 58),
+            renderData->renderTheme.gridAzimuthLine,
             [azimuthDeg](const int index) {
                 const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
                                                        / static_cast<double>(kGridAzimuthSampleCount);
@@ -415,7 +414,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             *renderData->preparedProjection,
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
-            cardinalMeridianColor(cardinalAzimuthDeg),
+            cardinalMeridianColor(cardinalAzimuthDeg, renderData->renderTheme),
             [cardinalAzimuthDeg](const int index) {
                 const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
                                                        / static_cast<double>(kGridAzimuthSampleCount);
@@ -432,7 +431,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         *renderData->preparedProjection,
         kHorizonSampleCount,
         maxSegmentLengthSquared,
-        kHorizonLineColor,
+        renderData->renderTheme.horizonLine,
         [](const int index) {
             const double azimuthDeg = (360.0 * static_cast<double>(index))
                                       / static_cast<double>(kHorizonSampleCount);
@@ -488,6 +487,11 @@ void SkyViewportItem::synchronizeRenderData()
             nextRenderData->viewportHeight
         );
         nextRenderData->preparedProjection = m_skySceneModel->preparedProjection();
+        if (auto* controller = qobject_cast<SkyContextController*>(
+                m_skySceneModel->skyContextController()
+            )) {
+            nextRenderData->renderTheme = controller->renderTheme();
+        }
         if (nextRenderData->preparedProjection.has_value()) {
             const auto lines = m_skySceneModel->renderLineSpan();
             nextRenderData->lines.assign(lines.begin(), lines.end());

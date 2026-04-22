@@ -4,6 +4,7 @@ import QtQuick.Controls
 Item {
     id: toolbarRoot
     required property var skyContextController
+    readonly property var theme: skyContextController.theme
     property var onRequestExpand: null
     property alias panelItem: searchToolbarPanel
     property alias toggleItem: searchToolbarToggle
@@ -70,9 +71,9 @@ Item {
         height: searchToolbarRow.implicitHeight + 14
         implicitHeight: height
         radius: 10
-        color: "#7f0b1428"
+        color: theme.toolbarPanelBackground
         border.width: 1
-        border.color: "#335177"
+        border.color: theme.toolbarPanelBorder
         opacity: collapsed ? 0.0 : 1.0
 
         Behavior on width {
@@ -141,7 +142,7 @@ Item {
 
                 contentItem: Text {
                     text: parent.text
-                    color: "#e8f4ff"
+                    color: theme.toolbarButtonText
                     font: parent.font
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -149,9 +150,13 @@ Item {
 
                 background: Rectangle {
                     radius: 8
-                    color: parent.down ? "#2a4a72" : (parent.hovered ? "#335b89" : "#1e3d63")
+                    color: parent.down
+                        ? theme.toolbarButtonBackgroundPressed
+                        : (parent.hovered
+                               ? theme.toolbarButtonBackgroundHover
+                               : theme.toolbarButtonBackground)
                     border.width: 1
-                    border.color: "#75bde8"
+                    border.color: theme.toolbarButtonBorder
                 }
             }
         }
@@ -187,7 +192,7 @@ Item {
 
         contentItem: Text {
             text: searchToolbarToggle.text
-            color: "#e8f4ff"
+            color: theme.toolbarToggleText
             font: searchToolbarToggle.font
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -196,10 +201,12 @@ Item {
         background: Rectangle {
             radius: 8
             color: searchToolbarToggle.down
-                ? "#27476d"
-                : (searchToolbarToggle.hovered ? "#315881" : "#1a3352")
+                ? theme.toolbarToggleBackgroundPressed
+                : (searchToolbarToggle.hovered
+                       ? theme.toolbarToggleBackgroundHover
+                       : theme.toolbarToggleBackground)
             border.width: 1
-            border.color: "#6fbde6"
+            border.color: theme.toolbarToggleBorder
         }
     }
 
@@ -222,16 +229,16 @@ Item {
             )
         )
         radius: 10
-        color: "#102745"
+        color: theme.toolbarDropdownBackground
         border.width: 1
-        border.color: "#4f79a8"
+        border.color: theme.toolbarDropdownBorder
         z: 30
         clip: true
 
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
-            color: "#102745"
+            color: theme.toolbarDropdownBackground
         }
 
         ListView {
@@ -260,8 +267,10 @@ Item {
                 height: 46
                 radius: 8
                 color: resultsListView.currentIndex === resultDelegate.index
-                    ? "#2f5f94"
-                    : (delegateMouse.containsMouse ? "#1c3b60" : "transparent")
+                    ? theme.toolbarItemBackgroundSelected
+                    : (delegateMouse.containsMouse
+                           ? theme.toolbarItemBackgroundHover
+                           : "transparent")
 
                 Column {
                     anchors.left: parent.left
@@ -273,7 +282,7 @@ Item {
 
                     Text {
                         text: displayText
-                        color: "#e8f4ff"
+                        color: theme.toolbarPrimaryText
                         font.family: "Avenir Next"
                         font.pixelSize: 12
                         font.weight: Font.DemiBold
@@ -282,7 +291,7 @@ Item {
 
                     Text {
                         text: detailText
-                        color: "#bfd6f5"
+                        color: theme.toolbarSecondaryText
                         font.family: "Avenir Next"
                         font.pixelSize: 10
                         elide: Text.ElideRight
@@ -306,7 +315,7 @@ Item {
             anchors.centerIn: parent
             visible: resultsListView.count === 0
             text: "No matching objects"
-            color: "#bfd6f5"
+            color: theme.emptyStateText
             font.family: "Avenir Next"
             font.pixelSize: 11
         }

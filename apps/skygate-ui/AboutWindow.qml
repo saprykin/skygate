@@ -13,7 +13,8 @@ Window {
     maximumWidth: 420
     maximumHeight: 356
     visible: false
-    color: "#171b30"
+    readonly property var theme: skyContext.theme
+    color: theme.windowBackground
     property Window transientParentWindow
     transientParent: transientParentWindow
     flags: Qt.Dialog
@@ -35,11 +36,11 @@ Window {
         radius: 16
         clip: true
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#1d2138" }
-            GradientStop { position: 1.0; color: "#1a1e33" }
+            GradientStop { position: 0.0; color: theme.cardBackground }
+            GradientStop { position: 1.0; color: theme.cardBackgroundBottom }
         }
         border.width: 1
-        border.color: "#474d70"
+        border.color: theme.cardBorder
 
         Rectangle {
             anchors.left: parent.left
@@ -48,8 +49,8 @@ Window {
             height: 60
             color: "transparent"
             gradient: Gradient {
-                GradientStop { position: 0.0; color: "#101631" }
-                GradientStop { position: 1.0; color: "#00101631" }
+                GradientStop { position: 0.0; color: theme.headerGradientStart }
+                GradientStop { position: 1.0; color: theme.headerGradientEnd }
             }
         }
 
@@ -76,7 +77,7 @@ Window {
 
                     contentItem: Text {
                         text: closeButton.text
-                        color: "#edf1ff"
+                        color: theme.closeButtonText
                         font: closeButton.font
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -85,10 +86,12 @@ Window {
                     background: Rectangle {
                         radius: 15
                         color: closeButton.down
-                            ? "#232843"
-                            : (closeButton.hovered ? "#292f4c" : "#1f2339")
+                            ? theme.closeButtonBackgroundPressed
+                            : (closeButton.hovered
+                                   ? theme.closeButtonBackgroundHover
+                                   : theme.closeButtonBackground)
                         border.width: 1
-                        border.color: "#596084"
+                        border.color: theme.closeButtonBorder
                     }
                 }
             }
@@ -127,10 +130,10 @@ Window {
                     Rectangle {
                         anchors.fill: parent
                         radius: 18
-                        color: "#151a36"
+                        color: theme.logoPanelBackground
                         opacity: 0.62
                         border.width: 1
-                        border.color: "#6676ab"
+                        border.color: theme.logoPanelBorder
                     }
 
                     Rectangle {
@@ -139,7 +142,7 @@ Window {
                         radius: 17
                         color: "transparent"
                         border.width: 1
-                        border.color: "#9dafeb"
+                        border.color: theme.logoPanelAccentBorder
                         opacity: 0.72
                     }
 
@@ -172,7 +175,7 @@ Window {
                 Label {
                     Layout.alignment: Qt.AlignHCenter
                     text: "SkyGate"
-                    color: "#f2f4ff"
+                    color: theme.textPrimary
                     font.family: "Avenir Next"
                     font.pixelSize: 30
                     font.weight: Font.DemiBold
@@ -181,7 +184,7 @@ Window {
                 Label {
                     Layout.alignment: Qt.AlignHCenter
                     text: "\u00A9 " + aboutWindow.currentYear + "  |  Version " + Qt.application.version
-                    color: "#9ca3c5"
+                    color: theme.textSecondary
                     font.family: "Avenir Next"
                     font.pixelSize: 13
                 }
@@ -192,7 +195,7 @@ Window {
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.Wrap
                     text: "Git " + skygateGitHash + "  |  Built " + skygateBuildDateTime
-                    color: "#7f87ad"
+                    color: theme.monospaceText
                     font.family: "Menlo"
                     font.pixelSize: 11
                 }
@@ -201,16 +204,16 @@ Window {
                     Layout.fillWidth: true
                     Layout.topMargin: 2
                     Layout.preferredHeight: 1
-                    color: "#343955"
+                    color: theme.dividerColor
                 }
 
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: quoteColumn.implicitHeight + 20
                     radius: 8
-                    color: "#232742"
+                    color: theme.quoteBackground
                     border.width: 1
-                    border.color: "#4c5278"
+                    border.color: theme.quoteBorder
 
                     Column {
                         id: quoteColumn
@@ -221,7 +224,7 @@ Window {
                         Label {
                             width: parent.width
                             text: "\"Across the sea of space, the stars are other suns.\""
-                            color: "#edf0fe"
+                            color: theme.quoteText
                             font.family: "Avenir Next"
                             font.pixelSize: 14
                             font.italic: true
@@ -232,7 +235,7 @@ Window {
                         Label {
                             width: parent.width
                             text: "- Carl Sagan"
-                            color: "#878dad"
+                            color: theme.textMuted
                             font.family: "Avenir Next"
                             font.pixelSize: 12
                             horizontalAlignment: Text.AlignHCenter

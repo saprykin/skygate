@@ -19,14 +19,6 @@ Item {
             rowSpacing: 6
             columnSpacing: 8
 
-            Label {
-                Layout.columnSpan: 2
-                text: "Catalog preset"
-                color: "#d4d8ee"
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-            }
-
             PreferencesComboBox {
                 id: catalogPresetCombo
                 Layout.fillWidth: true
@@ -63,7 +55,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
                 text: skyContextController.catalogDatasetInfoText
-                color: "#c2c8e5"
+                color: skyContext.theme.listItemPrimaryText
                 font.pixelSize: 11
                 font.family: "Avenir Next"
                 elide: Text.ElideRight
@@ -84,7 +76,7 @@ Item {
                 Layout.columnSpan: 2
                 Layout.preferredHeight: visible ? implicitHeight : 0
                 text: "Catalog URL"
-                color: "#d4d8ee"
+                color: skyContext.theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
             }

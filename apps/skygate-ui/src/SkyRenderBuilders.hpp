@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QVariantList>
 
+#include "SkyTheme.hpp"
 #include "skygate/core/PreparedProjection.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
@@ -42,6 +43,7 @@ public:
         std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
         double magnitudeCutoff,
         double viewportWidth,
-        double viewportHeight
+        double viewportHeight,
+        const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
     ) const;
 };

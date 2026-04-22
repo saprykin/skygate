@@ -33,6 +33,7 @@ bool SkyContextController::saveSettings() const
     snapshot.locationSourceText = locationSourceText();
     snapshot.selectedCityId = m_selectedCityId;
     snapshot.projectionTypeText = projectionTypeText();
+    snapshot.themeId = themeId();
     snapshot.catalogPresetIndex = catalogPresetIndex();
     snapshot.catalogUrlText = catalogUrlText();
     return m_settingsStore->saveState(snapshot);
@@ -88,6 +89,7 @@ bool SkyContextController::loadSettings()
         }
 
         setProjectionTypeText(stateSnapshot->projectionTypeText);
+        setThemeId(stateSnapshot->themeId);
         setCatalogPresetIndex(stateSnapshot->catalogPresetIndex);
         setCatalogUrlText(stateSnapshot->catalogUrlText);
     }

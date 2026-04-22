@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/themes">
+        <file alias="manifest.json">themes/manifest.json</file>
+        <file alias="default.json">themes/default.json</file>
+        <file alias="night-vision.json">themes/night-vision.json</file>
+    </qresource>
+</RCC>

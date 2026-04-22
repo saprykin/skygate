@@ -81,22 +81,25 @@ struct DecimatedStarPoint final {
     double distanceToCellCenterSquared = 0.0;
 };
 
-[[nodiscard]] QColor labelColorForBodyType(const skygate::ephemeris::CelestialBodyType type)
+[[nodiscard]] QColor labelColorForBodyType(
+    const skygate::ephemeris::CelestialBodyType type,
+    const SkyThemeRenderPalette& renderTheme
+)
 {
     switch (type) {
     case skygate::ephemeris::CelestialBodyType::Sun:
-        return QColor(255, 224, 135, 235);
+        return renderTheme.labelSun;
     case skygate::ephemeris::CelestialBodyType::Moon:
-        return QColor(152, 247, 255, 245);
+        return renderTheme.labelMoon;
     case skygate::ephemeris::CelestialBodyType::Planet:
-        return QColor(255, 196, 148, 235);
+        return renderTheme.labelPlanet;
     case skygate::ephemeris::CelestialBodyType::Constellation:
-        return QColor(201, 220, 255, 230);
+        return renderTheme.labelConstellation;
     case skygate::ephemeris::CelestialBodyType::Star:
         break;
     }
 
-    return QColor(201, 220, 255, 230);
+    return renderTheme.labelDefault;
 }
 
 [[nodiscard]] double starDecimationCellSizePx(
@@ -170,7 +173,8 @@ struct DecimatedStarPoint final {
 [[nodiscard]] SkyRenderPoint makeRenderPoint(
     const skygate::ephemeris::CelestialBody& body,
     const std::uint32_t bodyIndex,
-    const skygate::core::ScreenPoint& projected
+    const skygate::core::ScreenPoint& projected,
+    const SkyThemeRenderPalette& renderTheme
 )
 {
     SkyRenderPoint point;
@@ -181,7 +185,7 @@ struct DecimatedStarPoint final {
     if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
         point.sizePx = std::max(point.sizePx, 3.0);
     }
-    point.color = SkyContextRenderStyle::colorForBodyType(body.type);
+    point.color = SkyContextRenderStyle::colorForBodyType(body.type, renderTheme);
     return point;
 }
 
@@ -210,7 +214,8 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
     const double magnitudeCutoff,
     const double viewportWidth,
-    const double viewportHeight
+    const double viewportHeight,
+    const SkyThemeRenderPalette& renderTheme
 ) const
 {
     SkyRenderFrame frame;
@@ -280,7 +285,12 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                     continue;
                 }
 
-                existingPoint.point = makeRenderPoint(body, state.bodyIndex, projected);
+                existingPoint.point = makeRenderPoint(
+                    body,
+                    state.bodyIndex,
+                    projected,
+                    renderTheme
+                );
                 existingPoint.visualMagnitude = body.visualMagnitude;
                 existingPoint.distanceToCellCenterSquared = cellCenterDistanceSquared;
                 continue;
@@ -288,14 +298,14 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
 
             starPointIndexByCell.emplace(cellKey, decimatedStarPoints.size());
             decimatedStarPoints.push_back(DecimatedStarPoint {
-                .point = makeRenderPoint(body, state.bodyIndex, projected),
+                .point = makeRenderPoint(body, state.bodyIndex, projected, renderTheme),
                 .visualMagnitude = body.visualMagnitude,
                 .distanceToCellCenterSquared = cellCenterDistanceSquared
             });
             continue;
         }
 
-        frame.points.push_back(makeRenderPoint(body, state.bodyIndex, projected));
+        frame.points.push_back(makeRenderPoint(body, state.bodyIndex, projected, renderTheme));
     }
 
     if (!decimatedStarPoints.empty()) {
@@ -334,7 +344,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 .y1 = startProjected.y,
                 .x2 = endProjected.x,
                 .y2 = endProjected.y,
-                .color = SkyContextRenderStyle::constellationLineColor()
+                .color = SkyContextRenderStyle::constellationLineColor(renderTheme)
             });
         }
     }
@@ -372,7 +382,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             point.x,
             point.y,
             body.displayName,
-            labelColorForBodyType(body.type)
+            labelColorForBodyType(body.type, renderTheme)
         );
     }
 
@@ -425,7 +435,10 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 labelX,
                 labelY,
                 labelRef.first,
-                labelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation)
+                labelColorForBodyType(
+                    skygate::ephemeris::CelestialBodyType::Constellation,
+                    renderTheme
+                )
             );
         }
     }

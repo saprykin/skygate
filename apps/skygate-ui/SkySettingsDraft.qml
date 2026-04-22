@@ -11,6 +11,7 @@ QtObject {
     property string selectedCityId: ""
     property string selectedCityDisplayText: ""
     property string projectionTypeText: ""
+    property string themeId: ""
     property int catalogPresetIndex: 0
     property string catalogUrlText: ""
 
@@ -46,6 +47,7 @@ QtObject {
         selectedCityId = skyContextController.selectedCityId
         selectedCityDisplayText = skyContextController.selectedCityDisplayText
         projectionTypeText = skyContextController.projectionTypeText
+        themeId = skyContextController.themeId
         catalogPresetIndex = skyContextController.catalogPresetIndex()
         catalogUrlText = skyContextController.catalogUrlText()
     }
@@ -77,6 +79,7 @@ QtObject {
         }
 
         skyContextController.setProjectionTypeText(projectionTypeText)
+        skyContextController.setThemeId(themeId)
         skyContextController.setCatalogPresetIndex(catalogPresetIndex)
         skyContextController.setCatalogUrlText(catalogUrlText)
         resetFromContext()

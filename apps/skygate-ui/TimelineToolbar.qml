@@ -4,6 +4,7 @@ import QtQuick.Controls
 Item {
     id: toolbarRoot
     required property var skyContextController
+    readonly property var theme: skyContextController.theme
     property var onRequestExpand: null
     property alias panelItem: timelineToolbarPanel
     property alias toggleItem: timelineToolbarToggle
@@ -67,9 +68,9 @@ Item {
         height: timelineToolbarRow.implicitHeight + 14
         implicitHeight: height
         radius: 10
-        color: "#7f0b1428"
+        color: theme.toolbarPanelBackground
         border.width: 1
-        border.color: "#335177"
+        border.color: theme.toolbarPanelBorder
         opacity: collapsed ? 0.0 : 1.0
 
         Behavior on width {
@@ -98,7 +99,7 @@ Item {
 
                 contentItem: Text {
                     text: parent.text
-                    color: "#e8f4ff"
+                    color: theme.toolbarButtonText
                     font: parent.font
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -106,9 +107,13 @@ Item {
 
                 background: Rectangle {
                     radius: 8
-                    color: parent.down ? "#2a4a72" : (parent.hovered ? "#335b89" : "#1e3d63")
+                    color: parent.down
+                        ? theme.toolbarButtonBackgroundPressed
+                        : (parent.hovered
+                               ? theme.toolbarButtonBackgroundHover
+                               : theme.toolbarButtonBackground)
                     border.width: 1
-                    border.color: "#75bde8"
+                    border.color: theme.toolbarButtonBorder
                 }
             }
 
@@ -124,7 +129,7 @@ Item {
 
                 contentItem: Text {
                     text: timelineComboControl.displayText
-                    color: "#e8f4ff"
+                    color: theme.toolbarPrimaryText
                     font: timelineComboControl.font
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight
@@ -132,7 +137,7 @@ Item {
 
                 indicator: Text {
                     text: "\u25BE"
-                    color: "#b8daf7"
+                    color: theme.inputIndicator
                     font.pixelSize: 11
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.right: parent.right
@@ -142,10 +147,12 @@ Item {
                 background: Rectangle {
                     radius: 8
                     color: timelineComboControl.pressed
-                        ? "#2a4a72"
-                        : (timelineComboControl.hovered ? "#335b89" : "#1e3d63")
+                        ? theme.toolbarButtonBackgroundPressed
+                        : (timelineComboControl.hovered
+                               ? theme.toolbarButtonBackgroundHover
+                               : theme.toolbarButtonBackground)
                     border.width: 1
-                    border.color: "#75bde8"
+                    border.color: theme.toolbarButtonBorder
                 }
 
                 popup: Popup {
@@ -163,9 +170,9 @@ Item {
 
                     background: Rectangle {
                         radius: 10
-                        color: "#102745"
+                        color: theme.toolbarDropdownBackground
                         border.width: 1
-                        border.color: "#4f79a8"
+                        border.color: theme.toolbarDropdownBorder
                     }
                 }
 
@@ -176,7 +183,7 @@ Item {
 
                     contentItem: Text {
                         text: modelData
-                        color: highlighted ? "#e8f4ff" : "#bfd6f5"
+                        color: highlighted ? theme.toolbarPrimaryText : theme.toolbarSecondaryText
                         font: timelineComboControl.font
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
@@ -185,8 +192,10 @@ Item {
                     background: Rectangle {
                         radius: 7
                         color: highlighted
-                            ? "#2f5f94"
-                            : (timelineComboDelegate.hovered ? "#1c3b60" : "transparent")
+                            ? theme.toolbarItemBackgroundSelected
+                            : (timelineComboDelegate.hovered
+                                   ? theme.toolbarItemBackgroundHover
+                                   : "transparent")
                     }
                 }
             }
@@ -289,7 +298,7 @@ Item {
 
         contentItem: Text {
             text: timelineToolbarToggle.text
-            color: "#eaf7ff"
+            color: theme.toolbarToggleText
             font: timelineToolbarToggle.font
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
@@ -298,10 +307,12 @@ Item {
         background: Rectangle {
             radius: 8
             color: timelineToolbarToggle.down
-                ? "#27476d"
-                : (timelineToolbarToggle.hovered ? "#315881" : "#1a3352")
+                ? theme.toolbarToggleBackgroundPressed
+                : (timelineToolbarToggle.hovered
+                       ? theme.toolbarToggleBackgroundHover
+                       : theme.toolbarToggleBackground)
             border.width: 1
-            border.color: "#6fbde6"
+            border.color: theme.toolbarToggleBorder
         }
     }
 }

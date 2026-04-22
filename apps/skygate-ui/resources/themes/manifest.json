@@ -1,0 +1,13 @@
+{
+    "defaultThemeId": "default",
+    "themes": [
+        {
+            "id": "default",
+            "resourcePath": ":/themes/default.json"
+        },
+        {
+            "id": "night-vision",
+            "resourcePath": ":/themes/night-vision.json"
+        }
+    ]
+}
