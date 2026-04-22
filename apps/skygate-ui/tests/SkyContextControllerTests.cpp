@@ -134,9 +134,13 @@ private slots:
     void invalidSavedCityFallsBackToCustom();
     void defaultsLocationSourceByPositioningAvailability();
     void setUtcDateTimeTextAppliesAtomically();
+    void setUtcDateTimeTextAcceptsBceInput();
+    void bceAliasesResolveToTheSameInstant();
     void invalidUtcDateTimeInputLeavesTimelineUnchanged();
+    void invalidYearZeroUtcDateTimeIsRejected();
     void manualUtcApplyPausesLivePlayback();
     void manualTimelineSteppingStillWorks();
+    void manualTimelineSteppingCrossesBceBoundaryWithoutYearZero();
     void livePlaybackUsesManualStepWhileCatchingUp();
     void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
     void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
@@ -276,6 +280,33 @@ void SkyContextControllerTests::setUtcDateTimeTextAppliesAtomically()
     );
 }
 
+void SkyContextControllerTests::setUtcDateTimeTextAcceptsBceInput()
+{
+    const auto controller = createController();
+    controller->setLive(false);
+
+    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+    QCOMPARE(controller->utcDateText(), QString("0044-03-15 BCE"));
+    QCOMPARE(controller->utcTimeText(), QString("12:00:00"));
+    QCOMPARE(controllerUtcTime(*controller).date(), QDate(-44, 3, 15));
+}
+
+void SkyContextControllerTests::bceAliasesResolveToTheSameInstant()
+{
+    const auto bcController = createController();
+    bcController->setLive(false);
+    QVERIFY(bcController->setUtcDateTimeText("0044-03-15 BC", "12:00:00"));
+
+    const auto bceController = createController();
+    bceController->setLive(false);
+    QVERIFY(bceController->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+
+    QCOMPARE(
+        controllerUtcTime(*bcController).toSecsSinceEpoch(),
+        controllerUtcTime(*bceController).toSecsSinceEpoch()
+    );
+}
+
 void SkyContextControllerTests::invalidUtcDateTimeInputLeavesTimelineUnchanged()
 {
     const auto controller = createController();
@@ -287,6 +318,21 @@ void SkyContextControllerTests::invalidUtcDateTimeInputLeavesTimelineUnchanged()
 
     QCOMPARE(controller->utcDateText(), QString("2026-01-02"));
     QCOMPARE(controller->utcTimeText(), QString("03:04:05"));
+    QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), beforeSeconds);
+}
+
+void SkyContextControllerTests::invalidYearZeroUtcDateTimeIsRejected()
+{
+    const auto controller = createController();
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("2026-01-02", "03:04:05"));
+
+    const qint64 beforeSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QCOMPARE(
+        controller->validateUtcDateTimeText("0000-01-01", "00:00:00"),
+        QString("Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE.")
+    );
+    QVERIFY(!controller->setUtcDateTimeText("0000-01-01", "00:00:00"));
     QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), beforeSeconds);
 }
 
@@ -315,6 +361,22 @@ void SkyContextControllerTests::manualTimelineSteppingStillWorks()
 
     QCOMPARE(afterStepForwardSeconds - beforeSeconds, 60);
     QCOMPARE(afterStepBackwardSeconds, beforeSeconds);
+}
+
+void SkyContextControllerTests::manualTimelineSteppingCrossesBceBoundaryWithoutYearZero()
+{
+    const auto controller = createController();
+    controller->setLive(false);
+    controller->setStepSeconds(60);
+    QVERIFY(controller->setUtcDateTimeText("0001-12-31 BCE", "23:59:30"));
+
+    controller->stepForward();
+    QCOMPARE(controller->utcDateText(), QString("0001-01-01"));
+    QCOMPARE(controller->utcTimeText(), QString("00:00:30"));
+
+    controller->stepBackward();
+    QCOMPARE(controller->utcDateText(), QString("0001-12-31 BCE"));
+    QCOMPARE(controller->utcTimeText(), QString("23:59:30"));
 }
 
 void SkyContextControllerTests::livePlaybackUsesManualStepWhileCatchingUp()

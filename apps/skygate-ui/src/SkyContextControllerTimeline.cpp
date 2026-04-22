@@ -3,9 +3,6 @@
 #include "SkyContextControllerSupport.hpp"
 
 #include <QCoreApplication>
-#include <QDate>
-#include <QTime>
-#include <QTimeZone>
 
 #include "skygate/core/ProjectionFactory.hpp"
 #include "skygate/core/SystemTimeSource.hpp"
@@ -209,28 +206,25 @@ void SkyContextController::stepBackward()
     stepBySeconds(-m_stepSeconds);
 }
 
+QString SkyContextController::validateUtcDateTimeText(
+    const QString& utcDateText,
+    const QString& utcTimeText
+) const
+{
+    return SkyContextUtcDateTimeTextCodec::parse(utcDateText, utcTimeText).errorText;
+}
+
 bool SkyContextController::setUtcDateTimeText(
     const QString& utcDateText,
     const QString& utcTimeText
 )
 {
-    const auto date = QDate::fromString(utcDateText.trimmed(), "yyyy-MM-dd");
-    if (!date.isValid()) {
+    const auto parseResult = SkyContextUtcDateTimeTextCodec::parse(utcDateText, utcTimeText);
+    if (!parseResult.isValid()) {
         return false;
     }
 
-    const auto time = QTime::fromString(utcTimeText.trimmed(), "HH:mm:ss");
-    if (!time.isValid()) {
-        return false;
-    }
-
-    const QDateTime nextUtc(
-        date,
-        time,
-        QTimeZone::UTC
-    );
-
-    setCurrentUtc(nextUtc);
+    setCurrentUtc(parseResult.utcDateTime);
     setLive(false);
     return true;
 }

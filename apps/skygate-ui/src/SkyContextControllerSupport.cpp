@@ -1,12 +1,43 @@
 #include "SkyContextControllerSupport.hpp"
 
+#include <QDate>
 #include <QDir>
+#include <QRegularExpression>
 #include <QStandardPaths>
+#include <QTime>
 #include <QTimeZone>
 
 #include <algorithm>
 
 namespace skygate::ui::internal {
+namespace {
+
+const QRegularExpression& utcDateInputPattern()
+{
+    static const QRegularExpression pattern(
+        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)",
+        QRegularExpression::CaseInsensitiveOption
+    );
+    return pattern;
+}
+
+QString formatDateText(const QDate& date)
+{
+    const int year = date.year();
+    const qint64 displayYear = year < 0
+        ? -static_cast<qint64>(year)
+        : static_cast<qint64>(year);
+    const QString yearText = QString::number(displayYear).rightJustified(4, '0');
+    const QString dateText = QString("%1-%2-%3")
+        .arg(yearText)
+        .arg(date.month(), 2, 10, QChar('0'))
+        .arg(date.day(), 2, 10, QChar('0'));
+    return year < 0
+        ? QString("%1 BCE").arg(dateText)
+        : dateText;
+}
+
+}  // namespace
 
 QString SkyContextTextFormatter::formatCoordinate(const double value)
 {
@@ -125,6 +156,83 @@ QDateTime SkyContextTimeCodec::toQDateTimeUtc(const skygate::core::UtcTimePoint&
 skygate::core::UtcTimePoint SkyContextTimeCodec::toUtcTimePoint(const QDateTime& utcTime)
 {
     return skygate::core::UtcTimePoint(std::chrono::seconds(utcTime.toSecsSinceEpoch()));
+}
+
+bool SkyContextUtcDateTimeTextCodec::ParseResult::isValid() const noexcept
+{
+    return utcDateTime.isValid() && errorText.isEmpty();
+}
+
+SkyContextUtcDateTimeTextCodec::ParseResult SkyContextUtcDateTimeTextCodec::parse(
+    const QString& utcDateText,
+    const QString& utcTimeText
+)
+{
+    const QRegularExpressionMatch dateMatch = utcDateInputPattern().match(utcDateText.trimmed());
+    if (!dateMatch.hasMatch()) {
+        return {
+            .utcDateTime = {},
+            .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."
+        };
+    }
+
+    bool isValidYear = false;
+    const int yearMagnitude = dateMatch.captured(1).toInt(&isValidYear);
+    if (!isValidYear || yearMagnitude == 0) {
+        return {
+            .utcDateTime = {},
+            .errorText = "Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE."
+        };
+    }
+
+    bool isValidMonth = false;
+    const int month = dateMatch.captured(2).toInt(&isValidMonth);
+    bool isValidDay = false;
+    const int day = dateMatch.captured(3).toInt(&isValidDay);
+    if (!isValidMonth || !isValidDay) {
+        return {
+            .utcDateTime = {},
+            .errorText = "Enter a valid UTC date."
+        };
+    }
+
+    const bool isBce = !dateMatch.captured(4).isEmpty();
+    const int year = isBce
+        ? -yearMagnitude
+        : yearMagnitude;
+    const QDate date(year, month, day);
+    if (!date.isValid()) {
+        return {
+            .utcDateTime = {},
+            .errorText = "Enter a valid UTC date."
+        };
+    }
+
+    const QTime time = QTime::fromString(utcTimeText.trimmed(), "HH:mm:ss");
+    if (!time.isValid()) {
+        return {
+            .utcDateTime = {},
+            .errorText = "Use HH:mm:ss for the UTC time."
+        };
+    }
+
+    const QDateTime utcDateTime(date, time, QTimeZone::UTC);
+    if (!utcDateTime.isValid()) {
+        return {
+            .utcDateTime = {},
+            .errorText = "Enter a valid UTC date and time."
+        };
+    }
+
+    return {
+        .utcDateTime = utcDateTime,
+        .errorText = {}
+    };
+}
+
+QString SkyContextUtcDateTimeTextCodec::formatDate(const QDateTime& utcTime)
+{
+    return formatDateText(utcTime.date());
 }
 
 QString SkyContextSettings::key(const QString& name)

@@ -75,6 +75,22 @@ public:
     [[nodiscard]] static skygate::core::UtcTimePoint toUtcTimePoint(const QDateTime& utcTime);
 };
 
+class SkyContextUtcDateTimeTextCodec final {
+public:
+    struct ParseResult final {
+        QDateTime utcDateTime;
+        QString errorText;
+
+        [[nodiscard]] bool isValid() const noexcept;
+    };
+
+    [[nodiscard]] static ParseResult parse(
+        const QString& utcDateText,
+        const QString& utcTimeText
+    );
+    [[nodiscard]] static QString formatDate(const QDateTime& utcTime);
+};
+
 class SkyContextSettings final {
 public:
     [[nodiscard]] static QString key(const QString& name);

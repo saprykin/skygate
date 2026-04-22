@@ -164,7 +164,9 @@ QString SkyContextController::utcTimeText() const
 
 QString SkyContextController::utcDateText() const
 {
-    return SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toString("yyyy-MM-dd");
+    return SkyContextUtcDateTimeTextCodec::formatDate(
+        SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime)
+    );
 }
 
 QString SkyContextController::latitudeText() const

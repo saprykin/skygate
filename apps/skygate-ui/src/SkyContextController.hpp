@@ -163,6 +163,10 @@ public:
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
+    Q_INVOKABLE QString validateUtcDateTimeText(
+        const QString& utcDateText,
+        const QString& utcTimeText
+    ) const;
     Q_INVOKABLE bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);

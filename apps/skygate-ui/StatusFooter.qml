@@ -49,7 +49,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
-        width: 210
+        width: 280
         height: footerRoot.height
 
         Label {
@@ -63,6 +63,7 @@ Rectangle {
                   + " UTC"
             color: "#d7e3ff"
             font.family: "Menlo"
+            elide: Text.ElideLeft
             z: 1
         }
 

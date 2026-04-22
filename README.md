@@ -8,6 +8,7 @@ that renders stars, constellations, the horizon, and overlay labels.
 
 - Interactive sky map with pan, zoom, hover, and label overlays
 - Time playback controls with pause, step, and speed adjustment
+- Fixed UTC popup accepts BCE/BC dates using proleptic Gregorian years
 - Multiple projections: `Stereographic`,
   `AzimuthalEquidistant`, and `Perspective`
 - Observer location from current device, bundled city catalog, or
@@ -15,6 +16,11 @@ that renders stars, constellations, the horizon, and overlay labels.
 - Bundled starter catalog plus support for downloading HYG v4.2 stars
   and Stellarium constellation data
 - Persistent settings and cached catalog data between launches
+
+Ancient dates are intended for exploratory viewing. The date input uses a
+proleptic Gregorian calendar, and the current Sun, Moon, and planet formulas
+are lightweight approximations around J2000 rather than historical-astronomy
+grade ephemerides for the far past.
 
 ## Repository Layout
 

@@ -13,6 +13,7 @@ class SkySettingsStoreTests final : public QObject {
 private slots:
     void initTestCase();
     void savesAndLoadsStateSnapshot();
+    void savesAndLoadsNegativeUtcEpochSeconds();
     void savesLoadsAndClearsCatalogCache();
 
 private:
@@ -69,6 +70,21 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
+}
+
+void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
+{
+    QSettings settings;
+    settings.clear();
+
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot savedSnapshot;
+    savedSnapshot.utcEpochSeconds = -63'555'595'200LL;
+
+    QVERIFY(store.saveState(savedSnapshot));
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
 }
 
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()

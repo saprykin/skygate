@@ -11,8 +11,7 @@ FocusScope {
     property string errorText: ""
     property real popupRightMargin: 8
     property real popupBottomMargin: 56
-    readonly property bool hasStructuredInput: /^\d{4}-\d{2}-\d{2}$/.test(stagedDateText.trim())
-                                               && /^\d{2}:\d{2}:\d{2}$/.test(stagedTimeText.trim())
+    readonly property bool hasInput: stagedDateText.trim() !== "" && stagedTimeText.trim() !== ""
 
     anchors.fill: parent
     visible: opened
@@ -37,8 +36,12 @@ FocusScope {
     }
 
     function applyChanges() {
-        if (!hasStructuredInput) {
-            errorText = "Use YYYY-MM-DD and HH:mm:ss."
+        const validationError = skyContextController.validateUtcDateTimeText(
+            stagedDateText,
+            stagedTimeText
+        )
+        if (validationError !== "") {
+            errorText = validationError
             return
         }
 
@@ -63,7 +66,7 @@ FocusScope {
         anchors.bottom: parent.bottom
         anchors.rightMargin: dateTimePopup.popupRightMargin
         anchors.bottomMargin: dateTimePopup.popupBottomMargin
-        width: 286
+        width: 348
         radius: 10
         color: "#1d2138"
         border.width: 1
@@ -93,7 +96,7 @@ FocusScope {
 
             Label {
                 Layout.fillWidth: true
-                text: "Applies a fixed UTC until you jump back to Now."
+                text: "Applies a fixed UTC until you jump back to Now. BCE dates use proleptic Gregorian years."
                 color: "#9ca3c5"
                 font.family: "Avenir Next"
                 font.pixelSize: 10
@@ -110,7 +113,7 @@ FocusScope {
             PreferencesTextField {
                 id: dateField
                 Layout.fillWidth: true
-                placeholderText: "YYYY-MM-DD"
+                placeholderText: "YYYY-MM-DD or YYYY-MM-DD BCE"
 
                 Binding on text {
                     when: !dateField.activeFocus
@@ -185,7 +188,7 @@ FocusScope {
                     width: 86
                     primary: true
                     text: "Apply"
-                    enabled: dateTimePopup.hasStructuredInput
+                    enabled: dateTimePopup.hasInput
                     onClicked: dateTimePopup.applyChanges()
                 }
             }
