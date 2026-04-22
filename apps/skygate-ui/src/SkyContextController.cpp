@@ -2,6 +2,7 @@
 
 #include "LocationCatalogModel.hpp"
 #include "SkyCatalogManager.hpp"
+#include "SkyObjectSearchModel.hpp"
 #include "SkySettingsStore.hpp"
 
 #include <QDateTime>
@@ -46,6 +47,7 @@ SkyContextController::SkyContextController(
           std::move(ephemerisEngine),
           this
       ))
+    , m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
     connect(
         m_catalogManager.get(),
@@ -75,8 +77,13 @@ SkyContextController::SkyContextController(
         m_catalogManager.get(),
         &SkyCatalogManager::catalogChanged,
         this,
-        &SkyContextController::skyContextChanged
+        [this] {
+            refreshObjectSearchModel();
+            emit catalogDataChanged();
+            emit skyContextChanged();
+        }
     );
+    refreshObjectSearchModel();
 
     m_projection = skygate::core::createProjection(m_projectionType);
     const skygate::core::SystemTimeSource systemTimeSource;
@@ -104,6 +111,16 @@ SkyContextController::~SkyContextController() = default;
 bool SkyContextController::live() const noexcept
 {
     return m_live;
+}
+
+QString SkyContextController::selectedSearchTargetKind() const
+{
+    return m_selectedSearchTargetKind;
+}
+
+QString SkyContextController::selectedSearchTargetId() const
+{
+    return m_selectedSearchTargetId;
 }
 
 double SkyContextController::speedMultiplier() const noexcept
@@ -256,6 +273,30 @@ void SkyContextController::updateLocationStatusText()
     }
 }
 
+void SkyContextController::setSelectedSearchTarget(
+    const QString& targetKind,
+    const QString& targetId
+)
+{
+    const QString normalizedTargetKind = targetKind.trimmed();
+    const QString normalizedTargetId = targetId.trimmed();
+    if (
+        m_selectedSearchTargetKind == normalizedTargetKind
+        && m_selectedSearchTargetId == normalizedTargetId
+    ) {
+        return;
+    }
+
+    m_selectedSearchTargetKind = normalizedTargetKind;
+    m_selectedSearchTargetId = normalizedTargetId;
+    emit selectedSearchTargetChanged();
+}
+
+void SkyContextController::clearSelectedSearchTarget()
+{
+    setSelectedSearchTarget(QString(), QString());
+}
+
 QString SkyContextController::catalogStatusText() const
 {
     return m_catalogManager != nullptr ? m_catalogManager->statusText() : QString();
@@ -264,6 +305,11 @@ QString SkyContextController::catalogStatusText() const
 QString SkyContextController::catalogDatasetInfoText() const
 {
     return m_catalogManager != nullptr ? m_catalogManager->datasetInfoText() : QString();
+}
+
+QAbstractItemModel* SkyContextController::objectSearchModel() const noexcept
+{
+    return m_objectSearchModel.get();
 }
 
 bool SkyContextController::downloadingCatalog() const noexcept
@@ -316,6 +362,14 @@ const skygate::ephemeris::IEphemerisEngine* SkyContextController::ephemerisEngin
     return m_catalogManager != nullptr ? m_catalogManager->ephemerisEngine() : nullptr;
 }
 
+std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalogBodies() const noexcept
+{
+    const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
+    return starCatalog != nullptr
+        ? starCatalog->bodies()
+        : std::span<const skygate::ephemeris::CelestialBody> {};
+}
+
 std::span<const SkyContextController::ConstellationLineRef>
 SkyContextController::constellationLineRefs() const noexcept
 {
@@ -335,6 +389,15 @@ SkyContextController::constellationLabelRefs() const noexcept
 int SkyContextController::catalogPresetIndex() const noexcept
 {
     return m_catalogManager != nullptr ? m_catalogManager->catalogPresetIndex() : 0;
+}
+
+void SkyContextController::refreshObjectSearchModel()
+{
+    if (m_objectSearchModel == nullptr) {
+        return;
+    }
+
+    m_objectSearchModel->setCatalogData(catalogBodies(), constellationLabelRefs());
 }
 
 void SkyContextController::setCatalogPresetIndex(const int catalogPresetIndex)

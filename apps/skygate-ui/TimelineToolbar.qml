@@ -4,8 +4,11 @@ import QtQuick.Controls
 Item {
     id: toolbarRoot
     required property var skyContextController
+    property var onRequestExpand: null
     property alias panelItem: timelineToolbarPanel
     property alias toggleItem: timelineToolbarToggle
+    readonly property real expandedTotalWidth: timelineToolbarToggle.implicitWidth
+        + timelineToolbarPanel.expandedWidth + 6
 
     readonly property var speedValues: [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
     readonly property var stepValues: [1, 10, 60, 300, 3600]
@@ -277,9 +280,15 @@ Item {
         font.pixelSize: 12
         font.weight: Font.DemiBold
         z: 11
-        onClicked: skyContextController.setTimelineToolbarCollapsed(
-            !skyContextController.timelineToolbarCollapsed
-        )
+        onClicked: {
+            if (skyContextController.timelineToolbarCollapsed && toolbarRoot.onRequestExpand) {
+                toolbarRoot.onRequestExpand()
+            }
+
+            skyContextController.setTimelineToolbarCollapsed(
+                !skyContextController.timelineToolbarCollapsed
+            )
+        }
         ToolTip.visible: hovered
         ToolTip.delay: 250
         ToolTip.text: timelineToolbarPanel.collapsed

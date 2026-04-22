@@ -3,8 +3,11 @@
 #include "SkyContextController.hpp"
 
 #include <QColor>
+#include <QPointF>
 #include <QVariantMap>
 
+#include "skygate/core/math/AngleMath.hpp"
+#include "skygate/core/math/ProjectionMath.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 
 #include <array>
@@ -57,6 +60,130 @@ QColor cardinalColor(const double azimuthDeg)
     return QColor(168, 233, 200);
 }
 
+QString normalizedLookupKey(const QString& value)
+{
+    return value.trimmed().toCaseFolded();
+}
+
+QString normalizedLookupKey(const std::string& value)
+{
+    return normalizedLookupKey(QString::fromStdString(value));
+}
+
+bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
+{
+    return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
+}
+
+QVariantMap selectionMarkerEntry(
+    const double x,
+    const double y
+)
+{
+    QVariantMap entry;
+    entry.insert("kind", "searchSelection");
+    entry.insert("x", x);
+    entry.insert("y", y);
+    return entry;
+}
+
+std::optional<QPointF> selectedBodyPoint(
+    const skygate::ephemeris::SkySnapshot& snapshot,
+    const QHash<QString, std::size_t>& stateIndexByBodyId,
+    const skygate::core::PreparedProjection& preparedProjection,
+    const QString& targetId
+)
+{
+    const QString normalizedTargetId = normalizedLookupKey(targetId);
+    const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedTargetId);
+    if (stateIndexIt == stateIndexByBodyId.cend()) {
+        return std::nullopt;
+    }
+
+    const auto& state = snapshot.states.at(*stateIndexIt);
+    if (!hasFiniteHorizontal(state.horizontal)) {
+        return std::nullopt;
+    }
+
+    const auto projected = preparedProjection.project(state.horizontal);
+    if (!projected.isVisible) {
+        return std::nullopt;
+    }
+
+    return QPointF(projected.x, projected.y);
+}
+
+std::optional<QPointF> selectedConstellationPoint(
+    const skygate::ephemeris::SkySnapshot& snapshot,
+    const QHash<QString, std::size_t>& stateIndexByBodyId,
+    const skygate::core::PreparedProjection& preparedProjection,
+    const std::span<const SkyContextController::ConstellationLabelRef> labelRefs,
+    const QString& targetId
+)
+{
+    const QString normalizedTargetId = normalizedLookupKey(targetId);
+    const auto labelRefIt = std::find_if(
+        labelRefs.begin(),
+        labelRefs.end(),
+        [&normalizedTargetId](const SkyContextController::ConstellationLabelRef& labelRef) {
+            return normalizedLookupKey(labelRef.first) == normalizedTargetId;
+        }
+    );
+    if (labelRefIt == labelRefs.end()) {
+        return std::nullopt;
+    }
+
+    skygate::core::ProjectionMath::Vec3 sum {0.0, 0.0, 0.0};
+    int validAnchorCount = 0;
+    for (const std::string& hipId : labelRefIt->second) {
+        const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedLookupKey(hipId));
+        if (stateIndexIt == stateIndexByBodyId.cend()) {
+            continue;
+        }
+
+        const auto& state = snapshot.states.at(*stateIndexIt);
+        if (!hasFiniteHorizontal(state.horizontal)) {
+            continue;
+        }
+
+        const auto vector = skygate::core::ProjectionMath::horizontalToUnitVector(
+            state.horizontal
+        );
+        sum[0] += vector[0];
+        sum[1] += vector[1];
+        sum[2] += vector[2];
+        ++validAnchorCount;
+    }
+
+    if (validAnchorCount == 0) {
+        return std::nullopt;
+    }
+
+    const auto normalizedVector = skygate::core::ProjectionMath::normalize(sum);
+    if (skygate::core::ProjectionMath::length(normalizedVector) <= 0.0) {
+        return std::nullopt;
+    }
+
+    const skygate::core::HorizontalCoordinate center {
+        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(
+            normalizedVector[2],
+            -1.0,
+            1.0
+        ))),
+        .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
+            skygate::core::AngleMath::toDegrees(
+                std::atan2(normalizedVector[0], normalizedVector[1])
+            )
+        )
+    };
+    const auto projected = preparedProjection.project(center);
+    if (!projected.isVisible) {
+        return std::nullopt;
+    }
+
+    return QPointF(projected.x, projected.y);
+}
+
 }  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent)
@@ -90,6 +217,12 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             this,
             &SkySceneModel::rebuildSceneFrame
         );
+        m_selectedSearchTargetChangedConnection = connect(
+            m_skyContextController,
+            &SkyContextController::selectedSearchTargetChanged,
+            this,
+            &SkySceneModel::rebuildSceneFrame
+        );
     }
 
     emit skyContextControllerChanged();
@@ -99,6 +232,11 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
 QVariantList SkySceneModel::overlayItems() const
 {
     return m_sceneFrame.overlayItems;
+}
+
+QVariantMap SkySceneModel::selectionMarker() const
+{
+    return m_sceneFrame.selectionMarker;
 }
 
 std::uint64_t SkySceneModel::snapshotGeneration() const noexcept
@@ -199,8 +337,12 @@ void SkySceneModel::disconnectFromContextController()
     if (m_skyContextChangedConnection) {
         disconnect(m_skyContextChangedConnection);
     }
+    if (m_selectedSearchTargetChangedConnection) {
+        disconnect(m_selectedSearchTargetChangedConnection);
+    }
 
     m_skyContextChangedConnection = {};
+    m_selectedSearchTargetChangedConnection = {};
 }
 
 bool SkySceneModel::clearSceneFrame()
@@ -209,7 +351,8 @@ bool SkySceneModel::clearSceneFrame()
         || m_sceneFrame.snapshot.catalogBodies != nullptr
         || !m_sceneFrame.frame.points.empty()
         || !m_sceneFrame.frame.lines.empty()
-        || !m_sceneFrame.overlayItems.isEmpty();
+        || !m_sceneFrame.overlayItems.isEmpty()
+        || !m_sceneFrame.selectionMarker.isEmpty();
     m_cachedEphemerisEngine = nullptr;
     m_snapshotCacheKey.reset();
     m_renderFrameKey.reset();
@@ -271,6 +414,13 @@ void SkySceneModel::rebuildSceneFrame()
         || !m_snapshotCacheKey.value().equals(snapshotKey)
     ) {
         m_sceneFrame.snapshot = ephemerisEngine->compute(skyContext);
+        m_sceneFrame.stateIndexByBodyId.clear();
+        m_sceneFrame.stateIndexByBodyId.reserve(static_cast<qsizetype>(m_sceneFrame.snapshot.states.size()));
+        for (std::size_t stateIndex = 0; stateIndex < m_sceneFrame.snapshot.states.size(); ++stateIndex) {
+            const auto& state = m_sceneFrame.snapshot.states[stateIndex];
+            const auto& body = m_sceneFrame.snapshot.bodyAt(state.bodyIndex);
+            m_sceneFrame.stateIndexByBodyId.insert(normalizedLookupKey(body.id), stateIndex);
+        }
         m_cachedEphemerisEngine = ephemerisEngine;
         m_snapshotCacheKey = snapshotKey;
         m_renderFrameKey.reset();
@@ -319,6 +469,7 @@ void SkySceneModel::rebuildSceneFrame()
         }
 
         m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame);
+        m_sceneFrame.selectionMarker = buildSelectionMarker(m_sceneFrame);
         m_renderFrameKey = renderFrameKey;
         sceneFrameUpdated = true;
     }
@@ -359,4 +510,44 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
     }
 
     return overlayItems;
+}
+
+QVariantMap SkySceneModel::buildSelectionMarker(const SceneFrameData& sceneFrame) const
+{
+    if (
+        m_skyContextController == nullptr
+        || !sceneFrame.preparedProjection.has_value()
+    ) {
+        return {};
+    }
+
+    const QString targetKind = m_skyContextController->selectedSearchTargetKind();
+    const QString targetId = m_skyContextController->selectedSearchTargetId();
+    if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
+        return {};
+    }
+
+    std::optional<QPointF> markerPoint;
+    if (normalizedLookupKey(targetKind) == "body") {
+        markerPoint = selectedBodyPoint(
+            sceneFrame.snapshot,
+            sceneFrame.stateIndexByBodyId,
+            *sceneFrame.preparedProjection,
+            targetId
+        );
+    } else if (normalizedLookupKey(targetKind) == "constellationlabel") {
+        markerPoint = selectedConstellationPoint(
+            sceneFrame.snapshot,
+            sceneFrame.stateIndexByBodyId,
+            *sceneFrame.preparedProjection,
+            m_skyContextController->constellationLabelRefs(),
+            targetId
+        );
+    }
+
+    if (!markerPoint.has_value()) {
+        return {};
+    }
+
+    return selectionMarkerEntry(markerPoint->x(), markerPoint->y());
 }

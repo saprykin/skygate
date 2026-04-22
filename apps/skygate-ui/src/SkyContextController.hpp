@@ -25,6 +25,7 @@ class QGeoPositionInfo;
 class QGeoPositionInfoSource;
 class LocationCatalogModel;
 class SkyCatalogManager;
+class SkyObjectSearchModel;
 class SkySettingsStore;
 
 class SkyContextController final : public QObject {
@@ -37,6 +38,12 @@ class SkyContextController final : public QObject {
         READ timelineToolbarCollapsed
         WRITE setTimelineToolbarCollapsed
         NOTIFY timelineToolbarCollapsedChanged
+    )
+    Q_PROPERTY(
+        bool searchToolbarCollapsed
+        READ searchToolbarCollapsed
+        WRITE setSearchToolbarCollapsed
+        NOTIFY searchToolbarCollapsedChanged
     )
     Q_PROPERTY(double speedMultiplier READ speedMultiplier WRITE setSpeedMultiplier NOTIFY speedMultiplierChanged)
     Q_PROPERTY(int stepSeconds READ stepSeconds WRITE setStepSeconds NOTIFY stepSecondsChanged)
@@ -71,8 +78,19 @@ class SkyContextController final : public QObject {
         READ catalogDatasetInfoText
         NOTIFY catalogDatasetInfoTextChanged
     )
+    Q_PROPERTY(QAbstractItemModel* objectSearchModel READ objectSearchModel CONSTANT)
     Q_PROPERTY(bool downloadingCatalog READ downloadingCatalog NOTIFY downloadingCatalogChanged)
     Q_PROPERTY(bool catalogProcessing READ catalogProcessing NOTIFY catalogProcessingChanged)
+    Q_PROPERTY(
+        QString selectedSearchTargetKind
+        READ selectedSearchTargetKind
+        NOTIFY selectedSearchTargetChanged
+    )
+    Q_PROPERTY(
+        QString selectedSearchTargetId
+        READ selectedSearchTargetId
+        NOTIFY selectedSearchTargetChanged
+    )
     Q_PROPERTY(QString skyContextSummary READ skyContextSummary NOTIFY skyContextChanged)
 
 public:
@@ -102,6 +120,7 @@ public:
     [[nodiscard]] bool utcDateLocked() const noexcept;
     [[nodiscard]] bool utcTimeLocked() const noexcept;
     [[nodiscard]] bool timelineToolbarCollapsed() const noexcept;
+    [[nodiscard]] bool searchToolbarCollapsed() const noexcept;
     [[nodiscard]] double speedMultiplier() const noexcept;
     [[nodiscard]] int stepSeconds() const noexcept;
     [[nodiscard]] double magnitudeCutoff() const noexcept;
@@ -122,14 +141,18 @@ public:
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
+    [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
     [[nodiscard]] bool downloadingCatalog() const noexcept;
     [[nodiscard]] bool catalogProcessing() const noexcept;
+    [[nodiscard]] QString selectedSearchTargetKind() const;
+    [[nodiscard]] QString selectedSearchTargetId() const;
     [[nodiscard]] QString skyContextSummary() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
     [[nodiscard]] skygate::core::ProjectionType projectionType() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
+    [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
 
@@ -137,6 +160,7 @@ public:
     Q_INVOKABLE void setUtcDateLocked(bool utcDateLocked);
     Q_INVOKABLE void setUtcTimeLocked(bool utcTimeLocked);
     Q_INVOKABLE void setTimelineToolbarCollapsed(bool timelineToolbarCollapsed);
+    Q_INVOKABLE void setSearchToolbarCollapsed(bool searchToolbarCollapsed);
     Q_INVOKABLE void togglePlayPause();
     Q_INVOKABLE void setSpeedMultiplier(double speedMultiplier);
     Q_INVOKABLE void setStepSeconds(int stepSeconds);
@@ -167,12 +191,15 @@ public:
     Q_INVOKABLE void setCatalogPresetIndex(int catalogPresetIndex);
     Q_INVOKABLE QString catalogUrlText() const;
     Q_INVOKABLE void setCatalogUrlText(const QString& catalogUrlText);
+    Q_INVOKABLE bool focusSearchTarget(const QString& targetKind, const QString& targetId);
+    Q_INVOKABLE void clearSelectedSearchTarget();
 
 signals:
     void liveChanged();
     void utcDateLockedChanged();
     void utcTimeLockedChanged();
     void timelineToolbarCollapsedChanged();
+    void searchToolbarCollapsedChanged();
     void speedMultiplierChanged();
     void stepSecondsChanged();
     void magnitudeCutoffChanged();
@@ -196,6 +223,8 @@ signals:
     void catalogDatasetInfoTextChanged();
     void downloadingCatalogChanged();
     void catalogProcessingChanged();
+    void selectedSearchTargetChanged();
+    void catalogDataChanged();
     void skyContextChanged();
 
 private:
@@ -212,12 +241,15 @@ private:
     void setLocationStatusText(const QString& locationStatusText);
     void updateLocationStatusText();
     void setProjectionType(skygate::core::ProjectionType projectionType);
+    void refreshObjectSearchModel();
+    void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
 
 private:
     bool m_live = true;
     bool m_utcDateLocked = true;
     bool m_utcTimeLocked = true;
     bool m_timelineToolbarCollapsed = false;
+    bool m_searchToolbarCollapsed = false;
     bool m_catchingUpToCurrentUtc = false;
     double m_speedMultiplier = 1.0;
     double m_speedRemainderSeconds = 0.0;
@@ -235,9 +267,12 @@ private:
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
+    std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     QString m_locationStatusText;
     QString m_selectedCityId;
     QString m_selectedCityDisplayText;
+    QString m_selectedSearchTargetKind;
+    QString m_selectedSearchTargetId;
     QGeoPositionInfoSource* m_positionSource = nullptr;
     bool m_positionSourceConnected = false;
 };

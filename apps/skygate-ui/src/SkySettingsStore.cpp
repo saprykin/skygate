@@ -24,6 +24,10 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         SkyContextSettings::key("timelineToolbarCollapsed"),
         snapshot.timelineToolbarCollapsed
     );
+    settings.setValue(
+        SkyContextSettings::key("searchToolbarCollapsed"),
+        snapshot.searchToolbarCollapsed
+    );
     settings.setValue(SkyContextSettings::key("speedMultiplier"), snapshot.speedMultiplier);
     settings.setValue(SkyContextSettings::key("stepSeconds"), snapshot.stepSeconds);
     settings.setValue(SkyContextSettings::key("magnitudeCutoff"), snapshot.magnitudeCutoff);
@@ -81,6 +85,10 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
     snapshot.timelineToolbarCollapsed = settings.value(
         SkyContextSettings::key("timelineToolbarCollapsed"),
         snapshot.timelineToolbarCollapsed
+    ).toBool();
+    snapshot.searchToolbarCollapsed = settings.value(
+        SkyContextSettings::key("searchToolbarCollapsed"),
+        snapshot.searchToolbarCollapsed
     ).toBool();
     snapshot.speedMultiplier = settings.value(
         SkyContextSettings::key("speedMultiplier"),

@@ -47,6 +47,30 @@ ApplicationWindow {
         skyContextController: skyContext
     }
 
+    function topToolbarExpandedBounds() {
+        return {
+            searchRight: searchToolbar.x + searchToolbar.expandedTotalWidth,
+            timelineLeft: timelineToolbar.x
+        }
+    }
+
+    function expandedToolbarsWouldOverlap() {
+        const bounds = topToolbarExpandedBounds()
+        return bounds.searchRight > bounds.timelineLeft
+    }
+
+    function prepareSearchToolbarExpand() {
+        if (!skyContext.timelineToolbarCollapsed && expandedToolbarsWouldOverlap()) {
+            skyContext.setTimelineToolbarCollapsed(true)
+        }
+    }
+
+    function prepareTimelineToolbarExpand() {
+        if (!skyContext.searchToolbarCollapsed && expandedToolbarsWouldOverlap()) {
+            skyContext.setSearchToolbarCollapsed(true)
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
@@ -67,20 +91,35 @@ ApplicationWindow {
             skySceneModel: skyScene
         }
 
+        SearchToolbar {
+            id: searchToolbar
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.margins: 14
+            skyContextController: skyContext
+            onRequestExpand: root.prepareSearchToolbarExpand
+        }
+
         TimelineToolbar {
             id: timelineToolbar
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.margins: 14
             skyContextController: skyContext
+            onRequestExpand: root.prepareTimelineToolbarExpand
         }
 
         SkyOverlayLayer {
             anchors.fill: parent
             sceneModel: skyScene
             interactionLayer: interactionLayer
-            toolbarPanel: timelineToolbar.panelItem
-            toolbarToggle: timelineToolbar.toggleItem
+            avoidItems: [
+                searchToolbar.panelItem,
+                searchToolbar.toggleItem,
+                searchToolbar.dropdownItem,
+                timelineToolbar.panelItem,
+                timelineToolbar.toggleItem
+            ]
         }
     }
 }

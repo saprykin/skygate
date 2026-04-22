@@ -37,6 +37,7 @@ class SkySceneModelTests final : public QObject {
 private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
+    void showsSearchSelectionMarkerForFocusedBody();
 };
 
 void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
@@ -153,6 +154,56 @@ void SkySceneModelTests::reusesSnapshotAcrossViewChanges()
 
     controller.setUtcTimeText("22:30:00");
     QVERIFY(sceneModel.snapshotGeneration() > initialSnapshotGeneration);
+}
+
+void SkySceneModelTests::showsSearchSelectionMarkerForFocusedBody()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::CelestialBodyType::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    controller.setUtcDateLocked(false);
+    controller.setUtcTimeLocked(false);
+    controller.setUtcDateText("2024-06-01");
+    controller.setUtcTimeText("22:00:00");
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(controller.focusSearchTarget("body", "demo_target"));
+
+    const QVariantMap selectionMarker = sceneModel.selectionMarker();
+    QCOMPARE(selectionMarker.value("kind").toString(), QString("searchSelection"));
+    QVERIFY(selectionMarker.contains("x"));
+    QVERIFY(selectionMarker.contains("y"));
 }
 
 QTEST_GUILESS_MAIN(SkySceneModelTests)

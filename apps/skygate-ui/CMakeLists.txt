@@ -14,6 +14,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/CatalogCoordinator.hpp
     src/LocationCatalogModel.cpp
     src/LocationCatalogModel.hpp
+    src/SkyObjectSearchModel.cpp
+    src/SkyObjectSearchModel.hpp
     src/SkyCatalogManager.cpp
     src/SkyCatalogManager.hpp
     src/SkySceneModel.cpp
@@ -25,6 +27,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyContextController.cpp
     src/SkyContextController.hpp
     src/SkyContextControllerCatalog.cpp
+    src/SkyContextControllerSearch.cpp
     src/SkyRenderBuilders.cpp
     src/SkyRenderBuilders.hpp
     src/SkyContextControllerSettings.cpp
@@ -91,6 +94,7 @@ qt_add_qml_module(skygate-ui
         PreferencesCityPicker.qml
         PreferencesComboBox.qml
         PreferencesSectionButton.qml
+        SearchToolbar.qml
         SkyInteractionLayer.qml
         SkyOverlayLayer.qml
         SkySettingsDraft.qml

@@ -5,8 +5,8 @@ Item {
     id: overlayRoot
     required property var sceneModel
     required property var interactionLayer
-    required property Item toolbarPanel
-    required property Item toolbarToggle
+    required property var avoidItems
+    readonly property var selectionMarkerData: sceneModel.selectionMarker
 
     function rectsOverlap(firstX, firstY, firstWidth, firstHeight, secondX, secondY, secondWidth, secondHeight) {
         const firstRight = firstX + firstWidth
@@ -29,85 +29,87 @@ Item {
         }
     }
 
-    function overlapsTimelinePanel(itemX, itemY, itemWidth, itemHeight) {
+    function avoidItemRects() {
         const margin = 4
-        if (toolbarPanel.width > 1 && toolbarPanel.opacity > 0.05) {
-            const toolbarRect = itemRect(toolbarPanel)
+        const rects = []
+        if (!avoidItems) {
+            return rects
+        }
+
+        for (let index = 0; index < avoidItems.length; ++index) {
+            const item = avoidItems[index]
+            if (!item || !item.visible || item.width <= 1 || item.height <= 1) {
+                continue
+            }
+
+            const opacity = item.opacity !== undefined ? item.opacity : 1.0
+            if (opacity <= 0.05) {
+                continue
+            }
+
+            const rect = itemRect(item)
+            rects.push({
+                x: rect.x - margin,
+                y: rect.y - margin,
+                width: rect.width + (margin * 2),
+                height: rect.height + (margin * 2)
+            })
+        }
+
+        rects.sort(function(lhs, rhs) { return lhs.y - rhs.y })
+        return rects
+    }
+
+    function overlapsAvoidItems(itemX, itemY, itemWidth, itemHeight) {
+        const rects = avoidItemRects()
+        for (let index = 0; index < rects.length; ++index) {
+            const avoidRect = rects[index]
             if (
                 overlayRoot.rectsOverlap(
                     itemX,
                     itemY,
                     itemWidth,
                     itemHeight,
-                    toolbarRect.x - margin,
-                    toolbarRect.y - margin,
-                    toolbarRect.width + (margin * 2),
-                    toolbarRect.height + (margin * 2)
+                    avoidRect.x,
+                    avoidRect.y,
+                    avoidRect.width,
+                    avoidRect.height
                 )
             ) {
                 return true
             }
         }
 
-        const toggleRect = itemRect(toolbarToggle)
-        return toolbarToggle.visible
-            && overlayRoot.rectsOverlap(
-                itemX,
-                itemY,
-                itemWidth,
-                itemHeight,
-                toggleRect.x - margin,
-                toggleRect.y - margin,
-                toggleRect.width + (margin * 2),
-                toggleRect.height + (margin * 2)
-            )
+        return false
     }
 
-    function adjustedYToAvoidTimelinePanel(itemX, itemY, itemWidth, itemHeight) {
+    function adjustedYToAvoidItems(itemX, itemY, itemWidth, itemHeight) {
         let adjustedY = itemY
-        const margin = 4
+        const rects = avoidItemRects()
+        let changed = true
+        let iteration = 0
 
-        if (toolbarPanel.width > 1 && toolbarPanel.opacity > 0.05) {
-            const toolbarRect = itemRect(toolbarPanel)
-            const toolbarX = toolbarRect.x - margin
-            const toolbarY = toolbarRect.y - margin
-            const toolbarWidth = toolbarRect.width + (margin * 2)
-            const toolbarHeight = toolbarRect.height + (margin * 2)
-            if (
-                overlayRoot.rectsOverlap(
-                    itemX,
-                    adjustedY,
-                    itemWidth,
-                    itemHeight,
-                    toolbarX,
-                    toolbarY,
-                    toolbarWidth,
-                    toolbarHeight
-                )
-            ) {
-                adjustedY = toolbarY + toolbarHeight
+        while (changed && iteration <= rects.length) {
+            changed = false
+            ++iteration
+            for (let index = 0; index < rects.length; ++index) {
+                const avoidRect = rects[index]
+                if (
+                    overlayRoot.rectsOverlap(
+                        itemX,
+                        adjustedY,
+                        itemWidth,
+                        itemHeight,
+                        avoidRect.x,
+                        avoidRect.y,
+                        avoidRect.width,
+                        avoidRect.height
+                    )
+                ) {
+                    adjustedY = avoidRect.y + avoidRect.height
+                    changed = true
+                }
             }
-        }
-
-        const toggleRect = itemRect(toolbarToggle)
-        const toggleX = toggleRect.x - margin
-        const toggleY = toggleRect.y - margin
-        const toggleWidth = toggleRect.width + (margin * 2)
-        const toggleHeight = toggleRect.height + (margin * 2)
-        if (
-            toolbarToggle.visible
-            && overlayRoot.rectsOverlap(
-                itemX,
-                adjustedY,
-                itemWidth,
-                itemHeight,
-                toggleX,
-                toggleY,
-                toggleWidth,
-                toggleHeight
-            )
-        ) {
-            adjustedY = toggleY + toggleHeight
         }
 
         return adjustedY
@@ -136,39 +138,96 @@ Item {
         }
     }
 
+    Item {
+        id: searchSelectionMarker
+        visible: selectionMarkerData && selectionMarkerData.kind === "searchSelection"
+        x: (selectionMarkerData && selectionMarkerData.x !== undefined)
+            ? selectionMarkerData.x - (width * 0.5)
+            : 0
+        y: (selectionMarkerData && selectionMarkerData.y !== undefined)
+            ? selectionMarkerData.y - (height * 0.5)
+            : 0
+        width: 34
+        height: 34
+        z: 12
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width
+            height: parent.height
+            radius: width * 0.5
+            color: "#18ff4d4d"
+            border.width: 3
+            border.color: "#ff6b6b"
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width + 10
+            height: parent.height + 10
+            radius: width * 0.5
+            color: "transparent"
+            border.width: 2
+            border.color: "#66ff6b6b"
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 10
+            height: 10
+            radius: 5
+            color: "#ffb3b3"
+        }
+    }
+
     Repeater {
         model: sceneModel.overlayItems
 
-        delegate: Rectangle {
+        delegate: Item {
+            id: overlayDelegateRoot
             required property var modelData
             readonly property bool isCardinal: modelData.kind === "cardinal"
             readonly property color labelColor: modelData.color ? modelData.color : "#c9dcff"
-            readonly property real labelX: modelData.x - (width * 0.5)
-            readonly property real preferredY: modelData.y - height - 8
+            readonly property real labelWidth: overlayLabel.implicitWidth + 12
+            readonly property real labelHeight: overlayLabel.implicitHeight + 6
+            readonly property real labelX: modelData.x - (labelWidth * 0.5)
+            readonly property real labelPreferredY: modelData.y - labelHeight - 8
 
             x: labelX
             y: isCardinal
-                ? overlayRoot.adjustedYToAvoidTimelinePanel(labelX, preferredY, width, height)
-                : preferredY
+                    ? overlayRoot.adjustedYToAvoidItems(
+                        labelX,
+                        labelPreferredY,
+                        labelWidth,
+                        labelHeight
+                    )
+                    : labelPreferredY
+            width: labelWidth
+            height: labelHeight
             visible: isCardinal
-                ? true
-                : !overlayRoot.overlapsTimelinePanel(x, y, width, height)
-            radius: isCardinal ? 6 : 5
-            color: isCardinal ? "#880a1222" : "#aa071328"
-            border.width: 1
-            border.color: labelColor
-            z: isCardinal ? 9 : 8
-            width: overlayLabel.implicitWidth + 12
-            height: overlayLabel.implicitHeight + 6
+                    ? true
+                    : !overlayRoot.overlapsAvoidItems(x, y, width, height)
 
-            Label {
-                id: overlayLabel
-                anchors.centerIn: parent
-                text: modelData.text
-                color: labelColor
-                font.family: "Avenir Next"
-                font.pixelSize: isCardinal ? 14 : 11
-                font.bold: true
+            Rectangle {
+                x: 0
+                y: 0
+                width: overlayDelegateRoot.labelWidth
+                height: overlayDelegateRoot.labelHeight
+                radius: overlayDelegateRoot.isCardinal ? 6 : 5
+                color: overlayDelegateRoot.isCardinal ? "#880a1222" : "#aa071328"
+                border.width: 1
+                border.color: overlayDelegateRoot.labelColor
+                z: overlayDelegateRoot.isCardinal ? 9 : 8
+
+                Label {
+                    id: overlayLabel
+                    anchors.centerIn: parent
+                    text: overlayDelegateRoot.modelData.text
+                    color: overlayDelegateRoot.labelColor
+                    font.family: "Avenir Next"
+                    font.pixelSize: overlayDelegateRoot.isCardinal ? 14 : 11
+                    font.bold: true
+                }
             }
         }
     }

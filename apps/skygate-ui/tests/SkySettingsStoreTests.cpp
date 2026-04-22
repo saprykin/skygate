@@ -40,6 +40,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.utcDateLocked = false;
     savedSnapshot.utcTimeLocked = true;
     savedSnapshot.timelineToolbarCollapsed = true;
+    savedSnapshot.searchToolbarCollapsed = true;
     savedSnapshot.speedMultiplier = 4.0;
     savedSnapshot.stepSeconds = 300;
     savedSnapshot.magnitudeCutoff = 7.5;
@@ -62,6 +63,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->live, savedSnapshot.live);
     QCOMPARE(loadedSnapshot->utcDateLocked, savedSnapshot.utcDateLocked);
     QCOMPARE(loadedSnapshot->timelineToolbarCollapsed, savedSnapshot.timelineToolbarCollapsed);
+    QCOMPARE(loadedSnapshot->searchToolbarCollapsed, savedSnapshot.searchToolbarCollapsed);
     QCOMPARE(loadedSnapshot->speedMultiplier, savedSnapshot.speedMultiplier);
     QCOMPARE(loadedSnapshot->stepSeconds, savedSnapshot.stepSeconds);
     QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);

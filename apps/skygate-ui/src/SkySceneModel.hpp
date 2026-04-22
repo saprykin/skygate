@@ -3,6 +3,8 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
+#include <QHash>
+#include <QVariantMap>
 #include <QVariantList>
 
 #include "SkyRenderBuilders.hpp"
@@ -31,6 +33,7 @@ class SkySceneModel final : public QObject {
         NOTIFY skyContextControllerChanged
     )
     Q_PROPERTY(QVariantList overlayItems READ overlayItems NOTIFY sceneFrameChanged)
+    Q_PROPERTY(QVariantMap selectionMarker READ selectionMarker NOTIFY sceneFrameChanged)
 
 public:
     explicit SkySceneModel(QObject* parent = nullptr);
@@ -39,6 +42,7 @@ public:
     void setSkyContextController(QObject* skyContextController);
 
     [[nodiscard]] QVariantList overlayItems() const;
+    [[nodiscard]] QVariantMap selectionMarker() const;
     [[nodiscard]] std::uint64_t snapshotGeneration() const noexcept;
     void setViewportSize(double viewportWidth, double viewportHeight);
 
@@ -97,7 +101,9 @@ private:
         skygate::ephemeris::SkySnapshot snapshot;
         SkyRenderFrame frame;
         std::unordered_map<std::uint64_t, std::vector<std::size_t>> hoverPointIndicesByCell;
+        QHash<QString, std::size_t> stateIndexByBodyId;
         QVariantList overlayItems;
+        QVariantMap selectionMarker;
     };
 
 private:
@@ -105,10 +111,12 @@ private:
     void rebuildSceneFrame();
     [[nodiscard]] bool clearSceneFrame();
     [[nodiscard]] QVariantList buildOverlayItems(const SceneFrameData& sceneFrame) const;
+    [[nodiscard]] QVariantMap buildSelectionMarker(const SceneFrameData& sceneFrame) const;
 
 private:
     QPointer<SkyContextController> m_skyContextController;
     QMetaObject::Connection m_skyContextChangedConnection;
+    QMetaObject::Connection m_selectedSearchTargetChangedConnection;
     double m_viewportWidth = 0.0;
     double m_viewportHeight = 0.0;
     const skygate::ephemeris::IEphemerisEngine* m_cachedEphemerisEngine = nullptr;

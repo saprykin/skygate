@@ -20,6 +20,7 @@ bool SkyContextController::saveSettings() const
     snapshot.utcDateLocked = m_utcDateLocked;
     snapshot.utcTimeLocked = m_utcTimeLocked;
     snapshot.timelineToolbarCollapsed = m_timelineToolbarCollapsed;
+    snapshot.searchToolbarCollapsed = m_searchToolbarCollapsed;
     snapshot.speedMultiplier = m_speedMultiplier;
     snapshot.stepSeconds = m_stepSeconds;
     snapshot.magnitudeCutoff = m_magnitudeCutoff;
@@ -49,6 +50,7 @@ bool SkyContextController::loadSettings()
         setUtcDateLocked(stateSnapshot->utcDateLocked);
         setUtcTimeLocked(stateSnapshot->utcTimeLocked);
         setTimelineToolbarCollapsed(stateSnapshot->timelineToolbarCollapsed);
+        setSearchToolbarCollapsed(stateSnapshot->searchToolbarCollapsed);
         setSpeedMultiplier(stateSnapshot->speedMultiplier);
         setStepSeconds(stateSnapshot->stepSeconds);
         setMagnitudeCutoff(stateSnapshot->magnitudeCutoff);

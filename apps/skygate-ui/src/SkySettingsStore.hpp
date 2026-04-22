@@ -14,6 +14,7 @@ public:
         bool utcDateLocked = true;
         bool utcTimeLocked = true;
         bool timelineToolbarCollapsed = false;
+        bool searchToolbarCollapsed = false;
         double speedMultiplier = 1.0;
         int stepSeconds = 60;
         double magnitudeCutoff = 6.0;

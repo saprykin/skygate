@@ -13,9 +13,30 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <limits>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace {
+
+skygate::ephemeris::CelestialBody makeBody(
+    std::string id,
+    std::string displayName,
+    const skygate::ephemeris::CelestialBodyType type,
+    const double visualMagnitude,
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
+)
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.type = type;
+    body.visualMagnitude = visualMagnitude;
+    body.fixedEquatorial = fixedEquatorial;
+    return body;
+}
 
 std::unique_ptr<skygate::ephemeris::IStarCatalog> createTestCatalog()
 {
@@ -37,10 +58,25 @@ SkyContextController::InitializationOptions controllerInitializationOptions(bool
     return initializationOptions;
 }
 
+std::unique_ptr<SkyContextController> createController(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
+    bool loadSettings = false
+);
+
 std::unique_ptr<SkyContextController> createController(bool loadSettings = false)
 {
     auto starCatalog = createTestCatalog();
     auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    return createController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
+}
+
+std::unique_ptr<SkyContextController> createController(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
+    const bool loadSettings
+)
+{
     return std::make_unique<SkyContextController>(
         std::move(starCatalog),
         std::move(ephemerisEngine),
@@ -52,6 +88,38 @@ std::unique_ptr<SkyContextController> createController(bool loadSettings = false
 QDateTime controllerUtcTime(const SkyContextController& controller)
 {
     return skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(controller.skyContext().utcTime);
+}
+
+const skygate::ephemeris::CelestialBodyState* findStateById(
+    const skygate::ephemeris::SkySnapshot& snapshot,
+    const std::string& bodyId
+)
+{
+    for (const auto& state : snapshot.states) {
+        if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
+            return &state;
+        }
+    }
+
+    return nullptr;
+}
+
+void configureFocusTestContext(SkyContextController& controller)
+{
+    controller.setLive(false);
+    controller.setUtcDateLocked(false);
+    controller.setUtcTimeLocked(false);
+    controller.setUtcDateText("2024-06-01");
+    controller.setUtcTimeText("22:00:00");
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+}
+
+double azimuthDifferenceDeg(const double lhs, const double rhs)
+{
+    const double difference = std::abs(lhs - rhs);
+    return std::min(difference, 360.0 - difference);
 }
 
 }  // namespace
@@ -77,6 +145,10 @@ private slots:
     void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
     void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
     void goLiveNowJumpsToCurrentUtcAndEnablesLive();
+    void focusSearchTargetCentersBodyResult();
+    void focusSearchTargetCentersConstellationLabelResult();
+    void focusSearchTargetIgnoresInvalidTargets();
+    void collapsingSearchToolbarClearsSelectedSearchTarget();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -390,6 +462,180 @@ void SkyContextControllerTests::goLiveNowJumpsToCurrentUtcAndEnablesLive()
     const qint64 currentUtcSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
     QVERIFY(timelineSeconds >= currentUtcSeconds - 1);
     QVERIFY(timelineSeconds <= currentUtcSeconds + 1);
+}
+
+void SkyContextControllerTests::focusSearchTargetCentersBodyResult()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::CelestialBodyType::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    const auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    configureFocusTestContext(*controller);
+
+    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+    const auto* targetState = findStateById(snapshot, "demo_target");
+    QVERIFY(targetState != nullptr);
+
+    QVERIFY(controller->focusSearchTarget("body", "demo_target"));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(
+        azimuthDifferenceDeg(
+            controller->viewCenterAzimuthDeg(),
+            targetState->horizontal.azimuthDeg
+        ) < 1e-6
+    );
+}
+
+void SkyContextControllerTests::focusSearchTargetCentersConstellationLabelResult()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "hip_27989",
+            "HIP 27989",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+        makeBody(
+            "hip_25336",
+            "HIP 25336",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.1,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+        makeBody(
+            "hip_25930",
+            "HIP 25930",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.2,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+        makeBody(
+            "hip_26311",
+            "HIP 26311",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.3,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+        makeBody(
+            "hip_26727",
+            "HIP 26727",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.4,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+        makeBody(
+            "hip_24436",
+            "HIP 24436",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.5,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    const auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    configureFocusTestContext(*controller);
+
+    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+    const auto* targetState = findStateById(snapshot, "hip_27989");
+    QVERIFY(targetState != nullptr);
+    QVERIFY(
+        std::any_of(
+            controller->constellationLabelRefs().begin(),
+            controller->constellationLabelRefs().end(),
+            [](const SkyContextController::ConstellationLabelRef& labelRef) {
+                return labelRef.first == "Orion";
+            }
+        )
+    );
+
+    QVERIFY(controller->focusSearchTarget("constellationLabel", "Orion"));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("constellationLabel"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("Orion"));
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(
+        azimuthDifferenceDeg(
+            controller->viewCenterAzimuthDeg(),
+            targetState->horizontal.azimuthDeg
+        ) < 1e-6
+    );
+}
+
+void SkyContextControllerTests::focusSearchTargetIgnoresInvalidTargets()
+{
+    const auto controller = createController();
+    controller->setViewCenter(12.0, 123.0);
+
+    QVERIFY(!controller->focusSearchTarget("body", "missing_target"));
+    QCOMPARE(controller->viewCenterAltitudeDeg(), 12.0);
+    QCOMPARE(controller->viewCenterAzimuthDeg(), 123.0);
+
+    QVERIFY(!controller->focusSearchTarget("unknown", "mars"));
+    QCOMPARE(controller->viewCenterAltitudeDeg(), 12.0);
+    QCOMPARE(controller->viewCenterAzimuthDeg(), 123.0);
+}
+
+void SkyContextControllerTests::collapsingSearchToolbarClearsSelectedSearchTarget()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::CelestialBodyType::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    const auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    configureFocusTestContext(*controller);
+
+    QVERIFY(controller->focusSearchTarget("body", "demo_target"));
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
+
+    controller->setSearchToolbarCollapsed(true);
+    QVERIFY(controller->selectedSearchTargetKind().isEmpty());
+    QVERIFY(controller->selectedSearchTargetId().isEmpty());
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerTests)
