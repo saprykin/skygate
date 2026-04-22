@@ -31,8 +31,6 @@ class SkySettingsStore;
 class SkyContextController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool live READ live WRITE setLive NOTIFY liveChanged)
-    Q_PROPERTY(bool utcDateLocked READ utcDateLocked WRITE setUtcDateLocked NOTIFY utcDateLockedChanged)
-    Q_PROPERTY(bool utcTimeLocked READ utcTimeLocked WRITE setUtcTimeLocked NOTIFY utcTimeLockedChanged)
     Q_PROPERTY(
         bool timelineToolbarCollapsed
         READ timelineToolbarCollapsed
@@ -117,8 +115,6 @@ public:
     ~SkyContextController() override;
 
     [[nodiscard]] bool live() const noexcept;
-    [[nodiscard]] bool utcDateLocked() const noexcept;
-    [[nodiscard]] bool utcTimeLocked() const noexcept;
     [[nodiscard]] bool timelineToolbarCollapsed() const noexcept;
     [[nodiscard]] bool searchToolbarCollapsed() const noexcept;
     [[nodiscard]] double speedMultiplier() const noexcept;
@@ -157,8 +153,6 @@ public:
     [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
 
     Q_INVOKABLE void setLive(bool live);
-    Q_INVOKABLE void setUtcDateLocked(bool utcDateLocked);
-    Q_INVOKABLE void setUtcTimeLocked(bool utcTimeLocked);
     Q_INVOKABLE void setTimelineToolbarCollapsed(bool timelineToolbarCollapsed);
     Q_INVOKABLE void setSearchToolbarCollapsed(bool searchToolbarCollapsed);
     Q_INVOKABLE void togglePlayPause();
@@ -173,8 +167,7 @@ public:
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
-    Q_INVOKABLE void setUtcDateText(const QString& utcDateText);
-    Q_INVOKABLE void setUtcTimeText(const QString& utcTimeText);
+    Q_INVOKABLE bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);
     Q_INVOKABLE void setElevationText(const QString& elevationText);
@@ -196,8 +189,6 @@ public:
 
 signals:
     void liveChanged();
-    void utcDateLockedChanged();
-    void utcTimeLockedChanged();
     void timelineToolbarCollapsedChanged();
     void searchToolbarCollapsedChanged();
     void speedMultiplierChanged();
@@ -212,8 +203,6 @@ signals:
     void locationSourceTextChanged();
     void selectedCityIdChanged();
     void selectedCityDisplayTextChanged();
-    void invalidUtcDateInput(const QString& utcDateText);
-    void invalidUtcTimeInput(const QString& utcTimeText);
     void invalidLatitudeInput(const QString& latitudeText);
     void invalidLongitudeInput(const QString& longitudeText);
     void invalidElevationInput(const QString& elevationText);
@@ -246,8 +235,6 @@ private:
 
 private:
     bool m_live = true;
-    bool m_utcDateLocked = true;
-    bool m_utcTimeLocked = true;
     bool m_timelineToolbarCollapsed = false;
     bool m_searchToolbarCollapsed = false;
     bool m_catchingUpToCurrentUtc = false;

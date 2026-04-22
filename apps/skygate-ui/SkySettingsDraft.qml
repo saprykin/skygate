@@ -4,10 +4,6 @@ QtObject {
     id: draft
     required property var skyContextController
 
-    property bool utcDateLocked: true
-    property bool utcTimeLocked: true
-    property string utcDateText: ""
-    property string utcTimeText: ""
     property string latitudeText: ""
     property string longitudeText: ""
     property string elevationText: ""
@@ -43,10 +39,6 @@ QtObject {
     }
 
     function resetFromContext() {
-        utcDateLocked = skyContextController.utcDateLocked
-        utcTimeLocked = skyContextController.utcTimeLocked
-        utcDateText = skyContextController.utcDateText
-        utcTimeText = skyContextController.utcTimeText
         latitudeText = skyContextController.latitudeText
         longitudeText = skyContextController.longitudeText
         elevationText = skyContextController.elevationText
@@ -69,11 +61,6 @@ QtObject {
     }
 
     function applyToContext() {
-        skyContextController.setUtcDateLocked(utcDateLocked)
-        skyContextController.setUtcTimeLocked(utcTimeLocked)
-        skyContextController.setUtcDateText(utcDateText)
-        skyContextController.setUtcTimeText(utcTimeText)
-
         if (locationSourceText === "City" && selectedCityId !== "") {
             skyContextController.setLocationSourceText(locationSourceText)
             skyContextController.setSelectedCityId(selectedCityId)

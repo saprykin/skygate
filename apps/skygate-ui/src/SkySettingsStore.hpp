@@ -11,8 +11,6 @@ class SkySettingsStore final {
 public:
     struct StateSnapshot final {
         bool live = true;
-        bool utcDateLocked = true;
-        bool utcTimeLocked = true;
         bool timelineToolbarCollapsed = false;
         bool searchToolbarCollapsed = false;
         double speedMultiplier = 1.0;

@@ -104,7 +104,7 @@ This module is the application layer and the most stateful part of the system.
 - `TimelineToolbar`
   - Playback, stepping, speed, magnitude cutoff, and view reset controls.
 - `PreferencesWindow`
-  - Settings and catalog management UI.
+  - Observer location, projection, and catalog management UI.
   - Uses `SkySettingsDraft.qml` as a staged edit buffer before applying changes
     back to `SkyContextController`.
   - Includes a source-aware location workflow with `Current Device`, `City`,
@@ -112,6 +112,7 @@ This module is the application layer and the most stateful part of the system.
     catalog model.
 - `StatusFooter`
   - Current context and catalog status summary.
+  - Hosts the clickable UTC text that opens the compact fixed-time popup.
 
 This is intentionally a hybrid UI architecture: heavy drawing happens in C++
 scene graph code, while transient UI and chrome stay in QML.

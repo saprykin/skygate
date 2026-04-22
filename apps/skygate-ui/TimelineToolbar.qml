@@ -238,14 +238,6 @@ Item {
             }
 
             TimelineToolbarButton {
-                text: "Live Now"
-                onClicked: skyContextController.goLiveNow()
-                ToolTip.visible: hovered
-                ToolTip.delay: 250
-                ToolTip.text: "Jump to current UTC and enable live playback"
-            }
-
-            TimelineToolbarButton {
                 text: "Reset View"
                 onClicked: skyContextController.resetViewDirection()
                 ToolTip.visible: hovered

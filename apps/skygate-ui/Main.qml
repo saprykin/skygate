@@ -44,7 +44,17 @@ ApplicationWindow {
     }
 
     footer: StatusFooter {
+        id: statusFooter
         skyContextController: skyContext
+        dateTimePopupOpen: dateTimePopup.opened
+        onDateTimeClicked: dateTimePopup.open()
+    }
+
+    StatusDateTimePopup {
+        id: dateTimePopup
+        skyContextController: skyContext
+        popupRightMargin: 8
+        popupBottomMargin: 8
     }
 
     function topToolbarExpandedBounds() {
