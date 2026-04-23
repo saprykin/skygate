@@ -35,11 +35,6 @@ bool SkyOverlayLayerSettings::celestialEquator() const noexcept
     return m_visibility.celestialEquator;
 }
 
-bool SkyOverlayLayerSettings::meridian() const noexcept
-{
-    return m_visibility.meridian;
-}
-
 bool SkyOverlayLayerSettings::circumpolarBoundary() const noexcept
 {
     return m_visibility.circumpolarBoundary;
@@ -80,9 +75,6 @@ void SkyOverlayLayerSettings::setVisibility(const SkyOverlayLayerVisibility& vis
     }
     if (previous.celestialEquator != m_visibility.celestialEquator) {
         emit celestialEquatorChanged();
-    }
-    if (previous.meridian != m_visibility.meridian) {
-        emit meridianChanged();
     }
     if (previous.circumpolarBoundary != m_visibility.circumpolarBoundary) {
         emit circumpolarBoundaryChanged();
@@ -132,13 +124,6 @@ void SkyOverlayLayerSettings::setCelestialEquator(const bool celestialEquator)
 {
     SkyOverlayLayerVisibility visibility = m_visibility;
     visibility.celestialEquator = celestialEquator;
-    setVisibility(visibility);
-}
-
-void SkyOverlayLayerSettings::setMeridian(const bool meridian)
-{
-    SkyOverlayLayerVisibility visibility = m_visibility;
-    visibility.meridian = meridian;
     setVisibility(visibility);
 }
 

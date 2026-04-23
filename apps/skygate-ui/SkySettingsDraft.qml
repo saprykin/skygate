@@ -18,7 +18,6 @@ QtObject {
     property bool overlayConstellationLabels: true
     property bool overlayEcliptic: false
     property bool overlayCelestialEquator: false
-    property bool overlayMeridian: false
     property bool overlayCircumpolarBoundary: false
     property bool overlaySolarSystemLabels: true
     property int catalogPresetIndex: 0
@@ -63,7 +62,6 @@ QtObject {
         overlayConstellationLabels = skyContextController.overlayLayers.constellationLabels
         overlayEcliptic = skyContextController.overlayLayers.ecliptic
         overlayCelestialEquator = skyContextController.overlayLayers.celestialEquator
-        overlayMeridian = skyContextController.overlayLayers.meridian
         overlayCircumpolarBoundary = skyContextController.overlayLayers.circumpolarBoundary
         overlaySolarSystemLabels = skyContextController.overlayLayers.solarSystemLabels
         catalogPresetIndex = skyContextController.catalogPresetIndex()
@@ -104,7 +102,6 @@ QtObject {
         skyContextController.overlayLayers.constellationLabels = overlayConstellationLabels
         skyContextController.overlayLayers.ecliptic = overlayEcliptic
         skyContextController.overlayLayers.celestialEquator = overlayCelestialEquator
-        skyContextController.overlayLayers.meridian = overlayMeridian
         skyContextController.overlayLayers.circumpolarBoundary = overlayCircumpolarBoundary
         skyContextController.overlayLayers.solarSystemLabels = overlaySolarSystemLabels
         skyContextController.setCatalogPresetIndex(catalogPresetIndex)

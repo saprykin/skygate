@@ -338,7 +338,6 @@ void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
     snapshot.overlayLayers.constellationLabels = false;
     snapshot.overlayLayers.ecliptic = true;
     snapshot.overlayLayers.celestialEquator = true;
-    snapshot.overlayLayers.meridian = true;
     snapshot.overlayLayers.circumpolarBoundary = true;
     snapshot.overlayLayers.solarSystemLabels = false;
     QVERIFY(store.saveState(snapshot));
@@ -352,7 +351,6 @@ void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
     QVERIFY(!overlayLayers->constellationLabels());
     QVERIFY(overlayLayers->ecliptic());
     QVERIFY(overlayLayers->celestialEquator());
-    QVERIFY(overlayLayers->meridian());
     QVERIFY(overlayLayers->circumpolarBoundary());
     QVERIFY(!overlayLayers->solarSystemLabels());
 }

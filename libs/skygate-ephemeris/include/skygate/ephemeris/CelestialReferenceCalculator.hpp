@@ -27,8 +27,6 @@ public:
         const core::UtcTimePoint& utcTime
     ) noexcept;
 
-    [[nodiscard]] static core::HorizontalCoordinate meridianPoint(double progress) noexcept;
-
     [[nodiscard]] static double circumpolarBoundaryDeclinationDeg(
         const core::GeoLocation& observer
     ) noexcept;

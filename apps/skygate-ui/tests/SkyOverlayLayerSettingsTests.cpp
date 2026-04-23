@@ -23,7 +23,6 @@ void SkyOverlayLayerSettingsTests::defaultsMatchLayerPolicy()
     QVERIFY(settings.constellationLabels());
     QVERIFY(!settings.ecliptic());
     QVERIFY(!settings.celestialEquator());
-    QVERIFY(!settings.meridian());
     QVERIFY(!settings.circumpolarBoundary());
     QVERIFY(settings.solarSystemLabels());
 }

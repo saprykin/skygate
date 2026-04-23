@@ -28,7 +28,6 @@ constexpr int kGridAzimuthStepDeg = 30;
 constexpr int kGridAltitudeSampleCount = 96;
 constexpr int kGridAzimuthSampleCount = 64;
 constexpr int kReferenceCircleSampleCount = 192;
-constexpr int kMeridianSampleCount = 128;
 constexpr float kGridLineWidthPx = 1.0F;
 constexpr float kCardinalLineWidthPx = 1.8F;
 constexpr float kHorizonLineWidthPx = 2.2F;
@@ -73,7 +72,7 @@ private:
     QSGNode* m_pointRoot = nullptr;
 };
 
-[[nodiscard]] QColor cardinalMeridianColor(
+[[nodiscard]] QColor cardinalAzimuthLineColor(
     const int azimuthDeg,
     const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
 )
@@ -470,7 +469,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
                 *renderData->preparedProjection,
                 kGridAzimuthSampleCount,
                 maxSegmentLengthSquared,
-                cardinalMeridianColor(cardinalAzimuthDeg, renderData->renderTheme),
+                cardinalAzimuthLineColor(cardinalAzimuthDeg, renderData->renderTheme),
                 kCardinalLineWidthPx,
                 [cardinalAzimuthDeg](const int index) {
                     const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
@@ -535,22 +534,6 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
                     0.0,
                     renderData->observer,
                     renderData->utcTime
-                );
-            }
-        );
-    }
-
-    if (renderData->overlayLayers.meridian) {
-        appendProjectedPolyline(
-            lineSegments,
-            *renderData->preparedProjection,
-            kMeridianSampleCount,
-            maxSegmentLengthSquared,
-            renderData->renderTheme.meridianLine,
-            kReferenceLineWidthPx,
-            [](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::meridianPoint(
-                    static_cast<double>(index) / static_cast<double>(kMeridianSampleCount)
                 );
             }
         );

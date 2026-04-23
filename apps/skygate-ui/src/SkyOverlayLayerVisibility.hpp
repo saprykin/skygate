@@ -7,7 +7,6 @@ struct SkyOverlayLayerVisibility final {
     bool constellationLabels = true;
     bool ecliptic = false;
     bool celestialEquator = false;
-    bool meridian = false;
     bool circumpolarBoundary = false;
     bool solarSystemLabels = true;
 
@@ -19,7 +18,6 @@ struct SkyOverlayLayerVisibility final {
             && constellationLabels == other.constellationLabels
             && ecliptic == other.ecliptic
             && celestialEquator == other.celestialEquator
-            && meridian == other.meridian
             && circumpolarBoundary == other.circumpolarBoundary
             && solarSystemLabels == other.solarSystemLabels;
     }

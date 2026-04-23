@@ -3,7 +3,6 @@
 #include "engine/CoordinateTransform.hpp"
 #include "engine/JulianDateTime.hpp"
 
-#include <algorithm>
 #include <cmath>
 
 namespace skygate::ephemeris {
@@ -56,24 +55,6 @@ core::HorizontalCoordinate CelestialReferenceCalculator::declinationCirclePoint(
     const double rightAscensionHours = 24.0 * static_cast<double>(sampleIndex)
         / static_cast<double>(sampleCount);
     return equatorialPoint(rightAscensionHours, declinationDeg, observer, utcTime);
-}
-
-core::HorizontalCoordinate CelestialReferenceCalculator::meridianPoint(
-    const double progress
-) noexcept
-{
-    const double clampedProgress = std::clamp(progress, 0.0, 1.0);
-    if (clampedProgress <= 0.5) {
-        return core::HorizontalCoordinate {
-            .altitudeDeg = -90.0 + (360.0 * clampedProgress),
-            .azimuthDeg = 0.0
-        };
-    }
-
-    return core::HorizontalCoordinate {
-        .altitudeDeg = 90.0 - (360.0 * (clampedProgress - 0.5)),
-        .azimuthDeg = 180.0
-    };
 }
 
 double CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(

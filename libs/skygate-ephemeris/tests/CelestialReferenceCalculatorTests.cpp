@@ -14,7 +14,6 @@ class CelestialReferenceCalculatorTests final : public QObject {
 
 private slots:
     void computesFiniteEclipticAndEquatorialPoints();
-    void meridianPointTracesNorthSouthGreatCircle();
     void circumpolarBoundaryDeclinationFollowsHemisphere();
     void constellationLabelCenterAveragesAnchorVectors();
 };
@@ -53,24 +52,6 @@ void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoint
     QVERIFY(equatorialPoint.altitudeDeg <= 90.0);
     QVERIFY(equatorialPoint.azimuthDeg >= 0.0);
     QVERIFY(equatorialPoint.azimuthDeg < 360.0);
-}
-
-void CelestialReferenceCalculatorTests::meridianPointTracesNorthSouthGreatCircle()
-{
-    const auto northHorizon =
-        skygate::ephemeris::CelestialReferenceCalculator::meridianPoint(0.25);
-    QCOMPARE(northHorizon.altitudeDeg, 0.0);
-    QCOMPARE(northHorizon.azimuthDeg, 0.0);
-
-    const auto zenith =
-        skygate::ephemeris::CelestialReferenceCalculator::meridianPoint(0.5);
-    QCOMPARE(zenith.altitudeDeg, 90.0);
-    QCOMPARE(zenith.azimuthDeg, 0.0);
-
-    const auto southHorizon =
-        skygate::ephemeris::CelestialReferenceCalculator::meridianPoint(0.75);
-    QCOMPARE(southHorizon.altitudeDeg, 0.0);
-    QCOMPARE(southHorizon.azimuthDeg, 180.0);
 }
 
 void CelestialReferenceCalculatorTests::circumpolarBoundaryDeclinationFollowsHemisphere()

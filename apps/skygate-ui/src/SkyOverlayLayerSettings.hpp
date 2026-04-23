@@ -27,7 +27,6 @@ class SkyOverlayLayerSettings final : public QObject {
         WRITE setCelestialEquator
         NOTIFY celestialEquatorChanged
     )
-    Q_PROPERTY(bool meridian READ meridian WRITE setMeridian NOTIFY meridianChanged)
     Q_PROPERTY(
         bool circumpolarBoundary
         READ circumpolarBoundary
@@ -50,7 +49,6 @@ public:
     [[nodiscard]] bool constellationLabels() const noexcept;
     [[nodiscard]] bool ecliptic() const noexcept;
     [[nodiscard]] bool celestialEquator() const noexcept;
-    [[nodiscard]] bool meridian() const noexcept;
     [[nodiscard]] bool circumpolarBoundary() const noexcept;
     [[nodiscard]] bool solarSystemLabels() const noexcept;
     [[nodiscard]] const SkyOverlayLayerVisibility& visibility() const noexcept;
@@ -64,7 +62,6 @@ public slots:
     void setConstellationLabels(bool constellationLabels);
     void setEcliptic(bool ecliptic);
     void setCelestialEquator(bool celestialEquator);
-    void setMeridian(bool meridian);
     void setCircumpolarBoundary(bool circumpolarBoundary);
     void setSolarSystemLabels(bool solarSystemLabels);
 
@@ -75,7 +72,6 @@ signals:
     void constellationLabelsChanged();
     void eclipticChanged();
     void celestialEquatorChanged();
-    void meridianChanged();
     void circumpolarBoundaryChanged();
     void solarSystemLabelsChanged();
     void visibilityChanged();

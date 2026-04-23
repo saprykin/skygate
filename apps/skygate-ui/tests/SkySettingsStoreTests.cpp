@@ -60,7 +60,6 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.overlayLayers.constellationLabels = false;
     savedSnapshot.overlayLayers.ecliptic = true;
     savedSnapshot.overlayLayers.celestialEquator = true;
-    savedSnapshot.overlayLayers.meridian = true;
     savedSnapshot.overlayLayers.circumpolarBoundary = true;
     savedSnapshot.overlayLayers.solarSystemLabels = false;
     savedSnapshot.catalogPresetIndex = 2;

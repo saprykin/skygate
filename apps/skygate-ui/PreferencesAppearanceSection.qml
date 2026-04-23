@@ -158,18 +158,6 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayMeridian
-                onToggled: root.settingsDraft.overlayMeridian = checked
-            }
-            Label {
-                text: "Meridian"
-                color: skyContext.theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
-                Layout.alignment: Qt.AlignVCenter
-            }
-
-            PreferencesCheckBox {
                 checked: root.settingsDraft.overlayCircumpolarBoundary
                 onToggled: root.settingsDraft.overlayCircumpolarBoundary = checked
             }

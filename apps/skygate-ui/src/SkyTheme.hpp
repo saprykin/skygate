@@ -131,7 +131,6 @@ namespace skygate::ui::internal {
     X(horizonLine) \
     X(eclipticLine) \
     X(celestialEquatorLine) \
-    X(meridianLine) \
     X(circumpolarBoundaryLine) \
     X(cardinalNorthLine) \
     X(cardinalEastLine) \

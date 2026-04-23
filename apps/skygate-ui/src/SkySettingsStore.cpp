@@ -80,10 +80,6 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         snapshot.overlayLayers.celestialEquator
     );
     settings.setValue(
-        SkyContextSettings::key("overlayLayers/meridian"),
-        snapshot.overlayLayers.meridian
-    );
-    settings.setValue(
         SkyContextSettings::key("overlayLayers/circumpolarBoundary"),
         snapshot.overlayLayers.circumpolarBoundary
     );
@@ -196,10 +192,6 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
     snapshot.overlayLayers.celestialEquator = settings.value(
         SkyContextSettings::key("overlayLayers/celestialEquator"),
         snapshot.overlayLayers.celestialEquator
-    ).toBool();
-    snapshot.overlayLayers.meridian = settings.value(
-        SkyContextSettings::key("overlayLayers/meridian"),
-        snapshot.overlayLayers.meridian
     ).toBool();
     snapshot.overlayLayers.circumpolarBoundary = settings.value(
         SkyContextSettings::key("overlayLayers/circumpolarBoundary"),

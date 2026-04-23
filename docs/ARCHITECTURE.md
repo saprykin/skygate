@@ -87,7 +87,7 @@ This module is the application layer and the most stateful part of the system.
     - projected constellation segments
     - horizon line
     - altitude/azimuth grid
-    - highlighted cardinal meridians
+    - highlighted cardinal azimuth lines
   - Uses a mutex-protected shared render-data snapshot to bridge scene-model
     data into `updatePaintNode()`.
 
