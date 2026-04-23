@@ -5,6 +5,7 @@
 #include "catalog/HygCatalogParser.hpp"
 #include "catalog/HygGzipCatalogParser.hpp"
 #include "catalog/InMemoryStarCatalog.hpp"
+#include "catalog/OpenNgcCatalogParser.hpp"
 
 #include <algorithm>
 #include <array>
@@ -111,6 +112,40 @@ bool containsBodyIdCaseInsensitive(
     });
 }
 
+void appendDeepSkyAliasKeys(std::vector<std::string>& keys, const CelestialBody& body)
+{
+    const auto appendKey = [&keys](std::string value) {
+        value = toLowerId(value);
+        value.erase(std::remove_if(value.begin(), value.end(), [](const unsigned char c) {
+            return !std::isalnum(c);
+        }), value.end());
+        if (!value.empty() && std::find(keys.begin(), keys.end(), value) == keys.end()) {
+            keys.push_back(std::move(value));
+        }
+    };
+
+    appendKey(body.id);
+    appendKey(body.displayName);
+    if (!body.deepSkyObject.has_value()) {
+        return;
+    }
+
+    for (const auto& alias : body.deepSkyObject->aliases) {
+        appendKey(alias);
+    }
+}
+
+bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs)
+{
+    std::vector<std::string> lhsKeys;
+    std::vector<std::string> rhsKeys;
+    appendDeepSkyAliasKeys(lhsKeys, lhs);
+    appendDeepSkyAliasKeys(rhsKeys, rhs);
+    return std::any_of(lhsKeys.begin(), lhsKeys.end(), [&rhsKeys](const std::string& key) {
+        return std::find(rhsKeys.begin(), rhsKeys.end(), key) != rhsKeys.end();
+    });
+}
+
 }  // namespace
 
 CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request)
@@ -129,6 +164,13 @@ CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request)
     }
     case CatalogSourceType::HygCsvGzip: {
         const HygGzipCatalogParser parser;
+        return finalizeCatalogLoad(
+            parser.parse(request.data, request.progressCallback),
+            request.selectionOptions
+        );
+    }
+    case CatalogSourceType::OpenNgcCsv: {
+        const OpenNgcCatalogParser parser;
         return finalizeCatalogLoad(
             parser.parse(request.data, request.progressCallback),
             request.selectionOptions
@@ -210,6 +252,67 @@ std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsvGzip(
 )
 {
     return createStarCatalog(CatalogSourceType::HygCsvGzip, gzipData, progressCallback);
+}
+
+std::unique_ptr<IStarCatalog> createStarCatalogFromOpenNgcCsv(const std::string_view csvData)
+{
+    return createStarCatalogFromOpenNgcCsv(csvData, {});
+}
+
+std::unique_ptr<IStarCatalog> createStarCatalogFromOpenNgcCsv(
+    const std::string_view csvData,
+    const HygParseProgressCallback& progressCallback
+)
+{
+    return createStarCatalog(CatalogSourceType::OpenNgcCsv, csvData, progressCallback);
+}
+
+std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
+    const IStarCatalog& baseCatalog,
+    const IStarCatalog& deepSkyCatalog
+)
+{
+    return createCatalogByMergingDeepSkyObjects(baseCatalog.bodies(), deepSkyCatalog.bodies());
+}
+
+std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
+    const std::span<const CelestialBody> baseBodies,
+    const std::span<const CelestialBody> deepSkyBodies
+)
+{
+    std::vector<CelestialBody> mergedBodies;
+    mergedBodies.reserve(baseBodies.size() + deepSkyBodies.size());
+    for (const auto& body : baseBodies) {
+        if (body.type != CelestialBodyType::DeepSkyObject) {
+            mergedBodies.push_back(body);
+        }
+    }
+
+    for (const auto& body : baseBodies) {
+        if (body.type != CelestialBodyType::DeepSkyObject) {
+            continue;
+        }
+
+        const bool replacedByDownloadedDeepSkyObject = std::any_of(
+            deepSkyBodies.begin(),
+            deepSkyBodies.end(),
+            [&body](const CelestialBody& deepSkyBody) {
+                return deepSkyBody.type == CelestialBodyType::DeepSkyObject
+                    && sharesDeepSkyAlias(body, deepSkyBody);
+            }
+        );
+        if (!replacedByDownloadedDeepSkyObject) {
+            mergedBodies.push_back(body);
+        }
+    }
+
+    for (const auto& body : deepSkyBodies) {
+        if (body.type == CelestialBodyType::DeepSkyObject) {
+            mergedBodies.push_back(body);
+        }
+    }
+
+    return createStarCatalogFromBodies(std::move(mergedBodies));
 }
 
 std::unique_ptr<IStarCatalog> createCatalogWithCoreSolarSystemBodies(const IStarCatalog& catalog)

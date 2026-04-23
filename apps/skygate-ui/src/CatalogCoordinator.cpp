@@ -26,6 +26,8 @@ QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCo
         return "missing required HYG columns";
     case skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv:
         return "invalid HYG CSV payload";
+    case skygate::ephemeris::CatalogLoadErrorCode::InvalidOpenNgcCsv:
+        return "invalid OpenNGC CSV payload";
     case skygate::ephemeris::CatalogLoadErrorCode::InvalidGzipData:
         return "invalid gzip payload";
     case skygate::ephemeris::CatalogLoadErrorCode::InvalidZipData:

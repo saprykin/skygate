@@ -6,6 +6,11 @@ namespace skygate::ephemeris {
 
 QVector<QStringView> CsvRowTokenizer::splitColumns(const QStringView line)
 {
+    return splitColumns(line, ',');
+}
+
+QVector<QStringView> CsvRowTokenizer::splitColumns(const QStringView line, const QChar separator)
+{
     QVector<QStringView> columns;
     columns.reserve(32);
 
@@ -22,7 +27,7 @@ QVector<QStringView> CsvRowTokenizer::splitColumns(const QStringView line)
             continue;
         }
 
-        if (c == ',' && !insideQuotes) {
+        if (c == separator && !insideQuotes) {
             columns.push_back(line.sliced(columnStart, i - columnStart));
             columnStart = i + 1;
         }

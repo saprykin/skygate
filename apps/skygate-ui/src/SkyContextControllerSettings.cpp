@@ -38,6 +38,8 @@ bool SkyContextController::saveSettings() const
     snapshot.overlayLayers = overlayLayerVisibility();
     snapshot.catalogPresetIndex = catalogPresetIndex();
     snapshot.catalogUrlText = catalogUrlText();
+    snapshot.deepSkyCatalogPresetIndex = deepSkyCatalogPresetIndex();
+    snapshot.deepSkyCatalogUrlText = deepSkyCatalogUrlText();
     return m_settingsStore->saveState(snapshot);
 }
 
@@ -97,6 +99,8 @@ bool SkyContextController::loadSettings()
         }
         setCatalogPresetIndex(stateSnapshot->catalogPresetIndex);
         setCatalogUrlText(stateSnapshot->catalogUrlText);
+        setDeepSkyCatalogPresetIndex(stateSnapshot->deepSkyCatalogPresetIndex);
+        setDeepSkyCatalogUrlText(stateSnapshot->deepSkyCatalogUrlText);
     }
 
     if (m_catalogManager != nullptr) {

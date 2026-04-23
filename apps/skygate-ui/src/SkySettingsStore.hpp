@@ -32,11 +32,15 @@ public:
         SkyOverlayLayerVisibility overlayLayers;
         int catalogPresetIndex = 0;
         QString catalogUrlText;
+        int deepSkyCatalogPresetIndex = 0;
+        QString deepSkyCatalogUrlText;
     };
 
     struct CatalogCacheSnapshot final {
         QString sourceLabel;
         QByteArray catalogPayload;
+        QString deepSkySourceLabel;
+        QByteArray deepSkyCatalogPayload;
         QByteArray constellationLineRows;
         QByteArray constellationLabelRows;
         int constellationLineSchemaVersion = 0;

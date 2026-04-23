@@ -24,6 +24,8 @@ QtObject {
     property bool overlayDeepSkyLabels: true
     property int catalogPresetIndex: 0
     property string catalogUrlText: ""
+    property int deepSkyCatalogPresetIndex: 0
+    property string deepSkyCatalogUrlText: ""
 
     function setLocationSource(nextLocationSourceText) {
         locationSourceText = nextLocationSourceText
@@ -70,6 +72,8 @@ QtObject {
         overlayDeepSkyLabels = skyContextController.overlayLayers.deepSkyLabels
         catalogPresetIndex = skyContextController.catalogPresetIndex()
         catalogUrlText = skyContextController.catalogUrlText()
+        deepSkyCatalogPresetIndex = skyContextController.deepSkyCatalogPresetIndex()
+        deepSkyCatalogUrlText = skyContextController.deepSkyCatalogUrlText()
     }
 
     function syncDeviceLocationFromContext() {
@@ -112,6 +116,8 @@ QtObject {
         skyContextController.overlayLayers.deepSkyLabels = overlayDeepSkyLabels
         skyContextController.setCatalogPresetIndex(catalogPresetIndex)
         skyContextController.setCatalogUrlText(catalogUrlText)
+        skyContextController.setDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex)
+        skyContextController.setDeepSkyCatalogUrlText(deepSkyCatalogUrlText)
         resetFromContext()
     }
 }

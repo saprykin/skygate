@@ -33,7 +33,8 @@ struct CatalogSelectionOptions {
 enum class CatalogSourceType : std::uint8_t {
     Bundled,
     HygCsv,
-    HygCsvGzip
+    HygCsvGzip,
+    OpenNgcCsv
 };
 
 struct CatalogSourceRequest {
@@ -68,6 +69,19 @@ struct CatalogSourceRequest {
 [[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromHygCsvGzip(
     std::string_view gzipData,
     const HygParseProgressCallback& progressCallback
+);
+[[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromOpenNgcCsv(std::string_view csvData);
+[[nodiscard]] std::unique_ptr<IStarCatalog> createStarCatalogFromOpenNgcCsv(
+    std::string_view csvData,
+    const HygParseProgressCallback& progressCallback
+);
+[[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
+    const IStarCatalog& baseCatalog,
+    const IStarCatalog& deepSkyCatalog
+);
+[[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
+    std::span<const CelestialBody> baseBodies,
+    std::span<const CelestialBody> deepSkyBodies
 );
 [[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogWithCoreSolarSystemBodies(
     const IStarCatalog& catalog

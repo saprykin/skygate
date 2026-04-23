@@ -155,6 +155,7 @@ private slots:
     void focusSearchTargetCentersConstellationLabelResult();
     void focusSearchTargetIgnoresInvalidTargets();
     void collapsingSearchToolbarClearsSelectedSearchTarget();
+    void failedDeepSkyCatalogDownloadKeepsCountLabel();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -747,6 +748,22 @@ void SkyContextControllerTests::collapsingSearchToolbarClearsSelectedSearchTarge
     controller->setSearchToolbarCollapsed(true);
     QVERIFY(controller->selectedSearchTargetKind().isEmpty());
     QVERIFY(controller->selectedSearchTargetId().isEmpty());
+}
+
+void SkyContextControllerTests::failedDeepSkyCatalogDownloadKeepsCountLabel()
+{
+    const auto controller = createController();
+    QSignalSpy infoSpy(
+        controller.get(),
+        &SkyContextController::deepSkyCatalogInfoTextChanged
+    );
+
+    QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));
+    controller->downloadDeepSkyCatalogFromUrl(QString());
+
+    QCOMPARE(infoSpy.count(), 0);
+    QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));
+    QCOMPARE(controller->catalogStatusText(), QString("Catalog: Invalid URL"));
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerTests)

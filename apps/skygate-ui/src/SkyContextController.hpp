@@ -81,6 +81,11 @@ class SkyContextController final : public QObject {
         READ catalogDatasetInfoText
         NOTIFY catalogDatasetInfoTextChanged
     )
+    Q_PROPERTY(
+        QString deepSkyCatalogInfoText
+        READ deepSkyCatalogInfoText
+        NOTIFY deepSkyCatalogInfoTextChanged
+    )
     Q_PROPERTY(QAbstractItemModel* objectSearchModel READ objectSearchModel CONSTANT)
     Q_PROPERTY(bool downloadingCatalog READ downloadingCatalog NOTIFY downloadingCatalogChanged)
     Q_PROPERTY(bool catalogProcessing READ catalogProcessing NOTIFY catalogProcessingChanged)
@@ -144,6 +149,7 @@ public:
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
+    [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
     [[nodiscard]] bool downloadingCatalog() const noexcept;
     [[nodiscard]] bool catalogProcessing() const noexcept;
@@ -193,10 +199,16 @@ public:
     Q_INVOKABLE bool clearCatalogCache();
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
+    Q_INVOKABLE void loadDeepSkyCatalogPreset(const QString& presetId);
+    Q_INVOKABLE void downloadDeepSkyCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE int catalogPresetIndex() const noexcept;
     Q_INVOKABLE void setCatalogPresetIndex(int catalogPresetIndex);
     Q_INVOKABLE QString catalogUrlText() const;
     Q_INVOKABLE void setCatalogUrlText(const QString& catalogUrlText);
+    Q_INVOKABLE int deepSkyCatalogPresetIndex() const noexcept;
+    Q_INVOKABLE void setDeepSkyCatalogPresetIndex(int deepSkyCatalogPresetIndex);
+    Q_INVOKABLE QString deepSkyCatalogUrlText() const;
+    Q_INVOKABLE void setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUrlText);
     Q_INVOKABLE bool focusSearchTarget(const QString& targetKind, const QString& targetId);
     Q_INVOKABLE void clearSelectedSearchTarget();
 
@@ -222,6 +234,7 @@ signals:
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
     void catalogDatasetInfoTextChanged();
+    void deepSkyCatalogInfoTextChanged();
     void downloadingCatalogChanged();
     void catalogProcessingChanged();
     void selectedSearchTargetChanged();

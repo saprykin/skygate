@@ -205,7 +205,7 @@ Window {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.Wrap
-                    text: "Messier data derived from OpenNGC, CC-BY-SA-4.0"
+                    text: "Messier and OpenNGC data: OpenNGC, CC-BY-SA-4.0"
                     color: theme.textMuted
                     font.family: "Avenir Next"
                     font.pixelSize: 11

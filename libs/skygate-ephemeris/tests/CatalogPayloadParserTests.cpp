@@ -2,7 +2,9 @@
 
 #include <QtTest/QtTest>
 
+#include <algorithm>
 #include <array>
+#include <string>
 
 class CatalogPayloadParserTests final : public QObject {
     Q_OBJECT
@@ -10,6 +12,7 @@ class CatalogPayloadParserTests final : public QObject {
 private slots:
     void detectsPayloadFormats();
     void rejectsPipeRowsPayload();
+    void parsesOpenNgcPayload();
     void parsesHygGzipPayload();
     void parsesHygZipPayload();
     void reportsUnsupportedPayload();
@@ -26,6 +29,10 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
     QVERIFY(
         parser.detectFormat("id,hip,proper,ra,dec,mag\n")
         == skygate::ephemeris::CatalogPayloadFormat::HygCsv
+    );
+    QVERIFY(
+        parser.detectFormat("Name;Type;RA;Dec;M;NGC;IC\n")
+        == skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv
     );
 
     constexpr std::array<unsigned char, 2> kGzipPrefix {{0x1f, 0x8b}};
@@ -64,6 +71,66 @@ void CatalogPayloadParserTests::rejectsPipeRowsPayload()
     QVERIFY(!parseResult.isSuccess());
     QVERIFY(
         parseResult.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat
+    );
+}
+
+void CatalogPayloadParserTests::parsesOpenNgcPayload()
+{
+    constexpr std::string_view kOpenNgcCsv =
+        "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;Identifiers;Common names;NED notes;OpenNGC notes\n"
+        "SKIP0001;Star;00:00:00.00;+00:00:00.0;Psc;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"
+        "NGC0224;G;00:42:44.35;+41:16:08.6;And;177.83;69.66;35;4.36;3.44;;;;13.35;SA(s)b;;;;31;0224;;;PGC 2557,UGC 454;Andromeda Galaxy;;\n"
+        "NGC6720;PN;18:53:35.10;+33:01:45.0;Lyr;1.27;;0;;8.80;;;;;;;;;57;6720;;;PK 063+13 1;Ring Nebula;;\n";
+
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto parseResult = parser.parseResult(kOpenNgcCsv);
+    QVERIFY(parseResult.isSuccess());
+    QVERIFY(parseResult.catalog != nullptr);
+    QVERIFY(
+        parseResult.detectedFormat == skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv
+    );
+
+    const auto bodies = parseResult.catalog->bodies();
+    QCOMPARE(bodies.size(), 2U);
+
+    const auto m31It = std::find_if(
+        bodies.begin(),
+        bodies.end(),
+        [](const skygate::ephemeris::CelestialBody& body) {
+            return body.id == "messier_031";
+        }
+    );
+    QVERIFY(m31It != bodies.end());
+    QCOMPARE(m31It->displayName, std::string("M31"));
+    QVERIFY(m31It->type == skygate::ephemeris::CelestialBodyType::DeepSkyObject);
+    QVERIFY(
+        m31It->ephemerisSource
+        == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    );
+    QVERIFY(m31It->deepSkyObject.has_value());
+    QVERIFY(m31It->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Galaxy);
+    QVERIFY(m31It->deepSkyObject->majorAxisArcmin.has_value());
+    QCOMPARE(*m31It->deepSkyObject->majorAxisArcmin, 177.83);
+    QVERIFY(
+        std::find(
+            m31It->deepSkyObject->aliases.begin(),
+            m31It->deepSkyObject->aliases.end(),
+            std::string("Andromeda Galaxy")
+        ) != m31It->deepSkyObject->aliases.end()
+    );
+
+    const auto m57It = std::find_if(
+        bodies.begin(),
+        bodies.end(),
+        [](const skygate::ephemeris::CelestialBody& body) {
+            return body.id == "messier_057";
+        }
+    );
+    QVERIFY(m57It != bodies.end());
+    QVERIFY(
+        m57It->deepSkyObject.has_value()
+        && m57It->deepSkyObject->kind
+            == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula
     );
 }
 

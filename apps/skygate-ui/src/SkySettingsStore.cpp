@@ -100,6 +100,14 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         snapshot.catalogPresetIndex
     );
     settings.setValue(SkyContextSettings::key("catalogUrlText"), snapshot.catalogUrlText);
+    settings.setValue(
+        SkyContextSettings::key("deepSkyCatalogPresetIndex"),
+        snapshot.deepSkyCatalogPresetIndex
+    );
+    settings.setValue(
+        SkyContextSettings::key("deepSkyCatalogUrlText"),
+        snapshot.deepSkyCatalogUrlText
+    );
     settings.sync();
     return settings.status() == QSettings::NoError;
 }
@@ -225,6 +233,14 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
         SkyContextSettings::key("catalogUrlText"),
         snapshot.catalogUrlText
     ).toString();
+    snapshot.deepSkyCatalogPresetIndex = settings.value(
+        SkyContextSettings::key("deepSkyCatalogPresetIndex"),
+        snapshot.deepSkyCatalogPresetIndex
+    ).toInt();
+    snapshot.deepSkyCatalogUrlText = settings.value(
+        SkyContextSettings::key("deepSkyCatalogUrlText"),
+        snapshot.deepSkyCatalogUrlText
+    ).toString();
     return snapshot;
 }
 
@@ -246,6 +262,11 @@ bool SkySettingsStore::clearCatalogCache() const
 
     appendCachePath(configuredPath);
     appendCachePath(defaultPath);
+    appendCachePath(settings.value(
+        SkyContextSettings::key("deepSkyCatalogCachePath"),
+        SkyContextSettings::defaultDeepSkyCatalogCachePath()
+    ).toString());
+    appendCachePath(SkyContextSettings::defaultDeepSkyCatalogCachePath());
 
     if (!defaultPath.isEmpty()) {
         const QFileInfo defaultInfo(defaultPath);
@@ -268,7 +289,9 @@ bool SkySettingsStore::clearCatalogCache() const
     }
 
     settings.remove(SkyContextSettings::key("catalogCachePath"));
+    settings.remove(SkyContextSettings::key("deepSkyCatalogCachePath"));
     settings.remove(SkyContextSettings::key("catalogSourceLabel"));
+    settings.remove(SkyContextSettings::key("deepSkyCatalogSourceLabel"));
     settings.remove(SkyContextSettings::key("catalogConstellationLineRefs"));
     settings.remove(SkyContextSettings::key("catalogConstellationLabelRefs"));
     settings.remove(SkyContextSettings::key("catalogConstellationLineSchemaVersion"));
@@ -279,7 +302,7 @@ bool SkySettingsStore::clearCatalogCache() const
 
 bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) const
 {
-    if (snapshot.catalogPayload.isEmpty()) {
+    if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()) {
         return false;
     }
 
@@ -288,28 +311,39 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
         SkyContextSettings::key("catalogCachePath"),
         SkyContextSettings::defaultCatalogCachePath()
     ).toString();
-    if (configuredPath.isEmpty()) {
+    const QString configuredDeepSkyPath = settings.value(
+        SkyContextSettings::key("deepSkyCatalogCachePath"),
+        SkyContextSettings::defaultDeepSkyCatalogCachePath()
+    ).toString();
+    const auto writePayload = [](const QString& path, const QByteArray& payload) {
+        if (path.isEmpty() || payload.isEmpty()) {
+            return true;
+        }
+
+        const QFileInfo targetInfo(path);
+        QDir targetDir(targetInfo.absolutePath());
+        if (!targetDir.mkpath(".")) {
+            return false;
+        }
+
+        QSaveFile cacheFile(path);
+        if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            return false;
+        }
+
+        const qint64 writtenBytes = cacheFile.write(payload);
+        if (writtenBytes != payload.size()) {
+            cacheFile.cancelWriting();
+            return false;
+        }
+
+        return cacheFile.commit();
+    };
+
+    if (!writePayload(configuredPath, snapshot.catalogPayload)) {
         return false;
     }
-
-    const QFileInfo targetInfo(configuredPath);
-    QDir targetDir(targetInfo.absolutePath());
-    if (!targetDir.mkpath(".")) {
-        return false;
-    }
-
-    QSaveFile cacheFile(configuredPath);
-    if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        return false;
-    }
-
-    const qint64 writtenBytes = cacheFile.write(snapshot.catalogPayload);
-    if (writtenBytes != snapshot.catalogPayload.size()) {
-        cacheFile.cancelWriting();
-        return false;
-    }
-
-    if (!cacheFile.commit()) {
+    if (!writePayload(configuredDeepSkyPath, snapshot.deepSkyCatalogPayload)) {
         return false;
     }
 
@@ -317,10 +351,19 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
         SkyContextSettings::key("version"),
         SkyContextControllerConstants::kSettingsVersion
     );
-    settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
+    if (!snapshot.catalogPayload.isEmpty()) {
+        settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
+    }
+    if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
+        settings.setValue(SkyContextSettings::key("deepSkyCatalogCachePath"), configuredDeepSkyPath);
+    }
     settings.setValue(
         SkyContextSettings::key("catalogSourceLabel"),
         snapshot.sourceLabel
+    );
+    settings.setValue(
+        SkyContextSettings::key("deepSkyCatalogSourceLabel"),
+        snapshot.deepSkySourceLabel
     );
     settings.setValue(
         SkyContextSettings::key("catalogConstellationLineRefs"),
@@ -349,24 +392,37 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
         SkyContextSettings::key("catalogCachePath"),
         SkyContextSettings::defaultCatalogCachePath()
     ).toString();
-    if (configuredPath.isEmpty()) {
-        return std::nullopt;
-    }
-
-    QFile cacheFile(configuredPath);
-    if (!cacheFile.exists() || !cacheFile.open(QIODevice::ReadOnly)) {
-        return std::nullopt;
-    }
 
     CatalogCacheSnapshot snapshot;
-    snapshot.catalogPayload = cacheFile.readAll();
-    if (snapshot.catalogPayload.isEmpty()) {
+    QFile cacheFile(configuredPath);
+    if (!configuredPath.isEmpty() && cacheFile.exists() && cacheFile.open(QIODevice::ReadOnly)) {
+        snapshot.catalogPayload = cacheFile.readAll();
+    }
+
+    const QString configuredDeepSkyPath = settings.value(
+        SkyContextSettings::key("deepSkyCatalogCachePath"),
+        SkyContextSettings::defaultDeepSkyCatalogCachePath()
+    ).toString();
+    QFile deepSkyCacheFile(configuredDeepSkyPath);
+    if (
+        !configuredDeepSkyPath.isEmpty()
+        && deepSkyCacheFile.exists()
+        && deepSkyCacheFile.open(QIODevice::ReadOnly)
+    ) {
+        snapshot.deepSkyCatalogPayload = deepSkyCacheFile.readAll();
+    }
+
+    if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()) {
         return std::nullopt;
     }
 
     snapshot.sourceLabel = settings.value(
         SkyContextSettings::key("catalogSourceLabel"),
         QString("Saved")
+    ).toString();
+    snapshot.deepSkySourceLabel = settings.value(
+        SkyContextSettings::key("deepSkyCatalogSourceLabel"),
+        QString("Saved deep sky")
     ).toString();
     snapshot.constellationLineRows = settings.value(
         SkyContextSettings::key("catalogConstellationLineRefs")

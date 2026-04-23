@@ -35,8 +35,13 @@ public:
     static constexpr double kMagnitudeCutoffMin = -2.0;
     static constexpr double kMagnitudeCutoffMax = 12.0;
     static constexpr const char* kCatalogCacheFileName = "catalog-cache-v2.txt";
+    static constexpr const char* kDeepSkyCatalogCacheFileName = "deep-sky-catalog-cache-v1.txt";
     static constexpr const char* kHygCatalogPrimaryUrl =
         "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
+    static constexpr const char* kOpenNgcCatalogPrimaryUrl =
+        "https://raw.githubusercontent.com/mattiaverga/OpenNGC/refs/tags/v20260307/database_files/NGC.csv";
+    static constexpr const char* kOpenNgcCatalogMirrorUrl =
+        "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv";
     static constexpr const char* kStellariumConstellationLinesPrimaryUrl =
         "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/master/western/index.json";
     static constexpr const char* kStellariumConstellationLinesMirrorUrl =
@@ -96,6 +101,7 @@ class SkyContextSettings final {
 public:
     [[nodiscard]] static QString key(const QString& name);
     [[nodiscard]] static QString defaultCatalogCachePath();
+    [[nodiscard]] static QString defaultDeepSkyCatalogCachePath();
 };
 
 class SkyContextCatalogCodec final {

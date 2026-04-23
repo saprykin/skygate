@@ -240,6 +240,7 @@ Catalog import supports multiple payload shapes:
 - HYG CSV
 - gzip-compressed HYG CSV
 - zip archives containing HYG CSV
+- OpenNGC semicolon CSV for deep-sky objects
 
 The pipeline is:
 
@@ -254,9 +255,11 @@ merges bundled Sun, Moon, and planetary bodies back into the imported dataset.
 If the imported catalog has no stars, a small set of bundled reference stars is
 also retained so constellation line rendering still has anchor points.
 
-The bundled Messier layer is fixed-equatorial data and is merged into active
-catalogs alongside core solar-system bodies. Full OpenNGC download/import is
-reserved for a later catalog preset.
+Deep-sky objects are a fixed-equatorial catalog layer. The UI can use bundled
+Messier data or download/update the OpenNGC preset; `SkyCatalogManager` rebuilds
+the active `IStarCatalog` by merging that DSO layer with the current star
+catalog and core solar-system bodies. OpenNGC records are parsed and deduplicated
+in `libs/skygate-ephemeris`, not in QML or scene graph code.
 
 #### Constellation data
 Constellation lines and label anchors have two sources:

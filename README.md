@@ -14,8 +14,8 @@ that renders stars, constellations, the horizon, and overlay labels.
   `AzimuthalEquidistant`, and `Perspective`
 - Observer location from current device, bundled city catalog, or
   custom coordinates
-- Bundled starter catalog plus support for downloading HYG v4.2 stars
-  and Stellarium constellation data
+- Bundled starter catalog plus support for downloading HYG v4.2 stars,
+  OpenNGC deep-sky objects, and Stellarium constellation data
 - Persistent settings and cached catalog data between launches
 
 Ancient dates are intended for exploratory viewing. The date input uses a
@@ -139,9 +139,9 @@ cmake --build build --target package-skygate-ui-dmg
 
 - The app works with the bundled catalog out of the box; network access is only
   required for external catalog and constellation downloads.
-- Downloaded/imported catalogs are cached across launches via `QSettings` and an
-  app-data cache file.
-- Bundled Messier deep-sky object data is derived from OpenNGC v20260307 by
-  Mattia Verga, licensed under CC-BY-SA-4.0:
+- Downloaded/imported star and deep-sky catalogs are cached across launches via
+  `QSettings` and app-data cache files.
+- Bundled Messier deep-sky object data and the downloadable OpenNGC preset use
+  OpenNGC v20260307 by Mattia Verga, licensed under CC-BY-SA-4.0:
   https://github.com/mattiaverga/OpenNGC
 - For a deeper code tour, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

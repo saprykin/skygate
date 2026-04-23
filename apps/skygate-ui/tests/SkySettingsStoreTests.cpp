@@ -66,6 +66,8 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.overlayLayers.deepSkyLabels = false;
     savedSnapshot.catalogPresetIndex = 2;
     savedSnapshot.catalogUrlText = "https://example.com/catalog.csv";
+    savedSnapshot.deepSkyCatalogPresetIndex = 1;
+    savedSnapshot.deepSkyCatalogUrlText = "https://example.com/NGC.csv";
 
     QVERIFY(store.saveState(savedSnapshot));
     const auto loadedSnapshot = store.loadState();
@@ -83,6 +85,11 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QVERIFY(loadedSnapshot->overlayLayers.equals(savedSnapshot.overlayLayers));
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
+    QCOMPARE(
+        loadedSnapshot->deepSkyCatalogPresetIndex,
+        savedSnapshot.deepSkyCatalogPresetIndex
+    );
+    QCOMPARE(loadedSnapshot->deepSkyCatalogUrlText, savedSnapshot.deepSkyCatalogUrlText);
 }
 
 void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
@@ -108,13 +115,21 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()
         "skyContext/catalogCachePath",
         m_settingsDir.filePath("catalog-cache-test.txt")
     );
+    settings.setValue(
+        "skyContext/deepSkyCatalogCachePath",
+        m_settingsDir.filePath("deep-sky-catalog-cache-test.txt")
+    );
 
     SkySettingsStore store;
     SkySettingsStore::CatalogCacheSnapshot savedSnapshot;
     savedSnapshot.sourceLabel = "Saved";
+    savedSnapshot.deepSkySourceLabel = "Saved OpenNGC";
     savedSnapshot.catalogPayload =
         "id,hip,proper,ra,dec,mag\n"
         "1,42,Sirius,6.7525,-16.7161,-1.46\n";
+    savedSnapshot.deepSkyCatalogPayload =
+        "Name;Type;RA;Dec;M;NGC;IC\n"
+        "NGC0224;G;00:42:44.35;+41:16:08.6;31;0224;\n";
     savedSnapshot.constellationLineRows = "a|b\n";
     savedSnapshot.constellationLabelRows = "Orion|hip1,hip2\n";
     savedSnapshot.constellationLineSchemaVersion = 4;
@@ -124,7 +139,9 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()
     const auto loadedSnapshot = store.loadCatalogCache();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->sourceLabel, savedSnapshot.sourceLabel);
+    QCOMPARE(loadedSnapshot->deepSkySourceLabel, savedSnapshot.deepSkySourceLabel);
     QCOMPARE(loadedSnapshot->catalogPayload, savedSnapshot.catalogPayload);
+    QCOMPARE(loadedSnapshot->deepSkyCatalogPayload, savedSnapshot.deepSkyCatalogPayload);
     QCOMPARE(loadedSnapshot->constellationLineRows, savedSnapshot.constellationLineRows);
     QCOMPARE(
         loadedSnapshot->constellationLineSchemaVersion,

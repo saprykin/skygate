@@ -76,6 +76,12 @@ SkyContextController::SkyContextController(
     );
     connect(
         m_catalogManager.get(),
+        &SkyCatalogManager::deepSkyCatalogInfoTextChanged,
+        this,
+        &SkyContextController::deepSkyCatalogInfoTextChanged
+    );
+    connect(
+        m_catalogManager.get(),
         &SkyCatalogManager::downloadingCatalogChanged,
         this,
         &SkyContextController::downloadingCatalogChanged
@@ -329,6 +335,13 @@ QString SkyContextController::catalogDatasetInfoText() const
     return m_catalogManager != nullptr ? m_catalogManager->datasetInfoText() : QString();
 }
 
+QString SkyContextController::deepSkyCatalogInfoText() const
+{
+    return m_catalogManager != nullptr
+        ? m_catalogManager->deepSkyCatalogInfoText()
+        : QString();
+}
+
 QAbstractItemModel* SkyContextController::objectSearchModel() const noexcept
 {
     return m_objectSearchModel.get();
@@ -388,6 +401,11 @@ int SkyContextController::catalogPresetIndex() const noexcept
     return m_catalogManager != nullptr ? m_catalogManager->catalogPresetIndex() : 0;
 }
 
+int SkyContextController::deepSkyCatalogPresetIndex() const noexcept
+{
+    return m_catalogManager != nullptr ? m_catalogManager->deepSkyCatalogPresetIndex() : 0;
+}
+
 void SkyContextController::refreshObjectSearchModel()
 {
     if (m_objectSearchModel == nullptr) {
@@ -401,6 +419,13 @@ void SkyContextController::setCatalogPresetIndex(const int catalogPresetIndex)
 {
     if (m_catalogManager != nullptr) {
         m_catalogManager->setCatalogPresetIndex(catalogPresetIndex);
+    }
+}
+
+void SkyContextController::setDeepSkyCatalogPresetIndex(const int deepSkyCatalogPresetIndex)
+{
+    if (m_catalogManager != nullptr) {
+        m_catalogManager->setDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex);
     }
 }
 
@@ -429,6 +454,18 @@ void SkyContextController::setCatalogUrlText(const QString& catalogUrlText)
 {
     if (m_catalogManager != nullptr) {
         m_catalogManager->setCatalogUrlText(catalogUrlText);
+    }
+}
+
+QString SkyContextController::deepSkyCatalogUrlText() const
+{
+    return m_catalogManager != nullptr ? m_catalogManager->deepSkyCatalogUrlText() : QString();
+}
+
+void SkyContextController::setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUrlText)
+{
+    if (m_catalogManager != nullptr) {
+        m_catalogManager->setDeepSkyCatalogUrlText(deepSkyCatalogUrlText);
     }
 }
 

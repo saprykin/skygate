@@ -13,6 +13,7 @@ enum class CatalogPayloadFormat : std::uint8_t {
     HygCsv,
     HygCsvGzip,
     HygCsvZip,
+    OpenNgcCsv,
     Unknown
 };
 
@@ -22,6 +23,7 @@ enum class CatalogLoadErrorCode : std::uint8_t {
     UnsupportedFormat,
     MissingRequiredColumns,
     InvalidHygCsv,
+    InvalidOpenNgcCsv,
     InvalidGzipData,
     InvalidZipData,
     NoBodies

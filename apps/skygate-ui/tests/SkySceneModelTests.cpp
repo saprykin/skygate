@@ -8,6 +8,7 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -405,7 +406,15 @@ void SkySceneModelTests::deepSkyObjectsRenderAndCanBeHidden()
     controller.setElevationText("408.0");
 
     const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const auto& state = snapshot.states.front();
+    const auto m31StateIt = std::find_if(
+        snapshot.states.begin(),
+        snapshot.states.end(),
+        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
+            return snapshot.bodyAt(state.bodyIndex).displayName == "M31";
+        }
+    );
+    QVERIFY(m31StateIt != snapshot.states.end());
+    const auto& state = *m31StateIt;
     QVERIFY(std::isfinite(state.horizontal.altitudeDeg));
     QVERIFY(std::isfinite(state.horizontal.azimuthDeg));
     controller.setViewCenter(state.horizontal.altitudeDeg, state.horizontal.azimuthDeg);
@@ -415,8 +424,13 @@ void SkySceneModelTests::deepSkyObjectsRenderAndCanBeHidden()
     sceneModel.setViewportSize(1100.0, 760.0);
 
     QVERIFY(!sceneModel.renderGlyphSpan().empty());
-    const auto& glyph = sceneModel.renderGlyphSpan().front();
-    QCOMPARE(sceneModel.objectLabelAt(glyph.x, glyph.y), QString("M31"));
+    QVERIFY(std::any_of(
+        sceneModel.renderGlyphSpan().begin(),
+        sceneModel.renderGlyphSpan().end(),
+        [&sceneModel](const SkyRenderGlyph& glyph) {
+            return sceneModel.objectLabelAt(glyph.x, glyph.y) == "M31";
+        }
+    ));
 
     auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
     QVERIFY(overlayLayers != nullptr);

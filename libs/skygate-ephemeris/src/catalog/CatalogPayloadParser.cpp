@@ -101,6 +101,16 @@ CatalogPayloadFormat CatalogPayloadParser::detectFormat(const std::string_view p
         return CatalogPayloadFormat::HygCsv;
     }
 
+    if (
+        headerLine.find(';') != std::string_view::npos
+        && containsCaseInsensitiveToken(headerLine, "Name")
+        && containsCaseInsensitiveToken(headerLine, "Type")
+        && containsCaseInsensitiveToken(headerLine, "RA")
+        && containsCaseInsensitiveToken(headerLine, "Dec")
+    ) {
+        return CatalogPayloadFormat::OpenNgcCsv;
+    }
+
     return CatalogPayloadFormat::Unknown;
 }
 
@@ -150,6 +160,15 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
         return result;
     }
+    case CatalogPayloadFormat::OpenNgcCsv:
+        result = loadStarCatalog(
+            CatalogSourceType::OpenNgcCsv,
+            request.payload,
+            request.progressCallback,
+            request.selectionOptions
+        );
+        result.detectedFormat = CatalogPayloadFormat::OpenNgcCsv;
+        return result;
     case CatalogPayloadFormat::Unknown:
         break;
     }
