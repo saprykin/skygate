@@ -47,7 +47,14 @@ ApplicationWindow {
         id: statusFooter
         skyContextController: skyContext
         dateTimePopupOpen: dateTimePopup.opened
-        onDateTimeClicked: dateTimePopup.open()
+        onDateTimeClicked: {
+            if (dateTimePopup.opened) {
+                dateTimePopup.cancel()
+                return
+            }
+
+            dateTimePopup.open()
+        }
     }
 
     StatusDateTimePopup {

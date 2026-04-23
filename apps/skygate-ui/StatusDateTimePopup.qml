@@ -31,6 +31,10 @@ FocusScope {
         forceActiveFocus()
     }
 
+    function cancel() {
+        close()
+    }
+
     function close() {
         opened = false
         errorText = ""
@@ -172,7 +176,7 @@ FocusScope {
                 PreferencesActionButton {
                     width: 72
                     text: "Cancel"
-                    onClicked: dateTimePopup.close()
+                    onClicked: dateTimePopup.cancel()
                 }
 
                 PreferencesActionButton {
