@@ -62,6 +62,8 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.overlayLayers.celestialEquator = true;
     savedSnapshot.overlayLayers.circumpolarBoundary = true;
     savedSnapshot.overlayLayers.solarSystemLabels = false;
+    savedSnapshot.overlayLayers.deepSkyObjects = false;
+    savedSnapshot.overlayLayers.deepSkyLabels = false;
     savedSnapshot.catalogPresetIndex = 2;
     savedSnapshot.catalogUrlText = "https://example.com/catalog.csv";
 

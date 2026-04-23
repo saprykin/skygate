@@ -39,6 +39,18 @@ class SkyOverlayLayerSettings final : public QObject {
         WRITE setSolarSystemLabels
         NOTIFY solarSystemLabelsChanged
     )
+    Q_PROPERTY(
+        bool deepSkyObjects
+        READ deepSkyObjects
+        WRITE setDeepSkyObjects
+        NOTIFY deepSkyObjectsChanged
+    )
+    Q_PROPERTY(
+        bool deepSkyLabels
+        READ deepSkyLabels
+        WRITE setDeepSkyLabels
+        NOTIFY deepSkyLabelsChanged
+    )
 
 public:
     explicit SkyOverlayLayerSettings(QObject* parent = nullptr);
@@ -51,6 +63,8 @@ public:
     [[nodiscard]] bool celestialEquator() const noexcept;
     [[nodiscard]] bool circumpolarBoundary() const noexcept;
     [[nodiscard]] bool solarSystemLabels() const noexcept;
+    [[nodiscard]] bool deepSkyObjects() const noexcept;
+    [[nodiscard]] bool deepSkyLabels() const noexcept;
     [[nodiscard]] const SkyOverlayLayerVisibility& visibility() const noexcept;
 
     void setVisibility(const SkyOverlayLayerVisibility& visibility);
@@ -64,6 +78,8 @@ public slots:
     void setCelestialEquator(bool celestialEquator);
     void setCircumpolarBoundary(bool circumpolarBoundary);
     void setSolarSystemLabels(bool solarSystemLabels);
+    void setDeepSkyObjects(bool deepSkyObjects);
+    void setDeepSkyLabels(bool deepSkyLabels);
 
 signals:
     void horizonChanged();
@@ -74,6 +90,8 @@ signals:
     void celestialEquatorChanged();
     void circumpolarBoundaryChanged();
     void solarSystemLabelsChanged();
+    void deepSkyObjectsChanged();
+    void deepSkyLabelsChanged();
     void visibilityChanged();
 
 private:

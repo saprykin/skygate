@@ -68,6 +68,7 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     const auto* saturn = findStateById(snapshot, "saturn");
     const auto* uranus = findStateById(snapshot, "uranus");
     const auto* neptune = findStateById(snapshot, "neptune");
+    const auto* messier31 = findStateById(snapshot, "messier_031");
 
     QVERIFY(sun != nullptr);
     QVERIFY(sun->equatorial.rightAscensionHours > 0.0 && sun->equatorial.rightAscensionHours < 24.0);
@@ -108,6 +109,12 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     QVERIFY(neptune != nullptr);
     QVERIFY(std::isfinite(neptune->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(neptune->equatorial.declinationDeg));
+
+    QVERIFY(messier31 != nullptr);
+    QVERIFY(std::isfinite(messier31->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(messier31->equatorial.declinationDeg));
+    QVERIFY(std::isfinite(messier31->horizontal.altitudeDeg));
+    QVERIFY(std::isfinite(messier31->horizontal.azimuthDeg));
 }
 
 void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()

@@ -3,12 +3,24 @@
 #include "skygate/core/math/GeometryMath.hpp"
 
 #include <cstdint>
+#include <cmath>
+
+namespace {
+
+[[nodiscard]] bool isNear(const double actual, const double expected, const double tolerance = 1e-9)
+{
+    return std::abs(actual - expected) <= tolerance;
+}
+
+}  // namespace
 
 class GeometryMathTests final : public QObject {
     Q_OBJECT
 
 private slots:
     void squaredDistance2dUsesCartesianDelta();
+    void rotatedOffsetPoint2dAppliesDegreeRotation();
+    void ellipseOffsetPoint2dUsesParametricSamples();
     void perpendicularOffset2dBuildsNormalOffset();
     void gridHelpersUseFlooredCells();
     void areaScaleUsesSquareRootOfAreaRatio();
@@ -19,6 +31,40 @@ void GeometryMathTests::squaredDistance2dUsesCartesianDelta()
     QCOMPARE(skygate::core::GeometryMath::squaredDistance2d(1.0, 2.0, 4.0, 6.0), 25.0);
     QCOMPARE(skygate::core::GeometryMath::squaredDistance2d(4.0, 6.0, 1.0, 2.0), 25.0);
     QCOMPARE(skygate::core::GeometryMath::squaredDistance2d(-2.0, 3.0, -2.0, 3.0), 0.0);
+}
+
+void GeometryMathTests::rotatedOffsetPoint2dAppliesDegreeRotation()
+{
+    const auto quarterTurn = skygate::core::GeometryMath::rotatedOffsetPoint2d(
+        10.0,
+        20.0,
+        3.0,
+        0.0,
+        90.0
+    );
+    QVERIFY(isNear(quarterTurn.x, 10.0));
+    QVERIFY(isNear(quarterTurn.y, 23.0));
+
+    const auto halfTurn = skygate::core::GeometryMath::rotatedOffsetPoint2d(
+        10.0,
+        20.0,
+        3.0,
+        4.0,
+        180.0
+    );
+    QVERIFY(isNear(halfTurn.x, 7.0));
+    QVERIFY(isNear(halfTurn.y, 16.0));
+}
+
+void GeometryMathTests::ellipseOffsetPoint2dUsesParametricSamples()
+{
+    const auto start = skygate::core::GeometryMath::ellipseOffsetPoint2d(8.0, 4.0, 0, 4);
+    QVERIFY(isNear(start.x, 8.0));
+    QVERIFY(isNear(start.y, 0.0));
+
+    const auto quarter = skygate::core::GeometryMath::ellipseOffsetPoint2d(8.0, 4.0, 1, 4);
+    QVERIFY(isNear(quarter.x, 0.0));
+    QVERIFY(isNear(quarter.y, 4.0));
 }
 
 void GeometryMathTests::perpendicularOffset2dBuildsNormalOffset()

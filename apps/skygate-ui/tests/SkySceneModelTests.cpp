@@ -53,6 +53,7 @@ private slots:
     void showsSearchSelectionMarkerForFocusedBody();
     void themeChangesUpdateRenderedColors();
     void solarSystemLabelsCanBeHidden();
+    void deepSkyObjectsRenderAndCanBeHidden();
     void constellationLabelsAndLinesCanBeHiddenIndependently();
     void referenceLayerLabelsFollowVisibility();
 };
@@ -361,6 +362,67 @@ void SkySceneModelTests::solarSystemLabelsCanBeHidden()
     overlayLayers->setSolarSystemLabels(false);
 
     QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Demo Planet"));
+}
+
+void SkySceneModelTests::deepSkyObjectsRenderAndCanBeHidden()
+{
+    skygate::ephemeris::CelestialBody m31 = makeBody(
+        "messier_031",
+        "M31",
+        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+        3.44,
+        skygate::core::EquatorialCoordinate {
+            .rightAscensionHours = 0.7123,
+            .declinationDeg = 41.269
+        }
+    );
+    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+        .aliases = {"M31", "Andromeda Galaxy"},
+        .majorAxisArcmin = 177.0,
+        .minorAxisArcmin = 70.0,
+        .positionAngleDeg = 35.0,
+    };
+
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({m31});
+    QVERIFY(starCatalog != nullptr);
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-09-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
+    const auto& state = snapshot.states.front();
+    QVERIFY(std::isfinite(state.horizontal.altitudeDeg));
+    QVERIFY(std::isfinite(state.horizontal.azimuthDeg));
+    controller.setViewCenter(state.horizontal.altitudeDeg, state.horizontal.azimuthDeg);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(!sceneModel.renderGlyphSpan().empty());
+    const auto& glyph = sceneModel.renderGlyphSpan().front();
+    QCOMPARE(sceneModel.objectLabelAt(glyph.x, glyph.y), QString("M31"));
+
+    auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
+    QVERIFY(overlayLayers != nullptr);
+    overlayLayers->setDeepSkyObjects(false);
+
+    QVERIFY(sceneModel.renderGlyphSpan().empty());
 }
 
 void SkySceneModelTests::constellationLabelsAndLinesCanBeHiddenIndependently()

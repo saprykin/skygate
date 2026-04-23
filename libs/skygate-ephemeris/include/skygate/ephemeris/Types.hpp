@@ -16,7 +16,8 @@ enum class CelestialBodyType : std::uint8_t {
     Planet,
     Moon,
     Sun,
-    Constellation
+    Constellation,
+    DeepSkyObject
 };
 
 enum class CelestialBodyEphemerisSource : std::uint8_t {
@@ -29,6 +30,24 @@ enum class CelestialBodyEphemerisSource : std::uint8_t {
     Constellation
 };
 
+enum class DeepSkyObjectKind : std::uint8_t {
+    Unknown,
+    Galaxy,
+    OpenCluster,
+    GlobularCluster,
+    Nebula,
+    PlanetaryNebula,
+    Asterism
+};
+
+struct DeepSkyObjectInfo {
+    DeepSkyObjectKind kind = DeepSkyObjectKind::Unknown;
+    std::vector<std::string> aliases;
+    std::optional<double> majorAxisArcmin;
+    std::optional<double> minorAxisArcmin;
+    std::optional<double> positionAngleDeg;
+};
+
 struct CelestialBody {
     std::string id;
     std::string displayName;
@@ -36,6 +55,7 @@ struct CelestialBody {
     CelestialBodyEphemerisSource ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
     double visualMagnitude = 0.0;
     std::optional<core::EquatorialCoordinate> fixedEquatorial;
+    std::optional<DeepSkyObjectInfo> deepSkyObject;
 };
 
 struct CelestialBodyState {

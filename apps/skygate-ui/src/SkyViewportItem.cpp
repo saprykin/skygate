@@ -20,6 +20,7 @@
 #include <mutex>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -33,6 +34,7 @@ constexpr float kGridLineWidthPx = 1.0F;
 constexpr float kCardinalLineWidthPx = 1.8F;
 constexpr float kHorizonLineWidthPx = 2.2F;
 constexpr float kReferenceLineWidthPx = 1.4F;
+constexpr int kGlyphEllipseSampleCount = 32;
 struct LineSegment final {
     float x1 = 0.0F;
     float y1 = 0.0F;
@@ -340,6 +342,156 @@ void appendProjectedPolyline(
     }
 }
 
+[[nodiscard]] std::pair<float, float> rotatedGlyphPoint(
+    const SkyRenderGlyph& glyph,
+    const double x,
+    const double y
+)
+{
+    const auto point = skygate::core::GeometryMath::rotatedOffsetPoint2d(
+        glyph.x,
+        glyph.y,
+        x,
+        y,
+        glyph.rotationDeg
+    );
+    return {
+        static_cast<float>(point.x),
+        static_cast<float>(point.y)
+    };
+}
+
+void appendGlyphCircle(
+    std::vector<LineSegment>& lineSegments,
+    const SkyRenderGlyph& glyph,
+    const double radiusXScale,
+    const double radiusYScale
+)
+{
+    const auto previousOffset = skygate::core::GeometryMath::ellipseOffsetPoint2d(
+        glyph.radiusXPx * radiusXScale,
+        glyph.radiusYPx * radiusYScale,
+        0,
+        kGlyphEllipseSampleCount
+    );
+    auto previous = rotatedGlyphPoint(
+        glyph,
+        previousOffset.x,
+        previousOffset.y
+    );
+    for (int index = 1; index <= kGlyphEllipseSampleCount; ++index) {
+        const auto nextOffset = skygate::core::GeometryMath::ellipseOffsetPoint2d(
+            glyph.radiusXPx * radiusXScale,
+            glyph.radiusYPx * radiusYScale,
+            index,
+            kGlyphEllipseSampleCount
+        );
+        const auto next = rotatedGlyphPoint(
+            glyph,
+            nextOffset.x,
+            nextOffset.y
+        );
+        appendLineSegment(
+            lineSegments,
+            previous.first,
+            previous.second,
+            next.first,
+            next.second,
+            static_cast<float>(glyph.widthPx),
+            glyph.color
+        );
+        previous = next;
+    }
+}
+
+void appendGlyphCross(
+    std::vector<LineSegment>& lineSegments,
+    const SkyRenderGlyph& glyph,
+    const double scale
+)
+{
+    const auto left = rotatedGlyphPoint(glyph, -glyph.radiusXPx * scale, 0.0);
+    const auto right = rotatedGlyphPoint(glyph, glyph.radiusXPx * scale, 0.0);
+    const auto top = rotatedGlyphPoint(glyph, 0.0, -glyph.radiusYPx * scale);
+    const auto bottom = rotatedGlyphPoint(glyph, 0.0, glyph.radiusYPx * scale);
+    appendLineSegment(
+        lineSegments,
+        left.first,
+        left.second,
+        right.first,
+        right.second,
+        static_cast<float>(glyph.widthPx),
+        glyph.color
+    );
+    appendLineSegment(
+        lineSegments,
+        top.first,
+        top.second,
+        bottom.first,
+        bottom.second,
+        static_cast<float>(glyph.widthPx),
+        glyph.color
+    );
+}
+
+void appendGlyphDiamond(
+    std::vector<LineSegment>& lineSegments,
+    const SkyRenderGlyph& glyph
+)
+{
+    const std::array<std::pair<float, float>, 4> points {{
+        rotatedGlyphPoint(glyph, 0.0, -glyph.radiusYPx),
+        rotatedGlyphPoint(glyph, glyph.radiusXPx, 0.0),
+        rotatedGlyphPoint(glyph, 0.0, glyph.radiusYPx),
+        rotatedGlyphPoint(glyph, -glyph.radiusXPx, 0.0),
+    }};
+    for (std::size_t index = 0; index < points.size(); ++index) {
+        const auto& start = points[index];
+        const auto& end = points[(index + 1U) % points.size()];
+        appendLineSegment(
+            lineSegments,
+            start.first,
+            start.second,
+            end.first,
+            end.second,
+            static_cast<float>(glyph.widthPx),
+            glyph.color
+        );
+    }
+}
+
+void appendDeepSkyGlyph(
+    std::vector<LineSegment>& lineSegments,
+    const SkyRenderGlyph& glyph
+)
+{
+    switch (glyph.kind) {
+    case skygate::ephemeris::DeepSkyObjectKind::Galaxy:
+        appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
+        appendGlyphCircle(lineSegments, glyph, 0.58, 0.58);
+        break;
+    case skygate::ephemeris::DeepSkyObjectKind::OpenCluster:
+    case skygate::ephemeris::DeepSkyObjectKind::Asterism:
+        appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
+        break;
+    case skygate::ephemeris::DeepSkyObjectKind::GlobularCluster:
+        appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
+        appendGlyphCross(lineSegments, glyph, 0.62);
+        break;
+    case skygate::ephemeris::DeepSkyObjectKind::Nebula:
+        appendGlyphDiamond(lineSegments, glyph);
+        appendGlyphCircle(lineSegments, glyph, 0.68, 0.68);
+        break;
+    case skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula:
+        appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
+        appendGlyphCross(lineSegments, glyph, 1.0);
+        break;
+    case skygate::ephemeris::DeepSkyObjectKind::Unknown:
+        appendGlyphDiamond(lineSegments, glyph);
+        break;
+    }
+}
+
 }  // namespace
 
 struct SkyViewportItem::ViewportRenderData final {
@@ -352,6 +504,7 @@ struct SkyViewportItem::ViewportRenderData final {
     skygate::core::UtcTimePoint utcTime {};
     std::vector<SkyRenderLine> lines;
     std::vector<SkyRenderPoint> points;
+    std::vector<SkyRenderGlyph> glyphs;
 };
 
 SkyViewportItem::SkyViewportItem(QQuickItem* parent)
@@ -586,6 +739,10 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         );
     }
 
+    for (const auto& glyph : renderData->glyphs) {
+        appendDeepSkyGlyph(lineSegments, glyph);
+    }
+
     syncBatchedLineNodes(rootNode->lineRoot(), lineSegments);
     syncBatchedPointNodes(rootNode->pointRoot(), renderData->points);
 
@@ -637,6 +794,8 @@ void SkyViewportItem::synchronizeRenderData()
 
             const auto points = m_skySceneModel->renderPointSpan();
             nextRenderData->points.assign(points.begin(), points.end());
+            const auto glyphs = m_skySceneModel->renderGlyphSpan();
+            nextRenderData->glyphs.assign(glyphs.begin(), glyphs.end());
         }
     }
 

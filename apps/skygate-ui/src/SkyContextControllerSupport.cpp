@@ -417,6 +417,8 @@ QColor SkyContextRenderStyle::colorForBodyType(
         return renderPalette.bodyStar;
     case skygate::ephemeris::CelestialBodyType::Constellation:
         return renderPalette.bodyConstellation;
+    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
+        return renderPalette.bodyDeepSkyObject;
     }
 
     return renderPalette.bodyStar;

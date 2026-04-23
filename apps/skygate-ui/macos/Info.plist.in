@@ -17,6 +17,8 @@
     <string>APPL</string>
     <key>CFBundleIconName</key>
     <string>Skygate</string>
+    <key>CFBundleGetInfoString</key>
+    <string>SkyGate ${MACOSX_BUNDLE_SHORT_VERSION_STRING}. Messier data derived from OpenNGC, CC-BY-SA-4.0.</string>
     <key>CFBundleShortVersionString</key>
     <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
     <key>CFBundleVersion</key>

@@ -7,11 +7,11 @@ Window {
     id: aboutWindow
     title: "About SkyGate"
     width: 420
-    height: 356
+    height: 388
     minimumWidth: 420
-    minimumHeight: 356
+    minimumHeight: 388
     maximumWidth: 420
-    maximumHeight: 356
+    maximumHeight: 388
     visible: false
     readonly property var theme: skyContext.theme
     color: theme.windowBackground
@@ -197,6 +197,17 @@ Window {
                     text: "Git " + skygateGitHash + "  |  Built " + skygateBuildDateTime
                     color: theme.monospaceText
                     font.family: "Menlo"
+                    font.pixelSize: 11
+                }
+
+                Label {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: "Messier data derived from OpenNGC, CC-BY-SA-4.0"
+                    color: theme.textMuted
+                    font.family: "Avenir Next"
                     font.pixelSize: 11
                 }
 

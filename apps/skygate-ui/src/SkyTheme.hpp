@@ -141,10 +141,12 @@ namespace skygate::ui::internal {
     X(bodyPlanet) \
     X(bodyStar) \
     X(bodyConstellation) \
+    X(bodyDeepSkyObject) \
     X(labelSun) \
     X(labelMoon) \
     X(labelPlanet) \
     X(labelConstellation) \
+    X(labelDeepSkyObject) \
     X(labelDefault) \
     X(overlayTooltipBackground) \
     X(overlayTooltipBorder) \

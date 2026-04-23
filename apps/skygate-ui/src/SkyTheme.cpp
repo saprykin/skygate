@@ -157,10 +157,12 @@ namespace {
     theme.render.bodyPlanet = QColor(255, 188, 140, 220);
     theme.render.bodyStar = QColor(188, 214, 255, 210);
     theme.render.bodyConstellation = QColor(160, 244, 200, 205);
+    theme.render.bodyDeepSkyObject = QColor(126, 230, 202, 185);
     theme.render.labelSun = QColor(255, 224, 135, 235);
     theme.render.labelMoon = QColor(152, 247, 255, 245);
     theme.render.labelPlanet = QColor(255, 196, 148, 235);
     theme.render.labelConstellation = QColor(201, 220, 255, 230);
+    theme.render.labelDeepSkyObject = QColor(168, 242, 218, 225);
     theme.render.labelDefault = QColor(201, 220, 255, 230);
     theme.render.overlayTooltipBackground = QColor("#cc0a1222");
     theme.render.overlayTooltipBorder = QColor("#6b8fc8");

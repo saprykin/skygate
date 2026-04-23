@@ -1,5 +1,8 @@
 #include "skygate/core/math/GeometryMath.hpp"
 
+#include "skygate/core/math/AngleMath.hpp"
+#include "skygate/core/math/MathConstants.hpp"
+
 #include <cmath>
 
 namespace skygate::core {
@@ -19,6 +22,45 @@ double GeometryMath::squaredDistance2d(
 double GeometryMath::length2d(const double x, const double y) noexcept
 {
     return std::hypot(x, y);
+}
+
+Vector2d GeometryMath::rotatedOffsetPoint2d(
+    const double originX,
+    const double originY,
+    const double offsetX,
+    const double offsetY,
+    const double rotationDeg
+) noexcept
+{
+    const double rotationRadians = AngleMath::toRadians(rotationDeg);
+    const double cosRotation = std::cos(rotationRadians);
+    const double sinRotation = std::sin(rotationRadians);
+    return Vector2d {
+        .x = originX + (offsetX * cosRotation) - (offsetY * sinRotation),
+        .y = originY + (offsetX * sinRotation) + (offsetY * cosRotation)
+    };
+}
+
+Vector2d GeometryMath::ellipseOffsetPoint2d(
+    const double radiusX,
+    const double radiusY,
+    const int sampleIndex,
+    const int sampleCount
+) noexcept
+{
+    if (sampleCount <= 0) {
+        return Vector2d {
+            .x = radiusX,
+            .y = 0.0
+        };
+    }
+
+    const double angle = (2.0 * MathConstants::kPi * static_cast<double>(sampleIndex))
+        / static_cast<double>(sampleCount);
+    return Vector2d {
+        .x = std::cos(angle) * radiusX,
+        .y = std::sin(angle) * radiusY
+    };
 }
 
 std::optional<Vector2d> GeometryMath::perpendicularOffset2d(

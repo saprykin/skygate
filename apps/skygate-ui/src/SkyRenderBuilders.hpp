@@ -30,9 +30,23 @@ struct SkyRenderLine final {
     QColor color;
 };
 
+struct SkyRenderGlyph final {
+    double x = 0.0;
+    double y = 0.0;
+    double radiusXPx = 4.0;
+    double radiusYPx = 4.0;
+    double rotationDeg = 0.0;
+    double widthPx = 1.0;
+    std::uint32_t bodyIndex = 0;
+    skygate::ephemeris::DeepSkyObjectKind kind =
+        skygate::ephemeris::DeepSkyObjectKind::Unknown;
+    QColor color;
+};
+
 struct SkyRenderFrame final {
     std::vector<SkyRenderPoint> points;
     std::vector<SkyRenderLine> lines;
+    std::vector<SkyRenderGlyph> glyphs;
     QVariantList labels;
 };
 

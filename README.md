@@ -7,6 +7,7 @@ that renders stars, constellations, the horizon, and overlay labels.
 ## Highlights
 
 - Interactive sky map with pan, zoom, hover, and label overlays
+- Bundled Messier deep-sky object markers with symbolic glyph rendering
 - Time playback controls with pause, step, and speed adjustment
 - Fixed UTC popup accepts BCE/BC dates using proleptic Gregorian years
 - Multiple projections: `Stereographic`,
@@ -140,4 +141,7 @@ cmake --build build --target package-skygate-ui-dmg
   required for external catalog and constellation downloads.
 - Downloaded/imported catalogs are cached across launches via `QSettings` and an
   app-data cache file.
+- Bundled Messier deep-sky object data is derived from OpenNGC v20260307 by
+  Mattia Verga, licensed under CC-BY-SA-4.0:
+  https://github.com/mattiaverga/OpenNGC
 - For a deeper code tour, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

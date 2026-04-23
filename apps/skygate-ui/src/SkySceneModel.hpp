@@ -51,6 +51,7 @@ public:
     [[nodiscard]] std::optional<skygate::core::PreparedProjection> preparedProjection() const;
     [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan() const;
     [[nodiscard]] std::span<const SkyRenderLine> renderLineSpan() const;
+    [[nodiscard]] std::span<const SkyRenderGlyph> renderGlyphSpan() const;
 
 signals:
     void skyContextControllerChanged();
@@ -101,10 +102,18 @@ private:
     };
 
     struct SceneFrameData final {
+        struct HoverTarget final {
+            std::uint32_t bodyIndex = 0;
+            double x = 0.0;
+            double y = 0.0;
+            double radiusPx = 0.0;
+        };
+
         std::optional<skygate::core::PreparedProjection> preparedProjection;
         skygate::ephemeris::SkySnapshot snapshot;
         SkyRenderFrame frame;
-        std::unordered_map<std::uint64_t, std::vector<std::size_t>> hoverPointIndicesByCell;
+        std::vector<HoverTarget> hoverTargets;
+        std::unordered_map<std::uint64_t, std::vector<std::size_t>> hoverTargetIndicesByCell;
         QHash<QString, std::size_t> stateIndexByBodyId;
         QVariantList overlayItems;
         QVariantMap selectionMarker;

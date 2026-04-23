@@ -82,8 +82,9 @@ QString SkyCatalogManager::statusText() const
 QString SkyCatalogManager::datasetInfoText() const
 {
     const QLocale locale = QLocale::system();
-    return QString("Objects: %1 | Constellations: %2").arg(
+    return QString("Objects: %1 | Deep sky: %2 | Constellations: %3").arg(
         locale.toString(static_cast<qulonglong>(m_bodyCount)),
+        locale.toString(static_cast<qulonglong>(m_deepSkyObjectCount)),
         locale.toString(static_cast<qulonglong>(m_constellationCount))
     );
 }
@@ -550,6 +551,7 @@ void SkyCatalogManager::applyCatalog(
     if (catalog == nullptr) {
         m_bodyCount = 0;
         m_constellationCount = 0;
+        m_deepSkyObjectCount = 0;
         m_statusText = "Catalog: Failed to load";
         emit statusTextChanged();
         emit datasetInfoTextChanged();
@@ -558,9 +560,13 @@ void SkyCatalogManager::applyCatalog(
 
     const auto bodies = catalog->bodies();
     std::size_t constellationCount = 0;
+    std::size_t deepSkyObjectCount = 0;
     for (const auto& body : bodies) {
         if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
             ++constellationCount;
+        }
+        if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
+            ++deepSkyObjectCount;
         }
     }
 
@@ -569,10 +575,12 @@ void SkyCatalogManager::applyCatalog(
     ++m_catalogRevision;
     m_bodyCount = bodies.size();
     m_constellationCount = constellationCount;
+    m_deepSkyObjectCount = deepSkyObjectCount;
     m_sourceLabel = sourceLabel;
-    m_statusText = QString("Catalog: %1 (%2 objects, %3 constellations)").arg(
+    m_statusText = QString("Catalog: %1 (%2 objects, %3 deep sky, %4 constellations)").arg(
         sourceLabel,
         QString::number(static_cast<qulonglong>(bodies.size())),
+        QString::number(static_cast<qulonglong>(deepSkyObjectCount)),
         QString::number(static_cast<qulonglong>(constellationCount))
     );
     if (persistCatalog) {

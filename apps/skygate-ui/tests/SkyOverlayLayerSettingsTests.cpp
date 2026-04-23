@@ -25,6 +25,8 @@ void SkyOverlayLayerSettingsTests::defaultsMatchLayerPolicy()
     QVERIFY(!settings.celestialEquator());
     QVERIFY(!settings.circumpolarBoundary());
     QVERIFY(settings.solarSystemLabels());
+    QVERIFY(settings.deepSkyObjects());
+    QVERIFY(settings.deepSkyLabels());
 }
 
 void SkyOverlayLayerSettingsTests::settersEmitSpecificAndAggregateSignals()
@@ -50,15 +52,18 @@ void SkyOverlayLayerSettingsTests::setVisibilityEmitsChangedSignalsOnce()
     SkyOverlayLayerSettings settings;
     QSignalSpy horizonSpy(&settings, &SkyOverlayLayerSettings::horizonChanged);
     QSignalSpy eclipticSpy(&settings, &SkyOverlayLayerSettings::eclipticChanged);
+    QSignalSpy deepSkyLabelsSpy(&settings, &SkyOverlayLayerSettings::deepSkyLabelsChanged);
     QSignalSpy visibilitySpy(&settings, &SkyOverlayLayerSettings::visibilityChanged);
 
     SkyOverlayLayerVisibility visibility = settings.visibility();
     visibility.horizon = false;
     visibility.ecliptic = true;
+    visibility.deepSkyLabels = false;
     settings.setVisibility(visibility);
 
     QCOMPARE(horizonSpy.count(), 1);
     QCOMPARE(eclipticSpy.count(), 1);
+    QCOMPARE(deepSkyLabelsSpy.count(), 1);
     QCOMPARE(visibilitySpy.count(), 1);
 }
 

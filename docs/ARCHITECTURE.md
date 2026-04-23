@@ -45,8 +45,8 @@ Normal frame production works like this:
 2. The controller emits `skyContextChanged()`.
 3. `SkySceneModel` decides whether it must recompute an ephemeris snapshot,
    rebuild projected render data, or both.
-4. `SkyRenderFrameBuilder` converts snapshot data into render points, lines, and
-   overlay labels.
+4. `SkyRenderFrameBuilder` converts snapshot data into render points, lines,
+   symbolic deep-sky glyphs, and overlay labels.
 5. `SkyViewportItem` copies the derived frame into render data and rebuilds
    batched `QSGNode` geometry.
 6. QML overlay components render hover labels and scene annotations on top of
@@ -76,14 +76,15 @@ This module is the application layer and the most stateful part of the system.
   - Produces:
     - cached `skygate::ephemeris::SkySnapshot`
     - cached `skygate::core::PreparedProjection`
-    - `SkyRenderFrame` with projected points, constellation segments, and
-      labels
+    - `SkyRenderFrame` with projected points, constellation segments,
+      deep-sky glyphs, and labels
     - `overlayItems` for QML overlays
   - Also builds a spatial hover lookup for hit-testing object labels.
 - `SkyViewportItem`
   - Custom `QQuickItem` responsible for drawing the sky in the Qt scene graph.
   - Renders:
     - projected celestial points
+    - symbolic Messier deep-sky glyphs
     - projected constellation segments
     - horizon line
     - altitude/azimuth grid
@@ -196,7 +197,8 @@ computation.
 - `InMemoryStarCatalog`
   - Current concrete catalog implementation backed by a `std::vector`.
 - `CelestialBody`
-  - Body metadata, type, magnitude, and optional fixed equatorial coordinates.
+  - Body metadata, type, magnitude, optional fixed equatorial coordinates, and
+    optional deep-sky metadata for Messier objects.
 - `CelestialBodyEphemerisSource`
   - Explicit dispatch key describing how runtime coordinates should be
     produced.
@@ -233,6 +235,7 @@ Its responsibilities are:
 Catalog import supports multiple payload shapes:
 
 - bundled starter rows
+- bundled Messier deep-sky objects derived from OpenNGC
 - saved pipe-row cache format
 - HYG CSV
 - gzip-compressed HYG CSV
@@ -250,6 +253,10 @@ When an external catalog is activated, `createCatalogWithCoreSolarSystemBodies`
 merges bundled Sun, Moon, and planetary bodies back into the imported dataset.
 If the imported catalog has no stars, a small set of bundled reference stars is
 also retained so constellation line rendering still has anchor points.
+
+The bundled Messier layer is fixed-equatorial data and is merged into active
+catalogs alongside core solar-system bodies. Full OpenNGC download/import is
+reserved for a later catalog preset.
 
 #### Constellation data
 Constellation lines and label anchors have two sources:

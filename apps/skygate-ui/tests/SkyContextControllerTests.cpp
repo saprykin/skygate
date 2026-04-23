@@ -340,6 +340,8 @@ void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
     snapshot.overlayLayers.celestialEquator = true;
     snapshot.overlayLayers.circumpolarBoundary = true;
     snapshot.overlayLayers.solarSystemLabels = false;
+    snapshot.overlayLayers.deepSkyObjects = false;
+    snapshot.overlayLayers.deepSkyLabels = false;
     QVERIFY(store.saveState(snapshot));
 
     const auto controller = createController(true);
@@ -353,6 +355,8 @@ void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
     QVERIFY(overlayLayers->celestialEquator());
     QVERIFY(overlayLayers->circumpolarBoundary());
     QVERIFY(!overlayLayers->solarSystemLabels());
+    QVERIFY(!overlayLayers->deepSkyObjects());
+    QVERIFY(!overlayLayers->deepSkyLabels());
 }
 
 void SkyContextControllerTests::setUtcDateTimeTextAppliesAtomically()

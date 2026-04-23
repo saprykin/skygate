@@ -98,6 +98,8 @@ struct DecimatedStarPoint final {
         return renderTheme.labelPlanet;
     case skygate::ephemeris::CelestialBodyType::Constellation:
         return renderTheme.labelConstellation;
+    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
+        return renderTheme.labelDeepSkyObject;
     case skygate::ephemeris::CelestialBodyType::Star:
         break;
     }
@@ -186,6 +188,85 @@ struct DecimatedStarPoint final {
     return point;
 }
 
+[[nodiscard]] double deepSkyMagnitudeCutoff(
+    const double fovDeg,
+    const double magnitudeCutoff
+)
+{
+    if (fovDeg > 90.0) {
+        return std::min(magnitudeCutoff, 5.8);
+    }
+    if (fovDeg > 60.0) {
+        return std::min(magnitudeCutoff + 1.0, 7.2);
+    }
+    if (fovDeg > 35.0) {
+        return std::min(magnitudeCutoff + 2.0, 9.0);
+    }
+    return magnitudeCutoff + 4.0;
+}
+
+[[nodiscard]] bool shouldRenderDeepSkyObject(
+    const skygate::ephemeris::CelestialBody& body,
+    const skygate::core::ProjectionParams& projectionParams,
+    const double magnitudeCutoff,
+    const SkyOverlayLayerVisibility& overlayLayers
+)
+{
+    if (!overlayLayers.deepSkyObjects) {
+        return false;
+    }
+
+    if (!std::isfinite(body.visualMagnitude)) {
+        return projectionParams.fovDeg <= 35.0;
+    }
+
+    return body.visualMagnitude <= deepSkyMagnitudeCutoff(
+        projectionParams.fovDeg,
+        magnitudeCutoff
+    );
+}
+
+[[nodiscard]] SkyRenderGlyph makeRenderGlyph(
+    const skygate::ephemeris::CelestialBody& body,
+    const std::uint32_t bodyIndex,
+    const skygate::core::ScreenPoint& projected,
+    const skygate::core::ProjectionParams& projectionParams,
+    const SkyThemeRenderPalette& renderTheme
+)
+{
+    const skygate::ephemeris::DeepSkyObjectInfo defaultInfo;
+    const auto& info = body.deepSkyObject.has_value() ? *body.deepSkyObject : defaultInfo;
+    const double pixelsPerDeg = std::min(
+        projectionParams.viewportWidth,
+        projectionParams.viewportHeight
+    ) / std::max(1.0, projectionParams.fovDeg);
+    const double majorArcmin = info.majorAxisArcmin.value_or(10.0);
+    const double minorArcmin = info.minorAxisArcmin.value_or(majorArcmin);
+    const double radiusX = ((majorArcmin / 60.0) * pixelsPerDeg) * 0.5;
+    const double radiusY = ((minorArcmin / 60.0) * pixelsPerDeg) * 0.5;
+
+    SkyRenderGlyph glyph;
+    glyph.x = projected.x;
+    glyph.y = projected.y;
+    glyph.bodyIndex = bodyIndex;
+    glyph.kind = info.kind;
+    glyph.radiusXPx = std::clamp(radiusX, 4.5, 44.0);
+    glyph.radiusYPx = std::clamp(radiusY, 4.0, 32.0);
+    if (info.kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula) {
+        glyph.radiusXPx = std::clamp(radiusX, 5.0, 12.0);
+        glyph.radiusYPx = glyph.radiusXPx;
+    }
+    glyph.rotationDeg = info.positionAngleDeg.value_or(0.0);
+    glyph.widthPx = 1.25;
+    glyph.color = SkyContextRenderStyle::colorForBodyType(body.type, renderTheme);
+    return glyph;
+}
+
+[[nodiscard]] double deepSkyHitRadius(const SkyRenderGlyph& glyph)
+{
+    return std::max({glyph.radiusXPx, glyph.radiusYPx, 8.0});
+}
+
 void appendLabel(
     QVariantList& labels,
     const double x,
@@ -228,6 +309,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     std::unordered_map<std::uint64_t, std::size_t> starPointIndexByCell;
     std::vector<DecimatedStarPoint> decimatedStarPoints;
     frame.points.reserve(snapshot.states.size() / 8U);
+    frame.glyphs.reserve(128U);
     if (starCellSizePx > 0.0) {
         starPointIndexByCell.reserve(snapshot.states.size() / 6U);
         decimatedStarPoints.reserve(snapshot.states.size() / 6U);
@@ -257,8 +339,31 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             continue;
         }
 
+        if (
+            body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject
+            && !shouldRenderDeepSkyObject(
+                body,
+                projection.params(),
+                magnitudeCutoff,
+                overlayLayers
+            )
+        ) {
+            continue;
+        }
+
         const auto projected = projection.project(state.horizontal);
         if (!projected.isVisible) {
+            continue;
+        }
+
+        if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
+            frame.glyphs.push_back(makeRenderGlyph(
+                body,
+                state.bodyIndex,
+                projected,
+                projection.params(),
+                renderTheme
+            ));
             continue;
         }
 
@@ -390,6 +495,32 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             body.displayName,
             labelColorForBodyType(body.type, renderTheme)
         );
+    }
+
+    if (overlayLayers.deepSkyLabels && projection.params().fovDeg <= 35.0) {
+        for (const auto& glyph : frame.glyphs) {
+            const auto& body = snapshot.bodyAt(glyph.bodyIndex);
+            if (body.displayName.empty() || !seenLabels.insert(body.displayName).second) {
+                continue;
+            }
+
+            if (
+                glyph.x < kEdgeMarginPx
+                || glyph.x > (viewportWidth - kEdgeMarginPx)
+                || glyph.y < kEdgeMarginPx
+                || glyph.y > (viewportHeight - kEdgeMarginPx)
+            ) {
+                continue;
+            }
+
+            appendLabel(
+                frame.labels,
+                glyph.x,
+                glyph.y - deepSkyHitRadius(glyph),
+                body.displayName,
+                labelColorForBodyType(body.type, renderTheme)
+            );
+        }
     }
 
     if (lookup.has_value() && overlayLayers.constellationLabels) {

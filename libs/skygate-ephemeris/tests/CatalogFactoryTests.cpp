@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <algorithm>
+#include <string>
 
 class CatalogFactoryTests final : public QObject {
     Q_OBJECT
@@ -24,12 +25,16 @@ void CatalogFactoryTests::createsBundledCatalogBySourceType()
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
-    QVERIFY(bodies.size() == 9U);
-    QVERIFY(std::all_of(bodies.begin(), bodies.end(), [](const auto& body) {
-        return body.type == skygate::ephemeris::CelestialBodyType::Sun
-            || body.type == skygate::ephemeris::CelestialBodyType::Moon
-            || body.type == skygate::ephemeris::CelestialBodyType::Planet;
-    }));
+    QVERIFY(bodies.size() == 119U);
+    const auto messier31It = std::find_if(bodies.begin(), bodies.end(), [](const auto& body) {
+        return body.id == "messier_031";
+    });
+    QVERIFY(messier31It != bodies.end());
+    QVERIFY(messier31It->displayName == "M31");
+    QVERIFY(messier31It->type == skygate::ephemeris::CelestialBodyType::DeepSkyObject);
+    QVERIFY(messier31It->fixedEquatorial.has_value());
+    QVERIFY(messier31It->deepSkyObject.has_value());
+    QVERIFY(messier31It->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Galaxy);
 }
 
 void CatalogFactoryTests::createsHygCatalogBySourceRequest()

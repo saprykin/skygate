@@ -135,6 +135,29 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                checked: root.settingsDraft.overlayDeepSkyObjects
+                onToggled: root.settingsDraft.overlayDeepSkyObjects = checked
+            }
+            Label {
+                text: "Deep sky objects"
+                color: skyContext.theme.formLabelText
+                font.family: "Avenir Next"
+                font.pixelSize: 11
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            PreferencesCheckBox {
+                checked: root.settingsDraft.overlayDeepSkyLabels
+                onToggled: root.settingsDraft.overlayDeepSkyLabels = checked
+            }
+            Label {
+                text: "Deep sky labels"
+                color: skyContext.theme.formLabelText
+                font.family: "Avenir Next"
+                font.pixelSize: 11
+                Layout.alignment: Qt.AlignVCenter
+            }
+            PreferencesCheckBox {
                 checked: root.settingsDraft.overlayEcliptic
                 onToggled: root.settingsDraft.overlayEcliptic = checked
             }

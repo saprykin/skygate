@@ -20,6 +20,8 @@ QtObject {
     property bool overlayCelestialEquator: false
     property bool overlayCircumpolarBoundary: false
     property bool overlaySolarSystemLabels: true
+    property bool overlayDeepSkyObjects: true
+    property bool overlayDeepSkyLabels: true
     property int catalogPresetIndex: 0
     property string catalogUrlText: ""
 
@@ -64,6 +66,8 @@ QtObject {
         overlayCelestialEquator = skyContextController.overlayLayers.celestialEquator
         overlayCircumpolarBoundary = skyContextController.overlayLayers.circumpolarBoundary
         overlaySolarSystemLabels = skyContextController.overlayLayers.solarSystemLabels
+        overlayDeepSkyObjects = skyContextController.overlayLayers.deepSkyObjects
+        overlayDeepSkyLabels = skyContextController.overlayLayers.deepSkyLabels
         catalogPresetIndex = skyContextController.catalogPresetIndex()
         catalogUrlText = skyContextController.catalogUrlText()
     }
@@ -104,6 +108,8 @@ QtObject {
         skyContextController.overlayLayers.celestialEquator = overlayCelestialEquator
         skyContextController.overlayLayers.circumpolarBoundary = overlayCircumpolarBoundary
         skyContextController.overlayLayers.solarSystemLabels = overlaySolarSystemLabels
+        skyContextController.overlayLayers.deepSkyObjects = overlayDeepSkyObjects
+        skyContextController.overlayLayers.deepSkyLabels = overlayDeepSkyLabels
         skyContextController.setCatalogPresetIndex(catalogPresetIndex)
         skyContextController.setCatalogUrlText(catalogUrlText)
         resetFromContext()

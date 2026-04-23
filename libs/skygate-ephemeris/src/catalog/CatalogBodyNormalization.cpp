@@ -49,6 +49,11 @@ void CatalogBodyNormalization::apply(CelestialBody& body)
     case CelestialBodyType::Constellation:
         body.ephemerisSource = CelestialBodyEphemerisSource::Constellation;
         break;
+    case CelestialBodyType::DeepSkyObject:
+        body.ephemerisSource = body.fixedEquatorial.has_value()
+            ? CelestialBodyEphemerisSource::FixedEquatorial
+            : CelestialBodyEphemerisSource::Unresolved;
+        break;
     }
 }
 

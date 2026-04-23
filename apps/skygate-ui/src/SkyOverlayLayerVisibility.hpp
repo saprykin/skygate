@@ -9,6 +9,8 @@ struct SkyOverlayLayerVisibility final {
     bool celestialEquator = false;
     bool circumpolarBoundary = false;
     bool solarSystemLabels = true;
+    bool deepSkyObjects = true;
+    bool deepSkyLabels = true;
 
     [[nodiscard]] bool equals(const SkyOverlayLayerVisibility& other) const noexcept
     {
@@ -19,6 +21,8 @@ struct SkyOverlayLayerVisibility final {
             && ecliptic == other.ecliptic
             && celestialEquator == other.celestialEquator
             && circumpolarBoundary == other.circumpolarBoundary
-            && solarSystemLabels == other.solarSystemLabels;
+            && solarSystemLabels == other.solarSystemLabels
+            && deepSkyObjects == other.deepSkyObjects
+            && deepSkyLabels == other.deepSkyLabels;
     }
 };

@@ -242,6 +242,7 @@ std::unique_ptr<IStarCatalog> createCatalogWithCoreSolarSystemBodies(
         if (
             !isSunOrMoonType(body.type)
             && body.type != CelestialBodyType::Planet
+            && body.type != CelestialBodyType::DeepSkyObject
             && !isReferenceLineStar
         ) {
             continue;

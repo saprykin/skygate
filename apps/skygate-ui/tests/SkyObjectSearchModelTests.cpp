@@ -57,6 +57,7 @@ private slots:
     void blankQueryReturnsNoRows();
     void filtersPlanetStarHipAndConstellationTargets();
     void normalizesHipQueries();
+    void filtersDeepSkyAliases();
     void deduplicatesDisplayNamesPreferringBodies();
     void ranksExactPrefixAndContainsMatches();
 };
@@ -128,6 +129,37 @@ void SkyObjectSearchModelTests::normalizesHipQueries()
         QCOMPARE(model.rowCount(), 1);
         QCOMPARE(targetIdAt(model, 0), QString("hip_77"));
     }
+}
+
+void SkyObjectSearchModelTests::filtersDeepSkyAliases()
+{
+    skygate::ephemeris::CelestialBody m31 = makeBody(
+        "messier_031",
+        "M31",
+        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+        3.44,
+        skygate::core::EquatorialCoordinate {
+            .rightAscensionHours = 0.7123,
+            .declinationDeg = 41.269
+        }
+    );
+    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+        .aliases = {"M31", "NGC 224", "Andromeda Galaxy"},
+    };
+
+    SkyObjectSearchModel model;
+    model.setCatalogData(
+        std::vector<skygate::ephemeris::CelestialBody> {m31},
+        std::vector<skygate::ephemeris::ConstellationLabelRef> {}
+    );
+
+    model.setFilterText("andromeda");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(displayTextAt(model, 0), QString("Andromeda Galaxy"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
+    QCOMPARE(targetKindAt(model, 0), QString("body"));
+    QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
 }
 
 void SkyObjectSearchModelTests::deduplicatesDisplayNamesPreferringBodies()

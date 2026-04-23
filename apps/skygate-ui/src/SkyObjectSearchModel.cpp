@@ -38,6 +38,8 @@ QString celestialBodyTypeText(const skygate::ephemeris::CelestialBodyType type)
         return "Star";
     case skygate::ephemeris::CelestialBodyType::Constellation:
         return "Constellation";
+    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
+        return "Deep sky";
     }
 
     return "Object";
@@ -62,6 +64,39 @@ bool shouldShowBodyId(const skygate::ephemeris::CelestialBody& body)
 QString bodyDetailText(const skygate::ephemeris::CelestialBody& body)
 {
     const QString typeText = celestialBodyTypeText(body.type);
+    if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
+        QString detailText = typeText;
+        if (body.deepSkyObject.has_value()) {
+            switch (body.deepSkyObject->kind) {
+            case skygate::ephemeris::DeepSkyObjectKind::Galaxy:
+                detailText = "Deep sky • Galaxy";
+                break;
+            case skygate::ephemeris::DeepSkyObjectKind::OpenCluster:
+                detailText = "Deep sky • Open cluster";
+                break;
+            case skygate::ephemeris::DeepSkyObjectKind::GlobularCluster:
+                detailText = "Deep sky • Globular cluster";
+                break;
+            case skygate::ephemeris::DeepSkyObjectKind::Nebula:
+                detailText = "Deep sky • Nebula";
+                break;
+            case skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula:
+                detailText = "Deep sky • Planetary nebula";
+                break;
+            case skygate::ephemeris::DeepSkyObjectKind::Asterism:
+                detailText = "Deep sky • Asterism";
+                break;
+            case skygate::ephemeris::DeepSkyObjectKind::Unknown:
+                break;
+            }
+        }
+
+        if (!shouldShowBodyId(body)) {
+            return detailText;
+        }
+        return QString("%1 • %2").arg(detailText, QString::fromStdString(body.id));
+    }
+
     if (!shouldShowBodyId(body)) {
         return typeText;
     }
@@ -208,15 +243,37 @@ void SkyObjectSearchModel::setCatalogData(
             continue;
         }
 
+        const QString targetId = QString::fromStdString(body.id);
         upsertEntry(SourceEntry {
             .displayText = QString::fromStdString(body.displayName),
             .detailText = bodyDetailText(body),
             .targetKind = "body",
-            .targetId = QString::fromStdString(body.id),
+            .targetId = targetId,
             .brightnessMagnitude = body.visualMagnitude,
             .selectable = true,
             .isBody = true,
         });
+
+        if (body.type != skygate::ephemeris::CelestialBodyType::DeepSkyObject
+            || !body.deepSkyObject.has_value()) {
+            continue;
+        }
+
+        for (const std::string& alias : body.deepSkyObject->aliases) {
+            if (alias.empty() || alias == body.displayName) {
+                continue;
+            }
+
+            upsertEntry(SourceEntry {
+                .displayText = QString::fromStdString(alias),
+                .detailText = bodyDetailText(body),
+                .targetKind = "body",
+                .targetId = targetId,
+                .brightnessMagnitude = body.visualMagnitude,
+                .selectable = true,
+                .isBody = true,
+            });
+        }
     }
 
     for (const auto& labelRef : labelRefs) {

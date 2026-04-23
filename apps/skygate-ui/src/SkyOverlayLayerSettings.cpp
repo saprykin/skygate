@@ -45,6 +45,16 @@ bool SkyOverlayLayerSettings::solarSystemLabels() const noexcept
     return m_visibility.solarSystemLabels;
 }
 
+bool SkyOverlayLayerSettings::deepSkyObjects() const noexcept
+{
+    return m_visibility.deepSkyObjects;
+}
+
+bool SkyOverlayLayerSettings::deepSkyLabels() const noexcept
+{
+    return m_visibility.deepSkyLabels;
+}
+
 const SkyOverlayLayerVisibility& SkyOverlayLayerSettings::visibility() const noexcept
 {
     return m_visibility;
@@ -81,6 +91,12 @@ void SkyOverlayLayerSettings::setVisibility(const SkyOverlayLayerVisibility& vis
     }
     if (previous.solarSystemLabels != m_visibility.solarSystemLabels) {
         emit solarSystemLabelsChanged();
+    }
+    if (previous.deepSkyObjects != m_visibility.deepSkyObjects) {
+        emit deepSkyObjectsChanged();
+    }
+    if (previous.deepSkyLabels != m_visibility.deepSkyLabels) {
+        emit deepSkyLabelsChanged();
     }
     emit visibilityChanged();
 }
@@ -138,5 +154,19 @@ void SkyOverlayLayerSettings::setSolarSystemLabels(const bool solarSystemLabels)
 {
     SkyOverlayLayerVisibility visibility = m_visibility;
     visibility.solarSystemLabels = solarSystemLabels;
+    setVisibility(visibility);
+}
+
+void SkyOverlayLayerSettings::setDeepSkyObjects(const bool deepSkyObjects)
+{
+    SkyOverlayLayerVisibility visibility = m_visibility;
+    visibility.deepSkyObjects = deepSkyObjects;
+    setVisibility(visibility);
+}
+
+void SkyOverlayLayerSettings::setDeepSkyLabels(const bool deepSkyLabels)
+{
+    SkyOverlayLayerVisibility visibility = m_visibility;
+    visibility.deepSkyLabels = deepSkyLabels;
     setVisibility(visibility);
 }

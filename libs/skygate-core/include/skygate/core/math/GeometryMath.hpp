@@ -20,6 +20,19 @@ public:
     ) noexcept;
 
     [[nodiscard]] static double length2d(double x, double y) noexcept;
+    [[nodiscard]] static Vector2d rotatedOffsetPoint2d(
+        double originX,
+        double originY,
+        double offsetX,
+        double offsetY,
+        double rotationDeg
+    ) noexcept;
+    [[nodiscard]] static Vector2d ellipseOffsetPoint2d(
+        double radiusX,
+        double radiusY,
+        int sampleIndex,
+        int sampleCount
+    ) noexcept;
 
     [[nodiscard]] static std::optional<Vector2d> perpendicularOffset2d(
         double startX,

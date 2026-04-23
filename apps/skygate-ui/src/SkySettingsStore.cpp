@@ -88,6 +88,14 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         snapshot.overlayLayers.solarSystemLabels
     );
     settings.setValue(
+        SkyContextSettings::key("overlayLayers/deepSkyObjects"),
+        snapshot.overlayLayers.deepSkyObjects
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/deepSkyLabels"),
+        snapshot.overlayLayers.deepSkyLabels
+    );
+    settings.setValue(
         SkyContextSettings::key("catalogPresetIndex"),
         snapshot.catalogPresetIndex
     );
@@ -200,6 +208,14 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
     snapshot.overlayLayers.solarSystemLabels = settings.value(
         SkyContextSettings::key("overlayLayers/solarSystemLabels"),
         snapshot.overlayLayers.solarSystemLabels
+    ).toBool();
+    snapshot.overlayLayers.deepSkyObjects = settings.value(
+        SkyContextSettings::key("overlayLayers/deepSkyObjects"),
+        snapshot.overlayLayers.deepSkyObjects
+    ).toBool();
+    snapshot.overlayLayers.deepSkyLabels = settings.value(
+        SkyContextSettings::key("overlayLayers/deepSkyLabels"),
+        snapshot.overlayLayers.deepSkyLabels
     ).toBool();
     snapshot.catalogPresetIndex = settings.value(
         SkyContextSettings::key("catalogPresetIndex"),

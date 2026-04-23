@@ -291,14 +291,14 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
     if (
         m_viewportWidth <= 0.0
         || m_viewportHeight <= 0.0
-        || m_sceneFrame.frame.points.empty()
+        || m_sceneFrame.hoverTargets.empty()
         || m_sceneFrame.snapshot.catalogBodies == nullptr
     ) {
         return {};
     }
 
     double bestDistanceSquared = std::numeric_limits<double>::infinity();
-    std::size_t bestPointIndex = m_sceneFrame.frame.points.size();
+    std::size_t bestTargetIndex = m_sceneFrame.hoverTargets.size();
     const std::int32_t cellX =
         skygate::core::GeometryMath::gridCellIndex(x, kHoverLookupCellSizePx);
     const std::int32_t cellY =
@@ -306,16 +306,16 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
 
     for (int deltaY = -1; deltaY <= 1; ++deltaY) {
         for (int deltaX = -1; deltaX <= 1; ++deltaX) {
-            const auto cellIt = m_sceneFrame.hoverPointIndicesByCell.find(
+            const auto cellIt = m_sceneFrame.hoverTargetIndicesByCell.find(
                 skygate::core::GeometryMath::packedGridCellKey(cellX + deltaX, cellY + deltaY)
             );
-            if (cellIt == m_sceneFrame.hoverPointIndicesByCell.end()) {
+            if (cellIt == m_sceneFrame.hoverTargetIndicesByCell.end()) {
                 continue;
             }
 
-            for (const std::size_t pointIndex : cellIt->second) {
-                const auto& point = m_sceneFrame.frame.points[pointIndex];
-                const auto& body = m_sceneFrame.snapshot.bodyAt(point.bodyIndex);
+            for (const std::size_t targetIndex : cellIt->second) {
+                const auto& target = m_sceneFrame.hoverTargets[targetIndex];
+                const auto& body = m_sceneFrame.snapshot.bodyAt(target.bodyIndex);
                 if (body.displayName.empty()) {
                     continue;
                 }
@@ -323,28 +323,28 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
                 const double distanceSquared = skygate::core::GeometryMath::squaredDistance2d(
                     x,
                     y,
-                    point.x,
-                    point.y
+                    target.x,
+                    target.y
                 );
-                const double hitRadius = std::max(10.0, point.sizePx + 5.0);
+                const double hitRadius = target.radiusPx;
                 if (distanceSquared > (hitRadius * hitRadius)) {
                     continue;
                 }
 
                 if (distanceSquared < bestDistanceSquared) {
                     bestDistanceSquared = distanceSquared;
-                    bestPointIndex = pointIndex;
+                    bestTargetIndex = targetIndex;
                 }
             }
         }
     }
 
-    if (bestPointIndex >= m_sceneFrame.frame.points.size()) {
+    if (bestTargetIndex >= m_sceneFrame.hoverTargets.size()) {
         return {};
     }
 
     return QString::fromStdString(
-        m_sceneFrame.snapshot.bodyAt(m_sceneFrame.frame.points[bestPointIndex].bodyIndex).displayName
+        m_sceneFrame.snapshot.bodyAt(m_sceneFrame.hoverTargets[bestTargetIndex].bodyIndex).displayName
     );
 }
 
@@ -361,6 +361,11 @@ std::span<const SkyRenderPoint> SkySceneModel::renderPointSpan() const
 std::span<const SkyRenderLine> SkySceneModel::renderLineSpan() const
 {
     return std::span<const SkyRenderLine>(m_sceneFrame.frame.lines);
+}
+
+std::span<const SkyRenderGlyph> SkySceneModel::renderGlyphSpan() const
+{
+    return std::span<const SkyRenderGlyph>(m_sceneFrame.frame.glyphs);
 }
 
 void SkySceneModel::disconnectFromContextController()
@@ -386,6 +391,7 @@ bool SkySceneModel::clearSceneFrame()
         || m_sceneFrame.snapshot.catalogBodies != nullptr
         || !m_sceneFrame.frame.points.empty()
         || !m_sceneFrame.frame.lines.empty()
+        || !m_sceneFrame.frame.glyphs.empty()
         || !m_sceneFrame.overlayItems.isEmpty()
         || !m_sceneFrame.selectionMarker.isEmpty();
     m_cachedEphemerisEngine = nullptr;
@@ -491,20 +497,54 @@ void SkySceneModel::rebuildSceneFrame()
             m_skyContextController->overlayLayerVisibility()
         );
 
-        m_sceneFrame.hoverPointIndicesByCell.clear();
-        m_sceneFrame.hoverPointIndicesByCell.reserve(
-            (m_sceneFrame.frame.points.size() / 4U) + 1U
+        m_sceneFrame.hoverTargets.clear();
+        m_sceneFrame.hoverTargets.reserve(
+            m_sceneFrame.frame.points.size() + m_sceneFrame.frame.glyphs.size()
         );
-        for (std::size_t pointIndex = 0; pointIndex < m_sceneFrame.frame.points.size(); ++pointIndex) {
-            const auto& point = m_sceneFrame.frame.points[pointIndex];
+        m_sceneFrame.hoverTargetIndicesByCell.clear();
+        m_sceneFrame.hoverTargetIndicesByCell.reserve(
+            ((m_sceneFrame.frame.points.size() + m_sceneFrame.frame.glyphs.size()) / 4U) + 1U
+        );
+        for (const auto& point : m_sceneFrame.frame.points) {
             const auto& body = m_sceneFrame.snapshot.bodyAt(point.bodyIndex);
             if (body.displayName.empty()) {
                 continue;
             }
 
-            m_sceneFrame.hoverPointIndicesByCell[
+            const std::size_t targetIndex = m_sceneFrame.hoverTargets.size();
+            const double hitRadius = std::max(10.0, point.sizePx + 5.0);
+            m_sceneFrame.hoverTargets.push_back(SceneFrameData::HoverTarget {
+                .bodyIndex = point.bodyIndex,
+                .x = point.x,
+                .y = point.y,
+                .radiusPx = hitRadius
+            });
+            m_sceneFrame.hoverTargetIndicesByCell[
                 hoverCellKey(point.x, point.y, kHoverLookupCellSizePx)
-            ].push_back(pointIndex);
+            ].push_back(targetIndex);
+        }
+
+        for (const auto& glyph : m_sceneFrame.frame.glyphs) {
+            const auto& body = m_sceneFrame.snapshot.bodyAt(glyph.bodyIndex);
+            if (body.displayName.empty()) {
+                continue;
+            }
+
+            const double hitRadius = std::max({
+                glyph.radiusXPx,
+                glyph.radiusYPx,
+                12.0
+            });
+            const std::size_t targetIndex = m_sceneFrame.hoverTargets.size();
+            m_sceneFrame.hoverTargets.push_back(SceneFrameData::HoverTarget {
+                .bodyIndex = glyph.bodyIndex,
+                .x = glyph.x,
+                .y = glyph.y,
+                .radiusPx = hitRadius
+            });
+            m_sceneFrame.hoverTargetIndicesByCell[
+                hoverCellKey(glyph.x, glyph.y, kHoverLookupCellSizePx)
+            ].push_back(targetIndex);
         }
 
         m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame);
@@ -529,6 +569,34 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
     const auto& overlayLayers = m_skyContextController->overlayLayerVisibility();
     const auto& renderTheme = m_skyContextController->renderTheme();
     const auto& skyContext = m_skyContextController->skyContext();
+
+    if (normalizedLookupKey(m_skyContextController->selectedSearchTargetKind()) == "body") {
+        const QString targetId = m_skyContextController->selectedSearchTargetId();
+        const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
+            normalizedLookupKey(targetId)
+        );
+        if (stateIndexIt != sceneFrame.stateIndexByBodyId.cend()) {
+            const auto& state = sceneFrame.snapshot.states.at(*stateIndexIt);
+            const auto& body = sceneFrame.snapshot.bodyAt(state.bodyIndex);
+            if (
+                body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject
+                && overlayLayers.deepSkyObjects
+                && !body.displayName.empty()
+                && hasFiniteHorizontal(state.horizontal)
+            ) {
+                const auto projected = sceneFrame.preparedProjection->project(state.horizontal);
+                if (projected.isVisible) {
+                    overlayItems.push_back(overlayEntry(
+                        "selectionLabel",
+                        projected.x,
+                        projected.y,
+                        QString::fromStdString(body.displayName),
+                        renderTheme.labelDeepSkyObject
+                    ));
+                }
+            }
+        }
+    }
 
     if (overlayLayers.ecliptic) {
         appendReferenceLayerLabel(
