@@ -61,7 +61,8 @@ Item {
     Rectangle {
         id: timelineToolbarPanel
         anchors.top: parent.top
-        anchors.right: parent.right
+        anchors.right: timelineToolbarToggle.left
+        anchors.rightMargin: 6
         property bool collapsed: skyContextController.timelineToolbarCollapsed
         readonly property real expandedWidth: timelineToolbarRow.implicitWidth + 16
         width: collapsed ? 0 : expandedWidth
@@ -72,6 +73,7 @@ Item {
         border.width: 1
         border.color: theme.toolbarPanelBorder
         opacity: collapsed ? 0.0 : 1.0
+        clip: true
 
         Behavior on width {
             NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
@@ -82,7 +84,9 @@ Item {
 
         Row {
             id: timelineToolbarRow
-            anchors.centerIn: parent
+            anchors.right: parent.right
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 6
             visible: !timelineToolbarPanel.collapsed
             enabled: !timelineToolbarPanel.collapsed
@@ -271,8 +275,7 @@ Item {
     ToolButton {
         id: timelineToolbarToggle
         anchors.verticalCenter: timelineToolbarPanel.verticalCenter
-        anchors.right: timelineToolbarPanel.left
-        anchors.rightMargin: 6
+        anchors.right: parent.right
         width: 30
         height: 44
         implicitWidth: width

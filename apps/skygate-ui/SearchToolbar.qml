@@ -64,7 +64,8 @@ Item {
     Rectangle {
         id: searchToolbarPanel
         anchors.top: parent.top
-        anchors.left: parent.left
+        anchors.left: searchToolbarToggle.right
+        anchors.leftMargin: 6
         property bool collapsed: skyContextController.searchToolbarCollapsed
         readonly property real expandedWidth: searchToolbarRow.implicitWidth + 16
         width: collapsed ? 0 : expandedWidth
@@ -75,6 +76,7 @@ Item {
         border.width: 1
         border.color: theme.toolbarPanelBorder
         opacity: collapsed ? 0.0 : 1.0
+        clip: true
 
         Behavior on width {
             NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
@@ -85,7 +87,9 @@ Item {
 
         Row {
             id: searchToolbarRow
-            anchors.centerIn: parent
+            anchors.left: parent.left
+            anchors.leftMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 6
             visible: !searchToolbarPanel.collapsed
             enabled: !searchToolbarPanel.collapsed
@@ -165,8 +169,7 @@ Item {
     ToolButton {
         id: searchToolbarToggle
         anchors.verticalCenter: searchToolbarPanel.verticalCenter
-        anchors.left: searchToolbarPanel.right
-        anchors.leftMargin: 6
+        anchors.left: parent.left
         width: 30
         height: 44
         implicitWidth: width
