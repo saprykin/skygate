@@ -32,13 +32,10 @@ Rectangle {
             text: "Lat " + footerRoot.skyContextController.latitudeText
                   + " | Lon " + footerRoot.skyContextController.longitudeText
                   + " | Elev " + footerRoot.skyContextController.elevationText + " m"
-                  + " | Proj " + footerRoot.skyContextController.projectionTypeText
                   + " | View Alt "
                   + Number(footerRoot.skyContextController.viewCenterAltitudeDeg).toFixed(1)
                   + " Az "
                   + Number(footerRoot.skyContextController.viewCenterAzimuthDeg).toFixed(1)
-                  + " | Mag ≤ "
-                  + Number(footerRoot.skyContextController.magnitudeCutoff).toFixed(1)
             color: theme.footerInfoText
             elide: Text.ElideRight
             width: Math.max(120, statusLeftRow.width - 320)
