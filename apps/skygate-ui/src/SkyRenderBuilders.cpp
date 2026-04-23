@@ -17,6 +17,7 @@
 using namespace skygate::ui::internal;
 
 namespace {
+constexpr double kConstellationLineWidthPx = 1.8;
 
 class HorizontalLookup final {
 public:
@@ -344,6 +345,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 .y1 = startProjected.y,
                 .x2 = endProjected.x,
                 .y2 = endProjected.y,
+                .widthPx = kConstellationLineWidthPx,
                 .color = SkyContextRenderStyle::constellationLineColor(renderTheme)
             });
         }

@@ -24,16 +24,21 @@ constexpr int kGridAltitudeStepDeg = 15;
 constexpr int kGridAzimuthStepDeg = 30;
 constexpr int kGridAltitudeSampleCount = 96;
 constexpr int kGridAzimuthSampleCount = 64;
+constexpr float kGridLineWidthPx = 1.0F;
+constexpr float kCardinalLineWidthPx = 1.8F;
+constexpr float kHorizonLineWidthPx = 2.2F;
 struct LineSegment final {
     float x1 = 0.0F;
     float y1 = 0.0F;
     float x2 = 0.0F;
     float y2 = 0.0F;
+    float widthPx = 1.0F;
     QColor color;
 };
 
 struct VertexBucket final {
     QColor color;
+    float widthPx = 1.0F;
     std::vector<float> coordinates;
 };
 
@@ -87,6 +92,7 @@ void appendLineSegment(
     const float y1,
     const float x2,
     const float y2,
+    const float widthPx,
     const QColor& color
 )
 {
@@ -95,6 +101,7 @@ void appendLineSegment(
         .y1 = y1,
         .x2 = x2,
         .y2 = y2,
+        .widthPx = widthPx,
         .color = color
     });
 }
@@ -126,16 +133,49 @@ void syncBatchedLineNodes(
     std::map<std::uint32_t, VertexBucket> buckets;
     for (const auto& lineSegment : lineSegments) {
         const std::uint32_t colorKey = static_cast<std::uint32_t>(lineSegment.color.rgba());
-        auto& bucket = buckets[colorKey];
+        const std::uint32_t widthKey = static_cast<std::uint32_t>(lineSegment.widthPx * 100.0F);
+        const std::uint32_t bucketKey = (colorKey << 8U) ^ widthKey;
+        auto& bucket = buckets[bucketKey];
         bucket.color = lineSegment.color;
-        bucket.coordinates.push_back(lineSegment.x1);
-        bucket.coordinates.push_back(lineSegment.y1);
-        bucket.coordinates.push_back(lineSegment.x2);
-        bucket.coordinates.push_back(lineSegment.y2);
+        bucket.widthPx = lineSegment.widthPx;
+
+        const float deltaX = lineSegment.x2 - lineSegment.x1;
+        const float deltaY = lineSegment.y2 - lineSegment.y1;
+        const float length = std::hypot(deltaX, deltaY);
+        if (length <= 0.0F) {
+            continue;
+        }
+
+        const float halfWidth = lineSegment.widthPx * 0.5F;
+        const float offsetX = -deltaY / length * halfWidth;
+        const float offsetY = deltaX / length * halfWidth;
+
+        const float startLeftX = lineSegment.x1 + offsetX;
+        const float startLeftY = lineSegment.y1 + offsetY;
+        const float startRightX = lineSegment.x1 - offsetX;
+        const float startRightY = lineSegment.y1 - offsetY;
+        const float endLeftX = lineSegment.x2 + offsetX;
+        const float endLeftY = lineSegment.y2 + offsetY;
+        const float endRightX = lineSegment.x2 - offsetX;
+        const float endRightY = lineSegment.y2 - offsetY;
+
+        bucket.coordinates.push_back(startLeftX);
+        bucket.coordinates.push_back(startLeftY);
+        bucket.coordinates.push_back(startRightX);
+        bucket.coordinates.push_back(startRightY);
+        bucket.coordinates.push_back(endLeftX);
+        bucket.coordinates.push_back(endLeftY);
+
+        bucket.coordinates.push_back(startRightX);
+        bucket.coordinates.push_back(startRightY);
+        bucket.coordinates.push_back(endRightX);
+        bucket.coordinates.push_back(endRightY);
+        bucket.coordinates.push_back(endLeftX);
+        bucket.coordinates.push_back(endLeftY);
     }
 
-    for (const auto& [colorKey, bucket] : buckets) {
-        (void) colorKey;
+    for (const auto& [bucketKey, bucket] : buckets) {
+        (void) bucketKey;
 
         const int vertexCount = static_cast<int>(bucket.coordinates.size() / 2U);
         if (vertexCount <= 0) {
@@ -147,7 +187,7 @@ void syncBatchedLineNodes(
             QSGGeometry::defaultAttributes_Point2D(),
             vertexCount
         );
-        geometry->setDrawingMode(QSGGeometry::DrawLines);
+        geometry->setDrawingMode(QSGGeometry::DrawTriangles);
 
         auto* vertices = geometry->vertexDataAsPoint2D();
         for (int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
@@ -247,6 +287,7 @@ void appendProjectedPolyline(
     const int sampleCount,
     const double maxSegmentLengthSquared,
     const QColor& color,
+    const float widthPx,
     CoordinateFn coordinateFn
 )
 {
@@ -275,6 +316,7 @@ void appendProjectedPolyline(
                     static_cast<float>(previousPoint.y),
                     static_cast<float>(projected.x),
                     static_cast<float>(projected.y),
+                    widthPx,
                     color
                 );
             }
@@ -374,6 +416,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             kGridAltitudeSampleCount,
             maxSegmentLengthSquared,
             renderData->renderTheme.gridAltitudeLine,
+            kGridLineWidthPx,
             [altitudeDeg](const int index) {
                 const double azimuthDeg = (360.0 * static_cast<double>(index))
                                           / static_cast<double>(kGridAltitudeSampleCount);
@@ -396,6 +439,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
             renderData->renderTheme.gridAzimuthLine,
+            kGridLineWidthPx,
             [azimuthDeg](const int index) {
                 const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
                                                        / static_cast<double>(kGridAzimuthSampleCount);
@@ -415,6 +459,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             kGridAzimuthSampleCount,
             maxSegmentLengthSquared,
             cardinalMeridianColor(cardinalAzimuthDeg, renderData->renderTheme),
+            kCardinalLineWidthPx,
             [cardinalAzimuthDeg](const int index) {
                 const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
                                                        / static_cast<double>(kGridAzimuthSampleCount);
@@ -432,6 +477,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
         kHorizonSampleCount,
         maxSegmentLengthSquared,
         renderData->renderTheme.horizonLine,
+        kHorizonLineWidthPx,
         [](const int index) {
             const double azimuthDeg = (360.0 * static_cast<double>(index))
                                       / static_cast<double>(kHorizonSampleCount);
@@ -446,6 +492,7 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
             static_cast<float>(line.y1),
             static_cast<float>(line.x2),
             static_cast<float>(line.y2),
+            static_cast<float>(line.widthPx),
             line.color
         );
     }
