@@ -6,7 +6,9 @@
 #include <QPointF>
 #include <QVariantMap>
 
+#include "skygate/core/math/GeometryMath.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
+#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
 #include <array>
@@ -16,6 +18,8 @@
 namespace {
 
 constexpr double kHoverLookupCellSizePx = 24.0;
+constexpr int kReferenceLabelSampleCount = 96;
+constexpr double kReferenceLabelEdgeMarginPx = 36.0;
 
 [[nodiscard]] std::uint64_t hoverCellKey(
     const double x,
@@ -23,9 +27,7 @@ constexpr double kHoverLookupCellSizePx = 24.0;
     const double cellSizePx
 ) noexcept
 {
-    const std::uint32_t cellX = static_cast<std::uint32_t>(std::floor(x / cellSizePx));
-    const std::uint32_t cellY = static_cast<std::uint32_t>(std::floor(y / cellSizePx));
-    return (static_cast<std::uint64_t>(cellX) << 32U) | static_cast<std::uint64_t>(cellY);
+    return skygate::core::GeometryMath::packedGridCellKey(x, y, cellSizePx);
 }
 
 QVariantMap overlayEntry(
@@ -60,6 +62,71 @@ QColor cardinalColor(
         return renderTheme.cardinalSouthLine;
     }
     return renderTheme.cardinalWestLine;
+}
+
+bool pointIsInsideLabelMargin(
+    const skygate::core::ScreenPoint& point,
+    const skygate::core::ProjectionParams& params
+) noexcept
+{
+    return point.x >= kReferenceLabelEdgeMarginPx
+        && point.x <= (params.viewportWidth - kReferenceLabelEdgeMarginPx)
+        && point.y >= kReferenceLabelEdgeMarginPx
+        && point.y <= (params.viewportHeight - kReferenceLabelEdgeMarginPx);
+}
+
+template <typename CoordinateAt>
+void appendReferenceLayerLabel(
+    QVariantList& overlayItems,
+    const skygate::core::PreparedProjection& preparedProjection,
+    const QString& text,
+    const QColor& color,
+    CoordinateAt coordinateAt
+)
+{
+    const auto& params = preparedProjection.params();
+    const double targetX = params.viewportWidth * 0.72;
+    const double targetY = params.viewportHeight * 0.34;
+
+    std::optional<QPointF> bestPoint;
+    double bestScore = std::numeric_limits<double>::max();
+    std::optional<QPointF> fallbackPoint;
+    double fallbackScore = std::numeric_limits<double>::max();
+
+    for (int index = 0; index < kReferenceLabelSampleCount; ++index) {
+        const auto projected = preparedProjection.project(coordinateAt(index));
+        if (!projected.isVisible) {
+            continue;
+        }
+
+        const double score = skygate::core::GeometryMath::squaredDistance2d(
+            projected.x,
+            projected.y,
+            targetX,
+            targetY
+        );
+        if (score < fallbackScore) {
+            fallbackPoint = QPointF(projected.x, projected.y);
+            fallbackScore = score;
+        }
+        if (pointIsInsideLabelMargin(projected, params) && score < bestScore) {
+            bestPoint = QPointF(projected.x, projected.y);
+            bestScore = score;
+        }
+    }
+
+    const std::optional<QPointF>& labelPoint = bestPoint.has_value() ? bestPoint : fallbackPoint;
+    if (!labelPoint.has_value()) {
+        return;
+    }
+
+    overlayItems.push_back(overlayEntry(
+        "referenceLine",
+        labelPoint->x(),
+        labelPoint->y(),
+        text,
+        color
+    ));
 }
 
 QString normalizedLookupKey(const QString& value)
@@ -232,14 +299,15 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
 
     double bestDistanceSquared = std::numeric_limits<double>::infinity();
     std::size_t bestPointIndex = m_sceneFrame.frame.points.size();
-    const std::int32_t cellX = static_cast<std::int32_t>(std::floor(x / kHoverLookupCellSizePx));
-    const std::int32_t cellY = static_cast<std::int32_t>(std::floor(y / kHoverLookupCellSizePx));
+    const std::int32_t cellX =
+        skygate::core::GeometryMath::gridCellIndex(x, kHoverLookupCellSizePx);
+    const std::int32_t cellY =
+        skygate::core::GeometryMath::gridCellIndex(y, kHoverLookupCellSizePx);
 
     for (int deltaY = -1; deltaY <= 1; ++deltaY) {
         for (int deltaX = -1; deltaX <= 1; ++deltaX) {
             const auto cellIt = m_sceneFrame.hoverPointIndicesByCell.find(
-                (static_cast<std::uint64_t>(static_cast<std::uint32_t>(cellX + deltaX)) << 32U)
-                | static_cast<std::uint64_t>(static_cast<std::uint32_t>(cellY + deltaY))
+                skygate::core::GeometryMath::packedGridCellKey(cellX + deltaX, cellY + deltaY)
             );
             if (cellIt == m_sceneFrame.hoverPointIndicesByCell.end()) {
                 continue;
@@ -252,10 +320,12 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
                     continue;
                 }
 
-                const double deltaPointX = x - point.x;
-                const double deltaPointY = y - point.y;
-                const double distanceSquared =
-                    (deltaPointX * deltaPointX) + (deltaPointY * deltaPointY);
+                const double distanceSquared = skygate::core::GeometryMath::squaredDistance2d(
+                    x,
+                    y,
+                    point.x,
+                    point.y
+                );
                 const double hitRadius = std::max(10.0, point.sizePx + 5.0);
                 if (distanceSquared > (hitRadius * hitRadius)) {
                     continue;
@@ -456,13 +526,74 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
         return overlayItems;
     }
 
-    if (!m_skyContextController->overlayLayerVisibility().horizon) {
+    const auto& overlayLayers = m_skyContextController->overlayLayerVisibility();
+    const auto& renderTheme = m_skyContextController->renderTheme();
+    const auto& skyContext = m_skyContextController->skyContext();
+
+    if (overlayLayers.ecliptic) {
+        appendReferenceLayerLabel(
+            overlayItems,
+            *sceneFrame.preparedProjection,
+            "Ecliptic",
+            renderTheme.eclipticLine,
+            [&skyContext](const int index) {
+                const double eclipticLongitudeDeg = 360.0 * static_cast<double>(index)
+                    / static_cast<double>(kReferenceLabelSampleCount);
+                return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
+                    eclipticLongitudeDeg,
+                    skyContext.observer,
+                    skyContext.utcTime
+                );
+            }
+        );
+    }
+
+    if (overlayLayers.celestialEquator) {
+        appendReferenceLayerLabel(
+            overlayItems,
+            *sceneFrame.preparedProjection,
+            "Celestial equator",
+            renderTheme.celestialEquatorLine,
+            [&skyContext](const int index) {
+                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+                    index,
+                    kReferenceLabelSampleCount,
+                    0.0,
+                    skyContext.observer,
+                    skyContext.utcTime
+                );
+            }
+        );
+    }
+
+    if (overlayLayers.circumpolarBoundary && skyContext.observer.isValid()) {
+        const double boundaryDeclinationDeg =
+            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
+                skyContext.observer
+            );
+        appendReferenceLayerLabel(
+            overlayItems,
+            *sceneFrame.preparedProjection,
+            "Circumpolar",
+            renderTheme.circumpolarBoundaryLine,
+            [boundaryDeclinationDeg, &skyContext](const int index) {
+                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+                    index,
+                    kReferenceLabelSampleCount,
+                    boundaryDeclinationDeg,
+                    skyContext.observer,
+                    skyContext.utcTime
+                );
+            }
+        );
+    }
+
+    if (!overlayLayers.horizon) {
         return overlayItems;
     }
 
     constexpr std::array<const char*, 4> kCardinalLabels {"N", "E", "S", "W"};
     constexpr std::array<double, 4> kCardinalAzimuths {0.0, 90.0, 180.0, 270.0};
-    const auto& renderTheme = m_skyContextController->renderTheme();
     for (std::size_t index = 0; index < kCardinalLabels.size(); ++index) {
         const auto projected = sceneFrame.preparedProjection->project(
             skygate::core::HorizontalCoordinate {

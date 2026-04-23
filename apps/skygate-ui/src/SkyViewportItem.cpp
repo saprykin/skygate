@@ -9,15 +9,16 @@
 #include <QSGGeometryNode>
 #include <QSGNode>
 
+#include "skygate/core/math/GeometryMath.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -144,16 +145,20 @@ void syncBatchedLineNodes(
         bucket.color = lineSegment.color;
         bucket.widthPx = lineSegment.widthPx;
 
-        const float deltaX = lineSegment.x2 - lineSegment.x1;
-        const float deltaY = lineSegment.y2 - lineSegment.y1;
-        const float length = std::hypot(deltaX, deltaY);
-        if (length <= 0.0F) {
+        const std::optional<skygate::core::Vector2d> offset =
+            skygate::core::GeometryMath::perpendicularOffset2d(
+                lineSegment.x1,
+                lineSegment.y1,
+                lineSegment.x2,
+                lineSegment.y2,
+                lineSegment.widthPx * 0.5F
+            );
+        if (!offset.has_value()) {
             continue;
         }
 
-        const float halfWidth = lineSegment.widthPx * 0.5F;
-        const float offsetX = -deltaY / length * halfWidth;
-        const float offsetY = deltaX / length * halfWidth;
+        const float offsetX = static_cast<float>(offset->x);
+        const float offsetY = static_cast<float>(offset->y);
 
         const float startLeftX = lineSegment.x1 + offsetX;
         const float startLeftY = lineSegment.y1 + offsetY;
@@ -311,9 +316,12 @@ void appendProjectedPolyline(
         }
 
         if (hasPreviousPoint) {
-            const double deltaX = projected.x - previousPoint.x;
-            const double deltaY = projected.y - previousPoint.y;
-            const double segmentLengthSquared = (deltaX * deltaX) + (deltaY * deltaY);
+            const double segmentLengthSquared = skygate::core::GeometryMath::squaredDistance2d(
+                projected.x,
+                projected.y,
+                previousPoint.x,
+                previousPoint.y
+            );
             if (segmentLengthSquared <= maxSegmentLengthSquared) {
                 appendLineSegment(
                     lineSegments,

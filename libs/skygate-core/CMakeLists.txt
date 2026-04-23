@@ -8,6 +8,7 @@ add_library(skygate-core STATIC
     include/skygate/core/SystemTimeSource.hpp
     include/skygate/core/Types.hpp
     include/skygate/core/math/AngleMath.hpp
+    include/skygate/core/math/GeometryMath.hpp
     include/skygate/core/math/MathConstants.hpp
     include/skygate/core/math/ProjectionMath.hpp
     include/skygate/core/math/ViewportMath.hpp
@@ -19,6 +20,7 @@ add_library(skygate-core STATIC
     src/ProjectionTypes.cpp
     src/SystemTimeSource.cpp
     src/math/AngleMath.cpp
+    src/math/GeometryMath.cpp
     src/math/ProjectionMath.cpp
     src/math/ViewportMath.cpp
     src/ProjectionFactory.cpp

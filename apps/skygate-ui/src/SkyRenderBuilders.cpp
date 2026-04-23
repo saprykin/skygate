@@ -4,6 +4,8 @@
 
 #include <QVariantMap>
 
+#include "skygate/core/math/GeometryMath.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -121,7 +123,7 @@ struct DecimatedStarPoint final {
     const double normalizedFov = std::clamp((projectionParams.fovDeg - 35.0) / 95.0, 0.0, 1.0);
     const double baseCellSize = 2.5 + (normalizedFov * 4.5);
     const double viewportScale = std::clamp(
-        std::sqrt((viewportWidth * viewportHeight) / (1100.0 * 760.0)),
+        skygate::core::GeometryMath::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0),
         0.85,
         1.35
     );
@@ -134,9 +136,7 @@ struct DecimatedStarPoint final {
     const double cellSizePx
 )
 {
-    const std::uint32_t cellX = static_cast<std::uint32_t>(std::floor(x / cellSizePx));
-    const std::uint32_t cellY = static_cast<std::uint32_t>(std::floor(y / cellSizePx));
-    return (static_cast<std::uint64_t>(cellX) << 32U) | static_cast<std::uint64_t>(cellY);
+    return skygate::core::GeometryMath::packedGridCellKey(x, y, cellSizePx);
 }
 
 [[nodiscard]] double distanceToCellCenterSquared(
@@ -145,13 +145,9 @@ struct DecimatedStarPoint final {
     const double cellSizePx
 )
 {
-    const double cellX = std::floor(x / cellSizePx);
-    const double cellY = std::floor(y / cellSizePx);
-    const double centerX = (cellX * cellSizePx) + (cellSizePx * 0.5);
-    const double centerY = (cellY * cellSizePx) + (cellSizePx * 0.5);
-    const double deltaX = x - centerX;
-    const double deltaY = y - centerY;
-    return (deltaX * deltaX) + (deltaY * deltaY);
+    const skygate::core::Vector2d center =
+        skygate::core::GeometryMath::gridCellCenter(x, y, cellSizePx);
+    return skygate::core::GeometryMath::squaredDistance2d(x, y, center.x, center.y);
 }
 
 [[nodiscard]] bool shouldReplaceStarPoint(
@@ -334,9 +330,12 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 continue;
             }
 
-            const double deltaX = endProjected.x - startProjected.x;
-            const double deltaY = endProjected.y - startProjected.y;
-            const double lengthSquared = deltaX * deltaX + deltaY * deltaY;
+            const double lengthSquared = skygate::core::GeometryMath::squaredDistance2d(
+                endProjected.x,
+                endProjected.y,
+                startProjected.x,
+                startProjected.y
+            );
             if (lengthSquared > maxSegmentLengthSquared) {
                 continue;
             }

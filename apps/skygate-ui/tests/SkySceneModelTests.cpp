@@ -4,6 +4,7 @@
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySceneModel.hpp"
 
+#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
@@ -53,6 +54,7 @@ private slots:
     void themeChangesUpdateRenderedColors();
     void solarSystemLabelsCanBeHidden();
     void constellationLabelsAndLinesCanBeHiddenIndependently();
+    void referenceLayerLabelsFollowVisibility();
 };
 
 void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
@@ -464,6 +466,101 @@ void SkySceneModelTests::constellationLabelsAndLinesCanBeHiddenIndependently()
     overlayLayers->setConstellationLines(false);
 
     QVERIFY(sceneModel.renderLineSpan().empty());
+}
+
+void SkySceneModelTests::referenceLayerLabelsFollowVisibility()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5,
+                .declinationDeg = 5.0
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+    controller.setViewCenter(35.0, 0.0);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Ecliptic"));
+    QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Celestial equator"));
+    QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Circumpolar"));
+
+    auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
+    QVERIFY(overlayLayers != nullptr);
+
+    const auto centerOn = [&controller](const skygate::core::HorizontalCoordinate& horizontal) {
+        if (!std::isfinite(horizontal.altitudeDeg) || !std::isfinite(horizontal.azimuthDeg)) {
+            return false;
+        }
+
+        controller.setViewCenter(horizontal.altitudeDeg, horizontal.azimuthDeg);
+        return true;
+    };
+
+    QVERIFY(centerOn(skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
+        90.0,
+        controller.skyContext().observer,
+        controller.skyContext().utcTime
+    )));
+    overlayLayers->setEcliptic(true);
+    QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Ecliptic"));
+    overlayLayers->setEcliptic(false);
+    QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Ecliptic"));
+
+    QVERIFY(centerOn(skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+        24,
+        96,
+        0.0,
+        controller.skyContext().observer,
+        controller.skyContext().utcTime
+    )));
+    overlayLayers->setCelestialEquator(true);
+    QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Celestial equator"));
+    overlayLayers->setCelestialEquator(false);
+    QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Celestial equator"));
+
+    const double boundaryDeclinationDeg =
+        skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
+            controller.skyContext().observer
+        );
+    QVERIFY(centerOn(skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+        24,
+        96,
+        boundaryDeclinationDeg,
+        controller.skyContext().observer,
+        controller.skyContext().utcTime
+    )));
+    overlayLayers->setCircumpolarBoundary(true);
+    QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Circumpolar"));
+    overlayLayers->setCircumpolarBoundary(false);
+    QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Circumpolar"));
 }
 
 QTEST_GUILESS_MAIN(SkySceneModelTests)
