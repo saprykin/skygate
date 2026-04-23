@@ -56,6 +56,42 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
     );
     settings.setValue(SkyContextSettings::key("themeId"), snapshot.themeId);
     settings.setValue(
+        SkyContextSettings::key("overlayLayers/horizon"),
+        snapshot.overlayLayers.horizon
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/altAzGrid"),
+        snapshot.overlayLayers.altAzGrid
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/constellationLines"),
+        snapshot.overlayLayers.constellationLines
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/constellationLabels"),
+        snapshot.overlayLayers.constellationLabels
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/ecliptic"),
+        snapshot.overlayLayers.ecliptic
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/celestialEquator"),
+        snapshot.overlayLayers.celestialEquator
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/meridian"),
+        snapshot.overlayLayers.meridian
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/circumpolarBoundary"),
+        snapshot.overlayLayers.circumpolarBoundary
+    );
+    settings.setValue(
+        SkyContextSettings::key("overlayLayers/solarSystemLabels"),
+        snapshot.overlayLayers.solarSystemLabels
+    );
+    settings.setValue(
         SkyContextSettings::key("catalogPresetIndex"),
         snapshot.catalogPresetIndex
     );
@@ -137,6 +173,42 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
         SkyContextSettings::key("themeId"),
         snapshot.themeId
     ).toString();
+    snapshot.overlayLayers.horizon = settings.value(
+        SkyContextSettings::key("overlayLayers/horizon"),
+        snapshot.overlayLayers.horizon
+    ).toBool();
+    snapshot.overlayLayers.altAzGrid = settings.value(
+        SkyContextSettings::key("overlayLayers/altAzGrid"),
+        snapshot.overlayLayers.altAzGrid
+    ).toBool();
+    snapshot.overlayLayers.constellationLines = settings.value(
+        SkyContextSettings::key("overlayLayers/constellationLines"),
+        snapshot.overlayLayers.constellationLines
+    ).toBool();
+    snapshot.overlayLayers.constellationLabels = settings.value(
+        SkyContextSettings::key("overlayLayers/constellationLabels"),
+        snapshot.overlayLayers.constellationLabels
+    ).toBool();
+    snapshot.overlayLayers.ecliptic = settings.value(
+        SkyContextSettings::key("overlayLayers/ecliptic"),
+        snapshot.overlayLayers.ecliptic
+    ).toBool();
+    snapshot.overlayLayers.celestialEquator = settings.value(
+        SkyContextSettings::key("overlayLayers/celestialEquator"),
+        snapshot.overlayLayers.celestialEquator
+    ).toBool();
+    snapshot.overlayLayers.meridian = settings.value(
+        SkyContextSettings::key("overlayLayers/meridian"),
+        snapshot.overlayLayers.meridian
+    ).toBool();
+    snapshot.overlayLayers.circumpolarBoundary = settings.value(
+        SkyContextSettings::key("overlayLayers/circumpolarBoundary"),
+        snapshot.overlayLayers.circumpolarBoundary
+    ).toBool();
+    snapshot.overlayLayers.solarSystemLabels = settings.value(
+        SkyContextSettings::key("overlayLayers/solarSystemLabels"),
+        snapshot.overlayLayers.solarSystemLabels
+    ).toBool();
     snapshot.catalogPresetIndex = settings.value(
         SkyContextSettings::key("catalogPresetIndex"),
         snapshot.catalogPresetIndex

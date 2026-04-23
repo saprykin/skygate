@@ -4,7 +4,9 @@ find_package(ZLIB REQUIRED)
 add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/CatalogLoadResult.hpp
     include/skygate/ephemeris/CatalogPayloadParser.hpp
+    include/skygate/ephemeris/CelestialReferenceCalculator.hpp
     include/skygate/ephemeris/ConstellationData.hpp
+    include/skygate/ephemeris/ConstellationReferenceCalculator.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
     include/skygate/ephemeris/IStarCatalog.hpp
@@ -31,6 +33,8 @@ add_library(skygate-ephemeris STATIC
     src/engine/PlanetEquatorialCalculator.hpp
     src/engine/StarEquatorialCalculator.hpp
     src/engine/SunEquatorialCalculator.hpp
+    src/CelestialReferenceCalculator.cpp
+    src/ConstellationReferenceCalculator.cpp
     src/BundledStarCatalog.cpp
     src/SimpleEphemerisEngine.cpp
     src/catalog/BundledCatalogParser.cpp

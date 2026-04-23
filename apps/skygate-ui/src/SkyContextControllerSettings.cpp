@@ -2,6 +2,7 @@
 
 #include "SkyCatalogManager.hpp"
 #include "SkyContextControllerSupport.hpp"
+#include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
 
 #include <QDateTime>
@@ -34,6 +35,7 @@ bool SkyContextController::saveSettings() const
     snapshot.selectedCityId = m_selectedCityId;
     snapshot.projectionTypeText = projectionTypeText();
     snapshot.themeId = themeId();
+    snapshot.overlayLayers = overlayLayerVisibility();
     snapshot.catalogPresetIndex = catalogPresetIndex();
     snapshot.catalogUrlText = catalogUrlText();
     return m_settingsStore->saveState(snapshot);
@@ -90,6 +92,9 @@ bool SkyContextController::loadSettings()
 
         setProjectionTypeText(stateSnapshot->projectionTypeText);
         setThemeId(stateSnapshot->themeId);
+        if (m_overlayLayerSettings != nullptr) {
+            m_overlayLayerSettings->setVisibility(stateSnapshot->overlayLayers);
+        }
         setCatalogPresetIndex(stateSnapshot->catalogPresetIndex);
         setCatalogUrlText(stateSnapshot->catalogUrlText);
     }

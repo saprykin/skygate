@@ -6,9 +6,8 @@
 #include <QPointF>
 #include <QVariantMap>
 
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/ProjectionMath.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
+#include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
 #include <array>
 #include <cmath>
@@ -118,68 +117,21 @@ std::optional<QPointF> selectedBodyPoint(
 
 std::optional<QPointF> selectedConstellationPoint(
     const skygate::ephemeris::SkySnapshot& snapshot,
-    const QHash<QString, std::size_t>& stateIndexByBodyId,
     const skygate::core::PreparedProjection& preparedProjection,
     const std::span<const SkyContextController::ConstellationLabelRef> labelRefs,
     const QString& targetId
 )
 {
-    const QString normalizedTargetId = normalizedLookupKey(targetId);
-    const auto labelRefIt = std::find_if(
-        labelRefs.begin(),
-        labelRefs.end(),
-        [&normalizedTargetId](const SkyContextController::ConstellationLabelRef& labelRef) {
-            return normalizedLookupKey(labelRef.first) == normalizedTargetId;
-        }
+    const auto center = skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(
+        snapshot,
+        labelRefs,
+        targetId.toStdString()
     );
-    if (labelRefIt == labelRefs.end()) {
+    if (!center.has_value()) {
         return std::nullopt;
     }
 
-    skygate::core::ProjectionMath::Vec3 sum {0.0, 0.0, 0.0};
-    int validAnchorCount = 0;
-    for (const std::string& hipId : labelRefIt->second) {
-        const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedLookupKey(hipId));
-        if (stateIndexIt == stateIndexByBodyId.cend()) {
-            continue;
-        }
-
-        const auto& state = snapshot.states.at(*stateIndexIt);
-        if (!hasFiniteHorizontal(state.horizontal)) {
-            continue;
-        }
-
-        const auto vector = skygate::core::ProjectionMath::horizontalToUnitVector(
-            state.horizontal
-        );
-        sum[0] += vector[0];
-        sum[1] += vector[1];
-        sum[2] += vector[2];
-        ++validAnchorCount;
-    }
-
-    if (validAnchorCount == 0) {
-        return std::nullopt;
-    }
-
-    const auto normalizedVector = skygate::core::ProjectionMath::normalize(sum);
-    if (skygate::core::ProjectionMath::length(normalizedVector) <= 0.0) {
-        return std::nullopt;
-    }
-
-    const skygate::core::HorizontalCoordinate center {
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(
-            normalizedVector[2],
-            -1.0,
-            1.0
-        ))),
-        .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
-            skygate::core::AngleMath::toDegrees(
-                std::atan2(normalizedVector[0], normalizedVector[1])
-            )
-        )
-    };
-    const auto projected = preparedProjection.project(center);
+    const auto projected = preparedProjection.project(*center);
     if (!projected.isVisible) {
         return std::nullopt;
     }
@@ -452,7 +404,8 @@ void SkySceneModel::rebuildSceneFrame()
         .viewCenterAzimuthDeg = m_skyContextController->viewCenterAzimuthDeg(),
         .viewFieldOfViewDeg = m_skyContextController->viewFieldOfViewDeg(),
         .magnitudeCutoff = m_skyContextController->magnitudeCutoff(),
-        .themeId = m_skyContextController->themeId()
+        .themeId = m_skyContextController->themeId(),
+        .overlayLayers = m_skyContextController->overlayLayerVisibility()
     };
     if (!m_renderFrameKey.has_value() || !m_renderFrameKey.value().equals(renderFrameKey)) {
         const SkyRenderFrameBuilder frameBuilder;
@@ -464,7 +417,8 @@ void SkySceneModel::rebuildSceneFrame()
             m_skyContextController->magnitudeCutoff(),
             m_viewportWidth,
             m_viewportHeight,
-            m_skyContextController->renderTheme()
+            m_skyContextController->renderTheme(),
+            m_skyContextController->overlayLayerVisibility()
         );
 
         m_sceneFrame.hoverPointIndicesByCell.clear();
@@ -499,6 +453,10 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
     QVariantList overlayItems = sceneFrame.frame.labels;
 
     if (!sceneFrame.preparedProjection.has_value()) {
+        return overlayItems;
+    }
+
+    if (!m_skyContextController->overlayLayerVisibility().horizon) {
         return overlayItems;
     }
 
@@ -554,7 +512,6 @@ QVariantMap SkySceneModel::buildSelectionMarker(const SceneFrameData& sceneFrame
     } else if (normalizedLookupKey(targetKind) == "constellationlabel") {
         markerPoint = selectedConstellationPoint(
             sceneFrame.snapshot,
-            sceneFrame.stateIndexByBodyId,
             *sceneFrame.preparedProjection,
             m_skyContextController->constellationLabelRefs(),
             targetId

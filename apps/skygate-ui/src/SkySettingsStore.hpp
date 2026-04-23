@@ -4,6 +4,8 @@
 #include <QString>
 #include <QtGlobal>
 
+#include "SkyOverlayLayerVisibility.hpp"
+
 #include <cstddef>
 #include <optional>
 
@@ -27,6 +29,7 @@ public:
         QString selectedCityId;
         QString projectionTypeText;
         QString themeId;
+        SkyOverlayLayerVisibility overlayLayers;
         int catalogPresetIndex = 0;
         QString catalogUrlText;
     };

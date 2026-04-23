@@ -1,6 +1,7 @@
 #include <QtTest>
 
 #include "SkyContextController.hpp"
+#include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -137,6 +138,7 @@ private slots:
     void restoresSavedThemeId();
     void invalidSavedThemeFallsBackToDefault();
     void setThemeIdUpdatesPaletteAndEmitsSignals();
+    void restoresSavedOverlayLayerVisibility();
     void setUtcDateTimeTextAppliesAtomically();
     void setUtcDateTimeTextAcceptsBceInput();
     void bceAliasesResolveToTheSameInstant();
@@ -324,6 +326,35 @@ void SkyContextControllerTests::setThemeIdUpdatesPaletteAndEmitsSignals()
         controller->theme()->property("windowBackground").value<QColor>(),
         QColor("#150707")
     );
+}
+
+void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
+{
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.overlayLayers.horizon = false;
+    snapshot.overlayLayers.altAzGrid = false;
+    snapshot.overlayLayers.constellationLines = false;
+    snapshot.overlayLayers.constellationLabels = false;
+    snapshot.overlayLayers.ecliptic = true;
+    snapshot.overlayLayers.celestialEquator = true;
+    snapshot.overlayLayers.meridian = true;
+    snapshot.overlayLayers.circumpolarBoundary = true;
+    snapshot.overlayLayers.solarSystemLabels = false;
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+    auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller->overlayLayers());
+    QVERIFY(overlayLayers != nullptr);
+    QVERIFY(!overlayLayers->horizon());
+    QVERIFY(!overlayLayers->altAzGrid());
+    QVERIFY(!overlayLayers->constellationLines());
+    QVERIFY(!overlayLayers->constellationLabels());
+    QVERIFY(overlayLayers->ecliptic());
+    QVERIFY(overlayLayers->celestialEquator());
+    QVERIFY(overlayLayers->meridian());
+    QVERIFY(overlayLayers->circumpolarBoundary());
+    QVERIFY(!overlayLayers->solarSystemLabels());
 }
 
 void SkyContextControllerTests::setUtcDateTimeTextAppliesAtomically()

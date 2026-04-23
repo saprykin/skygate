@@ -145,6 +145,10 @@ namespace {
     theme.render.gridAzimuthLine = QColor(102, 138, 184, 58);
     theme.render.constellationLine = QColor(146, 205, 255, 132);
     theme.render.horizonLine = QColor(255, 170, 92, 220);
+    theme.render.eclipticLine = QColor(255, 204, 112, 150);
+    theme.render.celestialEquatorLine = QColor(132, 196, 255, 120);
+    theme.render.meridianLine = QColor(255, 255, 255, 95);
+    theme.render.circumpolarBoundaryLine = QColor(188, 162, 255, 120);
     theme.render.cardinalNorthLine = QColor(130, 216, 255, 132);
     theme.render.cardinalEastLine = QColor(255, 208, 136, 132);
     theme.render.cardinalSouthLine = QColor(255, 158, 158, 132);

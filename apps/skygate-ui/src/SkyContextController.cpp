@@ -3,6 +3,7 @@
 #include "LocationCatalogModel.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyObjectSearchModel.hpp"
+#include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
 
 #include <QDateTime>
@@ -42,6 +43,7 @@ SkyContextController::SkyContextController(
     , m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this))
     , m_themePalette(std::make_unique<SkyThemePalette>(this))
     , m_themeRepository(std::make_unique<SkyThemeRepository>())
+    , m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this))
     , m_settingsStore(std::make_unique<SkySettingsStore>())
     , m_catalogManager(std::make_unique<SkyCatalogManager>(
           m_settingsStore.get(),
@@ -53,6 +55,12 @@ SkyContextController::SkyContextController(
 {
     m_themeOptions = m_themeRepository->themeOptions();
     m_themePalette->setDefinition(m_themeRepository->defaultTheme());
+    connect(
+        m_overlayLayerSettings.get(),
+        &SkyOverlayLayerSettings::visibilityChanged,
+        this,
+        &SkyContextController::skyContextChanged
+    );
 
     connect(
         m_catalogManager.get(),
@@ -237,6 +245,19 @@ QVariantList SkyContextController::themeOptions() const
 QObject* SkyContextController::theme() const noexcept
 {
     return m_themePalette.get();
+}
+
+QObject* SkyContextController::overlayLayers() const noexcept
+{
+    return m_overlayLayerSettings.get();
+}
+
+const SkyOverlayLayerVisibility& SkyContextController::overlayLayerVisibility() const noexcept
+{
+    static const SkyOverlayLayerVisibility kDefaultVisibility;
+    return m_overlayLayerSettings != nullptr
+        ? m_overlayLayerSettings->visibility()
+        : kDefaultVisibility;
 }
 
 QString SkyContextController::locationStatusText() const

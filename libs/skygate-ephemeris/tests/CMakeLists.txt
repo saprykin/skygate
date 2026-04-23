@@ -27,5 +27,6 @@ add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-catalog-tests HygCatalogParser
 add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-gzip-tests HygCatalogGzipTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-stellarium-parser-tests StellariumConstellationParserTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-factory-tests CatalogFactoryTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-celestial-reference-tests CelestialReferenceCalculatorTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-engine-baseline-tests EphemerisEngineBaselineTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-engine-fallback-tests EphemerisEngineFallbackTests.cpp)

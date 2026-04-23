@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QVariantList>
 
+#include "SkyOverlayLayerVisibility.hpp"
 #include "SkyTheme.hpp"
 #include "skygate/core/PreparedProjection.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
@@ -45,6 +46,7 @@ public:
         double magnitudeCutoff,
         double viewportWidth,
         double viewportHeight,
-        const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
+        const skygate::ui::internal::SkyThemeRenderPalette& renderTheme,
+        const SkyOverlayLayerVisibility& overlayLayers
     ) const;
 };

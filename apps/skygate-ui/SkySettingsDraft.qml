@@ -12,6 +12,15 @@ QtObject {
     property string selectedCityDisplayText: ""
     property string projectionTypeText: ""
     property string themeId: ""
+    property bool overlayHorizon: true
+    property bool overlayAltAzGrid: true
+    property bool overlayConstellationLines: true
+    property bool overlayConstellationLabels: true
+    property bool overlayEcliptic: false
+    property bool overlayCelestialEquator: false
+    property bool overlayMeridian: false
+    property bool overlayCircumpolarBoundary: false
+    property bool overlaySolarSystemLabels: true
     property int catalogPresetIndex: 0
     property string catalogUrlText: ""
 
@@ -48,6 +57,15 @@ QtObject {
         selectedCityDisplayText = skyContextController.selectedCityDisplayText
         projectionTypeText = skyContextController.projectionTypeText
         themeId = skyContextController.themeId
+        overlayHorizon = skyContextController.overlayLayers.horizon
+        overlayAltAzGrid = skyContextController.overlayLayers.altAzGrid
+        overlayConstellationLines = skyContextController.overlayLayers.constellationLines
+        overlayConstellationLabels = skyContextController.overlayLayers.constellationLabels
+        overlayEcliptic = skyContextController.overlayLayers.ecliptic
+        overlayCelestialEquator = skyContextController.overlayLayers.celestialEquator
+        overlayMeridian = skyContextController.overlayLayers.meridian
+        overlayCircumpolarBoundary = skyContextController.overlayLayers.circumpolarBoundary
+        overlaySolarSystemLabels = skyContextController.overlayLayers.solarSystemLabels
         catalogPresetIndex = skyContextController.catalogPresetIndex()
         catalogUrlText = skyContextController.catalogUrlText()
     }
@@ -80,6 +98,15 @@ QtObject {
 
         skyContextController.setProjectionTypeText(projectionTypeText)
         skyContextController.setThemeId(themeId)
+        skyContextController.overlayLayers.horizon = overlayHorizon
+        skyContextController.overlayLayers.altAzGrid = overlayAltAzGrid
+        skyContextController.overlayLayers.constellationLines = overlayConstellationLines
+        skyContextController.overlayLayers.constellationLabels = overlayConstellationLabels
+        skyContextController.overlayLayers.ecliptic = overlayEcliptic
+        skyContextController.overlayLayers.celestialEquator = overlayCelestialEquator
+        skyContextController.overlayLayers.meridian = overlayMeridian
+        skyContextController.overlayLayers.circumpolarBoundary = overlayCircumpolarBoundary
+        skyContextController.overlayLayers.solarSystemLabels = overlaySolarSystemLabels
         skyContextController.setCatalogPresetIndex(catalogPresetIndex)
         skyContextController.setCatalogUrlText(catalogUrlText)
         resetFromContext()

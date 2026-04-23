@@ -83,6 +83,7 @@ private:
         double viewFieldOfViewDeg = 0.0;
         double magnitudeCutoff = 0.0;
         QString themeId;
+        SkyOverlayLayerVisibility overlayLayers;
 
         [[nodiscard]] bool equals(const RenderFrameKey& other) const noexcept
         {
@@ -94,7 +95,8 @@ private:
                 && viewCenterAzimuthDeg == other.viewCenterAzimuthDeg
                 && viewFieldOfViewDeg == other.viewFieldOfViewDeg
                 && magnitudeCutoff == other.magnitudeCutoff
-                && themeId == other.themeId;
+                && themeId == other.themeId
+                && overlayLayers.equals(other.overlayLayers);
         }
     };
 

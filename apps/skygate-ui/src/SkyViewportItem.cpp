@@ -9,8 +9,11 @@
 #include <QSGGeometryNode>
 #include <QSGNode>
 
+#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -24,9 +27,12 @@ constexpr int kGridAltitudeStepDeg = 15;
 constexpr int kGridAzimuthStepDeg = 30;
 constexpr int kGridAltitudeSampleCount = 96;
 constexpr int kGridAzimuthSampleCount = 64;
+constexpr int kReferenceCircleSampleCount = 192;
+constexpr int kMeridianSampleCount = 128;
 constexpr float kGridLineWidthPx = 1.0F;
 constexpr float kCardinalLineWidthPx = 1.8F;
 constexpr float kHorizonLineWidthPx = 2.2F;
+constexpr float kReferenceLineWidthPx = 1.4F;
 struct LineSegment final {
     float x1 = 0.0F;
     float y1 = 0.0F;
@@ -334,6 +340,9 @@ struct SkyViewportItem::ViewportRenderData final {
     double viewportHeight = 0.0;
     std::optional<skygate::core::PreparedProjection> preparedProjection;
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
+    SkyOverlayLayerVisibility overlayLayers;
+    skygate::core::GeoLocation observer;
+    skygate::core::UtcTimePoint utcTime {};
     std::vector<SkyRenderLine> lines;
     std::vector<SkyRenderPoint> points;
 };
@@ -405,85 +414,174 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     clearChildNodes(rootNode->lineRoot());
     clearChildNodes(rootNode->pointRoot());
 
-    for (int altitudeDeg = -75; altitudeDeg <= 75; altitudeDeg += kGridAltitudeStepDeg) {
-        if (altitudeDeg == 0) {
-            continue;
+    if (renderData->overlayLayers.altAzGrid) {
+        for (int altitudeDeg = -75; altitudeDeg <= 75; altitudeDeg += kGridAltitudeStepDeg) {
+            if (altitudeDeg == 0) {
+                continue;
+            }
+
+            appendProjectedPolyline(
+                lineSegments,
+                *renderData->preparedProjection,
+                kGridAltitudeSampleCount,
+                maxSegmentLengthSquared,
+                renderData->renderTheme.gridAltitudeLine,
+                kGridLineWidthPx,
+                [altitudeDeg](const int index) {
+                    const double azimuthDeg = (360.0 * static_cast<double>(index))
+                                              / static_cast<double>(kGridAltitudeSampleCount);
+                    return skygate::core::HorizontalCoordinate {
+                        .altitudeDeg = static_cast<double>(altitudeDeg),
+                        .azimuthDeg = azimuthDeg
+                    };
+                }
+            );
         }
 
+        for (int azimuthDeg = 0; azimuthDeg < 360; azimuthDeg += kGridAzimuthStepDeg) {
+            if (azimuthDeg % 90 == 0) {
+                continue;
+            }
+
+            appendProjectedPolyline(
+                lineSegments,
+                *renderData->preparedProjection,
+                kGridAzimuthSampleCount,
+                maxSegmentLengthSquared,
+                renderData->renderTheme.gridAzimuthLine,
+                kGridLineWidthPx,
+                [azimuthDeg](const int index) {
+                    const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
+                                                           / static_cast<double>(kGridAzimuthSampleCount);
+                    return skygate::core::HorizontalCoordinate {
+                        .altitudeDeg = altitudeDeg,
+                        .azimuthDeg = static_cast<double>(azimuthDeg)
+                    };
+                }
+            );
+        }
+    }
+
+    if (renderData->overlayLayers.altAzGrid) {
+        constexpr std::array<int, 4> kCardinalAzimuths {0, 90, 180, 270};
+        for (const int cardinalAzimuthDeg : kCardinalAzimuths) {
+            appendProjectedPolyline(
+                lineSegments,
+                *renderData->preparedProjection,
+                kGridAzimuthSampleCount,
+                maxSegmentLengthSquared,
+                cardinalMeridianColor(cardinalAzimuthDeg, renderData->renderTheme),
+                kCardinalLineWidthPx,
+                [cardinalAzimuthDeg](const int index) {
+                    const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
+                                                           / static_cast<double>(kGridAzimuthSampleCount);
+                    return skygate::core::HorizontalCoordinate {
+                        .altitudeDeg = altitudeDeg,
+                        .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
+                    };
+                }
+            );
+        }
+    }
+
+    if (renderData->overlayLayers.horizon) {
         appendProjectedPolyline(
             lineSegments,
             *renderData->preparedProjection,
-            kGridAltitudeSampleCount,
+            kHorizonSampleCount,
             maxSegmentLengthSquared,
-            renderData->renderTheme.gridAltitudeLine,
-            kGridLineWidthPx,
-            [altitudeDeg](const int index) {
+            renderData->renderTheme.horizonLine,
+            kHorizonLineWidthPx,
+            [](const int index) {
                 const double azimuthDeg = (360.0 * static_cast<double>(index))
-                                          / static_cast<double>(kGridAltitudeSampleCount);
-                return skygate::core::HorizontalCoordinate {
-                    .altitudeDeg = static_cast<double>(altitudeDeg),
-                    .azimuthDeg = azimuthDeg
-                };
+                                          / static_cast<double>(kHorizonSampleCount);
+                return skygate::core::HorizontalCoordinate {.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg};
             }
         );
     }
 
-    for (int azimuthDeg = 0; azimuthDeg < 360; azimuthDeg += kGridAzimuthStepDeg) {
-        if (azimuthDeg % 90 == 0) {
-            continue;
-        }
-
+    if (renderData->overlayLayers.ecliptic) {
         appendProjectedPolyline(
             lineSegments,
             *renderData->preparedProjection,
-            kGridAzimuthSampleCount,
+            kReferenceCircleSampleCount,
             maxSegmentLengthSquared,
-            renderData->renderTheme.gridAzimuthLine,
-            kGridLineWidthPx,
-            [azimuthDeg](const int index) {
-                const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
-                                                       / static_cast<double>(kGridAzimuthSampleCount);
-                return skygate::core::HorizontalCoordinate {
-                    .altitudeDeg = altitudeDeg,
-                    .azimuthDeg = static_cast<double>(azimuthDeg)
-                };
+            renderData->renderTheme.eclipticLine,
+            kReferenceLineWidthPx,
+            [renderData](const int index) {
+                const double eclipticLongitudeDeg = 360.0 * static_cast<double>(index)
+                    / static_cast<double>(kReferenceCircleSampleCount);
+                return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
+                    eclipticLongitudeDeg,
+                    renderData->observer,
+                    renderData->utcTime
+                );
             }
         );
     }
 
-    constexpr std::array<int, 4> kCardinalAzimuths {0, 90, 180, 270};
-    for (const int cardinalAzimuthDeg : kCardinalAzimuths) {
+    if (renderData->overlayLayers.celestialEquator) {
         appendProjectedPolyline(
             lineSegments,
             *renderData->preparedProjection,
-            kGridAzimuthSampleCount,
+            kReferenceCircleSampleCount,
             maxSegmentLengthSquared,
-            cardinalMeridianColor(cardinalAzimuthDeg, renderData->renderTheme),
-            kCardinalLineWidthPx,
-            [cardinalAzimuthDeg](const int index) {
-                const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
-                                                       / static_cast<double>(kGridAzimuthSampleCount);
-                return skygate::core::HorizontalCoordinate {
-                    .altitudeDeg = altitudeDeg,
-                    .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
-                };
+            renderData->renderTheme.celestialEquatorLine,
+            kReferenceLineWidthPx,
+            [renderData](const int index) {
+                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+                    index,
+                    kReferenceCircleSampleCount,
+                    0.0,
+                    renderData->observer,
+                    renderData->utcTime
+                );
             }
         );
     }
 
-    appendProjectedPolyline(
-        lineSegments,
-        *renderData->preparedProjection,
-        kHorizonSampleCount,
-        maxSegmentLengthSquared,
-        renderData->renderTheme.horizonLine,
-        kHorizonLineWidthPx,
-        [](const int index) {
-            const double azimuthDeg = (360.0 * static_cast<double>(index))
-                                      / static_cast<double>(kHorizonSampleCount);
-            return skygate::core::HorizontalCoordinate {.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg};
-        }
-    );
+    if (renderData->overlayLayers.meridian) {
+        appendProjectedPolyline(
+            lineSegments,
+            *renderData->preparedProjection,
+            kMeridianSampleCount,
+            maxSegmentLengthSquared,
+            renderData->renderTheme.meridianLine,
+            kReferenceLineWidthPx,
+            [](const int index) {
+                return skygate::ephemeris::CelestialReferenceCalculator::meridianPoint(
+                    static_cast<double>(index) / static_cast<double>(kMeridianSampleCount)
+                );
+            }
+        );
+    }
+
+    if (
+        renderData->overlayLayers.circumpolarBoundary
+        && renderData->observer.isValid()
+    ) {
+        const double boundaryDeclinationDeg =
+            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
+                renderData->observer
+            );
+        appendProjectedPolyline(
+            lineSegments,
+            *renderData->preparedProjection,
+            kReferenceCircleSampleCount,
+            maxSegmentLengthSquared,
+            renderData->renderTheme.circumpolarBoundaryLine,
+            kReferenceLineWidthPx,
+            [boundaryDeclinationDeg, renderData](const int index) {
+                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+                    index,
+                    kReferenceCircleSampleCount,
+                    boundaryDeclinationDeg,
+                    renderData->observer,
+                    renderData->utcTime
+                );
+            }
+        );
+    }
 
     for (const auto& line : renderData->lines) {
         appendLineSegment(
@@ -538,6 +636,9 @@ void SkyViewportItem::synchronizeRenderData()
                 m_skySceneModel->skyContextController()
             )) {
             nextRenderData->renderTheme = controller->renderTheme();
+            nextRenderData->overlayLayers = controller->overlayLayerVisibility();
+            nextRenderData->observer = controller->skyContext().observer;
+            nextRenderData->utcTime = controller->skyContext().utcTime;
         }
         if (nextRenderData->preparedProjection.has_value()) {
             const auto lines = m_skySceneModel->renderLineSpan();

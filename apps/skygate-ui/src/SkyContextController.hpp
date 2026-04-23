@@ -12,6 +12,7 @@
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include "SkyContextControllerSupport.hpp"
+#include "SkyOverlayLayerVisibility.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -26,6 +27,7 @@ class QGeoPositionInfoSource;
 class LocationCatalogModel;
 class SkyCatalogManager;
 class SkyObjectSearchModel;
+class SkyOverlayLayerSettings;
 class SkySettingsStore;
 
 class SkyContextController final : public QObject {
@@ -71,6 +73,7 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString themeId READ themeId WRITE setThemeId NOTIFY themeChanged)
     Q_PROPERTY(QVariantList themeOptions READ themeOptions NOTIFY themeOptionsChanged)
     Q_PROPERTY(QObject* theme READ theme CONSTANT)
+    Q_PROPERTY(QObject* overlayLayers READ overlayLayers CONSTANT)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
     Q_PROPERTY(
@@ -137,6 +140,7 @@ public:
     [[nodiscard]] QString themeId() const;
     [[nodiscard]] QVariantList themeOptions() const;
     [[nodiscard]] QObject* theme() const noexcept;
+    [[nodiscard]] QObject* overlayLayers() const noexcept;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
@@ -150,6 +154,7 @@ public:
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
     [[nodiscard]] skygate::core::ProjectionType projectionType() const noexcept;
     [[nodiscard]] const skygate::ui::internal::SkyThemeRenderPalette& renderTheme() const noexcept;
+    [[nodiscard]] const SkyOverlayLayerVisibility& overlayLayerVisibility() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
     [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
@@ -260,6 +265,7 @@ private:
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
     std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;
+    std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;

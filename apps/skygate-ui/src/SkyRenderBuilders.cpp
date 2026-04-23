@@ -216,7 +216,8 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const double magnitudeCutoff,
     const double viewportWidth,
     const double viewportHeight,
-    const SkyThemeRenderPalette& renderTheme
+    const SkyThemeRenderPalette& renderTheme,
+    const SkyOverlayLayerVisibility& overlayLayers
 ) const
 {
     SkyRenderFrame frame;
@@ -319,7 +320,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const double maxSegmentLength = std::max(viewportWidth, viewportHeight) * 0.90;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
 
-    if (lookup.has_value()) {
+    if (lookup.has_value() && overlayLayers.constellationLines) {
         for (const auto& lineRef : lineRefs) {
             const auto* startHorizontal = lookup->findHorizontal(lineRef.first);
             const auto* endHorizontal = lookup->findHorizontal(lineRef.second);
@@ -357,11 +358,15 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
 
     for (const auto& point : frame.points) {
         const auto& body = snapshot.bodyAt(point.bodyIndex);
+        const bool isConstellationLabel =
+            body.type == skygate::ephemeris::CelestialBodyType::Constellation;
+        const bool isSolarSystemLabel =
+            body.type == skygate::ephemeris::CelestialBodyType::Planet
+            || body.type == skygate::ephemeris::CelestialBodyType::Sun
+            || body.type == skygate::ephemeris::CelestialBodyType::Moon;
         if (
-            body.type != skygate::ephemeris::CelestialBodyType::Constellation
-            && body.type != skygate::ephemeris::CelestialBodyType::Planet
-            && body.type != skygate::ephemeris::CelestialBodyType::Sun
-            && body.type != skygate::ephemeris::CelestialBodyType::Moon
+            (!isConstellationLabel || !overlayLayers.constellationLabels)
+            && (!isSolarSystemLabel || !overlayLayers.solarSystemLabels)
         ) {
             continue;
         }
@@ -388,7 +393,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
         );
     }
 
-    if (lookup.has_value()) {
+    if (lookup.has_value() && overlayLayers.constellationLabels) {
         for (const auto& labelRef : labelRefs) {
             if (labelRef.first.empty() || labelRef.second.empty()) {
                 continue;

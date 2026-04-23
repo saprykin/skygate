@@ -27,3 +27,4 @@ add_skygate_ui_qtest(skygate-ui-context-controller-tests SkyContextControllerTes
 add_skygate_ui_qtest(skygate-ui-settings-store-tests SkySettingsStoreTests.cpp)
 add_skygate_ui_qtest(skygate-ui-object-search-model-tests SkyObjectSearchModelTests.cpp)
 add_skygate_ui_qtest(skygate-ui-theme-repository-tests SkyThemeRepositoryTests.cpp)
+add_skygate_ui_qtest(skygate-ui-overlay-layer-settings-tests SkyOverlayLayerSettingsTests.cpp)

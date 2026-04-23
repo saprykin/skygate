@@ -54,6 +54,15 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.selectedCityId = "ch-zurich";
     savedSnapshot.projectionTypeText = "Perspective";
     savedSnapshot.themeId = "night-vision";
+    savedSnapshot.overlayLayers.horizon = false;
+    savedSnapshot.overlayLayers.altAzGrid = false;
+    savedSnapshot.overlayLayers.constellationLines = false;
+    savedSnapshot.overlayLayers.constellationLabels = false;
+    savedSnapshot.overlayLayers.ecliptic = true;
+    savedSnapshot.overlayLayers.celestialEquator = true;
+    savedSnapshot.overlayLayers.meridian = true;
+    savedSnapshot.overlayLayers.circumpolarBoundary = true;
+    savedSnapshot.overlayLayers.solarSystemLabels = false;
     savedSnapshot.catalogPresetIndex = 2;
     savedSnapshot.catalogUrlText = "https://example.com/catalog.csv";
 
@@ -70,6 +79,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
     QCOMPARE(loadedSnapshot->themeId, savedSnapshot.themeId);
+    QVERIFY(loadedSnapshot->overlayLayers.equals(savedSnapshot.overlayLayers));
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
 }
