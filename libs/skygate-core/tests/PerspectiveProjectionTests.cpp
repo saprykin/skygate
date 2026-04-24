@@ -126,7 +126,7 @@ void PerspectiveProjectionTests::invalidParamsAreRejected()
 
     skygate::core::ProjectionParams params = makeDefaultPerspectiveParams();
 
-    params.fovDeg = 19.9;
+    params.fovDeg = 0.9;
     const auto tooSmallFov = projection->project(params.center, params);
     QVERIFY(!tooSmallFov.isVisible);
     QCOMPARE(tooSmallFov.status, skygate::core::ProjectionStatus::InvalidParameters);

@@ -190,7 +190,7 @@ void SkyContextControllerTests::pinchZoomScaleDeltaAdjustsAndClampsFieldOfView()
         skygate::core::ViewportMath::kFieldOfViewMaxDeg
     );
 
-    controller->zoomViewByScaleDelta(10.0);
+    controller->zoomViewByScaleDelta(200.0);
     QCOMPARE(
         controller->viewFieldOfViewDeg(),
         skygate::core::ViewportMath::kFieldOfViewMinDeg

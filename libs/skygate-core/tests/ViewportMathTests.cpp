@@ -28,7 +28,7 @@ void ViewportMathTests::clampAltitudeEnforcesRange()
 void ViewportMathTests::clampFieldOfViewEnforcesRange()
 {
     QCOMPARE(skygate::core::ViewportMath::clampFieldOfViewDeg(90.0), 90.0);
-    QCOMPARE(skygate::core::ViewportMath::clampFieldOfViewDeg(5.0), 20.0);
+    QCOMPARE(skygate::core::ViewportMath::clampFieldOfViewDeg(0.5), 1.0);
     QCOMPARE(skygate::core::ViewportMath::clampFieldOfViewDeg(170.0), 150.0);
 }
 
@@ -39,12 +39,12 @@ void ViewportMathTests::buildProjectionParamsNormalizesAndClampsInputs()
         800.0,
         120.0,
         -150.0,
-        5.0
+        0.5
     );
 
     QCOMPARE(params.center.altitudeDeg, 90.0);
     QCOMPARE(params.center.azimuthDeg, 210.0);
-    QCOMPARE(params.fovDeg, 20.0);
+    QCOMPARE(params.fovDeg, 1.0);
     QCOMPARE(params.rollDeg, 0.0);
     QCOMPARE(params.viewportWidth, 1200.0);
     QCOMPARE(params.viewportHeight, 800.0);

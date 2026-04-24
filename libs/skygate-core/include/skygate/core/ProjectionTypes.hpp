@@ -27,7 +27,7 @@ struct ScreenPoint {
 };
 
 struct ProjectionParams {
-    static constexpr double kFieldOfViewMinDeg = 20.0;
+    static constexpr double kFieldOfViewMinDeg = 1.0;
     static constexpr double kFieldOfViewMaxDeg = 150.0;
 
     HorizontalCoordinate center;

@@ -2,16 +2,21 @@
 
 #include "SkyContextController.hpp"
 #include "SkyOverlayLayerSettings.hpp"
+#include "SkyRenderBuilders.hpp"
 #include "SkySceneModel.hpp"
+#include "SkyTheme.hpp"
 
+#include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -43,6 +48,74 @@ bool overlayItemsContainText(const QVariantList& overlayItems, const QString& te
     return false;
 }
 
+skygate::ephemeris::CelestialBody makeDeepSkyBody(
+    std::string id,
+    std::string displayName,
+    const double visualMagnitude,
+    std::vector<std::string> aliases = {}
+)
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.type = skygate::ephemeris::CelestialBodyType::DeepSkyObject;
+    body.visualMagnitude = visualMagnitude;
+    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+        .aliases = std::move(aliases),
+        .majorAxisArcmin = 8.0,
+        .minorAxisArcmin = 4.0,
+        .positionAngleDeg = 0.0,
+    };
+    return body;
+}
+
+SkyRenderFrame buildDeepSkyRenderFrame(
+    std::vector<skygate::ephemeris::CelestialBody> bodies,
+    std::vector<skygate::core::HorizontalCoordinate> horizontalCoordinates,
+    const double fovDeg
+)
+{
+    skygate::ephemeris::SkySnapshot snapshot;
+    auto catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(
+        std::move(bodies)
+    );
+    snapshot.catalogBodies = catalogBodies;
+    for (std::uint32_t index = 0; index < catalogBodies->size(); ++index) {
+        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState {
+            .bodyIndex = index,
+            .horizontal = horizontalCoordinates.at(index)
+        });
+    }
+
+    const auto projectionParams = skygate::core::ViewportMath::buildProjectionParams(
+        1000.0,
+        700.0,
+        45.0,
+        180.0,
+        fovDeg
+    );
+    const auto projection = skygate::core::PreparedProjection::create(
+        skygate::core::ProjectionType::Stereographic,
+        projectionParams
+    );
+    Q_ASSERT(projection.has_value());
+
+    const skygate::ui::internal::SkyThemeRepository themeRepository;
+    const SkyRenderFrameBuilder frameBuilder;
+    return frameBuilder.buildFrame(
+        snapshot,
+        *projection,
+        {},
+        {},
+        12.0,
+        1000.0,
+        700.0,
+        themeRepository.defaultTheme().render,
+        SkyOverlayLayerVisibility {}
+    );
+}
+
 }  // namespace
 
 class SkySceneModelTests final : public QObject {
@@ -55,6 +128,9 @@ private slots:
     void themeChangesUpdateRenderedColors();
     void solarSystemLabelsCanBeHidden();
     void deepSkyObjectsRenderAndCanBeHidden();
+    void denseDeepSkyLabelsAreBudgeted();
+    void wideDeepSkyLabelsPreferNamedObjects();
+    void deepestDeepSkyZoomShowsSeparatedAnonymousLabels();
     void constellationLabelsAndLinesCanBeHiddenIndependently();
     void referenceLayerLabelsFollowVisibility();
 };
@@ -437,6 +513,117 @@ void SkySceneModelTests::deepSkyObjectsRenderAndCanBeHidden()
     overlayLayers->setDeepSkyObjects(false);
 
     QVERIFY(sceneModel.renderGlyphSpan().empty());
+}
+
+void SkySceneModelTests::denseDeepSkyLabelsAreBudgeted()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::core::HorizontalCoordinate> coordinates;
+    bodies.reserve(360U);
+    coordinates.reserve(360U);
+
+    for (int index = 0; index < 360; ++index) {
+        const int row = index / 24;
+        const int column = index % 24;
+        bodies.push_back(makeDeepSkyBody(
+            "ngc_" + std::to_string(index + 1),
+            "NGC " + std::to_string(index + 1),
+            9.0 + (static_cast<double>(index % 5) * 0.1)
+        ));
+        coordinates.push_back(skygate::core::HorizontalCoordinate {
+            .altitudeDeg = 45.0 + ((static_cast<double>(row) - 7.0) * 0.16),
+            .azimuthDeg = 180.0 + ((static_cast<double>(column) - 12.0) * 0.16)
+        });
+    }
+
+    const SkyRenderFrame frame = buildDeepSkyRenderFrame(
+        std::move(bodies),
+        std::move(coordinates),
+        10.0
+    );
+
+    QCOMPARE(frame.glyphs.size(), 360U);
+    QVERIFY(frame.labels.size() > 0);
+    QVERIFY(frame.labels.size() <= 100);
+}
+
+void SkySceneModelTests::wideDeepSkyLabelsPreferNamedObjects()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    bodies.push_back(makeDeepSkyBody(
+        "messier_031",
+        "M31",
+        3.44,
+        {"M 31", "NGC 224", "Andromeda Galaxy"}
+    ));
+    bodies.push_back(makeDeepSkyBody(
+        "ngc_100",
+        "NGC 100",
+        4.0,
+        {"NGC 100"}
+    ));
+    bodies.push_back(makeDeepSkyBody(
+        "ngc_7000",
+        "NGC 7000",
+        4.0,
+        {"NGC 7000", "North America Nebula"}
+    ));
+
+    const SkyRenderFrame frame = buildDeepSkyRenderFrame(
+        std::move(bodies),
+        {
+            skygate::core::HorizontalCoordinate {
+                .altitudeDeg = 45.0,
+                .azimuthDeg = 180.0
+            },
+            skygate::core::HorizontalCoordinate {
+                .altitudeDeg = 45.0,
+                .azimuthDeg = 195.0
+            },
+            skygate::core::HorizontalCoordinate {
+                .altitudeDeg = 45.0,
+                .azimuthDeg = 165.0
+            }
+        },
+        50.0
+    );
+
+    QVERIFY(overlayItemsContainText(frame.labels, "M31"));
+    QVERIFY(overlayItemsContainText(frame.labels, "NGC 7000"));
+    QVERIFY(!overlayItemsContainText(frame.labels, "NGC 100"));
+}
+
+void SkySceneModelTests::deepestDeepSkyZoomShowsSeparatedAnonymousLabels()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::core::HorizontalCoordinate> coordinates;
+    bodies.reserve(24U);
+    coordinates.reserve(24U);
+
+    for (int index = 0; index < 24; ++index) {
+        const int row = index / 6;
+        const int column = index % 6;
+        bodies.push_back(makeDeepSkyBody(
+            "ngc_" + std::to_string(7000 + index),
+            "NGC " + std::to_string(7000 + index),
+            10.0
+        ));
+        coordinates.push_back(skygate::core::HorizontalCoordinate {
+            .altitudeDeg = 45.0 + ((static_cast<double>(row) - 1.5) * 0.16),
+            .azimuthDeg = 180.0 + ((static_cast<double>(column) - 2.5) * 0.16)
+        });
+    }
+
+    const SkyRenderFrame frame = buildDeepSkyRenderFrame(
+        std::move(bodies),
+        std::move(coordinates),
+        skygate::core::ViewportMath::kFieldOfViewMinDeg
+    );
+
+    QCOMPARE(frame.glyphs.size(), 24U);
+    QCOMPARE(frame.labels.size(), 24);
+    QVERIFY(overlayItemsContainText(frame.labels, "NGC 7000"));
+    QVERIFY(overlayItemsContainText(frame.labels, "NGC 7023"));
 }
 
 void SkySceneModelTests::constellationLabelsAndLinesCanBeHiddenIndependently()
