@@ -1,7 +1,9 @@
 #pragma once
 
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "skygate/ephemeris/IStarCatalog.hpp"
 
+#include <memory>
 #include <string_view>
 
 namespace skygate::ephemeris {

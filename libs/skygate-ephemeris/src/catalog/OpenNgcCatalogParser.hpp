@@ -1,7 +1,7 @@
 #pragma once
 
 #include "catalog/CatalogBodyParseResult.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogLoader.hpp"
 
 #include <string_view>
 

@@ -1,15 +1,11 @@
 #include "catalog/OpenNgcCatalogParser.hpp"
 
-#include "catalog/CsvRowTokenizer.hpp"
+#include "catalog/DelimitedCatalogReader.hpp"
 
 #include <QByteArray>
-#include <QChar>
-#include <QHash>
 #include <QRegularExpression>
 #include <QString>
 #include <QStringList>
-#include <QStringView>
-#include <QVector>
 
 #include <algorithm>
 #include <cmath>
@@ -17,6 +13,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
@@ -25,7 +22,6 @@ namespace {
 constexpr std::size_t kOpenNgcProgressCallbackInterval = 512;
 constexpr std::size_t kMinOpenNgcRowCountLimit = 200000;
 constexpr std::size_t kMinPlausibleOpenNgcRowBytes = 12;
-constexpr qsizetype kMissingColumnIndex = -1;
 
 std::string toStdString(const QString& text)
 {
@@ -243,184 +239,112 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
     const HygParseProgressCallback& progressCallback
 ) const
 {
-    CatalogBodyParseResult result;
-    if (csvData.empty()) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
-        result.errorDetail = "OpenNGC CSV payload is empty.";
-        return result;
-    }
-
-    const std::size_t maxAllowedRowCount = std::max(
-        kMinOpenNgcRowCountLimit,
-        (csvData.size() / kMinPlausibleOpenNgcRowBytes) + 1U
-    );
-    std::vector<CelestialBody> bodies;
-    std::size_t cursor = 0;
-    std::size_t processedRowCount = 0;
     std::size_t parsedObjectCount = 0;
-    bool hasHeader = false;
-    QHash<QString, qsizetype> headerIndex;
 
-    const auto columnIndex = [&headerIndex](const QString& name) -> qsizetype {
-        const auto it = headerIndex.constFind(name.toLower());
-        return it == headerIndex.cend() ? kMissingColumnIndex : *it;
-    };
-
-    while (cursor < csvData.size()) {
-        const std::size_t newline = csvData.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? csvData.size() : newline;
-        const std::string_view rawLine = csvData.substr(cursor, lineEnd - cursor);
-        const QString line = QString::fromUtf8(
-            rawLine.data(),
-            static_cast<qsizetype>(rawLine.size())
-        ).trimmed();
-        const auto advanceCursor = [&cursor, newline]() {
-            if (newline == std::string_view::npos) {
-                cursor = std::string_view::npos;
-                return;
+    CatalogBodyParseResult result = DelimitedCatalogReader::read(
+        csvData,
+        DelimitedCatalogReaderOptions {
+            .separator = ';',
+            .requiredColumns = {
+                QStringLiteral("Name"),
+                QStringLiteral("Type"),
+                QStringLiteral("RA"),
+                QStringLiteral("Dec"),
+            },
+            .invalidErrorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv,
+            .minRowCountLimit = kMinOpenNgcRowCountLimit,
+            .minPlausibleRowBytes = kMinPlausibleOpenNgcRowBytes,
+            .emptyInputDetail = "OpenNGC CSV payload is empty.",
+            .missingColumnsDetail =
+                "OpenNGC CSV payload is missing one of the required columns: "
+                "Name, Type, RA, Dec.",
+            .rowLimitDetail = "OpenNGC CSV payload exceeds the supported row limit.",
+        },
+        [&](const DelimitedCatalogReader::Row& row, CatalogBodyParseResult& rowResult) {
+            const QString typeText = row.decodeColumn(QStringLiteral("Type"));
+            if (shouldSkipOpenNgcType(typeText)) {
+                return true;
             }
-            cursor = newline + 1U;
-        };
 
-        if (!line.isEmpty()) {
-            const QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView {line}, ';');
-            if (!hasHeader) {
-                for (qsizetype i = 0; i < columns.size(); ++i) {
-                    const QString header = CsvRowTokenizer::decodeField(columns.at(i)).trimmed().toLower();
-                    if (!header.isEmpty()) {
-                        headerIndex.insert(header, i);
-                    }
-                }
-                if (
-                    columnIndex("Name") == kMissingColumnIndex
-                    || columnIndex("Type") == kMissingColumnIndex
-                    || columnIndex("RA") == kMissingColumnIndex
-                    || columnIndex("Dec") == kMissingColumnIndex
-                ) {
-                    result.errorCode = CatalogLoadErrorCode::MissingRequiredColumns;
-                    result.errorDetail =
-                        "OpenNGC CSV payload is missing one of the required columns: "
-                        "Name, Type, RA, Dec.";
-                    return result;
-                }
-                hasHeader = true;
-            } else {
-                ++processedRowCount;
-                if (processedRowCount > maxAllowedRowCount) {
-                    result.errorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv;
-                    result.errorDetail = "OpenNGC CSV payload exceeds the supported row limit.";
-                    return result;
-                }
-
-                const auto decodeColumn = [&](const QString& name) -> QString {
-                    const qsizetype index = columnIndex(name);
-                    if (index == kMissingColumnIndex || index >= columns.size()) {
-                        return {};
-                    }
-                    return CsvRowTokenizer::decodeField(columns.at(index)).trimmed();
-                };
-
-                const QString typeText = decodeColumn("Type");
-                if (shouldSkipOpenNgcType(typeText)) {
-                    advanceCursor();
-                    continue;
-                }
-
-                const auto raHours = parseRightAscensionHours(decodeColumn("RA"));
-                const auto decDeg = parseDeclinationDeg(decodeColumn("Dec"));
-                if (!raHours.has_value() || !decDeg.has_value()) {
-                    advanceCursor();
-                    continue;
-                }
-
-                std::vector<std::string> aliases;
-                const QString name = decodeColumn("Name");
-                const QString messier = withoutLeadingZeros(decodeColumn("M"));
-                const QString ngc = withoutLeadingZeros(decodeColumn("NGC"));
-                const QString ic = withoutLeadingZeros(decodeColumn("IC"));
-                if (!messier.isEmpty()) {
-                    appendAlias(aliases, "M " + messier);
-                }
-                if (!ngc.isEmpty()) {
-                    appendAlias(aliases, "NGC " + ngc);
-                }
-                if (!ic.isEmpty()) {
-                    appendAlias(aliases, "IC " + ic);
-                }
-                appendAlias(aliases, name);
-                appendDelimitedAliases(aliases, decodeColumn("Identifiers"));
-                appendDelimitedAliases(aliases, decodeColumn("Common names"));
-
-                const QString displayName = !messier.isEmpty()
-                    ? QString("M%1").arg(messier)
-                    : (!ngc.isEmpty()
-                        ? QString("NGC %1").arg(ngc)
-                        : (!ic.isEmpty() ? QString("IC %1").arg(ic) : normalizedCatalogAlias(name)));
-                const QString id = !messier.isEmpty()
-                    ? objectIdFromAlias("M " + messier)
-                    : (!ngc.isEmpty()
-                        ? objectIdFromAlias("NGC " + ngc)
-                        : (!ic.isEmpty() ? objectIdFromAlias("IC " + ic) : objectIdFromAlias(name)));
-                if (displayName.isEmpty() || id.isEmpty()) {
-                    advanceCursor();
-                    continue;
-                }
-
-                ++parsedObjectCount;
-                if (parsedObjectCount > maxAllowedRowCount) {
-                    result.errorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv;
-                    result.errorDetail = "OpenNGC CSV payload exceeds the supported object limit.";
-                    return result;
-                }
-                if (progressCallback && (parsedObjectCount % kOpenNgcProgressCallbackInterval) == 0U) {
-                    progressCallback(parsedObjectCount);
-                }
-
-                const auto visualMagnitude = parseFiniteDouble(decodeColumn("V-Mag"));
-                CelestialBody body;
-                body.id = toStdString(id);
-                body.displayName = toStdString(displayName);
-                body.type = CelestialBodyType::DeepSkyObject;
-                body.visualMagnitude = visualMagnitude.value_or(std::numeric_limits<double>::quiet_NaN());
-                body.fixedEquatorial = core::EquatorialCoordinate {
-                    .rightAscensionHours = *raHours,
-                    .declinationDeg = *decDeg
-                };
-                body.deepSkyObject = DeepSkyObjectInfo {
-                    .kind = kindFromOpenNgcType(typeText),
-                    .aliases = std::move(aliases),
-                    .majorAxisArcmin = parsePositiveDouble(decodeColumn("MajAx")),
-                    .minorAxisArcmin = parsePositiveDouble(decodeColumn("MinAx")),
-                    .positionAngleDeg = parsePositiveDouble(decodeColumn("PosAng")),
-                };
-                bodies.push_back(std::move(body));
+            const auto raHours = parseRightAscensionHours(row.decodeColumn(QStringLiteral("RA")));
+            const auto decDeg = parseDeclinationDeg(row.decodeColumn(QStringLiteral("Dec")));
+            if (!raHours.has_value() || !decDeg.has_value()) {
+                return true;
             }
-        }
 
-        if (newline == std::string_view::npos) {
-            break;
+            std::vector<std::string> aliases;
+            const QString name = row.decodeColumn(QStringLiteral("Name"));
+            const QString messier = withoutLeadingZeros(row.decodeColumn(QStringLiteral("M")));
+            const QString ngc = withoutLeadingZeros(row.decodeColumn(QStringLiteral("NGC")));
+            const QString ic = withoutLeadingZeros(row.decodeColumn(QStringLiteral("IC")));
+            if (!messier.isEmpty()) {
+                appendAlias(aliases, "M " + messier);
+            }
+            if (!ngc.isEmpty()) {
+                appendAlias(aliases, "NGC " + ngc);
+            }
+            if (!ic.isEmpty()) {
+                appendAlias(aliases, "IC " + ic);
+            }
+            appendAlias(aliases, name);
+            appendDelimitedAliases(aliases, row.decodeColumn(QStringLiteral("Identifiers")));
+            appendDelimitedAliases(aliases, row.decodeColumn(QStringLiteral("Common names")));
+
+            const QString displayName = !messier.isEmpty()
+                ? QString("M%1").arg(messier)
+                : (!ngc.isEmpty()
+                    ? QString("NGC %1").arg(ngc)
+                    : (!ic.isEmpty() ? QString("IC %1").arg(ic) : normalizedCatalogAlias(name)));
+            const QString id = !messier.isEmpty()
+                ? objectIdFromAlias("M " + messier)
+                : (!ngc.isEmpty()
+                    ? objectIdFromAlias("NGC " + ngc)
+                    : (!ic.isEmpty() ? objectIdFromAlias("IC " + ic) : objectIdFromAlias(name)));
+            if (displayName.isEmpty() || id.isEmpty()) {
+                return true;
+            }
+
+            ++parsedObjectCount;
+            if (progressCallback && (parsedObjectCount % kOpenNgcProgressCallbackInterval) == 0U) {
+                progressCallback(parsedObjectCount);
+            }
+
+            const auto visualMagnitude = parseFiniteDouble(row.decodeColumn(QStringLiteral("V-Mag")));
+            CelestialBody body;
+            body.id = toStdString(id);
+            body.displayName = toStdString(displayName);
+            body.type = CelestialBodyType::DeepSkyObject;
+            body.visualMagnitude = visualMagnitude.value_or(std::numeric_limits<double>::quiet_NaN());
+            body.fixedEquatorial = core::EquatorialCoordinate {
+                .rightAscensionHours = *raHours,
+                .declinationDeg = *decDeg
+            };
+            body.deepSkyObject = DeepSkyObjectInfo {
+                .kind = kindFromOpenNgcType(typeText),
+                .aliases = std::move(aliases),
+                .majorAxisArcmin = parsePositiveDouble(row.decodeColumn(QStringLiteral("MajAx"))),
+                .minorAxisArcmin = parsePositiveDouble(row.decodeColumn(QStringLiteral("MinAx"))),
+                .positionAngleDeg = parsePositiveDouble(row.decodeColumn(QStringLiteral("PosAng"))),
+            };
+            rowResult.bodies.push_back(std::move(body));
+            return true;
         }
-        cursor = newline + 1;
+    );
+
+    if (!result.isSuccess()) {
+        return result;
     }
 
     if (progressCallback) {
         progressCallback(parsedObjectCount);
     }
 
-    if (!hasHeader) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
-        result.errorDetail = "OpenNGC CSV payload is empty.";
-        return result;
-    }
     if (parsedObjectCount == 0U) {
         result.errorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv;
         result.errorDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.";
-        result.diagnostics.processedRowCount = processedRowCount;
         return result;
     }
 
-    result.bodies = std::move(bodies);
-    result.diagnostics.processedRowCount = processedRowCount;
     result.diagnostics.parsedBodyCount = parsedObjectCount;
     return result;
 }

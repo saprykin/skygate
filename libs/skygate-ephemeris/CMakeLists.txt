@@ -3,6 +3,9 @@ find_package(ZLIB REQUIRED)
 
 add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/CatalogLoadResult.hpp
+    include/skygate/ephemeris/CatalogComposer.hpp
+    include/skygate/ephemeris/CatalogFactory.hpp
+    include/skygate/ephemeris/CatalogLoader.hpp
     include/skygate/ephemeris/CatalogPayloadParser.hpp
     include/skygate/ephemeris/CelestialReferenceCalculator.hpp
     include/skygate/ephemeris/ConstellationData.hpp
@@ -16,8 +19,13 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogBodyNormalization.hpp
     src/catalog/CatalogBodyParseResult.hpp
     src/catalog/BundledCatalogParser.hpp
+    src/catalog/DelimitedCatalogReader.hpp
     src/catalog/CatalogBodyNormalization.cpp
+    src/catalog/CatalogComposer.cpp
+    src/catalog/CatalogFactory.cpp
+    src/catalog/CatalogLoader.cpp
     src/catalog/CatalogPayloadParser.cpp
+    src/catalog/DelimitedCatalogReader.cpp
     src/catalog/BundledConstellationData.cpp
     src/catalog/CsvRowTokenizer.hpp
     src/catalog/GzipCodec.hpp
@@ -36,7 +44,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/SunEquatorialCalculator.hpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
-    src/BundledStarCatalog.cpp
     src/SimpleEphemerisEngine.cpp
     src/catalog/BundledCatalogParser.cpp
     src/catalog/CsvRowTokenizer.cpp

@@ -245,10 +245,16 @@ Catalog import supports multiple payload shapes:
 The pipeline is:
 
 1. `CatalogPayloadParser` detects payload format.
-2. `StarCatalogFactory` routes to the correct parser implementation.
-3. Parsed bodies are normalized by `CatalogBodyNormalization`.
-4. Optional selection/truncation can keep only the brightest bodies.
-5. The final catalog is materialized as `InMemoryStarCatalog`.
+2. `CatalogLoader` routes source requests to the correct parser implementation.
+3. HYG/OpenNGC parsers share `DelimitedCatalogReader` for header, row, and
+   limit handling.
+4. Parsed bodies are normalized by `CatalogBodyNormalization`.
+5. Optional selection/truncation can keep only the brightest bodies.
+6. The final catalog is materialized as `InMemoryStarCatalog`.
+
+`StarCatalogFactory` remains as a compatibility umbrella header. New code should
+prefer the narrower `CatalogLoader`, `CatalogFactory`, and `CatalogComposer`
+headers.
 
 When an external catalog is activated, `createCatalogWithCoreSolarSystemBodies`
 merges bundled Sun, Moon, and planetary bodies back into the imported dataset.
@@ -258,8 +264,8 @@ also retained so constellation line rendering still has anchor points.
 Deep-sky objects are a fixed-equatorial catalog layer. The UI can use bundled
 Messier data or download/update the OpenNGC preset; `SkyCatalogManager` rebuilds
 the active `IStarCatalog` by merging that DSO layer with the current star
-catalog and core solar-system bodies. OpenNGC records are parsed and deduplicated
-in `libs/skygate-ephemeris`, not in QML or scene graph code.
+catalog and core solar-system bodies. OpenNGC records are parsed and
+deduplicated in `libs/skygate-ephemeris`, not in QML or scene graph code.
 
 #### Constellation data
 Constellation lines and label anchors have two sources:
@@ -384,7 +390,7 @@ Update:
 
 - `CatalogPayloadParser::detectFormat(...)`
 - `CatalogPayloadFormat`
-- `StarCatalogFactory` routing
+- `CatalogLoader` routing
 - parser implementation in `libs/skygate-ephemeris/src/catalog`
 - parser tests
 
