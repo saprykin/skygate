@@ -156,6 +156,7 @@ private slots:
     void focusSearchTargetIgnoresInvalidTargets();
     void collapsingSearchToolbarClearsSelectedSearchTarget();
     void failedDeepSkyCatalogDownloadKeepsCountLabel();
+    void restoresCachedCatalogConstellationCount();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -764,6 +765,37 @@ void SkyContextControllerTests::failedDeepSkyCatalogDownloadKeepsCountLabel()
     QCOMPARE(infoSpy.count(), 0);
     QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));
     QCOMPARE(controller->catalogStatusText(), QString("Catalog: Invalid URL"));
+}
+
+void SkyContextControllerTests::restoresCachedCatalogConstellationCount()
+{
+    QSettings settings;
+    settings.setValue(
+        "skyContext/catalogCachePath",
+        m_settingsDir.filePath("cached-hyg-catalog.csv")
+    );
+
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot stateSnapshot;
+    stateSnapshot.catalogPresetIndex = 1;
+    QVERIFY(store.saveState(stateSnapshot));
+
+    SkySettingsStore::CatalogCacheSnapshot cacheSnapshot;
+    cacheSnapshot.sourceLabel = "HYG v4.2";
+    cacheSnapshot.catalogPayload =
+        "id,hip,proper,ra,dec,mag\n"
+        "1,42,Demo Star,6.7525,-16.7161,-1.46\n";
+    cacheSnapshot.constellationLineRows = "hyg_1|hyg_1\n";
+    cacheSnapshot.constellationLabelRows = "Demo|hyg_1\n";
+    cacheSnapshot.constellationLineSchemaVersion =
+        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+    cacheSnapshot.constellationCount = 88;
+    QVERIFY(store.saveCatalogCache(cacheSnapshot));
+
+    const auto controller = createController(true);
+
+    QCOMPARE(controller->catalogPresetIndex(), 1);
+    QVERIFY(controller->catalogDatasetInfoText().contains("Constellations: 88"));
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerTests)

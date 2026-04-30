@@ -19,6 +19,14 @@ Item {
             rowSpacing: 6
             columnSpacing: 8
 
+            Label {
+                Layout.columnSpan: 2
+                text: "Star Catalog"
+                color: skyContext.theme.formLabelText
+                font.family: "Avenir Next"
+                font.pixelSize: 11
+            }
+
             PreferencesComboBox {
                 id: catalogPresetCombo
                 Layout.fillWidth: true

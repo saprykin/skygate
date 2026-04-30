@@ -719,6 +719,7 @@ void SkyCatalogManager::resetConstellationLineRefs()
     const skygate::ephemeris::BundledConstellationData bundledConstellationData;
     m_constellationLineRefs = bundledConstellationData.lineRefs();
     m_constellationLabelRefs = bundledConstellationData.labelRefs();
+    m_constellationCount = m_constellationLabelRefs.size();
     ++m_catalogRevision;
 }
 
@@ -873,16 +874,20 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
     }
 
     const auto bodies = activeCatalog->bodies();
-    std::size_t constellationCount = 0;
+    std::size_t catalogConstellationCount = 0;
     std::size_t deepSkyObjectCount = 0;
     for (const auto& body : bodies) {
         if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
-            ++constellationCount;
+            ++catalogConstellationCount;
         }
         if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
             ++deepSkyObjectCount;
         }
     }
+    const std::size_t constellationCount = std::max(
+        catalogConstellationCount,
+        m_constellationCount
+    );
 
     m_starCatalog = std::move(activeCatalog);
     m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*m_starCatalog);
