@@ -11,6 +11,7 @@
 
 #include "skygate/core/PreparedProjection.hpp"
 #include "skygate/core/ProjectionTypes.hpp"
+#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
@@ -119,12 +120,38 @@ private:
         QVariantMap selectionMarker;
     };
 
+    struct SceneBuildInput final {
+        const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
+        skygate::core::SkyContext skyContext;
+        std::uint64_t catalogRevision = 0;
+        skygate::core::ProjectionType projectionType =
+            skygate::core::ProjectionType::Stereographic;
+        double viewCenterAltitudeDeg = 0.0;
+        double viewCenterAzimuthDeg = 0.0;
+        double viewFieldOfViewDeg = 0.0;
+        double magnitudeCutoff = 0.0;
+        QString themeId;
+        skygate::ui::internal::SkyThemeRenderPalette renderTheme;
+        SkyOverlayLayerVisibility overlayLayers;
+        std::span<const skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
+        std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+        QString selectedSearchTargetKind;
+        QString selectedSearchTargetId;
+    };
+
 private:
     void disconnectFromContextController();
     void rebuildSceneFrame();
     [[nodiscard]] bool clearSceneFrame();
-    [[nodiscard]] QVariantList buildOverlayItems(const SceneFrameData& sceneFrame) const;
-    [[nodiscard]] QVariantMap buildSelectionMarker(const SceneFrameData& sceneFrame) const;
+    [[nodiscard]] std::optional<SceneBuildInput> buildSceneInput() const;
+    [[nodiscard]] QVariantList buildOverlayItems(
+        const SceneFrameData& sceneFrame,
+        const SceneBuildInput& input
+    ) const;
+    [[nodiscard]] QVariantMap buildSelectionMarker(
+        const SceneFrameData& sceneFrame,
+        const SceneBuildInput& input
+    ) const;
 
 private:
     QPointer<SkyContextController> m_skyContextController;

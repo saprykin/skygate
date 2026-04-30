@@ -185,7 +185,7 @@ std::optional<QPointF> selectedBodyPoint(
 std::optional<QPointF> selectedConstellationPoint(
     const skygate::ephemeris::SkySnapshot& snapshot,
     const skygate::core::PreparedProjection& preparedProjection,
-    const std::span<const SkyContextController::ConstellationLabelRef> labelRefs,
+    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
     const QString& targetId
 )
 {
@@ -343,9 +343,10 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
         return {};
     }
 
-    return QString::fromStdString(
-        m_sceneFrame.snapshot.bodyAt(m_sceneFrame.hoverTargets[bestTargetIndex].bodyIndex).displayName
+    const auto& body = m_sceneFrame.snapshot.bodyAt(
+        m_sceneFrame.hoverTargets[bestTargetIndex].bodyIndex
     );
+    return QString::fromStdString(body.displayName);
 }
 
 std::optional<skygate::core::PreparedProjection> SkySceneModel::preparedProjection() const
@@ -402,21 +403,44 @@ bool SkySceneModel::clearSceneFrame()
     return hadSceneFrame;
 }
 
-void SkySceneModel::rebuildSceneFrame()
+std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() const
 {
     if (
         m_skyContextController == nullptr
         || m_viewportWidth <= 0.0
         || m_viewportHeight <= 0.0
     ) {
-        if (clearSceneFrame()) {
-            emit sceneFrameChanged();
-        }
-        return;
+        return std::nullopt;
     }
 
     const auto* ephemerisEngine = m_skyContextController->ephemerisEngine();
     if (ephemerisEngine == nullptr) {
+        return std::nullopt;
+    }
+
+    return SceneBuildInput {
+        .ephemerisEngine = ephemerisEngine,
+        .skyContext = m_skyContextController->skyContext(),
+        .catalogRevision = m_skyContextController->catalogRevision(),
+        .projectionType = m_skyContextController->projectionType(),
+        .viewCenterAltitudeDeg = m_skyContextController->viewCenterAltitudeDeg(),
+        .viewCenterAzimuthDeg = m_skyContextController->viewCenterAzimuthDeg(),
+        .viewFieldOfViewDeg = m_skyContextController->viewFieldOfViewDeg(),
+        .magnitudeCutoff = m_skyContextController->magnitudeCutoff(),
+        .themeId = m_skyContextController->themeId(),
+        .renderTheme = m_skyContextController->renderTheme(),
+        .overlayLayers = m_skyContextController->overlayLayerVisibility(),
+        .constellationLineRefs = m_skyContextController->constellationLineRefs(),
+        .constellationLabelRefs = m_skyContextController->constellationLabelRefs(),
+        .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
+        .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId()
+    };
+}
+
+void SkySceneModel::rebuildSceneFrame()
+{
+    const auto input = buildSceneInput();
+    if (!input.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
         }
@@ -428,12 +452,12 @@ void SkySceneModel::rebuildSceneFrame()
         skygate::core::ViewportMath::buildProjectionParams(
             m_viewportWidth,
             m_viewportHeight,
-            m_skyContextController->viewCenterAltitudeDeg(),
-            m_skyContextController->viewCenterAzimuthDeg(),
-            m_skyContextController->viewFieldOfViewDeg()
+            input->viewCenterAltitudeDeg,
+            input->viewCenterAzimuthDeg,
+            input->viewFieldOfViewDeg
         );
     auto preparedProjection = skygate::core::PreparedProjection::create(
-        m_skyContextController->projectionType(),
+        input->projectionType,
         projectionParams
     );
     if (!preparedProjection.has_value()) {
@@ -443,26 +467,31 @@ void SkySceneModel::rebuildSceneFrame()
         return;
     }
 
-    const auto& skyContext = m_skyContextController->skyContext();
     const SnapshotCacheKey snapshotKey {
-        .catalogRevision = m_skyContextController->catalogRevision(),
-        .observer = skyContext.observer,
-        .utcTime = skyContext.utcTime
+        .catalogRevision = input->catalogRevision,
+        .observer = input->skyContext.observer,
+        .utcTime = input->skyContext.utcTime
     };
     if (
-        m_cachedEphemerisEngine != ephemerisEngine
+        m_cachedEphemerisEngine != input->ephemerisEngine
         || !m_snapshotCacheKey.has_value()
         || !m_snapshotCacheKey.value().equals(snapshotKey)
     ) {
-        m_sceneFrame.snapshot = ephemerisEngine->compute(skyContext);
+        m_sceneFrame.snapshot = input->ephemerisEngine->compute(input->skyContext);
         m_sceneFrame.stateIndexByBodyId.clear();
-        m_sceneFrame.stateIndexByBodyId.reserve(static_cast<qsizetype>(m_sceneFrame.snapshot.states.size()));
-        for (std::size_t stateIndex = 0; stateIndex < m_sceneFrame.snapshot.states.size(); ++stateIndex) {
+        m_sceneFrame.stateIndexByBodyId.reserve(
+            static_cast<qsizetype>(m_sceneFrame.snapshot.states.size())
+        );
+        for (
+            std::size_t stateIndex = 0;
+            stateIndex < m_sceneFrame.snapshot.states.size();
+            ++stateIndex
+        ) {
             const auto& state = m_sceneFrame.snapshot.states[stateIndex];
             const auto& body = m_sceneFrame.snapshot.bodyAt(state.bodyIndex);
             m_sceneFrame.stateIndexByBodyId.insert(normalizedLookupKey(body.id), stateIndex);
         }
-        m_cachedEphemerisEngine = ephemerisEngine;
+        m_cachedEphemerisEngine = input->ephemerisEngine;
         m_snapshotCacheKey = snapshotKey;
         m_renderFrameKey.reset();
         ++m_snapshotGeneration;
@@ -473,28 +502,28 @@ void SkySceneModel::rebuildSceneFrame()
 
     const RenderFrameKey renderFrameKey {
         .snapshotGeneration = m_snapshotGeneration,
-        .projectionType = m_skyContextController->projectionType(),
+        .projectionType = input->projectionType,
         .viewportWidth = m_viewportWidth,
         .viewportHeight = m_viewportHeight,
-        .viewCenterAltitudeDeg = m_skyContextController->viewCenterAltitudeDeg(),
-        .viewCenterAzimuthDeg = m_skyContextController->viewCenterAzimuthDeg(),
-        .viewFieldOfViewDeg = m_skyContextController->viewFieldOfViewDeg(),
-        .magnitudeCutoff = m_skyContextController->magnitudeCutoff(),
-        .themeId = m_skyContextController->themeId(),
-        .overlayLayers = m_skyContextController->overlayLayerVisibility()
+        .viewCenterAltitudeDeg = input->viewCenterAltitudeDeg,
+        .viewCenterAzimuthDeg = input->viewCenterAzimuthDeg,
+        .viewFieldOfViewDeg = input->viewFieldOfViewDeg,
+        .magnitudeCutoff = input->magnitudeCutoff,
+        .themeId = input->themeId,
+        .overlayLayers = input->overlayLayers
     };
     if (!m_renderFrameKey.has_value() || !m_renderFrameKey.value().equals(renderFrameKey)) {
         const SkyRenderFrameBuilder frameBuilder;
         m_sceneFrame.frame = frameBuilder.buildFrame(
             m_sceneFrame.snapshot,
             *m_sceneFrame.preparedProjection,
-            m_skyContextController->constellationLineRefs(),
-            m_skyContextController->constellationLabelRefs(),
-            m_skyContextController->magnitudeCutoff(),
+            input->constellationLineRefs,
+            input->constellationLabelRefs,
+            input->magnitudeCutoff,
             m_viewportWidth,
             m_viewportHeight,
-            m_skyContextController->renderTheme(),
-            m_skyContextController->overlayLayerVisibility()
+            input->renderTheme,
+            input->overlayLayers
         );
 
         m_sceneFrame.hoverTargets.clear();
@@ -547,8 +576,8 @@ void SkySceneModel::rebuildSceneFrame()
             ].push_back(targetIndex);
         }
 
-        m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame);
-        m_sceneFrame.selectionMarker = buildSelectionMarker(m_sceneFrame);
+        m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, input.value());
+        m_sceneFrame.selectionMarker = buildSelectionMarker(m_sceneFrame, input.value());
         m_renderFrameKey = renderFrameKey;
         sceneFrameUpdated = true;
     }
@@ -558,7 +587,10 @@ void SkySceneModel::rebuildSceneFrame()
     }
 }
 
-QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) const
+QVariantList SkySceneModel::buildOverlayItems(
+    const SceneFrameData& sceneFrame,
+    const SceneBuildInput& input
+) const
 {
     QVariantList overlayItems = sceneFrame.frame.labels;
 
@@ -566,12 +598,12 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
         return overlayItems;
     }
 
-    const auto& overlayLayers = m_skyContextController->overlayLayerVisibility();
-    const auto& renderTheme = m_skyContextController->renderTheme();
-    const auto& skyContext = m_skyContextController->skyContext();
+    const auto& overlayLayers = input.overlayLayers;
+    const auto& renderTheme = input.renderTheme;
+    const auto& skyContext = input.skyContext;
 
-    if (normalizedLookupKey(m_skyContextController->selectedSearchTargetKind()) == "body") {
-        const QString targetId = m_skyContextController->selectedSearchTargetId();
+    if (normalizedLookupKey(input.selectedSearchTargetKind) == "body") {
+        const QString targetId = input.selectedSearchTargetId;
         const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
             normalizedLookupKey(targetId)
         );
@@ -685,17 +717,17 @@ QVariantList SkySceneModel::buildOverlayItems(const SceneFrameData& sceneFrame) 
     return overlayItems;
 }
 
-QVariantMap SkySceneModel::buildSelectionMarker(const SceneFrameData& sceneFrame) const
+QVariantMap SkySceneModel::buildSelectionMarker(
+    const SceneFrameData& sceneFrame,
+    const SceneBuildInput& input
+) const
 {
-    if (
-        m_skyContextController == nullptr
-        || !sceneFrame.preparedProjection.has_value()
-    ) {
+    if (!sceneFrame.preparedProjection.has_value()) {
         return {};
     }
 
-    const QString targetKind = m_skyContextController->selectedSearchTargetKind();
-    const QString targetId = m_skyContextController->selectedSearchTargetId();
+    const QString targetKind = input.selectedSearchTargetKind;
+    const QString targetId = input.selectedSearchTargetId;
     if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return {};
     }
@@ -712,7 +744,7 @@ QVariantMap SkySceneModel::buildSelectionMarker(const SceneFrameData& sceneFrame
         markerPoint = selectedConstellationPoint(
             sceneFrame.snapshot,
             *sceneFrame.preparedProjection,
-            m_skyContextController->constellationLabelRefs(),
+            input.constellationLabelRefs,
             targetId
         );
     }

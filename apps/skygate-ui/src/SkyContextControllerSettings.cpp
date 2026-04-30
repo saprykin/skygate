@@ -17,22 +17,22 @@ bool SkyContextController::saveSettings() const
     }
 
     SkySettingsStore::StateSnapshot snapshot;
-    snapshot.live = m_live;
-    snapshot.timelineToolbarCollapsed = m_timelineToolbarCollapsed;
-    snapshot.searchToolbarCollapsed = m_searchToolbarCollapsed;
-    snapshot.speedMultiplier = m_speedMultiplier;
-    snapshot.stepSeconds = m_stepSeconds;
-    snapshot.magnitudeCutoff = m_magnitudeCutoff;
-    snapshot.viewCenterAltitudeDeg = m_viewCenterAltitudeDeg;
-    snapshot.viewCenterAzimuthDeg = m_viewCenterAzimuthDeg;
-    snapshot.viewFieldOfViewDeg = m_viewFieldOfViewDeg;
+    snapshot.live = m_timeline.live;
+    snapshot.timelineToolbarCollapsed = m_timeline.toolbarCollapsed;
+    snapshot.searchToolbarCollapsed = m_search.toolbarCollapsed;
+    snapshot.speedMultiplier = m_timeline.speedMultiplier;
+    snapshot.stepSeconds = m_timeline.stepSeconds;
+    snapshot.magnitudeCutoff = m_view.magnitudeCutoff;
+    snapshot.viewCenterAltitudeDeg = m_view.centerAltitudeDeg;
+    snapshot.viewCenterAzimuthDeg = m_view.centerAzimuthDeg;
+    snapshot.viewFieldOfViewDeg = m_view.fieldOfViewDeg;
     snapshot.utcEpochSeconds =
-        SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toSecsSinceEpoch();
-    snapshot.latitudeDeg = m_skyContext.observer.latitudeDeg;
-    snapshot.longitudeDeg = m_skyContext.observer.longitudeDeg;
-    snapshot.elevationMeters = m_skyContext.observer.elevationMeters;
+        SkyContextTimeCodec::toQDateTimeUtc(m_location.context.utcTime).toSecsSinceEpoch();
+    snapshot.latitudeDeg = m_location.context.observer.latitudeDeg;
+    snapshot.longitudeDeg = m_location.context.observer.longitudeDeg;
+    snapshot.elevationMeters = m_location.context.observer.elevationMeters;
     snapshot.locationSourceText = locationSourceText();
-    snapshot.selectedCityId = m_selectedCityId;
+    snapshot.selectedCityId = m_location.selectedCityId;
     snapshot.projectionTypeText = projectionTypeText();
     snapshot.themeId = themeId();
     snapshot.overlayLayers = overlayLayerVisibility();
@@ -65,7 +65,7 @@ bool SkyContextController::loadSettings()
             QTimeZone::UTC
         ));
 
-        skygate::core::GeoLocation observer = m_skyContext.observer;
+        skygate::core::GeoLocation observer = m_location.context.observer;
         observer.latitudeDeg = stateSnapshot->latitudeDeg;
         observer.longitudeDeg = stateSnapshot->longitudeDeg;
         observer.elevationMeters = stateSnapshot->elevationMeters;

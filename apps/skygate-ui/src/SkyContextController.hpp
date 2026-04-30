@@ -4,13 +4,12 @@
 #include <QStringList>
 #include <QTimer>
 
-#include "skygate/core/IProjection.hpp"
-#include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
+#include "SkyContextState.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 
@@ -259,23 +258,11 @@ private:
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
 
 private:
-    bool m_live = true;
-    bool m_timelineToolbarCollapsed = false;
-    bool m_searchToolbarCollapsed = false;
-    bool m_catchingUpToCurrentUtc = false;
-    double m_speedMultiplier = 1.0;
-    double m_speedRemainderSeconds = 0.0;
-    int m_stepSeconds = 60;
-    double m_magnitudeCutoff = 6.0;
-    double m_viewCenterAltitudeDeg = skygate::core::ViewportMath::kDefaultCenterAltitudeDeg;
-    double m_viewCenterAzimuthDeg = skygate::core::ViewportMath::kDefaultCenterAzimuthDeg;
-    double m_viewFieldOfViewDeg = 100.0;
+    skygate::ui::internal::SkyTimelineState m_timeline;
+    skygate::ui::internal::SkyViewState m_view;
+    skygate::ui::internal::SkyLocationState m_location;
+    skygate::ui::internal::SkySearchState m_search;
     QTimer m_timer;
-    skygate::core::SkyContext m_skyContext;
-    skygate::ui::internal::SkyContextLocationSource m_locationSource =
-        skygate::ui::internal::SkyContextLocationSourceCodec::defaultSource();
-    skygate::core::ProjectionType m_projectionType = skygate::core::ProjectionType::Stereographic;
-    std::unique_ptr<skygate::core::IProjection> m_projection;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
     std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;
@@ -284,11 +271,4 @@ private:
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     QVariantList m_themeOptions;
-    QString m_locationStatusText;
-    QString m_selectedCityId;
-    QString m_selectedCityDisplayText;
-    QString m_selectedSearchTargetKind;
-    QString m_selectedSearchTargetId;
-    QGeoPositionInfoSource* m_positionSource = nullptr;
-    bool m_positionSourceConnected = false;
 };

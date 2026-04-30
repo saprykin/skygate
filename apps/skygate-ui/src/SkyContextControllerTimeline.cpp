@@ -30,18 +30,20 @@ QDateTime currentUtcDateTime()
 
 void SkyContextController::setLive(bool live)
 {
-    if (m_live == live) {
+    if (m_timeline.live == live) {
         return;
     }
 
-    m_live = live;
-    m_speedRemainderSeconds = 0.0;
-    m_catchingUpToCurrentUtc = false;
+    m_timeline.live = live;
+    m_timeline.speedRemainderSeconds = 0.0;
+    m_timeline.catchingUpToCurrentUtc = false;
 
-    if (m_live) {
+    if (m_timeline.live) {
         const QDateTime currentUtc = currentUtcDateTime();
-        const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
-        m_catchingUpToCurrentUtc = timelineUtc < currentUtc;
+        const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(
+            m_location.context.utcTime
+        );
+        m_timeline.catchingUpToCurrentUtc = timelineUtc < currentUtc;
     }
 
     emit liveChanged();
@@ -49,22 +51,22 @@ void SkyContextController::setLive(bool live)
 
 bool SkyContextController::timelineToolbarCollapsed() const noexcept
 {
-    return m_timelineToolbarCollapsed;
+    return m_timeline.toolbarCollapsed;
 }
 
 void SkyContextController::setTimelineToolbarCollapsed(const bool timelineToolbarCollapsed)
 {
-    if (m_timelineToolbarCollapsed == timelineToolbarCollapsed) {
+    if (m_timeline.toolbarCollapsed == timelineToolbarCollapsed) {
         return;
     }
 
-    m_timelineToolbarCollapsed = timelineToolbarCollapsed;
+    m_timeline.toolbarCollapsed = timelineToolbarCollapsed;
     emit timelineToolbarCollapsedChanged();
 }
 
 void SkyContextController::togglePlayPause()
 {
-    setLive(!m_live);
+    setLive(!m_timeline.live);
 }
 
 void SkyContextController::setSpeedMultiplier(const double speedMultiplier)
@@ -74,12 +76,12 @@ void SkyContextController::setSpeedMultiplier(const double speedMultiplier)
         return;
     }
 
-    if (std::abs(m_speedMultiplier - speedMultiplier) < 1e-9) {
+    if (std::abs(m_timeline.speedMultiplier - speedMultiplier) < 1e-9) {
         return;
     }
 
-    m_speedMultiplier = speedMultiplier;
-    m_speedRemainderSeconds = 0.0;
+    m_timeline.speedMultiplier = speedMultiplier;
+    m_timeline.speedRemainderSeconds = 0.0;
     emit speedMultiplierChanged();
 }
 
@@ -90,11 +92,11 @@ void SkyContextController::setStepSeconds(const int stepSeconds)
         return;
     }
 
-    if (m_stepSeconds == stepSeconds) {
+    if (m_timeline.stepSeconds == stepSeconds) {
         return;
     }
 
-    m_stepSeconds = stepSeconds;
+    m_timeline.stepSeconds = stepSeconds;
     emit stepSecondsChanged();
 }
 
@@ -110,11 +112,11 @@ void SkyContextController::setMagnitudeCutoff(const double magnitudeCutoff)
         SkyContextControllerConstants::kMagnitudeCutoffMin,
         SkyContextControllerConstants::kMagnitudeCutoffMax
     );
-    if (std::abs(m_magnitudeCutoff - clamped) < 1e-9) {
+    if (std::abs(m_view.magnitudeCutoff - clamped) < 1e-9) {
         return;
     }
 
-    m_magnitudeCutoff = clamped;
+    m_view.magnitudeCutoff = clamped;
     emit magnitudeCutoffChanged();
     emit skyContextChanged();
 }
@@ -129,14 +131,14 @@ void SkyContextController::setViewCenter(const double altitudeDeg, const double 
     const double nextAltitudeDeg = skygate::core::ViewportMath::clampAltitudeDeg(altitudeDeg);
     const double nextAzimuthDeg = skygate::core::ViewportMath::normalizeAzimuthDeg(azimuthDeg);
     if (
-        std::abs(m_viewCenterAltitudeDeg - nextAltitudeDeg) < 1e-9
-        && std::abs(m_viewCenterAzimuthDeg - nextAzimuthDeg) < 1e-9
+        std::abs(m_view.centerAltitudeDeg - nextAltitudeDeg) < 1e-9
+        && std::abs(m_view.centerAzimuthDeg - nextAzimuthDeg) < 1e-9
     ) {
         return;
     }
 
-    m_viewCenterAltitudeDeg = nextAltitudeDeg;
-    m_viewCenterAzimuthDeg = nextAzimuthDeg;
+    m_view.centerAltitudeDeg = nextAltitudeDeg;
+    m_view.centerAzimuthDeg = nextAzimuthDeg;
     emit viewDirectionChanged();
     emit skyContextChanged();
 }
@@ -149,8 +151,8 @@ void SkyContextController::panViewBy(const double deltaAzimuthDeg, const double 
     }
 
     setViewCenter(
-        m_viewCenterAltitudeDeg + deltaAltitudeDeg,
-        m_viewCenterAzimuthDeg + deltaAzimuthDeg
+        m_view.centerAltitudeDeg + deltaAltitudeDeg,
+        m_view.centerAzimuthDeg + deltaAzimuthDeg
     );
 }
 
@@ -166,7 +168,7 @@ void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
         SkyContextControllerConstants::kWheelZoomStepScale,
         wheelSteps
     );
-    setViewFieldOfViewDeg(m_viewFieldOfViewDeg * zoomMultiplier);
+    setViewFieldOfViewDeg(m_view.fieldOfViewDeg * zoomMultiplier);
 }
 
 void SkyContextController::zoomViewByScaleDelta(const double scaleDelta)
@@ -175,7 +177,7 @@ void SkyContextController::zoomViewByScaleDelta(const double scaleDelta)
         return;
     }
 
-    setViewFieldOfViewDeg(m_viewFieldOfViewDeg / scaleDelta);
+    setViewFieldOfViewDeg(m_view.fieldOfViewDeg / scaleDelta);
 }
 
 void SkyContextController::resetViewDirection()
@@ -189,21 +191,21 @@ void SkyContextController::resetViewDirection()
 void SkyContextController::goLiveNow()
 {
     setCurrentUtc(currentUtcDateTime());
-    m_speedRemainderSeconds = 0.0;
-    m_catchingUpToCurrentUtc = false;
+    m_timeline.speedRemainderSeconds = 0.0;
+    m_timeline.catchingUpToCurrentUtc = false;
     setLive(true);
 }
 
 void SkyContextController::stepForward()
 {
     setLive(false);
-    stepBySeconds(m_stepSeconds);
+    stepBySeconds(m_timeline.stepSeconds);
 }
 
 void SkyContextController::stepBackward()
 {
     setLive(false);
-    stepBySeconds(-m_stepSeconds);
+    stepBySeconds(-m_timeline.stepSeconds);
 }
 
 QString SkyContextController::validateUtcDateTimeText(
@@ -233,18 +235,18 @@ void SkyContextController::setLatitudeText(const QString& latitudeText)
 {
     bool isValidNumber = false;
     const double latitude = latitudeText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
+    skygate::core::GeoLocation nextObserver = m_location.context.observer;
     nextObserver.latitudeDeg = latitude;
     if (!isValidNumber || !nextObserver.isValid()) {
         emit latitudeTextChanged();
         return;
     }
 
-    if (m_skyContext.observer.latitudeDeg == nextObserver.latitudeDeg) {
+    if (m_location.context.observer.latitudeDeg == nextObserver.latitudeDeg) {
         return;
     }
 
-    if (m_locationSource != SkyContextLocationSource::Custom) {
+    if (m_location.source != SkyContextLocationSource::Custom) {
         setLocationSource(SkyContextLocationSource::Custom);
     }
 
@@ -255,18 +257,18 @@ void SkyContextController::setLongitudeText(const QString& longitudeText)
 {
     bool isValidNumber = false;
     const double longitude = longitudeText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
+    skygate::core::GeoLocation nextObserver = m_location.context.observer;
     nextObserver.longitudeDeg = longitude;
     if (!isValidNumber || !nextObserver.isValid()) {
         emit longitudeTextChanged();
         return;
     }
 
-    if (m_skyContext.observer.longitudeDeg == nextObserver.longitudeDeg) {
+    if (m_location.context.observer.longitudeDeg == nextObserver.longitudeDeg) {
         return;
     }
 
-    if (m_locationSource != SkyContextLocationSource::Custom) {
+    if (m_location.source != SkyContextLocationSource::Custom) {
         setLocationSource(SkyContextLocationSource::Custom);
     }
 
@@ -277,14 +279,14 @@ void SkyContextController::setElevationText(const QString& elevationText)
 {
     bool isValidNumber = false;
     const double elevation = elevationText.trimmed().toDouble(&isValidNumber);
-    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
+    skygate::core::GeoLocation nextObserver = m_location.context.observer;
     nextObserver.elevationMeters = elevation;
     if (!isValidNumber || !nextObserver.isValid()) {
         emit elevationTextChanged();
         return;
     }
 
-    if (m_skyContext.observer.elevationMeters == nextObserver.elevationMeters) {
+    if (m_location.context.observer.elevationMeters == nextObserver.elevationMeters) {
         return;
     }
 
@@ -304,38 +306,40 @@ void SkyContextController::setProjectionTypeText(const QString& projectionTypeTe
 
 void SkyContextController::tickUtcTime()
 {
-    if (!m_live) {
+    if (!m_timeline.live) {
         return;
     }
 
     const QDateTime currentUtc = currentUtcDateTime();
-    const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime);
-    const bool catchingUpToCurrentUtc = m_catchingUpToCurrentUtc && timelineUtc < currentUtc;
+    const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.context.utcTime);
+    const bool catchingUpToCurrentUtc =
+        m_timeline.catchingUpToCurrentUtc && timelineUtc < currentUtc;
     if (catchingUpToCurrentUtc) {
-        m_speedRemainderSeconds += m_speedMultiplier * static_cast<double>(m_stepSeconds);
-        const int wholeSeconds = static_cast<int>(std::floor(m_speedRemainderSeconds));
+        m_timeline.speedRemainderSeconds +=
+            m_timeline.speedMultiplier * static_cast<double>(m_timeline.stepSeconds);
+        const int wholeSeconds = static_cast<int>(std::floor(m_timeline.speedRemainderSeconds));
         if (wholeSeconds <= 0) {
             return;
         }
 
-        m_speedRemainderSeconds -= wholeSeconds;
+        m_timeline.speedRemainderSeconds -= wholeSeconds;
         int appliedStepSeconds = wholeSeconds;
         const qint64 secondsUntilCurrentUtc = timelineUtc.secsTo(currentUtc);
         appliedStepSeconds = std::min(
             appliedStepSeconds,
             static_cast<int>(secondsUntilCurrentUtc)
         );
-        m_catchingUpToCurrentUtc = appliedStepSeconds < secondsUntilCurrentUtc;
-        if (!m_catchingUpToCurrentUtc) {
-            m_speedRemainderSeconds = 0.0;
+        m_timeline.catchingUpToCurrentUtc = appliedStepSeconds < secondsUntilCurrentUtc;
+        if (!m_timeline.catchingUpToCurrentUtc) {
+            m_timeline.speedRemainderSeconds = 0.0;
         }
 
         stepBySeconds(appliedStepSeconds);
         return;
     }
 
-    m_catchingUpToCurrentUtc = false;
-    m_speedRemainderSeconds = 0.0;
+    m_timeline.catchingUpToCurrentUtc = false;
+    m_timeline.speedRemainderSeconds = 0.0;
     stepBySeconds(1);
 }
 
@@ -345,21 +349,23 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
         return;
     }
 
-    if (!m_live) {
-        m_speedRemainderSeconds = 0.0;
+    if (!m_timeline.live) {
+        m_timeline.speedRemainderSeconds = 0.0;
     }
 
-    setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).addSecs(stepSeconds));
+    setCurrentUtc(
+        SkyContextTimeCodec::toQDateTimeUtc(m_location.context.utcTime).addSecs(stepSeconds)
+    );
 }
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
 {
     const auto nextUtc = SkyContextTimeCodec::toUtcTimePoint(utcTime.toUTC());
-    if (m_skyContext.utcTime == nextUtc) {
+    if (m_location.context.utcTime == nextUtc) {
         return;
     }
 
-    m_skyContext.utcTime = nextUtc;
+    m_location.context.utcTime = nextUtc;
     emit utcDateTextChanged();
     emit utcTimeTextChanged();
     emit skyContextChanged();
@@ -373,11 +379,11 @@ void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg
 
     const double nextViewFieldOfViewDeg =
         skygate::core::ViewportMath::clampFieldOfViewDeg(viewFieldOfViewDeg);
-    if (std::abs(m_viewFieldOfViewDeg - nextViewFieldOfViewDeg) < 1e-9) {
+    if (std::abs(m_view.fieldOfViewDeg - nextViewFieldOfViewDeg) < 1e-9) {
         return;
     }
 
-    m_viewFieldOfViewDeg = nextViewFieldOfViewDeg;
+    m_view.fieldOfViewDeg = nextViewFieldOfViewDeg;
     emit viewDirectionChanged();
     emit skyContextChanged();
 }
@@ -388,14 +394,15 @@ void SkyContextController::applyObserverLocation(const skygate::core::GeoLocatio
         return;
     }
 
-    const bool latitudeChanged = m_skyContext.observer.latitudeDeg != observer.latitudeDeg;
-    const bool longitudeChanged = m_skyContext.observer.longitudeDeg != observer.longitudeDeg;
-    const bool elevationChanged = m_skyContext.observer.elevationMeters != observer.elevationMeters;
+    const bool latitudeChanged = m_location.context.observer.latitudeDeg != observer.latitudeDeg;
+    const bool longitudeChanged = m_location.context.observer.longitudeDeg != observer.longitudeDeg;
+    const bool elevationChanged =
+        m_location.context.observer.elevationMeters != observer.elevationMeters;
     if (!latitudeChanged && !longitudeChanged && !elevationChanged) {
         return;
     }
 
-    m_skyContext.observer = observer;
+    m_location.context.observer = observer;
     if (latitudeChanged) {
         emit latitudeTextChanged();
     }
@@ -410,7 +417,7 @@ void SkyContextController::applyObserverLocation(const skygate::core::GeoLocatio
 
 void SkyContextController::refreshCurrentLocation()
 {
-    if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+    if (m_location.source != SkyContextLocationSource::CurrentDevice) {
         return;
     }
 
@@ -419,7 +426,7 @@ void SkyContextController::refreshCurrentLocation()
 
 void SkyContextController::initializeCurrentLocation()
 {
-    if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+    if (m_location.source != SkyContextLocationSource::CurrentDevice) {
         updateLocationStatusText();
         return;
     }
@@ -427,34 +434,34 @@ void SkyContextController::initializeCurrentLocation()
 #if SKYGATE_HAS_POSITIONING
     setLocationStatusText("Location: Initializing");
 
-    if (m_positionSource == nullptr) {
-        m_positionSource = QGeoPositionInfoSource::createDefaultSource(this);
+    if (m_location.positionSource == nullptr) {
+        m_location.positionSource = QGeoPositionInfoSource::createDefaultSource(this);
     }
-    if (m_positionSource == nullptr) {
+    if (m_location.positionSource == nullptr) {
         setLocationStatusText("Location: Device source unavailable");
         return;
     }
 
-    if (!m_positionSourceConnected) {
+    if (!m_location.positionSourceConnected) {
         connect(
-            m_positionSource,
+            m_location.positionSource,
             &QGeoPositionInfoSource::positionUpdated,
             this,
             &SkyContextController::applyCurrentLocation
         );
         connect(
-            m_positionSource,
+            m_location.positionSource,
             &QGeoPositionInfoSource::errorOccurred,
             this,
             [this](QGeoPositionInfoSource::Error) {
-                if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+                if (m_location.source != SkyContextLocationSource::CurrentDevice) {
                     return;
                 }
 
                 setLocationStatusText("Location: Update failed");
             }
         );
-        m_positionSourceConnected = true;
+        m_location.positionSourceConnected = true;
     }
 
     QLocationPermission permission;
@@ -463,7 +470,9 @@ void SkyContextController::initializeCurrentLocation()
 
     auto startLocationUpdate = [this] {
         setLocationStatusText("Location: Locating");
-        m_positionSource->requestUpdate(SkyContextControllerConstants::kLocationUpdateTimeoutMs);
+        m_location.positionSource->requestUpdate(
+            SkyContextControllerConstants::kLocationUpdateTimeoutMs
+        );
     };
 
     QCoreApplication* app = QCoreApplication::instance();
@@ -484,7 +493,7 @@ void SkyContextController::initializeCurrentLocation()
             permission,
             this,
             [this, startLocationUpdate](const QPermission& requestPermission) {
-                if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+                if (m_location.source != SkyContextLocationSource::CurrentDevice) {
                     return;
                 }
 
@@ -508,7 +517,7 @@ void SkyContextController::initializeCurrentLocation()
 void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& positionInfo)
 {
 #if SKYGATE_HAS_POSITIONING
-    if (m_locationSource != SkyContextLocationSource::CurrentDevice) {
+    if (m_location.source != SkyContextLocationSource::CurrentDevice) {
         return;
     }
 
@@ -521,7 +530,7 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
         return;
     }
 
-    skygate::core::GeoLocation nextObserver = m_skyContext.observer;
+    skygate::core::GeoLocation nextObserver = m_location.context.observer;
     nextObserver.latitudeDeg = coordinate.latitude();
     nextObserver.longitudeDeg = coordinate.longitude();
     if (std::isfinite(coordinate.altitude())) {
@@ -541,18 +550,19 @@ void SkyContextController::applyCurrentLocation(const QGeoPositionInfo& position
 
 void SkyContextController::setProjectionType(const skygate::core::ProjectionType projectionType)
 {
-    if (m_projectionType == projectionType) {
+    if (m_view.projectionType == projectionType) {
         return;
     }
 
-    std::unique_ptr<skygate::core::IProjection> projection = skygate::core::createProjection(projectionType);
+    std::unique_ptr<skygate::core::IProjection> projection =
+        skygate::core::createProjection(projectionType);
     if (projection == nullptr) {
         emit projectionTypeChanged();
         return;
     }
 
-    m_projectionType = projectionType;
-    m_projection = std::move(projection);
+    m_view.projectionType = projectionType;
+    m_view.projection = std::move(projection);
     emit projectionTypeChanged();
     emit viewDirectionChanged();
     emit skyContextChanged();

@@ -103,9 +103,9 @@ SkyContextController::SkyContextController(
     );
     refreshObjectSearchModel();
 
-    m_projection = skygate::core::createProjection(m_projectionType);
+    m_view.projection = skygate::core::createProjection(m_view.projectionType);
     const skygate::core::SystemTimeSource systemTimeSource;
-    m_skyContext.utcTime = systemTimeSource.nowUtc();
+    m_location.context.utcTime = systemTimeSource.nowUtc();
     if (initializationOptions.loadSettings) {
         loadSettings();
     }
@@ -118,7 +118,7 @@ SkyContextController::SkyContextController(
 
     if (
         initializationOptions.initializeLocation
-        && m_locationSource == SkyContextLocationSource::CurrentDevice
+        && m_location.source == SkyContextLocationSource::CurrentDevice
     ) {
         initializeCurrentLocation();
     }
@@ -128,52 +128,52 @@ SkyContextController::~SkyContextController() = default;
 
 bool SkyContextController::live() const noexcept
 {
-    return m_live;
+    return m_timeline.live;
 }
 
 QString SkyContextController::selectedSearchTargetKind() const
 {
-    return m_selectedSearchTargetKind;
+    return m_search.selectedTargetKind;
 }
 
 QString SkyContextController::selectedSearchTargetId() const
 {
-    return m_selectedSearchTargetId;
+    return m_search.selectedTargetId;
 }
 
 double SkyContextController::speedMultiplier() const noexcept
 {
-    return m_speedMultiplier;
+    return m_timeline.speedMultiplier;
 }
 
 int SkyContextController::stepSeconds() const noexcept
 {
-    return m_stepSeconds;
+    return m_timeline.stepSeconds;
 }
 
 double SkyContextController::magnitudeCutoff() const noexcept
 {
-    return m_magnitudeCutoff;
+    return m_view.magnitudeCutoff;
 }
 
 double SkyContextController::viewCenterAltitudeDeg() const noexcept
 {
-    return m_viewCenterAltitudeDeg;
+    return m_view.centerAltitudeDeg;
 }
 
 double SkyContextController::viewCenterAzimuthDeg() const noexcept
 {
-    return m_viewCenterAzimuthDeg;
+    return m_view.centerAzimuthDeg;
 }
 
 double SkyContextController::viewFieldOfViewDeg() const noexcept
 {
-    return m_viewFieldOfViewDeg;
+    return m_view.fieldOfViewDeg;
 }
 
 skygate::core::ProjectionType SkyContextController::projectionType() const noexcept
 {
-    return m_projectionType;
+    return m_view.projectionType;
 }
 
 const SkyThemeRenderPalette& SkyContextController::renderTheme() const noexcept
@@ -183,34 +183,34 @@ const SkyThemeRenderPalette& SkyContextController::renderTheme() const noexcept
 
 QString SkyContextController::utcTimeText() const
 {
-    return SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime).toString("HH:mm:ss");
+    return SkyContextTimeCodec::toQDateTimeUtc(m_location.context.utcTime).toString("HH:mm:ss");
 }
 
 QString SkyContextController::utcDateText() const
 {
     return SkyContextUtcDateTimeTextCodec::formatDate(
-        SkyContextTimeCodec::toQDateTimeUtc(m_skyContext.utcTime)
+        SkyContextTimeCodec::toQDateTimeUtc(m_location.context.utcTime)
     );
 }
 
 QString SkyContextController::latitudeText() const
 {
-    return SkyContextTextFormatter::formatCoordinate(m_skyContext.observer.latitudeDeg);
+    return SkyContextTextFormatter::formatCoordinate(m_location.context.observer.latitudeDeg);
 }
 
 QString SkyContextController::longitudeText() const
 {
-    return SkyContextTextFormatter::formatCoordinate(m_skyContext.observer.longitudeDeg);
+    return SkyContextTextFormatter::formatCoordinate(m_location.context.observer.longitudeDeg);
 }
 
 QString SkyContextController::elevationText() const
 {
-    return SkyContextTextFormatter::formatElevation(m_skyContext.observer.elevationMeters);
+    return SkyContextTextFormatter::formatElevation(m_location.context.observer.elevationMeters);
 }
 
 QString SkyContextController::locationSourceText() const
 {
-    return SkyContextLocationSourceCodec::toString(m_locationSource);
+    return SkyContextLocationSourceCodec::toString(m_location.source);
 }
 
 QStringList SkyContextController::locationSourceOptions() const
@@ -220,12 +220,12 @@ QStringList SkyContextController::locationSourceOptions() const
 
 QString SkyContextController::selectedCityId() const
 {
-    return m_selectedCityId;
+    return m_location.selectedCityId;
 }
 
 QString SkyContextController::selectedCityDisplayText() const
 {
-    return m_selectedCityDisplayText;
+    return m_location.selectedCityDisplayText;
 }
 
 QAbstractItemModel* SkyContextController::cityCatalogModel() const noexcept
@@ -235,7 +235,7 @@ QAbstractItemModel* SkyContextController::cityCatalogModel() const noexcept
 
 QString SkyContextController::projectionTypeText() const
 {
-    return SkyContextProjectionTypeCodec::toString(m_projectionType);
+    return SkyContextProjectionTypeCodec::toString(m_view.projectionType);
 }
 
 QString SkyContextController::themeId() const
@@ -268,28 +268,30 @@ const SkyOverlayLayerVisibility& SkyContextController::overlayLayerVisibility() 
 
 QString SkyContextController::locationStatusText() const
 {
-    return m_locationStatusText;
+    return m_location.statusText;
 }
 
 void SkyContextController::setLocationStatusText(const QString& locationStatusText)
 {
-    if (m_locationStatusText == locationStatusText) {
+    if (m_location.statusText == locationStatusText) {
         return;
     }
 
-    m_locationStatusText = locationStatusText;
+    m_location.statusText = locationStatusText;
     emit locationStatusTextChanged();
 }
 
 void SkyContextController::updateLocationStatusText()
 {
-    switch (m_locationSource) {
+    switch (m_location.source) {
     case SkyContextLocationSource::CurrentDevice:
         setLocationStatusText("Location: Current device");
         return;
     case SkyContextLocationSource::City:
-        if (!m_selectedCityDisplayText.isEmpty()) {
-            setLocationStatusText(QString("Location: City - %1").arg(m_selectedCityDisplayText));
+        if (!m_location.selectedCityDisplayText.isEmpty()) {
+            setLocationStatusText(
+                QString("Location: City - %1").arg(m_location.selectedCityDisplayText)
+            );
             return;
         }
 
@@ -309,14 +311,14 @@ void SkyContextController::setSelectedSearchTarget(
     const QString normalizedTargetKind = targetKind.trimmed();
     const QString normalizedTargetId = targetId.trimmed();
     if (
-        m_selectedSearchTargetKind == normalizedTargetKind
-        && m_selectedSearchTargetId == normalizedTargetId
+        m_search.selectedTargetKind == normalizedTargetKind
+        && m_search.selectedTargetId == normalizedTargetId
     ) {
         return;
     }
 
-    m_selectedSearchTargetKind = normalizedTargetKind;
-    m_selectedSearchTargetId = normalizedTargetId;
+    m_search.selectedTargetKind = normalizedTargetKind;
+    m_search.selectedTargetId = normalizedTargetId;
     emit selectedSearchTargetChanged();
 }
 
@@ -359,7 +361,7 @@ bool SkyContextController::catalogProcessing() const noexcept
 
 const skygate::core::SkyContext& SkyContextController::skyContext() const noexcept
 {
-    return m_skyContext;
+    return m_location.context;
 }
 
 std::uint64_t SkyContextController::catalogRevision() const noexcept
@@ -372,9 +374,12 @@ const skygate::ephemeris::IEphemerisEngine* SkyContextController::ephemerisEngin
     return m_catalogManager != nullptr ? m_catalogManager->ephemerisEngine() : nullptr;
 }
 
-std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalogBodies() const noexcept
+std::span<const skygate::ephemeris::CelestialBody>
+SkyContextController::catalogBodies() const noexcept
 {
-    const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
+    const auto* starCatalog = m_catalogManager != nullptr
+        ? m_catalogManager->starCatalog()
+        : nullptr;
     return starCatalog != nullptr
         ? starCatalog->bodies()
         : std::span<const skygate::ephemeris::CelestialBody> {};
@@ -471,14 +476,14 @@ void SkyContextController::setDeepSkyCatalogUrlText(const QString& deepSkyCatalo
 
 void SkyContextController::clearSelectedCity()
 {
-    const bool hadSelectedCityId = !m_selectedCityId.isEmpty();
-    const bool hadSelectedCityDisplayText = !m_selectedCityDisplayText.isEmpty();
+    const bool hadSelectedCityId = !m_location.selectedCityId.isEmpty();
+    const bool hadSelectedCityDisplayText = !m_location.selectedCityDisplayText.isEmpty();
     if (!hadSelectedCityId && !hadSelectedCityDisplayText) {
         return;
     }
 
-    m_selectedCityId.clear();
-    m_selectedCityDisplayText.clear();
+    m_location.selectedCityId.clear();
+    m_location.selectedCityDisplayText.clear();
 
     if (hadSelectedCityId) {
         emit selectedCityIdChanged();
@@ -495,16 +500,16 @@ void SkyContextController::setLocationSource(const SkyContextLocationSource loca
         nextLocationSource = SkyContextLocationSource::Custom;
     }
 
-    if (m_locationSource == nextLocationSource) {
-        if (m_locationSource != SkyContextLocationSource::City) {
+    if (m_location.source == nextLocationSource) {
+        if (m_location.source != SkyContextLocationSource::City) {
             clearSelectedCity();
         }
         updateLocationStatusText();
         return;
     }
 
-    m_locationSource = nextLocationSource;
-    if (m_locationSource != SkyContextLocationSource::City) {
+    m_location.source = nextLocationSource;
+    if (m_location.source != SkyContextLocationSource::City) {
         clearSelectedCity();
     }
 
@@ -532,13 +537,13 @@ bool SkyContextController::applySelectedCityId(const QString& cityId)
         return false;
     }
 
-    const bool cityIdChanged = m_selectedCityId != cityEntry->id;
+    const bool cityIdChanged = m_location.selectedCityId != cityEntry->id;
     const QString displayText = cityEntry->displayText();
-    const bool displayTextChanged = m_selectedCityDisplayText != displayText;
+    const bool displayTextChanged = m_location.selectedCityDisplayText != displayText;
 
-    m_selectedCityId = cityEntry->id;
-    m_selectedCityDisplayText = displayText;
-    m_locationSource = SkyContextLocationSource::City;
+    m_location.selectedCityId = cityEntry->id;
+    m_location.selectedCityDisplayText = displayText;
+    m_location.source = SkyContextLocationSource::City;
 
     if (cityIdChanged) {
         emit selectedCityIdChanged();
@@ -548,7 +553,7 @@ bool SkyContextController::applySelectedCityId(const QString& cityId)
     }
     emit locationSourceTextChanged();
 
-    skygate::core::GeoLocation observer = m_skyContext.observer;
+    skygate::core::GeoLocation observer = m_location.context.observer;
     observer.latitudeDeg = cityEntry->latitudeDeg;
     observer.longitudeDeg = cityEntry->longitudeDeg;
     applyObserverLocation(observer);
@@ -560,7 +565,7 @@ void SkyContextController::setSelectedCityId(const QString& selectedCityId)
 {
     if (selectedCityId.trimmed().isEmpty()) {
         clearSelectedCity();
-        if (m_locationSource == SkyContextLocationSource::City) {
+        if (m_location.source == SkyContextLocationSource::City) {
             updateLocationStatusText();
         }
         return;

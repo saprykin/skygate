@@ -41,17 +41,17 @@ const skygate::ephemeris::CelestialBodyState* findBodyStateById(
 
 bool SkyContextController::searchToolbarCollapsed() const noexcept
 {
-    return m_searchToolbarCollapsed;
+    return m_search.toolbarCollapsed;
 }
 
 void SkyContextController::setSearchToolbarCollapsed(const bool searchToolbarCollapsed)
 {
-    if (m_searchToolbarCollapsed == searchToolbarCollapsed) {
+    if (m_search.toolbarCollapsed == searchToolbarCollapsed) {
         return;
     }
 
-    m_searchToolbarCollapsed = searchToolbarCollapsed;
-    if (m_searchToolbarCollapsed) {
+    m_search.toolbarCollapsed = searchToolbarCollapsed;
+    if (m_search.toolbarCollapsed) {
         clearSelectedSearchTarget();
     }
     emit searchToolbarCollapsedChanged();
@@ -68,7 +68,7 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         return false;
     }
 
-    const auto snapshot = engine->compute(m_skyContext);
+    const auto snapshot = engine->compute(m_location.context);
     const QString normalizedTargetKind = normalizedLookupKey(targetKind);
     if (normalizedTargetKind == "body") {
         const auto* bodyState = findBodyStateById(snapshot, targetId);
