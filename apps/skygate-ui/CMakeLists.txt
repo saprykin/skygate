@@ -25,8 +25,16 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkySceneModel.hpp
     src/SkyTheme.cpp
     src/SkyTheme.hpp
+    src/catalog/SkyActiveCatalogBuilder.cpp
+    src/catalog/SkyActiveCatalogBuilder.hpp
+    src/catalog/SkyCatalogCacheController.cpp
+    src/catalog/SkyCatalogCacheController.hpp
     src/catalog/CatalogDownloadService.cpp
     src/catalog/CatalogDownloadService.hpp
+    src/catalog/SkyCatalogImportWorkflow.cpp
+    src/catalog/SkyCatalogImportWorkflow.hpp
+    src/catalog/SkyCatalogPresets.cpp
+    src/catalog/SkyCatalogPresets.hpp
     src/catalog/CatalogPayloadParseService.cpp
     src/catalog/CatalogPayloadParseService.hpp
     src/SkyContextController.cpp

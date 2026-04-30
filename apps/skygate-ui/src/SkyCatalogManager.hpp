@@ -17,7 +17,11 @@
 #include <vector>
 
 class QNetworkAccessManager;
-class CatalogCoordinator;
+
+namespace skygate::ui::internal {
+class SkyCatalogCacheController;
+class SkyCatalogImportWorkflow;
+}
 
 class SkyCatalogManager final : public QObject {
     Q_OBJECT
@@ -99,12 +103,12 @@ private:
     void persistCatalogCache() const;
 
 private:
-    SkySettingsStore* m_settingsStore = nullptr;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_sourceCatalog;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_deepSkyCatalog;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
-    std::unique_ptr<CatalogCoordinator> m_catalogCoordinator;
+    std::unique_ptr<skygate::ui::internal::SkyCatalogCacheController> m_cacheController;
+    std::unique_ptr<skygate::ui::internal::SkyCatalogImportWorkflow> m_importWorkflow;
     QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_statusText;
     QString m_sourceLabel = "Bundled";

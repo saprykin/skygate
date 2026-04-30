@@ -1,59 +1,20 @@
 #include "SkyCatalogManager.hpp"
 
-#include "CatalogCoordinator.hpp"
-#include "SkyContextControllerSupport.hpp"
+#include "catalog/SkyActiveCatalogBuilder.hpp"
+#include "catalog/SkyCatalogCacheController.hpp"
+#include "catalog/SkyCatalogImportWorkflow.hpp"
+#include "catalog/SkyCatalogPresets.hpp"
 
 #include <QLocale>
 #include <QNetworkAccessManager>
 
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/StarCatalogFactory.hpp"
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
 
-#include <algorithm>
-#include <cstddef>
-#include <string_view>
 #include <utility>
 
 using namespace skygate::ui::internal;
-
-namespace {
-
-QString stripSavedSuffixes(const QString& sourceLabel)
-{
-    QString normalizedSourceLabel = sourceLabel.trimmed();
-    const QString spacedSavedSuffix = QStringLiteral(" (saved)");
-    const QString compactSavedSuffix = QStringLiteral("(saved)");
-    while (
-        normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)
-        || normalizedSourceLabel.endsWith(compactSavedSuffix, Qt::CaseInsensitive)
-    ) {
-        if (normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)) {
-            normalizedSourceLabel.chop(spacedSavedSuffix.size());
-        } else {
-            normalizedSourceLabel.chop(compactSavedSuffix.size());
-        }
-        normalizedSourceLabel = normalizedSourceLabel.trimmed();
-    }
-    return normalizedSourceLabel;
-}
-
-std::size_t countDeepSkyObjects(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies
-)
-{
-    return static_cast<std::size_t>(std::count_if(
-        bodies.begin(),
-        bodies.end(),
-        [](const skygate::ephemeris::CelestialBody& body) {
-            return body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject;
-        }
-    ));
-}
-
-}  // namespace
 
 SkyCatalogManager::SkyCatalogManager(
     SkySettingsStore* settingsStore,
@@ -62,12 +23,12 @@ SkyCatalogManager::SkyCatalogManager(
     QObject* parent
 )
     : QObject(parent)
-    , m_settingsStore(settingsStore)
     , m_starCatalog(std::move(starCatalog))
     , m_ephemerisEngine(std::move(ephemerisEngine))
 {
     m_networkAccessManager = new QNetworkAccessManager(this);
-    m_catalogCoordinator = std::make_unique<CatalogCoordinator>(m_networkAccessManager);
+    m_cacheController = std::make_unique<SkyCatalogCacheController>(settingsStore);
+    m_importWorkflow = std::make_unique<SkyCatalogImportWorkflow>(m_networkAccessManager);
     resetConstellationLineRefs();
 
     if (m_starCatalog == nullptr) {
@@ -83,10 +44,8 @@ SkyCatalogManager::SkyCatalogManager(
         m_statusText = "Catalog: Unavailable";
     }
 
-    m_catalogUrlText = QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl);
-    m_deepSkyCatalogUrlText = QString::fromUtf8(
-        SkyContextControllerConstants::kOpenNgcCatalogPrimaryUrl
-    );
+    m_catalogUrlText = SkyCatalogPresets::defaultCatalogUrlText();
+    m_deepSkyCatalogUrlText = SkyCatalogPresets::defaultDeepSkyCatalogUrlText();
 }
 
 SkyCatalogManager::~SkyCatalogManager() = default;
@@ -187,44 +146,20 @@ SkyCatalogManager::constellationLabelRefs() const noexcept
 
 void SkyCatalogManager::setCatalogPresetIndex(const int catalogPresetIndex)
 {
-    if (catalogPresetIndex <= 0) {
-        m_catalogPresetIndex = 0;
-        return;
-    }
-    if (catalogPresetIndex == 1) {
-        m_catalogPresetIndex = 1;
-        return;
-    }
-    if (catalogPresetIndex == 2) {
-        m_catalogPresetIndex = 2;
-        return;
-    }
-
-    if (catalogPresetIndex == 3) {
-        m_catalogPresetIndex = 1;
-        return;
-    }
-    m_catalogPresetIndex = 2;
+    m_catalogPresetIndex = SkyCatalogPresets::normalizeCatalogPresetIndex(catalogPresetIndex);
 }
 
 void SkyCatalogManager::setDeepSkyCatalogPresetIndex(const int deepSkyCatalogPresetIndex)
 {
-    if (deepSkyCatalogPresetIndex <= 0) {
-        m_deepSkyCatalogPresetIndex = 0;
-        return;
-    }
-    if (deepSkyCatalogPresetIndex == 1) {
-        m_deepSkyCatalogPresetIndex = 1;
-        return;
-    }
-    m_deepSkyCatalogPresetIndex = 2;
+    m_deepSkyCatalogPresetIndex =
+        SkyCatalogPresets::normalizeDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex);
 }
 
 void SkyCatalogManager::setCatalogUrlText(const QString& catalogUrlText)
 {
     const QString normalizedCatalogUrlText = catalogUrlText.trimmed();
     m_catalogUrlText = normalizedCatalogUrlText.isEmpty()
-        ? QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl)
+        ? SkyCatalogPresets::defaultCatalogUrlText()
         : normalizedCatalogUrlText;
 }
 
@@ -232,7 +167,7 @@ void SkyCatalogManager::setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUr
 {
     const QString normalizedUrlText = deepSkyCatalogUrlText.trimmed();
     m_deepSkyCatalogUrlText = normalizedUrlText.isEmpty()
-        ? QString::fromUtf8(SkyContextControllerConstants::kOpenNgcCatalogPrimaryUrl)
+        ? SkyCatalogPresets::defaultDeepSkyCatalogUrlText()
         : normalizedUrlText;
 }
 
@@ -242,40 +177,27 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
         return;
     }
 
-    const QString normalizedPresetId = presetId.trimmed().toLower();
-    if (normalizedPresetId == "bundled") {
-        setCatalogPresetIndex(0);
+    const SkyCatalogPreset preset = SkyCatalogPresets::catalogPreset(presetId);
+    if (!preset.known) {
+        m_statusText = QString("Catalog: Unknown preset '%1'").arg(presetId);
+        emit statusTextChanged();
+        return;
+    }
+
+    setCatalogPresetIndex(preset.presetIndex);
+    if (preset.bundled) {
         m_cachedCatalogPayload.clear();
         resetConstellationLineRefs();
-        applyCatalog(skygate::ephemeris::createBundledStarCatalog(), "Bundled");
+        applyCatalog(skygate::ephemeris::createBundledStarCatalog(), preset.sourceLabel);
         return;
     }
 
-    if (normalizedPresetId == "hyg_v42" || normalizedPresetId == "hyg_v3") {
-        setCatalogPresetIndex(1);
-        setCatalogUrlText(QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl));
-        downloadCatalogFromUrls(
-            QStringList {
-                QString::fromUtf8(SkyContextControllerConstants::kHygCatalogPrimaryUrl)
-            },
-            "HYG v4.2",
-            QStringList {
-                QString::fromUtf8(
-                    SkyContextControllerConstants::kStellariumConstellationLinesPrimaryUrl
-                ),
-                QString::fromUtf8(
-                    SkyContextControllerConstants::kStellariumConstellationLinesMirrorUrl
-                ),
-                QString::fromUtf8(
-                    SkyContextControllerConstants::kStellariumConstellationLinesCdnUrl
-                )
-            }
-        );
-        return;
-    }
-
-    m_statusText = QString("Catalog: Unknown preset '%1'").arg(presetId);
-    emit statusTextChanged();
+    setCatalogUrlText(preset.defaultUrlText);
+    downloadCatalogFromUrls(
+        preset.catalogUrls,
+        preset.sourceLabel,
+        preset.constellationLineUrls
+    );
 }
 
 void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
@@ -284,34 +206,25 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
         return;
     }
 
-    const QString normalizedPresetId = presetId.trimmed().toLower();
-    if (normalizedPresetId == "bundled_messier" || normalizedPresetId == "bundled") {
-        setDeepSkyCatalogPresetIndex(0);
+    const SkyDeepSkyCatalogPreset preset = SkyCatalogPresets::deepSkyCatalogPreset(presetId);
+    if (!preset.known) {
+        m_statusText = QString("Catalog: Unknown deep-sky preset '%1'").arg(presetId);
+        emit statusTextChanged();
+        return;
+    }
+
+    setDeepSkyCatalogPresetIndex(preset.presetIndex);
+    if (preset.bundled) {
         m_cachedDeepSkyCatalogPayload.clear();
         m_deepSkyCatalog.reset();
         m_deepSkyCatalogFoundObjectCount = 0;
-        m_deepSkySourceLabel = "Bundled Messier";
+        m_deepSkySourceLabel = preset.sourceLabel;
         rebuildActiveCatalog(true);
         return;
     }
 
-    if (normalizedPresetId == "open_ngc") {
-        setDeepSkyCatalogPresetIndex(1);
-        setDeepSkyCatalogUrlText(
-            QString::fromUtf8(SkyContextControllerConstants::kOpenNgcCatalogPrimaryUrl)
-        );
-        downloadDeepSkyCatalogFromUrls(
-            QStringList {
-                QString::fromUtf8(SkyContextControllerConstants::kOpenNgcCatalogPrimaryUrl),
-                QString::fromUtf8(SkyContextControllerConstants::kOpenNgcCatalogMirrorUrl)
-            },
-            "OpenNGC"
-        );
-        return;
-    }
-
-    m_statusText = QString("Catalog: Unknown deep-sky preset '%1'").arg(presetId);
-    emit statusTextChanged();
+    setDeepSkyCatalogUrlText(preset.defaultUrlText);
+    downloadDeepSkyCatalogFromUrls(preset.catalogUrls, preset.sourceLabel);
 }
 
 void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
@@ -336,7 +249,8 @@ bool SkyCatalogManager::clearCatalogCache()
         return false;
     }
 
-    const bool cacheCleared = m_settingsStore != nullptr && m_settingsStore->clearCatalogCache();
+    const bool cacheCleared =
+        m_cacheController != nullptr && m_cacheController->clearCatalogCache();
     if (cacheCleared) {
         m_cachedCatalogPayload.clear();
     }
@@ -356,7 +270,7 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
     }
 
     const bool cacheCleared =
-        m_settingsStore != nullptr && m_settingsStore->clearDeepSkyCatalogCache();
+        m_cacheController != nullptr && m_cacheController->clearDeepSkyCatalogCache();
     if (cacheCleared) {
         m_cachedDeepSkyCatalogPayload.clear();
     }
@@ -369,104 +283,59 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
 
 bool SkyCatalogManager::restoreCatalogCache()
 {
-    if (m_settingsStore == nullptr) {
-        return false;
-    }
-    if (m_catalogPresetIndex == 0 && m_deepSkyCatalogPresetIndex == 0) {
+    if (m_cacheController == nullptr) {
         return false;
     }
 
-    const auto cacheSnapshot = m_settingsStore->loadCatalogCache();
-    if (!cacheSnapshot.has_value()) {
+    auto restoreResult = m_cacheController->restore(
+        m_catalogPresetIndex,
+        m_deepSkyCatalogPresetIndex
+    );
+    if (restoreResult.savedCatalogUnreadable) {
+        m_cachedCatalogPayload.clear();
+        m_statusText = restoreResult.statusText;
+        emit statusTextChanged();
+        return false;
+    }
+    if (!restoreResult.restored) {
         return false;
     }
 
-    const skygate::ephemeris::CatalogPayloadParser parser;
-    if (m_catalogPresetIndex != 0 && !cacheSnapshot->catalogPayload.isEmpty()) {
-        const std::string_view payloadView(
-            cacheSnapshot->catalogPayload.constData(),
-            static_cast<std::size_t>(cacheSnapshot->catalogPayload.size())
-        );
-        auto restoredCatalogResult = parser.parseResult(payloadView);
-        if (!restoredCatalogResult.isSuccess() || restoredCatalogResult.catalog == nullptr) {
-            m_cachedCatalogPayload.clear();
-            m_statusText = "Catalog: Saved cache unreadable, using bundled";
-            emit statusTextChanged();
-            return false;
-        }
-
-        m_cachedCatalogPayload = cacheSnapshot->catalogPayload;
-        QString normalizedSourceLabel = stripSavedSuffixes(cacheSnapshot->sourceLabel);
-        if (normalizedSourceLabel.isEmpty()) {
-            normalizedSourceLabel = "Saved";
-        }
+    if (restoreResult.catalog != nullptr) {
+        m_cachedCatalogPayload = restoreResult.catalogPayload;
         applyCatalog(
-            std::move(restoredCatalogResult.catalog),
-            QString("%1 (saved)").arg(normalizedSourceLabel),
+            std::move(restoreResult.catalog),
+            restoreResult.sourceLabel,
             false
         );
     }
 
-    if (
-        m_deepSkyCatalogPresetIndex != 0
-        && !cacheSnapshot->deepSkyCatalogPayload.isEmpty()
-    ) {
-        const std::string_view deepSkyPayloadView(
-            cacheSnapshot->deepSkyCatalogPayload.constData(),
-            static_cast<std::size_t>(cacheSnapshot->deepSkyCatalogPayload.size())
+    if (restoreResult.deepSkyCatalog != nullptr) {
+        m_cachedDeepSkyCatalogPayload = restoreResult.deepSkyCatalogPayload;
+        m_deepSkyCatalogFoundObjectCount = restoreResult.deepSkyObjectCount;
+        applyDeepSkyCatalog(
+            std::move(restoreResult.deepSkyCatalog),
+            restoreResult.deepSkySourceLabel,
+            false
         );
-        auto restoredDeepSkyResult = parser.parseResult(deepSkyPayloadView);
-        if (restoredDeepSkyResult.isSuccess() && restoredDeepSkyResult.catalog != nullptr) {
-            m_cachedDeepSkyCatalogPayload = cacheSnapshot->deepSkyCatalogPayload;
-            m_deepSkyCatalogFoundObjectCount =
-                restoredDeepSkyResult.diagnostics.parsedBodyCount;
-            QString normalizedDeepSkySourceLabel = stripSavedSuffixes(cacheSnapshot->deepSkySourceLabel);
-            if (normalizedDeepSkySourceLabel.isEmpty()) {
-                normalizedDeepSkySourceLabel = "Saved deep sky";
-            }
-            applyDeepSkyCatalog(
-                std::move(restoredDeepSkyResult.catalog),
-                QString("%1 (saved)").arg(normalizedDeepSkySourceLabel),
-                false
-            );
-        }
     }
 
-    if (
-        cacheSnapshot->constellationLineSchemaVersion
-            >= SkyContextControllerConstants::kConstellationLineCacheSchemaVersion
-        && !cacheSnapshot->constellationLineRows.isEmpty()
-    ) {
-        auto parsedLineRefs = SkyContextCatalogCodec::parseConstellationLineRows(
-            std::string_view(
-                cacheSnapshot->constellationLineRows.constData(),
-                static_cast<std::size_t>(cacheSnapshot->constellationLineRows.size())
-            )
-        );
-        if (!parsedLineRefs.empty()) {
-            setConstellationLineRefs(std::move(parsedLineRefs));
+    if (!restoreResult.constellationLineRefs.empty()) {
+        setConstellationLineRefs(std::move(restoreResult.constellationLineRefs));
+        setConstellationLabelRefs(std::move(restoreResult.constellationLabelRefs));
 
-            if (!cacheSnapshot->constellationLabelRows.isEmpty()) {
-                auto parsedLabelRefs = SkyContextCatalogCodec::parseConstellationLabelRows(
-                    std::string_view(
-                        cacheSnapshot->constellationLabelRows.constData(),
-                        static_cast<std::size_t>(cacheSnapshot->constellationLabelRows.size())
-                    )
-                );
-                setConstellationLabelRefs(std::move(parsedLabelRefs));
-            } else {
-                setConstellationLabelRefs({});
-            }
-
-            const std::size_t restoredConstellationCount = cacheSnapshot->constellationCount;
-            if (restoredConstellationCount != m_constellationCount) {
-                m_constellationCount = restoredConstellationCount;
-                emit datasetInfoTextChanged();
-            }
-            emit catalogChanged();
-            return true;
+        if (
+            restoreResult.constellationCount.has_value()
+            && restoreResult.constellationCount.value() != m_constellationCount
+        ) {
+            m_constellationCount = restoreResult.constellationCount.value();
+            emit datasetInfoTextChanged();
         }
-    } else if (cacheSnapshot->constellationLineSchemaVersion > 0) {
+        emit catalogChanged();
+        return true;
+    }
+
+    if (restoreResult.resetConstellationLineRefs) {
         resetConstellationLineRefs();
         emit catalogChanged();
         return true;
@@ -485,7 +354,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
         return;
     }
 
-    if (m_catalogCoordinator == nullptr) {
+    if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
         m_statusText = "Catalog: Network unavailable";
         emit statusTextChanged();
         return;
@@ -499,8 +368,9 @@ void SkyCatalogManager::downloadCatalogFromUrls(
     m_downloadingCatalog = true;
     emit downloadingCatalogChanged();
 
-    m_catalogCoordinator->downloadCatalogFromUrls(
+    m_importWorkflow->downloadCatalog(
         urlTexts,
+        sourceLabel,
         this,
         [this](const QString& statusText) {
             m_statusText = statusText;
@@ -515,7 +385,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
                 emit catalogProcessingChanged();
             }
         },
-        [this, sourceLabel, constellationLineUrlTexts](CatalogCoordinator::DownloadResult result) {
+        [this, constellationLineUrlTexts](SkyCatalogImportResult result) {
             if (m_catalogProcessing) {
                 m_catalogProcessing = false;
                 emit catalogProcessingChanged();
@@ -530,7 +400,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
             }
 
             m_cachedCatalogPayload = std::move(result.payload);
-            applyCatalog(std::move(result.catalog), sourceLabel);
+            applyCatalog(std::move(result.catalog), result.sourceLabel);
             if (result.diagnostics.truncatedBodyCount > 0U) {
                 const QLocale locale = QLocale::system();
                 m_statusText = QString("%1 | Brightness filter kept %2 of %3 objects").arg(
@@ -553,7 +423,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
 
             resetConstellationLineRefs();
             const QString catalogSummaryText = m_statusText;
-            m_catalogCoordinator->downloadRawDataFromUrls(
+            m_importWorkflow->downloadConstellationLines(
                 constellationLineUrlTexts,
                 this,
                 [this, catalogSummaryText](const QString& statusText) {
@@ -567,57 +437,20 @@ void SkyCatalogManager::downloadCatalogFromUrls(
                     );
                     emit statusTextChanged();
                 },
-                [this, catalogSummaryText](CatalogCoordinator::RawDownloadResult lineResult) {
-                    if (lineResult.payload.isEmpty()) {
-                        const QString reason = lineResult.errorText.isEmpty()
-                            ? QString("unavailable")
-                            : lineResult.errorText;
-                        m_statusText =
-                            QString("%1 | Constellation lines: fallback default (%2)").arg(
-                                catalogSummaryText,
-                                reason
-                            );
-                        emit statusTextChanged();
-                        persistCatalogCache();
-                        emit catalogChanged();
-                        return;
-                    }
-
-                    const std::string_view payloadView(
-                        lineResult.payload.constData(),
-                        static_cast<std::size_t>(lineResult.payload.size())
-                    );
-                    const skygate::ephemeris::StellariumConstellationParser parser;
-                    auto parsedData = parser.parse(payloadView);
-                    if (parsedData.lineRefs.empty()) {
-                        QString payloadPreview = QString::fromUtf8(
-                            lineResult.payload.left(120)
-                        ).simplified();
-                        if (payloadPreview.isEmpty()) {
-                            payloadPreview = "<empty>";
+                [this, catalogSummaryText](SkyConstellationLineImportResult lineResult) {
+                    if (lineResult.hasCustomLines()) {
+                        setConstellationLineRefs(std::move(lineResult.lineRefs));
+                        setConstellationLabelRefs(std::move(lineResult.labelRefs));
+                        if (lineResult.constellationCount > 0U) {
+                            m_constellationCount = lineResult.constellationCount;
+                            emit datasetInfoTextChanged();
                         }
-                        m_statusText = QString(
-                            "%1 | Constellation lines: fallback default (parse failed: %2)"
-                        ).arg(catalogSummaryText, payloadPreview);
-                        emit statusTextChanged();
-                        persistCatalogCache();
-                        emit catalogChanged();
-                        return;
                     }
-
-                    setConstellationLineRefs(std::move(parsedData.lineRefs));
-                    setConstellationLabelRefs(std::move(parsedData.labelRefs));
-                    if (parsedData.constellationCount > 0U) {
-                        m_constellationCount = parsedData.constellationCount;
-                        emit datasetInfoTextChanged();
-                    }
-                    persistCatalogCache();
-                    m_statusText = QString("%1 | Constellation lines: %2 segments").arg(
+                    m_statusText = QString("%1 | Constellation lines: %2").arg(
                         catalogSummaryText,
-                        QString::number(
-                            static_cast<qulonglong>(m_constellationLineRefs.size())
-                        )
+                        lineResult.statusSuffix
                     );
+                    persistCatalogCache();
                     emit statusTextChanged();
                     emit catalogChanged();
                 }
@@ -635,7 +468,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
         return;
     }
 
-    if (m_catalogCoordinator == nullptr) {
+    if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
         m_statusText = "Catalog: Network unavailable";
         emit statusTextChanged();
         return;
@@ -649,8 +482,9 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
     m_downloadingCatalog = true;
     emit downloadingCatalogChanged();
 
-    m_catalogCoordinator->downloadCatalogFromUrls(
+    m_importWorkflow->downloadDeepSkyCatalog(
         urlTexts,
+        sourceLabel,
         this,
         [this](const QString& statusText) {
             m_statusText = statusText;
@@ -665,7 +499,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
                 emit catalogProcessingChanged();
             }
         },
-        [this, sourceLabel](CatalogCoordinator::DownloadResult result) {
+        [this](SkyDeepSkyCatalogImportResult result) {
             if (m_catalogProcessing) {
                 m_catalogProcessing = false;
                 emit catalogProcessingChanged();
@@ -680,33 +514,15 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
                 return;
             }
 
-            const auto bodies = result.catalog->bodies();
-            const bool hasDeepSkyObjects = std::any_of(
-                bodies.begin(),
-                bodies.end(),
-                [](const skygate::ephemeris::CelestialBody& body) {
-                    return body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject;
-                }
-            );
-            if (!hasDeepSkyObjects) {
-                m_statusText = "Catalog: Downloaded deep-sky catalog contains no DSOs";
-                emit statusTextChanged();
-                return;
-            }
-
-            const std::size_t foundObjectCount = result.diagnostics.parsedBodyCount > 0U
-                ? result.diagnostics.parsedBodyCount
-                : countDeepSkyObjects(bodies);
-
             m_cachedDeepSkyCatalogPayload = std::move(result.payload);
-            m_deepSkyCatalogFoundObjectCount = foundObjectCount;
-            applyDeepSkyCatalog(std::move(result.catalog), sourceLabel);
-            if (foundObjectCount > 0U) {
+            m_deepSkyCatalogFoundObjectCount = result.foundObjectCount;
+            applyDeepSkyCatalog(std::move(result.catalog), result.sourceLabel);
+            if (result.foundObjectCount > 0U) {
                 const QLocale locale = QLocale::system();
                 m_statusText = QString("%1 | %2 found %3 objects").arg(
                     m_statusText,
-                    sourceLabel,
-                    locale.toString(static_cast<qulonglong>(foundObjectCount))
+                    result.sourceLabel,
+                    locale.toString(static_cast<qulonglong>(result.foundObjectCount))
                 );
                 emit statusTextChanged();
             }
@@ -746,7 +562,7 @@ void SkyCatalogManager::setConstellationLabelRefs(
 void SkyCatalogManager::persistCatalogCache() const
 {
     if (
-        m_settingsStore == nullptr
+        m_cacheController == nullptr
         || m_starCatalog == nullptr
         || (m_cachedCatalogPayload.isEmpty() && m_cachedDeepSkyCatalogPayload.isEmpty())
     ) {
@@ -758,21 +574,15 @@ void SkyCatalogManager::persistCatalogCache() const
         return;
     }
 
-    SkySettingsStore::CatalogCacheSnapshot snapshot;
-    snapshot.sourceLabel = m_sourceLabel;
-    snapshot.deepSkySourceLabel = m_deepSkySourceLabel;
-    snapshot.catalogPayload = m_cachedCatalogPayload;
-    snapshot.deepSkyCatalogPayload = m_cachedDeepSkyCatalogPayload;
-    snapshot.constellationLineRows = SkyContextCatalogCodec::serializeConstellationLineRows(
-        m_constellationLineRefs
-    );
-    snapshot.constellationLabelRows = SkyContextCatalogCodec::serializeConstellationLabelRows(
-        m_constellationLabelRefs
-    );
-    snapshot.constellationLineSchemaVersion =
-        SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
-    snapshot.constellationCount = m_constellationCount;
-    (void)m_settingsStore->saveCatalogCache(snapshot);
+    SkyCatalogCachePersistRequest request;
+    request.sourceLabel = m_sourceLabel;
+    request.deepSkySourceLabel = m_deepSkySourceLabel;
+    request.catalogPayload = m_cachedCatalogPayload;
+    request.deepSkyCatalogPayload = m_cachedDeepSkyCatalogPayload;
+    request.constellationLineRefs = m_constellationLineRefs;
+    request.constellationLabelRefs = m_constellationLabelRefs;
+    request.constellationCount = m_constellationCount;
+    m_cacheController->persist(request);
 }
 
 void SkyCatalogManager::applyCatalog(
@@ -830,78 +640,34 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
         return;
     }
 
-    auto activeCatalog = skygate::ephemeris::createCatalogWithCoreSolarSystemBodies(
-        *m_sourceCatalog
-    );
-    if (activeCatalog == nullptr) {
+    const SkyActiveCatalogBuildRequest request {
+        .sourceCatalog = *m_sourceCatalog,
+        .deepSkyCatalog = m_deepSkyCatalog.get(),
+        .useBundledDeepSkyCatalog = m_deepSkyCatalogPresetIndex == 0,
+        .currentConstellationCount = m_constellationCount,
+        .knownDeepSkyObjectCount = m_deepSkyCatalogFoundObjectCount,
+        .sourceLabel = m_sourceLabel,
+        .deepSkySourceLabel = m_deepSkySourceLabel
+    };
+    auto buildResult = SkyActiveCatalogBuilder::build(request);
+    if (!buildResult.isSuccess()) {
         m_bodyCount = 0;
         m_constellationCount = 0;
         m_deepSkyObjectCount = 0;
-        m_statusText = "Catalog: Failed to load";
+        m_statusText = buildResult.errorText;
         emit statusTextChanged();
         emit datasetInfoTextChanged();
         return;
     }
 
-    const skygate::ephemeris::IStarCatalog* deepSkyCatalog = m_deepSkyCatalog.get();
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledDeepSkyCatalog;
-    if (deepSkyCatalog == nullptr && m_deepSkyCatalogPresetIndex == 0) {
-        bundledDeepSkyCatalog = skygate::ephemeris::createBundledStarCatalog();
-        deepSkyCatalog = bundledDeepSkyCatalog.get();
-    }
-    if (deepSkyCatalog != nullptr) {
-        if (
-            m_deepSkyCatalogPresetIndex == 0
-            || m_deepSkyCatalogFoundObjectCount == 0U
-        ) {
-            m_deepSkyCatalogFoundObjectCount = countDeepSkyObjects(
-                deepSkyCatalog->bodies()
-            );
-        }
-        activeCatalog = skygate::ephemeris::createCatalogByMergingDeepSkyObjects(
-            *activeCatalog,
-            *deepSkyCatalog
-        );
-    }
-    if (activeCatalog == nullptr) {
-        m_bodyCount = 0;
-        m_constellationCount = 0;
-        m_deepSkyObjectCount = 0;
-        m_statusText = "Catalog: Failed to merge deep-sky catalog";
-        emit statusTextChanged();
-        emit datasetInfoTextChanged();
-        return;
-    }
-
-    const auto bodies = activeCatalog->bodies();
-    std::size_t catalogConstellationCount = 0;
-    std::size_t deepSkyObjectCount = 0;
-    for (const auto& body : bodies) {
-        if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
-            ++catalogConstellationCount;
-        }
-        if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
-            ++deepSkyObjectCount;
-        }
-    }
-    const std::size_t constellationCount = std::max(
-        catalogConstellationCount,
-        m_constellationCount
-    );
-
-    m_starCatalog = std::move(activeCatalog);
-    m_ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*m_starCatalog);
+    m_starCatalog = std::move(buildResult.catalog);
+    m_ephemerisEngine = std::move(buildResult.ephemerisEngine);
     ++m_catalogRevision;
-    m_bodyCount = bodies.size();
-    m_constellationCount = constellationCount;
-    m_deepSkyObjectCount = deepSkyObjectCount;
-    m_statusText = QString("Catalog: %1 + %2 (%3 objects, %4 deep sky, %5 constellations)").arg(
-        m_sourceLabel,
-        m_deepSkySourceLabel,
-        QString::number(static_cast<qulonglong>(bodies.size())),
-        QString::number(static_cast<qulonglong>(deepSkyObjectCount)),
-        QString::number(static_cast<qulonglong>(constellationCount))
-    );
+    m_bodyCount = buildResult.bodyCount;
+    m_constellationCount = buildResult.constellationCount;
+    m_deepSkyObjectCount = buildResult.deepSkyObjectCount;
+    m_deepSkyCatalogFoundObjectCount = buildResult.foundDeepSkyObjectCount;
+    m_statusText = buildResult.statusText;
     if (persistCatalog) {
         persistCatalogCache();
     }
