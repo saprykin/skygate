@@ -14,7 +14,7 @@ private slots:
     void initTestCase();
     void savesAndLoadsStateSnapshot();
     void savesAndLoadsNegativeUtcEpochSeconds();
-    void savesLoadsAndClearsCatalogCache();
+    void savesLoadsAndClearsCatalogCachesIndependently();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -107,7 +107,7 @@ void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
     QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
 }
 
-void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()
+void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 {
     QSettings settings;
     settings.clear();
@@ -150,6 +150,24 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCache()
     QCOMPARE(loadedSnapshot->constellationCount, savedSnapshot.constellationCount);
 
     QVERIFY(store.clearCatalogCache());
+    const auto starClearedSnapshot = store.loadCatalogCache();
+    QVERIFY(starClearedSnapshot.has_value());
+    QVERIFY(starClearedSnapshot->sourceLabel.isEmpty());
+    QVERIFY(starClearedSnapshot->catalogPayload.isEmpty());
+    QVERIFY(starClearedSnapshot->constellationLineRows.isEmpty());
+    QVERIFY(starClearedSnapshot->constellationLabelRows.isEmpty());
+    QCOMPARE(starClearedSnapshot->constellationLineSchemaVersion, 0);
+    QCOMPARE(starClearedSnapshot->constellationCount, 0U);
+    QCOMPARE(
+        starClearedSnapshot->deepSkySourceLabel,
+        savedSnapshot.deepSkySourceLabel
+    );
+    QCOMPARE(
+        starClearedSnapshot->deepSkyCatalogPayload,
+        savedSnapshot.deepSkyCatalogPayload
+    );
+
+    QVERIFY(store.clearDeepSkyCatalogCache());
     QVERIFY(!store.loadCatalogCache().has_value());
 }
 

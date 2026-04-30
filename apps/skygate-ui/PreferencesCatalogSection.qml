@@ -37,8 +37,8 @@ Item {
 
             PreferencesActionButton {
                 Layout.preferredWidth: 150
-                text: "Use Preset"
-                enabled: catalogPresetCombo.currentIndex !== 2
+                text: "Use catalog"
+                enabled: !catalogBusy && catalogPresetCombo.currentIndex !== 2
                 onClicked: {
                     settingsDraft.catalogPresetIndex = catalogPresetCombo.currentIndex
                     if (catalogPresetCombo.currentIndex === 0) {
@@ -68,7 +68,11 @@ Item {
                 text: "Clear Catalog Cache"
                 enabled: !skyContextController.downloadingCatalog
                          && !skyContextController.catalogProcessing
-                onClicked: skyContextController.clearCatalogCache()
+                onClicked: {
+                    settingsDraft.catalogPresetIndex = 0
+                    skyContextController.loadCatalogPreset("bundled")
+                    skyContextController.clearCatalogCache()
+                }
             }
 
             Label {
@@ -135,7 +139,7 @@ Item {
                 model: [
                     "Bundled Messier",
                     "OpenNGC",
-                    "Custom OpenNGC URL"
+                    "Custom URL"
                 ]
 
                 Binding on currentIndex {
@@ -153,29 +157,23 @@ Item {
 
             PreferencesActionButton {
                 Layout.preferredWidth: 150
-                text: deepSkyCatalogPresetCombo.currentIndex === 0
-                      ? "Use Bundled"
-                      : (skyContextController.downloadingCatalog ? "Downloading..." : "Download / Update")
-                enabled: !catalogBusy
+                text: "Use catalog"
+                enabled: !catalogBusy && deepSkyCatalogPresetCombo.currentIndex !== 2
                 onClicked: {
                     settingsDraft.deepSkyCatalogPresetIndex = deepSkyCatalogPresetCombo.currentIndex
                     if (deepSkyCatalogPresetCombo.currentIndex === 0) {
                         skyContextController.loadDeepSkyCatalogPreset("bundled_messier")
-                    } else if (deepSkyCatalogPresetCombo.currentIndex === 1) {
+                    } else {
                         skyContextController.loadDeepSkyCatalogPreset("open_ngc")
                         settingsDraft.deepSkyCatalogUrlText =
                             skyContextController.deepSkyCatalogUrlText()
-                    } else {
-                        skyContextController.downloadDeepSkyCatalogFromUrl(
-                            settingsDraft.deepSkyCatalogUrlText
-                        )
                     }
                 }
             }
 
             Label {
-                Layout.columnSpan: 2
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
                 text: skyContextController.deepSkyCatalogInfoText
                 color: skyContext.theme.listItemPrimaryText
                 font.pixelSize: 11
@@ -184,11 +182,23 @@ Item {
                 verticalAlignment: Text.AlignVCenter
             }
 
+            PreferencesActionButton {
+                Layout.preferredWidth: 150
+                Layout.alignment: Qt.AlignVCenter
+                text: "Clear Catalog Cache"
+                enabled: !catalogBusy
+                onClicked: {
+                    settingsDraft.deepSkyCatalogPresetIndex = 0
+                    skyContextController.loadDeepSkyCatalogPreset("bundled_messier")
+                    skyContextController.clearDeepSkyCatalogCache()
+                }
+            }
+
             Label {
                 visible: deepSkyCatalogPresetCombo.currentIndex === 2
                 Layout.columnSpan: 2
                 Layout.preferredHeight: visible ? implicitHeight : 0
-                text: "OpenNGC CSV URL"
+                text: "Catalog URL"
                 color: skyContext.theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 11
@@ -221,10 +231,18 @@ Item {
                 }
             }
 
-            Item {
+            PreferencesActionButton {
                 visible: deepSkyCatalogPresetCombo.currentIndex === 2
                 Layout.preferredWidth: 150
-                Layout.preferredHeight: visible ? deepSkyCatalogUrlInput.implicitHeight : 0
+                Layout.preferredHeight: visible ? implicitHeight : 0
+                text: skyContextController.downloadingCatalog ? "Downloading..." : "Download"
+                enabled: !catalogBusy
+                onClicked: {
+                    settingsDraft.deepSkyCatalogPresetIndex = 2
+                    skyContextController.downloadDeepSkyCatalogFromUrl(
+                        settingsDraft.deepSkyCatalogUrlText
+                    )
+                }
             }
         }
 

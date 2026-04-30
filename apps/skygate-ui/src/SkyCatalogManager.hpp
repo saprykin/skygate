@@ -61,6 +61,7 @@ public:
     void loadDeepSkyCatalogPreset(const QString& presetId);
     void downloadDeepSkyCatalogFromUrl(const QString& urlText);
     bool clearCatalogCache();
+    bool clearDeepSkyCatalogCache();
     bool restoreCatalogCache();
 
 signals:

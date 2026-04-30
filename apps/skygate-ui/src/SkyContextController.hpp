@@ -197,6 +197,7 @@ public:
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
     Q_INVOKABLE bool clearCatalogCache();
+    Q_INVOKABLE bool clearDeepSkyCatalogCache();
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE void loadDeepSkyCatalogPreset(const QString& presetId);

@@ -51,6 +51,7 @@ public:
     [[nodiscard]] bool saveState(const StateSnapshot& snapshot) const;
     [[nodiscard]] std::optional<StateSnapshot> loadState() const;
     [[nodiscard]] bool clearCatalogCache() const;
+    [[nodiscard]] bool clearDeepSkyCatalogCache() const;
     [[nodiscard]] bool saveCatalogCache(const CatalogCacheSnapshot& snapshot) const;
     [[nodiscard]] std::optional<CatalogCacheSnapshot> loadCatalogCache() const;
 };

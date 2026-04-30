@@ -99,9 +99,8 @@ QString SkyCatalogManager::statusText() const
 QString SkyCatalogManager::datasetInfoText() const
 {
     const QLocale locale = QLocale::system();
-    return QString("Objects: %1 | Deep sky: %2 | Constellations: %3").arg(
+    return QString("Objects: %1 | Constellations: %2").arg(
         locale.toString(static_cast<qulonglong>(m_bodyCount)),
-        locale.toString(static_cast<qulonglong>(m_deepSkyObjectCount)),
         locale.toString(static_cast<qulonglong>(m_constellationCount))
     );
 }
@@ -340,11 +339,30 @@ bool SkyCatalogManager::clearCatalogCache()
     const bool cacheCleared = m_settingsStore != nullptr && m_settingsStore->clearCatalogCache();
     if (cacheCleared) {
         m_cachedCatalogPayload.clear();
+    }
+    m_statusText = cacheCleared
+        ? "Catalog: Star catalog cache cleared"
+        : "Catalog: Star catalog cache clear failed";
+    emit statusTextChanged();
+    return cacheCleared;
+}
+
+bool SkyCatalogManager::clearDeepSkyCatalogCache()
+{
+    if (m_downloadingCatalog || m_catalogProcessing) {
+        m_statusText = "Catalog: Cannot clear cache while download is in progress";
+        emit statusTextChanged();
+        return false;
+    }
+
+    const bool cacheCleared =
+        m_settingsStore != nullptr && m_settingsStore->clearDeepSkyCatalogCache();
+    if (cacheCleared) {
         m_cachedDeepSkyCatalogPayload.clear();
     }
     m_statusText = cacheCleared
-        ? "Catalog: Cache cleared"
-        : "Catalog: Cache clear failed";
+        ? "Catalog: Deep-sky catalog cache cleared"
+        : "Catalog: Deep-sky catalog cache clear failed";
     emit statusTextChanged();
     return cacheCleared;
 }
