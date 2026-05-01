@@ -8,6 +8,7 @@
 #include <QtTest/QtTest>
 
 #include <QGuiApplication>
+#include <QFont>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSignalSpy>
@@ -75,6 +76,9 @@ int main(int argc, char* argv[])
     }
 
     QGuiApplication app(argc, argv);
+    QFont::insertSubstitution(QStringLiteral("Sans Serif"), QStringLiteral("Avenir Next"));
+    QFont::insertSubstitution(QStringLiteral("Monospace"), QStringLiteral("Menlo"));
+    app.setFont(QFont(QStringLiteral("Avenir Next")));
     QmlSmokeTests tests;
     return QTest::qExec(&tests, argc, argv);
 }

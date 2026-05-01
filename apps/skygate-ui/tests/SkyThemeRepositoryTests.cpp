@@ -3,6 +3,7 @@
 #include "SkyTheme.hpp"
 
 #include <QFile>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 
 using namespace skygate::ui::internal;
@@ -37,6 +38,10 @@ void SkyThemeRepositoryTests::missingThemeIdFallsBackToDefaultTheme()
 {
     const SkyThemeRepository repository;
     const SkyThemeDefinition& defaultTheme = repository.defaultTheme();
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Unknown theme id missing-theme - using default theme"
+    );
     const SkyThemeDefinition& resolvedTheme = repository.themeById("missing-theme");
 
     QCOMPARE(resolvedTheme.id, defaultTheme.id);
@@ -79,6 +84,10 @@ void SkyThemeRepositoryTests::malformedThemeDefinitionFallsBackToBuiltInDefault(
                            .toUtf8());
     manifestFile.close();
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression("Theme .*broken-theme\\.json has invalid color for key windowBackground")
+    );
     const SkyThemeRepository repository(manifestPath);
     const SkyThemeDefinition& fallbackTheme = repository.defaultTheme();
 

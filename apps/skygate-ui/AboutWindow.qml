@@ -110,12 +110,6 @@ Window {
                     Layout.preferredWidth: 76
                     Layout.preferredHeight: 76
                     clip: true
-                    property var aboutLogoSources: [
-                        "qrc:/icons/app-icon-512.png",
-                        "qrc:/qt/qml/com/skygate/app/resources/icons/skygate-icon-512.png",
-                        "resources/icons/skygate-icon-512.png"
-                    ]
-                    property int aboutLogoSourceIndex: 0
                     readonly property rect aboutLogoVisibleRect: Qt.rect(42, 37, 427, 437)
                     readonly property real aboutLogoRenderSize: Math.ceil(
                         (width * 512) / aboutLogoVisibleRect.height
@@ -158,17 +152,10 @@ Window {
                             ((parent.height - parent.aboutLogoVisibleHeight) * 0.5)
                             - ((parent.aboutLogoRenderSize * parent.aboutLogoVisibleRect.y) / 512)
                         )
-                        source: parent.aboutLogoSources[parent.aboutLogoSourceIndex]
+                        source: "resources/icons/skygate-icon-512.png"
                         fillMode: Image.PreserveAspectFit
                         smooth: true
                         mipmap: false
-                        onStatusChanged: {
-                            if (status === Image.Error
-                                && parent.aboutLogoSourceIndex + 1 < parent.aboutLogoSources.length) {
-                                parent.aboutLogoSourceIndex += 1
-                                source = parent.aboutLogoSources[parent.aboutLogoSourceIndex]
-                            }
-                        }
                     }
                 }
 

@@ -338,6 +338,10 @@ void SkyContextControllerTests::invalidSavedThemeFallsBackToDefault()
     snapshot.themeId = "missing-theme";
     QVERIFY(store.saveState(snapshot));
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Unknown theme id missing-theme - using default theme"
+    );
     const auto controller = createController(true);
     QCOMPARE(controller->themeId(), QString("default"));
 }
