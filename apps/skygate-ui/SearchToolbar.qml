@@ -26,8 +26,12 @@ Item {
     }
 
     function activateTarget(displayText, targetKind, targetId) {
+        const wasTracking = skyContextController.hasTrackedTarget
         if (!skyContextController.focusSearchTarget(targetKind, targetId)) {
             return
+        }
+        if (wasTracking && skyContextController.hasTrackedTarget) {
+            skyContextController.clearTrackedTarget()
         }
 
         suppressFilterSync = true

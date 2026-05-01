@@ -98,6 +98,22 @@ class SkyContextController final : public QObject {
         READ selectedSearchTargetId
         NOTIFY selectedSearchTargetChanged
     )
+    Q_PROPERTY(bool hasTrackedTarget READ hasTrackedTarget NOTIFY trackedTargetChanged)
+    Q_PROPERTY(
+        QString trackedTargetKind
+        READ trackedTargetKind
+        NOTIFY trackedTargetChanged
+    )
+    Q_PROPERTY(
+        QString trackedTargetId
+        READ trackedTargetId
+        NOTIFY trackedTargetChanged
+    )
+    Q_PROPERTY(
+        QString trackedTargetDisplayText
+        READ trackedTargetDisplayText
+        NOTIFY trackedTargetChanged
+    )
 
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
@@ -154,6 +170,10 @@ public:
     [[nodiscard]] bool catalogProcessing() const noexcept;
     [[nodiscard]] QString selectedSearchTargetKind() const;
     [[nodiscard]] QString selectedSearchTargetId() const;
+    [[nodiscard]] bool hasTrackedTarget() const;
+    [[nodiscard]] QString trackedTargetKind() const;
+    [[nodiscard]] QString trackedTargetId() const;
+    [[nodiscard]] QString trackedTargetDisplayText() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
@@ -213,6 +233,8 @@ public:
     Q_INVOKABLE void setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUrlText);
     Q_INVOKABLE bool focusSearchTarget(const QString& targetKind, const QString& targetId);
     Q_INVOKABLE void clearSelectedSearchTarget();
+    Q_INVOKABLE bool trackSearchTarget(const QString& targetKind, const QString& targetId);
+    Q_INVOKABLE void clearTrackedTarget();
 
 signals:
     void liveChanged();
@@ -240,12 +262,15 @@ signals:
     void downloadingCatalogChanged();
     void catalogProcessingChanged();
     void selectedSearchTargetChanged();
+    void trackedTargetChanged();
     void skyContextChanged();
 
 private:
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
+    [[nodiscard]] bool setViewCenterInternal(double altitudeDeg, double azimuthDeg);
+    [[nodiscard]] bool recenterTrackedTarget(bool emitSkyContextChangedWhenUnchanged = false);
     void setViewFieldOfViewDeg(double viewFieldOfViewDeg);
     void applyObserverLocation(const skygate::core::GeoLocation& observer);
     void initializeCurrentLocation();
@@ -258,6 +283,11 @@ private:
     void setProjectionType(skygate::core::ProjectionType projectionType);
     void refreshObjectSearchModel();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
+    void setTrackedTarget(
+        const QString& targetKind,
+        const QString& targetId,
+        const QString& displayText
+    );
 
 private:
     skygate::ui::internal::SkyTimelineState m_timeline;

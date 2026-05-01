@@ -50,6 +50,17 @@ bool overlayItemsContainText(const QVariantList& overlayItems, const QString& te
     return false;
 }
 
+bool overlayItemsContainKind(const QVariantList& overlayItems, const QString& kind)
+{
+    for (const QVariant& overlayItem : overlayItems) {
+        if (overlayItem.toMap().value("kind").toString() == kind) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 QString inspectorFieldValue(const QVariantMap& inspector, const QString& label)
 {
     const QVariantList fields = inspector.value("fields").toList();
@@ -142,6 +153,7 @@ private slots:
     void showsSearchSelectionMarkerForFocusedBody();
     void clickSelectionBuildsInspectorAndClearsOnEmptyClick();
     void searchSelectionBuildsInspectorNearMarker();
+    void trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector();
     void deepSkyInspectorIncludesAliasesSizeAndSource();
     void primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog();
     void themeChangesUpdateRenderedColors();
@@ -430,6 +442,58 @@ void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
     QVERIFY(inspector.value("y").toDouble() > selectionMarker.value("y").toDouble());
 }
 
+void SkySceneModelTests::trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::CelestialBodyType::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(controller.trackSearchTarget("body", "demo_target"));
+    QCOMPARE(sceneModel.selectedObjectInspector().value("title").toString(), QString("Demo Target"));
+    QVERIFY(!sceneModel.selectionMarker().isEmpty());
+
+    controller.clearSelectedSearchTarget();
+    QVERIFY(sceneModel.selectedObjectInspector().isEmpty());
+    QVERIFY(!sceneModel.selectionMarker().isEmpty());
+
+    QVERIFY(controller.focusSearchTarget(controller.trackedTargetKind(), controller.trackedTargetId()));
+    QCOMPARE(sceneModel.selectedObjectInspector().value("title").toString(), QString("Demo Target"));
+
+    controller.clearTrackedTarget();
+    QVERIFY(!controller.hasTrackedTarget());
+    QVERIFY(!sceneModel.selectionMarker().isEmpty());
+}
+
 void SkySceneModelTests::deepSkyInspectorIncludesAliasesSizeAndSource()
 {
     skygate::ephemeris::CelestialBody m31 = makeDeepSkyBody(
@@ -495,6 +559,10 @@ void SkySceneModelTests::deepSkyInspectorIncludesAliasesSizeAndSource()
     QVERIFY(inspectorFieldValue(inspector, "Angular size").contains("arcmin"));
     QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Bundled Messier"));
     QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
+
+    QVERIFY(controller.focusSearchTarget("body", "messier_031"));
+    QCOMPARE(sceneModel.selectedObjectInspector().value("title").toString(), QString("M31"));
+    QVERIFY(!overlayItemsContainKind(sceneModel.overlayItems(), "selectionLabel"));
 }
 
 void SkySceneModelTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog()

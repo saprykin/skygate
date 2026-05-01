@@ -149,6 +149,8 @@ private:
         QStringList catalogSourceLabels;
         QString selectedSearchTargetKind;
         QString selectedSearchTargetId;
+        QString trackedTargetKind;
+        QString trackedTargetId;
     };
 
 private:
@@ -174,6 +176,7 @@ private:
     QPointer<SkyContextController> m_skyContextController;
     QMetaObject::Connection m_skyContextChangedConnection;
     QMetaObject::Connection m_selectedSearchTargetChangedConnection;
+    QMetaObject::Connection m_trackedTargetChangedConnection;
     QMetaObject::Connection m_themeChangedConnection;
     double m_viewportWidth = 0.0;
     double m_viewportHeight = 0.0;

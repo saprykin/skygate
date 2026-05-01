@@ -5,8 +5,17 @@ Rectangle {
     id: footerRoot
     readonly property var theme: skyContextController.theme
     required property var skyContextController
+    required property var sceneModel
     property bool dateTimePopupOpen: false
     signal dateTimeClicked()
+
+    function trackedInspectorVisible() {
+        const inspector = sceneModel.selectedObjectInspector
+        return inspector
+            && inspector.visible === true
+            && inspector.targetKind === skyContextController.trackedTargetKind
+            && inspector.targetId === skyContextController.trackedTargetId
+    }
 
     height: 48
     color: theme.footerBackground
@@ -15,7 +24,7 @@ Rectangle {
         id: statusLeftRow
         anchors.left: parent.left
         anchors.leftMargin: 12
-        anchors.right: statusTimeArea.left
+        anchors.right: trackingIndicator.visible ? trackingIndicator.left : statusTimeArea.left
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         spacing: 20
@@ -40,6 +49,90 @@ Rectangle {
             elide: Text.ElideRight
             width: Math.max(120, statusLeftRow.width - 320)
         }
+    }
+
+    Item {
+        id: trackingIndicator
+        visible: footerRoot.skyContextController.hasTrackedTarget
+        x: statusTimeArea.x + statusTimeHighlight.x - width - 2
+        anchors.verticalCenter: parent.verticalCenter
+        width: visible ? 32 : 0
+        height: footerRoot.height
+
+        Rectangle {
+            id: trackingHighlight
+            anchors.centerIn: parent
+            width: 26
+            height: 26
+            radius: 8
+            color: trackingMouse.containsMouse ? theme.footerTimeHoverBackground : "transparent"
+            border.width: 1
+            border.color: trackingMouse.containsMouse
+                ? theme.footerTimeHoverBorder
+                : "transparent"
+        }
+
+        Canvas {
+            id: trackingIcon
+            anchors.centerIn: trackingHighlight
+            width: 22
+            height: 22
+            antialiasing: true
+
+            property color bodyColor: theme.footerTimeText
+
+            onBodyColorChanged: requestPaint()
+            onPaint: {
+                const ctx = getContext("2d")
+                const cx = 6.6
+                const cy = 7.0
+                const radius = 4.4
+                ctx.reset()
+                ctx.lineCap = "round"
+                ctx.lineJoin = "round"
+                ctx.strokeStyle = bodyColor
+                ctx.fillStyle = bodyColor
+
+                ctx.lineWidth = 1.2
+                ctx.beginPath()
+                ctx.moveTo(cx + 2.9, cy - 3.0)
+                ctx.lineTo(21.0, 5.8)
+                ctx.moveTo(cx + 2.5, cy + 1.0)
+                ctx.lineTo(20.4, 14.5)
+                ctx.moveTo(cx + 1.3, cy + 2.7)
+                ctx.lineTo(16.6, 17.6)
+                ctx.moveTo(cx - 2.0, cy + 3.8)
+                ctx.lineTo(13.0, 21.0)
+                ctx.stroke()
+
+                ctx.beginPath()
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+                ctx.fill()
+            }
+        }
+
+        MouseArea {
+            id: trackingMouse
+            anchors.fill: trackingHighlight
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                if (footerRoot.trackedInspectorVisible()) {
+                    footerRoot.sceneModel.clearSelectedObjectInspector()
+                    footerRoot.skyContextController.clearSelectedSearchTarget()
+                    return
+                }
+
+                footerRoot.skyContextController.focusSearchTarget(
+                    footerRoot.skyContextController.trackedTargetKind,
+                    footerRoot.skyContextController.trackedTargetId
+                )
+            }
+        }
+
+        ToolTip.visible: trackingMouse.containsMouse
+        ToolTip.delay: 250
+        ToolTip.text: "Tracking " + footerRoot.skyContextController.trackedTargetDisplayText
     }
 
     Item {

@@ -98,7 +98,9 @@ SkyContextController::SkyContextController(
         this,
         [this] {
             refreshObjectSearchModel();
-            emit skyContextChanged();
+            if (!recenterTrackedTarget(true)) {
+                emit skyContextChanged();
+            }
         }
     );
     refreshObjectSearchModel();
@@ -139,6 +141,27 @@ QString SkyContextController::selectedSearchTargetKind() const
 QString SkyContextController::selectedSearchTargetId() const
 {
     return m_search.selectedTargetId;
+}
+
+bool SkyContextController::hasTrackedTarget() const
+{
+    return !m_search.trackedTargetKind.trimmed().isEmpty()
+        && !m_search.trackedTargetId.trimmed().isEmpty();
+}
+
+QString SkyContextController::trackedTargetKind() const
+{
+    return m_search.trackedTargetKind;
+}
+
+QString SkyContextController::trackedTargetId() const
+{
+    return m_search.trackedTargetId;
+}
+
+QString SkyContextController::trackedTargetDisplayText() const
+{
+    return m_search.trackedTargetDisplayText;
 }
 
 double SkyContextController::speedMultiplier() const noexcept
@@ -325,6 +348,29 @@ void SkyContextController::setSelectedSearchTarget(
 void SkyContextController::clearSelectedSearchTarget()
 {
     setSelectedSearchTarget(QString(), QString());
+}
+
+void SkyContextController::setTrackedTarget(
+    const QString& targetKind,
+    const QString& targetId,
+    const QString& displayText
+)
+{
+    const QString normalizedTargetKind = targetKind.trimmed();
+    const QString normalizedTargetId = targetId.trimmed();
+    const QString normalizedDisplayText = displayText.trimmed();
+    if (
+        m_search.trackedTargetKind == normalizedTargetKind
+        && m_search.trackedTargetId == normalizedTargetId
+        && m_search.trackedTargetDisplayText == normalizedDisplayText
+    ) {
+        return;
+    }
+
+    m_search.trackedTargetKind = normalizedTargetKind;
+    m_search.trackedTargetId = normalizedTargetId;
+    m_search.trackedTargetDisplayText = normalizedDisplayText;
+    emit trackedTargetChanged();
 }
 
 QString SkyContextController::catalogStatusText() const

@@ -9,6 +9,12 @@ Item {
     required property var avoidItems
     readonly property var selectionMarkerData: sceneModel.selectionMarker
     readonly property var inspectorData: sceneModel.selectedObjectInspector
+    readonly property bool inspectorIsTracked: inspectorData
+        && inspectorData.targetKind !== undefined
+        && inspectorData.targetId !== undefined
+        && skyContext.hasTrackedTarget
+        && skyContext.trackedTargetKind === inspectorData.targetKind
+        && skyContext.trackedTargetId === inspectorData.targetId
 
     function rectsOverlap(firstX, firstY, firstWidth, firstHeight, secondX, secondY, secondWidth, secondHeight) {
         const firstRight = firstX + firstWidth
@@ -188,7 +194,7 @@ Item {
             && inspectorData.visible === true
             && inspectorData.title !== undefined
         visible: hasInspector
-        width: Math.min(330, Math.max(250, inspectorContent.implicitWidth + 22))
+        width: Math.min(350, Math.max(280, inspectorContent.implicitWidth + 22))
         height: inspectorContent.implicitHeight + 18
         x: hasInspector
             ? Math.min(
@@ -233,6 +239,7 @@ Item {
                 height: Math.max(
                     inspectorTitle.implicitHeight,
                     centerInspectorButton.height,
+                    trackInspectorButton.height,
                     closeInspectorButton.height
                 )
                 spacing: 8
@@ -241,8 +248,9 @@ Item {
                     id: inspectorTitle
                     width: parent.width
                         - centerInspectorButton.width
+                        - trackInspectorButton.width
                         - closeInspectorButton.width
-                        - (parent.spacing * 2)
+                        - (parent.spacing * 3)
                     text: objectInspector.hasInspector ? inspectorData.title : ""
                     color: theme.toolbarPrimaryText
                     font.family: "Avenir Next"
@@ -291,6 +299,56 @@ Item {
                                    : theme.toolbarButtonBackground)
                         border.width: 1
                         border.color: theme.toolbarButtonBorder
+                    }
+                }
+
+                ToolButton {
+                    id: trackInspectorButton
+                    width: 64
+                    height: 22
+                    text: overlayRoot.inspectorIsTracked ? "Untrack" : "Track"
+                    font.family: "Avenir Next"
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    enabled: objectInspector.hasInspector
+                        && inspectorData.targetKind !== undefined
+                        && inspectorData.targetId !== undefined
+                    onClicked: {
+                        if (overlayRoot.inspectorIsTracked) {
+                            skyContext.clearTrackedTarget()
+                            return
+                        }
+
+                        skyContext.trackSearchTarget(inspectorData.targetKind, inspectorData.targetId)
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: overlayRoot.inspectorIsTracked
+                        ? "Stop tracking object"
+                        : "Track object and keep it centered"
+
+                    contentItem: Text {
+                        text: trackInspectorButton.text
+                        color: trackInspectorButton.enabled
+                            ? theme.toolbarButtonText
+                            : theme.toolbarSecondaryText
+                        font: trackInspectorButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    background: Rectangle {
+                        radius: 6
+                        color: trackInspectorButton.down
+                            ? theme.toolbarButtonBackgroundPressed
+                            : (trackInspectorButton.hovered
+                                   ? theme.toolbarButtonBackgroundHover
+                                   : theme.toolbarButtonBackground)
+                        border.width: 1
+                        border.color: overlayRoot.inspectorIsTracked
+                            ? theme.selectionMarkerBorder
+                            : theme.toolbarButtonBorder
                     }
                 }
 

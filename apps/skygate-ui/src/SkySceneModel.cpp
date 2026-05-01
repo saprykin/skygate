@@ -445,6 +445,15 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
                 rebuildSceneFrame();
             }
         );
+        m_trackedTargetChangedConnection = connect(
+            m_skyContextController,
+            &SkyContextController::trackedTargetChanged,
+            this,
+            [this] {
+                m_renderFrameKey.reset();
+                rebuildSceneFrame();
+            }
+        );
         m_themeChangedConnection = connect(
             m_skyContextController,
             &SkyContextController::themeChanged,
@@ -637,12 +646,16 @@ void SkySceneModel::disconnectFromContextController()
     if (m_selectedSearchTargetChangedConnection) {
         disconnect(m_selectedSearchTargetChangedConnection);
     }
+    if (m_trackedTargetChangedConnection) {
+        disconnect(m_trackedTargetChangedConnection);
+    }
     if (m_themeChangedConnection) {
         disconnect(m_themeChangedConnection);
     }
 
     m_skyContextChangedConnection = {};
     m_selectedSearchTargetChangedConnection = {};
+    m_trackedTargetChangedConnection = {};
     m_themeChangedConnection = {};
 }
 
@@ -696,7 +709,9 @@ std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() c
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),
         .catalogSourceLabels = m_skyContextController->catalogSourceLabels(),
         .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
-        .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId()
+        .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId(),
+        .trackedTargetKind = m_skyContextController->trackedTargetKind(),
+        .trackedTargetId = m_skyContextController->trackedTargetId()
     };
 }
 
@@ -869,34 +884,6 @@ QVariantList SkySceneModel::buildOverlayItems(
     const auto& renderTheme = input.renderTheme;
     const auto& skyContext = input.skyContext;
 
-    if (normalizedLookupKey(input.selectedSearchTargetKind) == "body") {
-        const QString targetId = input.selectedSearchTargetId;
-        const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
-            normalizedLookupKey(targetId)
-        );
-        if (stateIndexIt != sceneFrame.stateIndexByBodyId.cend()) {
-            const auto& state = sceneFrame.snapshot.states.at(*stateIndexIt);
-            const auto& body = sceneFrame.snapshot.bodyAt(state.bodyIndex);
-            if (
-                body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject
-                && overlayLayers.deepSkyObjects
-                && !body.displayName.empty()
-                && hasFiniteHorizontal(state.horizontal)
-            ) {
-                const auto projected = sceneFrame.preparedProjection->project(state.horizontal);
-                if (projected.isVisible) {
-                    overlayItems.push_back(overlayEntry(
-                        "selectionLabel",
-                        projected.x,
-                        projected.y,
-                        QString::fromStdString(body.displayName),
-                        renderTheme.labelDeepSkyObject
-                    ));
-                }
-            }
-        }
-    }
-
     if (overlayLayers.ecliptic) {
         appendReferenceLayerLabel(
             overlayItems,
@@ -993,12 +980,18 @@ QVariantMap SkySceneModel::buildSelectionMarker(
         return {};
     }
 
-    const QString targetKind = !m_selectedObjectTargetId.isEmpty()
-        ? QString("body")
-        : input.selectedSearchTargetKind;
-    const QString targetId = !m_selectedObjectTargetId.isEmpty()
-        ? m_selectedObjectTargetId
-        : input.selectedSearchTargetId;
+    QString targetKind;
+    QString targetId;
+    if (!m_selectedObjectTargetId.isEmpty()) {
+        targetKind = "body";
+        targetId = m_selectedObjectTargetId;
+    } else if (!input.trackedTargetId.trimmed().isEmpty()) {
+        targetKind = input.trackedTargetKind;
+        targetId = input.trackedTargetId;
+    } else {
+        targetKind = input.selectedSearchTargetKind;
+        targetId = input.selectedSearchTargetId;
+    }
     if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return {};
     }

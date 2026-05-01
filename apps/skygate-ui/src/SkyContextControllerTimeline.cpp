@@ -123,9 +123,18 @@ void SkyContextController::setMagnitudeCutoff(const double magnitudeCutoff)
 
 void SkyContextController::setViewCenter(const double altitudeDeg, const double azimuthDeg)
 {
+    if (hasTrackedTarget() && recenterTrackedTarget()) {
+        return;
+    }
+
+    static_cast<void>(setViewCenterInternal(altitudeDeg, azimuthDeg));
+}
+
+bool SkyContextController::setViewCenterInternal(const double altitudeDeg, const double azimuthDeg)
+{
     if (!std::isfinite(altitudeDeg) || !std::isfinite(azimuthDeg)) {
         emit viewDirectionChanged();
-        return;
+        return false;
     }
 
     const double nextAltitudeDeg = skygate::core::ViewportMath::clampAltitudeDeg(altitudeDeg);
@@ -134,13 +143,14 @@ void SkyContextController::setViewCenter(const double altitudeDeg, const double 
         std::abs(m_view.centerAltitudeDeg - nextAltitudeDeg) < 1e-9
         && std::abs(m_view.centerAzimuthDeg - nextAzimuthDeg) < 1e-9
     ) {
-        return;
+        return false;
     }
 
     m_view.centerAltitudeDeg = nextAltitudeDeg;
     m_view.centerAzimuthDeg = nextAzimuthDeg;
     emit viewDirectionChanged();
     emit skyContextChanged();
+    return true;
 }
 
 void SkyContextController::panViewBy(const double deltaAzimuthDeg, const double deltaAltitudeDeg)
@@ -368,7 +378,9 @@ void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
     m_location.context.utcTime = nextUtc;
     emit utcDateTextChanged();
     emit utcTimeTextChanged();
-    emit skyContextChanged();
+    if (!recenterTrackedTarget(true)) {
+        emit skyContextChanged();
+    }
 }
 
 void SkyContextController::setViewFieldOfViewDeg(const double viewFieldOfViewDeg)
@@ -412,7 +424,9 @@ void SkyContextController::applyObserverLocation(const skygate::core::GeoLocatio
     if (elevationChanged) {
         emit elevationTextChanged();
     }
-    emit skyContextChanged();
+    if (!recenterTrackedTarget(true)) {
+        emit skyContextChanged();
+    }
 }
 
 void SkyContextController::refreshCurrentLocation()

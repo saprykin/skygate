@@ -46,6 +46,7 @@ ApplicationWindow {
     footer: StatusFooter {
         id: statusFooter
         skyContextController: skyContext
+        sceneModel: skyScene
         dateTimePopupOpen: dateTimePopup.opened
         onDateTimeClicked: {
             if (dateTimePopup.opened) {

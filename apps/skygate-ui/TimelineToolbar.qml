@@ -251,7 +251,7 @@ Item {
             }
 
             TimelineToolbarButton {
-                text: "Reset View"
+                text: "Reset"
                 onClicked: skyContextController.resetViewDirection()
                 ToolTip.visible: hovered
                 ToolTip.delay: 250
