@@ -408,12 +408,20 @@ types while changing only the final presentation adapter.
 The repository keeps tests close to each module:
 
 - `libs/skygate-core/tests`
-  - projection math, viewport math, type validation, prepared projections
+  - angle/projection math, viewport math, type validation, projection factory
+    behavior, prepared projections, and concrete projection strategies.
 - `libs/skygate-ephemeris/tests`
-  - catalog parsing, gzip/zip handling, constellation parsing, catalog factory,
-    engine baselines/fallbacks
+  - catalog payload detection, HYG/OpenNGC parser edge cases, gzip/zip archive
+    handling, constellation parsing, catalog factory/composer behavior,
+    celestial reference calculations, engine baselines/fallbacks, and fixed-date
+    ephemeris regression checks.
 - `apps/skygate-ui/tests`
-  - scene-model behavior and settings persistence
+  - scene-model behavior, controller/search/location/theme/overlay models,
+    settings persistence, active catalog building, catalog cache restore/persist
+    behavior, fake-network catalog download/coordinator workflows, and a minimal
+    QML smoke test for the main module.
 
 This mirrors the architectural split and keeps rendering-independent logic
-testable without a running UI.
+testable without a running UI. Network-facing catalog tests use deterministic
+fake `QNetworkAccessManager` responses instead of external services, and the QML
+smoke test checks load/registration health without asserting visual rendering.
