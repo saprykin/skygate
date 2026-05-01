@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QHash>
+#include <QStringList>
 #include <QVariantMap>
 #include <QVariantList>
 
@@ -35,6 +36,11 @@ class SkySceneModel final : public QObject {
     )
     Q_PROPERTY(QVariantList overlayItems READ overlayItems NOTIFY sceneFrameChanged)
     Q_PROPERTY(QVariantMap selectionMarker READ selectionMarker NOTIFY sceneFrameChanged)
+    Q_PROPERTY(
+        QVariantMap selectedObjectInspector
+        READ selectedObjectInspector
+        NOTIFY sceneFrameChanged
+    )
 
 public:
     explicit SkySceneModel(QObject* parent = nullptr);
@@ -44,10 +50,13 @@ public:
 
     [[nodiscard]] QVariantList overlayItems() const;
     [[nodiscard]] QVariantMap selectionMarker() const;
+    [[nodiscard]] QVariantMap selectedObjectInspector() const;
     [[nodiscard]] std::uint64_t snapshotGeneration() const noexcept;
     void setViewportSize(double viewportWidth, double viewportHeight);
 
     Q_INVOKABLE QString objectLabelAt(double x, double y) const;
+    Q_INVOKABLE bool selectObjectAt(double x, double y);
+    Q_INVOKABLE void clearSelectedObjectInspector();
 
     [[nodiscard]] std::optional<skygate::core::PreparedProjection> preparedProjection() const;
     [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan() const;
@@ -118,6 +127,7 @@ private:
         QHash<QString, std::size_t> stateIndexByBodyId;
         QVariantList overlayItems;
         QVariantMap selectionMarker;
+        QVariantMap selectedObjectInspector;
     };
 
     struct SceneBuildInput final {
@@ -135,6 +145,8 @@ private:
         SkyOverlayLayerVisibility overlayLayers;
         std::span<const skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
         std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+        std::span<const std::uint8_t> catalogSourceIds;
+        QStringList catalogSourceLabels;
         QString selectedSearchTargetKind;
         QString selectedSearchTargetId;
     };
@@ -152,6 +164,11 @@ private:
         const SceneFrameData& sceneFrame,
         const SceneBuildInput& input
     ) const;
+    [[nodiscard]] QVariantMap buildSelectedObjectInspector(
+        const SceneFrameData& sceneFrame,
+        const SceneBuildInput& input
+    ) const;
+    [[nodiscard]] std::optional<std::size_t> hitTargetIndexAt(double x, double y) const;
 
 private:
     QPointer<SkyContextController> m_skyContextController;
@@ -165,4 +182,8 @@ private:
     std::optional<RenderFrameKey> m_renderFrameKey;
     std::uint64_t m_snapshotGeneration = 0;
     SceneFrameData m_sceneFrame;
+    QString m_selectedObjectTargetId;
+    double m_selectedObjectAnchorX = 0.0;
+    double m_selectedObjectAnchorY = 0.0;
+    bool m_selectedObjectHasClickAnchor = false;
 };

@@ -5,6 +5,7 @@
 #include "SkyRenderBuilders.hpp"
 #include "SkySceneModel.hpp"
 #include "SkyTheme.hpp"
+#include "catalog/SkyActiveCatalogBuilder.hpp"
 
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
@@ -13,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -46,6 +48,19 @@ bool overlayItemsContainText(const QVariantList& overlayItems, const QString& te
     }
 
     return false;
+}
+
+QString inspectorFieldValue(const QVariantMap& inspector, const QString& label)
+{
+    const QVariantList fields = inspector.value("fields").toList();
+    for (const QVariant& fieldValue : fields) {
+        const QVariantMap field = fieldValue.toMap();
+        if (field.value("label").toString() == label) {
+            return field.value("value").toString();
+        }
+    }
+
+    return {};
 }
 
 skygate::ephemeris::CelestialBody makeDeepSkyBody(
@@ -125,6 +140,10 @@ private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
     void showsSearchSelectionMarkerForFocusedBody();
+    void clickSelectionBuildsInspectorAndClearsOnEmptyClick();
+    void searchSelectionBuildsInspectorNearMarker();
+    void deepSkyInspectorIncludesAliasesSizeAndSource();
+    void primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog();
     void themeChangesUpdateRenderedColors();
     void solarSystemLabelsCanBeHidden();
     void deepSkyObjectsRenderAndCanBeHidden();
@@ -290,6 +309,255 @@ void SkySceneModelTests::showsSearchSelectionMarkerForFocusedBody()
     QCOMPARE(selectionMarker.value("kind").toString(), QString("searchSelection"));
     QVERIFY(selectionMarker.contains("x"));
     QVERIFY(selectionMarker.contains("y"));
+}
+
+void SkySceneModelTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.3,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
+    const auto stateIt = std::find_if(
+        snapshot.states.begin(),
+        snapshot.states.end(),
+        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
+            return snapshot.bodyAt(state.bodyIndex).id == "demo_star";
+        }
+    );
+    QVERIFY(stateIt != snapshot.states.end());
+    controller.setViewCenter(stateIt->horizontal.altitudeDeg, stateIt->horizontal.azimuthDeg);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    const SkyRenderPoint* targetPoint = nullptr;
+    for (const auto& point : sceneModel.renderPointSpan()) {
+        if (point.bodyIndex == stateIt->bodyIndex) {
+            targetPoint = &point;
+            break;
+        }
+    }
+    QVERIFY(targetPoint != nullptr);
+
+    QVERIFY(sceneModel.selectObjectAt(targetPoint->x, targetPoint->y));
+    const QVariantMap inspector = sceneModel.selectedObjectInspector();
+    QCOMPARE(inspector.value("title").toString(), QString("Demo Star"));
+    QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Star"));
+    QCOMPARE(inspectorFieldValue(inspector, "Magnitude"), QString("2.3"));
+    QVERIFY(!inspectorFieldValue(inspector, "Alt/Az").isEmpty());
+    QVERIFY(!inspectorFieldValue(inspector, "RA/Dec").isEmpty());
+    QVERIFY(inspectorFieldValue(inspector, "Angular size").isEmpty());
+    QVERIFY(!sceneModel.selectionMarker().isEmpty());
+
+    QVERIFY(!sceneModel.selectObjectAt(1.0, 1.0));
+    QVERIFY(sceneModel.selectedObjectInspector().isEmpty());
+}
+
+void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_target",
+            "Demo Target",
+            skygate::ephemeris::CelestialBodyType::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 1.5,
+                .declinationDeg = 2.5
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(controller.focusSearchTarget("body", "demo_target"));
+
+    const QVariantMap selectionMarker = sceneModel.selectionMarker();
+    const QVariantMap inspector = sceneModel.selectedObjectInspector();
+    QCOMPARE(inspector.value("title").toString(), QString("Demo Target"));
+    QVERIFY(inspector.value("x").toDouble() > selectionMarker.value("x").toDouble());
+    QVERIFY(inspector.value("y").toDouble() > selectionMarker.value("y").toDouble());
+}
+
+void SkySceneModelTests::deepSkyInspectorIncludesAliasesSizeAndSource()
+{
+    skygate::ephemeris::CelestialBody m31 = makeDeepSkyBody(
+        "messier_031",
+        "M31",
+        3.44,
+        {"M 31", "NGC 224", "Andromeda Galaxy"}
+    );
+    m31.fixedEquatorial = skygate::core::EquatorialCoordinate {
+        .rightAscensionHours = 0.7123,
+        .declinationDeg = 41.269
+    };
+
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({m31});
+    QVERIFY(starCatalog != nullptr);
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-09-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
+    const auto stateIt = std::find_if(
+        snapshot.states.begin(),
+        snapshot.states.end(),
+        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
+            return snapshot.bodyAt(state.bodyIndex).displayName == "M31";
+        }
+    );
+    QVERIFY(stateIt != snapshot.states.end());
+    controller.setViewCenter(stateIt->horizontal.altitudeDeg, stateIt->horizontal.azimuthDeg);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(!sceneModel.renderGlyphSpan().empty());
+    const auto glyphIt = std::find_if(
+        sceneModel.renderGlyphSpan().begin(),
+        sceneModel.renderGlyphSpan().end(),
+        [&sceneModel](const SkyRenderGlyph& glyph) {
+            return sceneModel.objectLabelAt(glyph.x, glyph.y) == "M31";
+        }
+    );
+    QVERIFY(glyphIt != sceneModel.renderGlyphSpan().end());
+
+    QVERIFY(sceneModel.selectObjectAt(glyphIt->x, glyphIt->y));
+    const QVariantMap inspector = sceneModel.selectedObjectInspector();
+    QCOMPARE(inspector.value("title").toString(), QString("M31"));
+    QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
+    QVERIFY(inspectorFieldValue(inspector, "Angular size").contains("arcmin"));
+    QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Bundled Messier"));
+    QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
+}
+
+void SkySceneModelTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog()
+{
+    auto primaryCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeDeepSkyBody(
+            "primary_dso",
+            "Primary DSO",
+            8.0,
+            {"Primary DSO"}
+        ),
+        makeDeepSkyBody(
+            "messier_031",
+            "M31",
+            3.44,
+            {"M 31", "NGC 224"}
+        ),
+    });
+    QVERIFY(primaryCatalog != nullptr);
+
+    auto deepSkyCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeDeepSkyBody(
+            "open_ngc_m31",
+            "OpenNGC M31",
+            3.4,
+            {"M 31", "NGC 224", "Andromeda Galaxy"}
+        ),
+    });
+    QVERIFY(deepSkyCatalog != nullptr);
+
+    const auto buildResult = skygate::ui::internal::SkyActiveCatalogBuilder::build(
+        skygate::ui::internal::SkyActiveCatalogBuildRequest {
+            .sourceCatalog = *primaryCatalog,
+            .deepSkyCatalog = deepSkyCatalog.get(),
+            .sourceLabel = "Primary",
+            .deepSkySourceLabel = "OpenNGC"
+        }
+    );
+    QVERIFY(buildResult.isSuccess());
+    QCOMPARE(buildResult.sourceIds.size(), buildResult.catalog->bodies().size());
+
+    const int primarySourceIndex = buildResult.sourceLabels.indexOf("Primary");
+    const int deepSkySourceIndex = buildResult.sourceLabels.indexOf("OpenNGC");
+    QVERIFY(primarySourceIndex >= 0);
+    QVERIFY(deepSkySourceIndex >= 0);
+
+    bool sawPrimaryDso = false;
+    bool sawOpenNgcM31 = false;
+    for (std::size_t index = 0; index < buildResult.catalog->bodies().size(); ++index) {
+        const auto& body = buildResult.catalog->bodies()[index];
+        if (body.id == "primary_dso") {
+            sawPrimaryDso = true;
+            QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(primarySourceIndex));
+        } else if (body.id == "open_ngc_m31") {
+            sawOpenNgcM31 = true;
+            QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(deepSkySourceIndex));
+        } else if (body.id == "messier_031") {
+            QFAIL("Merged catalog should replace the primary M31 with the OpenNGC body");
+        }
+    }
+
+    QVERIFY(sawPrimaryDso);
+    QVERIFY(sawOpenNgcM31);
 }
 
 void SkySceneModelTests::themeChangesUpdateRenderedColors()

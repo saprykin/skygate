@@ -12,15 +12,22 @@ MouseArea {
 
     property real lastX: 0
     property real lastY: 0
+    property real pressX: 0
+    property real pressY: 0
     property real hoverX: 0
     property real hoverY: 0
     property string hoveredObjectLabel: ""
+    property bool draggedSincePress: false
     readonly property real azimuthSensitivity: 0.18
     readonly property real altitudeSensitivity: 0.18
+    readonly property real dragThresholdPx: 5
 
     onPressed: function(mouse) {
         lastX = mouse.x
         lastY = mouse.y
+        pressX = mouse.x
+        pressY = mouse.y
+        draggedSincePress = false
     }
 
     onPositionChanged: function(mouse) {
@@ -32,6 +39,15 @@ MouseArea {
             return
         }
 
+        const pressDeltaX = mouse.x - pressX
+        const pressDeltaY = mouse.y - pressY
+        if (!draggedSincePress
+                && ((pressDeltaX * pressDeltaX) + (pressDeltaY * pressDeltaY))
+                    < (dragThresholdPx * dragThresholdPx)) {
+            return
+        }
+
+        draggedSincePress = true
         const deltaX = mouse.x - lastX
         const deltaY = mouse.y - lastY
         skyContextController.panViewBy(
@@ -41,6 +57,19 @@ MouseArea {
         lastX = mouse.x
         lastY = mouse.y
         hoveredObjectLabel = ""
+    }
+
+    onReleased: function(mouse) {
+        if (mouse.button !== Qt.LeftButton || draggedSincePress) {
+            return
+        }
+
+        hoverX = mouse.x
+        hoverY = mouse.y
+        if (!skySceneModel.selectObjectAt(mouse.x, mouse.y)) {
+            skyContextController.clearSelectedSearchTarget()
+        }
+        hoveredObjectLabel = skySceneModel.objectLabelAt(mouse.x, mouse.y)
     }
 
     onWheel: function(wheel) {

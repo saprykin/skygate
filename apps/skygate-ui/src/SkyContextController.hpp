@@ -162,6 +162,8 @@ public:
     [[nodiscard]] const SkyOverlayLayerVisibility& overlayLayerVisibility() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
     [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
+    [[nodiscard]] QStringList catalogSourceLabels() const;
+    [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
 

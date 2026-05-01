@@ -53,6 +53,8 @@ public:
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IStarCatalog* starCatalog() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
+    [[nodiscard]] QStringList sourceLabels() const;
+    [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
 
@@ -124,6 +126,8 @@ private:
     std::size_t m_constellationCount = 0;
     std::size_t m_deepSkyObjectCount = 0;
     std::size_t m_deepSkyCatalogFoundObjectCount = 0;
+    QStringList m_sourceLabels;
+    std::vector<std::uint8_t> m_sourceIds;
     QByteArray m_cachedCatalogPayload;
     QByteArray m_cachedDeepSkyCatalogPayload;
     std::vector<ConstellationLineRef> m_constellationLineRefs;

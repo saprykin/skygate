@@ -385,6 +385,18 @@ SkyContextController::catalogBodies() const noexcept
         : std::span<const skygate::ephemeris::CelestialBody> {};
 }
 
+QStringList SkyContextController::catalogSourceLabels() const
+{
+    return m_catalogManager != nullptr ? m_catalogManager->sourceLabels() : QStringList {};
+}
+
+std::span<const std::uint8_t> SkyContextController::catalogSourceIds() const noexcept
+{
+    return m_catalogManager != nullptr
+        ? m_catalogManager->sourceIds()
+        : std::span<const std::uint8_t> {};
+}
+
 std::span<const SkyContextController::ConstellationLineRef>
 SkyContextController::constellationLineRefs() const noexcept
 {

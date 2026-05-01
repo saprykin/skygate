@@ -473,14 +473,18 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
         return std::nullopt;
     }
 
-    snapshot.sourceLabel = settings.value(
-        SkyContextSettings::key("catalogSourceLabel"),
-        QString("Saved")
-    ).toString();
-    snapshot.deepSkySourceLabel = settings.value(
-        SkyContextSettings::key("deepSkyCatalogSourceLabel"),
-        QString("Saved deep sky")
-    ).toString();
+    if (!snapshot.catalogPayload.isEmpty()) {
+        snapshot.sourceLabel = settings.value(
+            SkyContextSettings::key("catalogSourceLabel"),
+            QString("Saved")
+        ).toString();
+    }
+    if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
+        snapshot.deepSkySourceLabel = settings.value(
+            SkyContextSettings::key("deepSkyCatalogSourceLabel"),
+            QString("Saved deep sky")
+        ).toString();
+    }
     snapshot.constellationLineRows = settings.value(
         SkyContextSettings::key("catalogConstellationLineRefs")
     ).toByteArray();

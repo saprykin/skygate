@@ -13,6 +13,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 
 namespace {
@@ -206,6 +207,198 @@ std::optional<QPointF> selectedConstellationPoint(
     return QPointF(projected.x, projected.y);
 }
 
+QString celestialBodyTypeText(const skygate::ephemeris::CelestialBody& body)
+{
+    using skygate::ephemeris::CelestialBodyType;
+    using skygate::ephemeris::DeepSkyObjectKind;
+
+    if (body.type == CelestialBodyType::DeepSkyObject && body.deepSkyObject.has_value()) {
+        switch (body.deepSkyObject->kind) {
+        case DeepSkyObjectKind::Galaxy:
+            return "Galaxy";
+        case DeepSkyObjectKind::OpenCluster:
+            return "Open cluster";
+        case DeepSkyObjectKind::GlobularCluster:
+            return "Globular cluster";
+        case DeepSkyObjectKind::Nebula:
+            return "Nebula";
+        case DeepSkyObjectKind::PlanetaryNebula:
+            return "Planetary nebula";
+        case DeepSkyObjectKind::Asterism:
+            return "Asterism";
+        case DeepSkyObjectKind::Unknown:
+            return "Deep sky object";
+        }
+    }
+
+    switch (body.type) {
+    case CelestialBodyType::Sun:
+        return "Sun";
+    case CelestialBodyType::Moon:
+        return "Moon";
+    case CelestialBodyType::Planet:
+        return "Planet";
+    case CelestialBodyType::Star:
+        return "Star";
+    case CelestialBodyType::Constellation:
+        return "Constellation";
+    case CelestialBodyType::DeepSkyObject:
+        return "Deep sky object";
+    }
+
+    return "Object";
+}
+
+QString formatFiniteNumber(const double value, const int precision)
+{
+    return std::isfinite(value)
+        ? QString::number(value, 'f', precision)
+        : QString("--");
+}
+
+QString formatMagnitude(const double value)
+{
+    return formatFiniteNumber(value, 1);
+}
+
+QString formatHorizontalCoordinate(
+    const skygate::core::HorizontalCoordinate& horizontal
+)
+{
+    return QString("Alt %1 deg / Az %2 deg").arg(
+        formatFiniteNumber(horizontal.altitudeDeg, 1),
+        formatFiniteNumber(horizontal.azimuthDeg, 1)
+    );
+}
+
+QString formatRightAscension(const double rightAscensionHours)
+{
+    if (!std::isfinite(rightAscensionHours)) {
+        return "--";
+    }
+
+    int totalSeconds = static_cast<int>(std::llround(rightAscensionHours * 3600.0));
+    totalSeconds %= 24 * 3600;
+    if (totalSeconds < 0) {
+        totalSeconds += 24 * 3600;
+    }
+
+    const int hours = totalSeconds / 3600;
+    const int minutes = (totalSeconds % 3600) / 60;
+    const int seconds = totalSeconds % 60;
+    return QString("%1h %2m %3s")
+        .arg(hours)
+        .arg(minutes, 2, 10, QChar('0'))
+        .arg(seconds, 2, 10, QChar('0'));
+}
+
+QString formatDeclination(const double declinationDeg)
+{
+    if (!std::isfinite(declinationDeg)) {
+        return "--";
+    }
+
+    const QString sign = declinationDeg < 0.0 ? "-" : "+";
+    int totalSeconds = static_cast<int>(std::llround(std::abs(declinationDeg) * 3600.0));
+    const int degrees = totalSeconds / 3600;
+    const int minutes = (totalSeconds % 3600) / 60;
+    const int seconds = totalSeconds % 60;
+    return QString("%1%2d %3m %4s")
+        .arg(sign)
+        .arg(degrees)
+        .arg(minutes, 2, 10, QChar('0'))
+        .arg(seconds, 2, 10, QChar('0'));
+}
+
+QString formatEquatorialCoordinate(
+    const skygate::core::EquatorialCoordinate& equatorial
+)
+{
+    return QString("%1 / %2").arg(
+        formatRightAscension(equatorial.rightAscensionHours),
+        formatDeclination(equatorial.declinationDeg)
+    );
+}
+
+QString formatArcmin(const double value)
+{
+    if (!std::isfinite(value)) {
+        return "--";
+    }
+
+    const int precision = value >= 10.0 ? 0 : 1;
+    return QString("%1 arcmin").arg(QString::number(value, 'f', precision));
+}
+
+QString angularSizeText(const skygate::ephemeris::DeepSkyObjectInfo& deepSkyObject)
+{
+    if (deepSkyObject.majorAxisArcmin.has_value() && deepSkyObject.minorAxisArcmin.has_value()) {
+        return QString("%1 x %2").arg(
+            formatArcmin(*deepSkyObject.majorAxisArcmin),
+            formatArcmin(*deepSkyObject.minorAxisArcmin)
+        );
+    }
+    if (deepSkyObject.majorAxisArcmin.has_value()) {
+        return formatArcmin(*deepSkyObject.majorAxisArcmin);
+    }
+    if (deepSkyObject.minorAxisArcmin.has_value()) {
+        return formatArcmin(*deepSkyObject.minorAxisArcmin);
+    }
+
+    return {};
+}
+
+QVariantMap inspectorField(const QString& label, const QString& value)
+{
+    QVariantMap field;
+    field.insert("label", label);
+    field.insert("value", value);
+    return field;
+}
+
+QString aliasesText(const skygate::ephemeris::CelestialBody& body)
+{
+    if (!body.deepSkyObject.has_value()) {
+        return {};
+    }
+
+    QStringList aliases;
+    const QString displayName = QString::fromStdString(body.displayName);
+    for (const std::string& alias : body.deepSkyObject->aliases) {
+        const QString aliasText = QString::fromStdString(alias).trimmed();
+        if (
+            aliasText.isEmpty()
+            || aliasText.compare(displayName, Qt::CaseInsensitive) == 0
+            || aliases.contains(aliasText, Qt::CaseInsensitive)
+        ) {
+            continue;
+        }
+
+        aliases.push_back(aliasText);
+    }
+
+    return aliases.join(", ");
+}
+
+QString sourceLabelForBodyIndex(
+    const std::span<const std::uint8_t> sourceIds,
+    const QStringList& sourceLabels,
+    const std::uint32_t bodyIndex
+)
+{
+    if (bodyIndex >= sourceIds.size()) {
+        return "Catalog";
+    }
+
+    const int sourceId = sourceIds[bodyIndex];
+    if (sourceId < 0 || sourceId >= sourceLabels.size()) {
+        return "Catalog";
+    }
+
+    const QString label = sourceLabels.at(sourceId).trimmed();
+    return label.isEmpty() ? QString("Catalog") : label;
+}
+
 }  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent)
@@ -232,6 +425,8 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
     m_renderFrameKey.reset();
     m_snapshotGeneration = 0;
     m_sceneFrame = {};
+    m_selectedObjectTargetId.clear();
+    m_selectedObjectHasClickAnchor = false;
     if (m_skyContextController != nullptr) {
         m_skyContextChangedConnection = connect(
             m_skyContextController,
@@ -243,7 +438,12 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             m_skyContextController,
             &SkyContextController::selectedSearchTargetChanged,
             this,
-            &SkySceneModel::rebuildSceneFrame
+            [this] {
+                m_selectedObjectTargetId.clear();
+                m_selectedObjectHasClickAnchor = false;
+                m_renderFrameKey.reset();
+                rebuildSceneFrame();
+            }
         );
         m_themeChangedConnection = connect(
             m_skyContextController,
@@ -267,6 +467,11 @@ QVariantMap SkySceneModel::selectionMarker() const
     return m_sceneFrame.selectionMarker;
 }
 
+QVariantMap SkySceneModel::selectedObjectInspector() const
+{
+    return m_sceneFrame.selectedObjectInspector;
+}
+
 std::uint64_t SkySceneModel::snapshotGeneration() const noexcept
 {
     return m_snapshotGeneration;
@@ -288,13 +493,71 @@ void SkySceneModel::setViewportSize(const double viewportWidth, const double vie
 
 QString SkySceneModel::objectLabelAt(const double x, const double y) const
 {
+    const auto targetIndex = hitTargetIndexAt(x, y);
+    if (!targetIndex.has_value()) {
+        return {};
+    }
+
+    const auto& body = m_sceneFrame.snapshot.bodyAt(
+        m_sceneFrame.hoverTargets[*targetIndex].bodyIndex
+    );
+    return QString::fromStdString(body.displayName);
+}
+
+bool SkySceneModel::selectObjectAt(const double x, const double y)
+{
+    const auto targetIndex = hitTargetIndexAt(x, y);
+    if (!targetIndex.has_value()) {
+        clearSelectedObjectInspector();
+        return false;
+    }
+
+    const auto& target = m_sceneFrame.hoverTargets[*targetIndex];
+    const auto& body = m_sceneFrame.snapshot.bodyAt(target.bodyIndex);
+    if (body.id.empty()) {
+        clearSelectedObjectInspector();
+        return false;
+    }
+
+    if (m_skyContextController != nullptr) {
+        m_skyContextController->clearSelectedSearchTarget();
+    }
+    m_selectedObjectTargetId = QString::fromStdString(body.id);
+    m_selectedObjectAnchorX = x;
+    m_selectedObjectAnchorY = y;
+    m_selectedObjectHasClickAnchor = true;
+    m_renderFrameKey.reset();
+    rebuildSceneFrame();
+    return true;
+}
+
+void SkySceneModel::clearSelectedObjectInspector()
+{
+    const bool hadSelection = !m_selectedObjectTargetId.isEmpty()
+        || m_selectedObjectHasClickAnchor
+        || !m_sceneFrame.selectedObjectInspector.isEmpty();
+    m_selectedObjectTargetId.clear();
+    m_selectedObjectHasClickAnchor = false;
+    if (!hadSelection) {
+        return;
+    }
+
+    m_renderFrameKey.reset();
+    rebuildSceneFrame();
+}
+
+std::optional<std::size_t> SkySceneModel::hitTargetIndexAt(
+    const double x,
+    const double y
+) const
+{
     if (
         m_viewportWidth <= 0.0
         || m_viewportHeight <= 0.0
         || m_sceneFrame.hoverTargets.empty()
         || m_sceneFrame.snapshot.catalogBodies == nullptr
     ) {
-        return {};
+        return std::nullopt;
     }
 
     double bestDistanceSquared = std::numeric_limits<double>::infinity();
@@ -340,13 +603,10 @@ QString SkySceneModel::objectLabelAt(const double x, const double y) const
     }
 
     if (bestTargetIndex >= m_sceneFrame.hoverTargets.size()) {
-        return {};
+        return std::nullopt;
     }
 
-    const auto& body = m_sceneFrame.snapshot.bodyAt(
-        m_sceneFrame.hoverTargets[bestTargetIndex].bodyIndex
-    );
-    return QString::fromStdString(body.displayName);
+    return bestTargetIndex;
 }
 
 std::optional<skygate::core::PreparedProjection> SkySceneModel::preparedProjection() const
@@ -394,7 +654,8 @@ bool SkySceneModel::clearSceneFrame()
         || !m_sceneFrame.frame.lines.empty()
         || !m_sceneFrame.frame.glyphs.empty()
         || !m_sceneFrame.overlayItems.isEmpty()
-        || !m_sceneFrame.selectionMarker.isEmpty();
+        || !m_sceneFrame.selectionMarker.isEmpty()
+        || !m_sceneFrame.selectedObjectInspector.isEmpty();
     m_cachedEphemerisEngine = nullptr;
     m_snapshotCacheKey.reset();
     m_renderFrameKey.reset();
@@ -432,6 +693,8 @@ std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() c
         .overlayLayers = m_skyContextController->overlayLayerVisibility(),
         .constellationLineRefs = m_skyContextController->constellationLineRefs(),
         .constellationLabelRefs = m_skyContextController->constellationLabelRefs(),
+        .catalogSourceIds = m_skyContextController->catalogSourceIds(),
+        .catalogSourceLabels = m_skyContextController->catalogSourceLabels(),
         .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
         .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId()
     };
@@ -578,6 +841,10 @@ void SkySceneModel::rebuildSceneFrame()
 
         m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, input.value());
         m_sceneFrame.selectionMarker = buildSelectionMarker(m_sceneFrame, input.value());
+        m_sceneFrame.selectedObjectInspector = buildSelectedObjectInspector(
+            m_sceneFrame,
+            input.value()
+        );
         m_renderFrameKey = renderFrameKey;
         sceneFrameUpdated = true;
     }
@@ -726,8 +993,12 @@ QVariantMap SkySceneModel::buildSelectionMarker(
         return {};
     }
 
-    const QString targetKind = input.selectedSearchTargetKind;
-    const QString targetId = input.selectedSearchTargetId;
+    const QString targetKind = !m_selectedObjectTargetId.isEmpty()
+        ? QString("body")
+        : input.selectedSearchTargetKind;
+    const QString targetId = !m_selectedObjectTargetId.isEmpty()
+        ? m_selectedObjectTargetId
+        : input.selectedSearchTargetId;
     if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return {};
     }
@@ -754,4 +1025,77 @@ QVariantMap SkySceneModel::buildSelectionMarker(
     }
 
     return selectionMarkerEntry(markerPoint->x(), markerPoint->y());
+}
+
+QVariantMap SkySceneModel::buildSelectedObjectInspector(
+    const SceneFrameData& sceneFrame,
+    const SceneBuildInput& input
+) const
+{
+    const QString targetId = !m_selectedObjectTargetId.isEmpty()
+        ? m_selectedObjectTargetId
+        : (normalizedLookupKey(input.selectedSearchTargetKind) == "body"
+            ? input.selectedSearchTargetId
+            : QString());
+    if (targetId.trimmed().isEmpty() || !sceneFrame.preparedProjection.has_value()) {
+        return {};
+    }
+
+    const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
+        normalizedLookupKey(targetId)
+    );
+    if (stateIndexIt == sceneFrame.stateIndexByBodyId.cend()) {
+        return {};
+    }
+
+    const auto& state = sceneFrame.snapshot.states.at(*stateIndexIt);
+    const auto& body = sceneFrame.snapshot.bodyAt(state.bodyIndex);
+    if (body.displayName.empty()) {
+        return {};
+    }
+
+    double inspectorX = m_selectedObjectAnchorX + 14.0;
+    double inspectorY = m_selectedObjectAnchorY + 14.0;
+    if (!m_selectedObjectHasClickAnchor) {
+        if (!hasFiniteHorizontal(state.horizontal)) {
+            return {};
+        }
+
+        const auto projected = sceneFrame.preparedProjection->project(state.horizontal);
+        if (!projected.isVisible) {
+            return {};
+        }
+
+        inspectorX = projected.x + 18.0;
+        inspectorY = projected.y + 18.0;
+    }
+
+    QVariantList fields;
+    fields.push_back(inspectorField("Type", celestialBodyTypeText(body)));
+    fields.push_back(inspectorField("Magnitude", formatMagnitude(body.visualMagnitude)));
+    fields.push_back(inspectorField("Alt/Az", formatHorizontalCoordinate(state.horizontal)));
+    fields.push_back(inspectorField("RA/Dec", formatEquatorialCoordinate(state.equatorial)));
+
+    if (body.deepSkyObject.has_value()) {
+        const QString sizeText = angularSizeText(*body.deepSkyObject);
+        if (!sizeText.isEmpty()) {
+            fields.push_back(inspectorField("Angular size", sizeText));
+        }
+    }
+
+    fields.push_back(inspectorField(
+        "Source",
+        sourceLabelForBodyIndex(input.catalogSourceIds, input.catalogSourceLabels, state.bodyIndex)
+    ));
+
+    QVariantMap inspector;
+    inspector.insert("visible", true);
+    inspector.insert("x", inspectorX);
+    inspector.insert("y", inspectorY);
+    inspector.insert("targetKind", "body");
+    inspector.insert("targetId", QString::fromStdString(body.id));
+    inspector.insert("title", QString::fromStdString(body.displayName));
+    inspector.insert("fields", fields);
+    inspector.insert("aliases", aliasesText(body));
+    return inspector;
 }

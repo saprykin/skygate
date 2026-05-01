@@ -8,6 +8,7 @@ Item {
     required property var interactionLayer
     required property var avoidItems
     readonly property var selectionMarkerData: sceneModel.selectionMarker
+    readonly property var inspectorData: sceneModel.selectedObjectInspector
 
     function rectsOverlap(firstX, firstY, firstWidth, firstHeight, secondX, secondY, secondWidth, secondHeight) {
         const firstRight = firstX + firstWidth
@@ -178,6 +179,215 @@ Item {
             height: 10
             radius: 5
             color: theme.selectionMarkerCenter
+        }
+    }
+
+    Rectangle {
+        id: objectInspector
+        readonly property bool hasInspector: inspectorData
+            && inspectorData.visible === true
+            && inspectorData.title !== undefined
+        visible: hasInspector
+        width: Math.min(330, Math.max(250, inspectorContent.implicitWidth + 22))
+        height: inspectorContent.implicitHeight + 18
+        x: hasInspector
+            ? Math.min(
+                Math.max(8, inspectorData.x),
+                Math.max(8, overlayRoot.width - width - 8)
+            )
+            : 0
+        y: hasInspector
+            ? Math.min(
+                Math.max(8, inspectorData.y),
+                Math.max(8, overlayRoot.height - height - 8)
+            )
+            : 0
+        radius: 8
+        color: theme.toolbarDropdownBackground
+        border.width: 1
+        border.color: theme.toolbarDropdownBorder
+        z: 14
+        clip: true
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            hoverEnabled: true
+            preventStealing: true
+            cursorShape: Qt.ArrowCursor
+            onWheel: function(wheel) {
+                wheel.accepted = true
+            }
+        }
+
+        Column {
+            id: inspectorContent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 10
+            spacing: 7
+
+            Row {
+                width: parent.width
+                height: Math.max(
+                    inspectorTitle.implicitHeight,
+                    centerInspectorButton.height,
+                    closeInspectorButton.height
+                )
+                spacing: 8
+
+                Text {
+                    id: inspectorTitle
+                    width: parent.width
+                        - centerInspectorButton.width
+                        - closeInspectorButton.width
+                        - (parent.spacing * 2)
+                    text: objectInspector.hasInspector ? inspectorData.title : ""
+                    color: theme.toolbarPrimaryText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                    height: parent.height
+                }
+
+                ToolButton {
+                    id: centerInspectorButton
+                    width: 64
+                    height: 22
+                    text: "Center"
+                    font.family: "Avenir Next"
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    enabled: objectInspector.hasInspector
+                        && inspectorData.targetKind !== undefined
+                        && inspectorData.targetId !== undefined
+                    onClicked: {
+                        skyContext.focusSearchTarget(inspectorData.targetKind, inspectorData.targetId)
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Center view on object"
+
+                    contentItem: Text {
+                        text: centerInspectorButton.text
+                        color: centerInspectorButton.enabled
+                            ? theme.toolbarButtonText
+                            : theme.toolbarSecondaryText
+                        font: centerInspectorButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    background: Rectangle {
+                        radius: 6
+                        color: centerInspectorButton.down
+                            ? theme.toolbarButtonBackgroundPressed
+                            : (centerInspectorButton.hovered
+                                   ? theme.toolbarButtonBackgroundHover
+                                   : theme.toolbarButtonBackground)
+                        border.width: 1
+                        border.color: theme.toolbarButtonBorder
+                    }
+                }
+
+                ToolButton {
+                    id: closeInspectorButton
+                    width: 22
+                    height: 22
+                    text: "x"
+                    font.family: "Avenir Next"
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                    onClicked: {
+                        sceneModel.clearSelectedObjectInspector()
+                        skyContext.clearSelectedSearchTarget()
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: "Close inspector"
+
+                    contentItem: Text {
+                        text: closeInspectorButton.text
+                        color: theme.toolbarButtonText
+                        font: closeInspectorButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    background: Rectangle {
+                        radius: 6
+                        color: closeInspectorButton.down
+                            ? theme.toolbarButtonBackgroundPressed
+                            : (closeInspectorButton.hovered
+                                   ? theme.toolbarButtonBackgroundHover
+                                   : theme.toolbarButtonBackground)
+                        border.width: 1
+                        border.color: theme.toolbarButtonBorder
+                    }
+                }
+            }
+
+            Repeater {
+                model: objectInspector.hasInspector && inspectorData.fields
+                    ? inspectorData.fields
+                    : []
+
+                delegate: Row {
+                    required property var modelData
+                    width: inspectorContent.width
+                    spacing: 8
+
+                    Text {
+                        width: 92
+                        text: modelData.label
+                        color: theme.toolbarSecondaryText
+                        font.family: "Avenir Next"
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width - 100
+                        text: modelData.value
+                        color: theme.toolbarPrimaryText
+                        font.family: "Avenir Next"
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+
+            Row {
+                visible: objectInspector.hasInspector
+                    && inspectorData.aliases !== undefined
+                    && inspectorData.aliases.length > 0
+                width: parent.width
+                spacing: 8
+
+                Text {
+                    width: 92
+                    text: "Aliases"
+                    color: theme.toolbarSecondaryText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: parent.width - 100
+                    text: objectInspector.hasInspector ? inspectorData.aliases : ""
+                    color: theme.toolbarPrimaryText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                }
+            }
         }
     }
 

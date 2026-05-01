@@ -132,6 +132,16 @@ const skygate::ephemeris::IEphemerisEngine* SkyCatalogManager::ephemerisEngine()
     return m_ephemerisEngine.get();
 }
 
+QStringList SkyCatalogManager::sourceLabels() const
+{
+    return m_sourceLabels;
+}
+
+std::span<const std::uint8_t> SkyCatalogManager::sourceIds() const noexcept
+{
+    return std::span<const std::uint8_t>(m_sourceIds);
+}
+
 std::span<const SkyCatalogManager::ConstellationLineRef>
 SkyCatalogManager::constellationLineRefs() const noexcept
 {
@@ -595,6 +605,8 @@ void SkyCatalogManager::applyCatalog(
         m_bodyCount = 0;
         m_constellationCount = 0;
         m_deepSkyObjectCount = 0;
+        m_sourceLabels.clear();
+        m_sourceIds.clear();
         m_statusText = "Catalog: Failed to load";
         emit statusTextChanged();
         emit datasetInfoTextChanged();
@@ -634,6 +646,8 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
         m_bodyCount = 0;
         m_constellationCount = 0;
         m_deepSkyObjectCount = 0;
+        m_sourceLabels.clear();
+        m_sourceIds.clear();
         m_statusText = "Catalog: Failed to load";
         emit statusTextChanged();
         emit datasetInfoTextChanged();
@@ -667,6 +681,8 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
     m_constellationCount = buildResult.constellationCount;
     m_deepSkyObjectCount = buildResult.deepSkyObjectCount;
     m_deepSkyCatalogFoundObjectCount = buildResult.foundDeepSkyObjectCount;
+    m_sourceLabels = buildResult.sourceLabels;
+    m_sourceIds = std::move(buildResult.sourceIds);
     m_statusText = buildResult.statusText;
     if (persistCatalog) {
         persistCatalogCache();

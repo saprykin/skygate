@@ -4,9 +4,12 @@
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <QString>
+#include <QStringList>
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace skygate::ui::internal {
 
@@ -29,6 +32,8 @@ struct SkyActiveCatalogBuildResult final {
     std::size_t constellationCount = 0;
     std::size_t deepSkyObjectCount = 0;
     std::size_t foundDeepSkyObjectCount = 0;
+    QStringList sourceLabels;
+    std::vector<std::uint8_t> sourceIds;
 
     [[nodiscard]] bool isSuccess() const noexcept;
 };
