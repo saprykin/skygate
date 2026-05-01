@@ -14,6 +14,11 @@ function(add_skygate_ephemeris_qtest target_name source_file)
             skygate::core
     )
 
+    target_include_directories(${target_name}
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    )
+
     target_compile_features(${target_name} PRIVATE cxx_std_20)
 
     add_test(
@@ -23,6 +28,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
 endfunction()
 
 add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-payload-parser-tests CatalogPayloadParserTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-open-ngc-parser-edge-tests OpenNgcParserEdgeTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-catalog-tests HygCatalogParserTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-gzip-tests HygCatalogGzipTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-stellarium-parser-tests StellariumConstellationParserTests.cpp)
@@ -30,3 +36,4 @@ add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-factory-tests CatalogFacto
 add_skygate_ephemeris_qtest(skygate-ephemeris-celestial-reference-tests CelestialReferenceCalculatorTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-engine-baseline-tests EphemerisEngineBaselineTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-engine-fallback-tests EphemerisEngineFallbackTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-regression-tests EphemerisRegressionTests.cpp)

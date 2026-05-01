@@ -15,6 +15,7 @@ private slots:
     void parsesOpenNgcPayload();
     void parsesHygGzipPayload();
     void parsesHygZipPayload();
+    void rejectsInvalidArchivePayloads();
     void reportsUnsupportedPayload();
 };
 
@@ -193,6 +194,38 @@ void CatalogPayloadParserTests::parsesHygZipPayload()
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
     QVERIFY(bodies[0].id == "hip_42");
+}
+
+void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()
+{
+    const skygate::ephemeris::CatalogPayloadParser parser;
+
+    const std::array<unsigned char, 4> invalidGzip {{0x1f, 0x8b, 0x00, 0x00}};
+    const std::string_view invalidGzipData(
+        reinterpret_cast<const char*>(invalidGzip.data()),
+        invalidGzip.size()
+    );
+    const auto invalidGzipResult = parser.parseResult(invalidGzipData);
+    QVERIFY(!invalidGzipResult.isSuccess());
+    QCOMPARE(
+        invalidGzipResult.errorCode,
+        skygate::ephemeris::CatalogLoadErrorCode::InvalidGzipData
+    );
+
+    constexpr std::array<unsigned char, 22> kEmptyZip {
+        0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    const std::string_view emptyZipData(
+        reinterpret_cast<const char*>(kEmptyZip.data()),
+        kEmptyZip.size()
+    );
+    const auto emptyZipResult = parser.parseResult(emptyZipData);
+    QVERIFY(!emptyZipResult.isSuccess());
+    QCOMPARE(
+        emptyZipResult.errorCode,
+        skygate::ephemeris::CatalogLoadErrorCode::InvalidZipData
+    );
 }
 
 void CatalogPayloadParserTests::reportsUnsupportedPayload()

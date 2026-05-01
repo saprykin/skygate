@@ -28,3 +28,12 @@ add_skygate_ui_qtest(skygate-ui-settings-store-tests SkySettingsStoreTests.cpp)
 add_skygate_ui_qtest(skygate-ui-object-search-model-tests SkyObjectSearchModelTests.cpp)
 add_skygate_ui_qtest(skygate-ui-theme-repository-tests SkyThemeRepositoryTests.cpp)
 add_skygate_ui_qtest(skygate-ui-overlay-layer-settings-tests SkyOverlayLayerSettingsTests.cpp)
+add_skygate_ui_qtest(skygate-ui-catalog-cache-controller-tests SkyCatalogCacheControllerTests.cpp)
+add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests SkyActiveCatalogBuilderTests.cpp)
+add_skygate_ui_qtest(skygate-ui-catalog-download-workflow-tests CatalogDownloadWorkflowTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-smoke-tests QmlSmokeTests.cpp)
+
+target_compile_definitions(skygate-ui-qml-smoke-tests
+    PRIVATE
+        SKYGATE_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
+)
