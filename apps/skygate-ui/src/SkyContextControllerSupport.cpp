@@ -7,6 +7,8 @@
 #include <QTime>
 #include <QTimeZone>
 
+#include "skygate/ephemeris/ConstellationDataCodec.hpp"
+
 #include <algorithm>
 
 namespace skygate::ui::internal {
@@ -268,143 +270,31 @@ QByteArray SkyContextCatalogCodec::serializeConstellationLineRows(
     const std::vector<std::pair<std::string, std::string>>& lineRefs
 )
 {
-    QByteArray rows;
-    rows.reserve(static_cast<int>(lineRefs.size() * 24));
-    for (const auto& lineRef : lineRefs) {
-        if (lineRef.first.empty() || lineRef.second.empty()) {
-            continue;
-        }
-
-        rows.append(QByteArray::fromStdString(lineRef.first));
-        rows.append('|');
-        rows.append(QByteArray::fromStdString(lineRef.second));
-        rows.append('\n');
-    }
-    return rows;
+    return QByteArray::fromStdString(
+        skygate::ephemeris::ConstellationDataCodec::serializeLineRows(lineRefs)
+    );
 }
 
 std::vector<std::pair<std::string, std::string>> SkyContextCatalogCodec::parseConstellationLineRows(
     const std::string_view rows
 )
 {
-    std::vector<std::pair<std::string, std::string>> lineRefs;
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd =
-            newline == std::string_view::npos ? rows.size() : newline;
-        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        if (!line.empty()) {
-            const std::size_t delimiter = line.find('|');
-            if (delimiter != std::string_view::npos) {
-                const std::string_view startId = line.substr(0, delimiter);
-                const std::string_view endId = line.substr(delimiter + 1);
-                if (!startId.empty() && !endId.empty()) {
-                    lineRefs.emplace_back(std::string(startId), std::string(endId));
-                }
-            }
-        }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
-    }
-
-    return lineRefs;
+    return skygate::ephemeris::ConstellationDataCodec::parseLineRows(rows);
 }
 
 QByteArray SkyContextCatalogCodec::serializeConstellationLabelRows(
     const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
 )
 {
-    QByteArray rows;
-    rows.reserve(static_cast<int>(labelRefs.size() * 48));
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty() || labelRef.second.empty()) {
-            continue;
-        }
-        const int rowStartSize = rows.size();
-
-        QString sanitizedLabel = QString::fromStdString(labelRef.first);
-        sanitizedLabel.replace('|', '/');
-        sanitizedLabel.replace('\n', ' ');
-        sanitizedLabel.replace('\r', ' ');
-        sanitizedLabel = sanitizedLabel.trimmed();
-        if (sanitizedLabel.isEmpty()) {
-            continue;
-        }
-
-        rows.append(sanitizedLabel.toUtf8());
-        rows.append('|');
-        bool hasAnyHip = false;
-        for (const std::string& hipId : labelRef.second) {
-            if (hipId.empty()) {
-                continue;
-            }
-            if (hasAnyHip) {
-                rows.append(',');
-            }
-            rows.append(QByteArray::fromStdString(hipId));
-            hasAnyHip = true;
-        }
-        if (!hasAnyHip) {
-            rows.truncate(rowStartSize);
-            continue;
-        }
-        rows.append('\n');
-    }
-
-    return rows;
+    return QByteArray::fromStdString(
+        skygate::ephemeris::ConstellationDataCodec::serializeLabelRows(labelRefs)
+    );
 }
 
 std::vector<std::pair<std::string, std::vector<std::string>>>
 SkyContextCatalogCodec::parseConstellationLabelRows(const std::string_view rows)
 {
-    std::vector<std::pair<std::string, std::vector<std::string>>> labelRefs;
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        if (!line.empty()) {
-            const std::size_t delimiter = line.find('|');
-            if (delimiter != std::string_view::npos) {
-                const std::string_view label = line.substr(0, delimiter);
-                const std::string_view hipList = line.substr(delimiter + 1);
-                if (!label.empty() && !hipList.empty()) {
-                    std::vector<std::string> hipIds;
-                    std::size_t hipCursor = 0;
-                    while (hipCursor < hipList.size()) {
-                        const std::size_t comma = hipList.find(',', hipCursor);
-                        const std::size_t hipEnd =
-                            comma == std::string_view::npos ? hipList.size() : comma;
-                        const std::string_view hipId = hipList.substr(hipCursor, hipEnd - hipCursor);
-                        if (!hipId.empty()) {
-                            hipIds.emplace_back(hipId);
-                        }
-                        if (comma == std::string_view::npos) {
-                            break;
-                        }
-                        hipCursor = comma + 1;
-                    }
-
-                    if (!hipIds.empty()) {
-                        labelRefs.emplace_back(std::string(label), std::move(hipIds));
-                    }
-                }
-            }
-        }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
-    }
-
-    return labelRefs;
+    return skygate::ephemeris::ConstellationDataCodec::parseLabelRows(rows);
 }
 
 double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)

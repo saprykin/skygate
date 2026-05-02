@@ -24,6 +24,8 @@ struct ScreenPoint {
     double y = 0.0;
     bool isVisible = false;
     ProjectionStatus status = ProjectionStatus::Culled;
+
+    [[nodiscard]] bool isFinite() const noexcept;
 };
 
 struct ProjectionParams {

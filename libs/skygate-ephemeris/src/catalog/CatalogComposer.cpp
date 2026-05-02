@@ -94,7 +94,150 @@ bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs)
     });
 }
 
+bool isAnalyticSolarSystemBody(const CelestialBody& body)
+{
+    return body.ephemerisSource == CelestialBodyEphemerisSource::Sun
+        || body.ephemerisSource == CelestialBodyEphemerisSource::Moon
+        || body.ephemerisSource == CelestialBodyEphemerisSource::Planet;
+}
+
+std::size_t countDeepSkyObjects(const std::span<const CelestialBody> bodies)
+{
+    return static_cast<std::size_t>(std::count_if(
+        bodies.begin(),
+        bodies.end(),
+        [](const CelestialBody& body) {
+            return body.type == CelestialBodyType::DeepSkyObject;
+        }
+    ));
+}
+
+void assignCompositionCounts(
+    ActiveCatalogCompositionResult& result,
+    const std::span<const CelestialBody> bodies,
+    const std::size_t currentConstellationCount
+)
+{
+    std::size_t catalogConstellationCount = 0;
+    std::size_t deepSkyObjectCount = 0;
+    for (const auto& body : bodies) {
+        if (body.type == CelestialBodyType::Constellation) {
+            ++catalogConstellationCount;
+        }
+        if (body.type == CelestialBodyType::DeepSkyObject) {
+            ++deepSkyObjectCount;
+        }
+    }
+
+    result.bodyCount = bodies.size();
+    result.constellationCount = std::max(catalogConstellationCount, currentConstellationCount);
+    result.deepSkyObjectCount = deepSkyObjectCount;
+}
+
 }  // namespace
+
+bool ActiveCatalogCompositionResult::isSuccess() const noexcept
+{
+    return catalog != nullptr;
+}
+
+ActiveCatalogCompositionResult composeActiveCatalog(
+    const ActiveCatalogCompositionRequest& request
+)
+{
+    ActiveCatalogCompositionResult result;
+    auto activeCatalog = createCatalogWithCoreSolarSystemBodies(request.sourceCatalog);
+    if (activeCatalog == nullptr) {
+        return result;
+    }
+
+    const IStarCatalog* deepSkyCatalog = request.deepSkyCatalog;
+    std::unique_ptr<IStarCatalog> bundledDeepSkyCatalog;
+    if (deepSkyCatalog == nullptr && request.useBundledDeepSkyCatalog) {
+        bundledDeepSkyCatalog = createBundledStarCatalog();
+        deepSkyCatalog = bundledDeepSkyCatalog.get();
+    }
+
+    std::vector<CelestialBody> activeBodies(
+        activeCatalog->bodies().begin(),
+        activeCatalog->bodies().end()
+    );
+    std::vector<CatalogCompositionSource> activeSourceKinds;
+    activeSourceKinds.reserve(activeBodies.size());
+    for (const auto& body : activeBodies) {
+        activeSourceKinds.push_back(
+            isAnalyticSolarSystemBody(body)
+                ? CatalogCompositionSource::BuiltInEphemeris
+                : CatalogCompositionSource::Primary
+        );
+    }
+
+    result.foundDeepSkyObjectCount = request.knownDeepSkyObjectCount;
+    if (deepSkyCatalog != nullptr) {
+        if (result.foundDeepSkyObjectCount == 0U || request.useBundledDeepSkyCatalog) {
+            result.foundDeepSkyObjectCount = countDeepSkyObjects(deepSkyCatalog->bodies());
+        }
+
+        std::vector<CelestialBody> mergedBodies;
+        std::vector<CatalogCompositionSource> mergedSourceKinds;
+        mergedBodies.reserve(activeBodies.size() + deepSkyCatalog->bodies().size());
+        mergedSourceKinds.reserve(activeBodies.size() + deepSkyCatalog->bodies().size());
+
+        for (std::size_t index = 0; index < activeBodies.size(); ++index) {
+            const auto& body = activeBodies[index];
+            if (body.type == CelestialBodyType::DeepSkyObject) {
+                continue;
+            }
+
+            mergedBodies.push_back(body);
+            mergedSourceKinds.push_back(activeSourceKinds[index]);
+        }
+
+        for (std::size_t index = 0; index < activeBodies.size(); ++index) {
+            const auto& body = activeBodies[index];
+            if (body.type != CelestialBodyType::DeepSkyObject) {
+                continue;
+            }
+
+            const bool replacedByDeepSkyObject = std::any_of(
+                deepSkyCatalog->bodies().begin(),
+                deepSkyCatalog->bodies().end(),
+                [&body](const CelestialBody& deepSkyBody) {
+                    return deepSkyBody.type == CelestialBodyType::DeepSkyObject
+                        && sharesDeepSkyAlias(body, deepSkyBody);
+                }
+            );
+            if (replacedByDeepSkyObject) {
+                continue;
+            }
+
+            mergedBodies.push_back(body);
+            mergedSourceKinds.push_back(activeSourceKinds[index]);
+        }
+
+        for (const auto& body : deepSkyCatalog->bodies()) {
+            if (body.type != CelestialBodyType::DeepSkyObject) {
+                continue;
+            }
+
+            mergedBodies.push_back(body);
+            mergedSourceKinds.push_back(CatalogCompositionSource::DeepSky);
+        }
+
+        activeCatalog = createStarCatalogFromBodies(std::move(mergedBodies));
+        activeSourceKinds = std::move(mergedSourceKinds);
+    }
+
+    if (activeCatalog == nullptr) {
+        result.sourceKinds.clear();
+        return result;
+    }
+
+    result.sourceKinds = std::move(activeSourceKinds);
+    assignCompositionCounts(result, activeCatalog->bodies(), request.currentConstellationCount);
+    result.catalog = std::move(activeCatalog);
+    return result;
+}
 
 std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
     const IStarCatalog& baseCatalog,

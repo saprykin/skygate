@@ -6,18 +6,27 @@
 
 namespace skygate::core {
 
+bool EquatorialCoordinate::isFinite() const noexcept
+{
+    return std::isfinite(rightAscensionHours) && std::isfinite(declinationDeg);
+}
+
 bool GeoLocation::isValid() const noexcept
 {
     return std::isfinite(latitudeDeg) && std::isfinite(longitudeDeg)
         && std::isfinite(elevationMeters)
         && latitudeDeg >= kLatitudeMinDeg && latitudeDeg <= kLatitudeMaxDeg
-        && longitudeDeg >= kLongitudeMinDeg && longitudeDeg <= kLongitudeMaxDeg;
+    && longitudeDeg >= kLongitudeMinDeg && longitudeDeg <= kLongitudeMaxDeg;
+}
+
+bool HorizontalCoordinate::isFinite() const noexcept
+{
+    return std::isfinite(altitudeDeg) && std::isfinite(azimuthDeg);
 }
 
 bool HorizontalCoordinate::isValid() const noexcept
 {
-    return std::isfinite(altitudeDeg)
-        && std::isfinite(azimuthDeg)
+    return isFinite()
         && altitudeDeg >= kAltitudeMinDeg
         && altitudeDeg <= kAltitudeMaxDeg;
 }

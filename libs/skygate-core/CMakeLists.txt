@@ -11,6 +11,7 @@ add_library(skygate-core STATIC
     include/skygate/core/math/GeometryMath.hpp
     include/skygate/core/math/MathConstants.hpp
     include/skygate/core/math/ProjectionMath.hpp
+    include/skygate/core/math/ScreenGeometry.hpp
     include/skygate/core/math/ViewportMath.hpp
     include/skygate/core/projections/AzimuthalEquidistantProjection.hpp
     include/skygate/core/projections/PerspectiveProjection.hpp
@@ -22,6 +23,7 @@ add_library(skygate-core STATIC
     src/math/AngleMath.cpp
     src/math/GeometryMath.cpp
     src/math/ProjectionMath.cpp
+    src/math/ScreenGeometry.cpp
     src/math/ViewportMath.cpp
     src/ProjectionFactory.cpp
     src/projections/AzimuthalEquidistantProjection.cpp

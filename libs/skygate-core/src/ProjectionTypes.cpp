@@ -4,6 +4,11 @@
 
 namespace skygate::core {
 
+bool ScreenPoint::isFinite() const noexcept
+{
+    return std::isfinite(x) && std::isfinite(y);
+}
+
 bool ProjectionParams::isProjectable() const noexcept
 {
     return center.isValid()

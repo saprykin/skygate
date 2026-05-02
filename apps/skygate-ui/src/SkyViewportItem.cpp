@@ -10,6 +10,7 @@
 #include <QSGNode>
 
 #include "skygate/core/math/GeometryMath.hpp"
+#include "skygate/core/math/ScreenGeometry.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
 #include <algorithm>
@@ -307,38 +308,23 @@ void appendProjectedPolyline(
         return;
     }
 
-    bool hasPreviousPoint = false;
-    auto previousPoint = projection.project(coordinateFn(0));
-
+    std::vector<skygate::core::HorizontalCoordinate> coordinates;
+    coordinates.reserve(static_cast<std::size_t>(sampleCount) + 1U);
     for (int index = 0; index <= sampleCount; ++index) {
-        const auto projected = projection.project(coordinateFn(index));
-        if (!projected.isVisible) {
-            hasPreviousPoint = false;
-            continue;
-        }
+        coordinates.push_back(coordinateFn(index));
+    }
 
-        if (hasPreviousPoint) {
-            const double segmentLengthSquared = skygate::core::GeometryMath::squaredDistance2d(
-                projected.x,
-                projected.y,
-                previousPoint.x,
-                previousPoint.y
-            );
-            if (segmentLengthSquared <= maxSegmentLengthSquared) {
-                appendLineSegment(
-                    lineSegments,
-                    static_cast<float>(previousPoint.x),
-                    static_cast<float>(previousPoint.y),
-                    static_cast<float>(projected.x),
-                    static_cast<float>(projected.y),
-                    widthPx,
-                    color
-                );
-            }
-        }
-
-        previousPoint = projected;
-        hasPreviousPoint = true;
+    const skygate::core::ProjectedPolylineBuilder builder;
+    for (const auto& segment : builder.build(projection, coordinates, maxSegmentLengthSquared)) {
+        appendLineSegment(
+            lineSegments,
+            static_cast<float>(segment.x1),
+            static_cast<float>(segment.y1),
+            static_cast<float>(segment.x2),
+            static_cast<float>(segment.y2),
+            widthPx,
+            color
+        );
     }
 }
 

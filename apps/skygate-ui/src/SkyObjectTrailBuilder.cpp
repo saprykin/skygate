@@ -1,16 +1,14 @@
 #include "SkyObjectTrailBuilder.hpp"
 
-#include "SkySceneShared.hpp"
-
 #include "skygate/core/math/GeometryMath.hpp"
+#include "skygate/core/math/ScreenGeometry.hpp"
+#include "skygate/ephemeris/BodyTrailCalculator.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <QColor>
 #include <QVariantMap>
 
 #include <algorithm>
-#include <chrono>
-#include <cmath>
 
 namespace {
 
@@ -61,28 +59,26 @@ void appendDashedTrailLine(
     const QColor& color
 )
 {
-    const double deltaX = x2 - x1;
-    const double deltaY = y2 - y1;
-    const double length = std::hypot(deltaX, deltaY);
-    if (length <= 1e-9) {
-        return;
-    }
-
-    const double unitX = deltaX / length;
-    const double unitY = deltaY / length;
-    double dashStart = 0.0;
-    while (dashStart < length) {
-        const double dashEnd = std::min(dashStart + kObjectTrailPastDashLengthPx, length);
+    const skygate::core::DashedLineBuilder dashBuilder;
+    for (const auto& dash : dashBuilder.build(
+             skygate::core::LineSegment2d {
+                 .x1 = x1,
+                 .y1 = y1,
+                 .x2 = x2,
+                 .y2 = y2
+             },
+             kObjectTrailPastDashLengthPx,
+             kObjectTrailPastDashGapPx
+         )) {
         appendTrailLine(
             frame,
-            x1 + (unitX * dashStart),
-            y1 + (unitY * dashStart),
-            x1 + (unitX * dashEnd),
-            y1 + (unitY * dashEnd),
+            dash.x1,
+            dash.y1,
+            dash.x2,
+            dash.y2,
             widthPx,
             color
         );
-        dashStart += kObjectTrailPastDashLengthPx + kObjectTrailPastDashGapPx;
     }
 }
 
@@ -144,27 +140,27 @@ void SkyObjectTrailBuilder::appendTrail(
     bool hasPreviousPoint = false;
     skygate::core::ScreenPoint previousPoint;
     int previousOffsetMinutes = 0;
-    const int pastMinutes = kObjectTrailPastHours * 60;
-    const int futureMinutes = kObjectTrailFutureHours * 60;
 
-    for (
-        int offsetMinutes = -pastMinutes;
-        offsetMinutes <= futureMinutes;
-        offsetMinutes += kObjectTrailSampleStepMinutes
-    ) {
-        skygate::core::SkyContext sampleContext = input.skyContext;
-        sampleContext.utcTime = input.skyContext.utcTime + std::chrono::minutes(offsetMinutes);
-        const auto state = input.ephemerisEngine->computeBodyState(
-            sampleContext,
-            input.targetBodyIndex
-        );
-        if (!state.has_value() || !skySceneHorizontalIsFinite(state->horizontal)) {
+    const skygate::ephemeris::BodyTrailCalculator trailCalculator;
+    const auto samples = trailCalculator.sample(
+        *input.ephemerisEngine,
+        input.skyContext,
+        input.targetBodyIndex,
+        skygate::ephemeris::BodyTrailOptions {
+            .pastHours = kObjectTrailPastHours,
+            .futureHours = kObjectTrailFutureHours,
+            .sampleStepMinutes = kObjectTrailSampleStepMinutes
+        }
+    );
+
+    for (const auto& sample : samples) {
+        if (!sample.horizontal.has_value()) {
             hasPreviousPoint = false;
             continue;
         }
 
-        const auto projected = input.preparedProjection->project(state->horizontal);
-        if (!skySceneScreenPointIsFinite(projected)) {
+        const auto projected = input.preparedProjection->project(*sample.horizontal);
+        if (!projected.isVisible || !projected.isFinite()) {
             hasPreviousPoint = false;
             continue;
         }
@@ -177,7 +173,8 @@ void SkyObjectTrailBuilder::appendTrail(
                 previousPoint.y
             );
             if (lengthSquared <= maxSegmentLengthSquared) {
-                const bool isPastSegment = previousOffsetMinutes < 0 && offsetMinutes <= 0;
+                const bool isPastSegment =
+                    previousOffsetMinutes < 0 && sample.offsetMinutes <= 0;
                 if (isPastSegment) {
                     appendDashedTrailLine(
                         frame,
@@ -203,14 +200,14 @@ void SkyObjectTrailBuilder::appendTrail(
         }
 
         if (
-            offsetMinutes > 0
-            && offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0
+            sample.offsetMinutes > 0
+            && sample.offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0
         ) {
-            appendFutureTrailTick(frame, projected, offsetMinutes, futureColor);
+            appendFutureTrailTick(frame, projected, sample.offsetMinutes, futureColor);
         }
 
         previousPoint = projected;
-        previousOffsetMinutes = offsetMinutes;
+        previousOffsetMinutes = sample.offsetMinutes;
         hasPreviousPoint = true;
     }
 }

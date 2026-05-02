@@ -5,6 +5,7 @@
 #include <QVariantMap>
 
 #include "skygate/core/math/GeometryMath.hpp"
+#include "skygate/core/math/ScreenGeometry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -85,112 +86,10 @@ struct DecimatedStarPoint final {
     double distanceToCellCenterSquared = 0.0;
 };
 
-struct LabelBounds final {
-    double left = 0.0;
-    double top = 0.0;
-    double right = 0.0;
-    double bottom = 0.0;
-};
-
 struct DeepSkyLabelCandidate final {
     std::size_t glyphIndex = 0;
     double score = 0.0;
-    LabelBounds bounds;
-};
-
-class LabelOccupancyGrid final {
-public:
-    explicit LabelOccupancyGrid(const double cellSizePx)
-        : m_cellSizePx(cellSizePx)
-    {
-    }
-
-    [[nodiscard]] bool collides(const LabelBounds& bounds) const
-    {
-        const auto minCellX = skygate::core::GeometryMath::gridCellIndex(
-            bounds.left,
-            m_cellSizePx
-        );
-        const auto maxCellX = skygate::core::GeometryMath::gridCellIndex(
-            bounds.right,
-            m_cellSizePx
-        );
-        const auto minCellY = skygate::core::GeometryMath::gridCellIndex(
-            bounds.top,
-            m_cellSizePx
-        );
-        const auto maxCellY = skygate::core::GeometryMath::gridCellIndex(
-            bounds.bottom,
-            m_cellSizePx
-        );
-
-        for (std::int32_t cellY = minCellY; cellY <= maxCellY; ++cellY) {
-            for (std::int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-                const auto cellIt = m_boundsByCell.find(
-                    skygate::core::GeometryMath::packedGridCellKey(cellX, cellY)
-                );
-                if (cellIt == m_boundsByCell.end()) {
-                    continue;
-                }
-
-                for (const std::size_t boundsIndex : cellIt->second) {
-                    if (intersects(bounds, m_bounds.at(boundsIndex))) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    void add(const LabelBounds& bounds)
-    {
-        const std::size_t boundsIndex = m_bounds.size();
-        m_bounds.push_back(bounds);
-
-        const auto minCellX = skygate::core::GeometryMath::gridCellIndex(
-            bounds.left,
-            m_cellSizePx
-        );
-        const auto maxCellX = skygate::core::GeometryMath::gridCellIndex(
-            bounds.right,
-            m_cellSizePx
-        );
-        const auto minCellY = skygate::core::GeometryMath::gridCellIndex(
-            bounds.top,
-            m_cellSizePx
-        );
-        const auto maxCellY = skygate::core::GeometryMath::gridCellIndex(
-            bounds.bottom,
-            m_cellSizePx
-        );
-
-        for (std::int32_t cellY = minCellY; cellY <= maxCellY; ++cellY) {
-            for (std::int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-                m_boundsByCell[
-                    skygate::core::GeometryMath::packedGridCellKey(cellX, cellY)
-                ].push_back(boundsIndex);
-            }
-        }
-    }
-
-private:
-    [[nodiscard]] static bool intersects(
-        const LabelBounds& lhs,
-        const LabelBounds& rhs
-    ) noexcept
-    {
-        return lhs.left < rhs.right
-            && lhs.right > rhs.left
-            && lhs.top < rhs.bottom
-            && lhs.bottom > rhs.top;
-    }
-
-private:
-    double m_cellSizePx = 64.0;
-    std::vector<LabelBounds> m_bounds;
-    std::unordered_map<std::uint64_t, std::vector<std::size_t>> m_boundsByCell;
+    skygate::core::Rect2d bounds;
 };
 
 [[nodiscard]] QColor labelColorForBodyType(
@@ -531,7 +430,7 @@ private:
     return score - (normalizedDistanceSquared * 120.0);
 }
 
-[[nodiscard]] LabelBounds labelBounds(
+[[nodiscard]] skygate::core::Rect2d labelBounds(
     const double anchorX,
     const double anchorY,
     const std::string_view text
@@ -548,7 +447,7 @@ private:
     );
     const double left = anchorX - (width * 0.5);
     const double top = anchorY - kLabelHeightPx - kLabelOffsetYPx;
-    return LabelBounds {
+    return skygate::core::Rect2d {
         .left = left,
         .top = top,
         .right = left + width,
@@ -557,16 +456,13 @@ private:
 }
 
 [[nodiscard]] bool labelFitsViewport(
-    const LabelBounds& bounds,
+    const skygate::core::Rect2d& bounds,
     const double viewportWidth,
     const double viewportHeight,
     const double edgeMarginPx
 )
 {
-    return bounds.left >= edgeMarginPx
-        && bounds.right <= (viewportWidth - edgeMarginPx)
-        && bounds.top >= edgeMarginPx
-        && bounds.bottom <= (viewportHeight - edgeMarginPx);
+    return skygate::core::fitsWithin(bounds, viewportWidth, viewportHeight, edgeMarginPx);
 }
 
 void appendLabel(
@@ -594,7 +490,7 @@ void appendDeepSkyLabels(
     const SkyThemeRenderPalette& renderTheme,
     const double edgeMarginPx,
     std::unordered_set<std::string_view>& seenLabels,
-    LabelOccupancyGrid& labelGrid
+    skygate::core::RectOccupancyGrid& labelGrid
 )
 {
     const std::size_t labelBudget = deepSkyLabelBudget(
@@ -620,7 +516,7 @@ void appendDeepSkyLabels(
         }
 
         const double anchorY = glyph.y - deepSkyHitRadius(glyph);
-        const LabelBounds bounds = labelBounds(glyph.x, anchorY, body.displayName);
+        const skygate::core::Rect2d bounds = labelBounds(glyph.x, anchorY, body.displayName);
         if (!labelFitsViewport(bounds, viewportWidth, viewportHeight, edgeMarginPx)) {
             continue;
         }
@@ -714,10 +610,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     }
 
     for (const auto& state : snapshot.states) {
-        if (
-            !std::isfinite(state.horizontal.altitudeDeg)
-            || !std::isfinite(state.horizontal.azimuthDeg)
-        ) {
+        if (!state.horizontal.isFinite()) {
             continue;
         }
 
@@ -746,7 +639,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
         }
 
         const auto projected = projection.project(state.horizontal);
-        if (!projected.isVisible) {
+        if (!projected.isVisible || !projected.isFinite()) {
             continue;
         }
 
@@ -825,7 +718,12 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
 
             const auto startProjected = projection.project(*startHorizontal);
             const auto endProjected = projection.project(*endHorizontal);
-            if (!startProjected.isVisible || !endProjected.isVisible) {
+            if (
+                !startProjected.isVisible
+                || !startProjected.isFinite()
+                || !endProjected.isVisible
+                || !endProjected.isFinite()
+            ) {
                 continue;
             }
 
@@ -853,7 +751,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     std::unordered_set<std::string_view> seenLabels;
     frame.labels.reserve(static_cast<int>(labelRefs.size() + 16U));
     constexpr double kEdgeMarginPx = 10.0;
-    LabelOccupancyGrid labelGrid(72.0);
+    skygate::core::RectOccupancyGrid labelGrid(72.0);
 
     for (const auto& point : frame.points) {
         const auto& body = snapshot.bodyAt(point.bodyIndex);
@@ -883,7 +781,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             continue;
         }
 
-        const LabelBounds bounds = labelBounds(point.x, point.y, body.displayName);
+        const skygate::core::Rect2d bounds = labelBounds(point.x, point.y, body.displayName);
         appendLabel(
             frame.labels,
             point.x,
@@ -928,7 +826,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 }
 
                 const auto projected = projection.project(*horizontal);
-                if (!projected.isVisible) {
+                if (!projected.isVisible || !projected.isFinite()) {
                     continue;
                 }
 
@@ -943,7 +841,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
 
             const double labelX = sumX / static_cast<double>(visiblePointCount);
             const double labelY = sumY / static_cast<double>(visiblePointCount);
-            const LabelBounds bounds = labelBounds(labelX, labelY, labelRef.first);
+            const skygate::core::Rect2d bounds = labelBounds(labelX, labelY, labelRef.first);
             if (
                 !labelFitsViewport(bounds, viewportWidth, viewportHeight, kEdgeMarginPx)
                 || labelGrid.collides(bounds)

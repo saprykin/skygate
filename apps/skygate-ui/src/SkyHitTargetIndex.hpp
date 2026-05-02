@@ -1,11 +1,11 @@
 #pragma once
 
 #include "SkyRenderBuilders.hpp"
+#include "skygate/core/math/ScreenGeometry.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
 #include <optional>
-#include <unordered_map>
 #include <vector>
 
 class SkyHitTargetIndex final {
@@ -24,13 +24,6 @@ public:
     ) const;
 
 private:
-    struct Target final {
-        std::uint32_t bodyIndex = 0;
-        double x = 0.0;
-        double y = 0.0;
-        double radiusPx = 0.0;
-    };
-
-    std::vector<Target> m_targets;
-    std::unordered_map<std::uint64_t, std::vector<std::size_t>> m_targetIndicesByCell;
+    std::vector<skygate::core::CircleHitTarget> m_targets;
+    skygate::core::CircleHitIndex m_hitIndex {24.0};
 };

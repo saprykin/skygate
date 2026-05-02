@@ -22,6 +22,8 @@ using UtcTimePoint = std::chrono::time_point<std::chrono::system_clock, std::chr
 struct EquatorialCoordinate {
     double rightAscensionHours = 0.0;
     double declinationDeg = 0.0;
+
+    [[nodiscard]] bool isFinite() const noexcept;
 };
 
 struct HorizontalCoordinate {
@@ -31,6 +33,7 @@ struct HorizontalCoordinate {
     double altitudeDeg = 0.0;
     double azimuthDeg = 0.0;
 
+    [[nodiscard]] bool isFinite() const noexcept;
     [[nodiscard]] bool isValid() const noexcept;
     [[nodiscard]] HorizontalCoordinate normalizedAzimuth() const noexcept;
 };

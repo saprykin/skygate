@@ -41,7 +41,7 @@ std::optional<QPointF> selectedBodyPoint(
     }
 
     const auto& state = snapshot.states.at(*stateIndexIt);
-    if (!skySceneHorizontalIsFinite(state.horizontal)) {
+    if (!state.horizontal.isFinite()) {
         return std::nullopt;
     }
 
@@ -347,7 +347,7 @@ QVariantMap SkySelectionOverlayBuilder::buildSelectedObjectInspector(
     double inspectorX = input.inspectorPinnedX;
     double inspectorY = input.inspectorPinnedY;
     if (!input.inspectorPinned) {
-        if (!skySceneHorizontalIsFinite(state.horizontal)) {
+        if (!state.horizontal.isFinite()) {
             return {};
         }
 

@@ -3,12 +3,14 @@ find_package(ZLIB REQUIRED)
 
 add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/CatalogLoadResult.hpp
+    include/skygate/ephemeris/BodyTrailCalculator.hpp
     include/skygate/ephemeris/CatalogComposer.hpp
     include/skygate/ephemeris/CatalogFactory.hpp
     include/skygate/ephemeris/CatalogLoader.hpp
     include/skygate/ephemeris/CatalogPayloadParser.hpp
     include/skygate/ephemeris/CelestialReferenceCalculator.hpp
     include/skygate/ephemeris/ConstellationData.hpp
+    include/skygate/ephemeris/ConstellationDataCodec.hpp
     include/skygate/ephemeris/ConstellationReferenceCalculator.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
@@ -25,6 +27,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp
     src/catalog/CatalogPayloadParser.cpp
+    src/catalog/ConstellationDataCodec.cpp
     src/catalog/DelimitedCatalogReader.cpp
     src/catalog/BundledConstellationData.cpp
     src/catalog/CsvRowTokenizer.hpp
@@ -60,6 +63,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/PlanetEquatorialCalculator.cpp
     src/engine/StarEquatorialCalculator.cpp
     src/engine/SunEquatorialCalculator.cpp
+    src/BodyTrailCalculator.cpp
 )
 
 target_include_directories(skygate-ephemeris
