@@ -7,40 +7,17 @@
 #include <QVariantMap>
 
 #include "skygate/core/math/GeometryMath.hpp"
-#include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
-#include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
-#include <algorithm>
 #include <array>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
 
 namespace {
 
-constexpr double kHoverLookupCellSizePx = 24.0;
 constexpr int kReferenceLabelSampleCount = 96;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
-constexpr int kObjectTrailPastHours = 6;
-constexpr int kObjectTrailFutureHours = 18;
-constexpr int kObjectTrailSampleStepMinutes = 30;
-constexpr double kObjectTrailPastWidthPx = 1.4;
-constexpr double kObjectTrailFutureWidthPx = 2.0;
-constexpr double kObjectTrailPastDashLengthPx = 8.0;
-constexpr double kObjectTrailPastDashGapPx = 7.0;
-constexpr int kObjectTrailFutureTickStepHours = 6;
-constexpr double kObjectTrailFutureTickRadiusPx = 5.0;
-
-[[nodiscard]] std::uint64_t hoverCellKey(
-    const double x,
-    const double y,
-    const double cellSizePx
-) noexcept
-{
-    return skygate::core::GeometryMath::packedGridCellKey(x, y, cellSizePx);
-}
 
 QVariantMap overlayEntry(
     const QString& kind,
@@ -141,376 +118,6 @@ void appendReferenceLayerLabel(
     ));
 }
 
-QString normalizedLookupKey(const QString& value)
-{
-    return value.trimmed().toCaseFolded();
-}
-
-QString normalizedLookupKey(const std::string& value)
-{
-    return normalizedLookupKey(QString::fromStdString(value));
-}
-
-bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
-{
-    return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
-}
-
-bool hasFiniteScreenPoint(const skygate::core::ScreenPoint& point)
-{
-    return point.isVisible && std::isfinite(point.x) && std::isfinite(point.y);
-}
-
-QColor colorWithAlpha(const QColor& color, const int alpha)
-{
-    QColor adjusted = color;
-    adjusted.setAlpha(alpha);
-    return adjusted;
-}
-
-void appendTrailLine(
-    SkyRenderFrame& frame,
-    const double x1,
-    const double y1,
-    const double x2,
-    const double y2,
-    const double widthPx,
-    const QColor& color
-)
-{
-    frame.lines.push_back(SkyRenderLine {
-        .x1 = x1,
-        .y1 = y1,
-        .x2 = x2,
-        .y2 = y2,
-        .widthPx = widthPx,
-        .color = color
-    });
-}
-
-void appendDashedTrailLine(
-    SkyRenderFrame& frame,
-    const double x1,
-    const double y1,
-    const double x2,
-    const double y2,
-    const double widthPx,
-    const QColor& color
-)
-{
-    const double deltaX = x2 - x1;
-    const double deltaY = y2 - y1;
-    const double length = std::hypot(deltaX, deltaY);
-    if (length <= 1e-9) {
-        return;
-    }
-
-    const double unitX = deltaX / length;
-    const double unitY = deltaY / length;
-    double dashStart = 0.0;
-    while (dashStart < length) {
-        const double dashEnd = std::min(dashStart + kObjectTrailPastDashLengthPx, length);
-        appendTrailLine(
-            frame,
-            x1 + (unitX * dashStart),
-            y1 + (unitY * dashStart),
-            x1 + (unitX * dashEnd),
-            y1 + (unitY * dashEnd),
-            widthPx,
-            color
-        );
-        dashStart += kObjectTrailPastDashLengthPx + kObjectTrailPastDashGapPx;
-    }
-}
-
-void appendFutureTrailTick(
-    SkyRenderFrame& frame,
-    const skygate::core::ScreenPoint& point,
-    const int offsetMinutes,
-    const QColor& color
-)
-{
-    appendTrailLine(
-        frame,
-        point.x - kObjectTrailFutureTickRadiusPx,
-        point.y,
-        point.x + kObjectTrailFutureTickRadiusPx,
-        point.y,
-        kObjectTrailFutureWidthPx,
-        color
-    );
-    appendTrailLine(
-        frame,
-        point.x,
-        point.y - kObjectTrailFutureTickRadiusPx,
-        point.x,
-        point.y + kObjectTrailFutureTickRadiusPx,
-        kObjectTrailFutureWidthPx,
-        color
-    );
-    frame.labels.push_back(overlayEntry(
-        "trailTick",
-        point.x,
-        point.y,
-        QString("+%1h").arg(offsetMinutes / 60),
-        color
-    ));
-}
-
-QVariantMap selectionMarkerEntry(
-    const double x,
-    const double y
-)
-{
-    QVariantMap entry;
-    entry.insert("kind", "searchSelection");
-    entry.insert("x", x);
-    entry.insert("y", y);
-    return entry;
-}
-
-std::optional<QPointF> selectedBodyPoint(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const QHash<QString, std::size_t>& stateIndexByBodyId,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const QString& targetId
-)
-{
-    const QString normalizedTargetId = normalizedLookupKey(targetId);
-    const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedTargetId);
-    if (stateIndexIt == stateIndexByBodyId.cend()) {
-        return std::nullopt;
-    }
-
-    const auto& state = snapshot.states.at(*stateIndexIt);
-    if (!hasFiniteHorizontal(state.horizontal)) {
-        return std::nullopt;
-    }
-
-    const auto projected = preparedProjection.project(state.horizontal);
-    if (!projected.isVisible) {
-        return std::nullopt;
-    }
-
-    return QPointF(projected.x, projected.y);
-}
-
-std::optional<QPointF> selectedConstellationPoint(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
-    const QString& targetId
-)
-{
-    const auto center = skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(
-        snapshot,
-        labelRefs,
-        targetId.toStdString()
-    );
-    if (!center.has_value()) {
-        return std::nullopt;
-    }
-
-    const auto projected = preparedProjection.project(*center);
-    if (!projected.isVisible) {
-        return std::nullopt;
-    }
-
-    return QPointF(projected.x, projected.y);
-}
-
-QString celestialBodyTypeText(const skygate::ephemeris::CelestialBody& body)
-{
-    using skygate::ephemeris::CelestialBodyType;
-    using skygate::ephemeris::DeepSkyObjectKind;
-
-    if (body.type == CelestialBodyType::DeepSkyObject && body.deepSkyObject.has_value()) {
-        switch (body.deepSkyObject->kind) {
-        case DeepSkyObjectKind::Galaxy:
-            return "Galaxy";
-        case DeepSkyObjectKind::OpenCluster:
-            return "Open cluster";
-        case DeepSkyObjectKind::GlobularCluster:
-            return "Globular cluster";
-        case DeepSkyObjectKind::Nebula:
-            return "Nebula";
-        case DeepSkyObjectKind::PlanetaryNebula:
-            return "Planetary nebula";
-        case DeepSkyObjectKind::Asterism:
-            return "Asterism";
-        case DeepSkyObjectKind::Unknown:
-            return "Deep sky object";
-        }
-    }
-
-    switch (body.type) {
-    case CelestialBodyType::Sun:
-        return "Sun";
-    case CelestialBodyType::Moon:
-        return "Moon";
-    case CelestialBodyType::Planet:
-        return "Planet";
-    case CelestialBodyType::Star:
-        return "Star";
-    case CelestialBodyType::Constellation:
-        return "Constellation";
-    case CelestialBodyType::DeepSkyObject:
-        return "Deep sky object";
-    }
-
-    return "Object";
-}
-
-QString formatFiniteNumber(const double value, const int precision)
-{
-    return std::isfinite(value)
-        ? QString::number(value, 'f', precision)
-        : QString("--");
-}
-
-QString formatMagnitude(const double value)
-{
-    return formatFiniteNumber(value, 1);
-}
-
-QString formatHorizontalCoordinate(
-    const skygate::core::HorizontalCoordinate& horizontal
-)
-{
-    return QString("Alt %1 deg / Az %2 deg").arg(
-        formatFiniteNumber(horizontal.altitudeDeg, 1),
-        formatFiniteNumber(horizontal.azimuthDeg, 1)
-    );
-}
-
-QString formatRightAscension(const double rightAscensionHours)
-{
-    if (!std::isfinite(rightAscensionHours)) {
-        return "--";
-    }
-
-    int totalSeconds = static_cast<int>(std::llround(rightAscensionHours * 3600.0));
-    totalSeconds %= 24 * 3600;
-    if (totalSeconds < 0) {
-        totalSeconds += 24 * 3600;
-    }
-
-    const int hours = totalSeconds / 3600;
-    const int minutes = (totalSeconds % 3600) / 60;
-    const int seconds = totalSeconds % 60;
-    return QString("%1h %2m %3s")
-        .arg(hours)
-        .arg(minutes, 2, 10, QChar('0'))
-        .arg(seconds, 2, 10, QChar('0'));
-}
-
-QString formatDeclination(const double declinationDeg)
-{
-    if (!std::isfinite(declinationDeg)) {
-        return "--";
-    }
-
-    const QString sign = declinationDeg < 0.0 ? "-" : "+";
-    int totalSeconds = static_cast<int>(std::llround(std::abs(declinationDeg) * 3600.0));
-    const int degrees = totalSeconds / 3600;
-    const int minutes = (totalSeconds % 3600) / 60;
-    const int seconds = totalSeconds % 60;
-    return QString("%1%2d %3m %4s")
-        .arg(sign)
-        .arg(degrees)
-        .arg(minutes, 2, 10, QChar('0'))
-        .arg(seconds, 2, 10, QChar('0'));
-}
-
-QString formatEquatorialCoordinate(
-    const skygate::core::EquatorialCoordinate& equatorial
-)
-{
-    return QString("%1 / %2").arg(
-        formatRightAscension(equatorial.rightAscensionHours),
-        formatDeclination(equatorial.declinationDeg)
-    );
-}
-
-QString formatArcmin(const double value)
-{
-    if (!std::isfinite(value)) {
-        return "--";
-    }
-
-    const int precision = value >= 10.0 ? 0 : 1;
-    return QString("%1 arcmin").arg(QString::number(value, 'f', precision));
-}
-
-QString angularSizeText(const skygate::ephemeris::DeepSkyObjectInfo& deepSkyObject)
-{
-    if (deepSkyObject.majorAxisArcmin.has_value() && deepSkyObject.minorAxisArcmin.has_value()) {
-        return QString("%1 x %2").arg(
-            formatArcmin(*deepSkyObject.majorAxisArcmin),
-            formatArcmin(*deepSkyObject.minorAxisArcmin)
-        );
-    }
-    if (deepSkyObject.majorAxisArcmin.has_value()) {
-        return formatArcmin(*deepSkyObject.majorAxisArcmin);
-    }
-    if (deepSkyObject.minorAxisArcmin.has_value()) {
-        return formatArcmin(*deepSkyObject.minorAxisArcmin);
-    }
-
-    return {};
-}
-
-QVariantMap inspectorField(const QString& label, const QString& value)
-{
-    QVariantMap field;
-    field.insert("label", label);
-    field.insert("value", value);
-    return field;
-}
-
-QString aliasesText(const skygate::ephemeris::CelestialBody& body)
-{
-    if (!body.deepSkyObject.has_value()) {
-        return {};
-    }
-
-    QStringList aliases;
-    const QString displayName = QString::fromStdString(body.displayName);
-    for (const std::string& alias : body.deepSkyObject->aliases) {
-        const QString aliasText = QString::fromStdString(alias).trimmed();
-        if (
-            aliasText.isEmpty()
-            || aliasText.compare(displayName, Qt::CaseInsensitive) == 0
-            || aliases.contains(aliasText, Qt::CaseInsensitive)
-        ) {
-            continue;
-        }
-
-        aliases.push_back(aliasText);
-    }
-
-    return aliases.join(", ");
-}
-
-QString sourceLabelForBodyIndex(
-    const std::span<const std::uint8_t> sourceIds,
-    const QStringList& sourceLabels,
-    const std::uint32_t bodyIndex
-)
-{
-    if (bodyIndex >= sourceIds.size()) {
-        return "Catalog";
-    }
-
-    const int sourceId = sourceIds[bodyIndex];
-    if (sourceId < 0 || sourceId >= sourceLabels.size()) {
-        return "Catalog";
-    }
-
-    const QString label = sourceLabels.at(sourceId).trimmed();
-    return label.isEmpty() ? QString("Catalog") : label;
-}
-
 }  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent)
@@ -532,10 +139,9 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
 
     disconnectFromContextController();
     m_skyContextController = controller;
-    m_cachedEphemerisEngine = nullptr;
-    m_snapshotCacheKey.reset();
-    m_renderFrameKey.reset();
-    m_snapshotGeneration = 0;
+    static_cast<void>(m_framePipeline.clear());
+    m_hitTargetIndex.clear();
+    m_sceneCompositionKey.reset();
     m_sceneFrame = {};
     m_selectedObjectTargetId.clear();
     m_selectedObjectInspectorPinned = false;
@@ -553,7 +159,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             [this] {
                 m_selectedObjectTargetId.clear();
                 m_selectedObjectInspectorPinned = false;
-                m_renderFrameKey.reset();
+                m_sceneCompositionKey.reset();
                 rebuildSceneFrame();
             }
         );
@@ -562,7 +168,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             &SkyContextController::trackedTargetChanged,
             this,
             [this] {
-                m_renderFrameKey.reset();
+                m_sceneCompositionKey.reset();
                 rebuildSceneFrame();
             }
         );
@@ -595,7 +201,7 @@ QVariantMap SkySceneModel::selectedObjectInspector() const
 
 std::uint64_t SkySceneModel::snapshotGeneration() const noexcept
 {
-    return m_snapshotGeneration;
+    return m_framePipeline.snapshotGeneration();
 }
 
 void SkySceneModel::setViewportSize(const double viewportWidth, const double viewportHeight)
@@ -614,27 +220,45 @@ void SkySceneModel::setViewportSize(const double viewportWidth, const double vie
 
 QString SkySceneModel::objectLabelAt(const double x, const double y) const
 {
-    const auto targetIndex = hitTargetIndexAt(x, y);
-    if (!targetIndex.has_value()) {
+    if (m_sceneFrame.snapshot == nullptr) {
         return {};
     }
 
-    const auto& body = m_sceneFrame.snapshot.bodyAt(
-        m_sceneFrame.hoverTargets[*targetIndex].bodyIndex
+    const auto bodyIndex = m_hitTargetIndex.bodyIndexAt(
+        x,
+        y,
+        m_viewportWidth,
+        m_viewportHeight,
+        *m_sceneFrame.snapshot
     );
+    if (!bodyIndex.has_value()) {
+        return {};
+    }
+
+    const auto& body = m_sceneFrame.snapshot->bodyAt(*bodyIndex);
     return QString::fromStdString(body.displayName);
 }
 
 bool SkySceneModel::selectObjectAt(const double x, const double y)
 {
-    const auto targetIndex = hitTargetIndexAt(x, y);
-    if (!targetIndex.has_value()) {
+    if (m_sceneFrame.snapshot == nullptr) {
         clearSelectedObjectInspector();
         return false;
     }
 
-    const auto& target = m_sceneFrame.hoverTargets[*targetIndex];
-    const auto& body = m_sceneFrame.snapshot.bodyAt(target.bodyIndex);
+    const auto bodyIndex = m_hitTargetIndex.bodyIndexAt(
+        x,
+        y,
+        m_viewportWidth,
+        m_viewportHeight,
+        *m_sceneFrame.snapshot
+    );
+    if (!bodyIndex.has_value()) {
+        clearSelectedObjectInspector();
+        return false;
+    }
+
+    const auto& body = m_sceneFrame.snapshot->bodyAt(*bodyIndex);
     if (body.id.empty()) {
         clearSelectedObjectInspector();
         return false;
@@ -645,7 +269,7 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
     }
     m_selectedObjectTargetId = QString::fromStdString(body.id);
     m_selectedObjectInspectorPinned = false;
-    m_renderFrameKey.reset();
+    m_sceneCompositionKey.reset();
     rebuildSceneFrame();
     return true;
 }
@@ -661,7 +285,7 @@ void SkySceneModel::clearSelectedObjectInspector()
         return;
     }
 
-    m_renderFrameKey.reset();
+    m_sceneCompositionKey.reset();
     rebuildSceneFrame();
 }
 
@@ -683,7 +307,7 @@ void SkySceneModel::setSelectedObjectInspectorPinned(const bool pinned)
     }
 
     m_selectedObjectInspectorPinned = pinned;
-    m_renderFrameKey.reset();
+    m_sceneCompositionKey.reset();
     rebuildSceneFrame();
 }
 
@@ -696,71 +320,8 @@ void SkySceneModel::moveSelectedObjectInspector(const double x, const double y)
     m_selectedObjectInspectorPinnedX = x;
     m_selectedObjectInspectorPinnedY = y;
     m_selectedObjectInspectorPinned = true;
-    m_renderFrameKey.reset();
+    m_sceneCompositionKey.reset();
     rebuildSceneFrame();
-}
-
-std::optional<std::size_t> SkySceneModel::hitTargetIndexAt(
-    const double x,
-    const double y
-) const
-{
-    if (
-        m_viewportWidth <= 0.0
-        || m_viewportHeight <= 0.0
-        || m_sceneFrame.hoverTargets.empty()
-        || m_sceneFrame.snapshot.catalogBodies == nullptr
-    ) {
-        return std::nullopt;
-    }
-
-    double bestDistanceSquared = std::numeric_limits<double>::infinity();
-    std::size_t bestTargetIndex = m_sceneFrame.hoverTargets.size();
-    const std::int32_t cellX =
-        skygate::core::GeometryMath::gridCellIndex(x, kHoverLookupCellSizePx);
-    const std::int32_t cellY =
-        skygate::core::GeometryMath::gridCellIndex(y, kHoverLookupCellSizePx);
-
-    for (int deltaY = -1; deltaY <= 1; ++deltaY) {
-        for (int deltaX = -1; deltaX <= 1; ++deltaX) {
-            const auto cellIt = m_sceneFrame.hoverTargetIndicesByCell.find(
-                skygate::core::GeometryMath::packedGridCellKey(cellX + deltaX, cellY + deltaY)
-            );
-            if (cellIt == m_sceneFrame.hoverTargetIndicesByCell.end()) {
-                continue;
-            }
-
-            for (const std::size_t targetIndex : cellIt->second) {
-                const auto& target = m_sceneFrame.hoverTargets[targetIndex];
-                const auto& body = m_sceneFrame.snapshot.bodyAt(target.bodyIndex);
-                if (body.displayName.empty()) {
-                    continue;
-                }
-
-                const double distanceSquared = skygate::core::GeometryMath::squaredDistance2d(
-                    x,
-                    y,
-                    target.x,
-                    target.y
-                );
-                const double hitRadius = target.radiusPx;
-                if (distanceSquared > (hitRadius * hitRadius)) {
-                    continue;
-                }
-
-                if (distanceSquared < bestDistanceSquared) {
-                    bestDistanceSquared = distanceSquared;
-                    bestTargetIndex = targetIndex;
-                }
-            }
-        }
-    }
-
-    if (bestTargetIndex >= m_sceneFrame.hoverTargets.size()) {
-        return std::nullopt;
-    }
-
-    return bestTargetIndex;
 }
 
 std::optional<skygate::core::PreparedProjection> SkySceneModel::preparedProjection() const
@@ -806,18 +367,17 @@ void SkySceneModel::disconnectFromContextController()
 
 bool SkySceneModel::clearSceneFrame()
 {
-    const bool hadSceneFrame = m_sceneFrame.preparedProjection.has_value()
-        || m_sceneFrame.snapshot.catalogBodies != nullptr
+    const bool hadSceneFrame = m_framePipeline.clear()
+        || m_sceneFrame.preparedProjection.has_value()
+        || m_sceneFrame.snapshot != nullptr
         || !m_sceneFrame.frame.points.empty()
         || !m_sceneFrame.frame.lines.empty()
         || !m_sceneFrame.frame.glyphs.empty()
         || !m_sceneFrame.overlayItems.isEmpty()
         || !m_sceneFrame.selectionMarker.isEmpty()
         || !m_sceneFrame.selectedObjectInspector.isEmpty();
-    m_cachedEphemerisEngine = nullptr;
-    m_snapshotCacheKey.reset();
-    m_renderFrameKey.reset();
-    m_snapshotGeneration = 0;
+    m_hitTargetIndex.clear();
+    m_sceneCompositionKey.reset();
     m_sceneFrame = {};
     return hadSceneFrame;
 }
@@ -838,19 +398,21 @@ std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() c
     }
 
     return SceneBuildInput {
-        .ephemerisEngine = ephemerisEngine,
-        .skyContext = m_skyContextController->skyContext(),
-        .catalogRevision = m_skyContextController->catalogRevision(),
-        .projectionType = m_skyContextController->projectionType(),
-        .viewCenterAltitudeDeg = m_skyContextController->viewCenterAltitudeDeg(),
-        .viewCenterAzimuthDeg = m_skyContextController->viewCenterAzimuthDeg(),
-        .viewFieldOfViewDeg = m_skyContextController->viewFieldOfViewDeg(),
-        .magnitudeCutoff = m_skyContextController->magnitudeCutoff(),
-        .themeId = m_skyContextController->themeId(),
-        .renderTheme = m_skyContextController->renderTheme(),
-        .overlayLayers = m_skyContextController->overlayLayerVisibility(),
-        .constellationLineRefs = m_skyContextController->constellationLineRefs(),
-        .constellationLabelRefs = m_skyContextController->constellationLabelRefs(),
+        .frameInput = SkySceneFramePipelineInput {
+            .ephemerisEngine = ephemerisEngine,
+            .skyContext = m_skyContextController->skyContext(),
+            .catalogRevision = m_skyContextController->catalogRevision(),
+            .projectionType = m_skyContextController->projectionType(),
+            .viewCenterAltitudeDeg = m_skyContextController->viewCenterAltitudeDeg(),
+            .viewCenterAzimuthDeg = m_skyContextController->viewCenterAzimuthDeg(),
+            .viewFieldOfViewDeg = m_skyContextController->viewFieldOfViewDeg(),
+            .magnitudeCutoff = m_skyContextController->magnitudeCutoff(),
+            .themeId = m_skyContextController->themeId(),
+            .renderTheme = m_skyContextController->renderTheme(),
+            .overlayLayers = m_skyContextController->overlayLayerVisibility(),
+            .constellationLineRefs = m_skyContextController->constellationLineRefs(),
+            .constellationLabelRefs = m_skyContextController->constellationLabelRefs()
+        },
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),
         .catalogSourceLabels = m_skyContextController->catalogSourceLabels(),
         .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
@@ -870,150 +432,68 @@ void SkySceneModel::rebuildSceneFrame()
         return;
     }
 
-    bool sceneFrameUpdated = false;
-    const skygate::core::ProjectionParams projectionParams =
-        skygate::core::ViewportMath::buildProjectionParams(
-            m_viewportWidth,
-            m_viewportHeight,
-            input->viewCenterAltitudeDeg,
-            input->viewCenterAzimuthDeg,
-            input->viewFieldOfViewDeg
-        );
-    auto preparedProjection = skygate::core::PreparedProjection::create(
-        input->projectionType,
-        projectionParams
+    const auto frameResult = m_framePipeline.rebuild(
+        input->frameInput,
+        m_viewportWidth,
+        m_viewportHeight
     );
-    if (!preparedProjection.has_value()) {
+    if (!frameResult.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
         }
         return;
     }
 
-    const SnapshotCacheKey snapshotKey {
-        .catalogRevision = input->catalogRevision,
-        .observer = input->skyContext.observer,
-        .utcTime = input->skyContext.utcTime
+    m_sceneFrame.preparedProjection = *frameResult->preparedProjection;
+    m_sceneFrame.snapshot = frameResult->snapshot;
+
+    const SkySelectionOverlayInput selectionInput = buildSelectionInput(*input, *frameResult);
+    const auto trailTargetBodyIndex =
+        m_selectionOverlayBuilder.activeTrailTargetBodyIndex(selectionInput);
+    const SceneCompositionKey compositionKey {
+        .renderFrameGeneration = frameResult->renderFrameGeneration,
+        .trailTargetBodyIndex = trailTargetBodyIndex,
+        .selectedObjectTargetId = m_selectedObjectTargetId,
+        .selectedSearchTargetKind = input->selectedSearchTargetKind,
+        .selectedSearchTargetId = input->selectedSearchTargetId,
+        .trackedTargetKind = input->trackedTargetKind,
+        .trackedTargetId = input->trackedTargetId,
+        .inspectorPinnedX = m_selectedObjectInspectorPinnedX,
+        .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
+        .inspectorPinned = m_selectedObjectInspectorPinned
     };
     if (
-        m_cachedEphemerisEngine != input->ephemerisEngine
-        || !m_snapshotCacheKey.has_value()
-        || !m_snapshotCacheKey.value().equals(snapshotKey)
+        !frameResult->updated
+        && m_sceneCompositionKey.has_value()
+        && m_sceneCompositionKey.value().equals(compositionKey)
     ) {
-        m_sceneFrame.snapshot = input->ephemerisEngine->compute(input->skyContext);
-        m_sceneFrame.stateIndexByBodyId.clear();
-        m_sceneFrame.stateIndexByBodyId.reserve(
-            static_cast<qsizetype>(m_sceneFrame.snapshot.states.size())
-        );
-        for (
-            std::size_t stateIndex = 0;
-            stateIndex < m_sceneFrame.snapshot.states.size();
-            ++stateIndex
-        ) {
-            const auto& state = m_sceneFrame.snapshot.states[stateIndex];
-            const auto& body = m_sceneFrame.snapshot.bodyAt(state.bodyIndex);
-            m_sceneFrame.stateIndexByBodyId.insert(normalizedLookupKey(body.id), stateIndex);
-        }
-        m_cachedEphemerisEngine = input->ephemerisEngine;
-        m_snapshotCacheKey = snapshotKey;
-        m_renderFrameKey.reset();
-        ++m_snapshotGeneration;
-        sceneFrameUpdated = true;
+        return;
     }
 
-    m_sceneFrame.preparedProjection = std::move(preparedProjection);
-
-    const RenderFrameKey renderFrameKey {
-        .snapshotGeneration = m_snapshotGeneration,
-        .projectionType = input->projectionType,
-        .viewportWidth = m_viewportWidth,
-        .viewportHeight = m_viewportHeight,
-        .viewCenterAltitudeDeg = input->viewCenterAltitudeDeg,
-        .viewCenterAzimuthDeg = input->viewCenterAzimuthDeg,
-        .viewFieldOfViewDeg = input->viewFieldOfViewDeg,
-        .magnitudeCutoff = input->magnitudeCutoff,
-        .themeId = input->themeId,
-        .trailTargetBodyIndex = activeTrailTargetBodyIndex(m_sceneFrame, input.value()),
-        .overlayLayers = input->overlayLayers
-    };
-    if (!m_renderFrameKey.has_value() || !m_renderFrameKey.value().equals(renderFrameKey)) {
-        const SkyRenderFrameBuilder frameBuilder;
-        m_sceneFrame.frame = frameBuilder.buildFrame(
-            m_sceneFrame.snapshot,
-            *m_sceneFrame.preparedProjection,
-            input->constellationLineRefs,
-            input->constellationLabelRefs,
-            input->magnitudeCutoff,
-            m_viewportWidth,
-            m_viewportHeight,
-            input->renderTheme,
-            input->overlayLayers
-        );
-        appendActiveObjectTrail(m_sceneFrame.frame, input.value());
-
-        m_sceneFrame.hoverTargets.clear();
-        m_sceneFrame.hoverTargets.reserve(
-            m_sceneFrame.frame.points.size() + m_sceneFrame.frame.glyphs.size()
-        );
-        m_sceneFrame.hoverTargetIndicesByCell.clear();
-        m_sceneFrame.hoverTargetIndicesByCell.reserve(
-            ((m_sceneFrame.frame.points.size() + m_sceneFrame.frame.glyphs.size()) / 4U) + 1U
-        );
-        for (const auto& point : m_sceneFrame.frame.points) {
-            const auto& body = m_sceneFrame.snapshot.bodyAt(point.bodyIndex);
-            if (body.displayName.empty()) {
-                continue;
+    m_sceneFrame.frame = *frameResult->frame;
+    if (trailTargetBodyIndex.has_value()) {
+        m_objectTrailBuilder.appendTrail(
+            m_sceneFrame.frame,
+            SkyObjectTrailInput {
+                .ephemerisEngine = input->frameInput.ephemerisEngine,
+                .preparedProjection = frameResult->preparedProjection,
+                .skyContext = input->frameInput.skyContext,
+                .renderTheme = input->frameInput.renderTheme,
+                .targetBodyIndex = *trailTargetBodyIndex,
+                .viewportWidth = m_viewportWidth,
+                .viewportHeight = m_viewportHeight
             }
-
-            const std::size_t targetIndex = m_sceneFrame.hoverTargets.size();
-            const double hitRadius = std::max(10.0, point.sizePx + 5.0);
-            m_sceneFrame.hoverTargets.push_back(SceneFrameData::HoverTarget {
-                .bodyIndex = point.bodyIndex,
-                .x = point.x,
-                .y = point.y,
-                .radiusPx = hitRadius
-            });
-            m_sceneFrame.hoverTargetIndicesByCell[
-                hoverCellKey(point.x, point.y, kHoverLookupCellSizePx)
-            ].push_back(targetIndex);
-        }
-
-        for (const auto& glyph : m_sceneFrame.frame.glyphs) {
-            const auto& body = m_sceneFrame.snapshot.bodyAt(glyph.bodyIndex);
-            if (body.displayName.empty()) {
-                continue;
-            }
-
-            const double hitRadius = std::max({
-                glyph.radiusXPx,
-                glyph.radiusYPx,
-                12.0
-            });
-            const std::size_t targetIndex = m_sceneFrame.hoverTargets.size();
-            m_sceneFrame.hoverTargets.push_back(SceneFrameData::HoverTarget {
-                .bodyIndex = glyph.bodyIndex,
-                .x = glyph.x,
-                .y = glyph.y,
-                .radiusPx = hitRadius
-            });
-            m_sceneFrame.hoverTargetIndicesByCell[
-                hoverCellKey(glyph.x, glyph.y, kHoverLookupCellSizePx)
-            ].push_back(targetIndex);
-        }
-
-        m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, input.value());
-        m_sceneFrame.selectionMarker = buildSelectionMarker(m_sceneFrame, input.value());
-        m_sceneFrame.selectedObjectInspector = buildSelectedObjectInspector(
-            m_sceneFrame,
-            input.value()
         );
-        m_renderFrameKey = renderFrameKey;
-        sceneFrameUpdated = true;
     }
 
-    if (sceneFrameUpdated) {
-        emit sceneFrameChanged();
-    }
+    m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
+    m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, *input);
+    m_sceneFrame.selectionMarker =
+        m_selectionOverlayBuilder.buildSelectionMarker(selectionInput);
+    m_sceneFrame.selectedObjectInspector =
+        m_selectionOverlayBuilder.buildSelectedObjectInspector(selectionInput);
+    m_sceneCompositionKey = compositionKey;
+    emit sceneFrameChanged();
 }
 
 QVariantList SkySceneModel::buildOverlayItems(
@@ -1027,9 +507,9 @@ QVariantList SkySceneModel::buildOverlayItems(
         return overlayItems;
     }
 
-    const auto& overlayLayers = input.overlayLayers;
-    const auto& renderTheme = input.renderTheme;
-    const auto& skyContext = input.skyContext;
+    const auto& overlayLayers = input.frameInput.overlayLayers;
+    const auto& renderTheme = input.frameInput.renderTheme;
+    const auto& skyContext = input.frameInput.skyContext;
 
     if (overlayLayers.ecliptic) {
         appendReferenceLayerLabel(
@@ -1118,265 +598,25 @@ QVariantList SkySceneModel::buildOverlayItems(
     return overlayItems;
 }
 
-QVariantMap SkySceneModel::buildSelectionMarker(
-    const SceneFrameData& sceneFrame,
-    const SceneBuildInput& input
+SkySelectionOverlayInput SkySceneModel::buildSelectionInput(
+    const SceneBuildInput& input,
+    const SkySceneFramePipelineResult& frameResult
 ) const
 {
-    if (!sceneFrame.preparedProjection.has_value()) {
-        return {};
-    }
-
-    QString targetKind;
-    QString targetId;
-    if (!m_selectedObjectTargetId.isEmpty()) {
-        targetKind = "body";
-        targetId = m_selectedObjectTargetId;
-    } else if (!input.trackedTargetId.trimmed().isEmpty()) {
-        targetKind = input.trackedTargetKind;
-        targetId = input.trackedTargetId;
-    } else {
-        targetKind = input.selectedSearchTargetKind;
-        targetId = input.selectedSearchTargetId;
-    }
-    if (targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
-        return {};
-    }
-
-    std::optional<QPointF> markerPoint;
-    if (normalizedLookupKey(targetKind) == "body") {
-        markerPoint = selectedBodyPoint(
-            sceneFrame.snapshot,
-            sceneFrame.stateIndexByBodyId,
-            *sceneFrame.preparedProjection,
-            targetId
-        );
-    } else if (normalizedLookupKey(targetKind) == "constellationlabel") {
-        markerPoint = selectedConstellationPoint(
-            sceneFrame.snapshot,
-            *sceneFrame.preparedProjection,
-            input.constellationLabelRefs,
-            targetId
-        );
-    }
-
-    if (!markerPoint.has_value()) {
-        return {};
-    }
-
-    return selectionMarkerEntry(markerPoint->x(), markerPoint->y());
-}
-
-QVariantMap SkySceneModel::buildSelectedObjectInspector(
-    const SceneFrameData& sceneFrame,
-    const SceneBuildInput& input
-) const
-{
-    const QString targetId = !m_selectedObjectTargetId.isEmpty()
-        ? m_selectedObjectTargetId
-        : (normalizedLookupKey(input.selectedSearchTargetKind) == "body"
-            ? input.selectedSearchTargetId
-            : QString());
-    if (targetId.trimmed().isEmpty() || !sceneFrame.preparedProjection.has_value()) {
-        return {};
-    }
-
-    const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
-        normalizedLookupKey(targetId)
-    );
-    if (stateIndexIt == sceneFrame.stateIndexByBodyId.cend()) {
-        return {};
-    }
-
-    const auto& state = sceneFrame.snapshot.states.at(*stateIndexIt);
-    const auto& body = sceneFrame.snapshot.bodyAt(state.bodyIndex);
-    if (body.displayName.empty()) {
-        return {};
-    }
-
-    double inspectorX = m_selectedObjectInspectorPinnedX;
-    double inspectorY = m_selectedObjectInspectorPinnedY;
-    if (!m_selectedObjectInspectorPinned) {
-        if (!hasFiniteHorizontal(state.horizontal)) {
-            return {};
-        }
-
-        const auto projected = sceneFrame.preparedProjection->project(state.horizontal);
-        if (!projected.isVisible) {
-            return {};
-        }
-
-        inspectorX = projected.x + 18.0;
-        inspectorY = projected.y + 18.0;
-    }
-
-    QVariantList fields;
-    fields.push_back(inspectorField("Type", celestialBodyTypeText(body)));
-    fields.push_back(inspectorField("Magnitude", formatMagnitude(body.visualMagnitude)));
-    fields.push_back(inspectorField("Alt/Az", formatHorizontalCoordinate(state.horizontal)));
-    fields.push_back(inspectorField("RA/Dec", formatEquatorialCoordinate(state.equatorial)));
-
-    if (body.deepSkyObject.has_value()) {
-        const QString sizeText = angularSizeText(*body.deepSkyObject);
-        if (!sizeText.isEmpty()) {
-            fields.push_back(inspectorField("Angular size", sizeText));
-        }
-    }
-
-    fields.push_back(inspectorField(
-        "Source",
-        sourceLabelForBodyIndex(input.catalogSourceIds, input.catalogSourceLabels, state.bodyIndex)
-    ));
-
-    QVariantMap inspector;
-    inspector.insert("visible", true);
-    inspector.insert("x", inspectorX);
-    inspector.insert("y", inspectorY);
-    inspector.insert("targetKind", "body");
-    inspector.insert("targetId", QString::fromStdString(body.id));
-    inspector.insert("title", QString::fromStdString(body.displayName));
-    inspector.insert("pinned", m_selectedObjectInspectorPinned);
-    inspector.insert("fields", fields);
-    inspector.insert("aliases", aliasesText(body));
-    return inspector;
-}
-
-QString SkySceneModel::activeTrailTargetBodyId(const SceneBuildInput& input) const
-{
-    if (!m_selectedObjectTargetId.trimmed().isEmpty()) {
-        return m_selectedObjectTargetId;
-    }
-
-    if (
-        normalizedLookupKey(input.trackedTargetKind) == "body"
-        && !input.trackedTargetId.trimmed().isEmpty()
-    ) {
-        return input.trackedTargetId;
-    }
-
-    if (
-        normalizedLookupKey(input.selectedSearchTargetKind) == "body"
-        && !input.selectedSearchTargetId.trimmed().isEmpty()
-    ) {
-        return input.selectedSearchTargetId;
-    }
-
-    return {};
-}
-
-std::optional<std::uint32_t> SkySceneModel::activeTrailTargetBodyIndex(
-    const SceneFrameData& sceneFrame,
-    const SceneBuildInput& input
-) const
-{
-    const QString targetBodyId = activeTrailTargetBodyId(input);
-    if (targetBodyId.trimmed().isEmpty()) {
-        return std::nullopt;
-    }
-
-    const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
-        normalizedLookupKey(targetBodyId)
-    );
-    if (stateIndexIt == sceneFrame.stateIndexByBodyId.cend()) {
-        return std::nullopt;
-    }
-
-    return sceneFrame.snapshot.states.at(*stateIndexIt).bodyIndex;
-}
-
-void SkySceneModel::appendActiveObjectTrail(
-    SkyRenderFrame& frame,
-    const SceneBuildInput& input
-) const
-{
-    if (
-        input.ephemerisEngine == nullptr
-        || !m_sceneFrame.preparedProjection.has_value()
-        || !input.skyContext.observer.isValid()
-    ) {
-        return;
-    }
-
-    const auto targetBodyIndex = activeTrailTargetBodyIndex(m_sceneFrame, input);
-    if (!targetBodyIndex.has_value()) {
-        return;
-    }
-
-    const double maxSegmentLength = std::max(m_viewportWidth, m_viewportHeight) * 0.35;
-    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
-    const QColor pastColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 105);
-    const QColor futureColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 175);
-
-    bool hasPreviousPoint = false;
-    skygate::core::ScreenPoint previousPoint;
-    int previousOffsetMinutes = 0;
-    const int pastMinutes = kObjectTrailPastHours * 60;
-    const int futureMinutes = kObjectTrailFutureHours * 60;
-
-    for (
-        int offsetMinutes = -pastMinutes;
-        offsetMinutes <= futureMinutes;
-        offsetMinutes += kObjectTrailSampleStepMinutes
-    ) {
-        skygate::core::SkyContext sampleContext = input.skyContext;
-        sampleContext.utcTime = input.skyContext.utcTime + std::chrono::minutes(offsetMinutes);
-        const auto state = input.ephemerisEngine->computeBodyState(
-            sampleContext,
-            *targetBodyIndex
-        );
-        if (!state.has_value() || !hasFiniteHorizontal(state->horizontal)) {
-            hasPreviousPoint = false;
-            continue;
-        }
-
-        const auto projected = m_sceneFrame.preparedProjection->project(state->horizontal);
-        if (!hasFiniteScreenPoint(projected)) {
-            hasPreviousPoint = false;
-            continue;
-        }
-
-        if (hasPreviousPoint) {
-            const double lengthSquared = skygate::core::GeometryMath::squaredDistance2d(
-                projected.x,
-                projected.y,
-                previousPoint.x,
-                previousPoint.y
-            );
-            if (lengthSquared <= maxSegmentLengthSquared) {
-                const bool isPastSegment = previousOffsetMinutes < 0 && offsetMinutes <= 0;
-                if (isPastSegment) {
-                    appendDashedTrailLine(
-                        frame,
-                        previousPoint.x,
-                        previousPoint.y,
-                        projected.x,
-                        projected.y,
-                        kObjectTrailPastWidthPx,
-                        pastColor
-                    );
-                } else {
-                    appendTrailLine(
-                        frame,
-                        previousPoint.x,
-                        previousPoint.y,
-                        projected.x,
-                        projected.y,
-                        kObjectTrailFutureWidthPx,
-                        futureColor
-                    );
-                }
-            }
-        }
-
-        if (
-            offsetMinutes > 0
-            && offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0
-        ) {
-            appendFutureTrailTick(frame, projected, offsetMinutes, futureColor);
-        }
-
-        previousPoint = projected;
-        previousOffsetMinutes = offsetMinutes;
-        hasPreviousPoint = true;
-    }
+    return SkySelectionOverlayInput {
+        .snapshot = frameResult.snapshot,
+        .preparedProjection = frameResult.preparedProjection,
+        .stateIndexByBodyId = frameResult.stateIndexByBodyId,
+        .constellationLabelRefs = input.frameInput.constellationLabelRefs,
+        .catalogSourceIds = input.catalogSourceIds,
+        .catalogSourceLabels = input.catalogSourceLabels,
+        .selectedObjectTargetId = m_selectedObjectTargetId,
+        .selectedSearchTargetKind = input.selectedSearchTargetKind,
+        .selectedSearchTargetId = input.selectedSearchTargetId,
+        .trackedTargetKind = input.trackedTargetKind,
+        .trackedTargetId = input.trackedTargetId,
+        .inspectorPinnedX = m_selectedObjectInspectorPinnedX,
+        .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
+        .inspectorPinned = m_selectedObjectInspectorPinned
+    };
 }

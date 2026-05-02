@@ -3,28 +3,24 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
-#include <QHash>
 #include <QStringList>
-#include <QVariantMap>
 #include <QVariantList>
+#include <QVariantMap>
 
+#include "SkyHitTargetIndex.hpp"
+#include "SkyObjectTrailBuilder.hpp"
 #include "SkyRenderBuilders.hpp"
+#include "SkySceneFramePipeline.hpp"
+#include "SkySelectionOverlayBuilder.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/ProjectionTypes.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <unordered_map>
-#include <vector>
 
 class SkyContextController;
-namespace skygate::ephemeris {
-class IEphemerisEngine;
-}
 
 class SkySceneModel final : public QObject {
     Q_OBJECT
@@ -70,85 +66,44 @@ signals:
     void sceneFrameChanged();
 
 private:
-    struct SnapshotCacheKey final {
-        std::uint64_t catalogRevision = 0;
-        skygate::core::GeoLocation observer;
-        skygate::core::UtcTimePoint utcTime {};
-
-        [[nodiscard]] bool equals(const SnapshotCacheKey& other) const noexcept
-        {
-            return catalogRevision == other.catalogRevision
-                && observer.latitudeDeg == other.observer.latitudeDeg
-                && observer.longitudeDeg == other.observer.longitudeDeg
-                && observer.elevationMeters == other.observer.elevationMeters
-                && utcTime == other.utcTime;
-        }
-    };
-
-    struct RenderFrameKey final {
-        std::uint64_t snapshotGeneration = 0;
-        skygate::core::ProjectionType projectionType =
-            skygate::core::ProjectionType::Stereographic;
-        double viewportWidth = 0.0;
-        double viewportHeight = 0.0;
-        double viewCenterAltitudeDeg = 0.0;
-        double viewCenterAzimuthDeg = 0.0;
-        double viewFieldOfViewDeg = 0.0;
-        double magnitudeCutoff = 0.0;
-        QString themeId;
+    struct SceneCompositionKey final {
+        std::uint64_t renderFrameGeneration = 0;
         std::optional<std::uint32_t> trailTargetBodyIndex;
-        SkyOverlayLayerVisibility overlayLayers;
+        QString selectedObjectTargetId;
+        QString selectedSearchTargetKind;
+        QString selectedSearchTargetId;
+        QString trackedTargetKind;
+        QString trackedTargetId;
+        double inspectorPinnedX = 0.0;
+        double inspectorPinnedY = 0.0;
+        bool inspectorPinned = false;
 
-        [[nodiscard]] bool equals(const RenderFrameKey& other) const noexcept
+        [[nodiscard]] bool equals(const SceneCompositionKey& other) const noexcept
         {
-            return snapshotGeneration == other.snapshotGeneration
-                && projectionType == other.projectionType
-                && viewportWidth == other.viewportWidth
-                && viewportHeight == other.viewportHeight
-                && viewCenterAltitudeDeg == other.viewCenterAltitudeDeg
-                && viewCenterAzimuthDeg == other.viewCenterAzimuthDeg
-                && viewFieldOfViewDeg == other.viewFieldOfViewDeg
-                && magnitudeCutoff == other.magnitudeCutoff
-                && themeId == other.themeId
+            return renderFrameGeneration == other.renderFrameGeneration
                 && trailTargetBodyIndex == other.trailTargetBodyIndex
-                && overlayLayers.equals(other.overlayLayers);
+                && selectedObjectTargetId == other.selectedObjectTargetId
+                && selectedSearchTargetKind == other.selectedSearchTargetKind
+                && selectedSearchTargetId == other.selectedSearchTargetId
+                && trackedTargetKind == other.trackedTargetKind
+                && trackedTargetId == other.trackedTargetId
+                && inspectorPinnedX == other.inspectorPinnedX
+                && inspectorPinnedY == other.inspectorPinnedY
+                && inspectorPinned == other.inspectorPinned;
         }
     };
 
     struct SceneFrameData final {
-        struct HoverTarget final {
-            std::uint32_t bodyIndex = 0;
-            double x = 0.0;
-            double y = 0.0;
-            double radiusPx = 0.0;
-        };
-
         std::optional<skygate::core::PreparedProjection> preparedProjection;
-        skygate::ephemeris::SkySnapshot snapshot;
+        const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
         SkyRenderFrame frame;
-        std::vector<HoverTarget> hoverTargets;
-        std::unordered_map<std::uint64_t, std::vector<std::size_t>> hoverTargetIndicesByCell;
-        QHash<QString, std::size_t> stateIndexByBodyId;
         QVariantList overlayItems;
         QVariantMap selectionMarker;
         QVariantMap selectedObjectInspector;
     };
 
     struct SceneBuildInput final {
-        const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
-        skygate::core::SkyContext skyContext;
-        std::uint64_t catalogRevision = 0;
-        skygate::core::ProjectionType projectionType =
-            skygate::core::ProjectionType::Stereographic;
-        double viewCenterAltitudeDeg = 0.0;
-        double viewCenterAzimuthDeg = 0.0;
-        double viewFieldOfViewDeg = 0.0;
-        double magnitudeCutoff = 0.0;
-        QString themeId;
-        skygate::ui::internal::SkyThemeRenderPalette renderTheme;
-        SkyOverlayLayerVisibility overlayLayers;
-        std::span<const skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
-        std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+        SkySceneFramePipelineInput frameInput;
         std::span<const std::uint8_t> catalogSourceIds;
         QStringList catalogSourceLabels;
         QString selectedSearchTargetKind;
@@ -166,21 +121,10 @@ private:
         const SceneFrameData& sceneFrame,
         const SceneBuildInput& input
     ) const;
-    [[nodiscard]] QVariantMap buildSelectionMarker(
-        const SceneFrameData& sceneFrame,
-        const SceneBuildInput& input
+    [[nodiscard]] SkySelectionOverlayInput buildSelectionInput(
+        const SceneBuildInput& input,
+        const SkySceneFramePipelineResult& frameResult
     ) const;
-    [[nodiscard]] QVariantMap buildSelectedObjectInspector(
-        const SceneFrameData& sceneFrame,
-        const SceneBuildInput& input
-    ) const;
-    [[nodiscard]] QString activeTrailTargetBodyId(const SceneBuildInput& input) const;
-    [[nodiscard]] std::optional<std::uint32_t> activeTrailTargetBodyIndex(
-        const SceneFrameData& sceneFrame,
-        const SceneBuildInput& input
-    ) const;
-    void appendActiveObjectTrail(SkyRenderFrame& frame, const SceneBuildInput& input) const;
-    [[nodiscard]] std::optional<std::size_t> hitTargetIndexAt(double x, double y) const;
 
 private:
     QPointer<SkyContextController> m_skyContextController;
@@ -190,10 +134,11 @@ private:
     QMetaObject::Connection m_themeChangedConnection;
     double m_viewportWidth = 0.0;
     double m_viewportHeight = 0.0;
-    const skygate::ephemeris::IEphemerisEngine* m_cachedEphemerisEngine = nullptr;
-    std::optional<SnapshotCacheKey> m_snapshotCacheKey;
-    std::optional<RenderFrameKey> m_renderFrameKey;
-    std::uint64_t m_snapshotGeneration = 0;
+    SkySceneFramePipeline m_framePipeline;
+    SkyHitTargetIndex m_hitTargetIndex;
+    SkySelectionOverlayBuilder m_selectionOverlayBuilder;
+    SkyObjectTrailBuilder m_objectTrailBuilder;
+    std::optional<SceneCompositionKey> m_sceneCompositionKey;
     SceneFrameData m_sceneFrame;
     QString m_selectedObjectTargetId;
     double m_selectedObjectInspectorPinnedX = 0.0;

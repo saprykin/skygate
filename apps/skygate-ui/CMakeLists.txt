@@ -19,10 +19,19 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyOverlayLayerSettings.cpp
     src/SkyOverlayLayerSettings.hpp
     src/SkyOverlayLayerVisibility.hpp
+    src/SkyHitTargetIndex.cpp
+    src/SkyHitTargetIndex.hpp
+    src/SkyObjectTrailBuilder.cpp
+    src/SkyObjectTrailBuilder.hpp
     src/SkyCatalogManager.cpp
     src/SkyCatalogManager.hpp
+    src/SkySceneFramePipeline.cpp
+    src/SkySceneFramePipeline.hpp
     src/SkySceneModel.cpp
     src/SkySceneModel.hpp
+    src/SkySceneShared.hpp
+    src/SkySelectionOverlayBuilder.cpp
+    src/SkySelectionOverlayBuilder.hpp
     src/SkyTheme.cpp
     src/SkyTheme.hpp
     src/catalog/SkyActiveCatalogBuilder.cpp
