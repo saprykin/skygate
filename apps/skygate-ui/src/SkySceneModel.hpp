@@ -57,6 +57,8 @@ public:
     Q_INVOKABLE QString objectLabelAt(double x, double y) const;
     Q_INVOKABLE bool selectObjectAt(double x, double y);
     Q_INVOKABLE void clearSelectedObjectInspector();
+    Q_INVOKABLE void setSelectedObjectInspectorPinned(bool pinned);
+    Q_INVOKABLE void moveSelectedObjectInspector(double x, double y);
 
     [[nodiscard]] std::optional<skygate::core::PreparedProjection> preparedProjection() const;
     [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan() const;
@@ -94,6 +96,7 @@ private:
         double viewFieldOfViewDeg = 0.0;
         double magnitudeCutoff = 0.0;
         QString themeId;
+        std::optional<std::uint32_t> trailTargetBodyIndex;
         SkyOverlayLayerVisibility overlayLayers;
 
         [[nodiscard]] bool equals(const RenderFrameKey& other) const noexcept
@@ -107,6 +110,7 @@ private:
                 && viewFieldOfViewDeg == other.viewFieldOfViewDeg
                 && magnitudeCutoff == other.magnitudeCutoff
                 && themeId == other.themeId
+                && trailTargetBodyIndex == other.trailTargetBodyIndex
                 && overlayLayers.equals(other.overlayLayers);
         }
     };
@@ -170,6 +174,12 @@ private:
         const SceneFrameData& sceneFrame,
         const SceneBuildInput& input
     ) const;
+    [[nodiscard]] QString activeTrailTargetBodyId(const SceneBuildInput& input) const;
+    [[nodiscard]] std::optional<std::uint32_t> activeTrailTargetBodyIndex(
+        const SceneFrameData& sceneFrame,
+        const SceneBuildInput& input
+    ) const;
+    void appendActiveObjectTrail(SkyRenderFrame& frame, const SceneBuildInput& input) const;
     [[nodiscard]] std::optional<std::size_t> hitTargetIndexAt(double x, double y) const;
 
 private:
@@ -186,7 +196,7 @@ private:
     std::uint64_t m_snapshotGeneration = 0;
     SceneFrameData m_sceneFrame;
     QString m_selectedObjectTargetId;
-    double m_selectedObjectAnchorX = 0.0;
-    double m_selectedObjectAnchorY = 0.0;
-    bool m_selectedObjectHasClickAnchor = false;
+    double m_selectedObjectInspectorPinnedX = 0.0;
+    double m_selectedObjectInspectorPinnedY = 0.0;
+    bool m_selectedObjectInspectorPinned = false;
 };

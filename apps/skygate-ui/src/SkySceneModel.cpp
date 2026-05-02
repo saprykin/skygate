@@ -11,7 +11,9 @@
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -21,6 +23,15 @@ namespace {
 constexpr double kHoverLookupCellSizePx = 24.0;
 constexpr int kReferenceLabelSampleCount = 96;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
+constexpr int kObjectTrailPastHours = 6;
+constexpr int kObjectTrailFutureHours = 18;
+constexpr int kObjectTrailSampleStepMinutes = 30;
+constexpr double kObjectTrailPastWidthPx = 1.4;
+constexpr double kObjectTrailFutureWidthPx = 2.0;
+constexpr double kObjectTrailPastDashLengthPx = 8.0;
+constexpr double kObjectTrailPastDashGapPx = 7.0;
+constexpr int kObjectTrailFutureTickStepHours = 6;
+constexpr double kObjectTrailFutureTickRadiusPx = 5.0;
 
 [[nodiscard]] std::uint64_t hoverCellKey(
     const double x,
@@ -143,6 +154,107 @@ QString normalizedLookupKey(const std::string& value)
 bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
 {
     return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
+}
+
+bool hasFiniteScreenPoint(const skygate::core::ScreenPoint& point)
+{
+    return point.isVisible && std::isfinite(point.x) && std::isfinite(point.y);
+}
+
+QColor colorWithAlpha(const QColor& color, const int alpha)
+{
+    QColor adjusted = color;
+    adjusted.setAlpha(alpha);
+    return adjusted;
+}
+
+void appendTrailLine(
+    SkyRenderFrame& frame,
+    const double x1,
+    const double y1,
+    const double x2,
+    const double y2,
+    const double widthPx,
+    const QColor& color
+)
+{
+    frame.lines.push_back(SkyRenderLine {
+        .x1 = x1,
+        .y1 = y1,
+        .x2 = x2,
+        .y2 = y2,
+        .widthPx = widthPx,
+        .color = color
+    });
+}
+
+void appendDashedTrailLine(
+    SkyRenderFrame& frame,
+    const double x1,
+    const double y1,
+    const double x2,
+    const double y2,
+    const double widthPx,
+    const QColor& color
+)
+{
+    const double deltaX = x2 - x1;
+    const double deltaY = y2 - y1;
+    const double length = std::hypot(deltaX, deltaY);
+    if (length <= 1e-9) {
+        return;
+    }
+
+    const double unitX = deltaX / length;
+    const double unitY = deltaY / length;
+    double dashStart = 0.0;
+    while (dashStart < length) {
+        const double dashEnd = std::min(dashStart + kObjectTrailPastDashLengthPx, length);
+        appendTrailLine(
+            frame,
+            x1 + (unitX * dashStart),
+            y1 + (unitY * dashStart),
+            x1 + (unitX * dashEnd),
+            y1 + (unitY * dashEnd),
+            widthPx,
+            color
+        );
+        dashStart += kObjectTrailPastDashLengthPx + kObjectTrailPastDashGapPx;
+    }
+}
+
+void appendFutureTrailTick(
+    SkyRenderFrame& frame,
+    const skygate::core::ScreenPoint& point,
+    const int offsetMinutes,
+    const QColor& color
+)
+{
+    appendTrailLine(
+        frame,
+        point.x - kObjectTrailFutureTickRadiusPx,
+        point.y,
+        point.x + kObjectTrailFutureTickRadiusPx,
+        point.y,
+        kObjectTrailFutureWidthPx,
+        color
+    );
+    appendTrailLine(
+        frame,
+        point.x,
+        point.y - kObjectTrailFutureTickRadiusPx,
+        point.x,
+        point.y + kObjectTrailFutureTickRadiusPx,
+        kObjectTrailFutureWidthPx,
+        color
+    );
+    frame.labels.push_back(overlayEntry(
+        "trailTick",
+        point.x,
+        point.y,
+        QString("+%1h").arg(offsetMinutes / 60),
+        color
+    ));
 }
 
 QVariantMap selectionMarkerEntry(
@@ -426,7 +538,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
     m_snapshotGeneration = 0;
     m_sceneFrame = {};
     m_selectedObjectTargetId.clear();
-    m_selectedObjectHasClickAnchor = false;
+    m_selectedObjectInspectorPinned = false;
     if (m_skyContextController != nullptr) {
         m_skyContextChangedConnection = connect(
             m_skyContextController,
@@ -440,7 +552,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             this,
             [this] {
                 m_selectedObjectTargetId.clear();
-                m_selectedObjectHasClickAnchor = false;
+                m_selectedObjectInspectorPinned = false;
                 m_renderFrameKey.reset();
                 rebuildSceneFrame();
             }
@@ -532,9 +644,7 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
         m_skyContextController->clearSelectedSearchTarget();
     }
     m_selectedObjectTargetId = QString::fromStdString(body.id);
-    m_selectedObjectAnchorX = x;
-    m_selectedObjectAnchorY = y;
-    m_selectedObjectHasClickAnchor = true;
+    m_selectedObjectInspectorPinned = false;
     m_renderFrameKey.reset();
     rebuildSceneFrame();
     return true;
@@ -543,14 +653,49 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
 void SkySceneModel::clearSelectedObjectInspector()
 {
     const bool hadSelection = !m_selectedObjectTargetId.isEmpty()
-        || m_selectedObjectHasClickAnchor
+        || m_selectedObjectInspectorPinned
         || !m_sceneFrame.selectedObjectInspector.isEmpty();
     m_selectedObjectTargetId.clear();
-    m_selectedObjectHasClickAnchor = false;
+    m_selectedObjectInspectorPinned = false;
     if (!hadSelection) {
         return;
     }
 
+    m_renderFrameKey.reset();
+    rebuildSceneFrame();
+}
+
+void SkySceneModel::setSelectedObjectInspectorPinned(const bool pinned)
+{
+    if (m_selectedObjectInspectorPinned == pinned) {
+        return;
+    }
+
+    if (pinned) {
+        if (m_sceneFrame.selectedObjectInspector.isEmpty()) {
+            return;
+        }
+
+        m_selectedObjectInspectorPinnedX =
+            m_sceneFrame.selectedObjectInspector.value("x").toDouble();
+        m_selectedObjectInspectorPinnedY =
+            m_sceneFrame.selectedObjectInspector.value("y").toDouble();
+    }
+
+    m_selectedObjectInspectorPinned = pinned;
+    m_renderFrameKey.reset();
+    rebuildSceneFrame();
+}
+
+void SkySceneModel::moveSelectedObjectInspector(const double x, const double y)
+{
+    if (!std::isfinite(x) || !std::isfinite(y)) {
+        return;
+    }
+
+    m_selectedObjectInspectorPinnedX = x;
+    m_selectedObjectInspectorPinnedY = y;
+    m_selectedObjectInspectorPinned = true;
     m_renderFrameKey.reset();
     rebuildSceneFrame();
 }
@@ -788,6 +933,7 @@ void SkySceneModel::rebuildSceneFrame()
         .viewFieldOfViewDeg = input->viewFieldOfViewDeg,
         .magnitudeCutoff = input->magnitudeCutoff,
         .themeId = input->themeId,
+        .trailTargetBodyIndex = activeTrailTargetBodyIndex(m_sceneFrame, input.value()),
         .overlayLayers = input->overlayLayers
     };
     if (!m_renderFrameKey.has_value() || !m_renderFrameKey.value().equals(renderFrameKey)) {
@@ -803,6 +949,7 @@ void SkySceneModel::rebuildSceneFrame()
             input->renderTheme,
             input->overlayLayers
         );
+        appendActiveObjectTrail(m_sceneFrame.frame, input.value());
 
         m_sceneFrame.hoverTargets.clear();
         m_sceneFrame.hoverTargets.reserve(
@@ -1047,9 +1194,9 @@ QVariantMap SkySceneModel::buildSelectedObjectInspector(
         return {};
     }
 
-    double inspectorX = m_selectedObjectAnchorX + 14.0;
-    double inspectorY = m_selectedObjectAnchorY + 14.0;
-    if (!m_selectedObjectHasClickAnchor) {
+    double inspectorX = m_selectedObjectInspectorPinnedX;
+    double inspectorY = m_selectedObjectInspectorPinnedY;
+    if (!m_selectedObjectInspectorPinned) {
         if (!hasFiniteHorizontal(state.horizontal)) {
             return {};
         }
@@ -1088,7 +1235,148 @@ QVariantMap SkySceneModel::buildSelectedObjectInspector(
     inspector.insert("targetKind", "body");
     inspector.insert("targetId", QString::fromStdString(body.id));
     inspector.insert("title", QString::fromStdString(body.displayName));
+    inspector.insert("pinned", m_selectedObjectInspectorPinned);
     inspector.insert("fields", fields);
     inspector.insert("aliases", aliasesText(body));
     return inspector;
+}
+
+QString SkySceneModel::activeTrailTargetBodyId(const SceneBuildInput& input) const
+{
+    if (!m_selectedObjectTargetId.trimmed().isEmpty()) {
+        return m_selectedObjectTargetId;
+    }
+
+    if (
+        normalizedLookupKey(input.trackedTargetKind) == "body"
+        && !input.trackedTargetId.trimmed().isEmpty()
+    ) {
+        return input.trackedTargetId;
+    }
+
+    if (
+        normalizedLookupKey(input.selectedSearchTargetKind) == "body"
+        && !input.selectedSearchTargetId.trimmed().isEmpty()
+    ) {
+        return input.selectedSearchTargetId;
+    }
+
+    return {};
+}
+
+std::optional<std::uint32_t> SkySceneModel::activeTrailTargetBodyIndex(
+    const SceneFrameData& sceneFrame,
+    const SceneBuildInput& input
+) const
+{
+    const QString targetBodyId = activeTrailTargetBodyId(input);
+    if (targetBodyId.trimmed().isEmpty()) {
+        return std::nullopt;
+    }
+
+    const auto stateIndexIt = sceneFrame.stateIndexByBodyId.constFind(
+        normalizedLookupKey(targetBodyId)
+    );
+    if (stateIndexIt == sceneFrame.stateIndexByBodyId.cend()) {
+        return std::nullopt;
+    }
+
+    return sceneFrame.snapshot.states.at(*stateIndexIt).bodyIndex;
+}
+
+void SkySceneModel::appendActiveObjectTrail(
+    SkyRenderFrame& frame,
+    const SceneBuildInput& input
+) const
+{
+    if (
+        input.ephemerisEngine == nullptr
+        || !m_sceneFrame.preparedProjection.has_value()
+        || !input.skyContext.observer.isValid()
+    ) {
+        return;
+    }
+
+    const auto targetBodyIndex = activeTrailTargetBodyIndex(m_sceneFrame, input);
+    if (!targetBodyIndex.has_value()) {
+        return;
+    }
+
+    const double maxSegmentLength = std::max(m_viewportWidth, m_viewportHeight) * 0.35;
+    const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
+    const QColor pastColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 105);
+    const QColor futureColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 175);
+
+    bool hasPreviousPoint = false;
+    skygate::core::ScreenPoint previousPoint;
+    int previousOffsetMinutes = 0;
+    const int pastMinutes = kObjectTrailPastHours * 60;
+    const int futureMinutes = kObjectTrailFutureHours * 60;
+
+    for (
+        int offsetMinutes = -pastMinutes;
+        offsetMinutes <= futureMinutes;
+        offsetMinutes += kObjectTrailSampleStepMinutes
+    ) {
+        skygate::core::SkyContext sampleContext = input.skyContext;
+        sampleContext.utcTime = input.skyContext.utcTime + std::chrono::minutes(offsetMinutes);
+        const auto state = input.ephemerisEngine->computeBodyState(
+            sampleContext,
+            *targetBodyIndex
+        );
+        if (!state.has_value() || !hasFiniteHorizontal(state->horizontal)) {
+            hasPreviousPoint = false;
+            continue;
+        }
+
+        const auto projected = m_sceneFrame.preparedProjection->project(state->horizontal);
+        if (!hasFiniteScreenPoint(projected)) {
+            hasPreviousPoint = false;
+            continue;
+        }
+
+        if (hasPreviousPoint) {
+            const double lengthSquared = skygate::core::GeometryMath::squaredDistance2d(
+                projected.x,
+                projected.y,
+                previousPoint.x,
+                previousPoint.y
+            );
+            if (lengthSquared <= maxSegmentLengthSquared) {
+                const bool isPastSegment = previousOffsetMinutes < 0 && offsetMinutes <= 0;
+                if (isPastSegment) {
+                    appendDashedTrailLine(
+                        frame,
+                        previousPoint.x,
+                        previousPoint.y,
+                        projected.x,
+                        projected.y,
+                        kObjectTrailPastWidthPx,
+                        pastColor
+                    );
+                } else {
+                    appendTrailLine(
+                        frame,
+                        previousPoint.x,
+                        previousPoint.y,
+                        projected.x,
+                        projected.y,
+                        kObjectTrailFutureWidthPx,
+                        futureColor
+                    );
+                }
+            }
+        }
+
+        if (
+            offsetMinutes > 0
+            && offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0
+        ) {
+            appendFutureTrailTick(frame, projected, offsetMinutes, futureColor);
+        }
+
+        previousPoint = projected;
+        previousOffsetMinutes = offsetMinutes;
+        hasPreviousPoint = true;
+    }
 }

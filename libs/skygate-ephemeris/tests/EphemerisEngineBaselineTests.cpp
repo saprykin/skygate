@@ -38,6 +38,7 @@ private slots:
     void computesFiniteSolarSystemCoordinates();
     void movingBodiesChangeAcrossDays();
     void supportsNullCatalogAndImportedFixedCoordinates();
+    void computesSingleBodyStateByCaseInsensitiveIdAndIndex();
 };
 
 void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
@@ -188,6 +189,42 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
         -30.0,
         1e-8
     ));
+}
+
+void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAndIndex()
+{
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
+
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            4.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 12.5,
+                .declinationDeg = -30.0
+            }
+        ),
+    });
+    QVERIFY(catalog != nullptr);
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
+
+    const auto byId = engine->computeBodyState(context, "DEMO_STAR");
+    QVERIFY(byId.has_value());
+    QCOMPARE(byId->bodyIndex, 0U);
+    QVERIFY(std::isfinite(byId->horizontal.altitudeDeg));
+
+    const auto byIndex = engine->computeBodyState(context, 0U);
+    QVERIFY(byIndex.has_value());
+    QCOMPARE(byIndex->bodyIndex, 0U);
+    QCOMPARE(byIndex->equatorial.rightAscensionHours, byId->equatorial.rightAscensionHours);
+    QVERIFY(!engine->computeBodyState(context, 1U).has_value());
 }
 
 QTEST_APPLESS_MAIN(EphemerisEngineBaselineTests)

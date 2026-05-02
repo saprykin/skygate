@@ -193,20 +193,40 @@ Item {
         readonly property bool hasInspector: inspectorData
             && inspectorData.visible === true
             && inspectorData.title !== undefined
+        readonly property bool inspectorPinned: objectInspector.hasInspector
+            && inspectorData.pinned === true
+        property bool draggingInspector: false
+        property real dragStartPointerX: 0
+        property real dragStartPointerY: 0
+        property real dragStartPanelX: 0
+        property real dragStartPanelY: 0
+
+        function clampedInspectorX(value) {
+            return Math.min(
+                Math.max(8, value),
+                Math.max(8, overlayRoot.width - objectInspector.width - 8)
+            )
+        }
+
+        function clampedInspectorY(value) {
+            return Math.min(
+                Math.max(8, value),
+                Math.max(8, overlayRoot.height - objectInspector.height - 8)
+            )
+        }
+
+        function pointerPositionInOverlay(mouse) {
+            return objectInspector.mapToItem(overlayRoot, mouse.x, mouse.y)
+        }
+
         visible: hasInspector
         width: Math.min(350, Math.max(280, inspectorContent.implicitWidth + 22))
         height: inspectorContent.implicitHeight + 18
         x: hasInspector
-            ? Math.min(
-                Math.max(8, inspectorData.x),
-                Math.max(8, overlayRoot.width - width - 8)
-            )
+            ? clampedInspectorX(inspectorData.x)
             : 0
         y: hasInspector
-            ? Math.min(
-                Math.max(8, inspectorData.y),
-                Math.max(8, overlayRoot.height - height - 8)
-            )
+            ? clampedInspectorY(inspectorData.y)
             : 0
         radius: 8
         color: theme.toolbarDropdownBackground
@@ -220,7 +240,41 @@ Item {
             acceptedButtons: Qt.AllButtons
             hoverEnabled: true
             preventStealing: true
-            cursorShape: Qt.ArrowCursor
+            cursorShape: objectInspector.draggingInspector
+                ? Qt.ClosedHandCursor
+                : Qt.OpenHandCursor
+            onPressed: function(mouse) {
+                if (mouse.button !== Qt.LeftButton || !objectInspector.hasInspector) {
+                    return
+                }
+
+                const pointer = objectInspector.pointerPositionInOverlay(mouse)
+                objectInspector.draggingInspector = true
+                objectInspector.dragStartPointerX = pointer.x
+                objectInspector.dragStartPointerY = pointer.y
+                objectInspector.dragStartPanelX = objectInspector.x
+                objectInspector.dragStartPanelY = objectInspector.y
+            }
+            onPositionChanged: function(mouse) {
+                if (!objectInspector.draggingInspector) {
+                    return
+                }
+
+                const pointer = objectInspector.pointerPositionInOverlay(mouse)
+                const nextX = objectInspector.clampedInspectorX(
+                    objectInspector.dragStartPanelX + pointer.x - objectInspector.dragStartPointerX
+                )
+                const nextY = objectInspector.clampedInspectorY(
+                    objectInspector.dragStartPanelY + pointer.y - objectInspector.dragStartPointerY
+                )
+                sceneModel.moveSelectedObjectInspector(nextX, nextY)
+            }
+            onReleased: function() {
+                objectInspector.draggingInspector = false
+            }
+            onCanceled: {
+                objectInspector.draggingInspector = false
+            }
             onWheel: function(wheel) {
                 wheel.accepted = true
             }
@@ -240,6 +294,7 @@ Item {
                     inspectorTitle.implicitHeight,
                     centerInspectorButton.height,
                     trackInspectorButton.height,
+                    pinInspectorButton.height,
                     closeInspectorButton.height
                 )
                 spacing: 8
@@ -249,8 +304,9 @@ Item {
                     width: parent.width
                         - centerInspectorButton.width
                         - trackInspectorButton.width
+                        - pinInspectorButton.width
                         - closeInspectorButton.width
-                        - (parent.spacing * 3)
+                        - (parent.spacing * 4)
                     text: objectInspector.hasInspector ? inspectorData.title : ""
                     color: theme.toolbarPrimaryText
                     font.family: "Avenir Next"
@@ -347,6 +403,54 @@ Item {
                                    : theme.toolbarButtonBackground)
                         border.width: 1
                         border.color: overlayRoot.inspectorIsTracked
+                            ? theme.selectionMarkerBorder
+                            : theme.toolbarButtonBorder
+                    }
+                }
+
+                ToolButton {
+                    id: pinInspectorButton
+                    width: 52
+                    height: 22
+                    text: objectInspector.inspectorPinned ? "Unpin" : "Pin"
+                    font.family: "Avenir Next"
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    enabled: objectInspector.hasInspector
+                    onClicked: {
+                        if (objectInspector.inspectorPinned) {
+                            sceneModel.setSelectedObjectInspectorPinned(false)
+                            return
+                        }
+
+                        sceneModel.moveSelectedObjectInspector(objectInspector.x, objectInspector.y)
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 250
+                    ToolTip.text: objectInspector.inspectorPinned
+                        ? "Let inspector follow object"
+                        : "Pin inspector on screen"
+
+                    contentItem: Text {
+                        text: pinInspectorButton.text
+                        color: pinInspectorButton.enabled
+                            ? theme.toolbarButtonText
+                            : theme.toolbarSecondaryText
+                        font: pinInspectorButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                    }
+
+                    background: Rectangle {
+                        radius: 6
+                        color: pinInspectorButton.down
+                            ? theme.toolbarButtonBackgroundPressed
+                            : (pinInspectorButton.hovered
+                                   ? theme.toolbarButtonBackgroundHover
+                                   : theme.toolbarButtonBackground)
+                        border.width: 1
+                        border.color: objectInspector.inspectorPinned
                             ? theme.selectionMarkerBorder
                             : theme.toolbarButtonBorder
                     }

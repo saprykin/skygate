@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -32,31 +33,71 @@ public:
         snapshot.states.reserve(m_bodies->size());
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
             const CelestialBody& body = (*m_bodies)[bodyIndex];
-            CelestialBodyState state;
-            state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
-            state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
-            state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
-            state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
-            state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
-
-            if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
-                state.equatorial = *equatorial;
-                if (context.observer.isValid()) {
-                    state.horizontal = CoordinateTransform::equatorialToHorizontal(
-                        *equatorial,
-                        context.observer,
-                        context.utcTime
-                    );
-                }
-            }
-
-            snapshot.states.push_back(state);
+            snapshot.states.push_back(computeStateForBody(body, bodyIndex, context));
         }
 
         return snapshot;
     }
 
+    [[nodiscard]] std::optional<CelestialBodyState> computeBodyState(
+        const core::SkyContext& context,
+        const std::string_view bodyId
+    ) const override
+    {
+        if (bodyId.empty()) {
+            return std::nullopt;
+        }
+
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            const CelestialBody& body = (*m_bodies)[bodyIndex];
+            if (detail::bodyIdEquals(body.id, bodyId)) {
+                return computeStateForBody(body, bodyIndex, context);
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<CelestialBodyState> computeBodyState(
+        const core::SkyContext& context,
+        const std::uint32_t bodyIndex
+    ) const override
+    {
+        if (bodyIndex >= m_bodies->size()) {
+            return std::nullopt;
+        }
+
+        return computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, context);
+    }
+
 private:
+    [[nodiscard]] CelestialBodyState computeStateForBody(
+        const CelestialBody& body,
+        const std::size_t bodyIndex,
+        const core::SkyContext& context
+    ) const
+    {
+        CelestialBodyState state;
+        state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
+        state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
+        state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
+        state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
+        state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
+
+        if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
+            state.equatorial = *equatorial;
+            if (context.observer.isValid()) {
+                state.horizontal = CoordinateTransform::equatorialToHorizontal(
+                    *equatorial,
+                    context.observer,
+                    context.utcTime
+                );
+            }
+        }
+
+        return state;
+    }
+
     [[nodiscard]] std::optional<core::EquatorialCoordinate> computeEquatorial(
         const CelestialBody& body,
         const core::UtcTimePoint& utcTime
