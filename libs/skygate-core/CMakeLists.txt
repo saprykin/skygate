@@ -9,10 +9,8 @@ add_library(skygate-core STATIC
     include/skygate/core/Types.hpp
     include/skygate/core/math/AngleMath.hpp
     include/skygate/core/math/Geometry2d.hpp
-    include/skygate/core/math/GeometryMath.hpp
     include/skygate/core/math/LinePattern.hpp
     include/skygate/core/math/MathConstants.hpp
-    include/skygate/core/math/ProjectionMath.hpp
     include/skygate/core/math/ProjectedPolylineBuilder.hpp
     include/skygate/core/math/ScreenGeometry.hpp
     include/skygate/core/math/SpatialIndex2d.hpp
@@ -27,9 +25,7 @@ add_library(skygate-core STATIC
     src/SystemTimeSource.cpp
     src/math/AngleMath.cpp
     src/math/Geometry2d.cpp
-    src/math/GeometryMath.cpp
     src/math/LinePattern.cpp
-    src/math/ProjectionMath.cpp
     src/math/ProjectedPolylineBuilder.cpp
     src/math/SpatialIndex2d.cpp
     src/math/SphericalGeometry.cpp
