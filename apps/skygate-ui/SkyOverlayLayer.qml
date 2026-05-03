@@ -541,7 +541,9 @@ Item {
 
                 Text {
                     width: parent.width - 100
-                    text: objectInspector.hasInspector ? inspectorData.aliases : ""
+                    text: objectInspector.hasInspector && inspectorData.aliases !== undefined
+                        ? inspectorData.aliases
+                        : ""
                     color: theme.toolbarPrimaryText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
