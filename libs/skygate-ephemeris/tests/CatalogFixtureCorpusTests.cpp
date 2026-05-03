@@ -23,6 +23,7 @@ private slots:
     void parsesFixtureCorpus_data();
     void parsesFixtureCorpus();
     void parsesStellariumFixture();
+    void toleratesMalformedStellariumFixture();
 };
 
 namespace {
@@ -92,6 +93,16 @@ void CatalogFixtureCorpusTests::parsesFixtureCorpus_data()
         << skygate::ephemeris::CatalogPayloadFormat::HygCsvZip
         << QStringLiteral("hip_32349")
         << 3;
+    QTest::newRow("hyg-extra-columns")
+        << QStringLiteral("catalogs/realistic-hyg-extra-columns.csv")
+        << skygate::ephemeris::CatalogPayloadFormat::HygCsv
+        << QStringLiteral("hip_7588")
+        << 2;
+    QTest::newRow("open-ngc-mixed")
+        << QStringLiteral("catalogs/realistic-openngc-mixed.csv")
+        << skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv
+        << QStringLiteral("messier_042")
+        << 4;
 }
 
 void CatalogFixtureCorpusTests::parsesFixtureCorpus()
@@ -129,6 +140,21 @@ void CatalogFixtureCorpusTests::parsesStellariumFixture()
     QCOMPARE(result.labelRefs.size(), 2U);
     QCOMPARE(result.labelRefs[0].first, std::string("Orion"));
     QCOMPARE(result.labelRefs[1].first, std::string("Ursa Major"));
+}
+
+void CatalogFixtureCorpusTests::toleratesMalformedStellariumFixture()
+{
+    const QByteArray payload =
+        readFixture(QStringLiteral("catalogs/stellarium-malformed-mixed.json"));
+    QVERIFY(!payload.isEmpty());
+
+    const skygate::ephemeris::StellariumConstellationParser parser;
+    const auto result = parser.parse(payloadView(payload));
+
+    QCOMPARE(result.constellationCount, 2U);
+    QCOMPARE(result.lineRefs.size(), 1U);
+    QCOMPARE(result.labelRefs.size(), 1U);
+    QCOMPARE(result.labelRefs.front().first, std::string("Cassiopeia"));
 }
 
 QTEST_APPLESS_MAIN(CatalogFixtureCorpusTests)

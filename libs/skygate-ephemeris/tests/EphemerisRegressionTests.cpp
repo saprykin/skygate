@@ -55,6 +55,7 @@ class EphemerisRegressionTests final : public QObject {
 private slots:
     void solarSystemBodiesMatchGoldenApproximation();
     void solarSystemBodiesMatchGoldenApproximationAcrossContexts();
+    void solarSystemBodiesStayNearExternalReferenceValues();
     void equatorialToHorizontalPlacesTransitAtZenith();
     void observerLongitudeChangesLocalSiderealHourAngle();
     void rightAscensionWrapsAcrossTwentyFourHours();
@@ -210,6 +211,77 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximationAcrossCo
                 expectedContext.label
             );
         }
+    }
+}
+
+void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues()
+{
+    const auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    QVERIFY(catalog != nullptr);
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
+
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 0.0;
+    context.observer.longitudeDeg = 0.0;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    const auto snapshot = engine->compute(context);
+    struct ExternalReference final {
+        const char* id;
+        double rightAscensionHours;
+        double declinationDeg;
+        double altitudeDeg;
+        double azimuthDeg;
+        double equatorialToleranceDeg;
+        double horizontalToleranceDeg;
+    };
+
+    // NASA/JPL Horizons observer table, 2024-Jan-01 00:00 UTC at 0 E, 0 N.
+    // The production engine is intentionally low precision, so these guardrails
+    // catch gross drift without requiring planetary-ephemeris accuracy.
+    const std::array<ExternalReference, 3> references {{
+        {"sun", 18.70435, -23.07967, -66.93037, 181.80724, 0.75, 1.0},
+        {"moon", 10.63987, 12.85442, 29.41594, 75.34794, 25.0, 30.0},
+        {"mars", 17.77972, -23.95164, -62.87989, 152.98409, 4.0, 35.0},
+    }};
+
+    for (const ExternalReference& reference : references) {
+        const auto* state = findStateById(snapshot, reference.id);
+        QVERIFY2(state != nullptr, reference.id);
+        const double raDeltaHours = std::abs(
+            state->equatorial.rightAscensionHours - reference.rightAscensionHours
+        );
+        const double wrappedRaDeltaHours = std::min(raDeltaHours, 24.0 - raDeltaHours);
+        QVERIFY2(
+            wrappedRaDeltaHours * 15.0 <= reference.equatorialToleranceDeg,
+            reference.id
+        );
+        QVERIFY2(
+            isNear(
+                state->equatorial.declinationDeg,
+                reference.declinationDeg,
+                reference.equatorialToleranceDeg
+            ),
+            reference.id
+        );
+        QVERIFY2(
+            isNear(
+                state->horizontal.altitudeDeg,
+                reference.altitudeDeg,
+                reference.horizontalToleranceDeg
+            ),
+            reference.id
+        );
+        QVERIFY2(
+            isNear(
+                state->horizontal.azimuthDeg,
+                reference.azimuthDeg,
+                reference.horizontalToleranceDeg
+            ),
+            reference.id
+        );
     }
 }
 

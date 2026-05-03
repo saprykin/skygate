@@ -147,10 +147,13 @@ private slots:
     void downloadServiceRetriesUntilFirstSuccessfulPayload();
     void downloadServiceRejectsEmptyAndOversizedPayloads();
     void downloadServiceDoesNotCallDestroyedCallbackContext();
+    void downloadServiceStopsRetryAfterDestroyedCallbackContext();
     void downloadServiceCompletesConcurrentRequestsIndependently();
+    void downloadServiceConcurrentFallbackChainsRemainIsolated();
     void coordinatorParsesSuccessfulDownloadedCatalog();
     void coordinatorReportsParseFailureWithSourceUrl();
     void importWorkflowParsesConstellationPayloads();
+    void importWorkflowDoesNotCompleteConstellationAfterContextDestroyed();
     void importWorkflowFallsBackForMalformedConstellationPayload();
     void importWorkflowRejectsDeepSkyCatalogWithoutDsos();
     void importWorkflowReportsDeepSkyObjectCount();
@@ -283,6 +286,44 @@ void CatalogDownloadWorkflowTests::downloadServiceDoesNotCallDestroyedCallbackCo
     QVERIFY(!completionCalled);
 }
 
+void CatalogDownloadWorkflowTests::downloadServiceStopsRetryAfterDestroyedCallbackContext()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/slow-fail.csv",
+        {
+            .error = QNetworkReply::ContentNotFoundError,
+            .errorText = "not found",
+            .httpStatusCode = 404,
+            .delayMs = 20
+        }
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/should-not-start.csv",
+        {.payload = "id,hip,proper,ra,dec,mag\n1,1,Unexpected,1.0,2.0,3.0\n"}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    bool completionCalled = false;
+    auto callbackContext = std::make_unique<QObject>();
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/slow-fail.csv", "https://example.test/should-not-start.csv"},
+        callbackContext.get(),
+        {},
+        [&completionCalled](CatalogDownloadService::DownloadResult) {
+            completionCalled = true;
+        }
+    );
+
+    QCOMPARE(networkAccessManager.requestedUrls().size(), 1);
+    callbackContext.reset();
+    QTest::qWait(60);
+    QCoreApplication::processEvents();
+
+    QVERIFY(!completionCalled);
+    QCOMPARE(networkAccessManager.requestedUrls().size(), 1);
+}
+
 void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsIndependently()
 {
     FakeNetworkAccessManager networkAccessManager;
@@ -328,6 +369,66 @@ void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsInd
     QVERIFY(firstResult.payload.contains("First"));
     QVERIFY(secondResult.payload.contains("Second"));
     QCOMPARE(networkAccessManager.requestedUrls().size(), 2);
+}
+
+void CatalogDownloadWorkflowTests::downloadServiceConcurrentFallbackChainsRemainIsolated()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/a-fail.csv",
+        {
+            .error = QNetworkReply::ContentNotFoundError,
+            .errorText = "not found",
+            .httpStatusCode = 404,
+            .delayMs = 20
+        }
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/a-ok.csv",
+        {.payload = "id,hip,proper,ra,dec,mag\n1,101,Alpha,1.0,2.0,3.0\n"}
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/b-fail.csv",
+        {.payload = QByteArray()}
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/b-ok.csv",
+        {
+            .payload = "id,hip,proper,ra,dec,mag\n2,202,Beta,4.0,5.0,6.0\n",
+            .delayMs = 10
+        }
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    CatalogDownloadService::DownloadResult firstResult;
+    CatalogDownloadService::DownloadResult secondResult;
+    bool firstCompleted = false;
+    bool secondCompleted = false;
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/a-fail.csv", "https://example.test/a-ok.csv"},
+        this,
+        {},
+        [&firstResult, &firstCompleted](CatalogDownloadService::DownloadResult result) {
+            firstResult = std::move(result);
+            firstCompleted = true;
+        }
+    );
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/b-fail.csv", "https://example.test/b-ok.csv"},
+        this,
+        {},
+        [&secondResult, &secondCompleted](CatalogDownloadService::DownloadResult result) {
+            secondResult = std::move(result);
+            secondCompleted = true;
+        }
+    );
+
+    QTRY_VERIFY(firstCompleted && secondCompleted);
+    QCOMPARE(firstResult.sourceUrl, QString("https://example.test/a-ok.csv"));
+    QCOMPARE(secondResult.sourceUrl, QString("https://example.test/b-ok.csv"));
+    QVERIFY(firstResult.payload.contains("Alpha"));
+    QVERIFY(secondResult.payload.contains("Beta"));
+    QCOMPARE(networkAccessManager.requestedUrls().size(), 4);
 }
 
 void CatalogDownloadWorkflowTests::coordinatorParsesSuccessfulDownloadedCatalog()
@@ -437,6 +538,44 @@ void CatalogDownloadWorkflowTests::importWorkflowParsesConstellationPayloads()
     QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const QString& status) {
         return status.contains("failed", Qt::CaseInsensitive);
     }));
+}
+
+void CatalogDownloadWorkflowTests::importWorkflowDoesNotCompleteConstellationAfterContextDestroyed()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/slow-index.json",
+        {
+            .payload = R"({
+                "constellations": [
+                    {
+                        "id": "orion",
+                        "common_name": { "english": "Orion" },
+                        "lines": [[24436, 25930]]
+                    }
+                ]
+            })",
+            .delayMs = 20
+        }
+    );
+    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
+
+    bool completionCalled = false;
+    auto callbackContext = std::make_unique<QObject>();
+    workflow.downloadConstellationLines(
+        {"https://example.test/slow-index.json"},
+        callbackContext.get(),
+        {},
+        [&completionCalled](skygate::ui::internal::SkyConstellationLineImportResult) {
+            completionCalled = true;
+        }
+    );
+
+    callbackContext.reset();
+    QTest::qWait(60);
+    QCoreApplication::processEvents();
+
+    QVERIFY(!completionCalled);
 }
 
 void CatalogDownloadWorkflowTests::importWorkflowFallsBackForMalformedConstellationPayload()

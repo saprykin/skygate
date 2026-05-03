@@ -3,15 +3,20 @@
 #include "LocationCatalogModel.hpp"
 #include "MacDockIcon.hpp"
 #include "SkyContextController.hpp"
+#include "SkyHitTargetIndex.hpp"
 #include "SkyObjectSearchModel.hpp"
+#include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneModel.hpp"
 #include "SkyTheme.hpp"
 
+#include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <QElapsedTimer>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -25,6 +30,8 @@ class PerformanceGuardTests final : public QObject {
 private slots:
     void buildsLargeSceneWithinGuardrail();
     void searchesLargeMixedCatalogWithinGuardrail();
+    void hitTestsDenseRenderFrameWithinGuardrail();
+    void buildsManyObjectTrailsWithinGuardrail();
     void packagedResourceDependenciesResolve();
     void platformNativeHooksTolerateEmptyInputs();
 };
@@ -34,6 +41,39 @@ namespace {
 constexpr qint64 kLargeSceneBuildBudgetMs = 15000;
 constexpr qint64 kLargeSearchLoadBudgetMs = 10000;
 constexpr qint64 kLargeSearchQueryBudgetMs = 3000;
+constexpr qint64 kDenseHitTestBudgetMs = 5000;
+constexpr qint64 kManyTrailsBudgetMs = 12000;
+
+class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
+        const skygate::core::SkyContext& context
+    ) const override
+    {
+        (void) context;
+        return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext& context,
+        const std::uint32_t bodyIndex
+    ) const override
+    {
+        const double offsetMinutes = static_cast<double>(
+            std::chrono::duration_cast<std::chrono::minutes>(
+                context.utcTime.time_since_epoch()
+            ).count()
+        );
+        const double bodyOffset = static_cast<double>(bodyIndex % 40U) * 0.015;
+        return skygate::ephemeris::CelestialBodyState {
+            .bodyIndex = bodyIndex,
+            .horizontal = {
+                .altitudeDeg = 45.0 + bodyOffset + (offsetMinutes / 8000.0),
+                .azimuthDeg = 180.0 + bodyOffset + (offsetMinutes / 8000.0)
+            }
+        };
+    }
+};
 
 void verifyElapsedBelow(
     const qint64 elapsedMs,
@@ -127,6 +167,32 @@ SkyContextController::InitializationOptions testInitializationOptions()
     };
 }
 
+skygate::ephemeris::SkySnapshot makeHitTestSnapshot(const int bodyCount)
+{
+    skygate::ephemeris::SkySnapshot snapshot;
+    auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
+    bodies->reserve(static_cast<std::size_t>(bodyCount));
+    for (int index = 0; index < bodyCount; ++index) {
+        bodies->push_back(makeBody(
+            "hit_body_" + std::to_string(index),
+            "Hit Body " + std::to_string(index),
+            skygate::ephemeris::CelestialBodyType::Star,
+            5.0,
+            0.0,
+            0.0
+        ));
+    }
+    snapshot.catalogBodies = std::move(bodies);
+    return snapshot;
+}
+
+skygate::ui::internal::SkyThemeRenderPalette makeTrailRenderTheme()
+{
+    skygate::ui::internal::SkyThemeRenderPalette renderTheme;
+    renderTheme.selectionMarkerBorder = QColor("#80c0ff");
+    return renderTheme;
+}
+
 }  // namespace
 
 void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
@@ -205,6 +271,79 @@ void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
     const qint64 aliasQueryElapsedMs = timer.elapsed();
     QVERIFY(model.rowCount() > 0);
     verifyElapsedBelow(aliasQueryElapsedMs, kLargeSearchQueryBudgetMs, "large alias search");
+}
+
+void PerformanceGuardTests::hitTestsDenseRenderFrameWithinGuardrail()
+{
+    constexpr int kTargetCount = 15000;
+    const auto snapshot = makeHitTestSnapshot(kTargetCount);
+    SkyRenderFrame frame;
+    frame.points.reserve(kTargetCount);
+    for (int index = 0; index < kTargetCount; ++index) {
+        frame.points.push_back(SkyRenderPoint {
+            .x = 10.0 + static_cast<double>((index * 37) % 1180),
+            .y = 10.0 + static_cast<double>((index * 53) % 780),
+            .sizePx = 3.0,
+            .bodyIndex = static_cast<std::uint32_t>(index)
+        });
+    }
+
+    SkyHitTargetIndex hitIndex;
+    QElapsedTimer timer;
+    timer.start();
+    hitIndex.rebuild(frame, snapshot);
+    int hitCount = 0;
+    for (int index = 0; index < 2000; ++index) {
+        const auto hit = hitIndex.bodyIndexAt(
+            10.0 + static_cast<double>((index * 37) % 1180),
+            10.0 + static_cast<double>((index * 53) % 780),
+            1200.0,
+            800.0,
+            snapshot
+        );
+        if (hit.has_value()) {
+            ++hitCount;
+        }
+    }
+    const qint64 elapsedMs = timer.elapsed();
+
+    QVERIFY(hitCount > 0);
+    verifyElapsedBelow(elapsedMs, kDenseHitTestBudgetMs, "dense hit testing");
+}
+
+void PerformanceGuardTests::buildsManyObjectTrailsWithinGuardrail()
+{
+    const auto projection = skygate::core::PreparedProjection::create(
+        skygate::core::ProjectionType::Stereographic,
+        skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 45.0, 180.0, 90.0)
+    );
+    QVERIFY(projection.has_value());
+    const PerformanceTrailEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+
+    SkyObjectTrailInput input;
+    input.ephemerisEngine = &engine;
+    input.preparedProjection = &projection.value();
+    input.skyContext.observer = {
+        .latitudeDeg = 47.0,
+        .longitudeDeg = 8.0,
+        .elevationMeters = 400.0
+    };
+    input.renderTheme = makeTrailRenderTheme();
+    input.viewportWidth = 1000.0;
+    input.viewportHeight = 800.0;
+
+    QElapsedTimer timer;
+    timer.start();
+    for (std::uint32_t bodyIndex = 0; bodyIndex < 120U; ++bodyIndex) {
+        input.targetBodyIndex = bodyIndex;
+        builder.appendTrail(frame, input);
+    }
+    const qint64 elapsedMs = timer.elapsed();
+
+    QVERIFY(!frame.lines.empty());
+    verifyElapsedBelow(elapsedMs, kManyTrailsBudgetMs, "many object trails");
 }
 
 void PerformanceGuardTests::packagedResourceDependenciesResolve()

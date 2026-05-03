@@ -1,4 +1,5 @@
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
+#include "catalog/ZipCodec.hpp"
 
 #include <QtTest/QtTest>
 
@@ -6,8 +7,10 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 class CatalogPerformanceGuardTests final : public QObject {
     Q_OBJECT
@@ -15,11 +18,89 @@ class CatalogPerformanceGuardTests final : public QObject {
 private slots:
     void parsesModeratelyLargeHygCatalogWithinGuardrail();
     void parsesModeratelyLargeOpenNgcCatalogWithinGuardrail();
+    void scansZipWithManyEntriesWithinGuardrail();
 };
 
 namespace {
 
 constexpr qint64 kLargeCatalogParseBudgetMs = 15000;
+constexpr qint64 kZipScanBudgetMs = 5000;
+
+struct ZipEntrySpec final {
+    std::string path;
+    std::string data;
+};
+
+void appendLe16(std::string& data, const std::uint16_t value)
+{
+    data.push_back(static_cast<char>(value & 0xffU));
+    data.push_back(static_cast<char>((value >> 8U) & 0xffU));
+}
+
+void appendLe32(std::string& data, const std::uint32_t value)
+{
+    appendLe16(data, static_cast<std::uint16_t>(value & 0xffffU));
+    appendLe16(data, static_cast<std::uint16_t>((value >> 16U) & 0xffffU));
+}
+
+std::string makeZip(const std::vector<ZipEntrySpec>& entries)
+{
+    std::string zipData;
+    std::vector<std::uint32_t> localHeaderOffsets;
+    localHeaderOffsets.reserve(entries.size());
+
+    for (const ZipEntrySpec& entry : entries) {
+        localHeaderOffsets.push_back(static_cast<std::uint32_t>(zipData.size()));
+        appendLe32(zipData, 0x04034b50U);
+        appendLe16(zipData, 20U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe32(zipData, 0U);
+        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
+        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
+        appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
+        appendLe16(zipData, 0U);
+        zipData += entry.path;
+        zipData += entry.data;
+    }
+
+    const std::uint32_t centralDirectoryOffset = static_cast<std::uint32_t>(zipData.size());
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        const ZipEntrySpec& entry = entries[index];
+        appendLe32(zipData, 0x02014b50U);
+        appendLe16(zipData, 20U);
+        appendLe16(zipData, 20U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe32(zipData, 0U);
+        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
+        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
+        appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe16(zipData, 0U);
+        appendLe32(zipData, 0U);
+        appendLe32(zipData, localHeaderOffsets[index]);
+        zipData += entry.path;
+    }
+
+    const std::uint32_t centralDirectorySize =
+        static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
+    appendLe32(zipData, 0x06054b50U);
+    appendLe16(zipData, 0U);
+    appendLe16(zipData, 0U);
+    appendLe16(zipData, static_cast<std::uint16_t>(entries.size()));
+    appendLe16(zipData, static_cast<std::uint16_t>(entries.size()));
+    appendLe32(zipData, centralDirectorySize);
+    appendLe32(zipData, centralDirectoryOffset);
+    appendLe16(zipData, 0U);
+    return zipData;
+}
 
 void verifyElapsedBelow(
     const qint64 elapsedMs,
@@ -138,6 +219,32 @@ void CatalogPerformanceGuardTests::parsesModeratelyLargeOpenNgcCatalogWithinGuar
     QVERIFY(result.catalog != nullptr);
     QCOMPARE(result.diagnostics.parsedBodyCount, 12000U);
     verifyElapsedBelow(elapsedMs, kLargeCatalogParseBudgetMs, "large OpenNGC parse");
+}
+
+void CatalogPerformanceGuardTests::scansZipWithManyEntriesWithinGuardrail()
+{
+    std::vector<ZipEntrySpec> entries;
+    entries.reserve(3001U);
+    for (int index = 0; index < 3000; ++index) {
+        entries.push_back(ZipEntrySpec {
+            .path = "notes/readme-" + std::to_string(index) + ".txt",
+            .data = "not a catalog\n"
+        });
+    }
+    entries.push_back(ZipEntrySpec {
+        .path = "catalogs/hyg.csv",
+        .data = "id,hip,proper,ra,dec,mag\n1,42,Target,1.0,2.0,3.0\n"
+    });
+    const std::string zipData = makeZip(entries);
+
+    QElapsedTimer timer;
+    timer.start();
+    const auto extracted = skygate::ephemeris::ZipCodec {}.extractFirstCsvEntry(zipData);
+    const qint64 elapsedMs = timer.elapsed();
+
+    QVERIFY(extracted.has_value());
+    QVERIFY(extracted->find("Target") != std::string::npos);
+    verifyElapsedBelow(elapsedMs, kZipScanBudgetMs, "large ZIP entry scan");
 }
 
 QTEST_APPLESS_MAIN(CatalogPerformanceGuardTests)

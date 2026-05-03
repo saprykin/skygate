@@ -44,6 +44,10 @@ add_skygate_ephemeris_qtest(
     CatalogPerformanceGuardTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-delimited-reader-tests
+    CatalogDelimitedReaderTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-string-utilities-tests
     StringUtilitiesTests.cpp
 )

@@ -76,7 +76,11 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
             QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView {line}, options.separator);
             if (!hasHeader) {
                 for (qsizetype i = 0; i < columns.size(); ++i) {
-                    const QString header = CsvRowTokenizer::decodeField(columns.at(i)).trimmed().toLower();
+                    QString header = CsvRowTokenizer::decodeField(columns.at(i)).trimmed();
+                    if (i == 0 && header.startsWith(QChar(0xfeff))) {
+                        header.remove(0, 1);
+                    }
+                    header = header.toLower();
                     if (!header.isEmpty()) {
                         headerIndex.insert(header, i);
                     }
