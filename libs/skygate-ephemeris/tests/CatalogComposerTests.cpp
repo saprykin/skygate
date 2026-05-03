@@ -74,6 +74,7 @@ private slots:
     void tagsPrimaryAndBuiltInSources();
     void replacesPrimaryDeepSkyAliasWithDownloadedObject();
     void bundledFallbackAddsDeepSkySourceKinds();
+    void bundledFallbackCanBeDisabled();
     void preservesKnownDeepSkyObjectCountWhenProvided();
 };
 
@@ -167,6 +168,35 @@ void CatalogComposerTests::bundledFallbackAddsDeepSkySourceKinds()
     QVERIFY(result.deepSkyObjectCount > 0U);
     QVERIFY(result.foundDeepSkyObjectCount > 0U);
     QVERIFY(std::any_of(
+        result.sourceKinds.begin(),
+        result.sourceKinds.end(),
+        [](const skygate::ephemeris::CatalogCompositionSource source) {
+            return source == skygate::ephemeris::CatalogCompositionSource::DeepSky;
+        }
+    ));
+}
+
+void CatalogComposerTests::bundledFallbackCanBeDisabled()
+{
+    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "hip_1",
+            "HIP 1",
+            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+        ),
+    });
+    QVERIFY(sourceCatalog != nullptr);
+
+    auto result = skygate::ephemeris::composeActiveCatalog({
+        .sourceCatalog = *sourceCatalog,
+        .useBundledDeepSkyCatalog = false
+    });
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.deepSkyObjectCount, 0U);
+    QCOMPARE(result.foundDeepSkyObjectCount, 0U);
+    QVERIFY(std::none_of(
         result.sourceKinds.begin(),
         result.sourceKinds.end(),
         [](const skygate::ephemeris::CatalogCompositionSource source) {

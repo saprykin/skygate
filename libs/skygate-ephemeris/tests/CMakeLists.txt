@@ -27,17 +27,79 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     )
 endfunction()
 
-add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-payload-parser-tests CatalogPayloadParserTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-private-helper-tests EphemerisPrivateHelperTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-open-ngc-parser-edge-tests OpenNgcParserEdgeTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-catalog-tests HygCatalogParserTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-gzip-tests HygCatalogGzipTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-stellarium-parser-tests StellariumConstellationParserTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-factory-tests CatalogFactoryTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-composer-tests CatalogComposerTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-constellation-data-codec-tests ConstellationDataCodecTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-body-trail-calculator-tests BodyTrailCalculatorTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-celestial-reference-tests CelestialReferenceCalculatorTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-engine-baseline-tests EphemerisEngineBaselineTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-engine-fallback-tests EphemerisEngineFallbackTests.cpp)
-add_skygate_ephemeris_qtest(skygate-ephemeris-regression-tests EphemerisRegressionTests.cpp)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-payload-parser-tests
+    CatalogPayloadParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-string-utilities-tests
+    StringUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-parsing-utilities-tests
+    CatalogParsingUtilitiesTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-payload-format-detector-tests
+    CatalogPayloadFormatDetectorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-archive-codec-tests
+    CatalogArchiveCodecTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-stellarium-extractor-tests
+    StellariumExtractorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-open-ngc-object-mapper-tests
+    OpenNgcObjectMapperTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-open-ngc-parser-edge-tests
+    OpenNgcParserEdgeTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-hyg-catalog-tests
+    HygCatalogParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-hyg-gzip-tests
+    HygCatalogGzipTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-stellarium-parser-tests
+    StellariumConstellationParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-factory-tests
+    CatalogFactoryTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-composer-tests
+    CatalogComposerTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-constellation-data-codec-tests
+    ConstellationDataCodecTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-body-trail-calculator-tests
+    BodyTrailCalculatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-celestial-reference-tests
+    CelestialReferenceCalculatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-baseline-tests
+    EphemerisEngineBaselineTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-fallback-tests
+    EphemerisEngineFallbackTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-regression-tests
+    EphemerisRegressionTests.cpp
+)

@@ -273,12 +273,14 @@ The public catalog API intentionally has only narrow front doors:
 - `composeActiveCatalog(...)` for active application catalog composition
 
 Deep-sky objects are a fixed-equatorial catalog layer. The UI can use bundled
-Messier data or download/update the OpenNGC preset. `composeActiveCatalog(...)`
-rebuilds the active `IStarCatalog` through private composition policies:
-`CoreBodyCatalogAugmenter` adds bundled Sun, Moon, planets, and reference-line
-stars when needed, while `DeepSkyCatalogMerger` applies DSO alias replacement
-and source-kind tracking. OpenNGC records are parsed and deduplicated in
-`libs/skygate-ephemeris`, not in QML or scene graph code.
+Messier data or download/update the OpenNGC preset. Bundled Messier data is
+included only when the active composition request enables the bundled deep-sky
+fallback. `composeActiveCatalog(...)` rebuilds the active `IStarCatalog`
+through private composition policies: `CoreBodyCatalogAugmenter` adds bundled
+Sun, Moon, planets, and reference-line stars when needed, while
+`DeepSkyCatalogMerger` applies DSO alias replacement and source-kind tracking.
+OpenNGC records are parsed and deduplicated in `libs/skygate-ephemeris`, not in
+QML or scene graph code.
 
 Catalog parsing uses private helpers to avoid repeated policy fragments:
 `StringUtilities` centralizes small ASCII normalization helpers,
@@ -373,7 +375,7 @@ The current codebase consistently uses a small set of practical patterns.
 ### Strategy + factory
 - `IProjection` + `createProjection(...)`
 - `IEphemerisEngine` + `createEphemerisEngine(...)`
-- `IStarCatalog` + catalog factory helpers
+- `IStarCatalog` + minimal catalog construction helpers
 
 ### Read-model / derived-state model
 - `SkySceneModel` derives render data from controller state and caches the
@@ -438,10 +440,10 @@ The repository keeps tests close to each module:
   - angle/projection math, viewport math, type validation, projection factory
     behavior, prepared projections, and concrete projection strategies.
 - `libs/skygate-ephemeris/tests`
-  - catalog payload detection, HYG/OpenNGC parser edge cases, gzip/zip archive
-    handling, constellation parsing, catalog factory/composer behavior,
-    celestial reference calculations, engine baselines/fallbacks, and fixed-date
-    ephemeris regression checks.
+  - catalog payload detection, catalog parsing helpers, HYG/OpenNGC parser edge
+    cases, gzip/zip archive handling, constellation parsing, catalog
+    factory/composer behavior, celestial reference calculations, engine
+    baselines/fallbacks, and fixed-date ephemeris regression checks.
 - `apps/skygate-ui/tests`
   - scene-model behavior, controller/search/location/theme/overlay models,
     settings persistence, active catalog building, catalog cache restore/persist
