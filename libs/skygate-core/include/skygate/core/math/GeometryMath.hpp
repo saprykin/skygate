@@ -1,14 +1,11 @@
 #pragma once
 
+#include "skygate/core/math/Geometry2d.hpp"
+
 #include <cstdint>
 #include <optional>
 
 namespace skygate::core {
-
-struct Vector2d final {
-    double x = 0.0;
-    double y = 0.0;
-};
 
 class GeometryMath final {
 public:

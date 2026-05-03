@@ -4,8 +4,8 @@
 
 #include <QVariantMap>
 
-#include "skygate/core/math/GeometryMath.hpp"
-#include "skygate/core/math/ScreenGeometry.hpp"
+#include "skygate/core/math/Geometry2d.hpp"
+#include "skygate/core/math/SpatialIndex2d.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -133,7 +133,7 @@ struct DeepSkyLabelCandidate final {
     const double normalizedFov = std::clamp((projectionParams.fovDeg - 35.0) / 95.0, 0.0, 1.0);
     const double baseCellSize = 2.5 + (normalizedFov * 4.5);
     const double viewportScale = std::clamp(
-        skygate::core::GeometryMath::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0),
+        skygate::core::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0),
         0.85,
         1.35
     );
@@ -146,7 +146,7 @@ struct DeepSkyLabelCandidate final {
     const double cellSizePx
 )
 {
-    return skygate::core::GeometryMath::packedGridCellKey(x, y, cellSizePx);
+    return skygate::core::packedGridCellKey(x, y, cellSizePx);
 }
 
 [[nodiscard]] double distanceToCellCenterSquared(
@@ -156,8 +156,8 @@ struct DeepSkyLabelCandidate final {
 )
 {
     const skygate::core::Vector2d center =
-        skygate::core::GeometryMath::gridCellCenter(x, y, cellSizePx);
-    return skygate::core::GeometryMath::squaredDistance2d(x, y, center.x, center.y);
+        skygate::core::gridCellCenter(x, y, cellSizePx);
+    return skygate::core::squaredDistance2d(x, y, center.x, center.y);
 }
 
 [[nodiscard]] bool shouldReplaceStarPoint(
@@ -381,7 +381,7 @@ struct DeepSkyLabelCandidate final {
     }
 
     const double viewportScale = std::clamp(
-        skygate::core::GeometryMath::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0),
+        skygate::core::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0),
         0.70,
         1.35
     );
@@ -420,7 +420,7 @@ struct DeepSkyLabelCandidate final {
     const double centerX = viewportWidth * 0.5;
     const double centerY = viewportHeight * 0.5;
     const double normalizedDistanceSquared =
-        skygate::core::GeometryMath::squaredDistance2d(
+        skygate::core::squaredDistance2d(
             glyph.x,
             glyph.y,
             centerX,
@@ -727,7 +727,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 continue;
             }
 
-            const double lengthSquared = skygate::core::GeometryMath::squaredDistance2d(
+            const double lengthSquared = skygate::core::squaredDistance2d(
                 endProjected.x,
                 endProjected.y,
                 startProjected.x,

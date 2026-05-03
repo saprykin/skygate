@@ -6,7 +6,7 @@
 #include <QPointF>
 #include <QVariantMap>
 
-#include "skygate/core/math/GeometryMath.hpp"
+#include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
 #include <array>
@@ -88,7 +88,7 @@ void appendReferenceLayerLabel(
             continue;
         }
 
-        const double score = skygate::core::GeometryMath::squaredDistance2d(
+        const double score = skygate::core::squaredDistance2d(
             projected.x,
             projected.y,
             targetX,

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SkyRenderBuilders.hpp"
-#include "skygate/core/math/ScreenGeometry.hpp"
+#include "skygate/core/math/SpatialIndex2d.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>

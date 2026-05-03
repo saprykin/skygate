@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/math/ProjectionMath.hpp"
+#include "skygate/core/math/SphericalGeometry.hpp"
 
 #include <optional>
 
@@ -20,9 +20,9 @@ public:
 private:
     ProjectionType m_projectionType = ProjectionType::Stereographic;
     ProjectionParams m_params;
-    ProjectionMath::Vec3 m_center;
-    ProjectionMath::Vec3 m_right;
-    ProjectionMath::Vec3 m_up;
+    SphericalGeometry::Vector3d m_center;
+    SphericalGeometry::Vector3d m_right;
+    SphericalGeometry::Vector3d m_up;
     double m_circularMaxRadius = 0.0;
     double m_rectHalfWidth = 0.0;
     double m_rectHalfHeight = 0.0;

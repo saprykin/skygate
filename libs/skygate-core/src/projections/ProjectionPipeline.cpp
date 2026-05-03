@@ -1,6 +1,7 @@
 #include "ProjectionPipeline.hpp"
 
 #include "skygate/core/math/MathConstants.hpp"
+#include "skygate/core/math/ProjectionMath.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +11,7 @@ namespace skygate::core {
 bool ProjectionPipeline::tryPrepare(
     const HorizontalCoordinate& coordinate,
     const ProjectionParams& params,
-    PreparedProjection& prepared,
+    ProjectionPreparation& prepared,
     ScreenPoint& failurePoint
 ) noexcept
 {
@@ -27,7 +28,7 @@ bool ProjectionPipeline::tryPrepare(
     prepared.params = params;
     prepared.params.center = params.center.normalizedAzimuth();
 
-    if (!ProjectionMath::tryBuildProjectionBasis(
+    if (!SphericalGeometry::tryBuildProjectionBasis(
             prepared.params.center,
             prepared.center,
             prepared.right,
@@ -37,7 +38,7 @@ bool ProjectionPipeline::tryPrepare(
         return false;
     }
 
-    prepared.target = ProjectionMath::horizontalToUnitVector(coordinate.normalizedAzimuth());
+    prepared.target = SphericalGeometry::horizontalToUnitVector(coordinate.normalizedAzimuth());
     failurePoint = culledPoint();
     return true;
 }

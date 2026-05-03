@@ -9,8 +9,8 @@
 #include <QSGGeometryNode>
 #include <QSGNode>
 
-#include "skygate/core/math/GeometryMath.hpp"
-#include "skygate/core/math/ScreenGeometry.hpp"
+#include "skygate/core/math/Geometry2d.hpp"
+#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
 #include <algorithm>
@@ -149,7 +149,7 @@ void syncBatchedLineNodes(
         bucket.widthPx = lineSegment.widthPx;
 
         const std::optional<skygate::core::Vector2d> offset =
-            skygate::core::GeometryMath::perpendicularOffset2d(
+            skygate::core::perpendicularOffset2d(
                 lineSegment.x1,
                 lineSegment.y1,
                 lineSegment.x2,
@@ -334,7 +334,7 @@ void appendProjectedPolyline(
     const double y
 )
 {
-    const auto point = skygate::core::GeometryMath::rotatedOffsetPoint2d(
+    const auto point = skygate::core::rotatedOffsetPoint2d(
         glyph.x,
         glyph.y,
         x,
@@ -354,7 +354,7 @@ void appendGlyphCircle(
     const double radiusYScale
 )
 {
-    const auto previousOffset = skygate::core::GeometryMath::ellipseOffsetPoint2d(
+    const auto previousOffset = skygate::core::ellipseOffsetPoint2d(
         glyph.radiusXPx * radiusXScale,
         glyph.radiusYPx * radiusYScale,
         0,
@@ -366,7 +366,7 @@ void appendGlyphCircle(
         previousOffset.y
     );
     for (int index = 1; index <= kGlyphEllipseSampleCount; ++index) {
-        const auto nextOffset = skygate::core::GeometryMath::ellipseOffsetPoint2d(
+        const auto nextOffset = skygate::core::ellipseOffsetPoint2d(
             glyph.radiusXPx * radiusXScale,
             glyph.radiusYPx * radiusYScale,
             index,

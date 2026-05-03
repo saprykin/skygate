@@ -1,7 +1,7 @@
 #include "SkyObjectTrailBuilder.hpp"
 
-#include "skygate/core/math/GeometryMath.hpp"
-#include "skygate/core/math/ScreenGeometry.hpp"
+#include "skygate/core/math/Geometry2d.hpp"
+#include "skygate/core/math/LinePattern.hpp"
 #include "skygate/ephemeris/BodyTrailCalculator.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
@@ -166,7 +166,7 @@ void SkyObjectTrailBuilder::appendTrail(
         }
 
         if (hasPreviousPoint) {
-            const double lengthSquared = skygate::core::GeometryMath::squaredDistance2d(
+            const double lengthSquared = skygate::core::squaredDistance2d(
                 projected.x,
                 projected.y,
                 previousPoint.x,

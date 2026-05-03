@@ -1,14 +1,13 @@
 #pragma once
 
 #include "skygate/core/ProjectionTypes.hpp"
-
-#include <array>
+#include "skygate/core/math/SphericalGeometry.hpp"
 
 namespace skygate::core {
 
 class ProjectionMath final {
 public:
-    using Vec3 = std::array<double, 3>;
+    using Vec3 = SphericalGeometry::Vector3d;
 
     [[nodiscard]] static bool isFinite(double value) noexcept;
     [[nodiscard]] static bool areValidProjectionParams(const ProjectionParams& params) noexcept;

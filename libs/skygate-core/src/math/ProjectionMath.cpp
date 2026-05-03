@@ -1,18 +1,10 @@
 #include "skygate/core/math/ProjectionMath.hpp"
 
 #include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/MathConstants.hpp"
 
 #include <cmath>
 
 namespace skygate::core {
-namespace {
-
-constexpr std::size_t kXIndex = 0;
-constexpr std::size_t kYIndex = 1;
-constexpr std::size_t kZIndex = 2;
-
-}  // namespace
 
 bool ProjectionMath::isFinite(const double value) noexcept
 {
@@ -31,50 +23,29 @@ double ProjectionMath::toRadians(const double degrees) noexcept
 
 double ProjectionMath::dot(const Vec3& lhs, const Vec3& rhs) noexcept
 {
-    return (lhs[kXIndex] * rhs[kXIndex]) + (lhs[kYIndex] * rhs[kYIndex]) + (lhs[kZIndex] * rhs[kZIndex]);
+    return SphericalGeometry::dot(lhs, rhs);
 }
 
 ProjectionMath::Vec3 ProjectionMath::cross(const Vec3& lhs, const Vec3& rhs) noexcept
 {
-    return {
-        (lhs[kYIndex] * rhs[kZIndex]) - (lhs[kZIndex] * rhs[kYIndex]),
-        (lhs[kZIndex] * rhs[kXIndex]) - (lhs[kXIndex] * rhs[kZIndex]),
-        (lhs[kXIndex] * rhs[kYIndex]) - (lhs[kYIndex] * rhs[kXIndex])
-    };
+    return SphericalGeometry::cross(lhs, rhs);
 }
 
 double ProjectionMath::length(const Vec3& vector) noexcept
 {
-    return std::sqrt(dot(vector, vector));
+    return SphericalGeometry::length(vector);
 }
 
 ProjectionMath::Vec3 ProjectionMath::normalize(const Vec3& vector) noexcept
 {
-    const double vectorLength = length(vector);
-    if (vectorLength <= MathConstants::kEpsilon) {
-        return {};
-    }
-
-    return {
-        vector[kXIndex] / vectorLength,
-        vector[kYIndex] / vectorLength,
-        vector[kZIndex] / vectorLength
-    };
+    return SphericalGeometry::normalize(vector);
 }
 
 ProjectionMath::Vec3 ProjectionMath::horizontalToUnitVector(
     const HorizontalCoordinate& coordinate
 ) noexcept
 {
-    const double altitudeRad = toRadians(coordinate.altitudeDeg);
-    const double azimuthRad = toRadians(coordinate.azimuthDeg);
-
-    const double cosAltitude = std::cos(altitudeRad);
-    return {
-        cosAltitude * std::sin(azimuthRad),
-        cosAltitude * std::cos(azimuthRad),
-        std::sin(altitudeRad)
-    };
+    return SphericalGeometry::horizontalToUnitVector(coordinate);
 }
 
 bool ProjectionMath::tryBuildProjectionBasis(
@@ -84,35 +55,7 @@ bool ProjectionMath::tryBuildProjectionBasis(
     Vec3& up
 ) noexcept
 {
-    if (!centerCoordinate.isValid()) {
-        return false;
-    }
-
-    const HorizontalCoordinate normalizedCoordinate = centerCoordinate.normalizedAzimuth();
-    const double altitudeRad = toRadians(normalizedCoordinate.altitudeDeg);
-    const double azimuthRad = toRadians(normalizedCoordinate.azimuthDeg);
-
-    const double sinAltitude = std::sin(altitudeRad);
-    const double cosAltitude = std::cos(altitudeRad);
-    const double sinAzimuth = std::sin(azimuthRad);
-    const double cosAzimuth = std::cos(azimuthRad);
-
-    center = {
-        cosAltitude * sinAzimuth,
-        cosAltitude * cosAzimuth,
-        sinAltitude
-    };
-    right = {
-        -cosAzimuth,
-        sinAzimuth,
-        0.0
-    };
-    up = {
-        -sinAltitude * sinAzimuth,
-        -sinAltitude * cosAzimuth,
-        cosAltitude
-    };
-    return true;
+    return SphericalGeometry::tryBuildProjectionBasis(centerCoordinate, center, right, up);
 }
 
 void ProjectionMath::applyRoll(double& x, double& y, const double rollDeg) noexcept

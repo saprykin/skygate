@@ -1,24 +1,24 @@
 #pragma once
 
 #include "skygate/core/IProjection.hpp"
-#include "skygate/core/math/ProjectionMath.hpp"
+#include "skygate/core/math/SphericalGeometry.hpp"
 
 namespace skygate::core {
 
 class ProjectionPipeline final {
 public:
-    struct PreparedProjection {
+    struct ProjectionPreparation final {
         ProjectionParams params;
-        ProjectionMath::Vec3 center;
-        ProjectionMath::Vec3 right;
-        ProjectionMath::Vec3 up;
-        ProjectionMath::Vec3 target;
+        SphericalGeometry::Vector3d center;
+        SphericalGeometry::Vector3d right;
+        SphericalGeometry::Vector3d up;
+        SphericalGeometry::Vector3d target;
     };
 
     [[nodiscard]] static bool tryPrepare(
         const HorizontalCoordinate& coordinate,
         const ProjectionParams& params,
-        PreparedProjection& prepared,
+        ProjectionPreparation& prepared,
         ScreenPoint& failurePoint
     ) noexcept;
 

@@ -176,6 +176,16 @@ module boundaries.
 - `ProjectionPipeline`
   - Shared helper for parameter validation, basis preparation, culling status,
     and viewport mapping.
+- `ProjectionAlgorithms`
+  - Internal implementation shared by direct projection strategies and
+    `PreparedProjection`, so projection formulas have one behavioral source.
+- Focused geometry helpers
+  - `Geometry2d` for primitive 2D math, rectangles, and line segments.
+  - `SpatialIndex2d` for screen-space rectangle/circle indexes.
+  - `LinePattern` for dash generation.
+  - `ProjectedPolylineBuilder` for projection-aware polyline splitting.
+- `SphericalGeometry`
+  - Core spherical/vector helpers shared by projection and ephemeris code.
 
 `PreparedProjection` is the preferred high-throughput path in the current UI.
 The `IProjection` strategies still exist as a clean abstraction boundary and are
@@ -306,6 +316,9 @@ This keeps pan/zoom/projection changes separate from catalog/time recomputation.
 ### Prepared projection cache
 `PreparedProjection` precomputes per-frame projection basis data and constants.
 It is rebuilt when viewport or view parameters change, not per object.
+Direct projections and prepared projections delegate to the same internal
+projection algorithms, keeping test-only/direct paths numerically aligned with
+the render path.
 
 ### Large-catalog star decimation
 `SkyRenderFrameBuilder` performs screen-space star decimation for dense star
@@ -381,8 +394,7 @@ Update:
 
 - `ProjectionType`
 - `createProjection(...)`
-- `PreparedProjection::create(...)`
-- `PreparedProjection::project(...)`
+- internal `ProjectionAlgorithms` frame setup and project formula
 - projection-specific tests
 
 ### Adding a new catalog payload format

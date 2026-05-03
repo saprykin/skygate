@@ -1,7 +1,7 @@
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
 #include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/ProjectionMath.hpp"
+#include "skygate/core/math/SphericalGeometry.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -46,11 +46,6 @@ namespace {
     return normalized;
 }
 
-[[nodiscard]] bool hasFiniteHorizontal(const core::HorizontalCoordinate& horizontal)
-{
-    return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
-}
-
 }  // namespace
 
 std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labelCenter(
@@ -82,18 +77,18 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
         horizontalByBodyId.insert({normalizedLookupKey(body.id), state.horizontal});
     }
 
-    core::ProjectionMath::Vec3 sum {0.0, 0.0, 0.0};
+    core::SphericalGeometry::Vector3d sum {0.0, 0.0, 0.0};
     int validAnchorCount = 0;
     for (const std::string& hipId : labelRefIt->second) {
         const auto horizontalIt = horizontalByBodyId.find(normalizedLookupKey(hipId));
         if (
             horizontalIt == horizontalByBodyId.end()
-            || !hasFiniteHorizontal(horizontalIt->second)
+            || !horizontalIt->second.isFinite()
         ) {
             continue;
         }
 
-        const auto vector = core::ProjectionMath::horizontalToUnitVector(horizontalIt->second);
+        const auto vector = core::SphericalGeometry::horizontalToUnitVector(horizontalIt->second);
         sum[0] += vector[0];
         sum[1] += vector[1];
         sum[2] += vector[2];
@@ -104,8 +99,8 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
         return std::nullopt;
     }
 
-    const auto normalizedVector = core::ProjectionMath::normalize(sum);
-    if (core::ProjectionMath::length(normalizedVector) <= 0.0) {
+    const auto normalizedVector = core::SphericalGeometry::normalize(sum);
+    if (core::SphericalGeometry::length(normalizedVector) <= 0.0) {
         return std::nullopt;
     }
 

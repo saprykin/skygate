@@ -16,7 +16,7 @@ bool GeoLocation::isValid() const noexcept
     return std::isfinite(latitudeDeg) && std::isfinite(longitudeDeg)
         && std::isfinite(elevationMeters)
         && latitudeDeg >= kLatitudeMinDeg && latitudeDeg <= kLatitudeMaxDeg
-    && longitudeDeg >= kLongitudeMinDeg && longitudeDeg <= kLongitudeMaxDeg;
+        && longitudeDeg >= kLongitudeMinDeg && longitudeDeg <= kLongitudeMaxDeg;
 }
 
 bool HorizontalCoordinate::isFinite() const noexcept
