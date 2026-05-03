@@ -157,6 +157,8 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
                     "targetId": "messier_031",
                     "fields": [
                         { "label": "Type", "value": "Galaxy" },
+                        { "label": "Rise / Set", "value": "2024-06-02 04:10:00 / 19:24:00 UTC" },
+                        { "label": "Culmination", "value": "2024-06-02 11:47:00 UTC at 72.4 deg" },
                         { "label": "Source", "value": "OpenNGC" }
                     ],
                     "aliases": "Andromeda Galaxy"
@@ -196,6 +198,10 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("M31")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Type")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Galaxy")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Rise / Set")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("2024-06-02 04:10:00 / 19:24:00 UTC")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Culmination")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("2024-06-02 11:47:00 UTC at 72.4 deg")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Andromeda Galaxy")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Vega")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("N")) != nullptr);
@@ -262,7 +268,9 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
                     "targetKind": "body",
                     "targetId": "sun",
                     "fields": [
-                        { "label": "Type", "value": "Star" }
+                        { "label": "Type", "value": "Star" },
+                        { "label": "Rise / Set", "value": "Always above" },
+                        { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                     ]
                 })
                 function moveSelectedObjectInspector(x, y) {
@@ -278,7 +286,9 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
                         "targetKind": "body",
                         "targetId": "sun",
                         "fields": [
-                            { "label": "Type", "value": "Star" }
+                            { "label": "Type", "value": "Star" },
+                            { "label": "Rise / Set", "value": "Always above" },
+                            { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                         ]
                     }
                 }
@@ -293,7 +303,9 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
                         "targetKind": "body",
                         "targetId": "sun",
                         "fields": [
-                            { "label": "Type", "value": "Star" }
+                            { "label": "Type", "value": "Star" },
+                            { "label": "Rise / Set", "value": "Always above" },
+                            { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                         ]
                     }
                 }

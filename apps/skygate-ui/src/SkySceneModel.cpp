@@ -605,8 +605,10 @@ SkySelectionOverlayInput SkySceneModel::buildSelectionInput(
 {
     return SkySelectionOverlayInput {
         .snapshot = frameResult.snapshot,
+        .ephemerisEngine = input.frameInput.ephemerisEngine,
         .preparedProjection = frameResult.preparedProjection,
         .stateIndexByBodyId = frameResult.stateIndexByBodyId,
+        .skyContext = input.frameInput.skyContext,
         .constellationLabelRefs = input.frameInput.constellationLabelRefs,
         .catalogSourceIds = input.catalogSourceIds,
         .catalogSourceLabels = input.catalogSourceLabels,

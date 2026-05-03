@@ -3,8 +3,11 @@
 #include "SkySceneShared.hpp"
 
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
+#include "skygate/ephemeris/ObservationEventCalculator.hpp"
 
+#include <QDateTime>
 #include <QPointF>
+#include <QTimeZone>
 #include <QVariantList>
 
 #include <cmath>
@@ -186,6 +189,128 @@ QString formatEquatorialCoordinate(const skygate::core::EquatorialCoordinate& eq
     );
 }
 
+QString formatUtcTime(const skygate::core::UtcTimePoint& utcTime)
+{
+    return QDateTime::fromSecsSinceEpoch(
+        utcTime.time_since_epoch().count(),
+        QTimeZone::UTC
+    ).toString("yyyy-MM-dd HH:mm:ss 'UTC'");
+}
+
+QDateTime toUtcDateTime(const skygate::core::UtcTimePoint& utcTime)
+{
+    return QDateTime::fromSecsSinceEpoch(
+        utcTime.time_since_epoch().count(),
+        QTimeZone::UTC
+    );
+}
+
+QString formatObservationStatus(
+    const skygate::ephemeris::ObservationEventStatus status
+)
+{
+    using skygate::ephemeris::ObservationEventStatus;
+
+    switch (status) {
+    case ObservationEventStatus::Available:
+        return {};
+    case ObservationEventStatus::AlwaysAbove:
+        return "Always above";
+    case ObservationEventStatus::AlwaysBelow:
+        return "Always below";
+    case ObservationEventStatus::InvalidInput:
+    case ObservationEventStatus::Unresolved:
+        return "--";
+    }
+
+    return "--";
+}
+
+QString formatObservationEvent(const skygate::ephemeris::ObservationEvent& event)
+{
+    if (
+        event.status == skygate::ephemeris::ObservationEventStatus::Available
+        && event.utcTime.has_value()
+    ) {
+        return formatUtcTime(*event.utcTime);
+    }
+
+    return formatObservationStatus(event.status);
+}
+
+QString formatObservationRiseSet(
+    const skygate::ephemeris::ObservationEvent& rise,
+    const skygate::ephemeris::ObservationEvent& set
+)
+{
+    using skygate::ephemeris::ObservationEventStatus;
+
+    if (
+        rise.status != ObservationEventStatus::Available
+        && rise.status == set.status
+    ) {
+        return formatObservationStatus(rise.status);
+    }
+
+    if (
+        rise.status == ObservationEventStatus::Available
+        && set.status == ObservationEventStatus::Available
+        && rise.utcTime.has_value()
+        && set.utcTime.has_value()
+    ) {
+        const QDateTime riseUtc = toUtcDateTime(*rise.utcTime);
+        const QDateTime setUtc = toUtcDateTime(*set.utcTime);
+        if (riseUtc.date() == setUtc.date()) {
+            return QString("%1 %2 / %3 UTC").arg(
+                riseUtc.toString("yyyy-MM-dd"),
+                riseUtc.toString("HH:mm:ss"),
+                setUtc.toString("HH:mm:ss")
+            );
+        }
+    }
+
+    return QString("%1 / %2").arg(formatObservationEvent(rise), formatObservationEvent(set));
+}
+
+QString formatObservationCulmination(
+    const skygate::ephemeris::ObservationCulmination& culmination
+)
+{
+    if (
+        culmination.status == skygate::ephemeris::ObservationEventStatus::Available
+        && culmination.utcTime.has_value()
+        && culmination.altitudeDeg.has_value()
+    ) {
+        return QString("%1 at %2 deg").arg(
+            formatUtcTime(*culmination.utcTime),
+            formatFiniteNumber(*culmination.altitudeDeg, 1)
+        );
+    }
+
+    return formatObservationStatus(culmination.status);
+}
+
+void appendObservationEventFields(
+    QVariantList& fields,
+    const SkySelectionOverlayInput& input,
+    const std::uint32_t bodyIndex
+)
+{
+    if (input.ephemerisEngine == nullptr || !input.skyContext.has_value()) {
+        return;
+    }
+
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const auto events = calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex);
+    fields.push_back(inspectorField(
+        "Rise / Set",
+        formatObservationRiseSet(events.nextRise, events.nextSet)
+    ));
+    fields.push_back(
+        inspectorField("Culmination", formatObservationCulmination(events.culmination))
+    );
+}
+
 QString formatArcmin(const double value)
 {
     if (!std::isfinite(value)) {
@@ -363,8 +488,9 @@ QVariantMap SkySelectionOverlayBuilder::buildSelectedObjectInspector(
     QVariantList fields;
     fields.push_back(inspectorField("Type", celestialBodyTypeText(body)));
     fields.push_back(inspectorField("Magnitude", formatMagnitude(body.visualMagnitude)));
-    fields.push_back(inspectorField("Alt/Az", formatHorizontalCoordinate(state.horizontal)));
-    fields.push_back(inspectorField("RA/Dec", formatEquatorialCoordinate(state.equatorial)));
+    fields.push_back(inspectorField("Alt / Az", formatHorizontalCoordinate(state.horizontal)));
+    fields.push_back(inspectorField("RA / Dec", formatEquatorialCoordinate(state.equatorial)));
+    appendObservationEventFields(fields, input, state.bodyIndex);
 
     if (body.deepSkyObject.has_value()) {
         const QString sizeText = angularSizeText(*body.deepSkyObject);

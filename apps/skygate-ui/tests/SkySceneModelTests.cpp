@@ -153,6 +153,7 @@ private slots:
     void showsSearchSelectionMarkerForFocusedBody();
     void clickSelectionBuildsInspectorAndClearsOnEmptyClick();
     void searchSelectionBuildsInspectorNearMarker();
+    void circumpolarInspectorShowsObservationFallbacks();
     void inspectorFollowsObjectUnlessPinned();
     void trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector();
     void selectedBodyBuildsTrailAndClearsIt();
@@ -391,8 +392,12 @@ void SkySceneModelTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
     QCOMPARE(inspector.value("title").toString(), QString("Demo Star"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Star"));
     QCOMPARE(inspectorFieldValue(inspector, "Magnitude"), QString("2.3"));
-    QVERIFY(!inspectorFieldValue(inspector, "Alt/Az").isEmpty());
-    QVERIFY(!inspectorFieldValue(inspector, "RA/Dec").isEmpty());
+    QVERIFY(!inspectorFieldValue(inspector, "Alt / Az").isEmpty());
+    QVERIFY(!inspectorFieldValue(inspector, "RA / Dec").isEmpty());
+    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains(" / "));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
     QVERIFY(inspectorFieldValue(inspector, "Angular size").isEmpty());
     QVERIFY(!sceneModel.selectionMarker().isEmpty());
 
@@ -443,9 +448,59 @@ void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
     const QVariantMap selectionMarker = sceneModel.selectionMarker();
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
     QCOMPARE(inspector.value("title").toString(), QString("Demo Target"));
+    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains(" / "));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
     QVERIFY(sceneModel.renderLineSpan().size() > 0U);
     QVERIFY(inspector.value("x").toDouble() > selectionMarker.value("x").toDouble());
     QVERIFY(inspector.value("y").toDouble() > selectionMarker.value("y").toDouble());
+}
+
+void SkySceneModelTests::circumpolarInspectorShowsObservationFallbacks()
+{
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_circumpolar",
+            "Demo Circumpolar",
+            skygate::ephemeris::CelestialBodyType::Star,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 3.0,
+                .declinationDeg = 80.0
+            }
+        ),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    QVERIFY(ephemerisEngine != nullptr);
+
+    SkyContextController::InitializationOptions initializationOptions;
+    initializationOptions.loadSettings = false;
+    initializationOptions.initializeLocation = false;
+    SkyContextController controller(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
+        nullptr
+    );
+    controller.setLive(false);
+    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
+    controller.setLatitudeText("47.3769");
+    controller.setLongitudeText("8.5417");
+    controller.setElevationText("408.0");
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(controller.focusSearchTarget("body", "demo_circumpolar"));
+
+    const QVariantMap inspector = sceneModel.selectedObjectInspector();
+    QCOMPARE(inspector.value("title").toString(), QString("Demo Circumpolar"));
+    QCOMPARE(inspectorFieldValue(inspector, "Rise / Set"), QString("Always above"));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
 }
 
 void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
@@ -506,12 +561,21 @@ void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
     QVERIFY(pinnedInspector.value("pinned").toBool());
     QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);
     QCOMPARE(pinnedInspector.value("y").toDouble(), 140.0);
+    const QString pinnedRiseSetText = inspectorFieldValue(pinnedInspector, "Rise / Set");
 
     controller.panViewBy(2.0, 0.0);
     pinnedInspector = sceneModel.selectedObjectInspector();
     QVERIFY(pinnedInspector.value("pinned").toBool());
     QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);
     QCOMPARE(pinnedInspector.value("y").toDouble(), 140.0);
+
+    QVERIFY(controller.setUtcDateTimeText("2024-06-02", "22:00:00"));
+    pinnedInspector = sceneModel.selectedObjectInspector();
+    QVERIFY(pinnedInspector.value("pinned").toBool());
+    QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);
+    QCOMPARE(pinnedInspector.value("y").toDouble(), 140.0);
+    QVERIFY(inspectorFieldValue(pinnedInspector, "Rise / Set").contains("UTC"));
+    QVERIFY(inspectorFieldValue(pinnedInspector, "Rise / Set") != pinnedRiseSetText);
 
     sceneModel.setSelectedObjectInspectorPinned(false);
     const QVariantMap unpinnedInspector = sceneModel.selectedObjectInspector();

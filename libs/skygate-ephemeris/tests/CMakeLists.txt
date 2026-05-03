@@ -108,6 +108,10 @@ add_skygate_ephemeris_qtest(
     CelestialReferenceCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-observation-event-calculator-tests
+    ObservationEventCalculatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-baseline-tests
     EphemerisEngineBaselineTests.cpp
 )

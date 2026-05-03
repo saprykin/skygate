@@ -6,7 +6,9 @@
 #include <QVariantMap>
 
 #include "skygate/core/PreparedProjection.hpp"
+#include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
+#include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
@@ -15,8 +17,10 @@
 
 struct SkySelectionOverlayInput final {
     const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
+    const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
     const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
+    std::optional<skygate::core::SkyContext> skyContext;
     std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
     std::span<const std::uint8_t> catalogSourceIds;
     QStringList catalogSourceLabels;
