@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <span>
 #include <vector>
 
 namespace skygate::ephemeris {
@@ -37,21 +36,6 @@ struct ActiveCatalogCompositionResult final {
 
 [[nodiscard]] ActiveCatalogCompositionResult composeActiveCatalog(
     const ActiveCatalogCompositionRequest& request
-);
-
-[[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
-    const IStarCatalog& baseCatalog,
-    const IStarCatalog& deepSkyCatalog
-);
-[[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogByMergingDeepSkyObjects(
-    std::span<const CelestialBody> baseBodies,
-    std::span<const CelestialBody> deepSkyBodies
-);
-[[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogWithCoreSolarSystemBodies(
-    const IStarCatalog& catalog
-);
-[[nodiscard]] std::unique_ptr<IStarCatalog> createCatalogWithCoreSolarSystemBodies(
-    std::span<const CelestialBody> bodies
 );
 
 }  // namespace skygate::ephemeris

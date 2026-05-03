@@ -10,7 +10,7 @@
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <algorithm>
 #include <cmath>

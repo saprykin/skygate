@@ -1,5 +1,6 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
+#include "common/StringUtilities.hpp"
 #include "engine/CoordinateTransform.hpp"
 #include "engine/KnownConstellationLookup.hpp"
 #include "engine/MoonEquatorialCalculator.hpp"
@@ -50,7 +51,7 @@ public:
 
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
             const CelestialBody& body = (*m_bodies)[bodyIndex];
-            if (detail::bodyIdEquals(body.id, bodyId)) {
+            if (strings::equalsIgnoreAsciiCase(body.id, bodyId)) {
                 return computeStateForBody(body, bodyIndex, context);
             }
         }

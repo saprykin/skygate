@@ -3,7 +3,7 @@
 #include "SkyViewportItem.hpp"
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 

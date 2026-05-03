@@ -15,19 +15,37 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
     include/skygate/ephemeris/IStarCatalog.hpp
-    include/skygate/ephemeris/StarCatalogFactory.hpp
     include/skygate/ephemeris/StellariumConstellationParser.hpp
     include/skygate/ephemeris/Types.hpp
+    src/common/StringUtilities.hpp
     src/catalog/CatalogBodyNormalization.hpp
     src/catalog/CatalogBodyParseResult.hpp
     src/catalog/BundledCatalogParser.hpp
+    src/catalog/CatalogIdentity.hpp
+    src/catalog/CatalogParsingUtilities.hpp
+    src/catalog/CatalogPayloadFormatDetector.hpp
+    src/catalog/CompressedDataInflater.hpp
+    src/catalog/CoreBodyCatalogAugmenter.hpp
+    src/catalog/DeepSkyCatalogMerger.hpp
     src/catalog/DelimitedCatalogReader.hpp
+    src/catalog/OpenNgcObjectMapper.hpp
+    src/catalog/StellariumHipParser.hpp
+    src/catalog/StellariumLabelRefExtractor.hpp
+    src/catalog/StellariumLineRefExtractor.hpp
+    src/catalog/ZipArchiveReader.hpp
+    src/common/StringUtilities.cpp
     src/catalog/CatalogBodyNormalization.cpp
+    src/catalog/CatalogIdentity.cpp
     src/catalog/CatalogComposer.cpp
+    src/catalog/CatalogParsingUtilities.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp
+    src/catalog/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogPayloadParser.cpp
+    src/catalog/CompressedDataInflater.cpp
     src/catalog/ConstellationDataCodec.cpp
+    src/catalog/CoreBodyCatalogAugmenter.cpp
+    src/catalog/DeepSkyCatalogMerger.cpp
     src/catalog/DelimitedCatalogReader.cpp
     src/catalog/BundledConstellationData.cpp
     src/catalog/CsvRowTokenizer.hpp
@@ -35,10 +53,16 @@ add_library(skygate-ephemeris STATIC
     src/catalog/HygCatalogParser.hpp
     src/catalog/HygGzipCatalogParser.hpp
     src/catalog/InMemoryStarCatalog.hpp
+    src/catalog/OpenNgcObjectMapper.cpp
     src/catalog/OpenNgcCatalogParser.hpp
     src/catalog/ZipCodec.hpp
+    src/catalog/ZipArchiveReader.cpp
     src/catalog/StellariumConstellationParser.cpp
+    src/catalog/StellariumHipParser.cpp
+    src/catalog/StellariumLabelRefExtractor.cpp
+    src/catalog/StellariumLineRefExtractor.cpp
     src/engine/CoordinateTransform.hpp
+    src/engine/FixedEquatorialLookup.hpp
     src/engine/JulianDateTime.hpp
     src/engine/KnownConstellationLookup.hpp
     src/engine/MoonEquatorialCalculator.hpp
@@ -47,6 +71,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/SunEquatorialCalculator.hpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
+    src/IEphemerisEngine.cpp
     src/SimpleEphemerisEngine.cpp
     src/catalog/BundledCatalogParser.cpp
     src/catalog/CsvRowTokenizer.cpp
@@ -57,6 +82,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/OpenNgcCatalogParser.cpp
     src/catalog/ZipCodec.cpp
     src/engine/CoordinateTransform.cpp
+    src/engine/FixedEquatorialLookup.cpp
     src/engine/JulianDateTime.cpp
     src/engine/KnownConstellationLookup.cpp
     src/engine/MoonEquatorialCalculator.cpp

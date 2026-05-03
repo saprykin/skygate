@@ -14,7 +14,7 @@
 #include <qqml.h>
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <utility>
 

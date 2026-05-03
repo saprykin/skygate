@@ -28,6 +28,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
 endfunction()
 
 add_skygate_ephemeris_qtest(skygate-ephemeris-catalog-payload-parser-tests CatalogPayloadParserTests.cpp)
+add_skygate_ephemeris_qtest(skygate-ephemeris-private-helper-tests EphemerisPrivateHelperTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-open-ngc-parser-edge-tests OpenNgcParserEdgeTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-catalog-tests HygCatalogParserTests.cpp)
 add_skygate_ephemeris_qtest(skygate-ephemeris-hyg-gzip-tests HygCatalogGzipTests.cpp)

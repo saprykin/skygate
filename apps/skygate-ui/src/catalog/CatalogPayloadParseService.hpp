@@ -1,7 +1,8 @@
 #pragma once
 
 #include "skygate/ephemeris/IStarCatalog.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogLoadResult.hpp"
+#include "skygate/ephemeris/CatalogLoader.hpp"
 
 #include <QByteArray>
 

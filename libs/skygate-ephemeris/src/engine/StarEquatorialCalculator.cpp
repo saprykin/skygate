@@ -1,16 +1,13 @@
 #include "engine/StarEquatorialCalculator.hpp"
 
+#include "engine/FixedEquatorialLookup.hpp"
+
 #include <array>
 
 namespace skygate::ephemeris {
 namespace {
 
-struct FixedStarCoordinate {
-    const char* id;
-    core::EquatorialCoordinate equatorial;
-};
-
-constexpr std::array<FixedStarCoordinate, 8> kFixedStarCoordinates = {{
+constexpr std::array<FixedEquatorialCoordinate, 8> kFixedStarCoordinates = {{
     {.id = "sirius", .equatorial = {.rightAscensionHours = 6.7525, .declinationDeg = -16.7161}},
     {.id = "canopus", .equatorial = {.rightAscensionHours = 6.3992, .declinationDeg = -52.6957}},
     {.id = "arcturus", .equatorial = {.rightAscensionHours = 14.2610, .declinationDeg = 19.1825}},
@@ -27,13 +24,7 @@ std::optional<core::EquatorialCoordinate> StarEquatorialCalculator::compute(
     const std::string_view bodyId
 ) const noexcept
 {
-    for (const FixedStarCoordinate& star : kFixedStarCoordinates) {
-        if (bodyId == star.id) {
-            return star.equatorial;
-        }
-    }
-
-    return std::nullopt;
+    return FixedEquatorialLookup::find(kFixedStarCoordinates, bodyId);
 }
 
 }  // namespace skygate::ephemeris

@@ -1,20 +1,8 @@
 #include "catalog/CatalogBodyNormalization.hpp"
 
-#include <algorithm>
-#include <cctype>
+#include "common/StringUtilities.hpp"
 
 namespace skygate::ephemeris {
-namespace {
-
-std::string toLowerAscii(std::string value)
-{
-    std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return value;
-}
-
-}  // namespace
 
 void CatalogBodyNormalization::apply(CelestialBody& body)
 {
@@ -23,7 +11,7 @@ void CatalogBodyNormalization::apply(CelestialBody& body)
         return;
     }
 
-    const std::string normalizedId = toLowerAscii(body.id);
+    const std::string normalizedId = strings::toLowerAscii(body.id);
     if (normalizedId == "sun") {
         body.ephemerisSource = CelestialBodyEphemerisSource::Sun;
         return;

@@ -1,5 +1,5 @@
 #include "TestHelpers.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogLoader.hpp"
 
 #include <QtTest/QtTest>
 
@@ -29,7 +29,12 @@ void HygCatalogGzipTests::parsesValidGzipCatalog()
         kCompressedCsv.size()
     );
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromHygCsvGzip(compressedData);
+    auto result = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsvGzip,
+        compressedData
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
@@ -52,13 +57,17 @@ void HygCatalogGzipTests::parsesValidGzipCatalog()
 
 void HygCatalogGzipTests::rejectsInvalidGzipCatalog()
 {
-    const auto emptyCatalog = skygate::ephemeris::createStarCatalogFromHygCsvGzip("");
-    QVERIFY(emptyCatalog == nullptr);
+    const auto emptyResult = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsvGzip,
+        ""
+    );
+    QVERIFY(!emptyResult.isSuccess());
 
-    const auto malformedCatalog = skygate::ephemeris::createStarCatalogFromHygCsvGzip(
+    const auto malformedResult = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsvGzip,
         "not-a-gzip-stream"
     );
-    QVERIFY(malformedCatalog == nullptr);
+    QVERIFY(!malformedResult.isSuccess());
 }
 
 QTEST_APPLESS_MAIN(HygCatalogGzipTests)

@@ -1,11 +1,12 @@
 #include "TestHelpers.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -29,6 +30,47 @@ skygate::ephemeris::CelestialBody makeBody(
     return body;
 }
 
+class SnapshotOnlyEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
+        const skygate::core::SkyContext& context
+    ) const override
+    {
+        auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+            std::vector<skygate::ephemeris::CelestialBody> {
+                makeBody(
+                    "HIP_42",
+                    "HIP 42",
+                    skygate::ephemeris::CelestialBodyType::Star,
+                    1.0,
+                    skygate::core::EquatorialCoordinate {
+                        .rightAscensionHours = 2.0,
+                        .declinationDeg = 3.0
+                    }
+                )
+            }
+        );
+
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.catalogBodies = std::move(bodies);
+        snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState {
+                .bodyIndex = 0,
+                .equatorial = {
+                    .rightAscensionHours = 2.0,
+                    .declinationDeg = 3.0
+                },
+                .horizontal = {
+                    .altitudeDeg = 4.0,
+                    .azimuthDeg = 5.0
+                }
+            }
+        );
+        return snapshot;
+    }
+};
+
 }  // namespace
 
 class EphemerisEngineFallbackTests final : public QObject {
@@ -36,6 +78,7 @@ class EphemerisEngineFallbackTests final : public QObject {
 
 private slots:
     void usesFallbackBodyLookupAndFixedCoordinatePriority();
+    void usesInterfaceDefaultBodyLookupCaseInsensitive();
     void skipsHorizontalCoordinatesForInvalidObserver();
 };
 
@@ -114,6 +157,19 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
 
     QVERIFY(unknownConstellation != nullptr);
     QVERIFY(std::isnan(unknownConstellation->equatorial.rightAscensionHours));
+}
+
+void EphemerisEngineFallbackTests::usesInterfaceDefaultBodyLookupCaseInsensitive()
+{
+    const SnapshotOnlyEngine engine;
+    const skygate::core::SkyContext context;
+
+    const auto state = engine.computeBodyState(context, "hip_42");
+    QVERIFY(state.has_value());
+    QCOMPARE(state->bodyIndex, 0U);
+    QCOMPARE(state->equatorial.rightAscensionHours, 2.0);
+
+    QVERIFY(!engine.computeBodyState(context, "missing").has_value());
 }
 
 void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver()

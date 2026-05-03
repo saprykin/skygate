@@ -1,5 +1,5 @@
 #include "TestHelpers.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogLoader.hpp"
 
 #include <QtTest/QtTest>
 
@@ -17,11 +17,14 @@ private slots:
 
 void HygCatalogParserTests::parsesBasicRows()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalogFromHygCsv(
+    auto result = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,32349,Sirius,6.7525,-16.7161,-1.46\n"
         "2,24608,Capella,5.2782,45.9979,0.08\n"
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
@@ -32,7 +35,8 @@ void HygCatalogParserTests::parsesBasicRows()
 
 void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalogFromHygCsv(
+    auto result = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
         "hip,id,proper,bf,ra,dec,mag\n"
         ",,Unnamed,,1.0,2.0,3.0\n"
         ",99,,Beta,4.0,5.0,6.0\n"
@@ -41,6 +45,8 @@ void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
         "3,102,\"Quote \"\"Star\"\"\",,12.0,13.0,2.5\n"
         "1,100,Skipped,,1.0,2.0,\n"
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
@@ -115,16 +121,18 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
 
 void HygCatalogParserTests::rejectsMalformedInput()
 {
-    const auto headerOnlyCatalog = skygate::ephemeris::createStarCatalogFromHygCsv(
+    const auto headerOnlyResult = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
         "hip,id,proper,ra,dec,mag\n"
     );
-    QVERIFY(headerOnlyCatalog == nullptr);
+    QVERIFY(!headerOnlyResult.isSuccess());
 
-    const auto malformedCatalog = skygate::ephemeris::createStarCatalogFromHygCsv(
+    const auto malformedResult = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,name\n"
         "1,NoCoordinates\n"
     );
-    QVERIFY(malformedCatalog == nullptr);
+    QVERIFY(!malformedResult.isSuccess());
 }
 
 QTEST_APPLESS_MAIN(HygCatalogParserTests)

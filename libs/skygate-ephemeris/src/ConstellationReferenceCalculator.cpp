@@ -1,52 +1,14 @@
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
+#include "common/StringUtilities.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/core/math/SphericalGeometry.hpp"
 
-#include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <string>
 #include <unordered_map>
 
 namespace skygate::ephemeris {
-namespace {
-
-[[nodiscard]] std::string normalizedLookupKey(const std::string_view value)
-{
-    const auto beginIt = std::find_if_not(
-        value.begin(),
-        value.end(),
-        [](const unsigned char character) {
-            return std::isspace(character) != 0;
-        }
-    );
-    const auto endIt = std::find_if_not(
-        value.rbegin(),
-        value.rend(),
-        [](const unsigned char character) {
-            return std::isspace(character) != 0;
-        }
-    ).base();
-
-    if (beginIt >= endIt) {
-        return {};
-    }
-
-    std::string normalized;
-    normalized.reserve(static_cast<std::size_t>(std::distance(beginIt, endIt)));
-    std::transform(
-        beginIt,
-        endIt,
-        std::back_inserter(normalized),
-        [](const unsigned char character) {
-            return static_cast<char>(std::tolower(character));
-        }
-    );
-    return normalized;
-}
-
-}  // namespace
 
 std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labelCenter(
     const SkySnapshot& snapshot,
@@ -54,7 +16,7 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
     const std::string_view label
 )
 {
-    const std::string normalizedLabel = normalizedLookupKey(label);
+    const std::string normalizedLabel = strings::normalizedLookupKey(label);
     if (normalizedLabel.empty()) {
         return std::nullopt;
     }
@@ -63,7 +25,7 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
         labelRefs.begin(),
         labelRefs.end(),
         [&normalizedLabel](const ConstellationLabelRef& labelRef) {
-            return normalizedLookupKey(labelRef.first) == normalizedLabel;
+            return strings::normalizedLookupKey(labelRef.first) == normalizedLabel;
         }
     );
     if (labelRefIt == labelRefs.end()) {
@@ -74,13 +36,13 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
     horizontalByBodyId.reserve(snapshot.states.size());
     for (const auto& state : snapshot.states) {
         const auto& body = snapshot.bodyAt(state.bodyIndex);
-        horizontalByBodyId.insert({normalizedLookupKey(body.id), state.horizontal});
+        horizontalByBodyId.insert({strings::normalizedLookupKey(body.id), state.horizontal});
     }
 
     core::SphericalGeometry::Vector3d sum {0.0, 0.0, 0.0};
     int validAnchorCount = 0;
     for (const std::string& hipId : labelRefIt->second) {
-        const auto horizontalIt = horizontalByBodyId.find(normalizedLookupKey(hipId));
+        const auto horizontalIt = horizontalByBodyId.find(strings::normalizedLookupKey(hipId));
         if (
             horizontalIt == horizontalByBodyId.end()
             || !horizontalIt->second.isFinite()

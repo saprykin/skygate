@@ -1,5 +1,6 @@
 #include "TestHelpers.hpp"
-#include "skygate/ephemeris/StarCatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "skygate/ephemeris/CatalogLoader.hpp"
 
 #include <QtTest/QtTest>
 
@@ -12,18 +13,19 @@ class CatalogFactoryTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void createsBundledCatalogBySourceType();
-    void createsHygCatalogBySourceRequest();
-    void createsHygCatalogBySourceTypeWithProgress();
-    void mergesDownloadedDeepSkyObjectsOverBundledAliases();
+    void loadsBundledCatalogBySourceType();
+    void loadsHygCatalogBySourceRequest();
+    void loadsHygCatalogBySourceTypeWithProgress();
     void reportsDiagnosticsForSelectionAndErrors();
 };
 
-void CatalogFactoryTests::createsBundledCatalogBySourceType()
+void CatalogFactoryTests::loadsBundledCatalogBySourceType()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalog(
+    auto result = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::Bundled
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
@@ -39,9 +41,9 @@ void CatalogFactoryTests::createsBundledCatalogBySourceType()
     QVERIFY(messier31It->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Galaxy);
 }
 
-void CatalogFactoryTests::createsHygCatalogBySourceRequest()
+void CatalogFactoryTests::loadsHygCatalogBySourceRequest()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalog(
+    auto result = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceRequest {
             .type = skygate::ephemeris::CatalogSourceType::HygCsv,
             .data =
@@ -49,6 +51,8 @@ void CatalogFactoryTests::createsHygCatalogBySourceRequest()
                 "1,11,Alpha,12.5,-30.0,4.0\n"
         }
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
@@ -57,10 +61,10 @@ void CatalogFactoryTests::createsHygCatalogBySourceRequest()
     QVERIFY(bodies[0].fixedEquatorial.has_value());
 }
 
-void CatalogFactoryTests::createsHygCatalogBySourceTypeWithProgress()
+void CatalogFactoryTests::loadsHygCatalogBySourceTypeWithProgress()
 {
     std::size_t callbackLastCount = 0;
-    const auto catalog = skygate::ephemeris::createStarCatalog(
+    auto result = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,11,Alpha,1.0,2.0,3.0\n"
@@ -69,74 +73,11 @@ void CatalogFactoryTests::createsHygCatalogBySourceTypeWithProgress()
             callbackLastCount = parsedObjectCount;
         }
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
     QVERIFY(catalog->bodies().size() == 2U);
     QVERIFY(callbackLastCount == 2U);
-}
-
-void CatalogFactoryTests::mergesDownloadedDeepSkyObjectsOverBundledAliases()
-{
-    skygate::ephemeris::CelestialBody bundledMessier;
-    bundledMessier.id = "messier_031";
-    bundledMessier.displayName = "M31";
-    bundledMessier.type = skygate::ephemeris::CelestialBodyType::DeepSkyObject;
-    bundledMessier.fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 0.7,
-        .declinationDeg = 41.0
-    };
-    bundledMessier.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-        .aliases = {"M31", "NGC 224"}
-    };
-
-    skygate::ephemeris::CelestialBody star;
-    star.id = "hip_42";
-    star.displayName = "Sirius";
-    star.type = skygate::ephemeris::CelestialBodyType::Star;
-    star.fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 6.7525,
-        .declinationDeg = -16.7161
-    };
-
-    skygate::ephemeris::CelestialBody downloadedMessier = bundledMessier;
-    downloadedMessier.id = "open_ngc_m31";
-    downloadedMessier.displayName = "OpenNGC M31";
-    downloadedMessier.deepSkyObject->aliases = {"M 31", "NGC0224"};
-
-    const auto mergedCatalog = skygate::ephemeris::createCatalogByMergingDeepSkyObjects(
-        std::span<const skygate::ephemeris::CelestialBody> {&star, 1U},
-        std::span<const skygate::ephemeris::CelestialBody> {&downloadedMessier, 1U}
-    );
-    const auto baseCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        star,
-        bundledMessier
-    });
-    const auto downloadedCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        downloadedMessier
-    });
-    const auto mergedWithReplacement = skygate::ephemeris::createCatalogByMergingDeepSkyObjects(
-        *baseCatalog,
-        *downloadedCatalog
-    );
-
-    QVERIFY(mergedCatalog != nullptr);
-    QVERIFY(mergedWithReplacement != nullptr);
-    QCOMPARE(mergedCatalog->bodies().size(), 2U);
-    QCOMPARE(mergedWithReplacement->bodies().size(), 2U);
-    QVERIFY(std::any_of(
-        mergedWithReplacement->bodies().begin(),
-        mergedWithReplacement->bodies().end(),
-        [](const skygate::ephemeris::CelestialBody& body) {
-            return body.id == "open_ngc_m31";
-        }
-    ));
-    QVERIFY(std::none_of(
-        mergedWithReplacement->bodies().begin(),
-        mergedWithReplacement->bodies().end(),
-        [](const skygate::ephemeris::CelestialBody& body) {
-            return body.id == "messier_031";
-        }
-    ));
 }
 
 void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()

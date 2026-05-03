@@ -254,7 +254,8 @@ Catalog import supports multiple payload shapes:
 
 The pipeline is:
 
-1. `CatalogPayloadParser` detects payload format.
+1. `CatalogPayloadParser` uses the private `CatalogPayloadFormatDetector` to
+   detect payload format.
 2. `CatalogLoader` routes source requests to the correct parser implementation.
 3. HYG/OpenNGC parsers share `DelimitedCatalogReader` for header, row, and
    limit handling.
@@ -262,20 +263,29 @@ The pipeline is:
 5. Optional selection/truncation can keep only the brightest bodies.
 6. The final catalog is materialized as `InMemoryStarCatalog`.
 
-`StarCatalogFactory` remains as a compatibility umbrella header. New code should
-prefer the narrower `CatalogLoader`, `CatalogFactory`, and `CatalogComposer`
-headers.
+The public catalog API intentionally has only narrow front doors:
 
-When an external catalog is activated, `createCatalogWithCoreSolarSystemBodies`
-merges bundled Sun, Moon, and planetary bodies back into the imported dataset.
-If the imported catalog has no stars, a small set of bundled reference stars is
-also retained so constellation line rendering still has anchor points.
+- `CatalogPayloadParser` for unknown downloaded/imported payloads
+- `loadStarCatalog(...)` for known catalog source types with diagnostics
+- `createStarCatalogFromBodies(...)` for test/UI fixtures and already parsed
+  bodies
+- `createBundledStarCatalog()` for the bundled starter dataset
+- `composeActiveCatalog(...)` for active application catalog composition
 
 Deep-sky objects are a fixed-equatorial catalog layer. The UI can use bundled
-Messier data or download/update the OpenNGC preset; `SkyCatalogManager` rebuilds
-the active `IStarCatalog` by merging that DSO layer with the current star
-catalog and core solar-system bodies. OpenNGC records are parsed and
-deduplicated in `libs/skygate-ephemeris`, not in QML or scene graph code.
+Messier data or download/update the OpenNGC preset. `composeActiveCatalog(...)`
+rebuilds the active `IStarCatalog` through private composition policies:
+`CoreBodyCatalogAugmenter` adds bundled Sun, Moon, planets, and reference-line
+stars when needed, while `DeepSkyCatalogMerger` applies DSO alias replacement
+and source-kind tracking. OpenNGC records are parsed and deduplicated in
+`libs/skygate-ephemeris`, not in QML or scene graph code.
+
+Catalog parsing uses private helpers to avoid repeated policy fragments:
+`StringUtilities` centralizes small ASCII normalization helpers,
+`CatalogParsingUtilities` centralizes catalog field parsing, and
+`OpenNgcObjectMapper` owns OpenNGC alias/id/display-name/object-kind mapping.
+Gzip and ZIP import share `CompressedDataInflater`; ZIP directory traversal is
+kept in `ZipArchiveReader`.
 
 #### Constellation data
 Constellation lines and label anchors have two sources:
@@ -286,6 +296,10 @@ Constellation lines and label anchors have two sources:
 
 `SkyCatalogManager` prefers downloaded constellation data when available and
 persists it with the catalog cache.
+
+`StellariumConstellationParser` is a small orchestration entrypoint over
+private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and
+`StellariumLabelRefExtractor`.
 
 ## Caching and Performance Model
 The current application uses several lightweight caches instead of a global
@@ -401,7 +415,7 @@ Update:
 ### Adding a new catalog payload format
 Update:
 
-- `CatalogPayloadParser::detectFormat(...)`
+- `CatalogPayloadFormatDetector`
 - `CatalogPayloadFormat`
 - `CatalogLoader` routing
 - parser implementation in `libs/skygate-ephemeris/src/catalog`
