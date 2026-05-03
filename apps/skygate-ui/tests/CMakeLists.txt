@@ -40,19 +40,23 @@ add_skygate_ui_qtest(skygate-ui-sky-scene-frame-pipeline-tests SkySceneFramePipe
 add_skygate_ui_qtest(skygate-ui-sky-selection-overlay-builder-tests SkySelectionOverlayBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-component-load-tests QmlComponentLoadTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-date-time-popup-tests QmlDateTimePopupTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-interaction-layer-tests QmlInteractionLayerTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-main-window-tests QmlMainWindowTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-preferences-tests QmlPreferencesTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-rendering-tests QmlRenderingTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-smoke-tests QmlSmokeTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-status-footer-tests QmlStatusFooterTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-toolbar-tests QmlToolbarTests.cpp)
 
 foreach(qml_test_target IN ITEMS
     skygate-ui-qml-component-load-tests
     skygate-ui-qml-date-time-popup-tests
+    skygate-ui-qml-interaction-layer-tests
     skygate-ui-qml-main-window-tests
     skygate-ui-qml-preferences-tests
     skygate-ui-qml-rendering-tests
     skygate-ui-qml-smoke-tests
+    skygate-ui-qml-status-footer-tests
     skygate-ui-qml-toolbar-tests
 )
     target_compile_definitions(${qml_test_target}

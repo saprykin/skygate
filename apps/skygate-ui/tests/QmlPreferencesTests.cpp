@@ -15,6 +15,7 @@ private slots:
     void appearanceCheckboxChangesRender_data();
     void appearanceCheckboxChangesRender();
     void locationCoordinateChangesPropagateToSkyView();
+    void preferencesWindowShellNavigatesAppliesAndCloses();
     void saveAndRestoreState();
 
 private:
@@ -209,7 +210,10 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     QVERIFY(downloadButtons.size() >= 2);
     QVERIFY(activateControl(downloadButtons.front()));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
-    QTRY_VERIFY(catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Downloaded Star")));
+    QTRY_VERIFY(catalogContainsDisplayName(
+        controller->catalogBodies(),
+        QStringLiteral("Downloaded Star")
+    ));
     QVERIFY(QFileInfo::exists(m_settings.cachePath(QStringLiteral("star-cache.csv"))));
 
     draft->setProperty("deepSkyCatalogPresetIndex", 2);
@@ -220,6 +224,7 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     QVERIFY(activateControl(downloadButtons.at(1)));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
     QTRY_VERIFY(catalogContainsAlias(controller->catalogBodies(), QStringLiteral("Custom Galaxy")));
+    QVERIFY(QFileInfo::exists(m_settings.cachePath(QStringLiteral("deep-sky-cache.csv"))));
 
     QVERIFY(controller->saveSettings());
     auto restoredController = makeController();
@@ -232,6 +237,10 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     QCOMPARE(restoredController->catalogUrlText(), starCatalogUrl);
     QCOMPARE(restoredController->deepSkyCatalogPresetIndex(), 2);
     QCOMPARE(restoredController->deepSkyCatalogUrlText(), deepSkyCatalogUrl);
+    QTRY_VERIFY(catalogContainsAlias(
+        restoredController->catalogBodies(),
+        QStringLiteral("Custom Galaxy")
+    ));
 
     draft->setProperty("catalogPresetIndex", 0);
     draft->setProperty("deepSkyCatalogPresetIndex", 0);
@@ -239,11 +248,17 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     const auto useButtons = invokableButtonsWithText(root, QStringLiteral("Use catalog"));
     QVERIFY(useButtons.size() >= 2);
     QVERIFY(activateControl(useButtons.front()));
-    QTRY_VERIFY(!catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Downloaded Star")));
+    QTRY_VERIFY(!catalogContainsDisplayName(
+        controller->catalogBodies(),
+        QStringLiteral("Downloaded Star")
+    ));
     QVERIFY(controller->catalogStatusText().contains("Bundled"));
 
     QVERIFY(activateControl(useButtons.at(1)));
-    QTRY_VERIFY(!catalogContainsAlias(controller->catalogBodies(), QStringLiteral("Custom Galaxy")));
+    QTRY_VERIFY(!catalogContainsAlias(
+        controller->catalogBodies(),
+        QStringLiteral("Custom Galaxy")
+    ));
 
     const auto clearButtons = invokableButtonsWithText(root, QStringLiteral("Clear Catalog Cache"));
     QVERIFY(clearButtons.size() >= 2);
@@ -339,7 +354,7 @@ void QmlPreferencesTests::appearanceCheckboxChangesRender()
     QQmlEngine engine;
     setupEngine(engine, *controller, sceneModel.get());
 
-    const QmlWarningScope warnings;
+    const QmlWarningScope warnings(QmlWarningScope::Forwarding::Disabled);
     auto object = createInlineComponent(engine, QStringLiteral(R"(
         import QtQuick
         Item {
@@ -426,9 +441,21 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
     QCOMPARE(longitudeInputs.size(), 1);
     QCOMPARE(elevationInputs.size(), 1);
 
-    replaceText(exposed.window(), qobject_cast<QQuickItem*>(latitudeInputs.front()), QStringLiteral("12.5"));
-    replaceText(exposed.window(), qobject_cast<QQuickItem*>(longitudeInputs.front()), QStringLiteral("34.5"));
-    replaceText(exposed.window(), qobject_cast<QQuickItem*>(elevationInputs.front()), QStringLiteral("88"));
+    replaceText(
+        exposed.window(),
+        qobject_cast<QQuickItem*>(latitudeInputs.front()),
+        QStringLiteral("12.5")
+    );
+    replaceText(
+        exposed.window(),
+        qobject_cast<QQuickItem*>(longitudeInputs.front()),
+        QStringLiteral("34.5")
+    );
+    replaceText(
+        exposed.window(),
+        qobject_cast<QQuickItem*>(elevationInputs.front()),
+        QStringLiteral("88")
+    );
     QCOMPARE(draft->property("locationSourceText").toString(), QString("Custom"));
     QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
 
@@ -439,6 +466,81 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
     const SkyViewRenderSignature changed = renderSignature(*controller, *sceneModel);
     QVERIFY(changed.differsFrom(baseline));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferencesTests::preferencesWindowShellNavigatesAppliesAndCloses()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setLatitudeText(QStringLiteral("47.000000"));
+    controller->setLongitudeText(QStringLiteral("8.000000"));
+    controller->setElevationText(QStringLiteral("400"));
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createFileComponent(
+        engine,
+        QStringLiteral("PreferencesWindow.qml"),
+        {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
+    );
+    QVERIFY(object != nullptr);
+    auto* window = qobject_cast<QQuickWindow*>(object.get());
+    QVERIFY(window != nullptr);
+
+    QObject* draft = firstObjectWithMetaProperties(
+        window,
+        {"overlayHorizon", "catalogPresetIndex", "deepSkyCatalogPresetIndex"}
+    );
+    QVERIFY(draft != nullptr);
+    draft->setProperty("latitudeText", QStringLiteral("1.000000"));
+
+    QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
+    QVERIFY(QMetaObject::invokeMethod(window, "openWindow"));
+    QTRY_VERIFY(window->isVisible());
+    QCOMPARE(draft->property("latitudeText").toString(), QString("47.000000"));
+
+    QObject* catalogSection = firstObjectWithProperty(window, "label", QStringLiteral("Catalog"));
+    QVERIFY(catalogSection != nullptr);
+    QVERIFY(activateControl(catalogSection));
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 2);
+    QCOMPARE(
+        window->property("currentSectionDescription").toString(),
+        QString("Catalog source and download settings")
+    );
+
+    QObject* skySection = firstObjectWithProperty(window, "label", QStringLiteral("Sky"));
+    QVERIFY(skySection != nullptr);
+    QVERIFY(activateControl(skySection));
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 0);
+
+    const auto applyButtons = invokableButtonsWithText(window, QStringLiteral("Apply"));
+    QCOMPARE(applyButtons.size(), 1);
+    QObject* applyButton = applyButtons.front();
+    draft->setProperty("locationSourceText", QStringLiteral("City"));
+    draft->setProperty("selectedCityId", QString());
+    QCoreApplication::processEvents();
+    QTRY_VERIFY(!window->property("applyEnabled").toBool());
+    QVERIFY(!applyButton->property("enabled").toBool());
+
+    draft->setProperty("locationSourceText", QStringLiteral("Custom"));
+    draft->setProperty("latitudeText", QStringLiteral("12.500000"));
+    draft->setProperty("longitudeText", QStringLiteral("34.500000"));
+    draft->setProperty("elevationText", QStringLiteral("88"));
+    QCoreApplication::processEvents();
+    QTRY_VERIFY(window->property("applyEnabled").toBool());
+    QVERIFY(applyButton->property("enabled").toBool());
+    QVERIFY(activateControl(applyButton));
+    QTRY_COMPARE(controller->latitudeText(), QString("12.500000"));
+    QCOMPARE(controller->longitudeText(), QString("34.500000"));
+    QCOMPARE(controller->elevationText(), QString("88.0"));
+
+    QTest::keyClick(window, Qt::Key_Escape);
+    QTRY_VERIFY(!window->isVisible());
+    QStringList unexpectedWarnings = warnings.messages();
+    unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));
+    QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
 }
 
 void QmlPreferencesTests::saveAndRestoreState()

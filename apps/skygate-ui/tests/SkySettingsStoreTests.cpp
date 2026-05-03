@@ -15,6 +15,7 @@ private slots:
     void savesAndLoadsStateSnapshot();
     void savesAndLoadsNegativeUtcEpochSeconds();
     void savesLoadsAndClearsCatalogCachesIndependently();
+    void partialCatalogCacheSavePreservesConfiguredPeerPath();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -169,6 +170,36 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 
     QVERIFY(store.clearDeepSkyCatalogCache());
     QVERIFY(!store.loadCatalogCache().has_value());
+}
+
+void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
+{
+    QSettings settings;
+    settings.clear();
+    const QString starCachePath = m_settingsDir.filePath("partial-star-cache.txt");
+    const QString deepSkyCachePath = m_settingsDir.filePath("partial-deep-sky-cache.txt");
+    settings.setValue("skyContext/catalogCachePath", starCachePath);
+    settings.setValue("skyContext/deepSkyCatalogCachePath", deepSkyCachePath);
+
+    SkySettingsStore store;
+    SkySettingsStore::CatalogCacheSnapshot starSnapshot;
+    starSnapshot.sourceLabel = "Saved";
+    starSnapshot.catalogPayload =
+        "id,hip,proper,ra,dec,mag\n"
+        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
+    QVERIFY(store.saveCatalogCache(starSnapshot));
+    QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
+    QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
+
+    SkySettingsStore::CatalogCacheSnapshot deepSkySnapshot;
+    deepSkySnapshot.deepSkySourceLabel = "Saved OpenNGC";
+    deepSkySnapshot.deepSkyCatalogPayload =
+        "Name;Type;RA;Dec;M;NGC;IC\n"
+        "NGC0224;G;00:42:44.35;+41:16:08.6;31;0224;\n";
+    QVERIFY(store.saveCatalogCache(deepSkySnapshot));
+    QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
+    QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
+    QVERIFY(QFileInfo::exists(deepSkyCachePath));
 }
 
 QTEST_GUILESS_MAIN(SkySettingsStoreTests)

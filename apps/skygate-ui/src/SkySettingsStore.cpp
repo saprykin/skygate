@@ -31,16 +31,6 @@ bool removeCacheFiles(const QStringList& cachePaths)
     return removedAllCacheFiles;
 }
 
-bool clearSavedCacheFile(const QString& path)
-{
-    if (path.isEmpty()) {
-        return true;
-    }
-
-    QFile cacheFile(path);
-    return !cacheFile.exists() || cacheFile.remove();
-}
-
 } // namespace
 
 bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
@@ -380,35 +370,18 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
     if (!writePayload(configuredDeepSkyPath, snapshot.deepSkyCatalogPayload)) {
         return false;
     }
-    if (snapshot.catalogPayload.isEmpty() && !clearSavedCacheFile(configuredPath)) {
-        return false;
-    }
-    if (
-        snapshot.deepSkyCatalogPayload.isEmpty()
-        && !clearSavedCacheFile(configuredDeepSkyPath)
-    ) {
-        return false;
-    }
-
     settings.setValue(
         SkyContextSettings::key("version"),
         SkyContextControllerConstants::kSettingsVersion
     );
     if (!snapshot.catalogPayload.isEmpty()) {
         settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
-    } else {
-        settings.remove(SkyContextSettings::key("catalogCachePath"));
-        settings.remove(SkyContextSettings::key("catalogSourceLabel"));
-        settings.remove(SkyContextSettings::key("catalogConstellationLineRefs"));
-        settings.remove(SkyContextSettings::key("catalogConstellationLabelRefs"));
-        settings.remove(SkyContextSettings::key("catalogConstellationLineSchemaVersion"));
-        settings.remove(SkyContextSettings::key("catalogConstellationCount"));
     }
     if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
-        settings.setValue(SkyContextSettings::key("deepSkyCatalogCachePath"), configuredDeepSkyPath);
-    } else {
-        settings.remove(SkyContextSettings::key("deepSkyCatalogCachePath"));
-        settings.remove(SkyContextSettings::key("deepSkyCatalogSourceLabel"));
+        settings.setValue(
+            SkyContextSettings::key("deepSkyCatalogCachePath"),
+            configuredDeepSkyPath
+        );
     }
     if (!snapshot.catalogPayload.isEmpty()) {
         settings.setValue(

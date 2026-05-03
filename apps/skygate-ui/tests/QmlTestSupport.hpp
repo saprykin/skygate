@@ -32,10 +32,12 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QWheelEvent>
 #include <qqml.h>
 
 #include <algorithm>
 #include <cstddef>
+#include <initializer_list>
 #include <memory>
 #include <span>
 
@@ -215,6 +217,38 @@ inline QObject* firstObjectWithProperty(
 {
     for (QObject* object : objectTree(root)) {
         if (object->property(propertyName) == value) {
+            return object;
+        }
+    }
+    return nullptr;
+}
+
+inline QList<QObject*> objectsWithMetaProperty(QObject* root, const char* propertyName)
+{
+    QList<QObject*> matches;
+    for (QObject* object : objectTree(root)) {
+        if (object->metaObject()->indexOfProperty(propertyName) >= 0) {
+            matches.push_back(object);
+        }
+    }
+    return matches;
+}
+
+inline QObject* firstObjectWithMetaProperties(
+    QObject* root,
+    const std::initializer_list<const char*> propertyNames
+)
+{
+    for (QObject* object : objectTree(root)) {
+        const QMetaObject* metaObject = object->metaObject();
+        const bool hasAllProperties = std::all_of(
+            propertyNames.begin(),
+            propertyNames.end(),
+            [metaObject](const char* propertyName) {
+                return metaObject->indexOfProperty(propertyName) >= 0;
+            }
+        );
+        if (hasAllProperties) {
             return object;
         }
     }
