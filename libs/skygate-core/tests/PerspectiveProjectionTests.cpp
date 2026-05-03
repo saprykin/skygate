@@ -33,9 +33,12 @@ private slots:
     void centerDirectionMapsToScreenCenter();
     void insideHorizontalFovNearRightEdgeIsVisible();
     void topEdgeMapsToViewportTop();
+    void exactHorizontalFovEdgeIsVisible();
     void outsideHorizontalFovIsHidden();
     void invalidParamsAreRejected();
     void invalidCoordinateIsRejected();
+    void legalFovBoundaryValuesAreAccepted();
+    void rollRotatesProjectedPoint();
     void zenithOrientationRemainsContinuous();
 };
 
@@ -63,8 +66,9 @@ void PerspectiveProjectionTests::insideHorizontalFovNearRightEdgeIsVisible()
     const skygate::core::ProjectionParams params = makeDefaultPerspectiveParams();
 
     const double halfVerticalFovRad = qDegreesToRadians(params.fovDeg * 0.5);
-    const double halfHorizontalFovDeg =
-        qRadiansToDegrees(std::atan(std::tan(halfVerticalFovRad) * (params.viewportWidth / params.viewportHeight)));
+    const double halfHorizontalFovDeg = qRadiansToDegrees(std::atan(
+        std::tan(halfVerticalFovRad) * (params.viewportWidth / params.viewportHeight)
+    ));
     const double insideHalfHorizontalFovDeg = halfHorizontalFovDeg - 0.5;
     const double rightInsideAzimuthDeg = 360.0 - insideHalfHorizontalFovDeg;
 
@@ -96,6 +100,36 @@ void PerspectiveProjectionTests::topEdgeMapsToViewportTop()
     QVERIFY(isNear(projectedTopEdgePoint.y, 0.0, 1e-4));
 }
 
+void PerspectiveProjectionTests::exactHorizontalFovEdgeIsVisible()
+{
+    const auto projection =
+        skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
+    QVERIFY(projection != nullptr);
+
+    const skygate::core::ProjectionParams params = makeDefaultPerspectiveParams();
+
+    const double halfVerticalFovRad = qDegreesToRadians(params.fovDeg * 0.5);
+    const double halfHorizontalFovDeg = qRadiansToDegrees(std::atan(
+        std::tan(halfVerticalFovRad) * (params.viewportWidth / params.viewportHeight)
+    ));
+
+    const auto edgePoint = projection->project(
+        {.altitudeDeg = 0.0, .azimuthDeg = 360.0 - halfHorizontalFovDeg},
+        params
+    );
+
+    QVERIFY(edgePoint.isVisible);
+    QCOMPARE(edgePoint.status, skygate::core::ProjectionStatus::Visible);
+    QVERIFY(isNear(edgePoint.x, params.viewportWidth, 1e-4));
+
+    const auto outsidePoint = projection->project(
+        {.altitudeDeg = 0.0, .azimuthDeg = 360.0 - halfHorizontalFovDeg - 0.25},
+        params
+    );
+    QVERIFY(!outsidePoint.isVisible);
+    QCOMPARE(outsidePoint.status, skygate::core::ProjectionStatus::Culled);
+}
+
 void PerspectiveProjectionTests::outsideHorizontalFovIsHidden()
 {
     const auto projection =
@@ -105,8 +139,9 @@ void PerspectiveProjectionTests::outsideHorizontalFovIsHidden()
     const skygate::core::ProjectionParams params = makeDefaultPerspectiveParams();
 
     const double halfVerticalFovRad = qDegreesToRadians(params.fovDeg * 0.5);
-    const double halfHorizontalFovDeg =
-        qRadiansToDegrees(std::atan(std::tan(halfVerticalFovRad) * (params.viewportWidth / params.viewportHeight)));
+    const double halfHorizontalFovDeg = qRadiansToDegrees(std::atan(
+        std::tan(halfVerticalFovRad) * (params.viewportWidth / params.viewportHeight)
+    ));
     const double outsideAzimuthDeg = 360.0 - (halfHorizontalFovDeg + 0.5);
 
     const auto projectedOutsidePoint = projection->project(
@@ -170,6 +205,59 @@ void PerspectiveProjectionTests::invalidCoordinateIsRejected()
 
     QVERIFY(!invalidCoordinatePoint.isVisible);
     QCOMPARE(invalidCoordinatePoint.status, skygate::core::ProjectionStatus::InvalidCoordinate);
+}
+
+void PerspectiveProjectionTests::legalFovBoundaryValuesAreAccepted()
+{
+    const auto projection =
+        skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
+    QVERIFY(projection != nullptr);
+
+    skygate::core::ProjectionParams params = makeDefaultPerspectiveParams();
+
+    params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMinDeg;
+    const auto minFovPoint = projection->project(params.center, params);
+    QVERIFY(minFovPoint.isVisible);
+    QCOMPARE(minFovPoint.status, skygate::core::ProjectionStatus::Visible);
+
+    params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMaxDeg;
+    const auto maxFovPoint = projection->project(params.center, params);
+    QVERIFY(maxFovPoint.isVisible);
+    QCOMPARE(maxFovPoint.status, skygate::core::ProjectionStatus::Visible);
+}
+
+void PerspectiveProjectionTests::rollRotatesProjectedPoint()
+{
+    const auto projection =
+        skygate::core::createProjection(skygate::core::ProjectionType::Perspective);
+    QVERIFY(projection != nullptr);
+
+    const skygate::core::HorizontalCoordinate target {.altitudeDeg = 10.0, .azimuthDeg = 10.0};
+    const skygate::core::ProjectionParams baseParams {
+        .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
+        .fovDeg = 120.0,
+        .rollDeg = 0.0,
+        .viewportWidth = 1000.0,
+        .viewportHeight = 1000.0,
+    };
+
+    const auto baselinePoint = projection->project(target, baseParams);
+    QVERIFY(baselinePoint.isVisible);
+
+    skygate::core::ProjectionParams rollParams = baseParams;
+    rollParams.rollDeg = 90.0;
+    const auto rotatedPoint = projection->project(target, rollParams);
+    QVERIFY(rotatedPoint.isVisible);
+
+    const double centerX = rollParams.viewportWidth * 0.5;
+    const double centerY = rollParams.viewportHeight * 0.5;
+    const double baselineOffsetX = baselinePoint.x - centerX;
+    const double baselineOffsetY = baselinePoint.y - centerY;
+    const double rotatedOffsetX = rotatedPoint.x - centerX;
+    const double rotatedOffsetY = rotatedPoint.y - centerY;
+
+    QVERIFY(isNear(rotatedOffsetX, baselineOffsetY, 1e-5));
+    QVERIFY(isNear(rotatedOffsetY, -baselineOffsetX, 1e-5));
 }
 
 void PerspectiveProjectionTests::zenithOrientationRemainsContinuous()

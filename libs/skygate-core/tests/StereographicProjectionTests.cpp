@@ -33,6 +33,8 @@ private slots:
     void oppositeDirectionIsHidden();
     void invalidParamsAreRejected();
     void invalidCoordinateIsRejected();
+    void legalFovBoundaryValuesAreAccepted();
+    void directionAtCircularFovEdgeIsVisible();
     void directionOutsideFovIsHidden();
     void rollRotatesProjectedPoint();
     void zenithCenterIsSupported();
@@ -122,6 +124,54 @@ void StereographicProjectionTests::invalidCoordinateIsRejected()
 
     QVERIFY(!invalidCoordinatePoint.isVisible);
     QCOMPARE(invalidCoordinatePoint.status, skygate::core::ProjectionStatus::InvalidCoordinate);
+}
+
+void StereographicProjectionTests::legalFovBoundaryValuesAreAccepted()
+{
+    const auto projection =
+        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    QVERIFY(projection != nullptr);
+
+    skygate::core::ProjectionParams params = makeDefaultStereographicParams();
+
+    params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMinDeg;
+    const auto minFovPoint = projection->project(params.center, params);
+    QVERIFY(minFovPoint.isVisible);
+    QCOMPARE(minFovPoint.status, skygate::core::ProjectionStatus::Visible);
+
+    params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMaxDeg;
+    const auto maxFovPoint = projection->project(params.center, params);
+    QVERIFY(maxFovPoint.isVisible);
+    QCOMPARE(maxFovPoint.status, skygate::core::ProjectionStatus::Visible);
+}
+
+void StereographicProjectionTests::directionAtCircularFovEdgeIsVisible()
+{
+    const auto projection =
+        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    QVERIFY(projection != nullptr);
+
+    const skygate::core::ProjectionParams params {
+        .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
+        .fovDeg = 60.0,
+        .rollDeg = 0.0,
+        .viewportWidth = 1000.0,
+        .viewportHeight = 1000.0,
+    };
+
+    const auto edgePoint = projection->project(
+        {.altitudeDeg = 0.0, .azimuthDeg = 30.0},
+        params
+    );
+    QVERIFY(edgePoint.isVisible);
+    QCOMPARE(edgePoint.status, skygate::core::ProjectionStatus::Visible);
+
+    const auto outsidePoint = projection->project(
+        {.altitudeDeg = 0.0, .azimuthDeg = 30.25},
+        params
+    );
+    QVERIFY(!outsidePoint.isVisible);
+    QCOMPARE(outsidePoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void StereographicProjectionTests::directionOutsideFovIsHidden()

@@ -71,12 +71,17 @@ ScreenPoint ProjectionPipeline::finishRectangular(
         return invalidParametersPoint();
     }
 
-    if (std::abs(projectedX) > halfWidth || std::abs(projectedY) > halfHeight) {
+    if (
+        std::abs(projectedX) > (halfWidth + MathConstants::kEpsilon)
+        || std::abs(projectedY) > (halfHeight + MathConstants::kEpsilon)
+    ) {
         return culledPoint();
     }
 
-    const double normalizedX = projectedX / halfWidth;
-    const double normalizedY = projectedY / halfHeight;
+    const double boundedX = std::clamp(projectedX, -halfWidth, halfWidth);
+    const double boundedY = std::clamp(projectedY, -halfHeight, halfHeight);
+    const double normalizedX = boundedX / halfWidth;
+    const double normalizedY = boundedY / halfHeight;
     const double screenX = ((normalizedX + 1.0) * 0.5) * params.viewportWidth;
     const double screenY = ((1.0 - normalizedY) * 0.5) * params.viewportHeight;
     if (!std::isfinite(screenX) || !std::isfinite(screenY)) {
