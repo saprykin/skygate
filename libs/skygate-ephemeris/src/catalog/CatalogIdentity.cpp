@@ -3,7 +3,6 @@
 #include "common/StringUtilities.hpp"
 
 #include <algorithm>
-#include <array>
 #include <string>
 #include <vector>
 
@@ -28,29 +27,6 @@ void appendDeepSkyAliasKeys(std::vector<std::string>& keys, const CelestialBody&
 }
 
 }  // namespace
-
-bool isReferenceLineStarId(const std::string_view id)
-{
-    constexpr std::array<std::string_view, 8> kReferenceLineStarIds = {{
-        "sirius",
-        "canopus",
-        "arcturus",
-        "vega",
-        "capella",
-        "rigel",
-        "procyon",
-        "betelgeuse",
-    }};
-
-    const std::string loweredId = strings::toLowerAscii(id);
-    return std::any_of(
-        kReferenceLineStarIds.begin(),
-        kReferenceLineStarIds.end(),
-        [&loweredId](const std::string_view referenceId) {
-            return loweredId == referenceId;
-        }
-    );
-}
 
 bool containsBodyId(
     const std::span<const CelestialBody> bodies,

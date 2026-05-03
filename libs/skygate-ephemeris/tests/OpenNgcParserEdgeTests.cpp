@@ -49,6 +49,7 @@ private slots:
     void skipsInvalidCoordinatesButKeepsValidRows();
     void rejectsPayloadWithNoUsableDeepSkyRows();
     void mapsSupportedObjectKinds();
+    void preservesValidGeometryFields();
     void normalizesAndDeduplicatesAliases();
 };
 
@@ -117,6 +118,35 @@ void OpenNgcParserEdgeTests::mapsSupportedObjectKinds()
     QVERIFY(findBody(bodies, "ngc_4")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Nebula);
     QVERIFY(findBody(bodies, "ngc_5")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula);
     QVERIFY(findBody(bodies, "ngc_6")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Asterism);
+}
+
+void OpenNgcParserEdgeTests::preservesValidGeometryFields()
+{
+    const std::string payload = std::string(kHeader)
+        + "NGC0224;G;00:42:44.35;+41:16:08.6;And;177.83;69.66;0;4.36;3.44;;;;13.35;SA(s)b;;;;31;0224;;;PGC 2557;Andromeda Galaxy;;\n"
+        + "NGC0001;G;00:00:00.00;+00:00:00.0;And;-1;0;-5;;;;;;;SA(s)b;;;;;0001;;;;;;\n";
+
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(payload);
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.catalog != nullptr);
+
+    const auto* m31 = findBody(result.catalog->bodies(), "messier_031");
+    QVERIFY(m31 != nullptr);
+    QVERIFY(m31->deepSkyObject.has_value());
+    QVERIFY(m31->deepSkyObject->majorAxisArcmin.has_value());
+    QVERIFY(m31->deepSkyObject->minorAxisArcmin.has_value());
+    QVERIFY(m31->deepSkyObject->positionAngleDeg.has_value());
+    QCOMPARE(*m31->deepSkyObject->majorAxisArcmin, 177.83);
+    QCOMPARE(*m31->deepSkyObject->minorAxisArcmin, 69.66);
+    QCOMPARE(*m31->deepSkyObject->positionAngleDeg, 0.0);
+
+    const auto* ngc1 = findBody(result.catalog->bodies(), "ngc_1");
+    QVERIFY(ngc1 != nullptr);
+    QVERIFY(ngc1->deepSkyObject.has_value());
+    QVERIFY(!ngc1->deepSkyObject->majorAxisArcmin.has_value());
+    QVERIFY(!ngc1->deepSkyObject->minorAxisArcmin.has_value());
+    QVERIFY(!ngc1->deepSkyObject->positionAngleDeg.has_value());
 }
 
 void OpenNgcParserEdgeTests::normalizesAndDeduplicatesAliases()

@@ -55,6 +55,9 @@ private slots:
     void solarSystemBodiesMatchGoldenApproximation();
     void equatorialToHorizontalPlacesTransitAtZenith();
     void observerLongitudeChangesLocalSiderealHourAngle();
+    void rightAscensionWrapsAcrossTwentyFourHours();
+    void negativeLongitudeMirrorsPositiveLongitude();
+    void polarObserverPlacesMatchingCelestialPoleAtZenith();
 };
 
 void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
@@ -121,12 +124,14 @@ void EphemerisRegressionTests::observerLongitudeChangesLocalSiderealHourAngle()
     const double greenwichRightAscensionHours =
         skygate::ephemeris::JulianDateTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
-    const auto greenwichHorizontal = skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+    const auto greenwichHorizontal =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
     );
-    const auto eastLongitudeHorizontal = skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+    const auto eastLongitudeHorizontal =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 15.0, .elevationMeters = 0.0},
         j2000NoonUtc
@@ -135,6 +140,74 @@ void EphemerisRegressionTests::observerLongitudeChangesLocalSiderealHourAngle()
     QVERIFY(greenwichHorizontal.altitudeDeg > eastLongitudeHorizontal.altitudeDeg);
     QVERIFY(isNear(eastLongitudeHorizontal.altitudeDeg, 75.0, 1e-9));
     QVERIFY(isNear(eastLongitudeHorizontal.azimuthDeg, 270.0, 1e-9));
+}
+
+void EphemerisRegressionTests::rightAscensionWrapsAcrossTwentyFourHours()
+{
+    const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
+
+    const auto zeroRightAscension = skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+        {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
+        j2000NoonUtc
+    );
+    const auto wrappedRightAscension =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        {.rightAscensionHours = 24.0, .declinationDeg = 0.0},
+        {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
+        j2000NoonUtc
+    );
+
+    QVERIFY(isNear(wrappedRightAscension.altitudeDeg, zeroRightAscension.altitudeDeg, 1e-9));
+    QVERIFY(isNear(wrappedRightAscension.azimuthDeg, zeroRightAscension.azimuthDeg, 1e-9));
+}
+
+void EphemerisRegressionTests::negativeLongitudeMirrorsPositiveLongitude()
+{
+    const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
+    const double greenwichRightAscensionHours =
+        skygate::ephemeris::JulianDateTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+
+    const auto eastLongitudeHorizontal =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
+        {.latitudeDeg = 0.0, .longitudeDeg = 15.0, .elevationMeters = 0.0},
+        j2000NoonUtc
+    );
+    const auto westLongitudeHorizontal =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
+        {.latitudeDeg = 0.0, .longitudeDeg = -15.0, .elevationMeters = 0.0},
+        j2000NoonUtc
+    );
+
+    QVERIFY(isNear(eastLongitudeHorizontal.altitudeDeg, 75.0, 1e-9));
+    QVERIFY(isNear(westLongitudeHorizontal.altitudeDeg, 75.0, 1e-9));
+    QVERIFY(isNear(eastLongitudeHorizontal.azimuthDeg, 270.0, 1e-9));
+    QVERIFY(isNear(westLongitudeHorizontal.azimuthDeg, 90.0, 1e-9));
+}
+
+void EphemerisRegressionTests::polarObserverPlacesMatchingCelestialPoleAtZenith()
+{
+    const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
+
+    const auto northPoleHorizontal =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        {.rightAscensionHours = 12.0, .declinationDeg = 90.0},
+        {.latitudeDeg = 90.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
+        j2000NoonUtc
+    );
+    const auto southPoleHorizontal =
+        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        {.rightAscensionHours = 12.0, .declinationDeg = -90.0},
+        {.latitudeDeg = -90.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
+        j2000NoonUtc
+    );
+
+    QVERIFY(isNear(northPoleHorizontal.altitudeDeg, 90.0, 1e-9));
+    QVERIFY(isNear(southPoleHorizontal.altitudeDeg, 90.0, 1e-9));
+    QVERIFY(std::isfinite(northPoleHorizontal.azimuthDeg));
+    QVERIFY(std::isfinite(southPoleHorizontal.azimuthDeg));
 }
 
 QTEST_APPLESS_MAIN(EphemerisRegressionTests)

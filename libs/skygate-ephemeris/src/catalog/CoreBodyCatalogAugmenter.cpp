@@ -4,9 +4,31 @@
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <algorithm>
+#include <array>
+#include <string_view>
+#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
+
+struct ReferenceLineStar final {
+    std::string_view id;
+    std::string_view displayName;
+    double rightAscensionHours;
+    double declinationDeg;
+    double visualMagnitude;
+};
+
+constexpr std::array<ReferenceLineStar, 8> kReferenceLineStars {{
+    {"sirius", "Sirius", 6.7525, -16.7161, -1.46},
+    {"canopus", "Canopus", 6.3992, -52.6957, -0.74},
+    {"arcturus", "Arcturus", 14.2610, 19.1825, -0.05},
+    {"vega", "Vega", 18.6156, 38.7837, 0.03},
+    {"capella", "Capella", 5.2782, 45.9979, 0.08},
+    {"rigel", "Rigel", 5.2423, -8.2016, 0.13},
+    {"procyon", "Procyon", 7.6550, 5.2250, 0.34},
+    {"betelgeuse", "Betelgeuse", 5.9195, 7.4071, 0.42},
+}};
 
 bool isSunOrMoonType(const CelestialBodyType type)
 {
@@ -47,14 +69,10 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
     }
 
     for (const CelestialBody& body : bundledCatalog->bodies()) {
-        const bool isReferenceLineStar = body.type == CelestialBodyType::Star
-            && catalog_identity::isReferenceLineStarId(body.id)
-            && starCount == 0U;
         if (
             !isSunOrMoonType(body.type)
             && body.type != CelestialBodyType::Planet
             && body.type != CelestialBodyType::DeepSkyObject
-            && !isReferenceLineStar
         ) {
             continue;
         }
@@ -69,6 +87,27 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
 
         result.sourceKinds.push_back(sourceKindForBody(body));
         result.bodies.push_back(body);
+    }
+
+    if (starCount == 0U) {
+        for (const ReferenceLineStar& star : kReferenceLineStars) {
+            if (catalog_identity::containsBodyId(result.bodies, star.id)) {
+                continue;
+            }
+
+            CelestialBody body;
+            body.id = star.id;
+            body.displayName = star.displayName;
+            body.type = CelestialBodyType::Star;
+            body.visualMagnitude = star.visualMagnitude;
+            body.fixedEquatorial = core::EquatorialCoordinate {
+                .rightAscensionHours = star.rightAscensionHours,
+                .declinationDeg = star.declinationDeg
+            };
+
+            result.sourceKinds.push_back(CatalogCompositionSource::BuiltInEphemeris);
+            result.bodies.push_back(std::move(body));
+        }
     }
 
     return result;

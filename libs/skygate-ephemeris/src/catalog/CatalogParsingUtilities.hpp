@@ -13,6 +13,8 @@ namespace skygate::ephemeris::catalog_parsing {
 [[nodiscard]] std::optional<double> parseFiniteDouble(const QString& text);
 [[nodiscard]] std::optional<double> parsePositiveDouble(QStringView text);
 [[nodiscard]] std::optional<double> parsePositiveDouble(const QString& text);
+[[nodiscard]] std::optional<double> parseNonNegativeDouble(QStringView text);
+[[nodiscard]] std::optional<double> parseNonNegativeDouble(const QString& text);
 [[nodiscard]] std::optional<double> parseRightAscensionHours(QString text);
 [[nodiscard]] std::optional<double> parseDeclinationDeg(QString text);
 

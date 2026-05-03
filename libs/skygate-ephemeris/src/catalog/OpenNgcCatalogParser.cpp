@@ -51,16 +51,26 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
                 return true;
             }
 
-            const auto raHours = catalog_parsing::parseRightAscensionHours(row.decodeColumn(QStringLiteral("RA")));
-            const auto decDeg = catalog_parsing::parseDeclinationDeg(row.decodeColumn(QStringLiteral("Dec")));
+            const auto raHours = catalog_parsing::parseRightAscensionHours(
+                row.decodeColumn(QStringLiteral("RA"))
+            );
+            const auto decDeg = catalog_parsing::parseDeclinationDeg(
+                row.decodeColumn(QStringLiteral("Dec"))
+            );
             if (!raHours.has_value() || !decDeg.has_value()) {
                 return true;
             }
 
             const QString name = row.decodeColumn(QStringLiteral("Name"));
-            const QString messier = OpenNgcObjectMapper::withoutLeadingZeros(row.decodeColumn(QStringLiteral("M")));
-            const QString ngc = OpenNgcObjectMapper::withoutLeadingZeros(row.decodeColumn(QStringLiteral("NGC")));
-            const QString ic = OpenNgcObjectMapper::withoutLeadingZeros(row.decodeColumn(QStringLiteral("IC")));
+            const QString messier = OpenNgcObjectMapper::withoutLeadingZeros(
+                row.decodeColumn(QStringLiteral("M"))
+            );
+            const QString ngc = OpenNgcObjectMapper::withoutLeadingZeros(
+                row.decodeColumn(QStringLiteral("NGC"))
+            );
+            const QString ic = OpenNgcObjectMapper::withoutLeadingZeros(
+                row.decodeColumn(QStringLiteral("IC"))
+            );
             auto mapping = OpenNgcObjectMapper::mapObject(
                 typeText,
                 name,
@@ -79,12 +89,16 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
                 progressCallback(parsedObjectCount);
             }
 
-            const auto visualMagnitude = catalog_parsing::parseFiniteDouble(row.decodeColumn(QStringLiteral("V-Mag")));
+            const auto visualMagnitude = catalog_parsing::parseFiniteDouble(
+                row.decodeColumn(QStringLiteral("V-Mag"))
+            );
             CelestialBody body;
             body.id = std::move(mapping.id);
             body.displayName = std::move(mapping.displayName);
             body.type = CelestialBodyType::DeepSkyObject;
-            body.visualMagnitude = visualMagnitude.value_or(std::numeric_limits<double>::quiet_NaN());
+            body.visualMagnitude = visualMagnitude.value_or(
+                std::numeric_limits<double>::quiet_NaN()
+            );
             body.fixedEquatorial = core::EquatorialCoordinate {
                 .rightAscensionHours = *raHours,
                 .declinationDeg = *decDeg
@@ -92,9 +106,14 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
             body.deepSkyObject = DeepSkyObjectInfo {
                 .kind = mapping.kind,
                 .aliases = std::move(mapping.aliases),
-                .majorAxisArcmin = catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("MajAx"))),
-                .minorAxisArcmin = catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("MinAx"))),
-                .positionAngleDeg = catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("PosAng"))),
+                .majorAxisArcmin =
+                    catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("MajAx"))),
+                .minorAxisArcmin =
+                    catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("MinAx"))),
+                .positionAngleDeg =
+                    catalog_parsing::parseNonNegativeDouble(
+                        row.decodeColumn(QStringLiteral("PosAng"))
+                    ),
             };
             rowResult.bodies.push_back(std::move(body));
             return true;

@@ -80,6 +80,7 @@ private slots:
     void usesFallbackBodyLookupAndFixedCoordinatePriority();
     void usesInterfaceDefaultBodyLookupCaseInsensitive();
     void skipsHorizontalCoordinatesForInvalidObserver();
+    void fixedCoordinatesOverrideExplicitSourceDispatch();
 };
 
 void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePriority()
@@ -193,6 +194,49 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
     QVERIFY(std::isfinite(sun->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(sun->horizontal.altitudeDeg));
     QVERIFY(std::isnan(sun->horizontal.azimuthDeg));
+}
+
+void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatch()
+{
+    skygate::ephemeris::CelestialBody body = makeBody(
+        "mars",
+        "Fixed Mars",
+        skygate::ephemeris::CelestialBodyType::Planet,
+        0.0,
+        skygate::core::EquatorialCoordinate {
+            .rightAscensionHours = 3.25,
+            .declinationDeg = -12.5
+        }
+    );
+    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet;
+
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({body});
+    QVERIFY(catalog != nullptr);
+    QCOMPARE(
+        catalog->bodies()[0].ephemerisSource,
+        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    );
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
+
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 10.0;
+    context.observer.longitudeDeg = 20.0;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1710000000));
+
+    const auto state = engine->computeBodyState(context, "mars");
+    QVERIFY(state.has_value());
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        state->equatorial.rightAscensionHours,
+        3.25,
+        1e-9
+    ));
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        state->equatorial.declinationDeg,
+        -12.5,
+        1e-9
+    ));
 }
 
 QTEST_APPLESS_MAIN(EphemerisEngineFallbackTests)

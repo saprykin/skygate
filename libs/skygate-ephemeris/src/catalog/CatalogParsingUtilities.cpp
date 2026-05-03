@@ -49,6 +49,20 @@ std::optional<double> parsePositiveDouble(const QString& text)
     return parsePositiveDouble(QStringView {text});
 }
 
+std::optional<double> parseNonNegativeDouble(const QStringView text)
+{
+    const auto value = parseFiniteDouble(text);
+    if (!value.has_value() || *value < 0.0) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::optional<double> parseNonNegativeDouble(const QString& text)
+{
+    return parseNonNegativeDouble(QStringView {text});
+}
+
 std::optional<double> parseRightAscensionHours(QString text)
 {
     text = text.trimmed();
@@ -58,7 +72,11 @@ std::optional<double> parseRightAscensionHours(QString text)
 
     const QStringList parts = text.split(':');
     if (parts.size() != 3) {
-        return parseFiniteDouble(text);
+        const auto value = parseFiniteDouble(text);
+        if (!value.has_value() || *value < 0.0 || *value >= 24.0) {
+            return std::nullopt;
+        }
+        return value;
     }
 
     const auto hours = parseFiniteDouble(parts.at(0));
@@ -84,7 +102,11 @@ std::optional<double> parseDeclinationDeg(QString text)
 
     const QStringList parts = text.split(':');
     if (parts.size() != 3) {
-        return parseFiniteDouble(text);
+        const auto value = parseFiniteDouble(text);
+        if (!value.has_value() || *value < -90.0 || *value > 90.0) {
+            return std::nullopt;
+        }
+        return value;
     }
 
     const double sign = text.startsWith('-') ? -1.0 : 1.0;

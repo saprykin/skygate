@@ -51,6 +51,9 @@ class BodyTrailCalculatorTests final : public QObject {
 
 private slots:
     void samplesOffsetsAndPreservesInvalidGaps();
+    void samplesCurrentInstantForZeroWindow();
+    void preservesMissingBodySamplesAsGaps();
+    void stopsBeforeEndWhenStepDoesNotDivideWindow();
     void rejectsInvalidOptions();
 };
 
@@ -80,6 +83,88 @@ void BodyTrailCalculatorTests::samplesOffsetsAndPreservesInvalidGaps()
     QVERIFY(!samples[3].horizontal.has_value());
     QCOMPARE(samples[4].offsetMinutes, 60);
     QVERIFY(samples[4].horizontal.has_value());
+}
+
+void BodyTrailCalculatorTests::samplesCurrentInstantForZeroWindow()
+{
+    const FakeTrailEngine engine;
+    const skygate::ephemeris::BodyTrailCalculator calculator;
+    const auto samples = calculator.sample(
+        engine,
+        skygate::core::SkyContext {},
+        7U,
+        skygate::ephemeris::BodyTrailOptions {
+            .pastHours = 0,
+            .futureHours = 0,
+            .sampleStepMinutes = 30
+        }
+    );
+
+    QCOMPARE(samples.size(), 1U);
+    QCOMPARE(samples[0].offsetMinutes, 0);
+    QVERIFY(samples[0].horizontal.has_value());
+}
+
+void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
+{
+    class MissingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
+    public:
+        [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
+            const skygate::core::SkyContext& context
+        ) const override
+        {
+            return skygate::ephemeris::SkySnapshot {.context = context};
+        }
+
+        [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+            const skygate::core::SkyContext&,
+            std::uint32_t
+        ) const override
+        {
+            return std::nullopt;
+        }
+    };
+
+    const MissingBodyEngine engine;
+    const skygate::ephemeris::BodyTrailCalculator calculator;
+    const auto samples = calculator.sample(
+        engine,
+        skygate::core::SkyContext {},
+        99U,
+        skygate::ephemeris::BodyTrailOptions {
+            .pastHours = 1,
+            .futureHours = 0,
+            .sampleStepMinutes = 30
+        }
+    );
+
+    QCOMPARE(samples.size(), 3U);
+    QCOMPARE(samples[0].offsetMinutes, -60);
+    QCOMPARE(samples[1].offsetMinutes, -30);
+    QCOMPARE(samples[2].offsetMinutes, 0);
+    QVERIFY(!samples[0].horizontal.has_value());
+    QVERIFY(!samples[1].horizontal.has_value());
+    QVERIFY(!samples[2].horizontal.has_value());
+}
+
+void BodyTrailCalculatorTests::stopsBeforeEndWhenStepDoesNotDivideWindow()
+{
+    const FakeTrailEngine engine;
+    const skygate::ephemeris::BodyTrailCalculator calculator;
+    const auto samples = calculator.sample(
+        engine,
+        skygate::core::SkyContext {},
+        7U,
+        skygate::ephemeris::BodyTrailOptions {
+            .pastHours = 1,
+            .futureHours = 0,
+            .sampleStepMinutes = 40
+        }
+    );
+
+    QCOMPARE(samples.size(), 2U);
+    QCOMPARE(samples[0].offsetMinutes, -60);
+    QCOMPARE(samples[1].offsetMinutes, -20);
 }
 
 void BodyTrailCalculatorTests::rejectsInvalidOptions()

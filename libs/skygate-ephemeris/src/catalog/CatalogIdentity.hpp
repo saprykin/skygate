@@ -8,7 +8,6 @@
 
 namespace skygate::ephemeris::catalog_identity {
 
-[[nodiscard]] bool isReferenceLineStarId(std::string_view id);
 [[nodiscard]] bool containsBodyId(
     std::span<const CelestialBody> bodies,
     std::string_view id
