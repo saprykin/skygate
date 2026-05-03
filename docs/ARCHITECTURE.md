@@ -286,8 +286,10 @@ Catalog parsing uses private helpers to avoid repeated policy fragments:
 `StringUtilities` centralizes small ASCII normalization helpers,
 `CatalogParsingUtilities` centralizes catalog field parsing, and
 `OpenNgcObjectMapper` owns OpenNGC alias/id/display-name/object-kind mapping.
-Gzip and ZIP import share `CompressedDataInflater`; ZIP directory traversal is
-kept in `ZipArchiveReader`.
+Gzip and ZIP import share `CompressedDataInflater`. ZIP handling is split into
+private layers: `ZipDirectoryReader` parses central-directory metadata,
+`CatalogZipEntrySelector` applies the catalog CSV choice policy, and
+`ZipEntryExtractor` validates local headers and inflates entry payloads.
 
 #### Constellation data
 Constellation lines and label anchors have two sources:

@@ -24,6 +24,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogIdentity.hpp
     src/catalog/CatalogParsingUtilities.hpp
     src/catalog/CatalogPayloadFormatDetector.hpp
+    src/catalog/CatalogZipEntrySelector.hpp
     src/catalog/CompressedDataInflater.hpp
     src/catalog/CoreBodyCatalogAugmenter.hpp
     src/catalog/DeepSkyCatalogMerger.hpp
@@ -32,7 +33,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/StellariumHipParser.hpp
     src/catalog/StellariumLabelRefExtractor.hpp
     src/catalog/StellariumLineRefExtractor.hpp
-    src/catalog/ZipArchiveReader.hpp
+    src/catalog/ZipBinaryUtilities.hpp
     src/common/StringUtilities.cpp
     src/catalog/CatalogBodyNormalization.cpp
     src/catalog/CatalogIdentity.cpp
@@ -42,6 +43,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogLoader.cpp
     src/catalog/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogPayloadParser.cpp
+    src/catalog/CatalogZipEntrySelector.cpp
     src/catalog/CompressedDataInflater.cpp
     src/catalog/ConstellationDataCodec.cpp
     src/catalog/CoreBodyCatalogAugmenter.cpp
@@ -56,7 +58,10 @@ add_library(skygate-ephemeris STATIC
     src/catalog/OpenNgcObjectMapper.cpp
     src/catalog/OpenNgcCatalogParser.hpp
     src/catalog/ZipCodec.hpp
-    src/catalog/ZipArchiveReader.cpp
+    src/catalog/ZipDirectoryReader.cpp
+    src/catalog/ZipDirectoryReader.hpp
+    src/catalog/ZipEntryExtractor.cpp
+    src/catalog/ZipEntryExtractor.hpp
     src/catalog/StellariumConstellationParser.cpp
     src/catalog/StellariumHipParser.cpp
     src/catalog/StellariumLabelRefExtractor.cpp
