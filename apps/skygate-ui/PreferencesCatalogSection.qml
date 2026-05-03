@@ -19,12 +19,9 @@ Item {
             rowSpacing: 6
             columnSpacing: 8
 
-            Label {
-                Layout.columnSpan: 2
+            PreferencesGroupTitle {
+                columnSpan: 2
                 text: "Star Catalog"
-                color: skyContext.theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
             }
 
             PreferencesComboBox {
@@ -132,13 +129,10 @@ Item {
                 }
             }
 
-            Label {
-                Layout.columnSpan: 2
+            PreferencesGroupTitle {
+                columnSpan: 2
                 Layout.topMargin: 8
                 text: "Deep-Sky Catalog"
-                color: skyContext.theme.formLabelText
-                font.family: "Avenir Next"
-                font.pixelSize: 11
             }
 
             PreferencesComboBox {

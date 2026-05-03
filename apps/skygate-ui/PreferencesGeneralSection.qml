@@ -35,13 +35,9 @@ Item {
             rowSpacing: 7
             columnSpacing: 8
 
-            Label {
-                Layout.columnSpan: 4
+            PreferencesGroupTitle {
+                columnSpan: 4
                 text: "Logging"
-                color: skyContext.theme.sectionTitleText
-                font.family: "Avenir Next"
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
             }
 
             Label {

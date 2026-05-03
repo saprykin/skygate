@@ -123,6 +123,7 @@ qt_add_qml_module(skygate-ui
         PreferencesCityPicker.qml
         PreferencesComboBox.qml
         PreferencesGeneralSection.qml
+        PreferencesGroupTitle.qml
         PreferencesSectionButton.qml
         SearchToolbar.qml
         SkyInteractionLayer.qml

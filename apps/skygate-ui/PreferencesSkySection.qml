@@ -14,6 +14,11 @@ Item {
         rowSpacing: 3
         columnSpacing: 6
 
+        PreferencesGroupTitle {
+            columnSpan: 4
+            text: "Location"
+        }
+
         Label {
             text: "Location Source"
             color: skyContext.theme.formLabelText
@@ -147,6 +152,12 @@ Item {
             }
 
             onTextEdited: root.settingsDraft.elevationText = text
+        }
+
+        PreferencesGroupTitle {
+            columnSpan: 4
+            Layout.topMargin: 8
+            text: "View"
         }
 
         Label {

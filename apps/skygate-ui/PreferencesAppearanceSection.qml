@@ -36,6 +36,11 @@ Item {
             rowSpacing: 3
             columnSpacing: 6
 
+            PreferencesGroupTitle {
+                columnSpan: 4
+                text: "Appearance"
+            }
+
             Label {
                 text: "Theme"
                 color: skyContext.theme.formLabelText
@@ -68,13 +73,9 @@ Item {
             rowSpacing: 7
             columnSpacing: 8
 
-            Label {
-                Layout.columnSpan: 4
+            PreferencesGroupTitle {
+                columnSpan: 4
                 text: "Overlay Layers"
-                color: skyContext.theme.sectionTitleText
-                font.family: "Avenir Next"
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
             }
 
             PreferencesCheckBox {
