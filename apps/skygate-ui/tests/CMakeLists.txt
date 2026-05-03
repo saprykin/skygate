@@ -38,9 +38,25 @@ add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests SkyObjectTrailBui
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests SkyRenderBuildersTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-scene-frame-pipeline-tests SkySceneFramePipelineTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-selection-overlay-builder-tests SkySelectionOverlayBuilderTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-component-load-tests QmlComponentLoadTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-date-time-popup-tests QmlDateTimePopupTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-main-window-tests QmlMainWindowTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-preferences-tests QmlPreferencesTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-rendering-tests QmlRenderingTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-smoke-tests QmlSmokeTests.cpp)
+add_skygate_ui_qtest(skygate-ui-qml-toolbar-tests QmlToolbarTests.cpp)
 
-target_compile_definitions(skygate-ui-qml-smoke-tests
-    PRIVATE
-        SKYGATE_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
+foreach(qml_test_target IN ITEMS
+    skygate-ui-qml-component-load-tests
+    skygate-ui-qml-date-time-popup-tests
+    skygate-ui-qml-main-window-tests
+    skygate-ui-qml-preferences-tests
+    skygate-ui-qml-rendering-tests
+    skygate-ui-qml-smoke-tests
+    skygate-ui-qml-toolbar-tests
 )
+    target_compile_definitions(${qml_test_target}
+        PRIVATE
+            SKYGATE_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
+    )
+endforeach()
