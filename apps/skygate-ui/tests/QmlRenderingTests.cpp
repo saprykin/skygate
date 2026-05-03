@@ -11,6 +11,7 @@ private slots:
     void skyOverlayLayerRendersPayloads();
     void skyOverlayLayerInspectorActionsAndAvoidanceWork();
     void skyViewportItemRendersNonBlankScene();
+    void skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges();
 
 private:
     QmlSettingsFixture m_settings;
@@ -327,6 +328,74 @@ void QmlRenderingTests::skyViewportItemRendersNonBlankScene()
     std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     QVERIFY(nodeTreeSize(paintNode.get()) > 3);
+}
+
+void QmlRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setViewCenter(45.0, 180.0);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    TestSkyViewportItem viewport;
+    QSignalSpy modelChangedSpy(&viewport, &SkyViewportItem::skySceneModelChanged);
+    viewport.setWidth(640.0);
+    viewport.setHeight(420.0);
+    viewport.setSkySceneModel(sceneModel.get());
+    QCOMPARE(modelChangedSpy.count(), 1);
+    QCOMPARE(viewport.skySceneModel(), sceneModel.get());
+    QTRY_VERIFY(sceneModel->preparedProjection().has_value());
+    QCOMPARE(sceneModel->preparedProjection()->params().viewportWidth, 640.0);
+    QCOMPARE(sceneModel->preparedProjection()->params().viewportHeight, 420.0);
+
+    std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    const int populatedNodeCount = nodeTreeSize(paintNode.get());
+    const int populatedVertexCount = geometryVertexCount(paintNode.get());
+    QVERIFY(populatedNodeCount > 3);
+    QVERIFY(populatedVertexCount > 0);
+
+    viewport.setWidth(320.0);
+    viewport.setHeight(240.0);
+    QTRY_VERIFY(sceneModel->preparedProjection().has_value());
+    QCOMPARE(sceneModel->preparedProjection()->params().viewportWidth, 320.0);
+    QCOMPARE(sceneModel->preparedProjection()->params().viewportHeight, 240.0);
+    paintNode.reset(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    QVERIFY(geometryVertexCount(paintNode.get()) > 0);
+
+    QObject* overlayLayers = controller->overlayLayers();
+    QVERIFY(overlayLayers != nullptr);
+    overlayLayers->setProperty("altAzGrid", false);
+    QCoreApplication::processEvents();
+    paintNode.reset(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    const int changedVertexCount = geometryVertexCount(paintNode.get());
+    QVERIFY(changedVertexCount > 0);
+    QVERIFY(changedVertexCount != populatedVertexCount);
+
+    viewport.setSkySceneModel(nullptr);
+    QCOMPARE(modelChangedSpy.count(), 2);
+    QCOMPARE(viewport.skySceneModel(), nullptr);
+    paintNode.reset(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    QCOMPARE(nodeTreeSize(paintNode.get()), 3);
+    QCOMPARE(geometryVertexCount(paintNode.get()), 0);
+
+    auto secondController = makeController();
+    QVERIFY(secondController != nullptr);
+    auto secondSceneModel = makeSceneModel(*secondController);
+    QVERIFY(secondSceneModel != nullptr);
+    viewport.setSkySceneModel(secondSceneModel.get());
+    QCOMPARE(modelChangedSpy.count(), 3);
+    QCOMPARE(viewport.skySceneModel(), secondSceneModel.get());
+    QTRY_VERIFY(secondSceneModel->preparedProjection().has_value());
+    QCOMPARE(secondSceneModel->preparedProjection()->params().viewportWidth, 320.0);
+    QCOMPARE(secondSceneModel->preparedProjection()->params().viewportHeight, 240.0);
+    paintNode.reset(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    QVERIFY(geometryVertexCount(paintNode.get()) > 0);
 }
 
 SKYGATE_QML_TEST_MAIN(QmlRenderingTests)

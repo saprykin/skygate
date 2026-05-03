@@ -11,6 +11,7 @@ private slots:
     void keyComponentsLoadWithoutWarnings_data();
     void keyComponentsLoadWithoutWarnings();
     void aboutWindowLoadsWithBuildMetadata();
+    void aboutWindowClosesFromButtonsAndShortcuts();
     void malformedQmlEmitsCapturedWarning();
 
 private:
@@ -165,6 +166,52 @@ void QmlComponentLoadTests::aboutWindowLoadsWithBuildMetadata()
     QCOMPARE(object->property("title").toString(), QStringLiteral("About SkyGate"));
     QVERIFY(firstObjectWithProperty(object.get(), "text", QStringLiteral("SkyGate")) != nullptr);
     QVERIFY(firstVisibleItemWithText(object.get(), QStringLiteral("Git test-git  |  Built test-build")) != nullptr);
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+    engine.rootContext()->setContextProperty("skygateBuildDateTime", QStringLiteral("test-build"));
+    engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
+
+    const QmlWarningScope warnings;
+    auto object = createFileComponent(engine, QStringLiteral("AboutWindow.qml"));
+    QVERIFY(object != nullptr);
+    auto* window = qobject_cast<QQuickWindow*>(object.get());
+    QVERIFY(window != nullptr);
+
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window));
+    QTRY_VERIFY(window->isVisible());
+    const auto closeButtons = invokableButtonsWithText(window, QStringLiteral("Close"));
+    QCOMPARE(closeButtons.size(), 1);
+    QVERIFY(activateControl(closeButtons.front()));
+    QTRY_VERIFY(!window->isVisible());
+
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window));
+    QTRY_VERIFY(window->isVisible());
+    const auto xButtons = invokableButtonsWithText(window, QString::fromUtf8("\xE2\x9C\x95"));
+    QCOMPARE(xButtons.size(), 1);
+    QVERIFY(activateControl(xButtons.front()));
+    QTRY_VERIFY(!window->isVisible());
+
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window));
+    QTRY_VERIFY(window->isVisible());
+    QTest::keyClick(window, Qt::Key_Escape);
+    QTRY_VERIFY(!window->isVisible());
+
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window));
+    QTRY_VERIFY(window->isVisible());
+    QTest::keySequence(window, QKeySequence::Close);
+    QTRY_VERIFY(!window->isVisible());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
