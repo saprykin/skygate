@@ -12,6 +12,8 @@ private slots:
     void skyOverlayLayerInspectorActionsAndAvoidanceWork();
     void skyViewportItemRendersNonBlankScene();
     void skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges();
+    void skyViewportItemOverlayLayersAddExpectedGeometry_data();
+    void skyViewportItemOverlayLayersAddExpectedGeometry();
 
 private:
     QmlSettingsFixture m_settings;
@@ -396,6 +398,66 @@ void QmlRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndFrameChan
     paintNode.reset(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     QVERIFY(geometryVertexCount(paintNode.get()) > 0);
+}
+
+void QmlRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry_data()
+{
+    QTest::addColumn<QString>("propertyName");
+
+    QTest::newRow("horizon") << QStringLiteral("horizon");
+    QTest::newRow("alt-az-grid") << QStringLiteral("altAzGrid");
+    QTest::newRow("celestial-equator") << QStringLiteral("celestialEquator");
+    QTest::newRow("deep-sky-glyphs") << QStringLiteral("deepSkyObjects");
+}
+
+void QmlRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry()
+{
+    QFETCH(QString, propertyName);
+
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setMagnitudeCutoff(8.0);
+    controller->setViewCenter(45.0, 180.0);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QObject* overlayLayers = controller->overlayLayers();
+    QVERIFY(overlayLayers != nullptr);
+    for (const char* layerProperty : {
+        "horizon",
+        "altAzGrid",
+        "ecliptic",
+        "celestialEquator",
+        "circumpolarBoundary",
+        "deepSkyObjects",
+    }) {
+        QVERIFY(overlayLayers->setProperty(layerProperty, false));
+    }
+    QCoreApplication::processEvents();
+
+    TestSkyViewportItem viewport;
+    viewport.setWidth(760.0);
+    viewport.setHeight(520.0);
+    viewport.setSkySceneModel(sceneModel.get());
+    QTRY_VERIFY(sceneModel->preparedProjection().has_value());
+
+    std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    const int baselineVertexCount = geometryVertexCount(paintNode.get());
+
+    const QByteArray layerPropertyName = propertyName.toUtf8();
+    QVERIFY(overlayLayers->setProperty(layerPropertyName.constData(), true));
+    QCoreApplication::processEvents();
+    viewport.setWidth(761.0);
+    viewport.setWidth(760.0);
+    paintNode.reset(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    const int enabledVertexCount = geometryVertexCount(paintNode.get());
+
+    QVERIFY2(
+        enabledVertexCount > baselineVertexCount,
+        qPrintable(QString("%1 did not add scene-graph geometry").arg(propertyName))
+    );
 }
 
 SKYGATE_QML_TEST_MAIN(QmlRenderingTests)

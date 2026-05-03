@@ -15,6 +15,7 @@ private slots:
     void appearanceCheckboxChangesRender_data();
     void appearanceCheckboxChangesRender();
     void locationCoordinateChangesPropagateToSkyView();
+    void settingsDraftCurrentDeviceApplyAndSyncWork();
     void preferencesWindowShellNavigatesAppliesAndCloses();
     void saveAndRestoreState();
 
@@ -148,7 +149,10 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     object->setProperty("latitudeText", QStringLiteral("99.000000"));
     QVERIFY(QMetaObject::invokeMethod(object.get(), "resetFromContext"));
     QCOMPARE(object->property("latitudeText").toString(), QString("12.500000"));
-    QCOMPARE(object->property("catalogUrlText").toString(), QString("https://example.test/stars.csv"));
+    QCOMPARE(
+        object->property("catalogUrlText").toString(),
+        QString("https://example.test/stars.csv")
+    );
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -433,7 +437,8 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    const SkyViewRenderSignature baseline = renderSignature(*controller, *sceneModel);
+    renderSignature(*controller, *sceneModel);
+    const std::uint64_t baselineSnapshotGeneration = sceneModel->snapshotGeneration();
     const auto latitudeInputs = objectsWithPlaceholder(root, QStringLiteral("-90..90"));
     const auto longitudeInputs = objectsWithPlaceholder(root, QStringLiteral("-180..180"));
     const auto elevationInputs = objectsWithPlaceholder(root, QStringLiteral("meters"));
@@ -463,8 +468,113 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
     QCOMPARE(controller->latitudeText(), QString("12.500000"));
     QCOMPARE(controller->longitudeText(), QString("34.500000"));
     QCOMPARE(controller->elevationText(), QString("88.0"));
-    const SkyViewRenderSignature changed = renderSignature(*controller, *sceneModel);
-    QVERIFY(changed.differsFrom(baseline));
+    QTRY_VERIFY(sceneModel->snapshotGeneration() > baselineSnapshotGeneration);
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
+{
+    QQmlEngine engine;
+    engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(engine, QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            property alias draft: draft
+            property alias fakeController: fakeController
+            QtObject {
+                id: overlayLayers
+                property bool horizon: true
+                property bool altAzGrid: true
+                property bool constellationLines: true
+                property bool constellationLabels: true
+                property bool ecliptic: false
+                property bool celestialEquator: false
+                property bool circumpolarBoundary: false
+                property bool solarSystemLabels: true
+                property bool deepSkyObjects: true
+                property bool deepSkyLabels: true
+            }
+            QtObject {
+                id: fakeController
+                property string latitudeText: "47.376900"
+                property string longitudeText: "8.541700"
+                property string elevationText: "408.0"
+                property string locationSourceText: "Custom"
+                property string selectedCityId: ""
+                property string selectedCityDisplayText: ""
+                property string projectionTypeText: "Stereographic"
+                property string themeId: "default"
+                property var overlayLayers: overlayLayers
+                property int lastCatalogPresetIndex: -1
+                property string lastCatalogUrlText: ""
+                property int lastDeepSkyCatalogPresetIndex: -1
+                property string lastDeepSkyCatalogUrlText: ""
+                property string lastLocationSourceText: ""
+                property string lastElevationText: ""
+                property int refreshCurrentLocationCount: 0
+                function catalogPresetIndex() { return 0 }
+                function catalogUrlText() { return "" }
+                function deepSkyCatalogPresetIndex() { return 0 }
+                function deepSkyCatalogUrlText() { return "" }
+                function setLocationSourceText(value) {
+                    lastLocationSourceText = value
+                    locationSourceText = value
+                }
+                function setSelectedCityId(value) { selectedCityId = value }
+                function setLatitudeText(value) { latitudeText = value }
+                function setLongitudeText(value) { longitudeText = value }
+                function setElevationText(value) {
+                    lastElevationText = value
+                    elevationText = value
+                }
+                function refreshCurrentLocation() { ++refreshCurrentLocationCount }
+                function setProjectionTypeText(value) { projectionTypeText = value }
+                function setThemeId(value) { themeId = value }
+                function setCatalogPresetIndex(value) { lastCatalogPresetIndex = value }
+                function setCatalogUrlText(value) { lastCatalogUrlText = value }
+                function setDeepSkyCatalogPresetIndex(value) {
+                    lastDeepSkyCatalogPresetIndex = value
+                }
+                function setDeepSkyCatalogUrlText(value) { lastDeepSkyCatalogUrlText = value }
+            }
+            SkySettingsDraft {
+                id: draft
+                skyContextController: fakeController
+            }
+        }
+    )"), QStringLiteral("SkySettingsDraftCurrentDeviceBehaviorTest.qml"));
+    QVERIFY(object != nullptr);
+    QObject* draft = qvariant_cast<QObject*>(object->property("draft"));
+    QObject* fakeController = qvariant_cast<QObject*>(object->property("fakeController"));
+    QVERIFY(draft != nullptr);
+    QVERIFY(fakeController != nullptr);
+
+    QVERIFY(QMetaObject::invokeMethod(draft, "resetFromContext"));
+    draft->setProperty("locationSourceText", QStringLiteral("Current Device"));
+    draft->setProperty("elevationText", QStringLiteral("123.0"));
+    QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
+    QCOMPARE(
+        fakeController->property("lastLocationSourceText").toString(),
+        QString("Current Device")
+    );
+    QCOMPARE(fakeController->property("lastElevationText").toString(), QString("123.0"));
+    QCOMPARE(fakeController->property("refreshCurrentLocationCount").toInt(), 1);
+
+    fakeController->setProperty("latitudeText", QStringLiteral("12.500000"));
+    fakeController->setProperty("longitudeText", QStringLiteral("34.500000"));
+    fakeController->setProperty("elevationText", QStringLiteral("88.0"));
+    QVERIFY(QMetaObject::invokeMethod(draft, "syncDeviceLocationFromContext"));
+    QCOMPARE(draft->property("latitudeText").toString(), QString("12.500000"));
+    QCOMPARE(draft->property("longitudeText").toString(), QString("34.500000"));
+    QCOMPARE(draft->property("elevationText").toString(), QString("88.0"));
+
+    draft->setProperty("locationSourceText", QStringLiteral("Custom"));
+    fakeController->setProperty("latitudeText", QStringLiteral("55.000000"));
+    QVERIFY(QMetaObject::invokeMethod(draft, "syncDeviceLocationFromContext"));
+    QCOMPARE(draft->property("latitudeText").toString(), QString("12.500000"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

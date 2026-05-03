@@ -44,6 +44,7 @@ private slots:
     void initTestCase();
     void init();
     void dateTimeClickAndTrackingIndicatorInvokeControllerActions();
+    void liveAndTrackingStateUpdateFooterPresentation();
 
 private:
     QmlSettingsFixture m_settings;
@@ -147,6 +148,60 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
     QTRY_VERIFY(scene->property("inspectorCleared").toBool());
     QTRY_VERIFY(controller->selectedSearchTargetId().isEmpty());
     QVERIFY(controller->hasTrackedTarget());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setLive(false);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(engine, QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 260
+            height: 48
+            property bool popupOpen: true
+            property alias scene: scene
+            QtObject {
+                id: scene
+                property var selectedObjectInspector: ({})
+                function clearSelectedObjectInspector() {
+                    selectedObjectInspector = ({})
+                }
+            }
+            StatusFooter {
+                anchors.fill: parent
+                skyContextController: skyContext
+                sceneModel: scene
+                dateTimePopupOpen: root.popupOpen
+            }
+        }
+    )"), QStringLiteral("StatusFooterStateBehaviorTest.qml"));
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    (void)exposed;
+    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: Off")) != nullptr);
+    QCOMPARE(pointingHandItems(root).size(), 1);
+
+    controller->setLive(true);
+    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: On")) != nullptr);
+
+    QVERIFY(controller->trackSearchTarget(QStringLiteral("body"), QStringLiteral("sun")));
+    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: On")) != nullptr);
+    QTRY_VERIFY(pointingHandItems(root).size() >= 2);
+
+    controller->clearTrackedTarget();
+    QTRY_COMPARE(pointingHandItems(root).size(), 1);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

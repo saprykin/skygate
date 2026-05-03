@@ -2,6 +2,20 @@
 
 using namespace skygate::ui::tests;
 
+namespace {
+
+QObject* pinchHandler(QObject* root)
+{
+    for (QObject* object : objectTree(root)) {
+        if (object->metaObject()->indexOfSignal("scaleChanged(qreal)") >= 0) {
+            return object;
+        }
+    }
+    return nullptr;
+}
+
+}  // namespace
+
 class QmlInteractionLayerTests final : public QObject {
     Q_OBJECT
 
@@ -9,6 +23,7 @@ private slots:
     void initTestCase();
     void init();
     void hoverClickDragAndWheelReachSceneAndController();
+    void pinchScaleHandlerZoomsAndClearsHover();
 
 private:
     QmlSettingsFixture m_settings;
@@ -149,6 +164,70 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
     QTRY_COMPARE(fakeController->property("zoomWheelCalls").toInt(), 1);
     QCOMPARE(fakeController->property("lastWheelDelta").toInt(), 120);
     QCOMPARE(interaction->property("hoveredObjectLabel").toString(), QString("label-160-170"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlInteractionLayerTests::pinchScaleHandlerZoomsAndClearsHover()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(engine, QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 640
+            height: 420
+            property alias fakeController: fakeController
+            property alias interaction: interaction
+            Rectangle {
+                id: viewport
+                anchors.fill: parent
+            }
+            QtObject {
+                id: fakeController
+                property int zoomScaleCalls: 0
+                property real lastScaleDelta: 0
+                function zoomViewByScaleDelta(scaleDelta) {
+                    ++zoomScaleCalls
+                    lastScaleDelta = scaleDelta
+                }
+                function panViewBy(deltaAzimuthDeg, deltaAltitudeDeg) {}
+                function zoomViewByWheelDelta(wheelDeltaY) {}
+                function clearSelectedSearchTarget() {}
+            }
+            QtObject {
+                id: fakeScene
+                function objectLabelAt(x, y) { return "" }
+                function selectObjectAt(x, y) { return false }
+            }
+            SkyInteractionLayer {
+                id: interaction
+                viewportItem: viewport
+                skyContextController: fakeController
+                skySceneModel: fakeScene
+                hoveredObjectLabel: "before-pinch"
+            }
+        }
+    )"), QStringLiteral("SkyInteractionLayerPinchBehaviorTest.qml"));
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    QObject* fakeController = qvariant_cast<QObject*>(root->property("fakeController"));
+    QObject* interaction = qvariant_cast<QObject*>(root->property("interaction"));
+    QObject* handler = pinchHandler(root);
+    QVERIFY(fakeController != nullptr);
+    QVERIFY(interaction != nullptr);
+    QVERIFY(handler != nullptr);
+
+    QVERIFY(QMetaObject::invokeMethod(handler, "scaleChanged", Q_ARG(qreal, 1.25)));
+    QTRY_COMPARE(fakeController->property("zoomScaleCalls").toInt(), 1);
+    QCOMPARE(fakeController->property("lastScaleDelta").toReal(), 1.25);
+    QCOMPARE(interaction->property("hoveredObjectLabel").toString(), QString());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
