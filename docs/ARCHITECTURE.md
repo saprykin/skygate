@@ -173,12 +173,12 @@ module boundaries.
   - Per-frame precomputation object used by the render path.
   - Stores the normalized center basis and projection-specific constants so
     large render passes do not repeat setup work for every star.
-- `ProjectionPipeline`
-  - Shared helper for parameter validation, basis preparation, culling status,
-    and viewport mapping.
 - `ProjectionAlgorithms`
   - Internal implementation shared by direct projection strategies and
     `PreparedProjection`, so projection formulas have one behavioral source.
+- `ProjectionPipeline`
+  - Internal helper for turning normalized projection results into
+    `ScreenPoint` status and viewport coordinates.
 - Focused geometry helpers
   - `Geometry2d` for primitive 2D math, rectangles, and line segments.
   - `SpatialIndex2d` for screen-space rectangle/circle indexes.
@@ -376,7 +376,8 @@ The current codebase consistently uses a small set of practical patterns.
 
 ### Builder / pipeline pattern
 - `SkyRenderFrameBuilder` transforms snapshots into render primitives.
-- `ProjectionPipeline` centralizes shared projection mechanics.
+- `ProjectionAlgorithms` centralizes shared projection formulas, while
+  `ProjectionPipeline` centralizes projection result/status mapping.
 - catalog parsing flows through format detection, parser selection,
   normalization, and catalog construction.
 

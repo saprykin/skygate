@@ -11,7 +11,7 @@
 #include <limits>
 #include <vector>
 
-class ScreenGeometryTests final : public QObject {
+class GeometryHelpersTests final : public QObject {
     Q_OBJECT
 
 private slots:
@@ -23,7 +23,7 @@ private slots:
     void coordinateFiniteQueriesDoNotChangeValidity();
 };
 
-void ScreenGeometryTests::rectIntersectionAndViewportFit()
+void GeometryHelpersTests::rectIntersectionAndViewportFit()
 {
     const skygate::core::Rect2d rect {
         .left = 10.0,
@@ -49,7 +49,7 @@ void ScreenGeometryTests::rectIntersectionAndViewportFit()
     QVERIFY(!skygate::core::fitsWithin(rect, 100.0, 100.0, 25.0));
 }
 
-void ScreenGeometryTests::rectOccupancyGridDetectsCollisions()
+void GeometryHelpersTests::rectOccupancyGridDetectsCollisions()
 {
     skygate::core::RectOccupancyGrid grid(16.0);
     const skygate::core::Rect2d occupied {
@@ -78,7 +78,7 @@ void ScreenGeometryTests::rectOccupancyGridDetectsCollisions()
     QVERIFY(!grid.collides(occupied));
 }
 
-void ScreenGeometryTests::circleHitIndexReturnsNearestPayload()
+void GeometryHelpersTests::circleHitIndexReturnsNearestPayload()
 {
     skygate::core::CircleHitIndex index(10.0);
     QVERIFY(!index.nearestPayloadAt(0.0, 0.0).has_value());
@@ -95,7 +95,7 @@ void ScreenGeometryTests::circleHitIndexReturnsNearestPayload()
     QVERIFY(!index.nearestPayloadAt(150.0, 150.0).has_value());
 }
 
-void ScreenGeometryTests::projectedPolylineSplitsGapsAndDropsLongJumps()
+void GeometryHelpersTests::projectedPolylineSplitsGapsAndDropsLongJumps()
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
@@ -125,7 +125,7 @@ void ScreenGeometryTests::projectedPolylineSplitsGapsAndDropsLongJumps()
     QVERIFY(filteredSegments.empty());
 }
 
-void ScreenGeometryTests::dashedLineBuilderCreatesDashSegments()
+void GeometryHelpersTests::dashedLineBuilderCreatesDashSegments()
 {
     const skygate::core::DashedLineBuilder builder;
     const auto segments = builder.build(
@@ -147,7 +147,7 @@ void ScreenGeometryTests::dashedLineBuilderCreatesDashSegments()
     ).empty());
 }
 
-void ScreenGeometryTests::coordinateFiniteQueriesDoNotChangeValidity()
+void GeometryHelpersTests::coordinateFiniteQueriesDoNotChangeValidity()
 {
     const double nan = std::numeric_limits<double>::quiet_NaN();
 
@@ -183,6 +183,6 @@ void ScreenGeometryTests::coordinateFiniteQueriesDoNotChangeValidity()
     QVERIFY(!(skygate::core::ScreenPoint {.x = nan, .y = 2.0}).isFinite());
 }
 
-QTEST_APPLESS_MAIN(ScreenGeometryTests)
+QTEST_APPLESS_MAIN(GeometryHelpersTests)
 
-#include "ScreenGeometryTests.moc"
+#include "GeometryHelpersTests.moc"

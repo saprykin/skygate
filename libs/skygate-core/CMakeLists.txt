@@ -12,7 +12,6 @@ add_library(skygate-core STATIC
     include/skygate/core/math/LinePattern.hpp
     include/skygate/core/math/MathConstants.hpp
     include/skygate/core/math/ProjectedPolylineBuilder.hpp
-    include/skygate/core/math/ScreenGeometry.hpp
     include/skygate/core/math/SpatialIndex2d.hpp
     include/skygate/core/math/SphericalGeometry.hpp
     include/skygate/core/math/ViewportMath.hpp
