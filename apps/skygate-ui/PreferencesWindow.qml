@@ -30,14 +30,17 @@ Window {
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
-    readonly property bool applyEnabled: !(selectedPage === 0
+    readonly property bool applyEnabled: !(selectedPage === 1
                                            && settingsDraft.locationSourceText === "City"
                                            && settingsDraft.selectedCityId === "")
     readonly property string currentSectionDescription: {
         if (selectedPage === 0) {
-            return "Observer location and projection"
+            return "Application behavior and diagnostics"
         }
         if (selectedPage === 1) {
+            return "Observer location and projection"
+        }
+        if (selectedPage === 2) {
             return "Theme and visual presentation"
         }
         return "Catalog source and download settings"
@@ -216,21 +219,27 @@ Window {
                         }
 
                         PreferencesSectionButton {
-                            label: "Sky"
+                            label: "General"
                             active: preferencesWindow.selectedPage === 0
                             onClicked: preferencesWindow.selectedPage = 0
                         }
 
                         PreferencesSectionButton {
-                            label: "Appearance"
+                            label: "Sky"
                             active: preferencesWindow.selectedPage === 1
                             onClicked: preferencesWindow.selectedPage = 1
                         }
 
                         PreferencesSectionButton {
-                            label: "Catalog"
+                            label: "Appearance"
                             active: preferencesWindow.selectedPage === 2
                             onClicked: preferencesWindow.selectedPage = 2
+                        }
+
+                        PreferencesSectionButton {
+                            label: "Catalog"
+                            active: preferencesWindow.selectedPage === 3
+                            onClicked: preferencesWindow.selectedPage = 3
                         }
 
                         Item {
@@ -261,6 +270,12 @@ Window {
                             currentIndex: preferencesWindow.selectedPage
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+
+                            PreferencesGeneralSection {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                settingsDraft: settingsDraft
+                            }
 
                             PreferencesSkySection {
                                 Layout.fillWidth: true
@@ -306,7 +321,7 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 3
-                        visible: preferencesWindow.selectedPage === 2 && preferencesWindow.catalogBusy
+                        visible: preferencesWindow.selectedPage === 3 && preferencesWindow.catalogBusy
 
                         Label {
                             Layout.fillWidth: true
@@ -370,9 +385,9 @@ Window {
                     }
 
                     Item {
-                        Layout.preferredWidth: preferencesWindow.selectedPage === 2
+                        Layout.preferredWidth: preferencesWindow.selectedPage === 3
                                                && preferencesWindow.catalogBusy ? 0 : 1
-                        Layout.fillWidth: !(preferencesWindow.selectedPage === 2
+                        Layout.fillWidth: !(preferencesWindow.selectedPage === 3
                                             && preferencesWindow.catalogBusy)
                     }
 

@@ -40,6 +40,9 @@ bool SkyContextController::saveSettings() const
     snapshot.catalogUrlText = catalogUrlText();
     snapshot.deepSkyCatalogPresetIndex = deepSkyCatalogPresetIndex();
     snapshot.deepSkyCatalogUrlText = deepSkyCatalogUrlText();
+    snapshot.logToTerminal = logToTerminal();
+    snapshot.logToFile = logToFile();
+    snapshot.logFilePath = logFilePath();
     return m_settingsStore->saveState(snapshot);
 }
 
@@ -101,6 +104,9 @@ bool SkyContextController::loadSettings()
         setCatalogUrlText(stateSnapshot->catalogUrlText);
         setDeepSkyCatalogPresetIndex(stateSnapshot->deepSkyCatalogPresetIndex);
         setDeepSkyCatalogUrlText(stateSnapshot->deepSkyCatalogUrlText);
+        setLogToTerminal(stateSnapshot->logToTerminal);
+        setLogToFile(stateSnapshot->logToFile);
+        setLogFilePath(stateSnapshot->logFilePath);
     }
 
     if (m_catalogManager != nullptr) {

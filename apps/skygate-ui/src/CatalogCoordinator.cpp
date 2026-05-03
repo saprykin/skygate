@@ -4,6 +4,7 @@
 #include "catalog/CatalogPayloadParseService.hpp"
 
 #include <QLocale>
+#include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QObject>
 
@@ -12,6 +13,8 @@
 #include <utility>
 
 namespace {
+
+Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCode errorCode)
 {
@@ -128,6 +131,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     if (!loadResult.isSuccess()) {
                         DownloadResult result;
                         result.errorText = catalogLoadErrorText(loadResult, sourceUrl);
+                        qCWarning(skygateCatalogParseLog).noquote() << result.errorText;
                         if (statusHandler) {
                             statusHandler(result.errorText);
                         }

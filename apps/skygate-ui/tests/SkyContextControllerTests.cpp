@@ -1,6 +1,7 @@
 #include <QtTest>
 
 #include "SkyContextController.hpp"
+#include "SkyLogging.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
 
@@ -272,6 +273,7 @@ private slots:
     void restoresSavedThemeId();
     void invalidSavedThemeFallsBackToDefault();
     void setThemeIdUpdatesPaletteAndEmitsSignals();
+    void loggingSettingsApplyAndPersist();
     void restoresSavedOverlayLayerVisibility();
     void setUtcDateTimeTextAppliesAtomically();
     void setUtcDateTimeTextAcceptsBceInput();
@@ -314,6 +316,7 @@ void SkyContextControllerTests::initTestCase()
 
 void SkyContextControllerTests::init()
 {
+    skygate::ui::SkyLogging::uninstall();
     QSettings settings;
     settings.clear();
 }
@@ -553,6 +556,36 @@ void SkyContextControllerTests::setThemeIdUpdatesPaletteAndEmitsSignals()
         controller->theme()->property("windowBackground").value<QColor>(),
         QColor("#150707")
     );
+}
+
+void SkyContextControllerTests::loggingSettingsApplyAndPersist()
+{
+    const QString logFilePath = m_settingsDir.filePath("controller-skygate.log");
+    const auto controller = createController();
+    QSignalSpy loggingSpy(controller.get(), &SkyContextController::loggingChanged);
+
+    controller->setLogToTerminal(false);
+    controller->setLogToFile(true);
+    controller->setLogFilePath(logFilePath);
+
+    QCOMPARE(controller->logToTerminal(), false);
+    QCOMPARE(controller->logToFile(), true);
+    QCOMPARE(controller->logFilePath(), logFilePath);
+    QVERIFY(loggingSpy.count() >= 3);
+    auto activeConfiguration = skygate::ui::SkyLogging::configuration();
+    QCOMPARE(activeConfiguration.logToTerminal, false);
+    QCOMPARE(activeConfiguration.logToFile, true);
+    QCOMPARE(activeConfiguration.logFilePath, logFilePath);
+
+    QVERIFY(controller->saveSettings());
+    const auto restoredController = createController(true);
+    QCOMPARE(restoredController->logToTerminal(), false);
+    QCOMPARE(restoredController->logToFile(), true);
+    QCOMPARE(restoredController->logFilePath(), logFilePath);
+    activeConfiguration = skygate::ui::SkyLogging::configuration();
+    QCOMPARE(activeConfiguration.logToTerminal, false);
+    QCOMPARE(activeConfiguration.logToFile, true);
+    QCOMPARE(activeConfiguration.logFilePath, logFilePath);
 }
 
 void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
@@ -1162,6 +1195,10 @@ void SkyContextControllerTests::failedDeepSkyCatalogDownloadKeepsCountLabel()
     );
 
     QCOMPARE(controller->deepSkyCatalogInfoText(), QString("Objects: 110"));
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog download aborted: no valid source URLs"
+    );
     controller->downloadDeepSkyCatalogFromUrl(QString());
 
     QCOMPARE(infoSpy.count(), 0);

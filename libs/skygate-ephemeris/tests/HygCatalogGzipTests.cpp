@@ -57,12 +57,20 @@ void HygCatalogGzipTests::parsesValidGzipCatalog()
 
 void HygCatalogGzipTests::rejectsInvalidGzipCatalog()
 {
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Gzip catalog parse failed: Gzip catalog payload is empty."
+    );
     const auto emptyResult = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsvGzip,
         ""
     );
     QVERIFY(!emptyResult.isSuccess());
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Gzip catalog parse failed: Gzip catalog payload could not be decompressed."
+    );
     const auto malformedResult = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsvGzip,
         "not-a-gzip-stream"

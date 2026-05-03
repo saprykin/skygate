@@ -35,6 +35,10 @@ void HygCatalogParserTests::parsesBasicRows()
 
 void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
 {
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "HYG CSV skipped 1 rows with invalid numeric values; samples: row 7 ra='1.0' dec='2.0' mag=''"
+    );
     auto result = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "hip,id,proper,bf,ra,dec,mag\n"
@@ -121,12 +125,20 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
 
 void HygCatalogParserTests::rejectsMalformedInput()
 {
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows."
+    );
     const auto headerOnlyResult = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "hip,id,proper,ra,dec,mag\n"
     );
     QVERIFY(!headerOnlyResult.isSuccess());
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
+    );
     const auto malformedResult = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,name\n"

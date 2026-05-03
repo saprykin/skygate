@@ -11,6 +11,7 @@ private slots:
     void catalogSectionBindsDraftAndControls();
     void settingsDraftApplyAndResetRoundTrip();
     void catalogSectionDownloadsAppliesClearsAndRestoresCatalogs();
+    void generalLoggingControlsBindDraft();
     void appearanceThemeSwitchWorks();
     void appearanceCheckboxChangesRender_data();
     void appearanceCheckboxChangesRender();
@@ -111,6 +112,9 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     controller->setLongitudeText(QStringLiteral("8.000000"));
     controller->setElevationText(QStringLiteral("400"));
     controller->overlayLayers()->setProperty("horizon", true);
+    controller->setLogToTerminal(false);
+    controller->setLogToFile(true);
+    controller->setLogFilePath(QStringLiteral("/tmp/skygate-qml-test.log"));
 
     QQmlEngine engine;
     setupEngine(engine, *controller);
@@ -127,6 +131,12 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     QCOMPARE(object->property("latitudeText").toString(), QString("47.000000"));
     QCOMPARE(object->property("longitudeText").toString(), QString("8.000000"));
     QCOMPARE(object->property("overlayHorizon").toBool(), true);
+    QCOMPARE(object->property("logToTerminal").toBool(), false);
+    QCOMPARE(object->property("logToFile").toBool(), true);
+    QCOMPARE(
+        object->property("logFilePath").toString(),
+        QString("/tmp/skygate-qml-test.log")
+    );
 
     object->setProperty("latitudeText", QStringLiteral("12.500000"));
     object->setProperty("longitudeText", QStringLiteral("34.500000"));
@@ -136,6 +146,9 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     object->setProperty("overlayHorizon", false);
     object->setProperty("catalogPresetIndex", 2);
     object->setProperty("catalogUrlText", QStringLiteral("https://example.test/stars.csv"));
+    object->setProperty("logToTerminal", true);
+    object->setProperty("logToFile", false);
+    object->setProperty("logFilePath", QStringLiteral("/tmp/skygate-qml-test-updated.log"));
     QVERIFY(QMetaObject::invokeMethod(object.get(), "applyToContext"));
 
     QCOMPARE(controller->latitudeText(), QString("12.500000"));
@@ -145,6 +158,9 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     QCOMPARE(controller->overlayLayers()->property("horizon").toBool(), false);
     QCOMPARE(controller->catalogPresetIndex(), 2);
     QCOMPARE(controller->catalogUrlText(), QString("https://example.test/stars.csv"));
+    QCOMPARE(controller->logToTerminal(), true);
+    QCOMPARE(controller->logToFile(), false);
+    QCOMPARE(controller->logFilePath(), QString("/tmp/skygate-qml-test-updated.log"));
 
     object->setProperty("latitudeText", QStringLiteral("99.000000"));
     QVERIFY(QMetaObject::invokeMethod(object.get(), "resetFromContext"));
@@ -152,6 +168,10 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     QCOMPARE(
         object->property("catalogUrlText").toString(),
         QString("https://example.test/stars.csv")
+    );
+    QCOMPARE(
+        object->property("logFilePath").toString(),
+        QString("/tmp/skygate-qml-test-updated.log")
     );
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
@@ -275,6 +295,77 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
+void QmlPreferencesTests::generalLoggingControlsBindDraft()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setLogToTerminal(true);
+    controller->setLogToFile(false);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(engine, QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 420
+            property alias draft: draft
+            SkySettingsDraft {
+                id: draft
+                skyContextController: skyContext
+                Component.onCompleted: resetFromContext()
+            }
+            PreferencesGeneralSection {
+                anchors.fill: parent
+                settingsDraft: draft
+            }
+        }
+    )"), QStringLiteral("PreferencesGeneralLoggingTest.qml"));
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    ExposedQuickWindow exposed(root);
+    (void)exposed;
+    QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
+    QVERIFY(draft != nullptr);
+
+    const auto boxes = checkBoxes(root);
+    QCOMPARE(boxes.size(), 2);
+    boxes.at(0)->setProperty("checked", false);
+    QVERIFY(QMetaObject::invokeMethod(boxes.at(0), "toggled"));
+    boxes.at(1)->setProperty("checked", true);
+    QVERIFY(QMetaObject::invokeMethod(boxes.at(1), "toggled"));
+    QCOMPARE(draft->property("logToTerminal").toBool(), false);
+    QCOMPARE(draft->property("logToFile").toBool(), true);
+
+    auto* logFileInput = qobject_cast<QQuickItem*>(firstObjectWithProperty(
+        root,
+        "objectName",
+        QStringLiteral("logFilePathField")
+    ));
+    QVERIFY(logFileInput != nullptr);
+    QVERIFY2(logFileInput->width() >= 260.0, "Log file field should stay wide enough to read paths");
+    logFileInput->setProperty("text", QStringLiteral("/tmp/skygate-qml-preferences.log"));
+    QVERIFY(QMetaObject::invokeMethod(logFileInput, "editingFinished"));
+    QTRY_COMPARE(
+        draft->property("logFilePath").toString(),
+        QString("/tmp/skygate-qml-preferences.log")
+    );
+
+    const auto browseButtons = invokableButtonsWithText(root, QStringLiteral("Browse..."));
+    QCOMPARE(browseButtons.size(), 1);
+    QVERIFY(browseButtons.front()->property("enabled").toBool());
+
+    QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
+    QCOMPARE(controller->logToTerminal(), false);
+    QCOMPARE(controller->logToFile(), true);
+    QCOMPARE(controller->logFilePath(), QString("/tmp/skygate-qml-preferences.log"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
 void QmlPreferencesTests::appearanceThemeSwitchWorks()
 {
     auto controller = makeController();
@@ -320,6 +411,7 @@ void QmlPreferencesTests::appearanceThemeSwitchWorks()
     themeCombos.front()->setProperty("currentIndex", 1);
     QVERIFY(QMetaObject::invokeMethod(themeCombos.front(), "activated", Q_ARG(int, 1)));
     QCOMPARE(draft->property("themeId").toString(), nextThemeId);
+
     QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
     QCOMPARE(controller->themeId(), nextThemeId);
     QVERIFY(controller->renderTheme().bodyStar != originalStarColor);
@@ -507,6 +599,9 @@ void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
                 property string selectedCityDisplayText: ""
                 property string projectionTypeText: "Stereographic"
                 property string themeId: "default"
+                property bool logToTerminal: true
+                property bool logToFile: false
+                property string logFilePath: "/tmp/fake-skygate.log"
                 property var overlayLayers: overlayLayers
                 property int lastCatalogPresetIndex: -1
                 property string lastCatalogUrlText: ""
@@ -533,6 +628,9 @@ void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
                 function refreshCurrentLocation() { ++refreshCurrentLocationCount }
                 function setProjectionTypeText(value) { projectionTypeText = value }
                 function setThemeId(value) { themeId = value }
+                function setLogToTerminal(value) { logToTerminal = value }
+                function setLogToFile(value) { logToFile = value }
+                function setLogFilePath(value) { logFilePath = value }
                 function setCatalogPresetIndex(value) { lastCatalogPresetIndex = value }
                 function setCatalogUrlText(value) { lastCatalogUrlText = value }
                 function setDeepSkyCatalogPresetIndex(value) {
@@ -614,7 +712,7 @@ void QmlPreferencesTests::preferencesWindowShellNavigatesAppliesAndCloses()
     QObject* catalogSection = firstObjectWithProperty(window, "label", QStringLiteral("Catalog"));
     QVERIFY(catalogSection != nullptr);
     QVERIFY(activateControl(catalogSection));
-    QTRY_COMPARE(window->property("selectedPage").toInt(), 2);
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 3);
     QCOMPARE(
         window->property("currentSectionDescription").toString(),
         QString("Catalog source and download settings")
@@ -623,7 +721,7 @@ void QmlPreferencesTests::preferencesWindowShellNavigatesAppliesAndCloses()
     QObject* skySection = firstObjectWithProperty(window, "label", QStringLiteral("Sky"));
     QVERIFY(skySection != nullptr);
     QVERIFY(activateControl(skySection));
-    QTRY_COMPARE(window->property("selectedPage").toInt(), 0);
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 1);
 
     const auto applyButtons = invokableButtonsWithText(window, QStringLiteral("Apply"));
     QCOMPARE(applyButtons.size(), 1);

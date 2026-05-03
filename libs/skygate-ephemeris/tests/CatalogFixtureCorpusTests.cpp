@@ -118,6 +118,14 @@ void CatalogFixtureCorpusTests::parsesFixtureCorpus()
     const skygate::ephemeris::CatalogPayloadParser parser;
     QCOMPARE(parser.detectFormat(payloadView(payload)), expectedFormat);
 
+    if (fixturePath == QStringLiteral("catalogs/realistic-hyg.csv")
+        || fixturePath == QStringLiteral("catalogs/realistic-hyg.csv.gz")
+        || fixturePath == QStringLiteral("catalogs/realistic-hyg.zip")) {
+        QTest::ignoreMessage(
+            QtWarningMsg,
+            "HYG CSV skipped 1 rows with invalid numeric values; samples: row 5 ra='not-a-number' dec='12.0' mag='4.2'"
+        );
+    }
     const auto parseResult = parser.parseResult(payloadView(payload));
     QVERIFY2(parseResult.isSuccess(), parseResult.errorDetail.c_str());
     QVERIFY(parseResult.catalog != nullptr);

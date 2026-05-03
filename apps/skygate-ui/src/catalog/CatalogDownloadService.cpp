@@ -3,6 +3,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QLoggingCategory>
 #include <QObject>
 #include <QUrl>
 
@@ -12,6 +13,8 @@
 namespace {
 
 constexpr std::size_t kMaxDownloadedCatalogBytes = 128U << 20;
+
+Q_LOGGING_CATEGORY(skygateCatalogDownloadLog, "skygate.catalog.download")
 
 QStringList normalizedCandidateUrls(const QStringList& urlTexts)
 {
@@ -45,6 +48,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
     if (candidateUrls.isEmpty()) {
         DownloadResult result;
         result.errorText = "Catalog: Invalid URL";
+        qCWarning(skygateCatalogDownloadLog) << "Catalog download aborted: no valid source URLs";
         completionHandler(std::move(result));
         return;
     }
@@ -52,6 +56,7 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
     if (m_networkAccessManager == nullptr) {
         DownloadResult result;
         result.errorText = "Catalog: Network unavailable";
+        qCWarning(skygateCatalogDownloadLog) << "Catalog download aborted: network unavailable";
         completionHandler(std::move(result));
         return;
     }
@@ -77,6 +82,8 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
         const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
         if (!url.isValid() || url.scheme().isEmpty()) {
             *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
+            qCWarning(skygateCatalogDownloadLog).noquote()
+                << "Skipping invalid catalog source URL" << candidateUrls[index];
             (*tryDownloadNextUrl)(index + 1);
             return;
         }
@@ -118,6 +125,9 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                         reply->errorString(),
                         QString::number(httpStatusCode)
                     );
+                    qCWarning(skygateCatalogDownloadLog).noquote()
+                        << "Catalog source failed" << candidateUrls[index]
+                        << reply->errorString() << "HTTP" << httpStatusCode;
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
                     }
@@ -128,6 +138,8 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                 const QByteArray payload = reply->readAll();
                 if (payload.isEmpty()) {
                     *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
+                    qCWarning(skygateCatalogDownloadLog).noquote()
+                        << "Catalog source returned empty data" << candidateUrls[index];
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
                     }
@@ -139,6 +151,9 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                     *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(
                         candidateUrls[index]
                     );
+                    qCWarning(skygateCatalogDownloadLog).noquote()
+                        << "Catalog source exceeded size limit" << candidateUrls[index]
+                        << payload.size();
                     if (statusHandler) {
                         statusHandler(*lastErrorText);
                     }

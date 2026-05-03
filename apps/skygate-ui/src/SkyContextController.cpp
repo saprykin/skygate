@@ -2,6 +2,7 @@
 
 #include "LocationCatalogModel.hpp"
 #include "SkyCatalogManager.hpp"
+#include "SkyLogging.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
@@ -53,6 +54,7 @@ SkyContextController::SkyContextController(
       ))
     , m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
+    m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
     m_location.positionSource = initializationOptions.positionSource;
     m_location.requestLocationPermission = initializationOptions.requestLocationPermission;
 
@@ -284,6 +286,21 @@ QObject* SkyContextController::overlayLayers() const noexcept
     return m_overlayLayerSettings.get();
 }
 
+bool SkyContextController::logToTerminal() const noexcept
+{
+    return m_logToTerminal;
+}
+
+bool SkyContextController::logToFile() const noexcept
+{
+    return m_logToFile;
+}
+
+QString SkyContextController::logFilePath() const
+{
+    return m_logFilePath;
+}
+
 const SkyOverlayLayerVisibility& SkyContextController::overlayLayerVisibility() const noexcept
 {
     static const SkyOverlayLayerVisibility kDefaultVisibility;
@@ -509,6 +526,54 @@ void SkyContextController::setThemeId(const QString& themeId)
     m_themePalette->setDefinition(resolvedTheme);
     emit themeChanged();
     emit skyContextChanged();
+}
+
+void SkyContextController::applyLoggingConfiguration()
+{
+    skygate::ui::SkyLoggingConfiguration configuration =
+        skygate::ui::SkyLogging::configuration();
+    configuration.logToTerminal = m_logToTerminal;
+    configuration.logToFile = m_logToFile;
+    configuration.logFilePath = m_logFilePath.trimmed().isEmpty()
+        ? skygate::ui::SkyLogging::defaultLogFilePath()
+        : m_logFilePath.trimmed();
+    skygate::ui::SkyLogging::configure(configuration);
+}
+
+void SkyContextController::setLogToTerminal(const bool logToTerminal)
+{
+    if (m_logToTerminal == logToTerminal) {
+        return;
+    }
+
+    m_logToTerminal = logToTerminal;
+    applyLoggingConfiguration();
+    emit loggingChanged();
+}
+
+void SkyContextController::setLogToFile(const bool logToFile)
+{
+    if (m_logToFile == logToFile) {
+        return;
+    }
+
+    m_logToFile = logToFile;
+    applyLoggingConfiguration();
+    emit loggingChanged();
+}
+
+void SkyContextController::setLogFilePath(const QString& logFilePath)
+{
+    const QString normalizedPath = logFilePath.trimmed().isEmpty()
+        ? skygate::ui::SkyLogging::defaultLogFilePath()
+        : logFilePath.trimmed();
+    if (m_logFilePath == normalizedPath) {
+        return;
+    }
+
+    m_logFilePath = normalizedPath;
+    applyLoggingConfiguration();
+    emit loggingChanged();
 }
 
 QString SkyContextController::catalogUrlText() const

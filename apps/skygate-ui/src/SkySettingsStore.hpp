@@ -34,6 +34,9 @@ public:
         QString catalogUrlText;
         int deepSkyCatalogPresetIndex = 0;
         QString deepSkyCatalogUrlText;
+        bool logToTerminal = true;
+        bool logToFile = false;
+        QString logFilePath;
     };
 
     struct CatalogCacheSnapshot final {

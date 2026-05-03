@@ -1,12 +1,30 @@
 #include <QtTest>
 
 #include "SkySettingsStore.hpp"
+#include "SkyLogging.hpp"
 
 #include <QCoreApplication>
 #include <QFile>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+
+namespace {
+
+void ignoreSkySettingsFallbackWarnings(const int count)
+{
+    for (int index = 0; index < count; ++index) {
+        QTest::ignoreMessage(
+            QtWarningMsg,
+            QRegularExpression(
+                "Invalid .*setting skyContext/.* - using fallback .*"
+            )
+        );
+    }
+}
+
+}  // namespace
 
 class SkySettingsStoreTests final : public QObject {
     Q_OBJECT
@@ -20,6 +38,8 @@ private slots:
     void savesLoadsAndClearsCatalogCachesIndependently();
     void partialCatalogCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
+    void savesLoadsAndDefaultsLoggingPreferences();
+    void malformedLoggingPreferencesFallBackToDefaults();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -73,6 +93,9 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.catalogUrlText = "https://example.com/catalog.csv";
     savedSnapshot.deepSkyCatalogPresetIndex = 1;
     savedSnapshot.deepSkyCatalogUrlText = "https://example.com/NGC.csv";
+    savedSnapshot.logToTerminal = false;
+    savedSnapshot.logToFile = true;
+    savedSnapshot.logFilePath = m_settingsDir.filePath("skygate-test.log");
 
     QVERIFY(store.saveState(savedSnapshot));
     const auto loadedSnapshot = store.loadState();
@@ -95,6 +118,9 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
         savedSnapshot.deepSkyCatalogPresetIndex
     );
     QCOMPARE(loadedSnapshot->deepSkyCatalogUrlText, savedSnapshot.deepSkyCatalogUrlText);
+    QCOMPARE(loadedSnapshot->logToTerminal, savedSnapshot.logToTerminal);
+    QCOMPARE(loadedSnapshot->logToFile, savedSnapshot.logToFile);
+    QCOMPARE(loadedSnapshot->logFilePath, savedSnapshot.logFilePath);
 }
 
 void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
@@ -135,8 +161,12 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     settings.setValue("skyContext/overlayLayers/ecliptic", "on");
     settings.setValue("skyContext/catalogPresetIndex", "primary");
     settings.setValue("skyContext/deepSkyCatalogPresetIndex", "deep");
+    settings.setValue("skyContext/logging/logToTerminal", "sure");
+    settings.setValue("skyContext/logging/logToFile", "nah");
+    settings.setValue("skyContext/logging/logFilePath", "");
 
     const SkySettingsStore store;
+    ignoreSkySettingsFallbackWarnings(17);
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->live, true);
@@ -157,6 +187,9 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     QCOMPARE(loadedSnapshot->overlayLayers.ecliptic, true);
     QCOMPARE(loadedSnapshot->catalogPresetIndex, 0);
     QCOMPARE(loadedSnapshot->deepSkyCatalogPresetIndex, 0);
+    QCOMPARE(loadedSnapshot->logToTerminal, true);
+    QCOMPARE(loadedSnapshot->logToFile, false);
+    QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
 }
 
 void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
@@ -177,6 +210,9 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
     QCOMPARE(loadedSnapshot->overlayLayers.horizon, true);
     QCOMPARE(loadedSnapshot->overlayLayers.altAzGrid, false);
     QCOMPARE(loadedSnapshot->overlayLayers.deepSkyLabels, true);
+    QCOMPARE(loadedSnapshot->logToTerminal, true);
+    QCOMPARE(loadedSnapshot->logToFile, false);
+    QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
 }
 
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
@@ -300,12 +336,59 @@ void SkySettingsStoreTests::missingCacheFilesAndMalformedCacheMetadataAreTolerat
     settings.setValue("skyContext/catalogCachePath", cachePath);
     settings.setValue("skyContext/catalogConstellationLineSchemaVersion", "latest");
     settings.setValue("skyContext/catalogConstellationCount", "many");
+    ignoreSkySettingsFallbackWarnings(2);
     const auto loadedSnapshot = store.loadCatalogCache();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->sourceLabel, QString("Missing HYG"));
     QCOMPARE(loadedSnapshot->constellationLineSchemaVersion, 0);
     QCOMPARE(loadedSnapshot->constellationCount, 0U);
     QVERIFY(loadedSnapshot->deepSkyCatalogPayload.isEmpty());
+}
+
+void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
+{
+    QSettings settings;
+    settings.clear();
+
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.logToTerminal = false;
+    snapshot.logToFile = true;
+    snapshot.logFilePath = m_settingsDir.filePath("custom-skygate.log");
+
+    QVERIFY(store.saveState(snapshot));
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->logToTerminal, false);
+    QCOMPARE(loadedSnapshot->logToFile, true);
+    QCOMPARE(loadedSnapshot->logFilePath, snapshot.logFilePath);
+
+    settings.setValue("skyContext/logging/logFilePath", "");
+    ignoreSkySettingsFallbackWarnings(1);
+    const auto loadedWithBlankPath = store.loadState();
+    QVERIFY(loadedWithBlankPath.has_value());
+    QCOMPARE(
+        loadedWithBlankPath->logFilePath,
+        skygate::ui::SkyLogging::defaultLogFilePath()
+    );
+}
+
+void SkySettingsStoreTests::malformedLoggingPreferencesFallBackToDefaults()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/logging/logToTerminal", "maybe");
+    settings.setValue("skyContext/logging/logToFile", "eventually");
+    settings.setValue("skyContext/logging/logFilePath", "   ");
+
+    const SkySettingsStore store;
+    ignoreSkySettingsFallbackWarnings(3);
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->logToTerminal, true);
+    QCOMPARE(loadedSnapshot->logToFile, false);
+    QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
 }
 
 QTEST_GUILESS_MAIN(SkySettingsStoreTests)

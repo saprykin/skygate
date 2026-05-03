@@ -3,9 +3,17 @@
 #include "catalog/CatalogPayloadFormatDetector.hpp"
 #include "catalog/ZipCodec.hpp"
 
+#include <QLoggingCategory>
+#include <QString>
+
 #include <string>
 
 namespace skygate::ephemeris {
+namespace {
+
+Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
+
+}  // namespace
 
 CatalogPayloadFormat CatalogPayloadParser::detectFormat(const std::string_view payload) const noexcept
 {
@@ -18,6 +26,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
     if (request.payload.empty()) {
         result.errorCode = CatalogLoadErrorCode::EmptyInput;
         result.errorDetail = "Catalog payload is empty.";
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "Catalog payload parse failed:" << QString::fromStdString(result.errorDetail);
         return result;
     }
 
@@ -56,6 +66,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         }
         result.errorCode = CatalogLoadErrorCode::InvalidZipData;
         result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "Catalog ZIP parse failed:" << QString::fromStdString(result.errorDetail);
         return result;
     }
     case CatalogPayloadFormat::OpenNgcCsv:
@@ -73,6 +85,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
 
     result.errorCode = CatalogLoadErrorCode::UnsupportedFormat;
     result.errorDetail = "Catalog payload format is not recognized.";
+    qCWarning(skygateCatalogParseLog).noquote()
+        << "Catalog payload parse failed:" << QString::fromStdString(result.errorDetail);
     return result;
 }
 

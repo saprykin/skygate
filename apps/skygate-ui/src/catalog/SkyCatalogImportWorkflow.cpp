@@ -4,6 +4,8 @@
 
 #include "skygate/ephemeris/StellariumConstellationParser.hpp"
 
+#include <QLoggingCategory>
+
 #include <algorithm>
 #include <span>
 #include <string_view>
@@ -11,6 +13,8 @@
 
 namespace skygate::ui::internal {
 namespace {
+
+Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 std::size_t countDeepSkyObjects(
     const std::span<const skygate::ephemeris::CelestialBody> bodies
@@ -160,6 +164,8 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
                     ? QString("unavailable")
                     : lineResult.errorText;
                 result.statusSuffix = QString("fallback default (%1)").arg(reason);
+                qCWarning(skygateCatalogParseLog).noquote()
+                    << "Constellation line download unavailable; using bundled fallback:" << reason;
                 completionHandler(std::move(result));
                 return;
             }
@@ -176,6 +182,9 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
                 result.statusSuffix = QString("fallback default (parse failed: %1)").arg(
                     payloadPreview
                 );
+                qCWarning(skygateCatalogParseLog).noquote()
+                    << "Constellation line parse failed; using bundled fallback. Payload preview:"
+                    << payloadPreview;
                 completionHandler(std::move(result));
                 return;
             }

@@ -4,7 +4,9 @@
 #include "catalog/DelimitedCatalogReader.hpp"
 #include "catalog/OpenNgcObjectMapper.hpp"
 
+#include <QLoggingCategory>
 #include <QString>
+#include <QStringList>
 
 #include <cstddef>
 #include <limits>
@@ -16,6 +18,9 @@ namespace {
 constexpr std::size_t kOpenNgcProgressCallbackInterval = 512;
 constexpr std::size_t kMinOpenNgcRowCountLimit = 200000;
 constexpr std::size_t kMinPlausibleOpenNgcRowBytes = 12;
+constexpr std::size_t kMaxInvalidRowSamples = 5;
+
+Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 }  // namespace
 
@@ -25,6 +30,11 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
 ) const
 {
     std::size_t parsedObjectCount = 0;
+    std::size_t dataRowNumber = 0;
+    std::size_t invalidCoordinateRowCount = 0;
+    std::size_t invalidMappingRowCount = 0;
+    QStringList invalidCoordinateRowSamples;
+    QStringList invalidMappingRowSamples;
 
     CatalogBodyParseResult result = DelimitedCatalogReader::read(
         csvData,
@@ -46,6 +56,7 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
             .rowLimitDetail = "OpenNGC CSV payload exceeds the supported row limit.",
         },
         [&](const DelimitedCatalogReader::Row& row, CatalogBodyParseResult& rowResult) {
+            ++dataRowNumber;
             const QString typeText = row.decodeColumn(QStringLiteral("Type"));
             if (OpenNgcObjectMapper::shouldSkipType(typeText)) {
                 return true;
@@ -58,6 +69,17 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
                 row.decodeColumn(QStringLiteral("Dec"))
             );
             if (!raHours.has_value() || !decDeg.has_value()) {
+                ++invalidCoordinateRowCount;
+                if (invalidCoordinateRowSamples.size() < static_cast<qsizetype>(kMaxInvalidRowSamples)) {
+                    invalidCoordinateRowSamples.push_back(QStringLiteral(
+                        "row %1 name='%2' ra='%3' dec='%4'"
+                    ).arg(
+                        QString::number(static_cast<qulonglong>(dataRowNumber + 1U)),
+                        row.decodeColumn(QStringLiteral("Name")),
+                        row.decodeColumn(QStringLiteral("RA")),
+                        row.decodeColumn(QStringLiteral("Dec"))
+                    ));
+                }
                 return true;
             }
 
@@ -81,6 +103,16 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
                 row.decodeColumn(QStringLiteral("Common names"))
             );
             if (mapping.displayName.empty() || mapping.id.empty()) {
+                ++invalidMappingRowCount;
+                if (invalidMappingRowSamples.size() < static_cast<qsizetype>(kMaxInvalidRowSamples)) {
+                    invalidMappingRowSamples.push_back(QStringLiteral(
+                        "row %1 name='%2' type='%3'"
+                    ).arg(
+                        QString::number(static_cast<qulonglong>(dataRowNumber + 1U)),
+                        name,
+                        typeText
+                    ));
+                }
                 return true;
             }
 
@@ -121,7 +153,22 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
     );
 
     if (!result.isSuccess()) {
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "OpenNGC CSV parse failed:" << QString::fromStdString(result.errorDetail);
         return result;
+    }
+
+    if (invalidCoordinateRowCount > 0U) {
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "OpenNGC CSV skipped" << static_cast<qulonglong>(invalidCoordinateRowCount)
+            << "rows with invalid coordinates; samples:"
+            << invalidCoordinateRowSamples.join(QStringLiteral("; "));
+    }
+    if (invalidMappingRowCount > 0U) {
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "OpenNGC CSV skipped" << static_cast<qulonglong>(invalidMappingRowCount)
+            << "rows with unmappable identifiers; samples:"
+            << invalidMappingRowSamples.join(QStringLiteral("; "));
     }
 
     if (progressCallback) {
@@ -131,6 +178,8 @@ CatalogBodyParseResult OpenNgcCatalogParser::parse(
     if (parsedObjectCount == 0U) {
         result.errorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv;
         result.errorDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.";
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "OpenNGC CSV parse failed:" << QString::fromStdString(result.errorDetail);
         return result;
     }
 

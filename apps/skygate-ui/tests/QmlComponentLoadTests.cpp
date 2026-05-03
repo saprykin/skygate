@@ -97,6 +97,25 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
+    QTest::newRow("PreferencesGeneralSection")
+        << QStringLiteral("PreferencesGeneralSection")
+        << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 520
+                SkySettingsDraft {
+                    id: draft
+                    skyContextController: skyContext
+                    Component.onCompleted: resetFromContext()
+                }
+                PreferencesGeneralSection {
+                    anchors.fill: parent
+                    settingsDraft: draft
+                }
+            }
+        )");
+
     QTest::newRow("SkyOverlayLayer")
         << QStringLiteral("SkyOverlayLayer")
         << QStringLiteral(R"(

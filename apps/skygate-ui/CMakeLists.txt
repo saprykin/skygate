@@ -21,6 +21,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyOverlayLayerVisibility.hpp
     src/SkyHitTargetIndex.cpp
     src/SkyHitTargetIndex.hpp
+    src/SkyLogging.cpp
+    src/SkyLogging.hpp
     src/SkyObjectTrailBuilder.cpp
     src/SkyObjectTrailBuilder.hpp
     src/SkyCatalogManager.cpp
@@ -120,6 +122,7 @@ qt_add_qml_module(skygate-ui
         PreferencesCheckBox.qml
         PreferencesCityPicker.qml
         PreferencesComboBox.qml
+        PreferencesGeneralSection.qml
         PreferencesSectionButton.qml
         SearchToolbar.qml
         SkyInteractionLayer.qml

@@ -229,7 +229,7 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     );
     QVERIFY(appearanceButton != nullptr);
     QVERIFY(activateControl(appearanceButton));
-    QTRY_COMPARE(preferencesWindow->property("selectedPage").toInt(), 1);
+    QTRY_COMPARE(preferencesWindow->property("selectedPage").toInt(), 2);
 
     const QVariantList themeOptions = controller->themeOptions();
     QVERIFY(themeOptions.size() >= 2);

@@ -75,6 +75,10 @@ void CatalogPayloadParseServiceTests::invalidPayloadCompletesWithFailure()
     CatalogPayloadParseService service;
     skygate::ephemeris::CatalogLoadResult finalResult;
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload format is not recognized."
+    );
     runAsync([&](QEventLoop& loop) {
         service.parseAsync(
             "not a catalog",

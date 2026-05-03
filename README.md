@@ -20,6 +20,7 @@ that renders stars, constellations, the horizon, and overlay labels.
 - Bundled starter catalog plus support for downloading HYG v4.2 stars,
   OpenNGC deep-sky objects, and Stellarium constellation data
 - Persistent settings and cached catalog data between launches
+- Configurable terminal/file logging with bounded rotating log files
 
 Ancient dates are intended for exploratory viewing. The date input uses a
 proleptic Gregorian calendar, and the current Sun, Moon, and planet formulas
@@ -97,6 +98,26 @@ cmake --build build --target run-skygate-ui-bundle
 
 On non-bundle platforms, the executable target is `skygate-ui` inside the build
 tree.
+
+### Logging
+
+SkyGate logs warnings and errors to the terminal by default. File logging can be
+enabled from Preferences, or at startup with command-line flags:
+
+```bash
+SkyGate --log-to-file --log-file /path/to/skygate.log
+SkyGate --log-to-terminal
+SkyGate --no-log-to-terminal
+```
+
+Environment overrides are also supported:
+
+```bash
+SKYGATE_LOG_OUTPUT=both SKYGATE_LOG_FILE=/path/to/skygate.log SkyGate
+```
+
+`SKYGATE_LOG_OUTPUT` accepts `terminal`, `file`, `both`, or `none`. File logs
+append across launches and rotate at 5 MiB, keeping three backups.
 
 ## Test
 

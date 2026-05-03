@@ -6,6 +6,50 @@
 #include <array>
 #include <string>
 
+namespace {
+
+class LogCapture final {
+public:
+    LogCapture()
+    {
+        s_current = this;
+        m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
+    }
+
+    ~LogCapture()
+    {
+        qInstallMessageHandler(m_previousHandler);
+        s_current = nullptr;
+    }
+
+    [[nodiscard]] QString joinedMessages() const
+    {
+        return m_messages.join('\n');
+    }
+
+private:
+    static void handler(
+        const QtMsgType type,
+        const QMessageLogContext& context,
+        const QString& message
+    )
+    {
+        if (s_current != nullptr && type >= QtWarningMsg) {
+            s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
+                QString::fromUtf8(context.category != nullptr ? context.category : "default"),
+                message
+            ));
+        }
+    }
+
+private:
+    QtMessageHandler m_previousHandler = nullptr;
+    QStringList m_messages;
+    static inline LogCapture* s_current = nullptr;
+};
+
+}  // namespace
+
 class CatalogPayloadParserTests final : public QObject {
     Q_OBJECT
 
@@ -17,6 +61,10 @@ private slots:
     void parsesHygZipPayload();
     void rejectsInvalidArchivePayloads();
     void reportsUnsupportedPayload();
+    void logsSampledInvalidHygRows();
+    void logsSampledInvalidOpenNgcRows();
+    void validPayloadsStayQuietAtWarningLevel();
+    void logsUnsupportedAndArchiveFailures();
 };
 
 void CatalogPayloadParserTests::detectsPayloadFormats()
@@ -65,6 +113,10 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
 void CatalogPayloadParserTests::rejectsPipeRowsPayload()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload format is not recognized."
+    );
     const auto parseResult = parser.parseResult(
         "demo_star|Demo Star|Star|1.0|12.5|-30.0\n"
         "demo_constellation|Demo Constellation|Constellation|2.0\n"
@@ -205,6 +257,10 @@ void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()
         reinterpret_cast<const char*>(invalidGzip.data()),
         invalidGzip.size()
     );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Gzip catalog parse failed: Gzip catalog payload could not be decompressed."
+    );
     const auto invalidGzipResult = parser.parseResult(invalidGzipData);
     QVERIFY(!invalidGzipResult.isSuccess());
     QCOMPARE(
@@ -220,6 +276,10 @@ void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()
         reinterpret_cast<const char*>(kEmptyZip.data()),
         kEmptyZip.size()
     );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog ZIP parse failed: ZIP catalog payload does not contain a readable CSV entry."
+    );
     const auto emptyZipResult = parser.parseResult(emptyZipData);
     QVERIFY(!emptyZipResult.isSuccess());
     QCOMPARE(
@@ -231,12 +291,100 @@ void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()
 void CatalogPayloadParserTests::reportsUnsupportedPayload()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload format is not recognized."
+    );
     auto parseResult = parser.parseResult("just some plain text");
 
     QVERIFY(!parseResult.isSuccess());
     QVERIFY(
         parseResult.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat
     );
+}
+
+void CatalogPayloadParserTests::logsSampledInvalidHygRows()
+{
+    std::string payload = "id,hip,proper,ra,dec,mag\n";
+    for (int index = 0; index < 8; ++index) {
+        payload += std::to_string(index + 1) + ",,Bad Star,bad,-16.0,1.0\n";
+    }
+    payload += "9,42,Sirius,6.7525,-16.7161,-1.46\n";
+
+    LogCapture capture;
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(payload);
+
+    QVERIFY(result.isSuccess());
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("skygate.catalog.parse")));
+    QVERIFY(messages.contains(QStringLiteral("HYG CSV skipped 8 rows")));
+    QVERIFY(messages.contains(QStringLiteral("row 2")));
+    QVERIFY(messages.contains(QStringLiteral("row 6")));
+    QVERIFY(!messages.contains(QStringLiteral("row 7")));
+}
+
+void CatalogPayloadParserTests::logsSampledInvalidOpenNgcRows()
+{
+    constexpr std::string_view kOpenNgcCsv =
+        "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;Identifiers;Common names;NED notes;OpenNGC notes\n"
+        "BAD0001;G;bad;+41:16:08.6;And;;;;;;;;;;;;;;;;;;;;0224;;;;\n"
+        "BAD0002;G;00:42:44.35;bad;And;;;;;;;;;;;;;;;;;;;;0225;;;;\n"
+        "NGC0224;G;00:42:44.35;+41:16:08.6;And;177.83;69.66;35;4.36;3.44;;;;13.35;SA(s)b;;;;31;0224;;;PGC 2557;Andromeda Galaxy;;\n";
+
+    LogCapture capture;
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(kOpenNgcCsv);
+
+    QVERIFY(result.isSuccess());
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("OpenNGC CSV skipped 2 rows")));
+    QVERIFY(messages.contains(QStringLiteral("invalid coordinates")));
+    QVERIFY(messages.contains(QStringLiteral("row 2")));
+    QVERIFY(messages.contains(QStringLiteral("row 3")));
+}
+
+void CatalogPayloadParserTests::validPayloadsStayQuietAtWarningLevel()
+{
+    constexpr std::string_view kHygCsv =
+        "id,hip,proper,ra,dec,mag\n"
+        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
+
+    LogCapture capture;
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(kHygCsv);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(capture.joinedMessages().isEmpty());
+}
+
+void CatalogPayloadParserTests::logsUnsupportedAndArchiveFailures()
+{
+    LogCapture capture;
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    (void)parser.parseResult("just some plain text");
+
+    const std::array<unsigned char, 4> invalidGzip {{0x1f, 0x8b, 0x00, 0x00}};
+    const std::string_view invalidGzipData(
+        reinterpret_cast<const char*>(invalidGzip.data()),
+        invalidGzip.size()
+    );
+    (void)parser.parseResult(invalidGzipData);
+
+    constexpr std::array<unsigned char, 22> kEmptyZip {
+        0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    const std::string_view emptyZipData(
+        reinterpret_cast<const char*>(kEmptyZip.data()),
+        kEmptyZip.size()
+    );
+    (void)parser.parseResult(emptyZipData);
+
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("Catalog payload format is not recognized")));
+    QVERIFY(messages.contains(QStringLiteral("Gzip catalog payload could not be decompressed")));
+    QVERIFY(messages.contains(QStringLiteral("ZIP catalog payload does not contain a readable CSV entry")));
 }
 
 QTEST_APPLESS_MAIN(CatalogPayloadParserTests)

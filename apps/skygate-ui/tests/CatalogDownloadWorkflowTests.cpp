@@ -165,6 +165,10 @@ void CatalogDownloadWorkflowTests::invalidUrlCompletesWithoutNetworkRequest()
     CatalogDownloadService service(&networkAccessManager);
 
     bool completed = false;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog download aborted: no valid source URLs"
+    );
     service.downloadFirstSuccessfulFromUrls(
         {"  "},
         this,
@@ -195,6 +199,10 @@ void CatalogDownloadWorkflowTests::downloadServiceRetriesUntilFirstSuccessfulPay
 
     CatalogDownloadService::DownloadResult finalResult;
     QStringList statuses;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog source failed https://example.test/fail.csv Unknown error HTTP 404"
+    );
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
             {"https://example.test/fail.csv", "https://example.test/ok.csv"},
@@ -231,6 +239,14 @@ void CatalogDownloadWorkflowTests::downloadServiceRejectsEmptyAndOversizedPayloa
 
     CatalogDownloadService::DownloadResult finalResult;
     QStringList statuses;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog source returned empty data https://example.test/empty.csv"
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog source exceeded size limit https://example.test/too-large.csv 134217729"
+    );
     runAsync([&](QEventLoop& loop) {
         service.downloadFirstSuccessfulFromUrls(
             {"https://example.test/empty.csv", "https://example.test/too-large.csv"},
@@ -404,6 +420,14 @@ void CatalogDownloadWorkflowTests::downloadServiceConcurrentFallbackChainsRemain
     CatalogDownloadService::DownloadResult secondResult;
     bool firstCompleted = false;
     bool secondCompleted = false;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog source returned empty data https://example.test/b-fail.csv"
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog source failed https://example.test/a-fail.csv Unknown error HTTP 404"
+    );
     service.downloadFirstSuccessfulFromUrls(
         {"https://example.test/a-fail.csv", "https://example.test/a-ok.csv"},
         this,
@@ -475,6 +499,18 @@ void CatalogDownloadWorkflowTests::coordinatorReportsParseFailureWithSourceUrl()
 
     CatalogCoordinator::DownloadResult finalResult;
     QStringList statuses;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "HYG CSV skipped 1 rows with invalid numeric values; samples: row 2 ra='not-ra' dec='2.0' mag='3.0'"
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog: Source https://example.test/bad.csv parse failed: invalid HYG CSV payload (HYG CSV payload does not contain any valid star rows.)"
+    );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/bad.csv"},
@@ -588,6 +624,10 @@ void CatalogDownloadWorkflowTests::importWorkflowFallsBackForMalformedConstellat
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
     skygate::ui::internal::SkyConstellationLineImportResult finalResult;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Constellation line parse failed; using bundled fallback. Payload preview: not-json"
+    );
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(
             {"https://example.test/bad-index.json"},

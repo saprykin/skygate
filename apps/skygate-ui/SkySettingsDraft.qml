@@ -26,6 +26,9 @@ QtObject {
     property string catalogUrlText: ""
     property int deepSkyCatalogPresetIndex: 0
     property string deepSkyCatalogUrlText: ""
+    property bool logToTerminal: true
+    property bool logToFile: false
+    property string logFilePath: ""
 
     function setLocationSource(nextLocationSourceText) {
         locationSourceText = nextLocationSourceText
@@ -74,6 +77,9 @@ QtObject {
         catalogUrlText = skyContextController.catalogUrlText()
         deepSkyCatalogPresetIndex = skyContextController.deepSkyCatalogPresetIndex()
         deepSkyCatalogUrlText = skyContextController.deepSkyCatalogUrlText()
+        logToTerminal = skyContextController.logToTerminal
+        logToFile = skyContextController.logToFile
+        logFilePath = skyContextController.logFilePath
     }
 
     function syncDeviceLocationFromContext() {
@@ -118,6 +124,9 @@ QtObject {
         skyContextController.setCatalogUrlText(catalogUrlText)
         skyContextController.setDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex)
         skyContextController.setDeepSkyCatalogUrlText(deepSkyCatalogUrlText)
+        skyContextController.setLogToTerminal(logToTerminal)
+        skyContextController.setLogToFile(logToFile)
+        skyContextController.setLogFilePath(logFilePath)
         resetFromContext()
     }
 }

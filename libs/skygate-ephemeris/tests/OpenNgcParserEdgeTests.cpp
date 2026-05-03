@@ -56,6 +56,10 @@ private slots:
 void OpenNgcParserEdgeTests::rejectsMissingRequiredColumns()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "OpenNGC CSV parse failed: OpenNGC CSV payload is missing one of the required columns: Name, Type, RA, Dec."
+    );
     const auto result = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::OpenNgcCsv,
         "Name;Type;RA\n"
@@ -74,6 +78,10 @@ void OpenNgcParserEdgeTests::skipsInvalidCoordinatesButKeepsValidRows()
         + "NGC0224;G;00:42:44.35;+41:16:08.6;And;177.83;69.66;35;4.36;3.44;;;;13.35;SA(s)b;;;;31;0224;;;PGC 2557,UGC 454;Andromeda Galaxy;;\n";
 
     const skygate::ephemeris::CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "OpenNGC CSV skipped 2 rows with invalid coordinates; samples: row 2 name='BADRA' ra='25:00:00.00' dec='+00:00:00.0'; row 3 name='BADDEC' ra='00:00:00.00' dec='+91:00:00.0'"
+    );
     const auto result = parser.parseResult(payload);
 
     QVERIFY(result.isSuccess());
@@ -90,6 +98,14 @@ void OpenNgcParserEdgeTests::rejectsPayloadWithNoUsableDeepSkyRows()
         + "BADRA;G;99:00:00.00;+00:00:00.0;And;;;;;;;;;;;;;;;;;1;0001;;;;;;\n";
 
     const skygate::ephemeris::CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "OpenNGC CSV skipped 1 rows with invalid coordinates; samples: row 3 name='BADRA' ra='99:00:00.00' dec='+00:00:00.0'"
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "OpenNGC CSV parse failed: OpenNGC CSV payload does not contain any valid deep-sky object rows."
+    );
     const auto result = parser.parseResult(payload);
 
     QVERIFY(!result.isSuccess());

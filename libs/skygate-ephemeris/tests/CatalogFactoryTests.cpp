@@ -98,6 +98,10 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
     QVERIFY(selectedCatalog.diagnostics.selectedBodyCount == 1U);
     QVERIFY(selectedCatalog.diagnostics.truncatedBodyCount == 1U);
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
+    );
     const auto invalidCatalog = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,name\n"

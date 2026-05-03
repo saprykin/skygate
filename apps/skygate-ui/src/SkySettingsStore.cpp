@@ -1,10 +1,12 @@
 #include "SkySettingsStore.hpp"
 
+#include "SkyLogging.hpp"
 #include "SkyContextControllerSupport.hpp"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QLoggingCategory>
 #include <QSaveFile>
 #include <QSettings>
 
@@ -14,6 +16,9 @@
 using namespace skygate::ui::internal;
 
 namespace {
+
+Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
+Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
 
 void appendCachePath(QStringList& cachePaths, const QString& path)
 {
@@ -28,6 +33,9 @@ bool removeCacheFiles(const QStringList& cachePaths)
     for (const QString& cachePath : cachePaths) {
         QFile cacheFile(cachePath);
         if (cacheFile.exists() && !cacheFile.remove()) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Failed to remove catalog cache file" << cachePath
+                << cacheFile.errorString();
             removedAllCacheFiles = false;
         }
     }
@@ -58,7 +66,16 @@ bool readBoolSetting(QSettings& settings, const QString& key, const bool fallbac
     if (!settings.contains(key)) {
         return fallback;
     }
-    return boolFromVariant(settings.value(key)).value_or(fallback);
+
+    const QVariant value = settings.value(key);
+    const std::optional<bool> parsedValue = boolFromVariant(value);
+    if (!parsedValue.has_value()) {
+        qCWarning(skygateSettingsLog).noquote()
+            << "Invalid boolean setting" << key << "value" << value.toString()
+            << "- using fallback" << fallback;
+        return fallback;
+    }
+    return *parsedValue;
 }
 
 double readDoubleSetting(QSettings& settings, const QString& key, const double fallback)
@@ -69,7 +86,13 @@ double readDoubleSetting(QSettings& settings, const QString& key, const double f
 
     bool ok = false;
     const double value = settings.value(key).toDouble(&ok);
-    return ok && std::isfinite(value) ? value : fallback;
+    if (!ok || !std::isfinite(value)) {
+        qCWarning(skygateSettingsLog).noquote()
+            << "Invalid numeric setting" << key << "value" << settings.value(key).toString()
+            << "- using fallback" << fallback;
+        return fallback;
+    }
+    return value;
 }
 
 int readIntSetting(QSettings& settings, const QString& key, const int fallback)
@@ -80,7 +103,13 @@ int readIntSetting(QSettings& settings, const QString& key, const int fallback)
 
     bool ok = false;
     const int value = settings.value(key).toInt(&ok);
-    return ok ? value : fallback;
+    if (!ok) {
+        qCWarning(skygateSettingsLog).noquote()
+            << "Invalid integer setting" << key << "value" << settings.value(key).toString()
+            << "- using fallback" << fallback;
+        return fallback;
+    }
+    return value;
 }
 
 qint64 readLongLongSetting(QSettings& settings, const QString& key, const qint64 fallback)
@@ -91,7 +120,13 @@ qint64 readLongLongSetting(QSettings& settings, const QString& key, const qint64
 
     bool ok = false;
     const qint64 value = settings.value(key).toLongLong(&ok);
-    return ok ? value : fallback;
+    if (!ok) {
+        qCWarning(skygateSettingsLog).noquote()
+            << "Invalid integer setting" << key << "value" << settings.value(key).toString()
+            << "- using fallback" << fallback;
+        return fallback;
+    }
+    return value;
 }
 
 qulonglong readULongLongSetting(
@@ -106,7 +141,25 @@ qulonglong readULongLongSetting(
 
     bool ok = false;
     const qulonglong value = settings.value(key).toULongLong(&ok);
-    return ok ? value : fallback;
+    if (!ok) {
+        qCWarning(skygateSettingsLog).noquote()
+            << "Invalid unsigned integer setting" << key << "value" << settings.value(key).toString()
+            << "- using fallback" << fallback;
+        return fallback;
+    }
+    return value;
+}
+
+QString readLogFilePathSetting(QSettings& settings, const QString& key)
+{
+    const QString fallback = skygate::ui::SkyLogging::defaultLogFilePath();
+    const QString configuredPath = settings.value(key, fallback).toString().trimmed();
+    if (configuredPath.isEmpty()) {
+        qCWarning(skygateSettingsLog).noquote()
+            << "Invalid blank log file path setting" << key << "- using fallback" << fallback;
+        return fallback;
+    }
+    return configuredPath;
 }
 
 } // namespace
@@ -209,8 +262,20 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         SkyContextSettings::key("deepSkyCatalogUrlText"),
         snapshot.deepSkyCatalogUrlText
     );
+    settings.setValue(SkyContextSettings::key("logging/logToTerminal"), snapshot.logToTerminal);
+    settings.setValue(SkyContextSettings::key("logging/logToFile"), snapshot.logToFile);
+    settings.setValue(
+        SkyContextSettings::key("logging/logFilePath"),
+        snapshot.logFilePath.trimmed().isEmpty()
+            ? skygate::ui::SkyLogging::defaultLogFilePath()
+            : snapshot.logFilePath.trimmed()
+    );
     settings.sync();
-    return settings.status() == QSettings::NoError;
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateSettingsLog) << "Failed to save SkyGate settings";
+        return false;
+    }
+    return true;
 }
 
 std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() const
@@ -366,6 +431,20 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
         SkyContextSettings::key("deepSkyCatalogUrlText"),
         snapshot.deepSkyCatalogUrlText
     ).toString();
+    snapshot.logToTerminal = readBoolSetting(
+        settings,
+        SkyContextSettings::key("logging/logToTerminal"),
+        snapshot.logToTerminal
+    );
+    snapshot.logToFile = readBoolSetting(
+        settings,
+        SkyContextSettings::key("logging/logToFile"),
+        snapshot.logToFile
+    );
+    snapshot.logFilePath = readLogFilePathSetting(
+        settings,
+        SkyContextSettings::key("logging/logFilePath")
+    );
     return snapshot;
 }
 
@@ -403,7 +482,11 @@ bool SkySettingsStore::clearCatalogCache() const
     settings.remove(SkyContextSettings::key("catalogConstellationLineSchemaVersion"));
     settings.remove(SkyContextSettings::key("catalogConstellationCount"));
     settings.sync();
-    return removedAllCacheFiles && settings.status() == QSettings::NoError;
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to clear star catalog cache settings";
+        return false;
+    }
+    return removedAllCacheFiles;
 }
 
 bool SkySettingsStore::clearDeepSkyCatalogCache() const
@@ -423,7 +506,11 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
     settings.remove(SkyContextSettings::key("deepSkyCatalogCachePath"));
     settings.remove(SkyContextSettings::key("deepSkyCatalogSourceLabel"));
     settings.sync();
-    return removedAllCacheFiles && settings.status() == QSettings::NoError;
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to clear deep-sky catalog cache settings";
+        return false;
+    }
+    return removedAllCacheFiles;
 }
 
 bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) const
@@ -449,21 +536,34 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
         const QFileInfo targetInfo(path);
         QDir targetDir(targetInfo.absolutePath());
         if (!targetDir.mkpath(".")) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Failed to create catalog cache directory" << targetDir.absolutePath();
             return false;
         }
 
         QSaveFile cacheFile(path);
         if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Failed to open catalog cache for writing" << path
+                << cacheFile.errorString();
             return false;
         }
 
         const qint64 writtenBytes = cacheFile.write(payload);
         if (writtenBytes != payload.size()) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Failed to write complete catalog cache" << path
+                << "written" << writtenBytes << "expected" << payload.size();
             cacheFile.cancelWriting();
             return false;
         }
 
-        return cacheFile.commit();
+        if (!cacheFile.commit()) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Failed to commit catalog cache" << path << cacheFile.errorString();
+            return false;
+        }
+        return true;
     };
 
     if (!writePayload(configuredPath, snapshot.catalogPayload)) {
@@ -514,7 +614,11 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
         );
     }
     settings.sync();
-    return settings.status() == QSettings::NoError;
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to save catalog cache settings";
+        return false;
+    }
+    return true;
 }
 
 std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCatalogCache() const
@@ -529,6 +633,10 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
     QFile cacheFile(configuredPath);
     if (!configuredPath.isEmpty() && cacheFile.exists() && cacheFile.open(QIODevice::ReadOnly)) {
         snapshot.catalogPayload = cacheFile.readAll();
+    } else if (!configuredPath.isEmpty() && cacheFile.exists()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open star catalog cache" << configuredPath
+            << cacheFile.errorString();
     }
 
     const QString configuredDeepSkyPath = settings.value(
@@ -542,6 +650,10 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
         && deepSkyCacheFile.open(QIODevice::ReadOnly)
     ) {
         snapshot.deepSkyCatalogPayload = deepSkyCacheFile.readAll();
+    } else if (!configuredDeepSkyPath.isEmpty() && deepSkyCacheFile.exists()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open deep-sky catalog cache" << configuredDeepSkyPath
+            << deepSkyCacheFile.errorString();
     }
 
     if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()) {

@@ -5,6 +5,7 @@
 
 #include <QCoreApplication>
 #include <QFile>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QStandardPaths>
@@ -231,6 +232,12 @@ void SkyCatalogManagerTests::failedLocalCatalogDownloadClearsBusyAndReportsStatu
     QSignalSpy downloadSpy(&manager, &SkyCatalogManager::downloadingCatalogChanged);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression(
+            "Catalog source failed file://.*/missing-stars\\.csv .* HTTP 0"
+        )
+    );
     manager.downloadCatalogFromUrl(missingCatalogUrl);
     QVERIFY(manager.downloadingCatalog());
 

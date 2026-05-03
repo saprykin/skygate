@@ -98,6 +98,14 @@ void SkyCatalogCacheControllerTests::unreadableSavedStarCatalogFallsBack()
     QVERIFY(store.saveCatalogCache(snapshot));
 
     const skygate::ui::internal::SkyCatalogCacheController controller(&store);
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload format is not recognized."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Saved star catalog cache unreadable; using bundled catalog: Catalog payload format is not recognized."
+    );
     const auto result = controller.restore(1, 0);
 
     QVERIFY(!result.restored);

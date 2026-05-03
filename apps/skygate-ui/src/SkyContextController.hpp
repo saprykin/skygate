@@ -73,6 +73,9 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QVariantList themeOptions READ themeOptions NOTIFY themeOptionsChanged)
     Q_PROPERTY(QObject* theme READ theme CONSTANT)
     Q_PROPERTY(QObject* overlayLayers READ overlayLayers CONSTANT)
+    Q_PROPERTY(bool logToTerminal READ logToTerminal WRITE setLogToTerminal NOTIFY loggingChanged)
+    Q_PROPERTY(bool logToFile READ logToFile WRITE setLogToFile NOTIFY loggingChanged)
+    Q_PROPERTY(QString logFilePath READ logFilePath WRITE setLogFilePath NOTIFY loggingChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
     Q_PROPERTY(
@@ -163,6 +166,9 @@ public:
     [[nodiscard]] QVariantList themeOptions() const;
     [[nodiscard]] QObject* theme() const noexcept;
     [[nodiscard]] QObject* overlayLayers() const noexcept;
+    [[nodiscard]] bool logToTerminal() const noexcept;
+    [[nodiscard]] bool logToFile() const noexcept;
+    [[nodiscard]] QString logFilePath() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
@@ -217,6 +223,9 @@ public:
     Q_INVOKABLE void refreshCurrentLocation();
     Q_INVOKABLE void setProjectionTypeText(const QString& projectionTypeText);
     Q_INVOKABLE void setThemeId(const QString& themeId);
+    Q_INVOKABLE void setLogToTerminal(bool logToTerminal);
+    Q_INVOKABLE void setLogToFile(bool logToFile);
+    Q_INVOKABLE void setLogFilePath(const QString& logFilePath);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
     Q_INVOKABLE bool clearCatalogCache();
@@ -257,6 +266,7 @@ signals:
     void projectionTypeChanged();
     void themeChanged();
     void themeOptionsChanged();
+    void loggingChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
     void catalogDatasetInfoTextChanged();
@@ -284,6 +294,7 @@ private:
     void updateLocationStatusText();
     void setProjectionType(skygate::core::ProjectionType projectionType);
     void refreshObjectSearchModel();
+    void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(
         const QString& targetKind,
@@ -305,4 +316,7 @@ private:
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     QVariantList m_themeOptions;
+    bool m_logToTerminal = true;
+    bool m_logToFile = false;
+    QString m_logFilePath;
 };

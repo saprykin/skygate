@@ -22,6 +22,8 @@ namespace skygate::ui::internal {
 
 namespace {
 
+Q_LOGGING_CATEGORY(skygateThemeLog, "skygate.theme")
+
 [[nodiscard]] SkyThemeDefinition makeBuiltInDefaultTheme()
 {
     SkyThemeDefinition theme;
@@ -187,14 +189,14 @@ namespace {
 {
     const QJsonValue value = object.value(QString::fromUtf8(key));
     if (!value.isString()) {
-        qWarning().noquote()
+        qCWarning(skygateThemeLog).noquote()
             << "Theme" << sourceDescription << "is missing color key" << key;
         return std::nullopt;
     }
 
     const QColor color(value.toString());
     if (!color.isValid()) {
-        qWarning().noquote()
+        qCWarning(skygateThemeLog).noquote()
             << "Theme" << sourceDescription << "has invalid color for key" << key;
         return std::nullopt;
     }
@@ -255,7 +257,7 @@ using PaletteAssigner = void (*)(Palette&, const QColor&);
 {
     QFile file(resourcePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        qWarning().noquote() << "Failed to open" << description << resourcePath;
+        qCWarning(skygateThemeLog).noquote() << "Failed to open" << description << resourcePath;
         return std::nullopt;
     }
     return file.readAll();
@@ -328,7 +330,8 @@ std::optional<SkyThemeDefinition> SkyThemeJsonCodec::parseTheme(
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(jsonBytes, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        qWarning().noquote() << "Failed to parse theme" << sourceDescription << parseError.errorString();
+        qCWarning(skygateThemeLog).noquote()
+            << "Failed to parse theme" << sourceDescription << parseError.errorString();
         return std::nullopt;
     }
 
@@ -336,14 +339,16 @@ std::optional<SkyThemeDefinition> SkyThemeJsonCodec::parseTheme(
     const QString id = rootObject.value("id").toString().trimmed();
     const QString displayName = rootObject.value("displayName").toString().trimmed();
     if (id.isEmpty() || displayName.isEmpty()) {
-        qWarning().noquote() << "Theme" << sourceDescription << "is missing id or displayName";
+        qCWarning(skygateThemeLog).noquote()
+            << "Theme" << sourceDescription << "is missing id or displayName";
         return std::nullopt;
     }
 
     const QJsonValue uiValue = rootObject.value("ui");
     const QJsonValue renderValue = rootObject.value("render");
     if (!uiValue.isObject() || !renderValue.isObject()) {
-        qWarning().noquote() << "Theme" << sourceDescription << "is missing ui/render sections";
+        qCWarning(skygateThemeLog).noquote()
+            << "Theme" << sourceDescription << "is missing ui/render sections";
         return std::nullopt;
     }
 
@@ -377,7 +382,8 @@ const SkyThemeDefinition& SkyThemeRepository::themeById(const QString& id) const
             }
         }
 
-        qWarning().noquote() << "Unknown theme id" << requestedId << "- using default theme";
+        qCWarning(skygateThemeLog).noquote()
+            << "Unknown theme id" << requestedId << "- using default theme";
     }
 
     return defaultTheme();
@@ -427,7 +433,7 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
         &parseError
     );
     if (parseError.error != QJsonParseError::NoError || !manifestDocument.isObject()) {
-        qWarning().noquote()
+        qCWarning(skygateThemeLog).noquote()
             << "Failed to parse theme manifest"
             << manifestResourcePath
             << parseError.errorString();
@@ -446,7 +452,7 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
         const QString id = themeObject.value("id").toString().trimmed();
         const QString resourcePath = themeObject.value("resourcePath").toString().trimmed();
         if (id.isEmpty() || resourcePath.isEmpty()) {
-            qWarning().noquote()
+            qCWarning(skygateThemeLog).noquote()
                 << "Skipping invalid theme descriptor in manifest"
                 << manifestResourcePath;
             continue;
@@ -466,7 +472,7 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
         }
 
         if (parsedTheme->id != id) {
-            qWarning().noquote()
+            qCWarning(skygateThemeLog).noquote()
                 << "Theme manifest id mismatch for"
                 << resourcePath
                 << "- expected"

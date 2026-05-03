@@ -4,11 +4,15 @@
 
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 
+#include <QLoggingCategory>
+
 #include <string_view>
 #include <utility>
 
 namespace skygate::ui::internal {
 namespace {
+
+Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
 
 QString stripSavedSuffixes(const QString& sourceLabel)
 {
@@ -89,6 +93,9 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
         if (!restoredCatalogResult.isSuccess() || restoredCatalogResult.catalog == nullptr) {
             result.savedCatalogUnreadable = true;
             result.statusText = "Catalog: Saved cache unreadable, using bundled";
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Saved star catalog cache unreadable; using bundled catalog:"
+                << QString::fromStdString(restoredCatalogResult.errorDetail);
             return result;
         }
 
@@ -114,6 +121,10 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
             );
             result.deepSkyCatalog = std::move(restoredDeepSkyResult.catalog);
             result.restored = true;
+        } else {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Saved deep-sky catalog cache unreadable; ignoring cache:"
+                << QString::fromStdString(restoredDeepSkyResult.errorDetail);
         }
     }
 
@@ -134,6 +145,9 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
             }
             result.constellationCount = cacheSnapshot->constellationCount;
             result.restored = true;
+        } else {
+            qCWarning(skygateCatalogCacheLog)
+                << "Saved constellation line cache unreadable; using bundled fallback";
         }
     } else if (cacheSnapshot->constellationLineSchemaVersion > 0) {
         result.resetConstellationLineRefs = true;
