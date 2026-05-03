@@ -31,6 +31,13 @@ add_skygate_ui_qtest(skygate-ui-overlay-layer-settings-tests SkyOverlayLayerSett
 add_skygate_ui_qtest(skygate-ui-catalog-cache-controller-tests SkyCatalogCacheControllerTests.cpp)
 add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests SkyActiveCatalogBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-catalog-download-workflow-tests CatalogDownloadWorkflowTests.cpp)
+add_skygate_ui_qtest(skygate-ui-catalog-payload-parse-service-tests CatalogPayloadParseServiceTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-catalog-manager-tests SkyCatalogManagerTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests SkyHitTargetIndexTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests SkyObjectTrailBuilderTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests SkyRenderBuildersTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-scene-frame-pipeline-tests SkySceneFramePipelineTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-selection-overlay-builder-tests SkySelectionOverlayBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-smoke-tests QmlSmokeTests.cpp)
 
 target_compile_definitions(skygate-ui-qml-smoke-tests

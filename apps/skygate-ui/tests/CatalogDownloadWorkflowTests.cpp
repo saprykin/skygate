@@ -1,5 +1,6 @@
 #include "CatalogCoordinator.hpp"
 #include "catalog/CatalogDownloadService.hpp"
+#include "catalog/SkyCatalogImportWorkflow.hpp"
 
 #include <QtTest/QtTest>
 
@@ -145,6 +146,10 @@ private slots:
     void downloadServiceRejectsEmptyAndOversizedPayloads();
     void coordinatorParsesSuccessfulDownloadedCatalog();
     void coordinatorReportsParseFailureWithSourceUrl();
+    void importWorkflowParsesConstellationPayloads();
+    void importWorkflowFallsBackForMalformedConstellationPayload();
+    void importWorkflowRejectsDeepSkyCatalogWithoutDsos();
+    void importWorkflowReportsDeepSkyObjectCount();
 };
 
 void CatalogDownloadWorkflowTests::invalidUrlCompletesWithoutNetworkRequest()
@@ -302,6 +307,149 @@ void CatalogDownloadWorkflowTests::coordinatorReportsParseFailureWithSourceUrl()
     QVERIFY(finalResult.errorText.contains("https://example.test/bad.csv"));
     QVERIFY(finalResult.errorText.contains("parse failed"));
     QCOMPARE(statuses.back(), finalResult.errorText);
+}
+
+void CatalogDownloadWorkflowTests::importWorkflowParsesConstellationPayloads()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/index.json",
+        {.payload = R"({
+            "constellations": [
+                {
+                    "id": "orion",
+                    "common_name": { "english": "Orion" },
+                    "lines": [[24436, 25930, 26727]]
+                }
+            ]
+        })"}
+    );
+    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
+
+    skygate::ui::internal::SkyConstellationLineImportResult finalResult;
+    QStringList statuses;
+    runAsync([&](QEventLoop& loop) {
+        workflow.downloadConstellationLines(
+            {"https://example.test/index.json"},
+            this,
+            [&statuses](const QString& status) {
+                statuses.push_back(status);
+            },
+            [&finalResult, &loop](
+                skygate::ui::internal::SkyConstellationLineImportResult result
+            ) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QCOMPARE(finalResult.constellationCount, 1U);
+    QCOMPARE(finalResult.lineRefs.size(), 2U);
+    QCOMPARE(finalResult.labelRefs.size(), 1U);
+    QVERIFY(finalResult.hasCustomLines());
+    QCOMPARE(finalResult.statusSuffix, QString("2 segments"));
+    QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const QString& status) {
+        return status.contains("failed", Qt::CaseInsensitive);
+    }));
+}
+
+void CatalogDownloadWorkflowTests::importWorkflowFallsBackForMalformedConstellationPayload()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/bad-index.json",
+        {.payload = "not-json"}
+    );
+    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
+
+    skygate::ui::internal::SkyConstellationLineImportResult finalResult;
+    runAsync([&](QEventLoop& loop) {
+        workflow.downloadConstellationLines(
+            {"https://example.test/bad-index.json"},
+            this,
+            {},
+            [&finalResult, &loop](
+                skygate::ui::internal::SkyConstellationLineImportResult result
+            ) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(!finalResult.hasCustomLines());
+    QVERIFY(finalResult.labelRefs.empty());
+    QVERIFY(finalResult.statusSuffix.contains("fallback default"));
+    QVERIFY(finalResult.statusSuffix.contains("parse failed"));
+    QVERIFY(finalResult.statusSuffix.contains("not-json"));
+}
+
+void CatalogDownloadWorkflowTests::importWorkflowRejectsDeepSkyCatalogWithoutDsos()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/stars.csv",
+        {.payload = "id,hip,proper,ra,dec,mag\n1,42,Sirius,6.7525,-16.7161,-1.46\n"}
+    );
+    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
+
+    skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
+    runAsync([&](QEventLoop& loop) {
+        workflow.downloadDeepSkyCatalog(
+            {"https://example.test/stars.csv"},
+            "HYG",
+            this,
+            {},
+            [&finalResult, &loop](
+                skygate::ui::internal::SkyDeepSkyCatalogImportResult result
+            ) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(finalResult.catalog == nullptr);
+    QCOMPARE(finalResult.sourceLabel, QString("HYG"));
+    QCOMPARE(finalResult.foundObjectCount, 1U);
+    QCOMPARE(finalResult.errorText, QString("Catalog: Downloaded deep-sky catalog contains no DSOs"));
+}
+
+void CatalogDownloadWorkflowTests::importWorkflowReportsDeepSkyObjectCount()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/open-ngc.csv",
+        {.payload =
+            "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
+            "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
+            "Identifiers;Common names;NED notes;OpenNGC notes\n"
+            "NGC0224;G;00:42:44.35;+41:16:08.6;And;177.83;69.66;35;4.36;3.44;;;;"
+            "13.35;SA(s)b;;;;31;0224;;;PGC 2557,UGC 454;Andromeda Galaxy;;\n"}
+    );
+    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
+
+    skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
+    runAsync([&](QEventLoop& loop) {
+        workflow.downloadDeepSkyCatalog(
+            {"https://example.test/open-ngc.csv"},
+            "OpenNGC",
+            this,
+            {},
+            [&finalResult, &loop](
+                skygate::ui::internal::SkyDeepSkyCatalogImportResult result
+            ) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(finalResult.catalog != nullptr);
+    QCOMPARE(finalResult.sourceLabel, QString("OpenNGC"));
+    QCOMPARE(finalResult.foundObjectCount, 1U);
+    QVERIFY(finalResult.errorText.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(CatalogDownloadWorkflowTests)
