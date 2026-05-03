@@ -32,6 +32,7 @@ add_skygate_ui_qtest(skygate-ui-catalog-cache-controller-tests SkyCatalogCacheCo
 add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests SkyActiveCatalogBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-catalog-download-workflow-tests CatalogDownloadWorkflowTests.cpp)
 add_skygate_ui_qtest(skygate-ui-catalog-payload-parse-service-tests CatalogPayloadParseServiceTests.cpp)
+add_skygate_ui_qtest(skygate-ui-performance-guard-tests PerformanceGuardTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-catalog-manager-tests SkyCatalogManagerTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests SkyObjectTrailBuilderTests.cpp)

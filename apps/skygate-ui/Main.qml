@@ -89,6 +89,17 @@ ApplicationWindow {
         }
     }
 
+    function enforceToolbarFit() {
+        if (!skyContext.searchToolbarCollapsed
+                && !skyContext.timelineToolbarCollapsed
+                && expandedToolbarsWouldOverlap()) {
+            skyContext.setTimelineToolbarCollapsed(true)
+        }
+    }
+
+    onWidthChanged: Qt.callLater(enforceToolbarFit)
+    Component.onCompleted: Qt.callLater(enforceToolbarFit)
+
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {

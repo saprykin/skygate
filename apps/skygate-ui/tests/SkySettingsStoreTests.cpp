@@ -3,6 +3,7 @@
 #include "SkySettingsStore.hpp"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -14,8 +15,11 @@ private slots:
     void initTestCase();
     void savesAndLoadsStateSnapshot();
     void savesAndLoadsNegativeUtcEpochSeconds();
+    void malformedStateValuesFallBackToDefaults();
+    void partialStateAndUnknownOverlayKeysAreTolerated();
     void savesLoadsAndClearsCatalogCachesIndependently();
     void partialCatalogCacheSavePreservesConfiguredPeerPath();
+    void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
 
 private:
     QTemporaryDir m_settingsDir;
@@ -106,6 +110,73 @@ void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
     QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
+}
+
+void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/live", "maybe");
+    settings.setValue("skyContext/timelineToolbarCollapsed", "no");
+    settings.setValue("skyContext/speedMultiplier", "fast");
+    settings.setValue("skyContext/stepSeconds", "soon");
+    settings.setValue("skyContext/magnitudeCutoff", "nan");
+    settings.setValue("skyContext/viewCenterAltitudeDeg", "above");
+    settings.setValue("skyContext/viewCenterAzimuthDeg", "east-ish");
+    settings.setValue("skyContext/viewFieldOfViewDeg", "wide");
+    settings.setValue("skyContext/utcEpochSeconds", "yesterday");
+    settings.setValue("skyContext/latitudeDeg", "north");
+    settings.setValue("skyContext/longitudeDeg", "west");
+    settings.setValue("skyContext/elevationMeters", "high");
+    settings.setValue("skyContext/projectionType", "FishEyePrototype");
+    settings.setValue("skyContext/themeId", "unknown-theme");
+    settings.setValue("skyContext/overlayLayers/horizon", "sometimes");
+    settings.setValue("skyContext/overlayLayers/ecliptic", "on");
+    settings.setValue("skyContext/catalogPresetIndex", "primary");
+    settings.setValue("skyContext/deepSkyCatalogPresetIndex", "deep");
+
+    const SkySettingsStore store;
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->live, true);
+    QCOMPARE(loadedSnapshot->timelineToolbarCollapsed, false);
+    QCOMPARE(loadedSnapshot->speedMultiplier, 1.0);
+    QCOMPARE(loadedSnapshot->stepSeconds, 60);
+    QCOMPARE(loadedSnapshot->magnitudeCutoff, 6.0);
+    QCOMPARE(loadedSnapshot->viewCenterAltitudeDeg, 0.0);
+    QCOMPARE(loadedSnapshot->viewCenterAzimuthDeg, 0.0);
+    QCOMPARE(loadedSnapshot->viewFieldOfViewDeg, 100.0);
+    QCOMPARE(loadedSnapshot->utcEpochSeconds, 0LL);
+    QCOMPARE(loadedSnapshot->latitudeDeg, 0.0);
+    QCOMPARE(loadedSnapshot->longitudeDeg, 0.0);
+    QCOMPARE(loadedSnapshot->elevationMeters, 0.0);
+    QCOMPARE(loadedSnapshot->projectionTypeText, QString("FishEyePrototype"));
+    QCOMPARE(loadedSnapshot->themeId, QString("unknown-theme"));
+    QCOMPARE(loadedSnapshot->overlayLayers.horizon, true);
+    QCOMPARE(loadedSnapshot->overlayLayers.ecliptic, true);
+    QCOMPARE(loadedSnapshot->catalogPresetIndex, 0);
+    QCOMPARE(loadedSnapshot->deepSkyCatalogPresetIndex, 0);
+}
+
+void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/searchToolbarCollapsed", true);
+    settings.setValue("skyContext/overlayLayers/altAzGrid", false);
+    settings.setValue("skyContext/overlayLayers/unusedPrototypeLayer", true);
+
+    const SkySettingsStore store;
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->live, true);
+    QCOMPARE(loadedSnapshot->searchToolbarCollapsed, true);
+    QCOMPARE(loadedSnapshot->timelineToolbarCollapsed, false);
+    QCOMPARE(loadedSnapshot->overlayLayers.horizon, true);
+    QCOMPARE(loadedSnapshot->overlayLayers.altAzGrid, false);
+    QCOMPARE(loadedSnapshot->overlayLayers.deepSkyLabels, true);
 }
 
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
@@ -200,6 +271,41 @@ void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
     QVERIFY(QFileInfo::exists(deepSkyCachePath));
+}
+
+void SkySettingsStoreTests::missingCacheFilesAndMalformedCacheMetadataAreTolerated()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue(
+        "skyContext/catalogCachePath",
+        m_settingsDir.filePath("missing-star-cache.csv")
+    );
+    settings.setValue("skyContext/catalogSourceLabel", "Missing HYG");
+    settings.setValue("skyContext/catalogConstellationLineSchemaVersion", "latest");
+    settings.setValue("skyContext/catalogConstellationCount", "many");
+
+    const SkySettingsStore store;
+    QVERIFY(!store.loadCatalogCache().has_value());
+
+    const QString cachePath = m_settingsDir.filePath("malformed-metadata-cache.csv");
+    QFile cacheFile(cachePath);
+    QVERIFY(cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QVERIFY(cacheFile.write(
+        "id,hip,proper,ra,dec,mag\n"
+        "1,42,Sirius,6.7525,-16.7161,-1.46\n"
+    ) > 0);
+    cacheFile.close();
+
+    settings.setValue("skyContext/catalogCachePath", cachePath);
+    settings.setValue("skyContext/catalogConstellationLineSchemaVersion", "latest");
+    settings.setValue("skyContext/catalogConstellationCount", "many");
+    const auto loadedSnapshot = store.loadCatalogCache();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->sourceLabel, QString("Missing HYG"));
+    QCOMPARE(loadedSnapshot->constellationLineSchemaVersion, 0);
+    QCOMPARE(loadedSnapshot->constellationCount, 0U);
+    QVERIFY(loadedSnapshot->deepSkyCatalogPayload.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(SkySettingsStoreTests)

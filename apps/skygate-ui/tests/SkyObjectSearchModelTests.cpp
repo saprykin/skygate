@@ -60,6 +60,7 @@ private slots:
     void filtersDeepSkyAliases();
     void deduplicatesDisplayNamesPreferringBodies();
     void ranksExactPrefixAndContainsMatches();
+    void ranksLargerMixedCatalogWithCollisions();
 };
 
 void SkyObjectSearchModelTests::blankQueryReturnsNoRows()
@@ -200,6 +201,92 @@ void SkyObjectSearchModelTests::ranksExactPrefixAndContainsMatches()
     QCOMPARE(displayTextAt(model, 1), QString("Mars"));
     QCOMPARE(displayTextAt(model, 2), QString("Scout"));
     QCOMPARE(displayTextAt(model, 3), QString("Landmark"));
+}
+
+void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
+{
+    auto m31 = makeBody(
+        "messier_031",
+        "M31",
+        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+        3.44
+    );
+    m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+        .aliases = {"Andromeda", "Andromeda Galaxy", "NGC 224"},
+    };
+    auto m57 = makeBody(
+        "messier_057",
+        "M57",
+        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+        8.8
+    );
+    m57.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        .kind = skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula,
+        .aliases = {"Ring Nebula", "NGC 6720"},
+    };
+    auto dimRingAlias = makeBody(
+        "open_ngc_ring_duplicate",
+        "Dim Ring Candidate",
+        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+        12.0
+    );
+    dimRingAlias.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        .kind = skygate::ephemeris::DeepSkyObjectKind::Nebula,
+        .aliases = {"Ring Nebula"},
+    };
+
+    SkyObjectSearchModel model;
+    model.setCatalogData(
+        std::vector<skygate::ephemeris::CelestialBody> {
+            makeBody("mars", "Mars", skygate::ephemeris::CelestialBodyType::Planet, -2.0),
+            makeBody("mercury", "Mercury", skygate::ephemeris::CelestialBodyType::Planet, -1.0),
+            makeBody("hip_24436", "Meissa", skygate::ephemeris::CelestialBodyType::Star, 3.3),
+            makeBody("hip_25930", "Mintaka", skygate::ephemeris::CelestialBodyType::Star, 2.2),
+            makeBody("andromeda_body", "Andromeda", skygate::ephemeris::CelestialBodyType::Constellation, 99.0),
+            m31,
+            m57,
+            dimRingAlias,
+        },
+        std::vector<skygate::ephemeris::ConstellationLabelRef> {
+            {"Andromeda", {"hip_24436"}},
+            {"Orion", {"hip_24436", "hip_25930"}},
+            {"Ring Nebula", {"hip_25930"}},
+            {"No Anchors", {"hip_999999"}},
+        }
+    );
+
+    model.setFilterText("andromeda");
+    QVERIFY(model.rowCount() >= 2);
+    QCOMPARE(displayTextAt(model, 0), QString("Andromeda"));
+    QCOMPARE(targetKindAt(model, 0), QString("body"));
+    QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
+    QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
+    QCOMPARE(displayTextAt(model, 1), QString("Andromeda Galaxy"));
+    QCOMPARE(targetIdAt(model, 1), QString("messier_031"));
+
+    model.setFilterText("ring nebula");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(displayTextAt(model, 0), QString("Ring Nebula"));
+    QCOMPARE(targetKindAt(model, 0), QString("body"));
+    QCOMPARE(targetIdAt(model, 0), QString("messier_057"));
+    QCOMPARE(
+        detailTextAt(model, 0),
+        QString("Deep sky • Planetary nebula • messier_057")
+    );
+
+    model.setFilterText("orion");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(displayTextAt(model, 0), QString("Orion"));
+    QCOMPARE(detailTextAt(model, 0), QString("Constellation"));
+    QCOMPARE(targetKindAt(model, 0), QString("constellationLabel"));
+
+    model.setFilterText("messier 031");
+    QVERIFY(model.rowCount() >= 1);
+    QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
+
+    model.setFilterText("no anchors");
+    QCOMPARE(model.rowCount(), 0);
 }
 
 QTEST_GUILESS_MAIN(SkyObjectSearchModelTests)

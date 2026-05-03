@@ -8,6 +8,9 @@
 #include <QSaveFile>
 #include <QSettings>
 
+#include <cmath>
+#include <optional>
+
 using namespace skygate::ui::internal;
 
 namespace {
@@ -29,6 +32,81 @@ bool removeCacheFiles(const QStringList& cachePaths)
         }
     }
     return removedAllCacheFiles;
+}
+
+std::optional<bool> boolFromVariant(const QVariant& value)
+{
+    if (!value.isValid()) {
+        return std::nullopt;
+    }
+    if (value.metaType().id() == QMetaType::Bool) {
+        return value.toBool();
+    }
+
+    const QString text = value.toString().trimmed().toLower();
+    if (text == "true" || text == "1" || text == "yes" || text == "on") {
+        return true;
+    }
+    if (text == "false" || text == "0" || text == "no" || text == "off") {
+        return false;
+    }
+    return std::nullopt;
+}
+
+bool readBoolSetting(QSettings& settings, const QString& key, const bool fallback)
+{
+    if (!settings.contains(key)) {
+        return fallback;
+    }
+    return boolFromVariant(settings.value(key)).value_or(fallback);
+}
+
+double readDoubleSetting(QSettings& settings, const QString& key, const double fallback)
+{
+    if (!settings.contains(key)) {
+        return fallback;
+    }
+
+    bool ok = false;
+    const double value = settings.value(key).toDouble(&ok);
+    return ok && std::isfinite(value) ? value : fallback;
+}
+
+int readIntSetting(QSettings& settings, const QString& key, const int fallback)
+{
+    if (!settings.contains(key)) {
+        return fallback;
+    }
+
+    bool ok = false;
+    const int value = settings.value(key).toInt(&ok);
+    return ok ? value : fallback;
+}
+
+qint64 readLongLongSetting(QSettings& settings, const QString& key, const qint64 fallback)
+{
+    if (!settings.contains(key)) {
+        return fallback;
+    }
+
+    bool ok = false;
+    const qint64 value = settings.value(key).toLongLong(&ok);
+    return ok ? value : fallback;
+}
+
+qulonglong readULongLongSetting(
+    QSettings& settings,
+    const QString& key,
+    const qulonglong fallback
+)
+{
+    if (!settings.contains(key)) {
+        return fallback;
+    }
+
+    bool ok = false;
+    const qulonglong value = settings.value(key).toULongLong(&ok);
+    return ok ? value : fallback;
 }
 
 } // namespace
@@ -143,55 +221,67 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
     }
 
     StateSnapshot snapshot;
-    snapshot.live = settings.value(SkyContextSettings::key("live"), snapshot.live).toBool();
-    snapshot.timelineToolbarCollapsed = settings.value(
+    snapshot.live = readBoolSetting(settings, SkyContextSettings::key("live"), snapshot.live);
+    snapshot.timelineToolbarCollapsed = readBoolSetting(
+        settings,
         SkyContextSettings::key("timelineToolbarCollapsed"),
         snapshot.timelineToolbarCollapsed
-    ).toBool();
-    snapshot.searchToolbarCollapsed = settings.value(
+    );
+    snapshot.searchToolbarCollapsed = readBoolSetting(
+        settings,
         SkyContextSettings::key("searchToolbarCollapsed"),
         snapshot.searchToolbarCollapsed
-    ).toBool();
-    snapshot.speedMultiplier = settings.value(
+    );
+    snapshot.speedMultiplier = readDoubleSetting(
+        settings,
         SkyContextSettings::key("speedMultiplier"),
         snapshot.speedMultiplier
-    ).toDouble();
-    snapshot.stepSeconds = settings.value(
+    );
+    snapshot.stepSeconds = readIntSetting(
+        settings,
         SkyContextSettings::key("stepSeconds"),
         snapshot.stepSeconds
-    ).toInt();
-    snapshot.magnitudeCutoff = settings.value(
+    );
+    snapshot.magnitudeCutoff = readDoubleSetting(
+        settings,
         SkyContextSettings::key("magnitudeCutoff"),
         snapshot.magnitudeCutoff
-    ).toDouble();
-    snapshot.viewCenterAltitudeDeg = settings.value(
+    );
+    snapshot.viewCenterAltitudeDeg = readDoubleSetting(
+        settings,
         SkyContextSettings::key("viewCenterAltitudeDeg"),
         snapshot.viewCenterAltitudeDeg
-    ).toDouble();
-    snapshot.viewCenterAzimuthDeg = settings.value(
+    );
+    snapshot.viewCenterAzimuthDeg = readDoubleSetting(
+        settings,
         SkyContextSettings::key("viewCenterAzimuthDeg"),
         snapshot.viewCenterAzimuthDeg
-    ).toDouble();
-    snapshot.viewFieldOfViewDeg = settings.value(
+    );
+    snapshot.viewFieldOfViewDeg = readDoubleSetting(
+        settings,
         SkyContextSettings::key("viewFieldOfViewDeg"),
         snapshot.viewFieldOfViewDeg
-    ).toDouble();
-    snapshot.utcEpochSeconds = settings.value(
+    );
+    snapshot.utcEpochSeconds = readLongLongSetting(
+        settings,
         SkyContextSettings::key("utcEpochSeconds"),
         snapshot.utcEpochSeconds
-    ).toLongLong();
-    snapshot.latitudeDeg = settings.value(
+    );
+    snapshot.latitudeDeg = readDoubleSetting(
+        settings,
         SkyContextSettings::key("latitudeDeg"),
         snapshot.latitudeDeg
-    ).toDouble();
-    snapshot.longitudeDeg = settings.value(
+    );
+    snapshot.longitudeDeg = readDoubleSetting(
+        settings,
         SkyContextSettings::key("longitudeDeg"),
         snapshot.longitudeDeg
-    ).toDouble();
-    snapshot.elevationMeters = settings.value(
+    );
+    snapshot.elevationMeters = readDoubleSetting(
+        settings,
         SkyContextSettings::key("elevationMeters"),
         snapshot.elevationMeters
-    ).toDouble();
+    );
     snapshot.locationSourceText = settings.value(
         SkyContextSettings::key("locationSource"),
         snapshot.locationSourceText
@@ -208,58 +298,70 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
         SkyContextSettings::key("themeId"),
         snapshot.themeId
     ).toString();
-    snapshot.overlayLayers.horizon = settings.value(
+    snapshot.overlayLayers.horizon = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/horizon"),
         snapshot.overlayLayers.horizon
-    ).toBool();
-    snapshot.overlayLayers.altAzGrid = settings.value(
+    );
+    snapshot.overlayLayers.altAzGrid = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/altAzGrid"),
         snapshot.overlayLayers.altAzGrid
-    ).toBool();
-    snapshot.overlayLayers.constellationLines = settings.value(
+    );
+    snapshot.overlayLayers.constellationLines = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/constellationLines"),
         snapshot.overlayLayers.constellationLines
-    ).toBool();
-    snapshot.overlayLayers.constellationLabels = settings.value(
+    );
+    snapshot.overlayLayers.constellationLabels = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/constellationLabels"),
         snapshot.overlayLayers.constellationLabels
-    ).toBool();
-    snapshot.overlayLayers.ecliptic = settings.value(
+    );
+    snapshot.overlayLayers.ecliptic = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/ecliptic"),
         snapshot.overlayLayers.ecliptic
-    ).toBool();
-    snapshot.overlayLayers.celestialEquator = settings.value(
+    );
+    snapshot.overlayLayers.celestialEquator = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/celestialEquator"),
         snapshot.overlayLayers.celestialEquator
-    ).toBool();
-    snapshot.overlayLayers.circumpolarBoundary = settings.value(
+    );
+    snapshot.overlayLayers.circumpolarBoundary = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/circumpolarBoundary"),
         snapshot.overlayLayers.circumpolarBoundary
-    ).toBool();
-    snapshot.overlayLayers.solarSystemLabels = settings.value(
+    );
+    snapshot.overlayLayers.solarSystemLabels = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/solarSystemLabels"),
         snapshot.overlayLayers.solarSystemLabels
-    ).toBool();
-    snapshot.overlayLayers.deepSkyObjects = settings.value(
+    );
+    snapshot.overlayLayers.deepSkyObjects = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/deepSkyObjects"),
         snapshot.overlayLayers.deepSkyObjects
-    ).toBool();
-    snapshot.overlayLayers.deepSkyLabels = settings.value(
+    );
+    snapshot.overlayLayers.deepSkyLabels = readBoolSetting(
+        settings,
         SkyContextSettings::key("overlayLayers/deepSkyLabels"),
         snapshot.overlayLayers.deepSkyLabels
-    ).toBool();
-    snapshot.catalogPresetIndex = settings.value(
+    );
+    snapshot.catalogPresetIndex = readIntSetting(
+        settings,
         SkyContextSettings::key("catalogPresetIndex"),
         snapshot.catalogPresetIndex
-    ).toInt();
+    );
     snapshot.catalogUrlText = settings.value(
         SkyContextSettings::key("catalogUrlText"),
         snapshot.catalogUrlText
     ).toString();
-    snapshot.deepSkyCatalogPresetIndex = settings.value(
+    snapshot.deepSkyCatalogPresetIndex = readIntSetting(
+        settings,
         SkyContextSettings::key("deepSkyCatalogPresetIndex"),
         snapshot.deepSkyCatalogPresetIndex
-    ).toInt();
+    );
     snapshot.deepSkyCatalogUrlText = settings.value(
         SkyContextSettings::key("deepSkyCatalogUrlText"),
         snapshot.deepSkyCatalogUrlText
@@ -464,15 +566,17 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
     snapshot.constellationLabelRows = settings.value(
         SkyContextSettings::key("catalogConstellationLabelRefs")
     ).toByteArray();
-    snapshot.constellationLineSchemaVersion = settings.value(
+    snapshot.constellationLineSchemaVersion = readIntSetting(
+        settings,
         SkyContextSettings::key("catalogConstellationLineSchemaVersion"),
         0
-    ).toInt();
+    );
     snapshot.constellationCount = static_cast<std::size_t>(
-        settings.value(
+        readULongLongSetting(
+            settings,
             SkyContextSettings::key("catalogConstellationCount"),
             static_cast<qulonglong>(0)
-        ).toULongLong()
+        )
     );
     return snapshot;
 }

@@ -121,8 +121,10 @@ public:
 
 public:
     struct InitializationOptions final {
-        bool loadSettings;
-        bool initializeLocation;
+        bool loadSettings = true;
+        bool initializeLocation = true;
+        QGeoPositionInfoSource* positionSource = nullptr;
+        bool requestLocationPermission = true;
     };
 
     explicit SkyContextController(

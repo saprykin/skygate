@@ -10,6 +10,7 @@ private slots:
     void init();
     void responsiveToolbarPolicyKeepsControlsSeparated();
     void menuActionsOpenAboutAndPreferencesWindows();
+    void mainWindowPreferenceSearchAndTrackingJourney();
 
 private:
     QmlSettingsFixture m_settings;
@@ -41,6 +42,37 @@ bool triggerMenuItem(QObject* menuItem)
     return false;
 }
 
+QObject* firstObjectWithLabel(QObject* root, const QString& label)
+{
+    for (QObject* object : objectTree(root)) {
+        if (object->property("label").toString() == label) {
+            return object;
+        }
+    }
+    return nullptr;
+}
+
+QQuickWindow* loadMainWindow(
+    QQmlApplicationEngine& engine,
+    SkyContextController& controller,
+    SkySceneModel& sceneModel
+)
+{
+    setupEngine(engine, controller, &sceneModel);
+    engine.rootContext()->setContextProperty("skygateBuildDateTime", QString("test"));
+    engine.rootContext()->setContextProperty("skygateGitHash", QString("test"));
+    engine.load(QUrl::fromLocalFile(qmlSourcePath(QStringLiteral("Main.qml"))));
+    if (engine.rootObjects().isEmpty()) {
+        return nullptr;
+    }
+
+    auto* rootWindow = qobject_cast<QQuickWindow*>(engine.rootObjects().front());
+    if (rootWindow != nullptr) {
+        (void)QTest::qWaitForWindowExposed(rootWindow);
+    }
+    return rootWindow;
+}
+
 }  // namespace
 
 void QmlMainWindowTests::initTestCase()
@@ -61,16 +93,9 @@ void QmlMainWindowTests::responsiveToolbarPolicyKeepsControlsSeparated()
     QVERIFY(sceneModel != nullptr);
 
     QQmlApplicationEngine engine;
-    setupEngine(engine, *controller, sceneModel.get());
-    engine.rootContext()->setContextProperty("skygateBuildDateTime", QString("test"));
-    engine.rootContext()->setContextProperty("skygateGitHash", QString("test"));
-
     const QmlWarningScope warnings;
-    engine.load(QUrl::fromLocalFile(qmlSourcePath(QStringLiteral("Main.qml"))));
-    QVERIFY(!engine.rootObjects().isEmpty());
-    auto* rootWindow = qobject_cast<QQuickWindow*>(engine.rootObjects().front());
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
     QVERIFY(rootWindow != nullptr);
-    (void)QTest::qWaitForWindowExposed(rootWindow);
 
     QVariant overlap;
     rootWindow->setWidth(1500);
@@ -117,16 +142,9 @@ void QmlMainWindowTests::menuActionsOpenAboutAndPreferencesWindows()
     QVERIFY(sceneModel != nullptr);
 
     QQmlApplicationEngine engine;
-    setupEngine(engine, *controller, sceneModel.get());
-    engine.rootContext()->setContextProperty("skygateBuildDateTime", QString("test"));
-    engine.rootContext()->setContextProperty("skygateGitHash", QString("test"));
-
     const QmlWarningScope warnings;
-    engine.load(QUrl::fromLocalFile(qmlSourcePath(QStringLiteral("Main.qml"))));
-    QVERIFY(!engine.rootObjects().isEmpty());
-    auto* rootWindow = qobject_cast<QQuickWindow*>(engine.rootObjects().front());
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
     QVERIFY(rootWindow != nullptr);
-    (void)QTest::qWaitForWindowExposed(rootWindow);
 
     QObject* aboutItem = firstObjectWithProperty(
         rootWindow,
@@ -151,6 +169,107 @@ void QmlMainWindowTests::menuActionsOpenAboutAndPreferencesWindows()
     QObject* preferencesWindow = objectWithWindowTitle(rootWindow, QStringLiteral("Preferences"));
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
+    auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
+    QVERIFY(preferencesQuickWindow != nullptr);
+
+    QStringList unexpectedWarnings = warnings.messages();
+    unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));
+    QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
+}
+
+void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setLive(false);
+    controller->setUtcDateTimeText(QStringLiteral("2024-06-01"), QStringLiteral("22:00:00"));
+    controller->setViewCenter(45.0, 180.0);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+    QTRY_VERIFY(sceneModel->snapshotGeneration() > 0U);
+    const std::uint64_t baselineGeneration = sceneModel->snapshotGeneration();
+
+    QObject* preferencesItem = firstObjectWithProperty(
+        rootWindow,
+        "text",
+        QStringLiteral("&Preferences...")
+    );
+    QVERIFY(preferencesItem != nullptr);
+    QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
+    QVERIFY(triggerMenuItem(preferencesItem));
+    QObject* preferencesWindow = objectWithWindowTitle(rootWindow, QStringLiteral("Preferences"));
+    QVERIFY(preferencesWindow != nullptr);
+    QTRY_VERIFY(preferencesWindow->property("visible").toBool());
+    auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
+    QVERIFY(preferencesQuickWindow != nullptr);
+
+    auto* latitudeInput = qobject_cast<QQuickItem*>(firstObjectWithProperty(
+        preferencesWindow,
+        "placeholderText",
+        QStringLiteral("-90..90")
+    ));
+    auto* longitudeInput = qobject_cast<QQuickItem*>(firstObjectWithProperty(
+        preferencesWindow,
+        "placeholderText",
+        QStringLiteral("-180..180")
+    ));
+    QVERIFY(latitudeInput != nullptr);
+    QVERIFY(longitudeInput != nullptr);
+    replaceText(preferencesQuickWindow, latitudeInput, QStringLiteral("35.689500"));
+    replaceText(preferencesQuickWindow, longitudeInput, QStringLiteral("139.691700"));
+
+    QObject* appearanceButton = firstObjectWithLabel(
+        preferencesWindow,
+        QStringLiteral("Appearance")
+    );
+    QVERIFY(appearanceButton != nullptr);
+    QVERIFY(activateControl(appearanceButton));
+    QTRY_COMPARE(preferencesWindow->property("selectedPage").toInt(), 1);
+
+    const QVariantList themeOptions = controller->themeOptions();
+    QVERIFY(themeOptions.size() >= 2);
+    const QString nextThemeId = themeOptions.at(1).toMap().value("id").toString();
+    const auto themeCombos = comboBoxesWithCount(preferencesWindow, themeOptions.size());
+    QCOMPARE(themeCombos.size(), 1);
+    themeCombos.front()->setProperty("currentIndex", 1);
+    QVERIFY(QMetaObject::invokeMethod(themeCombos.front(), "activated", Q_ARG(int, 1)));
+
+    const auto applyButtons = invokableButtonsWithText(preferencesWindow, QStringLiteral("Apply"));
+    QCOMPARE(applyButtons.size(), 1);
+    QVERIFY(activateControl(applyButtons.front()));
+    QTRY_COMPARE(controller->latitudeText(), QString("35.689500"));
+    QCOMPARE(controller->longitudeText(), QString("139.691700"));
+    QCOMPARE(controller->themeId(), nextThemeId);
+    QTRY_VERIFY(sceneModel->snapshotGeneration() > baselineGeneration);
+
+    preferencesWindow->setProperty("visible", false);
+    QTRY_VERIFY(!preferencesWindow->property("visible").toBool());
+    rootWindow->requestActivate();
+    QCoreApplication::processEvents();
+
+    auto* searchInput = qobject_cast<QQuickItem*>(firstObjectWithProperty(
+        rootWindow,
+        "placeholderText",
+        QStringLiteral("Search planets, stars, HIP, constellations")
+    ));
+    QVERIFY(searchInput != nullptr);
+    replaceText(rootWindow, searchInput, QStringLiteral("Sirius"));
+    QTRY_VERIFY(controller->objectSearchModel()->rowCount() > 0);
+    QTest::keyClick(rootWindow, Qt::Key_Return);
+    QTRY_COMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("sirius"));
+    QTRY_VERIFY(firstVisibleItemWithText(rootWindow, QStringLiteral("Sirius")) != nullptr);
+
+    const auto trackButtons = invokableButtonsWithText(rootWindow, QStringLiteral("Track"));
+    QCOMPARE(trackButtons.size(), 1);
+    QVERIFY(activateControl(trackButtons.front()));
+    QTRY_VERIFY(controller->hasTrackedTarget());
+    QCOMPARE(controller->trackedTargetId(), QString("sirius"));
 
     QStringList unexpectedWarnings = warnings.messages();
     unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));

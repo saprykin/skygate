@@ -1,5 +1,10 @@
 #include "QmlTestSupport.hpp"
 
+#include <optional>
+
+#include <QDateTime>
+#include <QTimeZone>
+
 using namespace skygate::ui::tests;
 
 class QmlRenderingTests final : public QObject {
@@ -14,10 +19,98 @@ private slots:
     void skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges();
     void skyViewportItemOverlayLayersAddExpectedGeometry_data();
     void skyViewportItemOverlayLayersAddExpectedGeometry();
+    void skyViewportItemAstronomicalLayersAddExpectedGeometry_data();
+    void skyViewportItemAstronomicalLayersAddExpectedGeometry();
+    void mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds();
 
 private:
     QmlSettingsFixture m_settings;
 };
+
+namespace {
+
+QObject* renderingObjectWithWindowTitle(QObject* root, const QString& title)
+{
+    for (QObject* object : objectTree(root)) {
+        if (qobject_cast<QWindow*>(object) != nullptr && object->property("title") == title) {
+            return object;
+        }
+    }
+    return nullptr;
+}
+
+bool renderingTriggerMenuItem(QObject* menuItem)
+{
+    if (menuItem == nullptr) {
+        return false;
+    }
+    if (menuItem->metaObject()->indexOfMethod("trigger()") >= 0) {
+        return QMetaObject::invokeMethod(menuItem, "trigger");
+    }
+    if (menuItem->metaObject()->indexOfSignal("triggered()") >= 0) {
+        return QMetaObject::invokeMethod(menuItem, "triggered");
+    }
+    return false;
+}
+
+bool windowHasMultipleSampledColors(QQuickWindow& window)
+{
+    const QImage image = window.grabWindow();
+    if (image.isNull()) {
+        return false;
+    }
+
+    std::optional<QRgb> firstColor;
+    for (int y = 0; y < image.height(); y += std::max(1, image.height() / 12)) {
+        for (int x = 0; x < image.width(); x += std::max(1, image.width() / 12)) {
+            const QRgb color = image.pixel(x, y);
+            if (!firstColor.has_value()) {
+                firstColor = color;
+                continue;
+            }
+            if (color != firstColor.value()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool visibleQuickItemsFitWithinWindow(QQuickWindow& window, QString* failure)
+{
+    const QRectF windowRect(0.0, 0.0, window.width(), window.height());
+    for (QObject* object : objectTree(&window)) {
+        auto* item = qobject_cast<QQuickItem*>(object);
+        if (
+            item == nullptr
+            || item->window() != &window
+            || !item->isVisible()
+            || item->width() <= 0.0
+            || item->height() <= 0.0
+        ) {
+            continue;
+        }
+
+        const QRectF bounds(item->mapToScene(QPointF(0.0, 0.0)), item->size());
+        const QRectF relaxedWindowRect = windowRect.adjusted(-1.0, -1.0, 1.0, 1.0);
+        if (!relaxedWindowRect.contains(bounds)) {
+            if (failure != nullptr) {
+                *failure = QStringLiteral("%1 at [%2,%3 %4x%5] outside %6x%7")
+                    .arg(QString::fromUtf8(item->metaObject()->className()))
+                    .arg(bounds.x())
+                    .arg(bounds.y())
+                    .arg(bounds.width())
+                    .arg(bounds.height())
+                    .arg(window.width())
+                    .arg(window.height());
+            }
+            return false;
+        }
+    }
+    return true;
+}
+
+}  // namespace
 
 void QmlRenderingTests::initTestCase()
 {
@@ -458,6 +551,185 @@ void QmlRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry()
         enabledVertexCount > baselineVertexCount,
         qPrintable(QString("%1 did not add scene-graph geometry").arg(propertyName))
     );
+}
+
+void QmlRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry_data()
+{
+    QTest::addColumn<QString>("propertyName");
+    QTest::addColumn<QString>("labelText");
+    QTest::addColumn<double>("latitudeDeg");
+    QTest::addColumn<double>("longitudeDeg");
+    QTest::addColumn<QDateTime>("utcTime");
+    QTest::addColumn<double>("centerAltitudeDeg");
+    QTest::addColumn<double>("centerAzimuthDeg");
+
+    QTest::newRow("ecliptic-greenwich-equinox")
+        << QStringLiteral("ecliptic")
+        << QStringLiteral("Ecliptic")
+        << 51.4769
+        << 0.0
+        << QDateTime(QDate(2026, 3, 20), QTime(10, 0), QTimeZone::UTC)
+        << 30.0
+        << 180.0;
+    QTest::newRow("circumpolar-reykjavik")
+        << QStringLiteral("circumpolarBoundary")
+        << QStringLiteral("Circumpolar")
+        << 64.1466
+        << -21.9426
+        << QDateTime(QDate(2026, 1, 15), QTime(0, 0), QTimeZone::UTC)
+        << 45.0
+        << 0.0;
+}
+
+void QmlRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry()
+{
+    QFETCH(QString, propertyName);
+    QFETCH(QString, labelText);
+    QFETCH(double, latitudeDeg);
+    QFETCH(double, longitudeDeg);
+    QFETCH(QDateTime, utcTime);
+    QFETCH(double, centerAltitudeDeg);
+    QFETCH(double, centerAzimuthDeg);
+
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    controller->setLatitudeText(QString::number(latitudeDeg, 'f', 4));
+    controller->setLongitudeText(QString::number(longitudeDeg, 'f', 4));
+    QVERIFY(controller->setUtcDateTimeText(
+        utcTime.date().toString(QStringLiteral("yyyy-MM-dd")),
+        utcTime.time().toString(QStringLiteral("HH:mm:ss"))
+    ));
+    controller->setViewCenter(centerAltitudeDeg, centerAzimuthDeg);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QObject* overlayLayers = controller->overlayLayers();
+    QVERIFY(overlayLayers != nullptr);
+    for (const char* layerProperty : {
+        "horizon",
+        "altAzGrid",
+        "ecliptic",
+        "celestialEquator",
+        "circumpolarBoundary",
+        "deepSkyObjects",
+    }) {
+        QVERIFY(overlayLayers->setProperty(layerProperty, false));
+    }
+    QCoreApplication::processEvents();
+
+    TestSkyViewportItem viewport;
+    viewport.setWidth(760.0);
+    viewport.setHeight(520.0);
+    viewport.setSkySceneModel(sceneModel.get());
+    QTRY_VERIFY(sceneModel->preparedProjection().has_value());
+
+    std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+    const int baselineVertexCount = geometryVertexCount(paintNode.get());
+    const int baselineNodeCount = nodeTreeSize(paintNode.get());
+    const int baselineOverlayItemCount = sceneModel->overlayItems().size();
+
+    const QByteArray layerPropertyName = propertyName.toUtf8();
+    QVERIFY(overlayLayers->setProperty(layerPropertyName.constData(), true));
+    QCoreApplication::processEvents();
+    viewport.setWidth(761.0);
+    viewport.setWidth(760.0);
+    paintNode.reset(viewport.buildPaintNode());
+    QVERIFY(paintNode != nullptr);
+
+    QVERIFY2(
+        geometryVertexCount(paintNode.get()) > baselineVertexCount,
+        qPrintable(QString("%1 did not add scene-graph geometry").arg(propertyName))
+    );
+    QVERIFY(nodeTreeSize(paintNode.get()) >= baselineNodeCount);
+    QVERIFY(sceneModel->overlayItems().size() > baselineOverlayItemCount);
+
+    bool hasReferenceLabel = false;
+    for (const QVariant& item : sceneModel->overlayItems()) {
+        const QVariantMap map = item.toMap();
+        if (map.value(QStringLiteral("text")).toString() == labelText) {
+            hasReferenceLabel = true;
+            break;
+        }
+    }
+    QVERIFY2(hasReferenceLabel, qPrintable(QString("%1 label was not projected").arg(labelText)));
+}
+
+void QmlRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    setupEngine(engine, *controller, sceneModel.get());
+    engine.rootContext()->setContextProperty("skygateBuildDateTime", QString("test"));
+    engine.rootContext()->setContextProperty("skygateGitHash", QString("test"));
+
+    const QmlWarningScope warnings;
+    engine.load(QUrl::fromLocalFile(qmlSourcePath(QStringLiteral("Main.qml"))));
+    QVERIFY(!engine.rootObjects().isEmpty());
+    auto* rootWindow = qobject_cast<QQuickWindow*>(engine.rootObjects().front());
+    QVERIFY(rootWindow != nullptr);
+    (void)QTest::qWaitForWindowExposed(rootWindow);
+
+    for (const QSize size : {QSize(1100, 760), QSize(560, 640)}) {
+        rootWindow->resize(size);
+        QCoreApplication::processEvents();
+        QTRY_VERIFY(windowHasMultipleSampledColors(*rootWindow));
+        QString failure;
+        bool itemsFit = false;
+        for (int attempt = 0; attempt < 30 && !itemsFit; ++attempt) {
+            failure.clear();
+            itemsFit = visibleQuickItemsFitWithinWindow(*rootWindow, &failure);
+            if (!itemsFit) {
+                QTest::qWait(10);
+                QCoreApplication::processEvents();
+            }
+        }
+        QVERIFY2(itemsFit, qPrintable(failure));
+    }
+
+    QObject* aboutItem = firstObjectWithProperty(
+        rootWindow,
+        "text",
+        QStringLiteral("&About SkyGate")
+    );
+    QVERIFY(aboutItem != nullptr);
+    QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
+    QVERIFY(renderingTriggerMenuItem(aboutItem));
+    auto* aboutWindow = qobject_cast<QQuickWindow*>(renderingObjectWithWindowTitle(
+        rootWindow,
+        QStringLiteral("About SkyGate")
+    ));
+    QVERIFY(aboutWindow != nullptr);
+    QTRY_VERIFY(aboutWindow->isVisible());
+    QTRY_VERIFY(windowHasMultipleSampledColors(*aboutWindow));
+    QString failure;
+    QVERIFY2(visibleQuickItemsFitWithinWindow(*aboutWindow, &failure), qPrintable(failure));
+
+    QObject* preferencesItem = firstObjectWithProperty(
+        rootWindow,
+        "text",
+        QStringLiteral("&Preferences...")
+    );
+    QVERIFY(preferencesItem != nullptr);
+    QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
+    QVERIFY(renderingTriggerMenuItem(preferencesItem));
+    auto* preferencesWindow = qobject_cast<QQuickWindow*>(renderingObjectWithWindowTitle(
+        rootWindow,
+        QStringLiteral("Preferences")
+    ));
+    QVERIFY(preferencesWindow != nullptr);
+    QTRY_VERIFY(preferencesWindow->isVisible());
+    QTRY_VERIFY(windowHasMultipleSampledColors(*preferencesWindow));
+    failure.clear();
+    QVERIFY2(visibleQuickItemsFitWithinWindow(*preferencesWindow, &failure), qPrintable(failure));
+
+    QStringList unexpectedWarnings = warnings.messages();
+    unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));
+    QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
 }
 
 SKYGATE_QML_TEST_MAIN(QmlRenderingTests)

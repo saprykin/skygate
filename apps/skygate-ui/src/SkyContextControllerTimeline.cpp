@@ -489,6 +489,11 @@ void SkyContextController::initializeCurrentLocation()
         );
     };
 
+    if (!m_location.requestLocationPermission) {
+        startLocationUpdate();
+        return;
+    }
+
     QCoreApplication* app = QCoreApplication::instance();
     if (app == nullptr) {
         setLocationStatusText("Location: Positioning unavailable");

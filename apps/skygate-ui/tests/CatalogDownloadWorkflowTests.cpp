@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 namespace {
@@ -22,6 +23,7 @@ struct FakeNetworkResponse final {
     QNetworkReply::NetworkError error = QNetworkReply::NoError;
     QString errorText;
     int httpStatusCode = 200;
+    int delayMs = 0;
 };
 
 class FakeNetworkReply final : public QNetworkReply {
@@ -41,7 +43,7 @@ public:
         }
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 
-        QTimer::singleShot(0, this, [this] {
+        QTimer::singleShot(response.delayMs, this, [this] {
             if (!m_payload.isEmpty()) {
                 emit readyRead();
             }
@@ -144,6 +146,8 @@ private slots:
     void invalidUrlCompletesWithoutNetworkRequest();
     void downloadServiceRetriesUntilFirstSuccessfulPayload();
     void downloadServiceRejectsEmptyAndOversizedPayloads();
+    void downloadServiceDoesNotCallDestroyedCallbackContext();
+    void downloadServiceCompletesConcurrentRequestsIndependently();
     void coordinatorParsesSuccessfulDownloadedCatalog();
     void coordinatorReportsParseFailureWithSourceUrl();
     void importWorkflowParsesConstellationPayloads();
@@ -243,6 +247,87 @@ void CatalogDownloadWorkflowTests::downloadServiceRejectsEmptyAndOversizedPayloa
     QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const QString& status) {
         return status.contains("returned empty data");
     }));
+}
+
+void CatalogDownloadWorkflowTests::downloadServiceDoesNotCallDestroyedCallbackContext()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/slow.csv",
+        {
+            .payload = "id,hip,proper,ra,dec,mag\n1,1,Slow,1.0,2.0,3.0\n",
+            .delayMs = 20
+        }
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    bool statusCalled = false;
+    bool completionCalled = false;
+    auto callbackContext = std::make_unique<QObject>();
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/slow.csv"},
+        callbackContext.get(),
+        [&statusCalled](const QString&) {
+            statusCalled = true;
+        },
+        [&completionCalled](CatalogDownloadService::DownloadResult) {
+            completionCalled = true;
+        }
+    );
+
+    QVERIFY(statusCalled);
+    callbackContext.reset();
+    QTest::qWait(50);
+    QCoreApplication::processEvents();
+
+    QVERIFY(!completionCalled);
+}
+
+void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsIndependently()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/first.csv",
+        {
+            .payload = "id,hip,proper,ra,dec,mag\n1,11,First,1.0,2.0,3.0\n",
+            .delayMs = 25
+        }
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/second.csv",
+        {.payload = "id,hip,proper,ra,dec,mag\n2,22,Second,4.0,5.0,6.0\n"}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    CatalogDownloadService::DownloadResult firstResult;
+    CatalogDownloadService::DownloadResult secondResult;
+    bool firstCompleted = false;
+    bool secondCompleted = false;
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/first.csv"},
+        this,
+        {},
+        [&firstResult, &firstCompleted](CatalogDownloadService::DownloadResult result) {
+            firstResult = std::move(result);
+            firstCompleted = true;
+        }
+    );
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/second.csv"},
+        this,
+        {},
+        [&secondResult, &secondCompleted](CatalogDownloadService::DownloadResult result) {
+            secondResult = std::move(result);
+            secondCompleted = true;
+        }
+    );
+
+    QTRY_VERIFY(firstCompleted && secondCompleted);
+    QCOMPARE(firstResult.sourceUrl, QString("https://example.test/first.csv"));
+    QCOMPARE(secondResult.sourceUrl, QString("https://example.test/second.csv"));
+    QVERIFY(firstResult.payload.contains("First"));
+    QVERIFY(secondResult.payload.contains("Second"));
+    QCOMPARE(networkAccessManager.requestedUrls().size(), 2);
 }
 
 void CatalogDownloadWorkflowTests::coordinatorParsesSuccessfulDownloadedCatalog()

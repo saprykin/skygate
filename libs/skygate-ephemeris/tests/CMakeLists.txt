@@ -20,6 +20,10 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     )
 
     target_compile_features(${target_name} PRIVATE cxx_std_20)
+    target_compile_definitions(${target_name}
+        PRIVATE
+            SKYGATE_EPHEMERIS_TESTDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+    )
 
     add_test(
         NAME ${target_name}
@@ -30,6 +34,14 @@ endfunction()
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-payload-parser-tests
     CatalogPayloadParserTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-fixture-corpus-tests
+    CatalogFixtureCorpusTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-performance-guard-tests
+    CatalogPerformanceGuardTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-string-utilities-tests

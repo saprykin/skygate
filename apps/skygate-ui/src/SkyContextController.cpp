@@ -53,6 +53,9 @@ SkyContextController::SkyContextController(
       ))
     , m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
+    m_location.positionSource = initializationOptions.positionSource;
+    m_location.requestLocationPermission = initializationOptions.requestLocationPermission;
+
     m_themeOptions = m_themeRepository->themeOptions();
     m_themePalette->setDefinition(m_themeRepository->defaultTheme());
     connect(

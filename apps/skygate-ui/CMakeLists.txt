@@ -162,10 +162,10 @@ target_compile_definitions(skygate-ui PRIVATE
 if(TARGET Qt6::Positioning)
     target_link_libraries(skygate-ui-lib PUBLIC Qt6::Positioning)
     target_compile_definitions(skygate-ui PRIVATE SKYGATE_HAS_POSITIONING=1)
-    target_compile_definitions(skygate-ui-lib PRIVATE SKYGATE_HAS_POSITIONING=1)
+    target_compile_definitions(skygate-ui-lib PUBLIC SKYGATE_HAS_POSITIONING=1)
 else()
     target_compile_definitions(skygate-ui PRIVATE SKYGATE_HAS_POSITIONING=0)
-    target_compile_definitions(skygate-ui-lib PRIVATE SKYGATE_HAS_POSITIONING=0)
+    target_compile_definitions(skygate-ui-lib PUBLIC SKYGATE_HAS_POSITIONING=0)
 endif()
 
 add_custom_target(run-skygate-ui

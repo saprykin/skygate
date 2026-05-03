@@ -14,6 +14,12 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
+#if SKYGATE_HAS_POSITIONING
+#include <QGeoCoordinate>
+#include <QGeoPositionInfo>
+#include <QGeoPositionInfoSource>
+#endif
+
 #include <algorithm>
 #include <limits>
 #include <optional>
@@ -65,6 +71,10 @@ std::unique_ptr<SkyContextController> createController(
     bool loadSettings = false
 );
 
+std::unique_ptr<SkyContextController> createControllerWithOptions(
+    SkyContextController::InitializationOptions initializationOptions
+);
+
 std::unique_ptr<SkyContextController> createController(bool loadSettings = false)
 {
     auto starCatalog = createTestCatalog();
@@ -82,6 +92,20 @@ std::unique_ptr<SkyContextController> createController(
         std::move(starCatalog),
         std::move(ephemerisEngine),
         controllerInitializationOptions(loadSettings),
+        nullptr
+    );
+}
+
+std::unique_ptr<SkyContextController> createControllerWithOptions(
+    SkyContextController::InitializationOptions initializationOptions
+)
+{
+    auto starCatalog = createTestCatalog();
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    return std::make_unique<SkyContextController>(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        initializationOptions,
         nullptr
     );
 }
@@ -145,6 +169,89 @@ double azimuthDifferenceDeg(const double lhs, const double rhs)
     return std::min(difference, 360.0 - difference);
 }
 
+#if SKYGATE_HAS_POSITIONING
+class FakePositionSource final : public QGeoPositionInfoSource {
+    Q_OBJECT
+
+public:
+    explicit FakePositionSource(QObject* parent = nullptr)
+        : QGeoPositionInfoSource(parent)
+    {
+    }
+
+    [[nodiscard]] PositioningMethods supportedPositioningMethods() const override
+    {
+        return SatellitePositioningMethods;
+    }
+
+    [[nodiscard]] int minimumUpdateInterval() const override
+    {
+        return 0;
+    }
+
+    [[nodiscard]] Error error() const override
+    {
+        return m_error;
+    }
+
+    [[nodiscard]] QGeoPositionInfo lastKnownPosition(
+        bool fromSatellitePositioningMethodsOnly = false
+    ) const override
+    {
+        (void)fromSatellitePositioningMethodsOnly;
+        return m_lastPosition;
+    }
+
+    void startUpdates() override {}
+    void stopUpdates() override {}
+
+    void requestUpdate(const int timeoutMs = 0) override
+    {
+        m_lastTimeoutMs = timeoutMs;
+        ++m_requestCount;
+    }
+
+    [[nodiscard]] int requestCount() const noexcept
+    {
+        return m_requestCount;
+    }
+
+    [[nodiscard]] int lastTimeoutMs() const noexcept
+    {
+        return m_lastTimeoutMs;
+    }
+
+    void publishPosition(
+        const double latitudeDeg,
+        const double longitudeDeg,
+        const double altitudeMeters
+    )
+    {
+        QGeoCoordinate coordinate(latitudeDeg, longitudeDeg, altitudeMeters);
+        QGeoPositionInfo positionInfo(coordinate, QDateTime::currentDateTimeUtc());
+        m_lastPosition = positionInfo;
+        emit positionUpdated(positionInfo);
+    }
+
+    void publishInvalidPosition()
+    {
+        emit positionUpdated(QGeoPositionInfo());
+    }
+
+    void publishError(const Error error)
+    {
+        m_error = error;
+        emit errorOccurred(error);
+    }
+
+private:
+    Error m_error = NoError;
+    QGeoPositionInfo m_lastPosition;
+    int m_requestCount = 0;
+    int m_lastTimeoutMs = 0;
+};
+#endif
+
 }  // namespace
 
 class SkyContextControllerTests final : public QObject {
@@ -159,6 +266,8 @@ private slots:
     void manualCoordinateEditSwitchesToCustom();
     void invalidSavedCityFallsBackToCustom();
     void defaultsLocationSourceByPositioningAvailability();
+    void currentDevicePositionSourceAppliesUpdates();
+    void currentDevicePositionSourceReportsErrorsAndIgnoresInvalidUpdates();
     void defaultsThemeToBundledDefault();
     void restoresSavedThemeId();
     void invalidSavedThemeFallsBackToDefault();
@@ -303,6 +412,87 @@ void SkyContextControllerTests::defaultsLocationSourceByPositioningAvailability(
     } else {
         QCOMPARE(controller->locationSourceText(), QString("Custom"));
     }
+}
+
+void SkyContextControllerTests::currentDevicePositionSourceAppliesUpdates()
+{
+#if SKYGATE_HAS_POSITIONING
+    FakePositionSource positionSource;
+    auto controller = createControllerWithOptions({
+        .loadSettings = false,
+        .initializeLocation = false,
+        .positionSource = &positionSource,
+        .requestLocationPermission = false
+    });
+    QVERIFY(controller != nullptr);
+    QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
+    QSignalSpy locationStatusSpy(
+        controller.get(),
+        &SkyContextController::locationStatusTextChanged
+    );
+
+    controller->setLocationSourceText(QStringLiteral("Current Device"));
+    controller->refreshCurrentLocation();
+
+    QCOMPARE(controller->locationSourceText(), QString("Current Device"));
+    QCOMPARE(positionSource.requestCount(), 1);
+    QCOMPARE(
+        positionSource.lastTimeoutMs(),
+        skygate::ui::internal::SkyContextControllerConstants::kLocationUpdateTimeoutMs
+    );
+    QCOMPARE(controller->locationStatusText(), QString("Location: Locating"));
+
+    positionSource.publishPosition(51.5074, -0.1278, 35.0);
+    QTRY_COMPARE(controller->latitudeText(), QString("51.507400"));
+    QCOMPARE(controller->longitudeText(), QString("-0.127800"));
+    QCOMPARE(controller->elevationText(), QString("35.0"));
+    QCOMPARE(controller->locationStatusText(), QString("Location: Using current location"));
+    QVERIFY(skyContextSpy.count() >= 1);
+    QVERIFY(locationStatusSpy.count() >= 2);
+#else
+    const auto controller = createController();
+    QVERIFY(!controller->locationSourceOptions().contains("Current Device"));
+#endif
+}
+
+void SkyContextControllerTests::currentDevicePositionSourceReportsErrorsAndIgnoresInvalidUpdates()
+{
+#if SKYGATE_HAS_POSITIONING
+    FakePositionSource positionSource;
+    auto controller = createControllerWithOptions({
+        .loadSettings = false,
+        .initializeLocation = false,
+        .positionSource = &positionSource,
+        .requestLocationPermission = false
+    });
+    QVERIFY(controller != nullptr);
+    controller->setLatitudeText(QStringLiteral("12.000000"));
+    controller->setLongitudeText(QStringLiteral("34.000000"));
+    controller->setElevationText(QStringLiteral("56.0"));
+
+    controller->setLocationSourceText(QStringLiteral("Current Device"));
+    controller->refreshCurrentLocation();
+    positionSource.publishInvalidPosition();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(controller->latitudeText(), QString("12.000000"));
+    QCOMPARE(controller->longitudeText(), QString("34.000000"));
+    QCOMPARE(controller->elevationText(), QString("56.0"));
+    QCOMPARE(controller->locationStatusText(), QString("Location: Locating"));
+
+    positionSource.publishError(QGeoPositionInfoSource::UpdateTimeoutError);
+    QTRY_COMPARE(controller->locationStatusText(), QString("Location: Update failed"));
+
+    positionSource.publishPosition(47.3769, 8.5417, 408.0);
+    QTRY_COMPARE(controller->locationStatusText(), QString("Location: Using current location"));
+    QCOMPARE(controller->latitudeText(), QString("47.376900"));
+    QCOMPARE(controller->longitudeText(), QString("8.541700"));
+    QCOMPARE(controller->elevationText(), QString("408.0"));
+#else
+    const auto controller = createController();
+    controller->setLocationSourceText(QStringLiteral("Current Device"));
+    QCOMPARE(controller->locationSourceText(), QString("Custom"));
+#endif
 }
 
 void SkyContextControllerTests::defaultsThemeToBundledDefault()

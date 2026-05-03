@@ -41,6 +41,7 @@ struct SkyLocationState final {
     QString selectedCityDisplayText;
     QGeoPositionInfoSource* positionSource = nullptr;
     bool positionSourceConnected = false;
+    bool requestLocationPermission = true;
 };
 
 struct SkySearchState final {

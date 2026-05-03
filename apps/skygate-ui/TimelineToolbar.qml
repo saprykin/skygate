@@ -37,8 +37,13 @@ Item {
         )
     }
 
-    implicitWidth: timelineToolbarToggle.implicitWidth + timelineToolbarPanel.expandedWidth + 6
-    implicitHeight: Math.max(timelineToolbarPanel.implicitHeight, timelineToolbarToggle.implicitHeight)
+    implicitWidth: skyContextController.timelineToolbarCollapsed
+        ? timelineToolbarToggle.implicitWidth
+        : timelineToolbarToggle.implicitWidth + timelineToolbarPanel.expandedWidth + 6
+    implicitHeight: Math.max(
+        timelineToolbarPanel.implicitHeight,
+        timelineToolbarToggle.implicitHeight
+    )
 
     Connections {
         target: skyContextController
