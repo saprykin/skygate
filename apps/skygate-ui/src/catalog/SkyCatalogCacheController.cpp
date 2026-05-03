@@ -103,6 +103,12 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
         result.sourceLabel = savedLabel(cacheSnapshot->sourceLabel, "Saved");
         result.catalog = std::move(restoredCatalogResult.catalog);
         result.restored = true;
+        qCInfo(skygateCatalogCacheLog).noquote()
+            << "Saved star catalog cache restored:" << result.sourceLabel
+            << "objects" << static_cast<qulonglong>(
+                   restoredCatalogResult.diagnostics.selectedBodyCount
+               )
+            << "bytes" << cacheSnapshot->catalogPayload.size();
     }
 
     if (
@@ -121,6 +127,10 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
             );
             result.deepSkyCatalog = std::move(restoredDeepSkyResult.catalog);
             result.restored = true;
+            qCInfo(skygateCatalogCacheLog).noquote()
+                << "Saved deep-sky catalog cache restored:" << result.deepSkySourceLabel
+                << "objects" << static_cast<qulonglong>(result.deepSkyObjectCount)
+                << "bytes" << cacheSnapshot->deepSkyCatalogPayload.size();
         } else {
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Saved deep-sky catalog cache unreadable; ignoring cache:"
@@ -145,6 +155,10 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
             }
             result.constellationCount = cacheSnapshot->constellationCount;
             result.restored = true;
+            qCInfo(skygateCatalogCacheLog).noquote()
+                << "Saved constellation line cache restored: segments"
+                << static_cast<qulonglong>(result.constellationLineRefs.size())
+                << "labels" << static_cast<qulonglong>(result.constellationLabelRefs.size());
         } else {
             qCWarning(skygateCatalogCacheLog)
                 << "Saved constellation line cache unreadable; using bundled fallback";

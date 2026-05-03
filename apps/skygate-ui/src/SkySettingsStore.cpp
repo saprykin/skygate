@@ -486,6 +486,10 @@ bool SkySettingsStore::clearCatalogCache() const
         qCWarning(skygateCatalogCacheLog) << "Failed to clear star catalog cache settings";
         return false;
     }
+    if (removedAllCacheFiles) {
+        qCInfo(skygateCatalogCacheLog).noquote()
+            << "Star catalog cache cleared: files" << cachePaths.size();
+    }
     return removedAllCacheFiles;
 }
 
@@ -509,6 +513,10 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateCatalogCacheLog) << "Failed to clear deep-sky catalog cache settings";
         return false;
+    }
+    if (removedAllCacheFiles) {
+        qCInfo(skygateCatalogCacheLog).noquote()
+            << "Deep-sky catalog cache cleared: files" << cachePaths.size();
     }
     return removedAllCacheFiles;
 }
@@ -618,6 +626,10 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
         qCWarning(skygateCatalogCacheLog) << "Failed to save catalog cache settings";
         return false;
     }
+    qCInfo(skygateCatalogCacheLog).noquote()
+        << "Catalog cache saved: starBytes" << snapshot.catalogPayload.size()
+        << "deepSkyBytes" << snapshot.deepSkyCatalogPayload.size()
+        << "constellationSegments" << snapshot.constellationLineRows.count('\n');
     return true;
 }
 
@@ -690,5 +702,8 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
             static_cast<qulonglong>(0)
         )
     );
+    qCInfo(skygateCatalogCacheLog).noquote()
+        << "Catalog cache loaded: starBytes" << snapshot.catalogPayload.size()
+        << "deepSkyBytes" << snapshot.deepSkyCatalogPayload.size();
     return snapshot;
 }

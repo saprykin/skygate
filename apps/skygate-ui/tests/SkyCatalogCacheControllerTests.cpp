@@ -8,6 +8,73 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
+namespace {
+
+int severityRank(const QtMsgType type) noexcept
+{
+    switch (type) {
+    case QtDebugMsg:
+        return 0;
+    case QtInfoMsg:
+        return 1;
+    case QtWarningMsg:
+        return 2;
+    case QtCriticalMsg:
+        return 3;
+    case QtFatalMsg:
+        return 4;
+    }
+
+    return 1;
+}
+
+class LogCapture final {
+public:
+    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
+        : m_minimumType(minimumType)
+    {
+        s_current = this;
+        m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
+    }
+
+    ~LogCapture()
+    {
+        qInstallMessageHandler(m_previousHandler);
+        s_current = nullptr;
+    }
+
+    [[nodiscard]] QString joinedMessages() const
+    {
+        return m_messages.join('\n');
+    }
+
+private:
+    static void handler(
+        const QtMsgType type,
+        const QMessageLogContext& context,
+        const QString& message
+    )
+    {
+        if (
+            s_current != nullptr
+            && severityRank(type) >= severityRank(s_current->m_minimumType)
+        ) {
+            s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
+                QString::fromUtf8(context.category != nullptr ? context.category : "default"),
+                message
+            ));
+        }
+    }
+
+private:
+    QtMessageHandler m_previousHandler = nullptr;
+    QtMsgType m_minimumType = QtWarningMsg;
+    QStringList m_messages;
+    static inline LogCapture* s_current = nullptr;
+};
+
+}  // namespace
+
 class SkyCatalogCacheControllerTests final : public QObject {
     Q_OBJECT
 
@@ -18,6 +85,7 @@ private slots:
     void unreadableSavedStarCatalogFallsBack();
     void staleConstellationLineSchemaRequestsReset();
     void persistRoundTripsConstellationRows();
+    void logsCacheLifecycleSummariesAtInfoLevel();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeValidCacheSnapshot() const;
@@ -154,6 +222,26 @@ void SkyCatalogCacheControllerTests::persistRoundTripsConstellationRows()
     QCOMPARE(result.constellationLabelRefs[0].second.size(), 3U);
     QVERIFY(result.constellationCount.has_value());
     QCOMPARE(*result.constellationCount, 12U);
+}
+
+void SkyCatalogCacheControllerTests::logsCacheLifecycleSummariesAtInfoLevel()
+{
+    SkySettingsStore store;
+    const skygate::ui::internal::SkyCatalogCacheController controller(&store);
+    LogCapture capture(QtInfoMsg);
+
+    QVERIFY(store.saveCatalogCache(makeValidCacheSnapshot()));
+    const auto result = controller.restore(1, 1);
+    QVERIFY(result.restored);
+    QVERIFY(controller.clearCatalogCache());
+
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("Catalog cache saved: starBytes")));
+    QVERIFY(messages.contains(QStringLiteral("Catalog cache loaded: starBytes")));
+    QVERIFY(messages.contains(QStringLiteral("Saved star catalog cache restored: Downloaded (saved)")));
+    QVERIFY(messages.contains(QStringLiteral("Saved deep-sky catalog cache restored: OpenNGC (saved)")));
+    QVERIFY(messages.contains(QStringLiteral("Saved constellation line cache restored: segments 1 labels 1")));
+    QVERIFY(messages.contains(QStringLiteral("Star catalog cache cleared: files")));
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogCacheControllerTests)

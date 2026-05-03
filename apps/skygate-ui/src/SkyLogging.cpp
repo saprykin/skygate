@@ -25,12 +25,30 @@ bool s_installed = false;
 bool s_fileOpenFailed = false;
 bool s_fileFailureReported = false;
 
+int severityRank(const QtMsgType type) noexcept
+{
+    switch (type) {
+    case QtDebugMsg:
+        return 0;
+    case QtInfoMsg:
+        return 1;
+    case QtWarningMsg:
+        return 2;
+    case QtCriticalMsg:
+        return 3;
+    case QtFatalMsg:
+        return 4;
+    }
+
+    return 1;
+}
+
 bool shouldLog(const QtMsgType type, const QtMsgType minimumType) noexcept
 {
     if (type == QtFatalMsg) {
         return true;
     }
-    return static_cast<int>(type) >= static_cast<int>(minimumType);
+    return severityRank(type) >= severityRank(minimumType);
 }
 
 QString severityLabel(const QtMsgType type)
@@ -204,7 +222,7 @@ void messageHandler(
         if (openLogFileLocked()) {
             const QByteArray encoded = line.toUtf8();
             s_logFile->write(encoded);
-            if (type >= QtWarningMsg) {
+            if (severityRank(type) >= severityRank(QtWarningMsg)) {
                 s_logFile->flush();
             }
 
@@ -257,6 +275,84 @@ SkyLoggingConfiguration SkyLogging::configuration()
 {
     QMutexLocker locker(&s_mutex);
     return s_configuration;
+}
+
+std::optional<QtMsgType> SkyLogging::messageTypeFromLevelText(const QString& levelText)
+{
+    const QString normalizedLevel = levelText.trimmed().toLower();
+    if (normalizedLevel == QStringLiteral("debug")) {
+        return QtDebugMsg;
+    }
+    if (normalizedLevel == QStringLiteral("info")) {
+        return QtInfoMsg;
+    }
+    if (
+        normalizedLevel == QStringLiteral("warning")
+        || normalizedLevel == QStringLiteral("warn")
+    ) {
+        return QtWarningMsg;
+    }
+    if (
+        normalizedLevel == QStringLiteral("error")
+        || normalizedLevel == QStringLiteral("critical")
+    ) {
+        return QtCriticalMsg;
+    }
+    if (normalizedLevel == QStringLiteral("fatal")) {
+        return QtFatalMsg;
+    }
+    return std::nullopt;
+}
+
+QString SkyLogging::levelSummary(const QtMsgType type)
+{
+    switch (type) {
+    case QtDebugMsg:
+        return QStringLiteral("debug");
+    case QtInfoMsg:
+        return QStringLiteral("info");
+    case QtWarningMsg:
+        return QStringLiteral("warning");
+    case QtCriticalMsg:
+        return QStringLiteral("error");
+    case QtFatalMsg:
+        return QStringLiteral("fatal");
+    }
+
+    return QStringLiteral("info");
+}
+
+QString SkyLogging::outputSummary(const SkyLoggingConfiguration& configuration)
+{
+    if (configuration.logToTerminal && configuration.logToFile) {
+        return QStringLiteral("both");
+    }
+    if (configuration.logToTerminal) {
+        return QStringLiteral("terminal");
+    }
+    if (configuration.logToFile) {
+        return QStringLiteral("file");
+    }
+    return QStringLiteral("none");
+}
+
+QString SkyLogging::configurationSummary(const SkyLoggingConfiguration& configuration)
+{
+    QString summary = QStringLiteral("outputs=%1").arg(outputSummary(configuration));
+    if (configuration.logToTerminal) {
+        summary += QStringLiteral(" terminalLevel=%1").arg(
+            levelSummary(configuration.terminalMinimumType)
+        );
+    }
+    if (configuration.logToFile) {
+        summary += QStringLiteral(" fileLevel=%1 logFile=%2").arg(
+            levelSummary(configuration.fileMinimumType),
+            configuration.logFilePath.trimmed().isEmpty()
+                ? defaultLogFilePath()
+                : configuration.logFilePath.trimmed()
+        );
+    }
+    return summary;
 }
 
 bool SkyLogging::isInstalled()

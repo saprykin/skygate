@@ -7,11 +7,44 @@
 #include <QString>
 
 #include <string>
+#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
+
+QString catalogPayloadFormatText(const CatalogPayloadFormat format)
+{
+    switch (format) {
+    case CatalogPayloadFormat::HygCsv:
+        return QStringLiteral("HYG CSV");
+    case CatalogPayloadFormat::HygCsvGzip:
+        return QStringLiteral("HYG CSV gzip");
+    case CatalogPayloadFormat::HygCsvZip:
+        return QStringLiteral("HYG CSV ZIP");
+    case CatalogPayloadFormat::OpenNgcCsv:
+        return QStringLiteral("OpenNGC CSV");
+    case CatalogPayloadFormat::Unknown:
+        return QStringLiteral("unknown");
+    }
+
+    return QStringLiteral("unknown");
+}
+
+CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
+{
+    if (!result.isSuccess()) {
+        return result;
+    }
+
+    qCInfo(skygateCatalogParseLog).noquote()
+        << "Catalog payload parsed: format" << catalogPayloadFormatText(result.detectedFormat)
+        << "parsed" << static_cast<qulonglong>(result.diagnostics.parsedBodyCount)
+        << "selected" << static_cast<qulonglong>(result.diagnostics.selectedBodyCount)
+        << "truncated" << static_cast<qulonglong>(result.diagnostics.truncatedBodyCount);
+    return result;
+}
 
 }  // namespace
 
@@ -41,7 +74,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
             request.selectionOptions
         );
         result.detectedFormat = CatalogPayloadFormat::HygCsv;
-        return result;
+        return logSuccessfulParse(std::move(result));
     case CatalogPayloadFormat::HygCsvGzip:
         result = loadStarCatalog(
             CatalogSourceType::HygCsvGzip,
@@ -50,7 +83,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
             request.selectionOptions
         );
         result.detectedFormat = CatalogPayloadFormat::HygCsvGzip;
-        return result;
+        return logSuccessfulParse(std::move(result));
     case CatalogPayloadFormat::HygCsvZip: {
         const ZipCodec zipCodec;
         const auto extractedCsv = zipCodec.extractFirstCsvEntry(request.payload);
@@ -62,7 +95,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
                 request.selectionOptions
             );
             result.detectedFormat = CatalogPayloadFormat::HygCsvZip;
-            return result;
+            return logSuccessfulParse(std::move(result));
         }
         result.errorCode = CatalogLoadErrorCode::InvalidZipData;
         result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
@@ -78,7 +111,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
             request.selectionOptions
         );
         result.detectedFormat = CatalogPayloadFormat::OpenNgcCsv;
-        return result;
+        return logSuccessfulParse(std::move(result));
     case CatalogPayloadFormat::Unknown:
         break;
     }

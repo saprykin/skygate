@@ -8,10 +8,12 @@
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QLoggingCategory>
 #include <QQmlContext>
 #include <QQmlApplicationEngine>
 #include <QSettings>
 #include <QSize>
+#include <QSysInfo>
 #include <QWindow>
 #include <qqml.h>
 
@@ -34,7 +36,18 @@
 
 namespace {
 
-void applyOutputText(skygate::ui::SkyLoggingConfiguration& configuration, const QString& outputText)
+Q_LOGGING_CATEGORY(skygateAppLog, "skygate.app")
+
+struct StartupLoggingConfiguration final {
+    skygate::ui::SkyLoggingConfiguration configuration;
+    bool overrideApplied = false;
+    QStringList ignoredLogLevelTexts;
+};
+
+bool applyOutputText(
+    skygate::ui::SkyLoggingConfiguration& configuration,
+    const QString& outputText
+)
 {
     const QString normalizedOutput = outputText.trimmed().toLower();
     if (normalizedOutput == QStringLiteral("terminal")) {
@@ -49,50 +62,100 @@ void applyOutputText(skygate::ui::SkyLoggingConfiguration& configuration, const 
     } else if (normalizedOutput == QStringLiteral("none")) {
         configuration.logToTerminal = false;
         configuration.logToFile = false;
+    } else {
+        return false;
     }
+    return true;
 }
 
-skygate::ui::SkyLoggingConfiguration startupLoggingConfiguration(const QStringList& arguments)
+bool applyLevelText(
+    skygate::ui::SkyLoggingConfiguration& configuration,
+    const QString& levelText
+)
 {
-    skygate::ui::SkyLoggingConfiguration configuration =
-        skygate::ui::SkyLogging::defaultConfiguration();
+    const auto minimumType = skygate::ui::SkyLogging::messageTypeFromLevelText(levelText);
+    if (!minimumType.has_value()) {
+        return false;
+    }
+
+    configuration.terminalMinimumType = *minimumType;
+    configuration.fileMinimumType = *minimumType;
+    return true;
+}
+
+StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& arguments)
+{
+    StartupLoggingConfiguration startupConfiguration {
+        .configuration = skygate::ui::SkyLogging::defaultConfiguration()
+    };
 
     QSettings settings;
-    configuration.logToTerminal = settings.value(
+    startupConfiguration.configuration.logToTerminal = settings.value(
         QStringLiteral("skyContext/logging/logToTerminal"),
-        configuration.logToTerminal
+        startupConfiguration.configuration.logToTerminal
     ).toBool();
-    configuration.logToFile = settings.value(
+    startupConfiguration.configuration.logToFile = settings.value(
         QStringLiteral("skyContext/logging/logToFile"),
-        configuration.logToFile
+        startupConfiguration.configuration.logToFile
     ).toBool();
-    configuration.logFilePath = settings.value(
+    startupConfiguration.configuration.logFilePath = settings.value(
         QStringLiteral("skyContext/logging/logFilePath"),
-        configuration.logFilePath
+        startupConfiguration.configuration.logFilePath
     ).toString();
 
-    applyOutputText(configuration, qEnvironmentVariable("SKYGATE_LOG_OUTPUT"));
+    startupConfiguration.overrideApplied = applyOutputText(
+        startupConfiguration.configuration,
+        qEnvironmentVariable("SKYGATE_LOG_OUTPUT")
+    );
     const QString envLogFilePath = qEnvironmentVariable("SKYGATE_LOG_FILE");
     if (!envLogFilePath.trimmed().isEmpty()) {
-        configuration.logFilePath = envLogFilePath.trimmed();
-        configuration.logToFile = true;
+        startupConfiguration.configuration.logFilePath = envLogFilePath.trimmed();
+        startupConfiguration.configuration.logToFile = true;
+        startupConfiguration.overrideApplied = true;
+    }
+
+    const QString envLogLevel = qEnvironmentVariable("SKYGATE_LOG_LEVEL");
+    if (!envLogLevel.trimmed().isEmpty()) {
+        if (applyLevelText(startupConfiguration.configuration, envLogLevel)) {
+            startupConfiguration.overrideApplied = true;
+        } else {
+            startupConfiguration.ignoredLogLevelTexts.push_back(envLogLevel.trimmed());
+        }
     }
 
     for (int index = 1; index < arguments.size(); ++index) {
         const QString argument = arguments.at(index);
         if (argument == QStringLiteral("--log-to-terminal")) {
-            configuration.logToTerminal = true;
+            startupConfiguration.configuration.logToTerminal = true;
+            startupConfiguration.overrideApplied = true;
         } else if (argument == QStringLiteral("--no-log-to-terminal")) {
-            configuration.logToTerminal = false;
+            startupConfiguration.configuration.logToTerminal = false;
+            startupConfiguration.overrideApplied = true;
         } else if (argument == QStringLiteral("--log-to-file")) {
-            configuration.logToFile = true;
+            startupConfiguration.configuration.logToFile = true;
+            startupConfiguration.overrideApplied = true;
         } else if (argument == QStringLiteral("--log-file") && index + 1 < arguments.size()) {
-            configuration.logFilePath = arguments.at(++index).trimmed();
-            configuration.logToFile = true;
+            startupConfiguration.configuration.logFilePath = arguments.at(++index).trimmed();
+            startupConfiguration.configuration.logToFile = true;
+            startupConfiguration.overrideApplied = true;
+        } else if (argument == QStringLiteral("--log-level") && index + 1 < arguments.size()) {
+            const QString levelText = arguments.at(++index).trimmed();
+            if (applyLevelText(startupConfiguration.configuration, levelText)) {
+                startupConfiguration.overrideApplied = true;
+            } else {
+                startupConfiguration.ignoredLogLevelTexts.push_back(levelText);
+            }
+        } else if (argument.startsWith(QStringLiteral("--log-level="))) {
+            const QString levelText = argument.mid(QStringLiteral("--log-level=").size()).trimmed();
+            if (applyLevelText(startupConfiguration.configuration, levelText)) {
+                startupConfiguration.overrideApplied = true;
+            } else {
+                startupConfiguration.ignoredLogLevelTexts.push_back(levelText);
+            }
         }
     }
 
-    return configuration;
+    return startupConfiguration;
 }
 
 }  // namespace
@@ -111,8 +174,10 @@ int main(int argc, char* argv[])
     QCoreApplication::setOrganizationDomain("skygate.app");
     QCoreApplication::setApplicationName("SkyGate");
     QCoreApplication::setApplicationVersion(QStringLiteral(SKYGATE_APP_VERSION));
-    const skygate::ui::SkyLoggingConfiguration loggingConfiguration =
+    const StartupLoggingConfiguration startupLogging =
         startupLoggingConfiguration(app.arguments());
+    const skygate::ui::SkyLoggingConfiguration loggingConfiguration =
+        startupLogging.configuration;
     skygate::ui::SkyLogging::install(loggingConfiguration);
 
     QIcon appIcon;
@@ -145,6 +210,19 @@ int main(int argc, char* argv[])
     skyContextController.setLogToTerminal(loggingConfiguration.logToTerminal);
     skyContextController.setLogToFile(loggingConfiguration.logToFile);
     skyContextController.setLogFilePath(loggingConfiguration.logFilePath);
+    qCInfo(skygateAppLog).noquote() << QStringLiteral(
+        "SkyGate started: version=%1 qt=%2 os=%3 %4 overrides=%5"
+    ).arg(
+        QCoreApplication::applicationVersion(),
+        QString::fromLatin1(qVersion()),
+        QSysInfo::prettyProductName(),
+        skygate::ui::SkyLogging::configurationSummary(skygate::ui::SkyLogging::configuration()),
+        startupLogging.overrideApplied ? QStringLiteral("yes") : QStringLiteral("no")
+    );
+    for (const QString& ignoredLogLevelText : startupLogging.ignoredLogLevelTexts) {
+        qCWarning(skygateAppLog).noquote()
+            << "Ignoring invalid log level" << ignoredLogLevelText;
+    }
     SkySceneModel skySceneModel;
     skySceneModel.setSkyContextController(&skyContextController);
     QObject::connect(
@@ -152,6 +230,7 @@ int main(int argc, char* argv[])
         &QCoreApplication::aboutToQuit,
         &app,
         [&skyContextController] {
+            qCInfo(skygateAppLog) << "SkyGate shutting down";
             skyContextController.saveSettings();
         }
     );

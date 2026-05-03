@@ -8,9 +8,28 @@
 
 namespace {
 
+int severityRank(const QtMsgType type) noexcept
+{
+    switch (type) {
+    case QtDebugMsg:
+        return 0;
+    case QtInfoMsg:
+        return 1;
+    case QtWarningMsg:
+        return 2;
+    case QtCriticalMsg:
+        return 3;
+    case QtFatalMsg:
+        return 4;
+    }
+
+    return 1;
+}
+
 class LogCapture final {
 public:
-    LogCapture()
+    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
+        : m_minimumType(minimumType)
     {
         s_current = this;
         m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
@@ -34,7 +53,10 @@ private:
         const QString& message
     )
     {
-        if (s_current != nullptr && type >= QtWarningMsg) {
+        if (
+            s_current != nullptr
+            && severityRank(type) >= severityRank(s_current->m_minimumType)
+        ) {
             s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
                 QString::fromUtf8(context.category != nullptr ? context.category : "default"),
                 message
@@ -44,6 +66,7 @@ private:
 
 private:
     QtMessageHandler m_previousHandler = nullptr;
+    QtMsgType m_minimumType = QtWarningMsg;
     QStringList m_messages;
     static inline LogCapture* s_current = nullptr;
 };
@@ -63,6 +86,7 @@ private slots:
     void reportsUnsupportedPayload();
     void logsSampledInvalidHygRows();
     void logsSampledInvalidOpenNgcRows();
+    void logsSuccessfulParseSummariesAtInfoLevel();
     void validPayloadsStayQuietAtWarningLevel();
     void logsUnsupportedAndArchiveFailures();
 };
@@ -342,6 +366,25 @@ void CatalogPayloadParserTests::logsSampledInvalidOpenNgcRows()
     QVERIFY(messages.contains(QStringLiteral("invalid coordinates")));
     QVERIFY(messages.contains(QStringLiteral("row 2")));
     QVERIFY(messages.contains(QStringLiteral("row 3")));
+}
+
+void CatalogPayloadParserTests::logsSuccessfulParseSummariesAtInfoLevel()
+{
+    constexpr std::string_view kHygCsv =
+        "id,hip,proper,ra,dec,mag\n"
+        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
+
+    LogCapture capture(QtInfoMsg);
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(kHygCsv);
+
+    QVERIFY(result.isSuccess());
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("skygate.catalog.parse")));
+    QVERIFY(messages.contains(QStringLiteral("Catalog payload parsed: format HYG CSV")));
+    QVERIFY(messages.contains(QStringLiteral("parsed 1")));
+    QVERIFY(messages.contains(QStringLiteral("selected 1")));
+    QVERIFY(!messages.contains(QStringLiteral("row 2")));
 }
 
 void CatalogPayloadParserTests::validPayloadsStayQuietAtWarningLevel()

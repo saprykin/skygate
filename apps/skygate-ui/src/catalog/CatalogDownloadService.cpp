@@ -61,6 +61,8 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
         return;
     }
 
+    qCInfo(skygateCatalogDownloadLog).noquote()
+        << "Catalog download started: sources" << candidateUrls.size();
     const auto lastErrorText = std::make_shared<QString>("Catalog: Download failed");
     const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
     *tryDownloadNextUrl = [
@@ -164,6 +166,9 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
                 DownloadResult result;
                 result.payload = payload;
                 result.sourceUrl = candidateUrls[index];
+                qCInfo(skygateCatalogDownloadLog).noquote()
+                    << "Catalog download succeeded:" << candidateUrls[index]
+                    << "bytes" << payload.size();
                 completionHandler(std::move(result));
             }
         );

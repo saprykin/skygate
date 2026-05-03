@@ -18,6 +18,24 @@
 
 namespace {
 
+int severityRank(const QtMsgType type) noexcept
+{
+    switch (type) {
+    case QtDebugMsg:
+        return 0;
+    case QtInfoMsg:
+        return 1;
+    case QtWarningMsg:
+        return 2;
+    case QtCriticalMsg:
+        return 3;
+    case QtFatalMsg:
+        return 4;
+    }
+
+    return 1;
+}
+
 struct FakeNetworkResponse final {
     QByteArray payload;
     QNetworkReply::NetworkError error = QNetworkReply::NoError;
@@ -122,6 +140,51 @@ private:
     QStringList m_requestedUrls;
 };
 
+class LogCapture final {
+public:
+    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
+        : m_minimumType(minimumType)
+    {
+        s_current = this;
+        m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
+    }
+
+    ~LogCapture()
+    {
+        qInstallMessageHandler(m_previousHandler);
+        s_current = nullptr;
+    }
+
+    [[nodiscard]] QString joinedMessages() const
+    {
+        return m_messages.join('\n');
+    }
+
+private:
+    static void handler(
+        const QtMsgType type,
+        const QMessageLogContext& context,
+        const QString& message
+    )
+    {
+        if (
+            s_current != nullptr
+            && severityRank(type) >= severityRank(s_current->m_minimumType)
+        ) {
+            s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
+                QString::fromUtf8(context.category != nullptr ? context.category : "default"),
+                message
+            ));
+        }
+    }
+
+private:
+    QtMessageHandler m_previousHandler = nullptr;
+    QtMsgType m_minimumType = QtWarningMsg;
+    QStringList m_messages;
+    static inline LogCapture* s_current = nullptr;
+};
+
 template <typename StartFn>
 void runAsync(StartFn startFn)
 {
@@ -144,6 +207,7 @@ class CatalogDownloadWorkflowTests final : public QObject {
 
 private slots:
     void invalidUrlCompletesWithoutNetworkRequest();
+    void downloadServiceLogsStartAndSuccessAtInfoLevel();
     void downloadServiceRetriesUntilFirstSuccessfulPayload();
     void downloadServiceRejectsEmptyAndOversizedPayloads();
     void downloadServiceDoesNotCallDestroyedCallbackContext();
@@ -182,6 +246,37 @@ void CatalogDownloadWorkflowTests::invalidUrlCompletesWithoutNetworkRequest()
 
     QVERIFY(completed);
     QVERIFY(networkAccessManager.requestedUrls().isEmpty());
+}
+
+void CatalogDownloadWorkflowTests::downloadServiceLogsStartAndSuccessAtInfoLevel()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/catalog.csv",
+        {.payload = "id,hip,proper,ra,dec,mag\n1,1,Alpha,1.0,2.0,3.0\n"}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    CatalogDownloadService::DownloadResult finalResult;
+    LogCapture capture(QtInfoMsg);
+    runAsync([&](QEventLoop& loop) {
+        service.downloadFirstSuccessfulFromUrls(
+            {"https://example.test/catalog.csv"},
+            this,
+            {},
+            [&finalResult, &loop](CatalogDownloadService::DownloadResult result) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(!finalResult.payload.isEmpty());
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("skygate.catalog.download")));
+    QVERIFY(messages.contains(QStringLiteral("Catalog download started: sources 1")));
+    QVERIFY(messages.contains(QStringLiteral("Catalog download succeeded: https://example.test/catalog.csv")));
+    QVERIFY(messages.contains(QStringLiteral("bytes")));
 }
 
 void CatalogDownloadWorkflowTests::downloadServiceRetriesUntilFirstSuccessfulPayload()
@@ -550,6 +645,7 @@ void CatalogDownloadWorkflowTests::importWorkflowParsesConstellationPayloads()
 
     skygate::ui::internal::SkyConstellationLineImportResult finalResult;
     QStringList statuses;
+    LogCapture capture(QtInfoMsg);
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(
             {"https://example.test/index.json"},
@@ -574,6 +670,8 @@ void CatalogDownloadWorkflowTests::importWorkflowParsesConstellationPayloads()
     QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const QString& status) {
         return status.contains("failed", Qt::CaseInsensitive);
     }));
+    const QString messages = capture.joinedMessages();
+    QVERIFY(messages.contains(QStringLiteral("Constellation lines parsed: 2 segments 1 labels 1 constellations")));
 }
 
 void CatalogDownloadWorkflowTests::importWorkflowDoesNotCompleteConstellationAfterContextDestroyed()
