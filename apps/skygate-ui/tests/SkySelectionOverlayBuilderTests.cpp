@@ -220,6 +220,7 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     QCOMPARE(inspector.value("title").toString(), QString("M31"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
     QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Deep Sky"));
+    QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("44.0 / 181.0 deg"));
     QCOMPARE(inspectorFieldValue(inspector, "RA / Dec"), QString("23h 59m 59s / -12d 30m 00s"));
     QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
     QVERIFY(!inspector.value("aliases").toString().contains("M31"));
@@ -281,7 +282,7 @@ void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody
     QVERIFY(inspector.value("visible").toBool());
     QCOMPARE(inspector.value("x").toDouble(), 123.0);
     QCOMPARE(inspector.value("y").toDouble(), 456.0);
-    QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("Alt -- deg / Az -- deg"));
+    QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("-- / -- deg"));
     QCOMPARE(inspectorFieldValue(inspector, "RA / Dec"), QString("-- / --"));
 }
 

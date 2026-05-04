@@ -157,7 +157,7 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
                     "targetId": "messier_031",
                     "fields": [
                         { "label": "Type", "value": "Galaxy" },
-                        { "label": "Rise / Set", "value": "2024-06-02 04:10:00 / 19:24:00 UTC" },
+                        { "label": "Rise / Set", "value": "2024-06-02 23:58:00 / 2024-06-03 04:12:00 UTC" },
                         { "label": "Culmination", "value": "2024-06-02 11:47:00 UTC at 72.4 deg" },
                         { "label": "Source", "value": "OpenNGC" }
                     ],
@@ -199,7 +199,13 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Type")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Galaxy")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Rise / Set")) != nullptr);
-    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("2024-06-02 04:10:00 / 19:24:00 UTC")) != nullptr);
+    auto* riseSetValue = firstVisibleItemWithText(
+        root,
+        QStringLiteral("2024-06-02 23:58:00 / 2024-06-03 04:12:00 UTC")
+    );
+    QVERIFY(riseSetValue != nullptr);
+    QCOMPARE(riseSetValue->property("text").toString().count(QStringLiteral("UTC")), 1);
+    QVERIFY(!riseSetValue->property("truncated").toBool());
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Culmination")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("2024-06-02 11:47:00 UTC at 72.4 deg")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Andromeda Galaxy")) != nullptr);

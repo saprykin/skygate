@@ -9,6 +9,7 @@ private slots:
     void initTestCase();
     void init();
     void responsiveToolbarPolicyKeepsControlsSeparated();
+    void topToolbarsStayAboveOverlay();
     void menuActionsOpenAboutAndPreferencesWindows();
     void mainWindowPreferenceSearchAndTrackingJourney();
 
@@ -131,6 +132,40 @@ void QmlMainWindowTests::responsiveToolbarPolicyKeepsControlsSeparated()
     QCoreApplication::processEvents();
     QVERIFY(QMetaObject::invokeMethod(rootWindow, "prepareTimelineToolbarExpand"));
     QTRY_VERIFY(controller->searchToolbarCollapsed());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlMainWindowTests::topToolbarsStayAboveOverlay()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+
+    auto* searchToolbar = qobject_cast<QQuickItem*>(firstObjectWithMetaProperties(
+        rootWindow,
+        {"panelItem", "toggleItem", "dropdownItem"}
+    ));
+    auto* timelineToolbar = qobject_cast<QQuickItem*>(firstObjectWithMetaProperties(
+        rootWindow,
+        {"panelItem", "toggleItem", "speedValues"}
+    ));
+    auto* overlayLayer = qobject_cast<QQuickItem*>(firstObjectWithMetaProperties(
+        rootWindow,
+        {"sceneModel", "interactionLayer", "avoidItems"}
+    ));
+
+    QVERIFY(searchToolbar != nullptr);
+    QVERIFY(timelineToolbar != nullptr);
+    QVERIFY(overlayLayer != nullptr);
+    QVERIFY(searchToolbar->z() > overlayLayer->z());
+    QVERIFY(timelineToolbar->z() > overlayLayer->z());
+    QCOMPARE(timelineToolbar->z(), searchToolbar->z());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

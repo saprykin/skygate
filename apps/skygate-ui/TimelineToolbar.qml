@@ -14,6 +14,7 @@ Item {
     readonly property var speedValues: [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
     readonly property var stepValues: [1, 10, 60, 300, 3600]
     readonly property var magnitudeValues: [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    z: 20
 
     function nearestIndex(values, target) {
         let nearest = 0

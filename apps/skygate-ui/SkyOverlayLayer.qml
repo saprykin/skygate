@@ -501,9 +501,11 @@ Item {
                 delegate: Row {
                     required property var modelData
                     width: inspectorContent.width
+                    height: Math.max(fieldLabel.implicitHeight, fieldValue.implicitHeight)
                     spacing: 8
 
                     Text {
+                        id: fieldLabel
                         width: 92
                         text: modelData.label
                         color: theme.toolbarSecondaryText
@@ -513,12 +515,13 @@ Item {
                     }
 
                     Text {
+                        id: fieldValue
                         width: parent.width - 100
                         text: modelData.value
                         color: theme.toolbarPrimaryText
                         font.family: "Avenir Next"
                         font.pixelSize: 10
-                        elide: Text.ElideRight
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                     }
                 }
             }

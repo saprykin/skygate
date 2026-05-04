@@ -136,7 +136,7 @@ QString formatMagnitude(const double value)
 
 QString formatHorizontalCoordinate(const skygate::core::HorizontalCoordinate& horizontal)
 {
-    return QString("Alt %1 deg / Az %2 deg").arg(
+    return QString("%1 / %2 deg").arg(
         formatFiniteNumber(horizontal.altitudeDeg, 1),
         formatFiniteNumber(horizontal.azimuthDeg, 1)
     );
@@ -269,6 +269,10 @@ QString formatObservationRiseSet(
                 setUtc.toString("HH:mm:ss")
             );
         }
+        return QString("%1 / %2 UTC").arg(
+            riseUtc.toString("yyyy-MM-dd HH:mm:ss"),
+            setUtc.toString("yyyy-MM-dd HH:mm:ss")
+        );
     }
 
     return QString("%1 / %2").arg(formatObservationEvent(rise), formatObservationEvent(set));
