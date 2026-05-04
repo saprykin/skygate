@@ -287,6 +287,8 @@ private slots:
     void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
     void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
     void goLiveNowJumpsToCurrentUtcAndEnablesLive();
+    void restoresLiveSettingsAtCurrentUtc();
+    void restoresPausedSettingsAtSavedUtc();
     void focusSearchTargetCentersBodyResult();
     void focusSearchTargetCentersConstellationLabelResult();
     void focusSearchTargetIgnoresInvalidTargets();
@@ -833,6 +835,41 @@ void SkyContextControllerTests::goLiveNowJumpsToCurrentUtcAndEnablesLive()
     const qint64 currentUtcSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
     QVERIFY(timelineSeconds >= currentUtcSeconds - 1);
     QVERIFY(timelineSeconds <= currentUtcSeconds + 1);
+}
+
+void SkyContextControllerTests::restoresLiveSettingsAtCurrentUtc()
+{
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.live = true;
+    snapshot.utcEpochSeconds =
+        QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
+    QVERIFY(store.saveState(snapshot));
+
+    const qint64 beforeCreateSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
+    const auto controller = createController(true);
+    const qint64 afterCreateSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
+
+    QVERIFY(controller->live());
+    const qint64 timelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QVERIFY(timelineSeconds >= beforeCreateSeconds - 1);
+    QVERIFY(timelineSeconds <= afterCreateSeconds + 1);
+    QVERIFY(timelineSeconds != snapshot.utcEpochSeconds);
+}
+
+void SkyContextControllerTests::restoresPausedSettingsAtSavedUtc()
+{
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.live = false;
+    snapshot.utcEpochSeconds =
+        QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+
+    QVERIFY(!controller->live());
+    QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), snapshot.utcEpochSeconds);
 }
 
 void SkyContextControllerTests::focusSearchTargetCentersBodyResult()

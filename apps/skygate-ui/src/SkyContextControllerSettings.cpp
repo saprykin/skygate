@@ -52,7 +52,6 @@ bool SkyContextController::loadSettings()
         ? m_settingsStore->loadState()
         : std::optional<SkySettingsStore::StateSnapshot> {};
     if (stateSnapshot.has_value()) {
-        setLive(stateSnapshot->live);
         setTimelineToolbarCollapsed(stateSnapshot->timelineToolbarCollapsed);
         setSearchToolbarCollapsed(stateSnapshot->searchToolbarCollapsed);
         setSpeedMultiplier(stateSnapshot->speedMultiplier);
@@ -63,10 +62,15 @@ bool SkyContextController::loadSettings()
             stateSnapshot->viewCenterAzimuthDeg
         );
         setViewFieldOfViewDeg(stateSnapshot->viewFieldOfViewDeg);
-        setCurrentUtc(QDateTime::fromSecsSinceEpoch(
-            stateSnapshot->utcEpochSeconds,
-            QTimeZone::UTC
-        ));
+        if (stateSnapshot->live) {
+            goLiveNow();
+        } else {
+            setLive(false);
+            setCurrentUtc(QDateTime::fromSecsSinceEpoch(
+                stateSnapshot->utcEpochSeconds,
+                QTimeZone::UTC
+            ));
+        }
 
         skygate::core::GeoLocation observer = m_location.context.observer;
         observer.latitudeDeg = stateSnapshot->latitudeDeg;
