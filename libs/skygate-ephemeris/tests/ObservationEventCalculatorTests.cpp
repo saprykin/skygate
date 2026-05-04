@@ -116,6 +116,47 @@ public:
     mutable int sampleCount = 0;
 };
 
+class ConstantAltitudeEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit ConstantAltitudeEngine(const double altitudeDeg) :
+        m_altitudeDeg(altitudeDeg)
+    {
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
+        const skygate::core::SkyContext& context
+    ) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.catalogBodies =
+            std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+                std::vector<skygate::ephemeris::CelestialBody> {makeFixedBody({})}
+            );
+        snapshot.states.push_back(*computeBodyState(context, 0U));
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        const std::uint32_t bodyIndex
+    ) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        return skygate::ephemeris::CelestialBodyState {
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+            .horizontal = {.altitudeDeg = m_altitudeDeg, .azimuthDeg = 180.0}
+        };
+    }
+
+private:
+    double m_altitudeDeg = 0.0;
+};
+
 }  // namespace
 
 class ObservationEventCalculatorTests final : public QObject {
@@ -127,6 +168,7 @@ private slots:
     void currentAboveHorizonSetsBeforeItRisesAgain();
     void currentBelowHorizonRisesBeforeItSetsAgain();
     void invalidAndUnresolvedInputsReturnExplicitStatuses();
+    void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
     void movingBodySamplesThroughEphemerisEngine();
 };
 
@@ -163,11 +205,12 @@ void ObservationEventCalculatorTests::circumpolarAndNeverRisingObjectsReportFall
     const skygate::ephemeris::ObservationEventCalculator calculator;
 
     const auto circumpolarContext = makeContext(60.0, 0.0);
-    auto engine = makeEngineForBody(makeFixedBody({
+    const auto circumpolarBody = makeFixedBody({
         .rightAscensionHours = 3.0,
         .declinationDeg = 80.0
-    }));
-    auto summary = calculator.compute(*engine, circumpolarContext, 0U);
+    });
+    auto engine = makeEngineForBody(circumpolarBody);
+    auto summary = calculator.compute(*engine, circumpolarContext, 0U, circumpolarBody);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -175,11 +218,12 @@ void ObservationEventCalculatorTests::circumpolarAndNeverRisingObjectsReportFall
     QVERIFY(*summary.culmination.altitudeDeg > 65.0);
 
     const auto neverRisingContext = makeContext(60.0, 0.0);
-    engine = makeEngineForBody(makeFixedBody({
+    const auto neverRisingBody = makeFixedBody({
         .rightAscensionHours = 3.0,
         .declinationDeg = -80.0
-    }));
-    summary = calculator.compute(*engine, neverRisingContext, 0U);
+    });
+    engine = makeEngineForBody(neverRisingBody);
+    summary = calculator.compute(*engine, neverRisingContext, 0U, neverRisingBody);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -250,6 +294,42 @@ void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitSt
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
+}
+
+void ObservationEventCalculatorTests::unprovenWindowMissDoesNotReportAlwaysAboveOrBelow()
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const ConstantAltitudeEngine belowHorizonEngine(-20.0);
+    const ConstantAltitudeEngine aboveHorizonEngine(20.0);
+    const auto context = makeContext(70.0, 0.0);
+
+    auto summary = calculator.compute(belowHorizonEngine, context, 0U);
+    QCOMPARE(
+        summary.nextRise.status,
+        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
+    );
+    QCOMPARE(
+        summary.nextSet.status,
+        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
+    );
+    QCOMPARE(
+        summary.culmination.status,
+        skygate::ephemeris::ObservationEventStatus::Available
+    );
+
+    summary = calculator.compute(aboveHorizonEngine, context, 0U);
+    QCOMPARE(
+        summary.nextRise.status,
+        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
+    );
+    QCOMPARE(
+        summary.nextSet.status,
+        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
+    );
+    QCOMPARE(
+        summary.culmination.status,
+        skygate::ephemeris::ObservationEventStatus::Available
+    );
 }
 
 void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()

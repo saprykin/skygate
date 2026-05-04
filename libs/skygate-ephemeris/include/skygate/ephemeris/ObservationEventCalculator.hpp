@@ -7,12 +7,14 @@
 
 namespace skygate::ephemeris {
 
+struct CelestialBody;
 class IEphemerisEngine;
 
 enum class ObservationEventStatus : std::uint8_t {
     Available,
     AlwaysAbove,
     AlwaysBelow,
+    NoEventInSearchWindow,
     InvalidInput,
     Unresolved
 };
@@ -40,6 +42,12 @@ public:
         const IEphemerisEngine& ephemerisEngine,
         const core::SkyContext& context,
         std::uint32_t bodyIndex
+    ) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const core::SkyContext& context,
+        std::uint32_t bodyIndex,
+        const CelestialBody& body
     ) const;
 };
 

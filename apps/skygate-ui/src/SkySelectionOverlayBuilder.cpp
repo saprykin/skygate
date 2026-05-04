@@ -218,6 +218,8 @@ QString formatObservationStatus(
         return "Always above";
     case ObservationEventStatus::AlwaysBelow:
         return "Always below";
+    case ObservationEventStatus::NoEventInSearchWindow:
+        return "No event in next 72h";
     case ObservationEventStatus::InvalidInput:
     case ObservationEventStatus::Unresolved:
         return "--";
@@ -293,6 +295,7 @@ QString formatObservationCulmination(
 void appendObservationEventFields(
     QVariantList& fields,
     const SkySelectionOverlayInput& input,
+    const skygate::ephemeris::CelestialBody& body,
     const std::uint32_t bodyIndex
 )
 {
@@ -301,7 +304,12 @@ void appendObservationEventFields(
     }
 
     const skygate::ephemeris::ObservationEventCalculator calculator;
-    const auto events = calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex);
+    const auto events = calculator.compute(
+        *input.ephemerisEngine,
+        *input.skyContext,
+        bodyIndex,
+        body
+    );
     fields.push_back(inspectorField(
         "Rise / Set",
         formatObservationRiseSet(events.nextRise, events.nextSet)
@@ -490,7 +498,7 @@ QVariantMap SkySelectionOverlayBuilder::buildSelectedObjectInspector(
     fields.push_back(inspectorField("Magnitude", formatMagnitude(body.visualMagnitude)));
     fields.push_back(inspectorField("Alt / Az", formatHorizontalCoordinate(state.horizontal)));
     fields.push_back(inspectorField("RA / Dec", formatEquatorialCoordinate(state.equatorial)));
-    appendObservationEventFields(fields, input, state.bodyIndex);
+    appendObservationEventFields(fields, input, body, state.bodyIndex);
 
     if (body.deepSkyObject.has_value()) {
         const QString sizeText = angularSizeText(*body.deepSkyObject);
