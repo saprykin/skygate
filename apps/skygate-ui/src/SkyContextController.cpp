@@ -103,6 +103,7 @@ SkyContextController::SkyContextController(
         this,
         [this] {
             refreshObjectSearchModel();
+            emit nightConditionsChanged();
             if (!recenterTrackedTarget(true)) {
                 emit skyContextChanged();
             }
@@ -167,6 +168,11 @@ QString SkyContextController::trackedTargetId() const
 QString SkyContextController::trackedTargetDisplayText() const
 {
     return m_search.trackedTargetDisplayText;
+}
+
+QVariantMap SkyContextController::nightConditions() const
+{
+    return m_nightConditions;
 }
 
 double SkyContextController::speedMultiplier() const noexcept

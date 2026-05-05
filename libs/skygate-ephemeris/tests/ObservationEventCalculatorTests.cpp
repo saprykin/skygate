@@ -66,13 +66,14 @@ double currentLocalSiderealHours(const skygate::core::SkyContext& context)
 void verifyCrossingAltitude(
     const skygate::ephemeris::IEphemerisEngine& engine,
     skygate::core::SkyContext context,
-    const skygate::core::UtcTimePoint& utcTime
+    const skygate::core::UtcTimePoint& utcTime,
+    const double expectedAltitudeDeg = 0.0
 )
 {
     context.utcTime = utcTime;
     const auto state = engine.computeBodyState(context, 0U);
     QVERIFY(state.has_value());
-    QVERIFY(std::abs(state->horizontal.altitudeDeg) < 0.02);
+    QVERIFY(std::abs(state->horizontal.altitudeDeg - expectedAltitudeDeg) < 0.02);
 }
 
 class MovingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
@@ -167,6 +168,7 @@ private slots:
     void circumpolarAndNeverRisingObjectsReportFallbacksButStillCulminate();
     void currentAboveHorizonSetsBeforeItRisesAgain();
     void currentBelowHorizonRisesBeforeItSetsAgain();
+    void configurableAltitudeThresholdFindsDifferentCrossings();
     void invalidAndUnresolvedInputsReturnExplicitStatuses();
     void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
     void movingBodySamplesThroughEphemerisEngine();
@@ -267,6 +269,30 @@ void ObservationEventCalculatorTests::currentBelowHorizonRisesBeforeItSetsAgain(
     QVERIFY(summary.nextRise.utcTime.has_value());
     QVERIFY(summary.nextSet.utcTime.has_value());
     QVERIFY(*summary.nextRise.utcTime < *summary.nextSet.utcTime);
+}
+
+void ObservationEventCalculatorTests::configurableAltitudeThresholdFindsDifferentCrossings()
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const auto context = makeContext(0.0, 0.0);
+    const auto engine = makeEngineForBody(makeFixedBody({
+        .rightAscensionHours = skygate::core::AngleMath::normalizeHours(
+            currentLocalSiderealHours(context) + 12.0
+        ),
+        .declinationDeg = 0.0
+    }));
+
+    const auto horizonSummary = calculator.compute(*engine, context, 0U, 0.0);
+    const auto twilightSummary = calculator.compute(*engine, context, 0U, -6.0);
+
+    QCOMPARE(horizonSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(twilightSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QVERIFY(horizonSummary.nextRise.utcTime.has_value());
+    QVERIFY(twilightSummary.nextRise.utcTime.has_value());
+    QVERIFY(*twilightSummary.nextRise.utcTime < *horizonSummary.nextRise.utcTime);
+
+    verifyCrossingAltitude(*engine, context, *horizonSummary.nextRise.utcTime, 0.0);
+    verifyCrossingAltitude(*engine, context, *twilightSummary.nextRise.utcTime, -6.0);
 }
 
 void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitStatuses()

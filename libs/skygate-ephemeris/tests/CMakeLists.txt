@@ -112,6 +112,10 @@ add_skygate_ephemeris_qtest(
     ObservationEventCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-night-conditions-calculator-tests
+    NightConditionsCalculatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-baseline-tests
     EphemerisEngineBaselineTests.cpp
 )

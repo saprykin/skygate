@@ -14,6 +14,7 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/ConstellationReferenceCalculator.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
+    include/skygate/ephemeris/NightConditionsCalculator.hpp
     include/skygate/ephemeris/IStarCatalog.hpp
     include/skygate/ephemeris/ObservationEventCalculator.hpp
     include/skygate/ephemeris/StellariumConstellationParser.hpp
@@ -78,6 +79,7 @@ add_library(skygate-ephemeris STATIC
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
     src/IEphemerisEngine.cpp
+    src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp
     src/SimpleEphemerisEngine.cpp
     src/catalog/BundledCatalogParser.cpp

@@ -299,6 +299,7 @@ private slots:
     void focusSearchTargetClearsTrackingForDifferentTarget();
     void clearingTrackedTargetPreservesSelectedSearchTarget();
     void collapsingSearchToolbarClearsSelectedSearchTarget();
+    void nightConditionsPopulateAndRefreshForValidObserver();
     void failedDeepSkyCatalogDownloadKeepsCountLabel();
     void restoresCachedCatalogConstellationCount();
 
@@ -1221,6 +1222,31 @@ void SkyContextControllerTests::collapsingSearchToolbarClearsSelectedSearchTarge
     controller->setSearchToolbarCollapsed(true);
     QVERIFY(controller->selectedSearchTargetKind().isEmpty());
     QVERIFY(controller->selectedSearchTargetId().isEmpty());
+}
+
+void SkyContextControllerTests::nightConditionsPopulateAndRefreshForValidObserver()
+{
+    const auto controller = createController();
+    configureFocusTestContext(*controller);
+    QVERIFY(controller->setUtcDateTimeText("2024-03-21", "12:00:00"));
+
+    controller->refreshNightConditions();
+    const QVariantMap initialConditions = controller->nightConditions();
+    QVERIFY(initialConditions.value("valid").toBool());
+    QCOMPARE(initialConditions.value("sunRows").toList().size(), 6);
+    QVERIFY(initialConditions.value("locationText").toString().contains("UTC"));
+    QVERIFY(initialConditions.value("moonPhaseText").toString().contains("%"));
+    QVERIFY(initialConditions.value("moonRiseText").toString() != "--");
+    QVERIFY(initialConditions.value("moonSetText").toString() != "--");
+    QVERIFY(
+        QStringList({"sun", "twilight", "moon"}).contains(controller->nightConditionsIconKind())
+    );
+
+    QVERIFY(controller->setUtcDateTimeText("2024-03-22", "12:00:00"));
+    controller->refreshNightConditions();
+    const QVariantMap refreshedConditions = controller->nightConditions();
+    QVERIFY(refreshedConditions.value("valid").toBool());
+    QVERIFY(refreshedConditions != initialConditions);
 }
 
 void SkyContextControllerTests::failedDeepSkyCatalogDownloadKeepsCountLabel()

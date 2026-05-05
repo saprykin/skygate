@@ -35,6 +35,23 @@ QList<QQuickItem*> pointingHandItems(QObject* root)
     return items;
 }
 
+QQuickItem* itemByObjectName(QObject* root, const QString& objectName)
+{
+    for (QObject* object : objectTree(root)) {
+        if (object->objectName() == objectName) {
+            return qobject_cast<QQuickItem*>(object);
+        }
+    }
+    return nullptr;
+}
+
+bool horizontallyOverlaps(const QQuickItem& lhs, const QQuickItem& rhs)
+{
+    const QRectF lhsRect(lhs.mapToScene(QPointF(0.0, 0.0)), QSizeF(lhs.width(), lhs.height()));
+    const QRectF rhsRect(rhs.mapToScene(QPointF(0.0, 0.0)), QSizeF(rhs.width(), rhs.height()));
+    return lhsRect.right() > rhsRect.left() && rhsRect.right() > lhsRect.left();
+}
+
 }  // namespace
 
 class QmlStatusFooterTests final : public QObject {
@@ -45,6 +62,7 @@ private slots:
     void init();
     void dateTimeClickAndTrackingIndicatorInvokeControllerActions();
     void liveAndTrackingStateUpdateFooterPresentation();
+    void rightFooterClusterKeepsNightTrackingAndTimeTargetsOrdered();
 
 private:
     QmlSettingsFixture m_settings;
@@ -94,6 +112,7 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
                 skyContextController: skyContext
                 sceneModel: scene
                 dateTimePopupOpen: false
+                nightConditionsPopupOpen: false
                 onDateTimeClicked: root.dateClicked = true
             }
         }
@@ -106,7 +125,7 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
 
     ExposedQuickWindow exposed(root);
     QList<QQuickItem*> clickableItems = pointingHandItems(root);
-    QVERIFY(clickableItems.size() >= 2);
+    QVERIFY(clickableItems.size() >= 3);
     QQuickItem* timeItem = clickableItems.back();
     QPointF timeCenter = timeItem->mapToScene(
         QPointF(timeItem->width() / 2.0, timeItem->height() / 2.0)
@@ -115,7 +134,7 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
     QTRY_VERIFY(root->property("dateClicked").toBool());
 
     clickableItems = pointingHandItems(root);
-    QVERIFY(clickableItems.size() >= 2);
+    QVERIFY(clickableItems.size() >= 3);
     QQuickItem* trackingItem = clickableItems.front();
     QVERIFY(trackingItem != nullptr);
     QPointF trackingCenter = trackingItem->mapToScene(
@@ -181,6 +200,7 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
                 skyContextController: skyContext
                 sceneModel: scene
                 dateTimePopupOpen: root.popupOpen
+                nightConditionsPopupOpen: false
             }
         }
     )"), QStringLiteral("StatusFooterStateBehaviorTest.qml"));
@@ -191,17 +211,73 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
     ExposedQuickWindow exposed(root);
     (void)exposed;
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: Off")) != nullptr);
-    QCOMPARE(pointingHandItems(root).size(), 1);
+    QCOMPARE(pointingHandItems(root).size(), 2);
 
     controller->setLive(true);
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: On")) != nullptr);
 
     QVERIFY(controller->trackSearchTarget(QStringLiteral("body"), QStringLiteral("sun")));
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: On")) != nullptr);
-    QTRY_VERIFY(pointingHandItems(root).size() >= 2);
+    QTRY_VERIFY(pointingHandItems(root).size() >= 3);
 
     controller->clearTrackedTarget();
-    QTRY_COMPARE(pointingHandItems(root).size(), 1);
+    QTRY_COMPARE(pointingHandItems(root).size(), 2);
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlStatusFooterTests::rightFooterClusterKeepsNightTrackingAndTimeTargetsOrdered()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    QVERIFY(controller->trackSearchTarget(QStringLiteral("body"), QStringLiteral("moon")));
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(engine, QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 420
+            height: 48
+            property bool nightClicked: false
+            property alias scene: scene
+            QtObject {
+                id: scene
+                property var selectedObjectInspector: ({})
+                function clearSelectedObjectInspector() {
+                    selectedObjectInspector = ({})
+                }
+            }
+            StatusFooter {
+                anchors.fill: parent
+                skyContextController: skyContext
+                sceneModel: scene
+                dateTimePopupOpen: false
+                nightConditionsPopupOpen: false
+                onNightConditionsClicked: root.nightClicked = true
+            }
+        }
+    )"), QStringLiteral("StatusFooterRightClusterTest.qml"));
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    QQuickItem* tracking = itemByObjectName(root, QStringLiteral("trackingMouse"));
+    QQuickItem* night = itemByObjectName(root, QStringLiteral("nightConditionsMouse"));
+    QQuickItem* time = itemByObjectName(root, QStringLiteral("statusTimeMouse"));
+    QVERIFY(tracking != nullptr);
+    QVERIFY(night != nullptr);
+    QVERIFY(time != nullptr);
+    QVERIFY(tracking->mapToScene(QPointF(0.0, 0.0)).x() < night->mapToScene(QPointF(0.0, 0.0)).x());
+    QVERIFY(night->mapToScene(QPointF(0.0, 0.0)).x() < time->mapToScene(QPointF(0.0, 0.0)).x());
+    QVERIFY(!horizontallyOverlaps(*tracking, *night));
+
+    const QPointF nightCenter = night->mapToScene(QPointF(night->width() / 2.0, night->height() / 2.0));
+    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, nightCenter.toPoint());
+    QTRY_VERIFY(root->property("nightClicked").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

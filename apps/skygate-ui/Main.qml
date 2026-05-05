@@ -48,7 +48,9 @@ ApplicationWindow {
         skyContextController: skyContext
         sceneModel: skyScene
         dateTimePopupOpen: dateTimePopup.opened
+        nightConditionsPopupOpen: nightConditionsPopup.opened
         onDateTimeClicked: {
+            nightConditionsPopup.close()
             if (dateTimePopup.opened) {
                 dateTimePopup.cancel()
                 return
@@ -56,12 +58,28 @@ ApplicationWindow {
 
             dateTimePopup.open()
         }
+        onNightConditionsClicked: {
+            dateTimePopup.close()
+            if (nightConditionsPopup.opened) {
+                nightConditionsPopup.cancel()
+                return
+            }
+
+            nightConditionsPopup.open()
+        }
     }
 
     StatusDateTimePopup {
         id: dateTimePopup
         skyContextController: skyContext
         popupRightMargin: 8
+        popupBottomMargin: 8
+    }
+
+    StatusNightConditionsPopup {
+        id: nightConditionsPopup
+        skyContextController: skyContext
+        popupRightMargin: 96
         popupBottomMargin: 8
     }
 

@@ -378,6 +378,7 @@ void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
     m_location.context.utcTime = nextUtc;
     emit utcDateTextChanged();
     emit utcTimeTextChanged();
+    emit nightConditionsChanged();
     if (!recenterTrackedTarget(true)) {
         emit skyContextChanged();
     }
@@ -424,6 +425,7 @@ void SkyContextController::applyObserverLocation(const skygate::core::GeoLocatio
     if (elevationChanged) {
         emit elevationTextChanged();
     }
+    emit nightConditionsChanged();
     if (!recenterTrackedTarget(true)) {
         emit skyContextChanged();
     }

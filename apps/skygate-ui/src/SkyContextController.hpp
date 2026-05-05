@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
+#include <QVariantMap>
 
 #include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
@@ -117,6 +118,12 @@ class SkyContextController final : public QObject {
         READ trackedTargetDisplayText
         NOTIFY trackedTargetChanged
     )
+    Q_PROPERTY(QVariantMap nightConditions READ nightConditions NOTIFY nightConditionsChanged)
+    Q_PROPERTY(
+        QString nightConditionsIconKind
+        READ nightConditionsIconKind
+        NOTIFY nightConditionsChanged
+    )
 
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
@@ -182,6 +189,8 @@ public:
     [[nodiscard]] QString trackedTargetKind() const;
     [[nodiscard]] QString trackedTargetId() const;
     [[nodiscard]] QString trackedTargetDisplayText() const;
+    [[nodiscard]] QVariantMap nightConditions() const;
+    [[nodiscard]] QString nightConditionsIconKind() const;
     [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
@@ -246,6 +255,7 @@ public:
     Q_INVOKABLE void clearSelectedSearchTarget();
     Q_INVOKABLE bool trackSearchTarget(const QString& targetKind, const QString& targetId);
     Q_INVOKABLE void clearTrackedTarget();
+    Q_INVOKABLE void refreshNightConditions();
 
 signals:
     void liveChanged();
@@ -275,6 +285,7 @@ signals:
     void catalogProcessingChanged();
     void selectedSearchTargetChanged();
     void trackedTargetChanged();
+    void nightConditionsChanged();
     void skyContextChanged();
 
 private:
@@ -319,4 +330,5 @@ private:
     bool m_logToTerminal = true;
     bool m_logToFile = false;
     QString m_logFilePath;
+    QVariantMap m_nightConditions;
 };

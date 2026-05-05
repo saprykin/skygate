@@ -51,6 +51,7 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyContextController.cpp
     src/SkyContextController.hpp
     src/SkyContextControllerCatalog.cpp
+    src/SkyContextControllerNightConditions.cpp
     src/SkyContextControllerSearch.cpp
     src/SkyContextState.hpp
     src/SkyRenderBuilders.cpp
@@ -131,6 +132,7 @@ qt_add_qml_module(skygate-ui
         SkySettingsDraft.qml
         StatusDateTimePopup.qml
         StatusFooter.qml
+        StatusNightConditionsPopup.qml
         TimelineToolbar.qml
         PreferencesSkySection.qml
         PreferencesTextField.qml

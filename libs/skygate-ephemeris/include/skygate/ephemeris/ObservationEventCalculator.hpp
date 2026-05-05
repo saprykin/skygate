@@ -47,7 +47,20 @@ public:
         const IEphemerisEngine& ephemerisEngine,
         const core::SkyContext& context,
         std::uint32_t bodyIndex,
+        double crossingAltitudeDeg
+    ) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const core::SkyContext& context,
+        std::uint32_t bodyIndex,
         const CelestialBody& body
+    ) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const core::SkyContext& context,
+        std::uint32_t bodyIndex,
+        const CelestialBody& body,
+        double crossingAltitudeDeg
     ) const;
 };
 
