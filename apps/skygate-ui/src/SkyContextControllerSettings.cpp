@@ -18,22 +18,22 @@ bool SkyContextController::saveSettings() const
     }
 
     SkySettingsStore::StateSnapshot snapshot;
-    snapshot.live = m_timeline.live;
-    snapshot.timelineToolbarCollapsed = m_timeline.toolbarCollapsed;
-    snapshot.searchToolbarCollapsed = m_search.toolbarCollapsed;
-    snapshot.speedMultiplier = m_timeline.speedMultiplier;
-    snapshot.stepSeconds = m_timeline.stepSeconds;
-    snapshot.magnitudeCutoff = m_view.magnitudeCutoff;
-    snapshot.viewCenterAltitudeDeg = m_view.centerAltitudeDeg;
-    snapshot.viewCenterAzimuthDeg = m_view.centerAzimuthDeg;
-    snapshot.viewFieldOfViewDeg = m_view.fieldOfViewDeg;
+    snapshot.live = m_timeline.live();
+    snapshot.timelineToolbarCollapsed = m_timeline.toolbarCollapsed();
+    snapshot.searchToolbarCollapsed = m_search.toolbarCollapsed();
+    snapshot.speedMultiplier = m_timeline.speedMultiplier();
+    snapshot.stepSeconds = m_timeline.stepSeconds();
+    snapshot.magnitudeCutoff = m_view.magnitudeCutoff();
+    snapshot.viewCenterAltitudeDeg = m_view.centerAltitudeDeg();
+    snapshot.viewCenterAzimuthDeg = m_view.centerAzimuthDeg();
+    snapshot.viewFieldOfViewDeg = m_view.fieldOfViewDeg();
     snapshot.utcEpochSeconds =
-        SkyContextTimeCodec::toQDateTimeUtc(m_location.context.utcTime).toSecsSinceEpoch();
-    snapshot.latitudeDeg = m_location.context.observer.latitudeDeg;
-    snapshot.longitudeDeg = m_location.context.observer.longitudeDeg;
-    snapshot.elevationMeters = m_location.context.observer.elevationMeters;
+        SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).toSecsSinceEpoch();
+    snapshot.latitudeDeg = m_location.observer().latitudeDeg;
+    snapshot.longitudeDeg = m_location.observer().longitudeDeg;
+    snapshot.elevationMeters = m_location.observer().elevationMeters;
     snapshot.locationSourceText = locationSourceText();
-    snapshot.selectedCityId = m_location.selectedCityId;
+    snapshot.selectedCityId = m_location.selectedCityId();
     snapshot.displayTimeZoneId = m_timeController->timeZoneId();
     snapshot.projectionTypeText = projectionTypeText();
     snapshot.themeId = themeId();
@@ -74,7 +74,7 @@ bool SkyContextController::loadSettings()
             ));
         }
 
-        skygate::core::GeoLocation observer = m_location.context.observer;
+        skygate::core::GeoLocation observer = m_location.observer();
         observer.latitudeDeg = stateSnapshot->latitudeDeg;
         observer.longitudeDeg = stateSnapshot->longitudeDeg;
         observer.elevationMeters = stateSnapshot->elevationMeters;

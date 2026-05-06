@@ -147,11 +147,11 @@ private:
 QString SkyContextController::nightConditionsIconKind() const
 {
     const auto* engine = ephemerisEngine();
-    if (engine == nullptr || !m_location.context.observer.isValid()) {
+    if (engine == nullptr || !m_location.context().observer.isValid()) {
         return QStringLiteral("unknown");
     }
 
-    const auto sunState = engine->computeBodyState(m_location.context, std::string_view("sun"));
+    const auto sunState = engine->computeBodyState(m_location.context(), std::string_view("sun"));
     if (!sunState.has_value() || !sunState->horizontal.isFinite()) {
         return QStringLiteral("unknown");
     }
@@ -171,13 +171,13 @@ void SkyContextController::refreshNightConditions()
     const auto sunIndex = bodyIndexById(bodies, "sun");
     const auto moonIndex = bodyIndexById(bodies, "moon");
     const auto* engine = ephemerisEngine();
-    const NightConditionsMapBuilder mapBuilder(m_location.context, m_timeController.get());
+    const NightConditionsMapBuilder mapBuilder(m_location.context(), m_timeController.get());
 
     QVariantMap nextConditions = mapBuilder.placeholderMap();
     if (engine != nullptr && sunIndex.has_value() && moonIndex.has_value()) {
         const skygate::ephemeris::NightConditionsCalculator calculator;
         nextConditions = mapBuilder.conditionsMap(
-            calculator.compute(*engine, m_location.context, *sunIndex, *moonIndex)
+            calculator.compute(*engine, m_location.context(), *sunIndex, *moonIndex)
         );
     }
 

@@ -10,8 +10,8 @@
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
-#include "SkyContextState.hpp"
 #include "SkyContextControllerSupport.hpp"
+#include "SkyContextDomainControllers.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyTimeController.hpp"
 
@@ -315,10 +315,10 @@ private:
     );
 
 private:
-    skygate::ui::internal::SkyTimelineState m_timeline;
-    skygate::ui::internal::SkyViewState m_view;
-    skygate::ui::internal::SkyLocationState m_location;
-    skygate::ui::internal::SkySearchState m_search;
+    skygate::ui::internal::SkyTimelineController m_timeline;
+    skygate::ui::internal::SkyViewController m_view;
+    skygate::ui::internal::SkyLocationController m_location;
+    skygate::ui::internal::SkySearchController m_search;
     QTimer m_timer;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;

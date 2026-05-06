@@ -50,17 +50,16 @@ const skygate::ephemeris::CelestialBodyState* findBodyStateById(
 
 bool SkyContextController::searchToolbarCollapsed() const noexcept
 {
-    return m_search.toolbarCollapsed;
+    return m_search.toolbarCollapsed();
 }
 
 void SkyContextController::setSearchToolbarCollapsed(const bool searchToolbarCollapsed)
 {
-    if (m_search.toolbarCollapsed == searchToolbarCollapsed) {
+    if (!m_search.setToolbarCollapsed(searchToolbarCollapsed)) {
         return;
     }
 
-    m_search.toolbarCollapsed = searchToolbarCollapsed;
-    if (m_search.toolbarCollapsed) {
+    if (m_search.toolbarCollapsed()) {
         clearSelectedSearchTarget();
     }
     emit searchToolbarCollapsedChanged();
@@ -77,7 +76,7 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         return false;
     }
 
-    const auto snapshot = engine->compute(m_location.context);
+    const auto snapshot = engine->compute(m_location.context());
     const QString normalizedTargetKind = normalizedLookupKey(targetKind);
     if (normalizedTargetKind == "body") {
         const auto* bodyState = findBodyStateById(snapshot, targetId);
@@ -88,8 +87,8 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         if (
             hasTrackedTarget()
             && (
-                normalizedLookupKey(m_search.trackedTargetKind) != "body"
-                || normalizedLookupKey(m_search.trackedTargetId) != normalizedLookupKey(targetId)
+                normalizedLookupKey(m_search.trackedTargetKind()) != "body"
+                || normalizedLookupKey(m_search.trackedTargetId()) != normalizedLookupKey(targetId)
             )
         ) {
             clearTrackedTarget();
@@ -134,7 +133,7 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
     }
 
     const QDateTime currentUtc = currentUtcDateTime();
-    skygate::core::SkyContext trackingContext = m_location.context;
+    skygate::core::SkyContext trackingContext = m_location.context();
     trackingContext.utcTime = skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(
         currentUtc.toUTC()
     );
@@ -151,14 +150,12 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
     const auto nextUtc = skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(
         currentUtc.toUTC()
     );
-    const bool utcChanged = m_location.context.utcTime != nextUtc;
-    const bool shouldEmitLiveChanged = !m_timeline.live;
+    const bool utcChanged = m_location.utcTime() != nextUtc;
+    const bool shouldEmitLiveChanged = !m_timeline.live();
 
-    m_location.context.utcTime = nextUtc;
+    m_location.setUtcTime(nextUtc);
     m_timeController->setUtcDateTime(currentUtc.toUTC());
-    m_timeline.live = true;
-    m_timeline.catchingUpToCurrentUtc = false;
-    m_timeline.speedRemainderSeconds = 0.0;
+    m_timeline.startLiveAtCurrentUtc();
 
     if (utcChanged) {
         emit utcDateTextChanged();
@@ -193,13 +190,13 @@ bool SkyContextController::recenterTrackedTarget(const bool emitSkyContextChange
     }
 
     const auto* engine = ephemerisEngine();
-    if (engine == nullptr || normalizedLookupKey(m_search.trackedTargetKind) != "body") {
+    if (engine == nullptr || normalizedLookupKey(m_search.trackedTargetKind()) != "body") {
         clearTrackedTarget();
         return false;
     }
 
-    const auto snapshot = engine->compute(m_location.context);
-    const auto* bodyState = findBodyStateById(snapshot, m_search.trackedTargetId);
+    const auto snapshot = engine->compute(m_location.context());
+    const auto* bodyState = findBodyStateById(snapshot, m_search.trackedTargetId());
     if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
         clearTrackedTarget();
         return false;
@@ -208,8 +205,8 @@ bool SkyContextController::recenterTrackedTarget(const bool emitSkyContextChange
     const auto& body = snapshot.bodyAt(bodyState->bodyIndex);
     if (!body.displayName.empty()) {
         setTrackedTarget(
-            m_search.trackedTargetKind,
-            m_search.trackedTargetId,
+            m_search.trackedTargetKind(),
+            m_search.trackedTargetId(),
             QString::fromStdString(body.displayName)
         );
     }

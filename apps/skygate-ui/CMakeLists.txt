@@ -57,6 +57,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyContextController.cpp
     src/SkyContextController.hpp
     src/SkyContextControllerCatalog.cpp
+    src/SkyContextDomainControllers.cpp
+    src/SkyContextDomainControllers.hpp
     src/SkyContextControllerNightConditions.cpp
     src/SkyContextControllerSearch.cpp
     src/SkyContextState.hpp
