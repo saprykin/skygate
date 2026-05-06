@@ -1,11 +1,11 @@
 #include "SkyContextController.hpp"
 
 #include "SkyContextControllerSupport.hpp"
+#include "SkyNightConditionsAdapter.hpp"
 #include "SkyTimeController.hpp"
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
 #include <QDateTime>
-#include <QVariantList>
 
 #include <cmath>
 #include <optional>
@@ -27,9 +27,9 @@ namespace {
     return std::nullopt;
 }
 
-class NightConditionsMapBuilder final {
+class NightConditionsDataBuilder final {
 public:
-    NightConditionsMapBuilder(
+    NightConditionsDataBuilder(
         const skygate::core::SkyContext& context,
         const SkyTimeController* timeController
     )
@@ -38,46 +38,42 @@ public:
     {
     }
 
-    [[nodiscard]] QVariantMap placeholderMap() const
+    [[nodiscard]] SkyNightConditionsData placeholderData() const
     {
-        return QVariantMap {
-            {QStringLiteral("valid"), false},
-            {QStringLiteral("locationText"), locationText()},
-            {QStringLiteral("sunRows"), QVariantList {}},
-            {QStringLiteral("moonPhaseText"), QStringLiteral("--")},
-            {QStringLiteral("moonRiseText"), QStringLiteral("--")},
-            {QStringLiteral("moonSetText"), QStringLiteral("--")}
+        return SkyNightConditionsData {
+            .valid = false,
+            .locationText = locationText(),
+            .sunRows = {},
+            .moonPhaseText = QStringLiteral("--"),
+            .moonRiseText = QStringLiteral("--"),
+            .moonSetText = QStringLiteral("--")
         };
     }
 
-    [[nodiscard]] QVariantMap conditionsMap(
+    [[nodiscard]] SkyNightConditionsData conditionsData(
         const skygate::ephemeris::NightConditions& conditions
     ) const
     {
         if (!conditions.valid) {
-            return placeholderMap();
+            return placeholderData();
         }
 
-        QVariantList sunRows;
-        sunRows.push_back(eventRow(QStringLiteral("Sunset"), conditions.sunset));
-        sunRows.push_back(eventRow(QStringLiteral("Civil dusk"), conditions.civilDusk));
-        sunRows.push_back(eventRow(QStringLiteral("Nautical dusk"), conditions.nauticalDusk));
-        sunRows.push_back(eventRow(QStringLiteral("Astro dusk"), conditions.astronomicalDusk));
-        sunRows.push_back(eventRow(QStringLiteral("Astro dawn"), conditions.astronomicalDawn));
-        sunRows.push_back(eventRow(QStringLiteral("Sunrise"), conditions.sunrise));
-
-        return QVariantMap {
-            {QStringLiteral("valid"), true},
-            {QStringLiteral("locationText"), locationText()},
-            {QStringLiteral("sunRows"), sunRows},
-            {
-                QStringLiteral("moonPhaseText"),
-                QString("%1 | %2%")
-                    .arg(QString::fromStdString(conditions.moonPhaseName))
-                    .arg(qRound(conditions.moonIlluminationPercent))
+        return SkyNightConditionsData {
+            .valid = true,
+            .locationText = locationText(),
+            .sunRows = {
+                eventRow(QStringLiteral("Sunset"), conditions.sunset),
+                eventRow(QStringLiteral("Civil dusk"), conditions.civilDusk),
+                eventRow(QStringLiteral("Nautical dusk"), conditions.nauticalDusk),
+                eventRow(QStringLiteral("Astro dusk"), conditions.astronomicalDusk),
+                eventRow(QStringLiteral("Astro dawn"), conditions.astronomicalDawn),
+                eventRow(QStringLiteral("Sunrise"), conditions.sunrise)
             },
-            {QStringLiteral("moonRiseText"), formatEventValue(conditions.moonrise)},
-            {QStringLiteral("moonSetText"), formatEventValue(conditions.moonset)}
+            .moonPhaseText = QString("%1 | %2%")
+                .arg(QString::fromStdString(conditions.moonPhaseName))
+                .arg(qRound(conditions.moonIlluminationPercent)),
+            .moonRiseText = formatEventValue(conditions.moonrise),
+            .moonSetText = formatEventValue(conditions.moonset)
         };
     }
 
@@ -112,14 +108,14 @@ private:
         return "--";
     }
 
-    [[nodiscard]] QVariantMap eventRow(
+    [[nodiscard]] SkyNightConditionSunRow eventRow(
         const QString& label,
         const skygate::ephemeris::ObservationEvent& event
     ) const
     {
-        return QVariantMap {
-            {QStringLiteral("label"), label},
-            {QStringLiteral("value"), formatEventValue(event)}
+        return SkyNightConditionSunRow {
+            .label = label,
+            .value = formatEventValue(event)
         };
     }
 
@@ -171,15 +167,17 @@ void SkyContextController::refreshNightConditions()
     const auto sunIndex = bodyIndexById(bodies, "sun");
     const auto moonIndex = bodyIndexById(bodies, "moon");
     const auto* engine = ephemerisEngine();
-    const NightConditionsMapBuilder mapBuilder(m_location.context(), m_timeController.get());
+    const NightConditionsDataBuilder dataBuilder(m_location.context(), m_timeController.get());
+    const SkyNightConditionsAdapter adapter;
 
-    QVariantMap nextConditions = mapBuilder.placeholderMap();
+    SkyNightConditionsData nextData = dataBuilder.placeholderData();
     if (engine != nullptr && sunIndex.has_value() && moonIndex.has_value()) {
         const skygate::ephemeris::NightConditionsCalculator calculator;
-        nextConditions = mapBuilder.conditionsMap(
+        nextData = dataBuilder.conditionsData(
             calculator.compute(*engine, m_location.context(), *sunIndex, *moonIndex)
         );
     }
+    const QVariantMap nextConditions = adapter.nightConditions(nextData);
 
     if (m_nightConditions == nextConditions) {
         emit nightConditionsChanged();

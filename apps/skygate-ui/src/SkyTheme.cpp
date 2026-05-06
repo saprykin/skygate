@@ -1,5 +1,7 @@
 #include "SkyTheme.hpp"
 
+#include "SkyThemeOptionsAdapter.hpp"
+
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -8,7 +10,6 @@
 #include <QLoggingCategory>
 #include <QMutex>
 #include <QMutexLocker>
-#include <QVariantMap>
 
 #include <array>
 #include <utility>
@@ -399,20 +400,27 @@ const SkyThemeDefinition& SkyThemeRepository::defaultTheme() const noexcept
 
 QVariantList SkyThemeRepository::themeOptions() const
 {
-    QVariantList options;
-    options.reserve(static_cast<qsizetype>(m_themes.size()));
+    const auto options = themeOptionData();
+    const SkyThemeOptionsAdapter adapter;
+    return adapter.themeOptions(options);
+}
+
+std::vector<SkyThemeOption> SkyThemeRepository::themeOptionData() const
+{
+    std::vector<SkyThemeOption> options;
+    options.reserve(m_themes.size());
     for (const auto& theme : m_themes) {
-        QVariantMap entry;
-        entry.insert("id", theme.id);
-        entry.insert("label", theme.displayName);
-        options.push_back(entry);
+        options.push_back(SkyThemeOption {
+            .id = theme.id,
+            .label = theme.displayName
+        });
     }
 
-    if (options.isEmpty()) {
-        QVariantMap entry;
-        entry.insert("id", m_fallbackTheme.id);
-        entry.insert("label", m_fallbackTheme.displayName);
-        options.push_back(entry);
+    if (options.empty()) {
+        options.push_back(SkyThemeOption {
+            .id = m_fallbackTheme.id,
+            .label = m_fallbackTheme.displayName
+        });
     }
     return options;
 }

@@ -37,8 +37,19 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkySceneOverlayAdapter.hpp
     src/SkySceneOverlayData.hpp
     src/SkySceneShared.hpp
+    src/SkyNightConditionsAdapter.hpp
+    src/SkyNightConditionsData.hpp
+    src/SkyObjectInspectorBuilder.cpp
+    src/SkyObjectInspectorBuilder.hpp
+    src/SkyObjectInspectorFormatters.cpp
+    src/SkyObjectInspectorFormatters.hpp
     src/SkySelectionOverlayBuilder.cpp
     src/SkySelectionOverlayBuilder.hpp
+    src/SkySelectionMarkerBuilder.cpp
+    src/SkySelectionMarkerBuilder.hpp
+    src/SkyThemeOptionsAdapter.hpp
+    src/SkyTrailTargetResolver.cpp
+    src/SkyTrailTargetResolver.hpp
     src/SkyConstellationRenderBuilder.cpp
     src/SkyConstellationRenderBuilder.hpp
     src/SkyTheme.cpp
@@ -161,8 +172,13 @@ qt_add_qml_module(skygate-ui
         PreferencesGroupTitle.qml
         PreferencesSectionButton.qml
         SearchToolbar.qml
+        SkyHoverLabel.qml
         SkyInteractionLayer.qml
+        SkyObjectInspector.qml
+        SkyObjectInspectorButton.qml
+        SkyOverlayLabel.qml
         SkyOverlayLayer.qml
+        SkySelectionMarker.qml
         PreferencesDraft.qml
         StatusDateTimePopup.qml
         StatusFooter.qml

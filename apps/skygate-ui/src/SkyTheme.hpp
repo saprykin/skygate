@@ -184,6 +184,11 @@ struct SkyThemeDescriptor final {
     QString resourcePath;
 };
 
+struct SkyThemeOption final {
+    QString id;
+    QString label;
+};
+
 class SkyThemePalette final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString id READ id NOTIFY themeChanged)
@@ -236,6 +241,7 @@ public:
     [[nodiscard]] QVariantList themeOptions() const;
 
 private:
+    [[nodiscard]] std::vector<SkyThemeOption> themeOptionData() const;
     void loadManifest(const QString& manifestResourcePath);
     void ensureDefaultTheme();
 
