@@ -1,4 +1,5 @@
 #include "SkySelectionOverlayBuilder.hpp"
+#include "SkyOverlayTestSupport.hpp"
 #include "SkyTimeController.hpp"
 
 #include <QtTest/QtTest>
@@ -15,6 +16,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+using skygate::ui::tests::overlayInspectorFieldValue;
 
 namespace {
 
@@ -144,16 +147,6 @@ SkySelectionOverlayInput makeInput(const OverlayFixture& fixture)
     };
 }
 
-QString inspectorFieldValue(const SkySelectedObjectInspector& inspector, const QString& label)
-{
-    for (const SkyInspectorField& field : inspector.fields) {
-        if (field.label == label) {
-            return field.value;
-        }
-    }
-    return {};
-}
-
 }  // namespace
 
 class SkySelectionOverlayBuilderTests final : public QObject {
@@ -217,10 +210,10 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
 
     QCOMPARE(inspector.title, QString("M31"));
-    QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
-    QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Deep Sky"));
-    QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("44.0 / 181.0 deg"));
-    QCOMPARE(inspectorFieldValue(inspector, "RA / Dec"), QString("23h 59m 59s / -12d 30m 00s"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Type"), QString("Galaxy"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Source"), QString("Deep Sky"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Alt / Az"), QString("44.0 / 181.0 deg"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("23h 59m 59s / -12d 30m 00s"));
     QVERIFY(inspector.aliases.contains("Andromeda Galaxy"));
     QVERIFY(!inspector.aliases.contains("M31"));
 
@@ -228,7 +221,7 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
     QCOMPARE(
-        inspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"),
+        overlayInspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"),
         QString("Catalog")
     );
 }
@@ -244,20 +237,20 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
     input.selectedObjectTargetId = "selected";
 
     SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
-    QVERIFY(inspectorFieldValue(inspector, "Rise").contains("UTC+06:00"));
-    QVERIFY(inspectorFieldValue(inspector, "Set").contains("UTC+06:00"));
-    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
-    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
-    QVERIFY(inspectorFieldValue(inspector, "Next rise").isEmpty());
-    QVERIFY(inspectorFieldValue(inspector, "Next set").isEmpty());
-    QVERIFY(inspectorFieldValue(inspector, "Max altitude").isEmpty());
+    QVERIFY(overlayInspectorFieldValue(inspector, "Rise").contains("UTC+06:00"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Set").contains("UTC+06:00"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Next rise").isEmpty());
+    QVERIFY(overlayInspectorFieldValue(inspector, "Next set").isEmpty());
+    QVERIFY(overlayInspectorFieldValue(inspector, "Max altitude").isEmpty());
 
     input.selectedObjectTargetId = "circumpolar";
     inspector = builder.buildSelectedObjectInspectorData(input);
-    QCOMPARE(inspectorFieldValue(inspector, "Rise"), QString("Always above"));
-    QCOMPARE(inspectorFieldValue(inspector, "Set"), QString("Always above"));
-    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
-    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("Always above"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Set"), QString("Always above"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
 }
 
 void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody()
@@ -285,8 +278,8 @@ void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody
     QVERIFY(inspector.visible);
     QCOMPARE(inspector.x, 123.0);
     QCOMPARE(inspector.y, 456.0);
-    QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("-- / -- deg"));
-    QCOMPARE(inspectorFieldValue(inspector, "RA / Dec"), QString("-- / --"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Alt / Az"), QString("-- / -- deg"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("-- / --"));
 }
 
 void SkySelectionOverlayBuilderTests::activeTrailTargetUsesExpectedPriority()

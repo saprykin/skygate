@@ -1,79 +1,11 @@
+#include "CatalogCacheTestSupport.hpp"
+#include "CatalogTestPayloads.hpp"
+#include "LogCapture.hpp"
 #include "SkySettingsStore.hpp"
+#include "SettingsTestFixture.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 
 #include <QtTest/QtTest>
-
-#include <QCoreApplication>
-#include <QSettings>
-#include <QStandardPaths>
-#include <QTemporaryDir>
-
-namespace {
-
-int severityRank(const QtMsgType type) noexcept
-{
-    switch (type) {
-    case QtDebugMsg:
-        return 0;
-    case QtInfoMsg:
-        return 1;
-    case QtWarningMsg:
-        return 2;
-    case QtCriticalMsg:
-        return 3;
-    case QtFatalMsg:
-        return 4;
-    }
-
-    return 1;
-}
-
-class LogCapture final {
-public:
-    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
-        : m_minimumType(minimumType)
-    {
-        s_current = this;
-        m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
-    }
-
-    ~LogCapture()
-    {
-        qInstallMessageHandler(m_previousHandler);
-        s_current = nullptr;
-    }
-
-    [[nodiscard]] QString joinedMessages() const
-    {
-        return m_messages.join('\n');
-    }
-
-private:
-    static void handler(
-        const QtMsgType type,
-        const QMessageLogContext& context,
-        const QString& message
-    )
-    {
-        if (
-            s_current != nullptr
-            && severityRank(type) >= severityRank(s_current->m_minimumType)
-        ) {
-            s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
-                QString::fromUtf8(context.category != nullptr ? context.category : "default"),
-                message
-            ));
-        }
-    }
-
-private:
-    QtMessageHandler m_previousHandler = nullptr;
-    QtMsgType m_minimumType = QtWarningMsg;
-    QStringList m_messages;
-    static inline LogCapture* s_current = nullptr;
-};
-
-}  // namespace
 
 class SkyCatalogCacheControllerTests final : public QObject {
     Q_OBJECT
@@ -91,46 +23,25 @@ private:
     SkySettingsStore::CatalogCacheSnapshot makeValidCacheSnapshot() const;
 
 private:
-    QTemporaryDir m_settingsDir;
+    skygate::ui::tests::SettingsTestFixture m_settings;
 };
 
 void SkyCatalogCacheControllerTests::initTestCase()
 {
-    QVERIFY(m_settingsDir.isValid());
-    QStandardPaths::setTestModeEnabled(true);
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settingsDir.path());
-    QCoreApplication::setOrganizationName("SkygateTests");
-    QCoreApplication::setApplicationName("SkyCatalogCacheControllerTests");
+    QVERIFY(m_settings.initialize(QStringLiteral("SkyCatalogCacheControllerTests")));
 }
 
 void SkyCatalogCacheControllerTests::init()
 {
-    QSettings settings;
-    settings.clear();
-    settings.setValue("skyContext/catalogCachePath", m_settingsDir.filePath("catalog-cache.txt"));
-    settings.setValue(
-        "skyContext/deepSkyCatalogCachePath",
-        m_settingsDir.filePath("deep-sky-catalog-cache.txt")
-    );
+    m_settings.resetSettingsWithCatalogCachePaths();
 }
 
 SkySettingsStore::CatalogCacheSnapshot SkyCatalogCacheControllerTests::makeValidCacheSnapshot() const
 {
-    SkySettingsStore::CatalogCacheSnapshot snapshot;
-    snapshot.sourceLabel = "Downloaded (saved) (saved)";
-    snapshot.catalogPayload =
-        "id,hip,proper,ra,dec,mag\n"
-        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
-    snapshot.deepSkySourceLabel = "OpenNGC (saved)";
-    snapshot.deepSkyCatalogPayload =
-        "Name;Type;RA;Dec;M;NGC;IC\n"
-        "NGC0224;G;00:42:44.35;+41:16:08.6;31;0224;\n";
-    snapshot.constellationLineRows = "hip_1|hip_2\n";
-    snapshot.constellationLabelRows = "Demo|hip_1,hip_2\n";
-    snapshot.constellationLineSchemaVersion = 4;
-    snapshot.constellationCount = 1;
-    return snapshot;
+    return skygate::ui::tests::sampleCatalogCacheSnapshot({
+        .sourceLabel = QStringLiteral("Downloaded (saved) (saved)"),
+        .deepSkySourceLabel = QStringLiteral("OpenNGC (saved)")
+    });
 }
 
 void SkyCatalogCacheControllerTests::restoresSavedCatalogsAndConstellationLabels()
@@ -206,9 +117,13 @@ void SkyCatalogCacheControllerTests::persistRoundTripsConstellationRows()
 
     skygate::ui::internal::SkyCatalogCachePersistRequest request;
     request.sourceLabel = "Custom";
-    request.catalogPayload =
-        "id,hip,proper,ra,dec,mag\n"
-        "1,11,Alpha,1.0,2.0,3.0\n";
+    request.catalogPayload = skygate::ui::tests::sampleHygCsvPayload({
+        .hip = 11,
+        .properName = "Alpha",
+        .ra = "1.0",
+        .dec = "2.0",
+        .mag = "3.0"
+    });
     request.constellationLineRefs = {{"hip_a", "hip_b"}};
     request.constellationLabelRefs = {{"Label", {"hip_a", "hip_b", "hip_c"}}};
     request.constellationCount = 12;
@@ -228,7 +143,7 @@ void SkyCatalogCacheControllerTests::logsCacheLifecycleSummariesAtInfoLevel()
 {
     SkySettingsStore store;
     const skygate::ui::internal::SkyCatalogCacheController controller(&store);
-    LogCapture capture(QtInfoMsg);
+    skygate::ui::tests::LogCapture capture(QtInfoMsg);
 
     QVERIFY(store.saveCatalogCache(makeValidCacheSnapshot()));
     const auto result = controller.restore(1, 1);

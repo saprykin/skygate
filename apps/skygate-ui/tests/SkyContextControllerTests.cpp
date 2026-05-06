@@ -3,6 +3,7 @@
 #include "SkyContextController.hpp"
 #include "SkyLogging.hpp"
 #include "SkyOverlayLayerSettings.hpp"
+#include "SettingsTestFixture.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
@@ -13,8 +14,6 @@
 #include <QDateTime>
 #include <QSettings>
 #include <QSignalSpy>
-#include <QStandardPaths>
-#include <QTemporaryDir>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -306,24 +305,18 @@ private slots:
     void restoresCachedCatalogConstellationCount();
 
 private:
-    QTemporaryDir m_settingsDir;
+    skygate::ui::tests::SettingsTestFixture m_settings;
 };
 
 void SkyContextControllerTests::initTestCase()
 {
-    QVERIFY(m_settingsDir.isValid());
-    QStandardPaths::setTestModeEnabled(true);
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settingsDir.path());
-    QCoreApplication::setOrganizationName("SkygateTests");
-    QCoreApplication::setApplicationName("SkygateUiControllerTests");
+    QVERIFY(m_settings.initialize(QStringLiteral("SkygateUiControllerTests")));
 }
 
 void SkyContextControllerTests::init()
 {
     skygate::ui::SkyLogging::uninstall();
-    QSettings settings;
-    settings.clear();
+    m_settings.clearSettings();
 }
 
 void SkyContextControllerTests::pinchZoomScaleDeltaAdjustsAndClampsFieldOfView()
@@ -565,7 +558,7 @@ void SkyContextControllerTests::setThemeIdUpdatesPaletteAndEmitsSignals()
 
 void SkyContextControllerTests::loggingSettingsApplyAndPersist()
 {
-    const QString logFilePath = m_settingsDir.filePath("controller-skygate.log");
+    const QString logFilePath = m_settings.filePath(QStringLiteral("controller-skygate.log"));
     const auto controller = createController();
     QSignalSpy loggingSpy(controller.get(), &SkyContextController::loggingChanged);
 
@@ -1298,7 +1291,7 @@ void SkyContextControllerTests::restoresCachedCatalogConstellationCount()
     QSettings settings;
     settings.setValue(
         "skyContext/catalogCachePath",
-        m_settingsDir.filePath("cached-hyg-catalog.csv")
+        m_settings.filePath(QStringLiteral("cached-hyg-catalog.csv"))
     );
 
     SkySettingsStore store;

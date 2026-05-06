@@ -1,13 +1,12 @@
 #include <QtTest>
 
+#include "SettingsTestFixture.hpp"
 #include "SkyLogging.hpp"
 
 #include <QDir>
 #include <QFile>
 #include <QLoggingCategory>
 #include <QRegularExpression>
-#include <QStandardPaths>
-#include <QTemporaryDir>
 
 #include <thread>
 #include <vector>
@@ -44,23 +43,20 @@ private:
     [[nodiscard]] skygate::ui::SkyLoggingConfiguration fileOnlyConfig(const QString& path) const;
 
 private:
-    QTemporaryDir m_tempDir;
+    skygate::ui::tests::SettingsTestFixture m_settings;
 };
 
 void SkyLoggingTests::initTestCase()
 {
-    QVERIFY(m_tempDir.isValid());
-    QStandardPaths::setTestModeEnabled(true);
-    QCoreApplication::setOrganizationName(QStringLiteral("SkygateTests"));
-    QCoreApplication::setApplicationName(QStringLiteral("SkyLoggingTests"));
+    QVERIFY(m_settings.initialize(QStringLiteral("SkyLoggingTests")));
 }
 
 void SkyLoggingTests::init()
 {
     skygate::ui::SkyLogging::uninstall();
-    const QStringList entries = QDir(m_tempDir.path()).entryList(QDir::Files);
+    const QStringList entries = QDir(m_settings.path()).entryList(QDir::Files);
     for (const QString& entry : entries) {
-        QFile::remove(QDir(m_tempDir.path()).filePath(entry));
+        QFile::remove(QDir(m_settings.path()).filePath(entry));
     }
 }
 
@@ -71,7 +67,7 @@ void SkyLoggingTests::cleanup()
 
 QString SkyLoggingTests::logPath(const QString& fileName) const
 {
-    return QDir(m_tempDir.path()).filePath(fileName);
+    return m_settings.filePath(fileName);
 }
 
 QString SkyLoggingTests::readText(const QString& path) const

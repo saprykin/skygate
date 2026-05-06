@@ -1,14 +1,14 @@
 #include <QtTest>
 
+#include "CatalogCacheTestSupport.hpp"
+#include "CatalogTestPayloads.hpp"
+#include "SettingsTestFixture.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyLogging.hpp"
 
-#include <QCoreApplication>
 #include <QFile>
 #include <QRegularExpression>
 #include <QSettings>
-#include <QStandardPaths>
-#include <QTemporaryDir>
 
 namespace {
 
@@ -42,17 +42,12 @@ private slots:
     void malformedLoggingPreferencesFallBackToDefaults();
 
 private:
-    QTemporaryDir m_settingsDir;
+    skygate::ui::tests::SettingsTestFixture m_settings;
 };
 
 void SkySettingsStoreTests::initTestCase()
 {
-    QVERIFY(m_settingsDir.isValid());
-    QStandardPaths::setTestModeEnabled(true);
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settingsDir.path());
-    QCoreApplication::setOrganizationName("SkygateTests");
-    QCoreApplication::setApplicationName("SkygateUiSettingsStoreTests");
+    QVERIFY(m_settings.initialize(QStringLiteral("SkygateUiSettingsStoreTests")));
 }
 
 void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
@@ -96,7 +91,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.deepSkyCatalogUrlText = "https://example.com/NGC.csv";
     savedSnapshot.logToTerminal = false;
     savedSnapshot.logToFile = true;
-    savedSnapshot.logFilePath = m_settingsDir.filePath("skygate-test.log");
+    savedSnapshot.logFilePath = m_settings.filePath(QStringLiteral("skygate-test.log"));
 
     QVERIFY(store.saveState(savedSnapshot));
     const auto loadedSnapshot = store.loadState();
@@ -221,31 +216,18 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
 
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 {
-    QSettings settings;
-    settings.clear();
-    settings.setValue(
-        "skyContext/catalogCachePath",
-        m_settingsDir.filePath("catalog-cache-test.txt")
-    );
-    settings.setValue(
-        "skyContext/deepSkyCatalogCachePath",
-        m_settingsDir.filePath("deep-sky-catalog-cache-test.txt")
+    m_settings.resetSettingsWithCatalogCachePaths(
+        QStringLiteral("catalog-cache-test.txt"),
+        QStringLiteral("deep-sky-catalog-cache-test.txt")
     );
 
     SkySettingsStore store;
-    SkySettingsStore::CatalogCacheSnapshot savedSnapshot;
-    savedSnapshot.sourceLabel = "Saved";
-    savedSnapshot.deepSkySourceLabel = "Saved OpenNGC";
-    savedSnapshot.catalogPayload =
-        "id,hip,proper,ra,dec,mag\n"
-        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
-    savedSnapshot.deepSkyCatalogPayload =
-        "Name;Type;RA;Dec;M;NGC;IC\n"
-        "NGC0224;G;00:42:44.35;+41:16:08.6;31;0224;\n";
-    savedSnapshot.constellationLineRows = "a|b\n";
-    savedSnapshot.constellationLabelRows = "Orion|hip1,hip2\n";
-    savedSnapshot.constellationLineSchemaVersion = 4;
-    savedSnapshot.constellationCount = 42;
+    const SkySettingsStore::CatalogCacheSnapshot savedSnapshot =
+        skygate::ui::tests::sampleCatalogCacheSnapshot({
+            .constellationLineRows = "a|b\n",
+            .constellationLabelRows = "Orion|hip1,hip2\n",
+            .constellationCount = 42
+        });
 
     QVERIFY(store.saveCatalogCache(savedSnapshot));
     const auto loadedSnapshot = store.loadCatalogCache();
@@ -285,19 +267,17 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 
 void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
 {
+    const QString starCachePath = m_settings.filePath(QStringLiteral("partial-star-cache.txt"));
+    const QString deepSkyCachePath =
+        m_settings.filePath(QStringLiteral("partial-deep-sky-cache.txt"));
+    m_settings.clearSettings();
+    m_settings.setCatalogCachePaths(starCachePath, deepSkyCachePath);
     QSettings settings;
-    settings.clear();
-    const QString starCachePath = m_settingsDir.filePath("partial-star-cache.txt");
-    const QString deepSkyCachePath = m_settingsDir.filePath("partial-deep-sky-cache.txt");
-    settings.setValue("skyContext/catalogCachePath", starCachePath);
-    settings.setValue("skyContext/deepSkyCatalogCachePath", deepSkyCachePath);
 
     SkySettingsStore store;
     SkySettingsStore::CatalogCacheSnapshot starSnapshot;
     starSnapshot.sourceLabel = "Saved";
-    starSnapshot.catalogPayload =
-        "id,hip,proper,ra,dec,mag\n"
-        "1,42,Sirius,6.7525,-16.7161,-1.46\n";
+    starSnapshot.catalogPayload = skygate::ui::tests::sampleHygCsvPayload();
     QVERIFY(store.saveCatalogCache(starSnapshot));
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
@@ -305,8 +285,7 @@ void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
     SkySettingsStore::CatalogCacheSnapshot deepSkySnapshot;
     deepSkySnapshot.deepSkySourceLabel = "Saved OpenNGC";
     deepSkySnapshot.deepSkyCatalogPayload =
-        "Name;Type;RA;Dec;M;NGC;IC\n"
-        "NGC0224;G;00:42:44.35;+41:16:08.6;31;0224;\n";
+        skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
     QVERIFY(store.saveCatalogCache(deepSkySnapshot));
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
@@ -315,12 +294,12 @@ void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
 
 void SkySettingsStoreTests::missingCacheFilesAndMalformedCacheMetadataAreTolerated()
 {
-    QSettings settings;
-    settings.clear();
-    settings.setValue(
-        "skyContext/catalogCachePath",
-        m_settingsDir.filePath("missing-star-cache.csv")
+    m_settings.clearSettings();
+    m_settings.setCatalogCachePaths(
+        m_settings.filePath(QStringLiteral("missing-star-cache.csv")),
+        m_settings.filePath(QStringLiteral("missing-deep-sky-cache.csv"))
     );
+    QSettings settings;
     settings.setValue("skyContext/catalogSourceLabel", "Missing HYG");
     settings.setValue("skyContext/catalogConstellationLineSchemaVersion", "latest");
     settings.setValue("skyContext/catalogConstellationCount", "many");
@@ -328,13 +307,10 @@ void SkySettingsStoreTests::missingCacheFilesAndMalformedCacheMetadataAreTolerat
     const SkySettingsStore store;
     QVERIFY(!store.loadCatalogCache().has_value());
 
-    const QString cachePath = m_settingsDir.filePath("malformed-metadata-cache.csv");
+    const QString cachePath = m_settings.filePath(QStringLiteral("malformed-metadata-cache.csv"));
     QFile cacheFile(cachePath);
     QVERIFY(cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate));
-    QVERIFY(cacheFile.write(
-        "id,hip,proper,ra,dec,mag\n"
-        "1,42,Sirius,6.7525,-16.7161,-1.46\n"
-    ) > 0);
+    QVERIFY(cacheFile.write(skygate::ui::tests::sampleHygCsvPayload()) > 0);
     cacheFile.close();
 
     settings.setValue("skyContext/catalogCachePath", cachePath);
@@ -358,7 +334,7 @@ void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
-    snapshot.logFilePath = m_settingsDir.filePath("custom-skygate.log");
+    snapshot.logFilePath = m_settings.filePath(QStringLiteral("custom-skygate.log"));
 
     QVERIFY(store.saveState(snapshot));
     const auto loadedSnapshot = store.loadState();

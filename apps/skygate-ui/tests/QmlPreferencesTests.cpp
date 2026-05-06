@@ -1,3 +1,4 @@
+#include "CatalogTestPayloads.hpp"
 #include "QmlTestSupport.hpp"
 #include "SkyTimeController.hpp"
 
@@ -188,15 +189,12 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
 {
     const QString starCatalogPath = m_settings.cachePath(QStringLiteral("download-stars.csv"));
     const QString deepSkyCatalogPath = m_settings.cachePath(QStringLiteral("download-dso.csv"));
-    const QByteArray starCatalogPayload =
-        "id,hip,proper,ra,dec,mag\n"
-        "1,900001,Downloaded Star,6.7525,-16.7161,1.0\n";
-    const QByteArray deepSkyCatalogPayload =
-        "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
-        "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
-        "Identifiers;Common names;NED notes;OpenNGC notes\n"
-        "NGC0999;G;00:42:44.35;+41:16:08.6;And;12.0;6.0;35;;8.10;;;;;"
-        "SA(s)b;;;;;0999;;;PGC 9999;Custom Galaxy;;\n";
+    const QByteArray starCatalogPayload = sampleHygCsvPayload(
+        {1, 900001, "Downloaded Star", "6.7525", "-16.7161", "1.0"}
+    );
+    const QByteArray deepSkyCatalogPayload = sampleOpenNgcCsvPayload(
+        {"NGC0999", "G", "00:42:44.35", "+41:16:08.6", "And", "", "0999", "PGC 9999", "Custom Galaxy"}
+    );
     QVERIFY(writeFile(starCatalogPath, starCatalogPayload));
     QVERIFY(writeFile(deepSkyCatalogPath, deepSkyCatalogPayload));
     const QString starCatalogUrl = QUrl::fromLocalFile(starCatalogPath).toString();

@@ -1,206 +1,21 @@
+#include "AsyncTestSupport.hpp"
 #include "CatalogCoordinator.hpp"
+#include "CatalogTestPayloads.hpp"
 #include "catalog/CatalogDownloadService.hpp"
+#include "FakeNetworkAccessManager.hpp"
+#include "LogCapture.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 
 #include <QtTest/QtTest>
 
-#include <QEventLoop>
-#include <QHash>
-#include <QNetworkAccessManager>
+#include <QCoreApplication>
 #include <QNetworkReply>
-#include <QQueue>
-#include <QTimer>
 
 #include <algorithm>
-#include <cstring>
 #include <memory>
 #include <utility>
 
-namespace {
-
-int severityRank(const QtMsgType type) noexcept
-{
-    switch (type) {
-    case QtDebugMsg:
-        return 0;
-    case QtInfoMsg:
-        return 1;
-    case QtWarningMsg:
-        return 2;
-    case QtCriticalMsg:
-        return 3;
-    case QtFatalMsg:
-        return 4;
-    }
-
-    return 1;
-}
-
-struct FakeNetworkResponse final {
-    QByteArray payload;
-    QNetworkReply::NetworkError error = QNetworkReply::NoError;
-    QString errorText;
-    int httpStatusCode = 200;
-    int delayMs = 0;
-};
-
-class FakeNetworkReply final : public QNetworkReply {
-    Q_OBJECT
-
-public:
-    FakeNetworkReply(const QNetworkRequest& request, FakeNetworkResponse response, QObject* parent)
-        : QNetworkReply(parent)
-        , m_payload(std::move(response.payload))
-    {
-        setRequest(request);
-        setUrl(request.url());
-        setAttribute(QNetworkRequest::HttpStatusCodeAttribute, response.httpStatusCode);
-        setHeader(QNetworkRequest::ContentLengthHeader, m_payload.size());
-        if (response.error != QNetworkReply::NoError) {
-            setError(response.error, response.errorText);
-        }
-        open(QIODevice::ReadOnly | QIODevice::Unbuffered);
-
-        QTimer::singleShot(response.delayMs, this, [this] {
-            if (!m_payload.isEmpty()) {
-                emit readyRead();
-            }
-            emit finished();
-        });
-    }
-
-    void abort() override {}
-
-    qint64 bytesAvailable() const override
-    {
-        return static_cast<qint64>(m_payload.size() - m_offset) + QNetworkReply::bytesAvailable();
-    }
-
-protected:
-    qint64 readData(char* data, const qint64 maxSize) override
-    {
-        if (m_offset >= m_payload.size()) {
-            return -1;
-        }
-
-        const qint64 bytesToRead = std::min<qint64>(
-            maxSize,
-            static_cast<qint64>(m_payload.size() - m_offset)
-        );
-        std::memcpy(data, m_payload.constData() + m_offset, static_cast<std::size_t>(bytesToRead));
-        m_offset += bytesToRead;
-        return bytesToRead;
-    }
-
-private:
-    QByteArray m_payload;
-    qsizetype m_offset = 0;
-};
-
-class FakeNetworkAccessManager final : public QNetworkAccessManager {
-    Q_OBJECT
-
-public:
-    void enqueueResponse(const QString& url, FakeNetworkResponse response)
-    {
-        m_responses[url].enqueue(std::move(response));
-    }
-
-    [[nodiscard]] QStringList requestedUrls() const
-    {
-        return m_requestedUrls;
-    }
-
-protected:
-    QNetworkReply* createRequest(
-        const Operation operation,
-        const QNetworkRequest& request,
-        QIODevice* outgoingData = nullptr
-    ) override
-    {
-        (void)operation;
-        (void)outgoingData;
-
-        const QString url = request.url().toString();
-        m_requestedUrls.push_back(url);
-        FakeNetworkResponse response;
-        auto responseIt = m_responses.find(url);
-        if (responseIt != m_responses.end() && !responseIt->isEmpty()) {
-            response = responseIt->dequeue();
-        } else {
-            response.error = QNetworkReply::HostNotFoundError;
-            response.errorText = "No fake response registered";
-            response.httpStatusCode = 404;
-        }
-        return new FakeNetworkReply(request, std::move(response), this);
-    }
-
-private:
-    QHash<QString, QQueue<FakeNetworkResponse>> m_responses;
-    QStringList m_requestedUrls;
-};
-
-class LogCapture final {
-public:
-    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
-        : m_minimumType(minimumType)
-    {
-        s_current = this;
-        m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
-    }
-
-    ~LogCapture()
-    {
-        qInstallMessageHandler(m_previousHandler);
-        s_current = nullptr;
-    }
-
-    [[nodiscard]] QString joinedMessages() const
-    {
-        return m_messages.join('\n');
-    }
-
-private:
-    static void handler(
-        const QtMsgType type,
-        const QMessageLogContext& context,
-        const QString& message
-    )
-    {
-        if (
-            s_current != nullptr
-            && severityRank(type) >= severityRank(s_current->m_minimumType)
-        ) {
-            s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
-                QString::fromUtf8(context.category != nullptr ? context.category : "default"),
-                message
-            ));
-        }
-    }
-
-private:
-    QtMessageHandler m_previousHandler = nullptr;
-    QtMsgType m_minimumType = QtWarningMsg;
-    QStringList m_messages;
-    static inline LogCapture* s_current = nullptr;
-};
-
-template <typename StartFn>
-void runAsync(StartFn startFn)
-{
-    QEventLoop loop;
-    QTimer timeout;
-    timeout.setSingleShot(true);
-    QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timeout.start(5000);
-    startFn(loop);
-    loop.exec();
-    const bool timedOut = !timeout.isActive();
-    timeout.stop();
-    QVERIFY(!timedOut);
-}
-
-}  // namespace
+using namespace skygate::ui::tests;
 
 class CatalogDownloadWorkflowTests final : public QObject {
     Q_OBJECT
@@ -253,7 +68,7 @@ void CatalogDownloadWorkflowTests::downloadServiceLogsStartAndSuccessAtInfoLevel
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         "https://example.test/catalog.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,1,Alpha,1.0,2.0,3.0\n"}
+        {.payload = sampleHygCsvPayload({1, 1, "Alpha", "1.0", "2.0", "3.0"})}
     );
     CatalogDownloadService service(&networkAccessManager);
 
@@ -288,7 +103,7 @@ void CatalogDownloadWorkflowTests::downloadServiceRetriesUntilFirstSuccessfulPay
     );
     networkAccessManager.enqueueResponse(
         "https://example.test/ok.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,1,Alpha,1.0,2.0,3.0\n"}
+        {.payload = sampleHygCsvPayload({1, 1, "Alpha", "1.0", "2.0", "3.0"})}
     );
     CatalogDownloadService service(&networkAccessManager);
 
@@ -369,7 +184,7 @@ void CatalogDownloadWorkflowTests::downloadServiceDoesNotCallDestroyedCallbackCo
     networkAccessManager.enqueueResponse(
         "https://example.test/slow.csv",
         {
-            .payload = "id,hip,proper,ra,dec,mag\n1,1,Slow,1.0,2.0,3.0\n",
+            .payload = sampleHygCsvPayload({1, 1, "Slow", "1.0", "2.0", "3.0"}),
             .delayMs = 20
         }
     );
@@ -411,7 +226,7 @@ void CatalogDownloadWorkflowTests::downloadServiceStopsRetryAfterDestroyedCallba
     );
     networkAccessManager.enqueueResponse(
         "https://example.test/should-not-start.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,1,Unexpected,1.0,2.0,3.0\n"}
+        {.payload = sampleHygCsvPayload({1, 1, "Unexpected", "1.0", "2.0", "3.0"})}
     );
     CatalogDownloadService service(&networkAccessManager);
 
@@ -441,13 +256,13 @@ void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsInd
     networkAccessManager.enqueueResponse(
         "https://example.test/first.csv",
         {
-            .payload = "id,hip,proper,ra,dec,mag\n1,11,First,1.0,2.0,3.0\n",
+            .payload = sampleHygCsvPayload({1, 11, "First", "1.0", "2.0", "3.0"}),
             .delayMs = 25
         }
     );
     networkAccessManager.enqueueResponse(
         "https://example.test/second.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n2,22,Second,4.0,5.0,6.0\n"}
+        {.payload = sampleHygCsvPayload({2, 22, "Second", "4.0", "5.0", "6.0"})}
     );
     CatalogDownloadService service(&networkAccessManager);
 
@@ -496,7 +311,7 @@ void CatalogDownloadWorkflowTests::downloadServiceConcurrentFallbackChainsRemain
     );
     networkAccessManager.enqueueResponse(
         "https://example.test/a-ok.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,101,Alpha,1.0,2.0,3.0\n"}
+        {.payload = sampleHygCsvPayload({1, 101, "Alpha", "1.0", "2.0", "3.0"})}
     );
     networkAccessManager.enqueueResponse(
         "https://example.test/b-fail.csv",
@@ -505,7 +320,7 @@ void CatalogDownloadWorkflowTests::downloadServiceConcurrentFallbackChainsRemain
     networkAccessManager.enqueueResponse(
         "https://example.test/b-ok.csv",
         {
-            .payload = "id,hip,proper,ra,dec,mag\n2,202,Beta,4.0,5.0,6.0\n",
+            .payload = sampleHygCsvPayload({2, 202, "Beta", "4.0", "5.0", "6.0"}),
             .delayMs = 10
         }
     );
@@ -555,7 +370,7 @@ void CatalogDownloadWorkflowTests::coordinatorParsesSuccessfulDownloadedCatalog(
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         "https://example.test/catalog.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,42,Sirius,6.7525,-16.7161,-1.46\n"}
+        {.payload = sampleHygCsvPayload()}
     );
     CatalogCoordinator coordinator(&networkAccessManager);
 
@@ -588,7 +403,7 @@ void CatalogDownloadWorkflowTests::coordinatorReportsParseFailureWithSourceUrl()
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         "https://example.test/bad.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,42,Bad,not-ra,2.0,3.0\n"}
+        {.payload = sampleHygCsvPayload({1, 42, "Bad", "not-ra", "2.0", "3.0"})}
     );
     CatalogCoordinator coordinator(&networkAccessManager);
 
@@ -631,15 +446,7 @@ void CatalogDownloadWorkflowTests::importWorkflowParsesConstellationPayloads()
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         "https://example.test/index.json",
-        {.payload = R"({
-            "constellations": [
-                {
-                    "id": "orion",
-                    "common_name": { "english": "Orion" },
-                    "lines": [[24436, 25930, 26727]]
-                }
-            ]
-        })"}
+        {.payload = sampleConstellationIndexJsonPayload()}
     );
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
@@ -680,15 +487,7 @@ void CatalogDownloadWorkflowTests::importWorkflowDoesNotCompleteConstellationAft
     networkAccessManager.enqueueResponse(
         "https://example.test/slow-index.json",
         {
-            .payload = R"({
-                "constellations": [
-                    {
-                        "id": "orion",
-                        "common_name": { "english": "Orion" },
-                        "lines": [[24436, 25930]]
-                    }
-                ]
-            })",
+            .payload = sampleConstellationIndexJsonPayload(),
             .delayMs = 20
         }
     );
@@ -752,7 +551,7 @@ void CatalogDownloadWorkflowTests::importWorkflowRejectsDeepSkyCatalogWithoutDso
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         "https://example.test/stars.csv",
-        {.payload = "id,hip,proper,ra,dec,mag\n1,42,Sirius,6.7525,-16.7161,-1.46\n"}
+        {.payload = sampleHygCsvPayload()}
     );
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
@@ -783,12 +582,7 @@ void CatalogDownloadWorkflowTests::importWorkflowReportsDeepSkyObjectCount()
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         "https://example.test/open-ngc.csv",
-        {.payload =
-            "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
-            "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
-            "Identifiers;Common names;NED notes;OpenNGC notes\n"
-            "NGC0224;G;00:42:44.35;+41:16:08.6;And;177.83;69.66;35;4.36;3.44;;;;"
-            "13.35;SA(s)b;;;;31;0224;;;PGC 2557,UGC 454;Andromeda Galaxy;;\n"}
+        {.payload = sampleOpenNgcCsvPayload()}
     );
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 

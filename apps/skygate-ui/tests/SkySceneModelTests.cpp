@@ -1,17 +1,17 @@
 #include <QtTest>
 
 #include "SkyContextController.hpp"
+#include "SkyEphemerisTestSupport.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkyRenderBuilders.hpp"
 #include "SkySceneModel.hpp"
+#include "SkySceneModelTestHarness.hpp"
 #include "SkyTimeController.hpp"
 #include "SkyTheme.hpp"
 #include "catalog/SkyActiveCatalogBuilder.hpp"
 
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -23,22 +23,12 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
-    std::string id,
-    std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
-    const double visualMagnitude,
-    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
-)
-{
-    skygate::ephemeris::CelestialBody body;
-    body.id = std::move(id);
-    body.displayName = std::move(displayName);
-    body.type = type;
-    body.visualMagnitude = visualMagnitude;
-    body.fixedEquatorial = fixedEquatorial;
-    return body;
-}
+using skygate::ui::tests::createTestCatalog;
+using skygate::ui::tests::makeBody;
+using skygate::ui::tests::makeDeepSkyBody;
+using skygate::ui::tests::makeFixedBody;
+using skygate::ui::tests::SkySceneModelTestHarness;
+using skygate::ui::tests::TestSkyContextConfig;
 
 bool overlayItemsContainText(const QVariantList& overlayItems, const QString& text)
 {
@@ -84,28 +74,6 @@ QString inspectorFieldValue(const QVariantMap& inspector, const QString& label)
     }
 
     return {};
-}
-
-skygate::ephemeris::CelestialBody makeDeepSkyBody(
-    std::string id,
-    std::string displayName,
-    const double visualMagnitude,
-    std::vector<std::string> aliases = {}
-)
-{
-    skygate::ephemeris::CelestialBody body;
-    body.id = std::move(id);
-    body.displayName = std::move(displayName);
-    body.type = skygate::ephemeris::CelestialBodyType::DeepSkyObject;
-    body.visualMagnitude = visualMagnitude;
-    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-        .aliases = std::move(aliases),
-        .majorAxisArcmin = 8.0,
-        .minorAxisArcmin = 4.0,
-        .positionAngleDeg = 0.0,
-    };
-    return body;
 }
 
 SkyRenderFrame buildDeepSkyRenderFrame(
@@ -186,70 +154,25 @@ private slots:
 
 void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_planet",
             "Demo Planet",
             skygate::ephemeris::CelestialBodyType::Planet,
             -1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("demo_planet"));
 
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const skygate::ephemeris::CelestialBodyState* demoPlanetState = nullptr;
-    for (const auto& state : snapshot.states) {
-        if (snapshot.bodyAt(state.bodyIndex).id == "demo_planet") {
-            demoPlanetState = &state;
-            break;
-        }
-    }
-    QVERIFY(demoPlanetState != nullptr);
-    QVERIFY(std::isfinite(demoPlanetState->horizontal.altitudeDeg));
-    QVERIFY(std::isfinite(demoPlanetState->horizontal.azimuthDeg));
-    controller.setViewCenter(
-        demoPlanetState->horizontal.altitudeDeg,
-        demoPlanetState->horizontal.azimuthDeg
-    );
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
-
+    const SkySceneModel& sceneModel = harness.sceneModel();
     QVERIFY(sceneModel.preparedProjection().has_value());
     const auto points = sceneModel.renderPointSpan();
     QVERIFY(!points.empty());
 
-    const SkyRenderPoint* demoPlanetPoint = nullptr;
-    for (const auto& point : points) {
-        if (point.bodyIndex == demoPlanetState->bodyIndex) {
-            demoPlanetPoint = &point;
-            break;
-        }
-    }
+    const SkyRenderPoint* demoPlanetPoint = harness.renderPointForBodyId("demo_planet");
     QVERIFY(demoPlanetPoint != nullptr);
 
     const QString label = sceneModel.objectLabelAt(demoPlanetPoint->x, demoPlanetPoint->y);
@@ -259,32 +182,10 @@ void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
 
 void SkySceneModelTests::reusesSnapshotAcrossViewChanges()
 {
-    auto starCatalog = skygate::ephemeris::createBundledStarCatalog();
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    SkySceneModelTestHarness harness = SkySceneModelTestHarness::fromBundledCatalog();
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     const std::uint64_t initialSnapshotGeneration = sceneModel.snapshotGeneration();
     QVERIFY(initialSnapshotGeneration > 0U);
@@ -298,43 +199,19 @@ void SkySceneModelTests::reusesSnapshotAcrossViewChanges()
 
 void SkySceneModelTests::showsSearchSelectionMarkerForFocusedBody()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_target",
             "Demo Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(controller.focusSearchTarget("body", "demo_target"));
 
@@ -346,61 +223,21 @@ void SkySceneModelTests::showsSearchSelectionMarkerForFocusedBody()
 
 void SkySceneModelTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_star",
             "Demo Star",
             skygate::ephemeris::CelestialBodyType::Star,
             2.3,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("demo_star"));
+    SkySceneModel& sceneModel = harness.sceneModel();
 
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const auto stateIt = std::find_if(
-        snapshot.states.begin(),
-        snapshot.states.end(),
-        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
-            return snapshot.bodyAt(state.bodyIndex).id == "demo_star";
-        }
-    );
-    QVERIFY(stateIt != snapshot.states.end());
-    controller.setViewCenter(stateIt->horizontal.altitudeDeg, stateIt->horizontal.azimuthDeg);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
-
-    const SkyRenderPoint* targetPoint = nullptr;
-    for (const auto& point : sceneModel.renderPointSpan()) {
-        if (point.bodyIndex == stateIt->bodyIndex) {
-            targetPoint = &point;
-            break;
-        }
-    }
+    const SkyRenderPoint* targetPoint = harness.renderPointForBodyId("demo_star");
     QVERIFY(targetPoint != nullptr);
 
     QVERIFY(sceneModel.selectObjectAt(targetPoint->x, targetPoint->y));
@@ -423,42 +260,19 @@ void SkySceneModelTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
 
 void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_target",
             "Demo Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(controller.focusSearchTarget("body", "demo_target"));
 
@@ -476,42 +290,19 @@ void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
 
 void SkySceneModelTests::circumpolarInspectorShowsObservationFallbacks()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_circumpolar",
             "Demo Circumpolar",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 3.0,
-                .declinationDeg = 80.0
-            }
+            3.0,
+            80.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
     QVERIFY(controller.focusSearchTarget("body", "demo_circumpolar"));
 
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
@@ -524,42 +315,19 @@ void SkySceneModelTests::circumpolarInspectorShowsObservationFallbacks()
 
 void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_target",
             "Demo Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    SkySceneModel& sceneModel = harness.sceneModel();
     QVERIFY(controller.focusSearchTarget("body", "demo_target"));
 
     const QVariantMap initialInspector = sceneModel.selectedObjectInspector();
@@ -621,39 +389,19 @@ void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
 
 void SkySceneModelTests::trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_target",
             "Demo Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(controller.trackSearchTarget("body", "demo_target"));
     QCOMPARE(sceneModel.selectedObjectInspector().value("title").toString(), QString("Demo Target"));
@@ -673,62 +421,23 @@ void SkySceneModelTests::trackedBodyMarkerSurvivesClearedSearchSelectionAndResto
 
 void SkySceneModelTests::selectedBodyBuildsTrailAndClearsIt()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_trail",
             "Demo Trail",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 20.0
-            }
+            5.5,
+            20.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const auto stateIt = std::find_if(
-        snapshot.states.begin(),
-        snapshot.states.end(),
-        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
-            return snapshot.bodyAt(state.bodyIndex).id == "demo_trail";
-        }
-    );
-    QVERIFY(stateIt != snapshot.states.end());
-    controller.setViewCenter(stateIt->horizontal.altitudeDeg, stateIt->horizontal.azimuthDeg);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("demo_trail"));
+    SkySceneModel& sceneModel = harness.sceneModel();
 
     QCOMPARE(sceneModel.renderLineSpan().size(), std::size_t(0));
 
-    const SkyRenderPoint* targetPoint = nullptr;
-    for (const auto& point : sceneModel.renderPointSpan()) {
-        if (point.bodyIndex == stateIt->bodyIndex) {
-            targetPoint = &point;
-            break;
-        }
-    }
+    const SkyRenderPoint* targetPoint = harness.renderPointForBodyId("demo_trail");
     QVERIFY(targetPoint != nullptr);
 
     QVERIFY(sceneModel.selectObjectAt(targetPoint->x, targetPoint->y));
@@ -740,39 +449,19 @@ void SkySceneModelTests::selectedBodyBuildsTrailAndClearsIt()
 
 void SkySceneModelTests::trackedBodyTrailSurvivesClearedSearchSelection()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_tracked_trail",
             "Demo Tracked Trail",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 20.0
-            }
+            5.5,
+            20.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(controller.trackSearchTarget("body", "demo_tracked_trail"));
     QVERIFY(sceneModel.renderLineSpan().size() > 0U);
@@ -786,95 +475,63 @@ void SkySceneModelTests::trackedBodyTrailSurvivesClearedSearchSelection()
 
 void SkySceneModelTests::constellationSelectionDoesNotBuildTrail()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "hip_27989",
             "HIP 27989",
             skygate::ephemeris::CelestialBodyType::Star,
             1.9,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_25336",
             "HIP 25336",
             skygate::ephemeris::CelestialBodyType::Star,
             2.1,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_25930",
             "HIP 25930",
             skygate::ephemeris::CelestialBodyType::Star,
             2.2,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_26311",
             "HIP 26311",
             skygate::ephemeris::CelestialBodyType::Star,
             2.3,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_26727",
             "HIP 26727",
             skygate::ephemeris::CelestialBodyType::Star,
             2.4,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_24436",
             "HIP 24436",
             skygate::ephemeris::CelestialBodyType::Star,
             2.5,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
     QVERIFY(overlayLayers != nullptr);
     overlayLayers->setConstellationLines(false);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
 
     QVERIFY(controller.focusSearchTarget("constellationLabel", "Orion"));
     QVERIFY(!sceneModel.selectionMarker().isEmpty());
@@ -883,7 +540,7 @@ void SkySceneModelTests::constellationSelectionDoesNotBuildTrail()
 
 void SkySceneModelTests::unresolvedBodySelectionDoesNotBuildTrail()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    SkySceneModelTestHarness harness({
         makeBody(
             "unresolved_target",
             "Unresolved Target",
@@ -891,33 +548,13 @@ void SkySceneModelTests::unresolvedBodySelectionDoesNotBuildTrail()
             8.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
     QVERIFY(overlayLayers != nullptr);
     overlayLayers->setConstellationLines(false);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
 
     QVERIFY(!controller.focusSearchTarget("body", "unresolved_target"));
     QCOMPARE(sceneModel.renderLineSpan().size(), std::size_t(0));
@@ -936,52 +573,19 @@ void SkySceneModelTests::deepSkyInspectorIncludesAliasesSizeAndSource()
         .declinationDeg = 41.269
     };
 
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({m31});
-    QVERIFY(starCatalog != nullptr);
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-09-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const auto stateIt = std::find_if(
-        snapshot.states.begin(),
-        snapshot.states.end(),
-        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
-            return snapshot.bodyAt(state.bodyIndex).displayName == "M31";
-        }
-    );
-    QVERIFY(stateIt != snapshot.states.end());
-    controller.setViewCenter(stateIt->horizontal.altitudeDeg, stateIt->horizontal.azimuthDeg);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    TestSkyContextConfig contextConfig;
+    contextConfig.utcDate = QStringLiteral("2024-09-01");
+    SkySceneModelTestHarness harness({std::move(m31)}, contextConfig);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("messier_031"));
+    SkyContextController& controller = harness.controller();
+    SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(!sceneModel.renderGlyphSpan().empty());
-    const auto glyphIt = std::find_if(
-        sceneModel.renderGlyphSpan().begin(),
-        sceneModel.renderGlyphSpan().end(),
-        [&sceneModel](const SkyRenderGlyph& glyph) {
-            return sceneModel.objectLabelAt(glyph.x, glyph.y) == "M31";
-        }
-    );
-    QVERIFY(glyphIt != sceneModel.renderGlyphSpan().end());
+    const std::optional<SkyRenderGlyph> glyph = harness.renderGlyphWithLabel(QStringLiteral("M31"));
+    QVERIFY(glyph.has_value());
 
-    QVERIFY(sceneModel.selectObjectAt(glyphIt->x, glyphIt->y));
+    QVERIFY(sceneModel.selectObjectAt(glyph->x, glyph->y));
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
     QCOMPARE(inspector.value("title").toString(), QString("M31"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
@@ -996,7 +600,7 @@ void SkySceneModelTests::deepSkyInspectorIncludesAliasesSizeAndSource()
 
 void SkySceneModelTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalog()
 {
-    auto primaryCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto primaryCatalog = createTestCatalog({
         makeDeepSkyBody(
             "primary_dso",
             "Primary DSO",
@@ -1012,7 +616,7 @@ void SkySceneModelTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalo
     });
     QVERIFY(primaryCatalog != nullptr);
 
-    auto deepSkyCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto deepSkyCatalog = createTestCatalog({
         makeDeepSkyBody(
             "open_ngc_m31",
             "OpenNGC M31",
@@ -1059,55 +663,22 @@ void SkySceneModelTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSkyCatalo
 
 void SkySceneModelTests::themeChangesUpdateRenderedColors()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_planet",
             "Demo Planet",
             skygate::ephemeris::CelestialBodyType::Planet,
             -1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const skygate::ephemeris::CelestialBodyState* demoPlanetState = nullptr;
-    for (const auto& state : snapshot.states) {
-        if (snapshot.bodyAt(state.bodyIndex).id == "demo_planet") {
-            demoPlanetState = &state;
-            break;
-        }
-    }
-    QVERIFY(demoPlanetState != nullptr);
-    controller.setViewCenter(
-        demoPlanetState->horizontal.altitudeDeg,
-        demoPlanetState->horizontal.azimuthDeg
-    );
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("demo_planet"));
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
+    const auto demoPlanetState = harness.bodyStateById("demo_planet");
+    QVERIFY(demoPlanetState.has_value());
 
     QColor defaultPointColor;
     for (const auto& point : sceneModel.renderPointSpan()) {
@@ -1146,56 +717,20 @@ void SkySceneModelTests::themeChangesUpdateRenderedColors()
 
 void SkySceneModelTests::solarSystemLabelsCanBeHidden()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_planet",
             "Demo Planet",
             skygate::ephemeris::CelestialBodyType::Planet,
             -1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            1.5,
+            2.5
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const skygate::ephemeris::CelestialBodyState* demoPlanetState = nullptr;
-    for (const auto& state : snapshot.states) {
-        if (snapshot.bodyAt(state.bodyIndex).id == "demo_planet") {
-            demoPlanetState = &state;
-            break;
-        }
-    }
-    QVERIFY(demoPlanetState != nullptr);
-    controller.setViewCenter(
-        demoPlanetState->horizontal.altitudeDeg,
-        demoPlanetState->horizontal.azimuthDeg
-    );
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("demo_planet"));
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Demo Planet"));
 
@@ -1226,43 +761,13 @@ void SkySceneModelTests::deepSkyObjectsRenderAndCanBeHidden()
         .positionAngleDeg = 35.0,
     };
 
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({m31});
-    QVERIFY(starCatalog != nullptr);
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-09-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
-
-    const auto snapshot = controller.ephemerisEngine()->compute(controller.skyContext());
-    const auto m31StateIt = std::find_if(
-        snapshot.states.begin(),
-        snapshot.states.end(),
-        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
-            return snapshot.bodyAt(state.bodyIndex).displayName == "M31";
-        }
-    );
-    QVERIFY(m31StateIt != snapshot.states.end());
-    const auto& state = *m31StateIt;
-    QVERIFY(std::isfinite(state.horizontal.altitudeDeg));
-    QVERIFY(std::isfinite(state.horizontal.azimuthDeg));
-    controller.setViewCenter(state.horizontal.altitudeDeg, state.horizontal.azimuthDeg);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
+    TestSkyContextConfig contextConfig;
+    contextConfig.utcDate = QStringLiteral("2024-09-01");
+    SkySceneModelTestHarness harness({std::move(m31)}, contextConfig);
+    QVERIFY(harness.isValid());
+    QVERIFY(harness.centerOnBody("messier_031"));
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
 
     QVERIFY(!sceneModel.renderGlyphSpan().empty());
     QVERIFY(std::any_of(
@@ -1393,93 +898,60 @@ void SkySceneModelTests::deepestDeepSkyZoomShowsSeparatedAnonymousLabels()
 
 void SkySceneModelTests::constellationLabelsAndLinesCanBeHiddenIndependently()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "hip_27989",
             "HIP 27989",
             skygate::ephemeris::CelestialBodyType::Star,
             1.9,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_25336",
             "HIP 25336",
             skygate::ephemeris::CelestialBodyType::Star,
             2.1,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_25930",
             "HIP 25930",
             skygate::ephemeris::CelestialBodyType::Star,
             2.2,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_26311",
             "HIP 26311",
             skygate::ephemeris::CelestialBodyType::Star,
             2.3,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_26727",
             "HIP 26727",
             skygate::ephemeris::CelestialBodyType::Star,
             2.4,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
-        makeBody(
+        makeFixedBody(
             "hip_24436",
             "HIP 24436",
             skygate::ephemeris::CelestialBodyType::Star,
             2.5,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
     QVERIFY(controller.focusSearchTarget("constellationLabel", "Orion"));
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
 
     QVERIFY(!sceneModel.renderLineSpan().empty());
     QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Orion"));
@@ -1498,43 +970,20 @@ void SkySceneModelTests::constellationLabelsAndLinesCanBeHiddenIndependently()
 
 void SkySceneModelTests::referenceLayerLabelsFollowVisibility()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
+    SkySceneModelTestHarness harness({
+        makeFixedBody(
             "demo_star",
             "Demo Star",
             skygate::ephemeris::CelestialBodyType::Star,
             2.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
+            5.5,
+            5.0
         ),
     });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    QVERIFY(ephemerisEngine != nullptr);
-
-    SkyContextController::InitializationOptions initializationOptions;
-    initializationOptions.loadSettings = false;
-    initializationOptions.initializeLocation = false;
-
-    SkyContextController controller(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
-    );
-    controller.setLive(false);
-    QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
-    controller.setLatitudeText("47.3769");
-    controller.setLongitudeText("8.5417");
-    controller.setElevationText("408.0");
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
     controller.setViewCenter(35.0, 0.0);
-
-    SkySceneModel sceneModel;
-    sceneModel.setSkyContextController(&controller);
-    sceneModel.setViewportSize(1100.0, 760.0);
 
     QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Ecliptic"));
     QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Celestial equator"));

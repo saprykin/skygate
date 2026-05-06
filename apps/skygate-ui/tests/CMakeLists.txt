@@ -41,6 +41,7 @@ add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests SkyHitTargetIndexTest
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests SkyObjectTrailBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests SkyRenderBuildersTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-scene-frame-pipeline-tests SkySceneFramePipelineTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-scene-overlay-adapter-tests SkySceneOverlayAdapterTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-selection-overlay-builder-tests SkySelectionOverlayBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-component-load-tests QmlComponentLoadTests.cpp)
 add_skygate_ui_qtest(skygate-ui-qml-date-time-popup-tests QmlDateTimePopupTests.cpp)
