@@ -5,9 +5,11 @@
 #include <QVariantMap>
 
 #include "skygate/core/math/Geometry2d.hpp"
+#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
 #include "skygate/core/math/SpatialIndex2d.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cctype>
 #include <cstdint>
@@ -268,6 +270,29 @@ struct DeepSkyLabelCandidate final {
     glyph.widthPx = 1.25;
     glyph.color = SkyContextRenderStyle::colorForBodyType(body.type, renderTheme);
     return glyph;
+}
+
+[[nodiscard]] double deepSkyGlyphMarginPx(
+    const skygate::ephemeris::CelestialBody& body,
+    const skygate::core::ProjectionParams& projectionParams
+)
+{
+    const skygate::ephemeris::DeepSkyObjectInfo defaultInfo;
+    const auto& info = body.deepSkyObject.has_value() ? *body.deepSkyObject : defaultInfo;
+    const double pixelsPerDeg = std::min(
+        projectionParams.viewportWidth,
+        projectionParams.viewportHeight
+    ) / std::max(1.0, projectionParams.fovDeg);
+    const double majorArcmin = info.majorAxisArcmin.value_or(10.0);
+    const double minorArcmin = info.minorAxisArcmin.value_or(majorArcmin);
+    double radiusX = std::clamp(((majorArcmin / 60.0) * pixelsPerDeg) * 0.5, 4.5, 44.0);
+    double radiusY = std::clamp(((minorArcmin / 60.0) * pixelsPerDeg) * 0.5, 4.0, 32.0);
+    if (info.kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula) {
+        radiusX = std::clamp(((majorArcmin / 60.0) * pixelsPerDeg) * 0.5, 5.0, 12.0);
+        radiusY = radiusX;
+    }
+
+    return std::max(radiusX, radiusY) + 2.0;
 }
 
 [[nodiscard]] double deepSkyHitRadius(const SkyRenderGlyph& glyph)
@@ -638,12 +663,19 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             continue;
         }
 
-        const auto projected = projection.project(state.horizontal);
+        const bool isDeepSkyObject =
+            body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject;
+        const auto projected = isDeepSkyObject
+            ? projection.projectWithMargin(
+                state.horizontal,
+                deepSkyGlyphMarginPx(body, projection.params())
+            )
+            : projection.project(state.horizontal);
         if (!projected.isVisible || !projected.isFinite()) {
             continue;
         }
 
-        if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
+        if (isDeepSkyObject) {
             frame.glyphs.push_back(makeRenderGlyph(
                 body,
                 state.bodyIndex,
@@ -709,6 +741,8 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
 
     if (lookup.has_value() && overlayLayers.constellationLines) {
+        const skygate::core::ProjectedPolylineBuilder lineBuilder;
+        const QColor lineColor = SkyContextRenderStyle::constellationLineColor(renderTheme);
         for (const auto& lineRef : lineRefs) {
             const auto* startHorizontal = lookup->findHorizontal(lineRef.first);
             const auto* endHorizontal = lookup->findHorizontal(lineRef.second);
@@ -716,35 +750,24 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
                 continue;
             }
 
-            const auto startProjected = projection.project(*startHorizontal);
-            const auto endProjected = projection.project(*endHorizontal);
-            if (
-                !startProjected.isVisible
-                || !startProjected.isFinite()
-                || !endProjected.isVisible
-                || !endProjected.isFinite()
-            ) {
-                continue;
+            const std::array<skygate::core::HorizontalCoordinate, 2> coordinates {
+                *startHorizontal,
+                *endHorizontal
+            };
+            for (const auto& segment : lineBuilder.build(
+                     projection,
+                     coordinates,
+                     maxSegmentLengthSquared
+                 )) {
+                frame.lines.push_back(SkyRenderLine {
+                    .x1 = segment.x1,
+                    .y1 = segment.y1,
+                    .x2 = segment.x2,
+                    .y2 = segment.y2,
+                    .widthPx = kConstellationLineWidthPx,
+                    .color = lineColor
+                });
             }
-
-            const double lengthSquared = skygate::core::squaredDistance2d(
-                endProjected.x,
-                endProjected.y,
-                startProjected.x,
-                startProjected.y
-            );
-            if (lengthSquared > maxSegmentLengthSquared) {
-                continue;
-            }
-
-            frame.lines.push_back(SkyRenderLine {
-                .x1 = startProjected.x,
-                .y1 = startProjected.y,
-                .x2 = endProjected.x,
-                .y2 = endProjected.y,
-                .widthPx = kConstellationLineWidthPx,
-                .color = SkyContextRenderStyle::constellationLineColor(renderTheme)
-            });
         }
     }
 

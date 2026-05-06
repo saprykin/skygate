@@ -30,20 +30,22 @@ ScreenPoint ProjectionPipeline::finishCircular(
     const double projectedX,
     const double projectedY,
     const ProjectionParams& params,
-    const double maxRadius
+    const double maxRadius,
+    const double marginPx
 ) noexcept
 {
     if (maxRadius <= MathConstants::kEpsilon || !std::isfinite(maxRadius)) {
         return invalidParametersPoint();
     }
 
-    if (std::hypot(projectedX, projectedY) > maxRadius) {
-        return culledPoint();
-    }
-
     const double scale = (0.5 * std::min(params.viewportWidth, params.viewportHeight)) / maxRadius;
     if (!std::isfinite(scale) || scale <= MathConstants::kEpsilon) {
         return invalidParametersPoint();
+    }
+
+    const double boundedMarginPx = std::max(0.0, marginPx);
+    if (std::hypot(projectedX, projectedY) > (maxRadius + (boundedMarginPx / scale))) {
+        return culledPoint();
     }
 
     const double screenX = (0.5 * params.viewportWidth) + (projectedX * scale);
@@ -60,7 +62,8 @@ ScreenPoint ProjectionPipeline::finishRectangular(
     const double projectedY,
     const ProjectionParams& params,
     const double halfWidth,
-    const double halfHeight
+    const double halfHeight,
+    const double marginPx
 ) noexcept
 {
     if (halfWidth <= MathConstants::kEpsilon || halfHeight <= MathConstants::kEpsilon) {
@@ -71,17 +74,29 @@ ScreenPoint ProjectionPipeline::finishRectangular(
         return invalidParametersPoint();
     }
 
+    const double scaleX = params.viewportWidth / (halfWidth * 2.0);
+    const double scaleY = params.viewportHeight / (halfHeight * 2.0);
     if (
-        std::abs(projectedX) > (halfWidth + MathConstants::kEpsilon)
-        || std::abs(projectedY) > (halfHeight + MathConstants::kEpsilon)
+        !std::isfinite(scaleX)
+        || !std::isfinite(scaleY)
+        || scaleX <= MathConstants::kEpsilon
+        || scaleY <= MathConstants::kEpsilon
+    ) {
+        return invalidParametersPoint();
+    }
+
+    const double boundedMarginPx = std::max(0.0, marginPx);
+    const double marginX = boundedMarginPx / scaleX;
+    const double marginY = boundedMarginPx / scaleY;
+    if (
+        std::abs(projectedX) > (halfWidth + marginX + MathConstants::kEpsilon)
+        || std::abs(projectedY) > (halfHeight + marginY + MathConstants::kEpsilon)
     ) {
         return culledPoint();
     }
 
-    const double boundedX = std::clamp(projectedX, -halfWidth, halfWidth);
-    const double boundedY = std::clamp(projectedY, -halfHeight, halfHeight);
-    const double normalizedX = boundedX / halfWidth;
-    const double normalizedY = boundedY / halfHeight;
+    const double normalizedX = projectedX / halfWidth;
+    const double normalizedY = projectedY / halfHeight;
     const double screenX = ((normalizedX + 1.0) * 0.5) * params.viewportWidth;
     const double screenY = ((1.0 - normalizedY) * 0.5) * params.viewportHeight;
     if (!std::isfinite(screenX) || !std::isfinite(screenY)) {

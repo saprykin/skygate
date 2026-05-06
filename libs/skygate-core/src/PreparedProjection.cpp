@@ -38,6 +38,14 @@ const ProjectionParams& PreparedProjection::params() const noexcept
 
 ScreenPoint PreparedProjection::project(const HorizontalCoordinate& coordinate) const noexcept
 {
+    return projectWithMargin(coordinate, 0.0);
+}
+
+ScreenPoint PreparedProjection::projectWithMargin(
+    const HorizontalCoordinate& coordinate,
+    const double marginPx
+) const noexcept
+{
     ProjectionAlgorithms::ProjectionFrame frame;
     frame.projectionType = m_projectionType;
     frame.params = m_params;
@@ -47,7 +55,7 @@ ScreenPoint PreparedProjection::project(const HorizontalCoordinate& coordinate) 
     frame.circularMaxRadius = m_circularMaxRadius;
     frame.rectHalfWidth = m_rectHalfWidth;
     frame.rectHalfHeight = m_rectHalfHeight;
-    return ProjectionAlgorithms::project(frame, coordinate);
+    return ProjectionAlgorithms::project(frame, coordinate, marginPx);
 }
 
 }  // namespace skygate::core

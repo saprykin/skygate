@@ -14,7 +14,8 @@ public:
         double projectedX,
         double projectedY,
         const ProjectionParams& params,
-        double maxRadius
+        double maxRadius,
+        double marginPx = 0.0
     ) noexcept;
 
     [[nodiscard]] static ScreenPoint finishRectangular(
@@ -22,7 +23,8 @@ public:
         double projectedY,
         const ProjectionParams& params,
         double halfWidth,
-        double halfHeight
+        double halfHeight,
+        double marginPx = 0.0
     ) noexcept;
 
 private:

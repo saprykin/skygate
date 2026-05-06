@@ -133,8 +133,10 @@ class SkyRenderBuildersTests final : public QObject {
 private slots:
     void starDecimationKeepsBrighterStarInScreenCell();
     void deepSkyVisibilityAndGlyphPolicyFollowPresentationRules();
+    void deepSkyGlyphRendersWhenCenterIsJustOutsideViewport();
     void deepSkyLabelsPreferNamedObjectsAndRespectVisibility();
     void constellationLinesAndLabelsRespectRefsAndVisibility();
+    void constellationLineRendersWhenEndpointsAreOutsideViewport();
 };
 
 void SkyRenderBuildersTests::starDecimationKeepsBrighterStarInScreenCell()
@@ -189,6 +191,20 @@ void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowPresentationRu
     QVERIFY(frame.glyphs.empty());
 }
 
+void SkyRenderBuildersTests::deepSkyGlyphRendersWhenCenterIsJustOutsideViewport()
+{
+    auto fixture = makeFixture({
+        makeDeepSkyBody("edge", "Edge DSO", 7.0),
+    }, 1.0);
+    fixture.snapshot.states.front().horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.76};
+
+    QVERIFY(!fixture.projection->project(fixture.snapshot.states.front().horizontal).isVisible);
+
+    const auto frame = buildFrame(fixture);
+
+    QCOMPARE(frame.glyphs.size(), 1U);
+}
+
 void SkyRenderBuildersTests::deepSkyLabelsPreferNamedObjectsAndRespectVisibility()
 {
     auto fixture = makeFixture({
@@ -240,6 +256,26 @@ void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility
     frame = buildFrame(fixture, hidden, lineRefs, labelRefs);
     QVERIFY(frame.lines.empty());
     QVERIFY(!labelsContainText(frame.labels, "Demo"));
+}
+
+void SkyRenderBuildersTests::constellationLineRendersWhenEndpointsAreOutsideViewport()
+{
+    auto fixture = makeFixture({
+        makeBody("hip_a", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+        makeBody("hip_b", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+    }, 1.0);
+    fixture.snapshot.states[0].horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0};
+    fixture.snapshot.states[1].horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0};
+    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs {
+        {"hip_a", "hip_b"},
+    };
+
+    QVERIFY(!fixture.projection->project(fixture.snapshot.states[0].horizontal).isVisible);
+    QVERIFY(!fixture.projection->project(fixture.snapshot.states[1].horizontal).isVisible);
+
+    const auto frame = buildFrame(fixture, {}, lineRefs);
+
+    QVERIFY(!frame.lines.empty());
 }
 
 QTEST_APPLESS_MAIN(SkyRenderBuildersTests)

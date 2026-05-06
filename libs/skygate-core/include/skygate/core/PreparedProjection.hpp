@@ -16,6 +16,10 @@ public:
     [[nodiscard]] ProjectionType type() const noexcept;
     [[nodiscard]] const ProjectionParams& params() const noexcept;
     [[nodiscard]] ScreenPoint project(const HorizontalCoordinate& coordinate) const noexcept;
+    [[nodiscard]] ScreenPoint projectWithMargin(
+        const HorizontalCoordinate& coordinate,
+        double marginPx
+    ) const noexcept;
 
 private:
     ProjectionType m_projectionType = ProjectionType::Stereographic;

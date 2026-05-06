@@ -2,6 +2,7 @@
 
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/core/math/LinePattern.hpp"
+#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
 #include "skygate/ephemeris/BodyTrailCalculator.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
@@ -9,6 +10,7 @@
 #include <QVariantMap>
 
 #include <algorithm>
+#include <array>
 
 namespace {
 
@@ -136,9 +138,10 @@ void SkyObjectTrailBuilder::appendTrail(
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;
     const QColor pastColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 105);
     const QColor futureColor = colorWithAlpha(input.renderTheme.selectionMarkerBorder, 175);
+    const skygate::core::ProjectedPolylineBuilder polylineBuilder;
 
-    bool hasPreviousPoint = false;
-    skygate::core::ScreenPoint previousPoint;
+    bool hasPreviousCoordinate = false;
+    skygate::core::HorizontalCoordinate previousCoordinate;
     int previousOffsetMinutes = 0;
 
     const skygate::ephemeris::BodyTrailCalculator trailCalculator;
@@ -154,44 +157,39 @@ void SkyObjectTrailBuilder::appendTrail(
     );
 
     for (const auto& sample : samples) {
-        if (!sample.horizontal.has_value()) {
-            hasPreviousPoint = false;
+        if (!sample.horizontal.has_value() || !sample.horizontal->isValid()) {
+            hasPreviousCoordinate = false;
             continue;
         }
 
-        const auto projected = input.preparedProjection->project(*sample.horizontal);
-        if (!projected.isVisible || !projected.isFinite()) {
-            hasPreviousPoint = false;
-            continue;
-        }
-
-        if (hasPreviousPoint) {
-            const double lengthSquared = skygate::core::squaredDistance2d(
-                projected.x,
-                projected.y,
-                previousPoint.x,
-                previousPoint.y
-            );
-            if (lengthSquared <= maxSegmentLengthSquared) {
-                const bool isPastSegment =
-                    previousOffsetMinutes < 0 && sample.offsetMinutes <= 0;
+        if (hasPreviousCoordinate) {
+            const std::array<skygate::core::HorizontalCoordinate, 2> coordinates {
+                previousCoordinate,
+                *sample.horizontal
+            };
+            const bool isPastSegment = previousOffsetMinutes < 0 && sample.offsetMinutes <= 0;
+            for (const auto& segment : polylineBuilder.build(
+                     *input.preparedProjection,
+                     coordinates,
+                     maxSegmentLengthSquared
+                 )) {
                 if (isPastSegment) {
                     appendDashedTrailLine(
                         frame,
-                        previousPoint.x,
-                        previousPoint.y,
-                        projected.x,
-                        projected.y,
+                        segment.x1,
+                        segment.y1,
+                        segment.x2,
+                        segment.y2,
                         kObjectTrailPastWidthPx,
                         pastColor
                     );
                 } else {
                     appendTrailLine(
                         frame,
-                        previousPoint.x,
-                        previousPoint.y,
-                        projected.x,
-                        projected.y,
+                        segment.x1,
+                        segment.y1,
+                        segment.x2,
+                        segment.y2,
                         kObjectTrailFutureWidthPx,
                         futureColor
                     );
@@ -199,15 +197,18 @@ void SkyObjectTrailBuilder::appendTrail(
             }
         }
 
+        const auto projected = input.preparedProjection->project(*sample.horizontal);
         if (
-            sample.offsetMinutes > 0
+            projected.isVisible
+            && projected.isFinite()
+            && sample.offsetMinutes > 0
             && sample.offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0
         ) {
             appendFutureTrailTick(frame, projected, sample.offsetMinutes, futureColor);
         }
 
-        previousPoint = projected;
+        previousCoordinate = *sample.horizontal;
         previousOffsetMinutes = sample.offsetMinutes;
-        hasPreviousPoint = true;
+        hasPreviousCoordinate = true;
     }
 }

@@ -99,7 +99,8 @@ bool ProjectionAlgorithms::prepareFrame(
 
 ScreenPoint ProjectionAlgorithms::project(
     const ProjectionFrame& frame,
-    const HorizontalCoordinate& coordinate
+    const HorizontalCoordinate& coordinate,
+    const double marginPx
 ) noexcept
 {
     if (!coordinate.isValid()) {
@@ -128,7 +129,8 @@ ScreenPoint ProjectionAlgorithms::project(
             projectedX,
             projectedY,
             frame.params,
-            frame.circularMaxRadius
+            frame.circularMaxRadius,
+            marginPx
         );
     }
     case ProjectionType::AzimuthalEquidistant: {
@@ -160,7 +162,8 @@ ScreenPoint ProjectionAlgorithms::project(
             projectedX,
             projectedY,
             frame.params,
-            frame.circularMaxRadius
+            frame.circularMaxRadius,
+            marginPx
         );
     }
     case ProjectionType::Perspective: {
@@ -177,7 +180,8 @@ ScreenPoint ProjectionAlgorithms::project(
             projectedY,
             frame.params,
             frame.rectHalfWidth,
-            frame.rectHalfHeight
+            frame.rectHalfHeight,
+            marginPx
         );
     }
     }
@@ -188,7 +192,8 @@ ScreenPoint ProjectionAlgorithms::project(
 ScreenPoint ProjectionAlgorithms::project(
     const ProjectionType projectionType,
     const HorizontalCoordinate& coordinate,
-    const ProjectionParams& params
+    const ProjectionParams& params,
+    const double marginPx
 ) noexcept
 {
     ProjectionFrame frame;
@@ -196,7 +201,7 @@ ScreenPoint ProjectionAlgorithms::project(
         return ProjectionPipeline::invalidParametersPoint();
     }
 
-    return project(frame, coordinate);
+    return project(frame, coordinate, marginPx);
 }
 
 }  // namespace skygate::core

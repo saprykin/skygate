@@ -6,6 +6,7 @@
 
 #include <QtTest/QtTest>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -31,6 +32,7 @@ private slots:
     void circleHitIndexFiltersTargetsAndSupportsRebuild();
     void projectedPolylineSplitsGapsAndDropsLongJumps();
     void projectedPolylineHandlesBoundaryAndDegenerateInputs();
+    void projectedPolylineSamplesInteriorOfOffscreenSegment();
     void dashedLineBuilderCreatesDashSegments();
     void dashedLineBuilderHandlesDegeneratePatternsAndDiagonals();
     void coordinateFiniteQueriesDoNotChangeValidity();
@@ -260,6 +262,39 @@ void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerateInputs()
         {.altitudeDeg = 46.0, .azimuthDeg = 181.0},
     };
     QVERIFY(builder.build(*projection, coordinatesWithGaps, 1'000'000.0).empty());
+}
+
+void GeometryHelpersTests::projectedPolylineSamplesInteriorOfOffscreenSegment()
+{
+    const auto projection = skygate::core::PreparedProjection::create(
+        skygate::core::ProjectionType::Stereographic,
+        skygate::core::ProjectionParams {
+            .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
+            .fovDeg = 1.0,
+            .rollDeg = 0.0,
+            .viewportWidth = 1000.0,
+            .viewportHeight = 800.0
+        }
+    );
+    QVERIFY(projection.has_value());
+
+    const std::vector<skygate::core::HorizontalCoordinate> coordinates {
+        {.altitudeDeg = 45.0, .azimuthDeg = 179.0},
+        {.altitudeDeg = 45.0, .azimuthDeg = 181.0},
+    };
+    QVERIFY(!projection->project(coordinates.front()).isVisible);
+    QVERIFY(!projection->project(coordinates.back()).isVisible);
+
+    const skygate::core::ProjectedPolylineBuilder builder;
+    const auto segments = builder.build(*projection, coordinates, 1'000'000.0);
+
+    QVERIFY(!segments.empty());
+    QVERIFY(std::any_of(segments.begin(), segments.end(), [](const skygate::core::LineSegment2d& segment) {
+        return segment.x1 >= 0.0 && segment.x1 <= 1000.0
+            && segment.y1 >= 0.0 && segment.y1 <= 800.0
+            && segment.x2 >= 0.0 && segment.x2 <= 1000.0
+            && segment.y2 >= 0.0 && segment.y2 <= 800.0;
+    }));
 }
 
 void GeometryHelpersTests::dashedLineBuilderCreatesDashSegments()

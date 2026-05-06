@@ -67,6 +67,43 @@ private:
     mutable bool m_sawExpectedBodyIndex = false;
 };
 
+class CrossingTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
+        const skygate::core::SkyContext& context
+    ) const override
+    {
+        (void) context;
+        return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext& context,
+        const std::uint32_t bodyIndex
+    ) const override
+    {
+        const auto offsetMinutes = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::minutes>(
+                context.utcTime.time_since_epoch()
+            ).count()
+        );
+        if (offsetMinutes == -30) {
+            return skygate::ephemeris::CelestialBodyState {
+                .bodyIndex = bodyIndex,
+                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0}
+            };
+        }
+        if (offsetMinutes == 0) {
+            return skygate::ephemeris::CelestialBodyState {
+                .bodyIndex = bodyIndex,
+                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0}
+            };
+        }
+
+        return std::nullopt;
+    }
+};
+
 skygate::ui::internal::SkyThemeRenderPalette makeRenderTheme()
 {
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
@@ -74,16 +111,16 @@ skygate::ui::internal::SkyThemeRenderPalette makeRenderTheme()
     return renderTheme;
 }
 
-std::optional<skygate::core::PreparedProjection> makeProjection()
+std::optional<skygate::core::PreparedProjection> makeProjection(const double fovDeg = 90.0)
 {
     return skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
-        skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 45.0, 180.0, 90.0)
+        skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 45.0, 180.0, fovDeg)
     );
 }
 
 SkyObjectTrailInput makeInput(
-    const TrailEngine& engine,
+    const skygate::ephemeris::IEphemerisEngine& engine,
     const skygate::core::PreparedProjection& projection
 )
 {
@@ -123,6 +160,7 @@ private slots:
     void appendsPastDashesFutureSegmentsAndTickLabels();
     void invalidSamplesBreakContinuity();
     void longProjectedJumpsAreDropped();
+    void offscreenTrailSamplesStillRenderCrossingSegment();
 };
 
 void SkyObjectTrailBuilderTests::invalidInputsAppendNoLines()
@@ -209,6 +247,19 @@ void SkyObjectTrailBuilderTests::longProjectedJumpsAreDropped()
         const double dy = line.y2 - line.y1;
         return (dx * dx + dy * dy) > (0.35 * 0.35);
     }));
+}
+
+void SkyObjectTrailBuilderTests::offscreenTrailSamplesStillRenderCrossingSegment()
+{
+    const auto projection = makeProjection(1.0);
+    QVERIFY(projection.has_value());
+    const CrossingTrailEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+
+    builder.appendTrail(frame, makeInput(engine, *projection));
+
+    QVERIFY(!frame.lines.empty());
 }
 
 QTEST_APPLESS_MAIN(SkyObjectTrailBuilderTests)
