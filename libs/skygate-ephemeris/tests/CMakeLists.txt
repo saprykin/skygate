@@ -64,6 +64,11 @@ add_skygate_ephemeris_qtest(
     CatalogPayloadParserTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-property-tests
+    CatalogPropertyTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-fixture-corpus-tests
     CatalogFixtureCorpusTests.cpp
     LABELS integration
@@ -94,6 +99,11 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-codec-tests
     CatalogArchiveCodecTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-archive-property-tests
+    CatalogArchivePropertyTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(

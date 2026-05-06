@@ -19,6 +19,7 @@ function(add_skygate_core_qtest target_name source_file)
         PRIVATE
             Qt6::Test
             skygate::core
+            skygate::test-support
     )
 
     target_compile_features(${target_name} PRIVATE cxx_std_20)
@@ -52,6 +53,7 @@ add_skygate_core_qtest(skygate-core-geolocation-tests GeoLocationTests.cpp)
 add_skygate_core_qtest(skygate-core-core-types-tests CoreTypesTests.cpp)
 add_skygate_core_qtest(skygate-core-angle-math-tests AngleMathTests.cpp)
 add_skygate_core_qtest(skygate-core-geometry-2d-tests Geometry2dTests.cpp)
+add_skygate_core_qtest(skygate-core-geometry-property-tests GeometryPropertyTests.cpp)
 add_skygate_core_qtest(skygate-core-geometry-helpers-tests GeometryHelpersTests.cpp)
 add_skygate_core_qtest(skygate-core-spherical-geometry-tests SphericalGeometryTests.cpp)
 add_skygate_core_qtest(skygate-core-projection-factory-tests ProjectionFactoryTests.cpp)
@@ -59,4 +61,5 @@ add_skygate_core_qtest(skygate-core-azimuthal-equidistant-projection-tests Azimu
 add_skygate_core_qtest(skygate-core-stereographic-projection-tests StereographicProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-perspective-projection-tests PerspectiveProjectionTests.cpp)
 add_skygate_core_qtest(skygate-core-prepared-projection-tests PreparedProjectionTests.cpp)
+add_skygate_core_qtest(skygate-core-projection-property-tests ProjectionPropertyTests.cpp)
 add_skygate_core_qtest(skygate-core-viewport-math-tests ViewportMathTests.cpp)

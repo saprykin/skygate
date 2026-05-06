@@ -78,6 +78,12 @@ std::optional<std::string> CompressedDataInflater::inflate(
     if (status != Z_STREAM_END || (!options.allowEmptyOutput && output.empty())) {
         return std::nullopt;
     }
+    if (
+        options.expectedOutputBytes > 0U
+        && output.size() != options.expectedOutputBytes
+    ) {
+        return std::nullopt;
+    }
 
     return output;
 }
