@@ -83,8 +83,32 @@ add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests LocationCatalogMode
 add_skygate_ui_qtest(skygate-ui-time-zone-catalog-model-tests TimeZoneCatalogModelTests.cpp)
 add_skygate_ui_qtest(skygate-ui-log-capture-tests LogCaptureTests.cpp)
 add_skygate_ui_qtest(
-    skygate-ui-context-controller-tests
-    SkyContextControllerTests.cpp
+    skygate-ui-context-controller-view-location-tests
+    SkyContextControllerViewLocationTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-context-controller-appearance-settings-tests
+    SkyContextControllerAppearanceSettingsTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-context-controller-timeline-tests
+    SkyContextControllerTimelineTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-context-controller-search-tracking-tests
+    SkyContextControllerSearchTrackingTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-context-controller-night-catalog-tests
+    SkyContextControllerNightCatalogTests.cpp
     LABELS integration
     TIMEOUT 60
 )
@@ -185,8 +209,36 @@ add_skygate_ui_qtest(
     ENVIRONMENT ${skygateQmlTestEnvironment}
 )
 add_skygate_ui_qtest(
-    skygate-ui-qml-preferences-tests
-    QmlPreferencesTests.cpp
+    skygate-ui-qml-preferences-catalog-tests
+    QmlPreferencesCatalogTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-preferences-draft-tests
+    QmlPreferencesDraftTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-preferences-appearance-tests
+    QmlPreferencesAppearanceTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-preferences-location-time-tests
+    QmlPreferencesLocationTimeTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-preferences-window-tests
+    QmlPreferencesWindowTests.cpp
     LABELS qml integration slow
     TIMEOUT 120
     ENVIRONMENT ${skygateQmlTestEnvironment}
@@ -199,8 +251,22 @@ add_skygate_ui_qtest(
     ENVIRONMENT ${skygateQmlTestEnvironment}
 )
 add_skygate_ui_qtest(
-    skygate-ui-qml-rendering-tests
-    QmlRenderingTests.cpp
+    skygate-ui-qml-overlay-rendering-tests
+    QmlOverlayRenderingTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-viewport-rendering-tests
+    QmlViewportRenderingTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-main-window-rendering-tests
+    QmlMainWindowRenderingTests.cpp
     LABELS qml integration slow
     TIMEOUT 120
     ENVIRONMENT ${skygateQmlTestEnvironment}
@@ -233,9 +299,15 @@ foreach(qml_test_target IN ITEMS
     skygate-ui-qml-interaction-layer-tests
     skygate-ui-qml-main-window-tests
     skygate-ui-qml-night-conditions-popup-tests
-    skygate-ui-qml-preferences-tests
+    skygate-ui-qml-preferences-catalog-tests
+    skygate-ui-qml-preferences-draft-tests
+    skygate-ui-qml-preferences-appearance-tests
+    skygate-ui-qml-preferences-location-time-tests
+    skygate-ui-qml-preferences-window-tests
     skygate-ui-qml-preference-control-tests
-    skygate-ui-qml-rendering-tests
+    skygate-ui-qml-overlay-rendering-tests
+    skygate-ui-qml-viewport-rendering-tests
+    skygate-ui-qml-main-window-rendering-tests
     skygate-ui-qml-smoke-tests
     skygate-ui-qml-status-footer-tests
     skygate-ui-qml-toolbar-tests
