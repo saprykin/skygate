@@ -75,8 +75,28 @@ set(skygateQmlTestEnvironment
 )
 
 add_skygate_ui_qtest(
-    skygate-ui-scene-model-tests
-    SkySceneModelTests.cpp
+    skygate-ui-scene-model-frame-tests
+    SkySceneModelFrameTests.cpp
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-scene-model-selection-inspector-tests
+    SkySceneModelSelectionInspectorTests.cpp
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-scene-model-trail-tests
+    SkySceneModelTrailTests.cpp
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-scene-model-deep-sky-tests
+    SkySceneModelDeepSkyTests.cpp
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-scene-model-layer-visibility-tests
+    SkySceneModelLayerVisibilityTests.cpp
     TIMEOUT 60
 )
 add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests LocationCatalogModelTests.cpp)
