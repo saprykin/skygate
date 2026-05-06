@@ -10,7 +10,7 @@ private slots:
     void initTestCase();
     void init();
     void catalogSectionBindsDraftAndControls();
-    void settingsDraftApplyAndResetRoundTrip();
+    void preferencesDraftApplyAndResetRoundTrip();
     void catalogSectionDownloadsAppliesClearsAndRestoresCatalogs();
     void generalLoggingControlsBindDraft();
     void appearanceThemeSwitchWorks();
@@ -18,7 +18,7 @@ private slots:
     void appearanceCheckboxChangesRender();
     void locationCoordinateChangesPropagateToSkyView();
     void timeZonePickerFiltersSelectsAndApplies();
-    void settingsDraftCurrentDeviceApplyAndSyncWork();
+    void preferencesDraftCurrentDeviceApplyAndSyncWork();
     void preferencesWindowShellNavigatesAppliesAndCloses();
     void saveAndRestoreState();
 
@@ -52,7 +52,7 @@ void QmlPreferencesTests::catalogSectionBindsDraftAndControls()
             width: 900
             height: 520
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
@@ -60,7 +60,7 @@ void QmlPreferencesTests::catalogSectionBindsDraftAndControls()
             PreferencesCatalogSection {
                 anchors.fill: parent
                 skyContextController: skyContext
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesCatalogSectionBehaviorTest.qml"));
@@ -106,7 +106,7 @@ void QmlPreferencesTests::catalogSectionBindsDraftAndControls()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
+void QmlPreferencesTests::preferencesDraftApplyAndResetRoundTrip()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -125,7 +125,7 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("SkySettingsDraft.qml"),
+        QStringLiteral("PreferencesDraft.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);
@@ -215,7 +215,7 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
             width: 900
             height: 520
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
@@ -223,7 +223,7 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
             PreferencesCatalogSection {
                 anchors.fill: parent
                 skyContextController: skyContext
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesCatalogDownloadTest.qml"));
@@ -321,14 +321,14 @@ void QmlPreferencesTests::generalLoggingControlsBindDraft()
             width: 900
             height: 420
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
             PreferencesGeneralSection {
                 anchors.fill: parent
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesGeneralLoggingTest.qml"));
@@ -395,14 +395,14 @@ void QmlPreferencesTests::appearanceThemeSwitchWorks()
             width: 900
             height: 420
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
             PreferencesAppearanceSection {
                 anchors.fill: parent
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesAppearanceThemeTest.qml"));
@@ -466,14 +466,14 @@ void QmlPreferencesTests::appearanceCheckboxChangesRender()
             width: 900
             height: 420
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
             PreferencesAppearanceSection {
                 anchors.fill: parent
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesAppearanceCheckboxTest.qml"));
@@ -519,14 +519,14 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
             width: 900
             height: 420
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
             PreferencesSkySection {
                 anchors.fill: parent
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesLocationTest.qml"));
@@ -588,14 +588,14 @@ void QmlPreferencesTests::timeZonePickerFiltersSelectsAndApplies()
             width: 900
             height: 520
             property alias draft: draft
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
             PreferencesSkySection {
                 anchors.fill: parent
-                settingsDraft: draft
+                preferencesDraft: draft
             }
         }
     )"), QStringLiteral("PreferencesTimeZonePickerTest.qml"));
@@ -641,7 +641,7 @@ void QmlPreferencesTests::timeZonePickerFiltersSelectsAndApplies()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
+void QmlPreferencesTests::preferencesDraftCurrentDeviceApplyAndSyncWork()
 {
     QQmlEngine engine;
     engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
@@ -726,12 +726,12 @@ void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
                 }
                 function setDeepSkyCatalogUrlText(value) { lastDeepSkyCatalogUrlText = value }
             }
-            SkySettingsDraft {
+            PreferencesDraft {
                 id: draft
                 skyContextController: fakeController
             }
         }
-    )"), QStringLiteral("SkySettingsDraftCurrentDeviceBehaviorTest.qml"));
+    )"), QStringLiteral("PreferencesDraftCurrentDeviceBehaviorTest.qml"));
     QVERIFY(object != nullptr);
     QObject* draft = qvariant_cast<QObject*>(object->property("draft"));
     QObject* fakeController = qvariant_cast<QObject*>(object->property("fakeController"));
@@ -849,7 +849,7 @@ void QmlPreferencesTests::saveAndRestoreState()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("SkySettingsDraft.qml"),
+        QStringLiteral("PreferencesDraft.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);

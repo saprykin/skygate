@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    required property var settingsDraft
+    required property var preferencesDraft
 
     function localPathFromFileUrl(fileUrl) {
         const text = fileUrl.toString()
@@ -20,7 +20,7 @@ Item {
         title: "Choose Log File"
         fileMode: FileDialog.SaveFile
         nameFilters: ["Log files (*.log *.txt)", "All files (*)"]
-        onAccepted: root.settingsDraft.logFilePath = root.localPathFromFileUrl(selectedFile)
+        onAccepted: root.preferencesDraft.logFilePath = root.localPathFromFileUrl(selectedFile)
     }
 
     ColumnLayout {
@@ -57,8 +57,8 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
-                        checked: root.settingsDraft.logToTerminal
-                        onToggled: root.settingsDraft.logToTerminal = checked
+                        checked: root.preferencesDraft.logToTerminal
+                        onToggled: root.preferencesDraft.logToTerminal = checked
                     }
 
                     Label {
@@ -74,8 +74,8 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
-                        checked: root.settingsDraft.logToFile
-                        onToggled: root.settingsDraft.logToFile = checked
+                        checked: root.preferencesDraft.logToFile
+                        onToggled: root.preferencesDraft.logToFile = checked
                     }
 
                     Label {
@@ -109,16 +109,16 @@ Item {
                     objectName: "logFilePathField"
                     Layout.fillWidth: true
                     Layout.minimumWidth: 260
-                    text: root.settingsDraft.logFilePath
-                    enabled: root.settingsDraft.logToFile
+                    text: root.preferencesDraft.logFilePath
+                    enabled: root.preferencesDraft.logToFile
                     placeholderText: "Default app data log path"
-                    onEditingFinished: root.settingsDraft.logFilePath = text
+                    onEditingFinished: root.preferencesDraft.logFilePath = text
                 }
 
                 PreferencesActionButton {
                     text: "Browse..."
                     implicitWidth: 88
-                    enabled: root.settingsDraft.logToFile
+                    enabled: root.preferencesDraft.logToFile
                     onClicked: logFileDialog.open()
                 }
             }

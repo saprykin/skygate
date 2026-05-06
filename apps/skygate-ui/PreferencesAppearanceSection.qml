@@ -4,8 +4,8 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    required property var settingsDraft
-    readonly property var themeOptions: settingsDraft.skyContextController.themeOptions
+    required property var preferencesDraft
+    readonly property var themeOptions: preferencesDraft.skyContextController.themeOptions
 
     function themeIndexForId(themeId) {
         for (let index = 0; index < themeOptions.length; ++index) {
@@ -57,12 +57,12 @@ Item {
                 model: root.themeLabels()
 
                 Binding on currentIndex {
-                    value: root.themeIndexForId(root.settingsDraft.themeId)
+                    value: root.themeIndexForId(root.preferencesDraft.themeId)
                 }
 
                 onActivated: {
                     if (currentIndex >= 0 && currentIndex < root.themeOptions.length) {
-                        root.settingsDraft.themeId = root.themeOptions[currentIndex].id
+                        root.preferencesDraft.themeId = root.themeOptions[currentIndex].id
                     }
                 }
             }
@@ -80,8 +80,8 @@ Item {
             }
 
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayHorizon
-                onToggled: root.settingsDraft.overlayHorizon = checked
+                checked: root.preferencesDraft.overlayHorizon
+                onToggled: root.preferencesDraft.overlayHorizon = checked
             }
             Label {
                 text: "Horizon"
@@ -91,8 +91,8 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayAltAzGrid
-                onToggled: root.settingsDraft.overlayAltAzGrid = checked
+                checked: root.preferencesDraft.overlayAltAzGrid
+                onToggled: root.preferencesDraft.overlayAltAzGrid = checked
             }
             Label {
                 text: "Alt/Az grid"
@@ -103,8 +103,8 @@ Item {
             }
 
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayConstellationLines
-                onToggled: root.settingsDraft.overlayConstellationLines = checked
+                checked: root.preferencesDraft.overlayConstellationLines
+                onToggled: root.preferencesDraft.overlayConstellationLines = checked
             }
             Label {
                 text: "Constellation lines"
@@ -114,8 +114,8 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayConstellationLabels
-                onToggled: root.settingsDraft.overlayConstellationLabels = checked
+                checked: root.preferencesDraft.overlayConstellationLabels
+                onToggled: root.preferencesDraft.overlayConstellationLabels = checked
             }
             Label {
                 text: "Constellation labels"
@@ -126,8 +126,8 @@ Item {
             }
 
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlaySolarSystemLabels
-                onToggled: root.settingsDraft.overlaySolarSystemLabels = checked
+                checked: root.preferencesDraft.overlaySolarSystemLabels
+                onToggled: root.preferencesDraft.overlaySolarSystemLabels = checked
             }
             Label {
                 text: "Solar system labels"
@@ -137,8 +137,8 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayDeepSkyObjects
-                onToggled: root.settingsDraft.overlayDeepSkyObjects = checked
+                checked: root.preferencesDraft.overlayDeepSkyObjects
+                onToggled: root.preferencesDraft.overlayDeepSkyObjects = checked
             }
             Label {
                 text: "Deep sky objects"
@@ -149,8 +149,8 @@ Item {
             }
 
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayDeepSkyLabels
-                onToggled: root.settingsDraft.overlayDeepSkyLabels = checked
+                checked: root.preferencesDraft.overlayDeepSkyLabels
+                onToggled: root.preferencesDraft.overlayDeepSkyLabels = checked
             }
             Label {
                 text: "Deep sky labels"
@@ -160,8 +160,8 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayEcliptic
-                onToggled: root.settingsDraft.overlayEcliptic = checked
+                checked: root.preferencesDraft.overlayEcliptic
+                onToggled: root.preferencesDraft.overlayEcliptic = checked
             }
             Label {
                 text: "Ecliptic"
@@ -172,8 +172,8 @@ Item {
             }
 
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayCelestialEquator
-                onToggled: root.settingsDraft.overlayCelestialEquator = checked
+                checked: root.preferencesDraft.overlayCelestialEquator
+                onToggled: root.preferencesDraft.overlayCelestialEquator = checked
             }
             Label {
                 text: "Celestial equator"
@@ -183,8 +183,8 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
-                checked: root.settingsDraft.overlayCircumpolarBoundary
-                onToggled: root.settingsDraft.overlayCircumpolarBoundary = checked
+                checked: root.preferencesDraft.overlayCircumpolarBoundary
+                onToggled: root.preferencesDraft.overlayCircumpolarBoundary = checked
             }
             Label {
                 text: "Circumpolar boundary"

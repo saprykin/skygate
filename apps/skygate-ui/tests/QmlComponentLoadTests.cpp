@@ -84,7 +84,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             Item {
                 width: 900
                 height: 520
-                SkySettingsDraft {
+                PreferencesDraft {
                     id: draft
                     skyContextController: skyContext
                     Component.onCompleted: resetFromContext()
@@ -92,7 +92,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
                 PreferencesCatalogSection {
                     anchors.fill: parent
                     skyContextController: skyContext
-                    settingsDraft: draft
+                    preferencesDraft: draft
                 }
             }
         )");
@@ -104,14 +104,14 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             Item {
                 width: 900
                 height: 520
-                SkySettingsDraft {
+                PreferencesDraft {
                     id: draft
                     skyContextController: skyContext
                     Component.onCompleted: resetFromContext()
                 }
                 PreferencesGeneralSection {
                     anchors.fill: parent
-                    settingsDraft: draft
+                    preferencesDraft: draft
                 }
             }
         )");
@@ -123,14 +123,14 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             Item {
                 width: 900
                 height: 520
-                SkySettingsDraft {
+                PreferencesDraft {
                     id: draft
                     skyContextController: skyContext
                     Component.onCompleted: resetFromContext()
                 }
                 PreferencesSkySection {
                     anchors.fill: parent
-                    settingsDraft: draft
+                    preferencesDraft: draft
                 }
             }
         )");

@@ -108,7 +108,7 @@ This module is the application layer and the most stateful part of the system.
   - Playback, stepping, speed, magnitude cutoff, and view reset controls.
 - `PreferencesWindow`
   - Observer location, projection, and catalog management UI.
-  - Uses `SkySettingsDraft.qml` as a staged edit buffer before applying changes
+  - Uses `PreferencesDraft.qml` as a staged edit buffer before applying changes
     back to `SkyContextController`.
   - Includes a source-aware location workflow with `Current Device`, `City`,
     and `Custom` modes plus a searchable city picker backed by the bundled

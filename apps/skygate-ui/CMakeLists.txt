@@ -135,7 +135,7 @@ qt_add_qml_module(skygate-ui
         SearchToolbar.qml
         SkyInteractionLayer.qml
         SkyOverlayLayer.qml
-        SkySettingsDraft.qml
+        PreferencesDraft.qml
         StatusDateTimePopup.qml
         StatusFooter.qml
         StatusNightConditionsPopup.qml

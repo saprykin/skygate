@@ -31,8 +31,8 @@ Window {
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
     readonly property bool applyEnabled: !(selectedPage === 1
-                                           && settingsDraft.locationSourceText === "City"
-                                           && settingsDraft.selectedCityId === "")
+                                           && preferencesDraft.locationSourceText === "City"
+                                           && preferencesDraft.selectedCityId === "")
     readonly property string currentSectionDescription: {
         if (selectedPage === 0) {
             return "Application behavior and diagnostics"
@@ -46,8 +46,8 @@ Window {
         return "Catalog source and download settings"
     }
 
-    SkySettingsDraft {
-        id: settingsDraft
+    PreferencesDraft {
+        id: preferencesDraft
         skyContextController: preferencesWindow.skyContextController
     }
 
@@ -55,28 +55,28 @@ Window {
         target: preferencesWindow.skyContextController
 
         function onLatitudeTextChanged() {
-            settingsDraft.syncDeviceLocationFromContext()
+            preferencesDraft.syncDeviceLocationFromContext()
         }
 
         function onLongitudeTextChanged() {
-            settingsDraft.syncDeviceLocationFromContext()
+            preferencesDraft.syncDeviceLocationFromContext()
         }
 
         function onElevationTextChanged() {
-            settingsDraft.syncDeviceLocationFromContext()
+            preferencesDraft.syncDeviceLocationFromContext()
         }
 
         function onLocationSourceTextChanged() {
-            settingsDraft.syncDeviceLocationFromContext()
+            preferencesDraft.syncDeviceLocationFromContext()
         }
     }
 
     function syncFormFromContext() {
-        settingsDraft.resetFromContext()
+        preferencesDraft.resetFromContext()
     }
 
     function applyFormToContext() {
-        settingsDraft.applyToContext()
+        preferencesDraft.applyToContext()
     }
 
     function openWindow() {
@@ -274,26 +274,26 @@ Window {
                             PreferencesGeneralSection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                settingsDraft: settingsDraft
+                                preferencesDraft: preferencesDraft
                             }
 
                             PreferencesSkySection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                settingsDraft: settingsDraft
+                                preferencesDraft: preferencesDraft
                             }
 
                             PreferencesAppearanceSection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                settingsDraft: settingsDraft
+                                preferencesDraft: preferencesDraft
                             }
 
                             PreferencesCatalogSection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 skyContextController: preferencesWindow.skyContextController
-                                settingsDraft: settingsDraft
+                                preferencesDraft: preferencesDraft
                             }
                         }
                     }

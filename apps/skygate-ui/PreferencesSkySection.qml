@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 Item {
     id: root
-    required property var settingsDraft
+    required property var preferencesDraft
 
     GridLayout {
         anchors.left: parent.left
@@ -31,16 +31,16 @@ Item {
             id: locationSourceCombo
             Layout.fillWidth: true
             Layout.columnSpan: 3
-            model: root.settingsDraft.skyContextController.locationSourceOptions
+            model: root.preferencesDraft.skyContextController.locationSourceOptions
 
             Binding on currentIndex {
                 value: Math.max(
                     0,
-                    locationSourceCombo.model.indexOf(root.settingsDraft.locationSourceText)
+                    locationSourceCombo.model.indexOf(root.preferencesDraft.locationSourceText)
                 )
             }
 
-            onActivated: root.settingsDraft.setLocationSource(currentText)
+            onActivated: root.preferencesDraft.setLocationSource(currentText)
         }
 
         Label {
@@ -49,20 +49,20 @@ Item {
             font.family: "Avenir Next"
             font.pixelSize: 11
             Layout.alignment: Qt.AlignVCenter
-            visible: root.settingsDraft.locationSourceText === "City"
+            visible: root.preferencesDraft.locationSourceText === "City"
         }
 
         PreferencesCityPicker {
             Layout.fillWidth: true
             Layout.columnSpan: 3
-            visible: root.settingsDraft.locationSourceText === "City"
+            visible: root.preferencesDraft.locationSourceText === "City"
             enabled: visible
             placeholderText: "Choose a city"
-            catalogModel: root.settingsDraft.skyContextController.cityCatalogModel
-            selectedCityId: root.settingsDraft.selectedCityId
-            selectedText: root.settingsDraft.selectedCityDisplayText
+            catalogModel: root.preferencesDraft.skyContextController.cityCatalogModel
+            selectedCityId: root.preferencesDraft.selectedCityId
+            selectedText: root.preferencesDraft.selectedCityDisplayText
             onCityChosen: function(cityId, displayText, latitudeDeg, longitudeDeg) {
-                root.settingsDraft.selectCity(cityId, displayText, latitudeDeg, longitudeDeg)
+                root.preferencesDraft.selectCity(cityId, displayText, latitudeDeg, longitudeDeg)
             }
         }
 
@@ -78,11 +78,11 @@ Item {
             Layout.fillWidth: true
             Layout.columnSpan: 3
             placeholderText: "Choose a timezone"
-            catalogModel: root.settingsDraft.skyContextController.time.timeZoneCatalogModel
-            selectedTimeZoneId: root.settingsDraft.timeZoneId
-            selectedText: root.settingsDraft.timeZoneDisplayText
+            catalogModel: root.preferencesDraft.skyContextController.time.timeZoneCatalogModel
+            selectedTimeZoneId: root.preferencesDraft.timeZoneId
+            selectedText: root.preferencesDraft.timeZoneDisplayText
             onTimeZoneChosen: function(timeZoneId, displayText) {
-                root.settingsDraft.selectTimeZone(timeZoneId, displayText)
+                root.preferencesDraft.selectTimeZone(timeZoneId, displayText)
             }
         }
 
@@ -108,12 +108,12 @@ Item {
             Binding on text {
                 when: !latitudeInput.activeFocus
                 restoreMode: Binding.RestoreNone
-                value: root.settingsDraft.latitudeText
+                value: root.preferencesDraft.latitudeText
             }
 
             onTextEdited: {
-                root.settingsDraft.useCustomCoordinates()
-                root.settingsDraft.latitudeText = text
+                root.preferencesDraft.useCustomCoordinates()
+                root.preferencesDraft.latitudeText = text
             }
         }
 
@@ -139,12 +139,12 @@ Item {
             Binding on text {
                 when: !longitudeInput.activeFocus
                 restoreMode: Binding.RestoreNone
-                value: root.settingsDraft.longitudeText
+                value: root.preferencesDraft.longitudeText
             }
 
             onTextEdited: {
-                root.settingsDraft.useCustomCoordinates()
-                root.settingsDraft.longitudeText = text
+                root.preferencesDraft.useCustomCoordinates()
+                root.preferencesDraft.longitudeText = text
             }
         }
 
@@ -168,10 +168,10 @@ Item {
             Binding on text {
                 when: !elevationInput.activeFocus
                 restoreMode: Binding.RestoreNone
-                value: root.settingsDraft.elevationText
+                value: root.preferencesDraft.elevationText
             }
 
-            onTextEdited: root.settingsDraft.elevationText = text
+            onTextEdited: root.preferencesDraft.elevationText = text
         }
 
         PreferencesGroupTitle {
@@ -195,10 +195,10 @@ Item {
             model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]
 
             Binding on currentIndex {
-                value: Math.max(0, projectionCombo.model.indexOf(root.settingsDraft.projectionTypeText))
+                value: Math.max(0, projectionCombo.model.indexOf(root.preferencesDraft.projectionTypeText))
             }
 
-            onActivated: root.settingsDraft.projectionTypeText = currentText
+            onActivated: root.preferencesDraft.projectionTypeText = currentText
         }
     }
 }

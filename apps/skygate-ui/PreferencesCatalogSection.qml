@@ -5,7 +5,7 @@ import QtQuick.Layouts
 Item {
     id: catalogSection
     required property var skyContextController
-    required property var settingsDraft
+    required property var preferencesDraft
     readonly property bool catalogBusy: skyContextController.downloadingCatalog
                                        || skyContextController.catalogProcessing
 
@@ -34,10 +34,10 @@ Item {
                 ]
 
                 Binding on currentIndex {
-                    value: Math.max(0, Math.min(catalogPresetCombo.count - 1, settingsDraft.catalogPresetIndex))
+                    value: Math.max(0, Math.min(catalogPresetCombo.count - 1, preferencesDraft.catalogPresetIndex))
                 }
 
-                onActivated: settingsDraft.catalogPresetIndex = currentIndex
+                onActivated: preferencesDraft.catalogPresetIndex = currentIndex
             }
 
             PreferencesActionButton {
@@ -45,11 +45,11 @@ Item {
                 text: "Use catalog"
                 enabled: !catalogBusy && catalogPresetCombo.currentIndex !== 2
                 onClicked: {
-                    settingsDraft.catalogPresetIndex = catalogPresetCombo.currentIndex
+                    preferencesDraft.catalogPresetIndex = catalogPresetCombo.currentIndex
                     if (catalogPresetCombo.currentIndex === 0) {
                         skyContextController.loadCatalogPreset("bundled")
                     } else if (catalogPresetCombo.currentIndex === 1) {
-                        settingsDraft.catalogUrlText =
+                        preferencesDraft.catalogUrlText =
                             "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz"
                         skyContextController.loadCatalogPreset("hyg_v42")
                     }
@@ -74,7 +74,7 @@ Item {
                 enabled: !skyContextController.downloadingCatalog
                          && !skyContextController.catalogProcessing
                 onClicked: {
-                    settingsDraft.catalogPresetIndex = 0
+                    preferencesDraft.catalogPresetIndex = 0
                     skyContextController.loadCatalogPreset("bundled")
                     skyContextController.clearCatalogCache()
                 }
@@ -101,10 +101,10 @@ Item {
                 Binding on text {
                     when: !catalogUrlInput.activeFocus
                     restoreMode: Binding.RestoreNone
-                    value: settingsDraft.catalogUrlText
+                    value: preferencesDraft.catalogUrlText
                 }
 
-                onTextEdited: settingsDraft.catalogUrlText = text
+                onTextEdited: preferencesDraft.catalogUrlText = text
                 onActiveFocusChanged: {
                     if (!activeFocus) {
                         cursorPosition = 0
@@ -124,8 +124,8 @@ Item {
                 text: skyContextController.downloadingCatalog ? "Downloading..." : "Download"
                 enabled: !catalogBusy
                 onClicked: {
-                    settingsDraft.catalogPresetIndex = 2
-                    skyContextController.downloadCatalogFromUrl(settingsDraft.catalogUrlText)
+                    preferencesDraft.catalogPresetIndex = 2
+                    skyContextController.downloadCatalogFromUrl(preferencesDraft.catalogUrlText)
                 }
             }
 
@@ -149,12 +149,12 @@ Item {
                         0,
                         Math.min(
                             deepSkyCatalogPresetCombo.count - 1,
-                            settingsDraft.deepSkyCatalogPresetIndex
+                            preferencesDraft.deepSkyCatalogPresetIndex
                         )
                     )
                 }
 
-                onActivated: settingsDraft.deepSkyCatalogPresetIndex = currentIndex
+                onActivated: preferencesDraft.deepSkyCatalogPresetIndex = currentIndex
             }
 
             PreferencesActionButton {
@@ -162,12 +162,12 @@ Item {
                 text: "Use catalog"
                 enabled: !catalogBusy && deepSkyCatalogPresetCombo.currentIndex !== 2
                 onClicked: {
-                    settingsDraft.deepSkyCatalogPresetIndex = deepSkyCatalogPresetCombo.currentIndex
+                    preferencesDraft.deepSkyCatalogPresetIndex = deepSkyCatalogPresetCombo.currentIndex
                     if (deepSkyCatalogPresetCombo.currentIndex === 0) {
                         skyContextController.loadDeepSkyCatalogPreset("bundled_messier")
                     } else {
                         skyContextController.loadDeepSkyCatalogPreset("open_ngc")
-                        settingsDraft.deepSkyCatalogUrlText =
+                        preferencesDraft.deepSkyCatalogUrlText =
                             skyContextController.deepSkyCatalogUrlText()
                     }
                 }
@@ -190,7 +190,7 @@ Item {
                 text: "Clear Catalog Cache"
                 enabled: !catalogBusy
                 onClicked: {
-                    settingsDraft.deepSkyCatalogPresetIndex = 0
+                    preferencesDraft.deepSkyCatalogPresetIndex = 0
                     skyContextController.loadDeepSkyCatalogPreset("bundled_messier")
                     skyContextController.clearDeepSkyCatalogCache()
                 }
@@ -217,10 +217,10 @@ Item {
                 Binding on text {
                     when: !deepSkyCatalogUrlInput.activeFocus
                     restoreMode: Binding.RestoreNone
-                    value: settingsDraft.deepSkyCatalogUrlText
+                    value: preferencesDraft.deepSkyCatalogUrlText
                 }
 
-                onTextEdited: settingsDraft.deepSkyCatalogUrlText = text
+                onTextEdited: preferencesDraft.deepSkyCatalogUrlText = text
                 onActiveFocusChanged: {
                     if (!activeFocus) {
                         cursorPosition = 0
@@ -240,9 +240,9 @@ Item {
                 text: skyContextController.downloadingCatalog ? "Downloading..." : "Download"
                 enabled: !catalogBusy
                 onClicked: {
-                    settingsDraft.deepSkyCatalogPresetIndex = 2
+                    preferencesDraft.deepSkyCatalogPresetIndex = 2
                     skyContextController.downloadDeepSkyCatalogFromUrl(
-                        settingsDraft.deepSkyCatalogUrlText
+                        preferencesDraft.deepSkyCatalogUrlText
                     )
                 }
             }
