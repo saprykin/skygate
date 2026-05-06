@@ -1,10 +1,9 @@
 #include "AsyncTestSupport.hpp"
-#include "CatalogCoordinator.hpp"
+#include "CatalogDownloadWorkflowTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "catalog/CatalogDownloadService.hpp"
 #include "FakeNetworkAccessManager.hpp"
 #include "LogCapture.hpp"
-#include "catalog/SkyCatalogImportWorkflow.hpp"
 
 #include <QtTest/QtTest>
 
@@ -17,59 +16,22 @@
 
 using namespace skygate::ui::tests;
 
-namespace {
-
-FakeNetworkReply* onlyIssuedReply(FakeNetworkAccessManager& networkAccessManager)
-{
-    const QList<FakeNetworkReply*> replies = networkAccessManager.issuedReplies();
-    if (replies.size() != 1) {
-        QTest::qFail(
-            qPrintable(QString("Expected 1 issued reply, got %1").arg(replies.size())),
-            __FILE__,
-            __LINE__
-        );
-        return nullptr;
-    }
-    return replies.front();
-}
-
-void waitForFakeReplyFinished(FakeNetworkReply* reply)
-{
-    QVERIFY(reply != nullptr);
-    if (!reply->isFinished()) {
-        QSignalSpy finishedSpy(reply, &QNetworkReply::finished);
-        if (!reply->isFinished()) {
-            QVERIFY(finishedSpy.wait(1000));
-        }
-    }
-    QVERIFY(reply->isFinished());
-}
-
-}  // namespace
-
-class CatalogDownloadWorkflowTests final : public QObject {
+class CatalogDownloadServiceTests final : public QObject {
     Q_OBJECT
 
 private slots:
     void invalidUrlCompletesWithoutNetworkRequest();
-    void downloadServiceLogsStartAndSuccessAtInfoLevel();
-    void downloadServiceRetriesUntilFirstSuccessfulPayload();
-    void downloadServiceRejectsEmptyAndOversizedPayloads();
-    void downloadServiceDoesNotCallDestroyedCallbackContext();
-    void downloadServiceStopsRetryAfterDestroyedCallbackContext();
-    void downloadServiceRetriesAfterAbortedReply();
-    void downloadServiceCompletesConcurrentRequestsIndependently();
-    void downloadServiceConcurrentFallbackChainsRemainIsolated();
-    void coordinatorParsesSuccessfulDownloadedCatalog();
-    void coordinatorReportsParseFailureWithSourceUrl();
-    void importWorkflowParsesConstellationPayloads();
-    void importWorkflowDoesNotCompleteConstellationAfterContextDestroyed();
-    void importWorkflowFallsBackForMalformedConstellationPayload();
-    void importWorkflowRejectsDeepSkyCatalogWithoutDsos();
-    void importWorkflowReportsDeepSkyObjectCount();
+    void logsStartAndSuccessAtInfoLevel();
+    void retriesUntilFirstSuccessfulPayload();
+    void rejectsEmptyAndOversizedPayloads();
+    void doesNotCallDestroyedCallbackContext();
+    void stopsRetryAfterDestroyedCallbackContext();
+    void retriesAfterAbortedReply();
+    void completesConcurrentRequestsIndependently();
+    void concurrentFallbackChainsRemainIsolated();
 };
 
-void CatalogDownloadWorkflowTests::invalidUrlCompletesWithoutNetworkRequest()
+void CatalogDownloadServiceTests::invalidUrlCompletesWithoutNetworkRequest()
 {
     FakeNetworkAccessManager networkAccessManager;
     CatalogDownloadService service(&networkAccessManager);
@@ -94,7 +56,7 @@ void CatalogDownloadWorkflowTests::invalidUrlCompletesWithoutNetworkRequest()
     QVERIFY(networkAccessManager.requestedUrls().isEmpty());
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceLogsStartAndSuccessAtInfoLevel()
+void CatalogDownloadServiceTests::logsStartAndSuccessAtInfoLevel()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -125,7 +87,7 @@ void CatalogDownloadWorkflowTests::downloadServiceLogsStartAndSuccessAtInfoLevel
     QVERIFY(messages.contains(QStringLiteral("bytes")));
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceRetriesUntilFirstSuccessfulPayload()
+void CatalogDownloadServiceTests::retriesUntilFirstSuccessfulPayload()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -168,7 +130,7 @@ void CatalogDownloadWorkflowTests::downloadServiceRetriesUntilFirstSuccessfulPay
     }));
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceRejectsEmptyAndOversizedPayloads()
+void CatalogDownloadServiceTests::rejectsEmptyAndOversizedPayloads()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse("https://example.test/empty.csv", {});
@@ -209,7 +171,7 @@ void CatalogDownloadWorkflowTests::downloadServiceRejectsEmptyAndOversizedPayloa
     }));
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceDoesNotCallDestroyedCallbackContext()
+void CatalogDownloadServiceTests::doesNotCallDestroyedCallbackContext()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -246,7 +208,7 @@ void CatalogDownloadWorkflowTests::downloadServiceDoesNotCallDestroyedCallbackCo
     QVERIFY(networkAccessManager.abortedUrls().isEmpty());
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceStopsRetryAfterDestroyedCallbackContext()
+void CatalogDownloadServiceTests::stopsRetryAfterDestroyedCallbackContext()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -287,7 +249,7 @@ void CatalogDownloadWorkflowTests::downloadServiceStopsRetryAfterDestroyedCallba
     QVERIFY(networkAccessManager.abortedUrls().isEmpty());
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceRetriesAfterAbortedReply()
+void CatalogDownloadServiceTests::retriesAfterAbortedReply()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -341,7 +303,7 @@ void CatalogDownloadWorkflowTests::downloadServiceRetriesAfterAbortedReply()
     }));
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsIndependently()
+void CatalogDownloadServiceTests::completesConcurrentRequestsIndependently()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -388,7 +350,7 @@ void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsInd
     QCOMPARE(networkAccessManager.requestedUrls().size(), 2);
 }
 
-void CatalogDownloadWorkflowTests::downloadServiceConcurrentFallbackChainsRemainIsolated()
+void CatalogDownloadServiceTests::concurrentFallbackChainsRemainIsolated()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -456,252 +418,6 @@ void CatalogDownloadWorkflowTests::downloadServiceConcurrentFallbackChainsRemain
     QCOMPARE(networkAccessManager.requestedUrls().size(), 4);
 }
 
-void CatalogDownloadWorkflowTests::coordinatorParsesSuccessfulDownloadedCatalog()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/catalog.csv",
-        {.payload = sampleHygCsvPayload()}
-    );
-    CatalogCoordinator coordinator(&networkAccessManager);
+QTEST_GUILESS_MAIN(CatalogDownloadServiceTests)
 
-    CatalogCoordinator::DownloadResult finalResult;
-    QStringList statuses;
-    runAsync([&](QEventLoop& loop) {
-        coordinator.downloadCatalogFromUrls(
-            {"https://example.test/catalog.csv"},
-            this,
-            [&statuses](const QString& status) {
-                statuses.push_back(status);
-            },
-            [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
-                finalResult = std::move(result);
-                loop.quit();
-            }
-        );
-    });
-
-    QVERIFY(finalResult.catalog != nullptr);
-    QCOMPARE(finalResult.diagnostics.parsedBodyCount, 1U);
-    QVERIFY(finalResult.errorText.isEmpty());
-    QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const QString& status) {
-        return status.startsWith("Catalog: Processing");
-    }));
-}
-
-void CatalogDownloadWorkflowTests::coordinatorReportsParseFailureWithSourceUrl()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/bad.csv",
-        {.payload = sampleHygCsvPayload({1, 42, "Bad", "not-ra", "2.0", "3.0"})}
-    );
-    CatalogCoordinator coordinator(&networkAccessManager);
-
-    CatalogCoordinator::DownloadResult finalResult;
-    QStringList statuses;
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV skipped 1 rows with invalid numeric values; samples: row 2 ra='not-ra' dec='2.0' mag='3.0'"
-    );
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows."
-    );
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Catalog: Source https://example.test/bad.csv parse failed: invalid HYG CSV payload (HYG CSV payload does not contain any valid star rows.)"
-    );
-    runAsync([&](QEventLoop& loop) {
-        coordinator.downloadCatalogFromUrls(
-            {"https://example.test/bad.csv"},
-            this,
-            [&statuses](const QString& status) {
-                statuses.push_back(status);
-            },
-            [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
-                finalResult = std::move(result);
-                loop.quit();
-            }
-        );
-    });
-
-    QVERIFY(finalResult.catalog == nullptr);
-    QVERIFY(finalResult.errorText.contains("https://example.test/bad.csv"));
-    QVERIFY(finalResult.errorText.contains("parse failed"));
-    QCOMPARE(statuses.back(), finalResult.errorText);
-}
-
-void CatalogDownloadWorkflowTests::importWorkflowParsesConstellationPayloads()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/index.json",
-        {.payload = sampleConstellationIndexJsonPayload()}
-    );
-    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
-
-    skygate::ui::internal::SkyConstellationLineImportResult finalResult;
-    QStringList statuses;
-    LogCapture capture(QtInfoMsg);
-    runAsync([&](QEventLoop& loop) {
-        workflow.downloadConstellationLines(
-            {"https://example.test/index.json"},
-            this,
-            [&statuses](const QString& status) {
-                statuses.push_back(status);
-            },
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyConstellationLineImportResult result
-            ) {
-                finalResult = std::move(result);
-                loop.quit();
-            }
-        );
-    });
-
-    QCOMPARE(finalResult.constellationCount, 1U);
-    QCOMPARE(finalResult.lineRefs.size(), 2U);
-    QCOMPARE(finalResult.labelRefs.size(), 1U);
-    QVERIFY(finalResult.hasCustomLines());
-    QCOMPARE(finalResult.statusSuffix, QString("2 segments"));
-    QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const QString& status) {
-        return status.contains("failed", Qt::CaseInsensitive);
-    }));
-    const QString messages = capture.joinedMessages();
-    QVERIFY(messages.contains(QStringLiteral("Constellation lines parsed: 2 segments 1 labels 1 constellations")));
-}
-
-void CatalogDownloadWorkflowTests::importWorkflowDoesNotCompleteConstellationAfterContextDestroyed()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/slow-index.json",
-        {
-            .payload = sampleConstellationIndexJsonPayload(),
-            .delayMs = 20
-        }
-    );
-    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
-
-    bool completionCalled = false;
-    auto callbackContext = std::make_unique<QObject>();
-    workflow.downloadConstellationLines(
-        {"https://example.test/slow-index.json"},
-        callbackContext.get(),
-        {},
-        [&completionCalled](skygate::ui::internal::SkyConstellationLineImportResult) {
-            completionCalled = true;
-        }
-    );
-
-    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
-    callbackContext.reset();
-    waitForFakeReplyFinished(reply);
-    QCoreApplication::processEvents();
-
-    QVERIFY(!completionCalled);
-    QCOMPARE(networkAccessManager.finishedUrls(), QStringList({"https://example.test/slow-index.json"}));
-    QVERIFY(networkAccessManager.abortedUrls().isEmpty());
-}
-
-void CatalogDownloadWorkflowTests::importWorkflowFallsBackForMalformedConstellationPayload()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/bad-index.json",
-        {.payload = "not-json"}
-    );
-    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
-
-    skygate::ui::internal::SkyConstellationLineImportResult finalResult;
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Constellation line parse failed; using bundled fallback. Payload preview: not-json"
-    );
-    runAsync([&](QEventLoop& loop) {
-        workflow.downloadConstellationLines(
-            {"https://example.test/bad-index.json"},
-            this,
-            {},
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyConstellationLineImportResult result
-            ) {
-                finalResult = std::move(result);
-                loop.quit();
-            }
-        );
-    });
-
-    QVERIFY(!finalResult.hasCustomLines());
-    QVERIFY(finalResult.labelRefs.empty());
-    QVERIFY(finalResult.statusSuffix.contains("fallback default"));
-    QVERIFY(finalResult.statusSuffix.contains("parse failed"));
-    QVERIFY(finalResult.statusSuffix.contains("not-json"));
-}
-
-void CatalogDownloadWorkflowTests::importWorkflowRejectsDeepSkyCatalogWithoutDsos()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/stars.csv",
-        {.payload = sampleHygCsvPayload()}
-    );
-    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
-
-    skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
-    runAsync([&](QEventLoop& loop) {
-        workflow.downloadDeepSkyCatalog(
-            {"https://example.test/stars.csv"},
-            "HYG",
-            this,
-            {},
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyDeepSkyCatalogImportResult result
-            ) {
-                finalResult = std::move(result);
-                loop.quit();
-            }
-        );
-    });
-
-    QVERIFY(finalResult.catalog == nullptr);
-    QCOMPARE(finalResult.sourceLabel, QString("HYG"));
-    QCOMPARE(finalResult.foundObjectCount, 1U);
-    QCOMPARE(finalResult.errorText, QString("Catalog: Downloaded deep-sky catalog contains no DSOs"));
-}
-
-void CatalogDownloadWorkflowTests::importWorkflowReportsDeepSkyObjectCount()
-{
-    FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/open-ngc.csv",
-        {.payload = sampleOpenNgcCsvPayload()}
-    );
-    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
-
-    skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
-    runAsync([&](QEventLoop& loop) {
-        workflow.downloadDeepSkyCatalog(
-            {"https://example.test/open-ngc.csv"},
-            "OpenNGC",
-            this,
-            {},
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyDeepSkyCatalogImportResult result
-            ) {
-                finalResult = std::move(result);
-                loop.quit();
-            }
-        );
-    });
-
-    QVERIFY(finalResult.catalog != nullptr);
-    QCOMPARE(finalResult.sourceLabel, QString("OpenNGC"));
-    QCOMPARE(finalResult.foundObjectCount, 1U);
-    QVERIFY(finalResult.errorText.isEmpty());
-}
-
-QTEST_GUILESS_MAIN(CatalogDownloadWorkflowTests)
-
-#include "CatalogDownloadWorkflowTests.moc"
+#include "CatalogDownloadServiceTests.moc"

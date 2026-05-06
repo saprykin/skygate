@@ -1,149 +1,24 @@
-#include "catalog/CompressedDataInflater.hpp"
-#include "catalog/CatalogZipEntrySelector.hpp"
+#include "CatalogArchiveTestSupport.hpp"
+
 #include "catalog/ZipCodec.hpp"
-#include "catalog/ZipDirectoryReader.hpp"
-#include "catalog/ZipEntryExtractor.hpp"
 
 #include <QtTest/QtTest>
 
 #include <array>
-#include <cstdint>
-#include <limits>
 #include <string>
 #include <string_view>
-#include <vector>
-
-namespace {
-
-struct ZipEntrySpec final {
-    std::string path;
-    std::string data;
-    std::uint16_t compressionMethod = 0;
-    std::uint16_t generalPurposeFlag = 0;
-};
-
-void appendLe16(std::string& data, const std::uint16_t value)
-{
-    data.push_back(static_cast<char>(value & 0xffU));
-    data.push_back(static_cast<char>((value >> 8U) & 0xffU));
-}
-
-void appendLe32(std::string& data, const std::uint32_t value)
-{
-    appendLe16(data, static_cast<std::uint16_t>(value & 0xffffU));
-    appendLe16(data, static_cast<std::uint16_t>((value >> 16U) & 0xffffU));
-}
-
-std::string makeZip(
-    const std::vector<ZipEntrySpec>& entries,
-    const std::string_view comment = {}
-)
-{
-    std::string zipData;
-    std::vector<std::uint32_t> localHeaderOffsets;
-    localHeaderOffsets.reserve(entries.size());
-
-    for (const ZipEntrySpec& entry : entries) {
-        localHeaderOffsets.push_back(static_cast<std::uint32_t>(zipData.size()));
-        appendLe32(zipData, 0x04034b50U);
-        appendLe16(zipData, 20U);
-        appendLe16(zipData, entry.generalPurposeFlag);
-        appendLe16(zipData, entry.compressionMethod);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe32(zipData, 0U);
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
-        appendLe16(zipData, 0U);
-        zipData += entry.path;
-        zipData += entry.data;
-    }
-
-    const std::uint32_t centralDirectoryOffset = static_cast<std::uint32_t>(zipData.size());
-    for (std::size_t index = 0; index < entries.size(); ++index) {
-        const ZipEntrySpec& entry = entries[index];
-        appendLe32(zipData, 0x02014b50U);
-        appendLe16(zipData, 20U);
-        appendLe16(zipData, 20U);
-        appendLe16(zipData, entry.generalPurposeFlag);
-        appendLe16(zipData, entry.compressionMethod);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe32(zipData, 0U);
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe16(zipData, 0U);
-        appendLe32(zipData, 0U);
-        appendLe32(zipData, localHeaderOffsets[index]);
-        zipData += entry.path;
-    }
-
-    const std::uint32_t centralDirectorySize =
-        static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
-    appendLe32(zipData, 0x06054b50U);
-    appendLe16(zipData, 0U);
-    appendLe16(zipData, 0U);
-    appendLe16(zipData, static_cast<std::uint16_t>(entries.size()));
-    appendLe16(zipData, static_cast<std::uint16_t>(entries.size()));
-    appendLe32(zipData, centralDirectorySize);
-    appendLe32(zipData, centralDirectoryOffset);
-    appendLe16(zipData, static_cast<std::uint16_t>(comment.size()));
-    zipData.append(comment.data(), comment.size());
-    return zipData;
-}
-
-}  // namespace
 
 class CatalogArchiveCodecTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void inflatesGzipCsvPayloads();
     void extractsFirstCsvEntryFromZipPayloads();
     void extractsStoredCsvEntryFromZipPayloads();
-    void readsCentralDirectoryEntryMetadata();
-    void selectsCsvEntriesAndFallsBackToFirstUsableEntry();
-    void extractorRejectsSizeMismatches();
     void choosesCsvEntryOverEarlierNonCsvEntry();
     void ignoresDirectoriesAndMatchesCsvExtensionCaseInsensitively();
     void rejectsUnsupportedCompressionAndCorruptLocalHeaders();
     void findsEndOfCentralDirectoryWithComment();
-    void inflaterRejectsInvalidInputsAndHonorsOptions();
-    void extractorRejectsBoundaryMetadata();
-    void directoryReaderRejectsMalformedStructures();
 };
-
-void CatalogArchiveCodecTests::inflatesGzipCsvPayloads()
-{
-    using namespace skygate::ephemeris;
-
-    constexpr std::array<unsigned char, 73> kCompressedCsv {
-        0x1f, 0x8b, 0x08, 0x00, 0x77, 0xa9, 0x86, 0x69, 0x00, 0x03, 0xcb, 0x4c,
-        0xd1, 0xc9, 0xc8, 0x2c, 0xd0, 0x29, 0x28, 0xca, 0x2f, 0x48, 0x2d, 0xd2,
-        0x29, 0x4a, 0xd4, 0x49, 0x49, 0x4d, 0xd6, 0xc9, 0x4d, 0x4c, 0xe7, 0x32,
-        0xd7, 0x31, 0x31, 0xd2, 0x09, 0x49, 0x2d, 0x2e, 0x09, 0x2e, 0x49, 0x2c,
-        0xd2, 0x31, 0xd4, 0x33, 0x32, 0xd5, 0xd1, 0x35, 0xd2, 0x33, 0xd5, 0x31,
-        0xd6, 0x33, 0xe2, 0x02, 0x00, 0xb9, 0xd5, 0xee, 0x71, 0x35, 0x00, 0x00,
-        0x00
-    };
-    const std::string_view compressedData(
-        reinterpret_cast<const char*>(kCompressedCsv.data()),
-        kCompressedCsv.size()
-    );
-
-    const auto inflated = CompressedDataInflater::inflate(
-        compressedData,
-        CompressedDataFormat::Gzip
-    );
-
-    QVERIFY(inflated.has_value());
-    QVERIFY(inflated->find("hip") != std::string::npos);
-}
 
 void CatalogArchiveCodecTests::extractsFirstCsvEntryFromZipPayloads()
 {
@@ -181,8 +56,8 @@ void CatalogArchiveCodecTests::extractsFirstCsvEntryFromZipPayloads()
 
 void CatalogArchiveCodecTests::extractsStoredCsvEntryFromZipPayloads()
 {
-    const std::string zipData = makeZip({
-        ZipEntrySpec {
+    const std::string zipData = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "hyg.csv",
             .data = "hip,ra,dec,mag\n42,1,2,3\n",
         },
@@ -194,121 +69,14 @@ void CatalogArchiveCodecTests::extractsStoredCsvEntryFromZipPayloads()
     QCOMPARE(*zipEntry, std::string("hip,ra,dec,mag\n42,1,2,3\n"));
 }
 
-void CatalogArchiveCodecTests::readsCentralDirectoryEntryMetadata()
-{
-    const std::string zipData = makeZip({
-        ZipEntrySpec {
-            .path = "catalog/",
-            .data = {},
-        },
-        ZipEntrySpec {
-            .path = "catalog/hyg.csv",
-            .data = "hip,ra,dec,mag\n5,1,2,3\n",
-        },
-        ZipEntrySpec {
-            .path = "secret.csv",
-            .data = "hidden",
-            .generalPurposeFlag = 0x1U,
-        },
-    });
-
-    const auto entries = skygate::ephemeris::ZipDirectoryReader::readEntries(zipData);
-
-    QVERIFY(entries.has_value());
-    QCOMPARE(entries->size(), std::size_t(3));
-    QCOMPARE(entries->at(0).path, std::string("catalog/"));
-    QVERIFY(entries->at(0).isDirectory());
-    QCOMPARE(entries->at(1).path, std::string("catalog/hyg.csv"));
-    QCOMPARE(entries->at(1).compressionMethod, static_cast<std::uint16_t>(0U));
-    QCOMPARE(entries->at(1).uncompressedSize, std::size_t(23));
-    QVERIFY(!entries->at(1).isEncrypted());
-    QCOMPARE(entries->at(2).path, std::string("secret.csv"));
-    QVERIFY(entries->at(2).isEncrypted());
-}
-
-void CatalogArchiveCodecTests::selectsCsvEntriesAndFallsBackToFirstUsableEntry()
-{
-    const std::vector<skygate::ephemeris::ZipEntryMetadata> entries {
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "catalog/",
-        },
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "secret.csv",
-            .generalPurposeFlag = 0x1U,
-        },
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "README.txt",
-        },
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "nested/HYG.CSV",
-        },
-    };
-
-    const auto* selected =
-        skygate::ephemeris::CatalogZipEntrySelector::selectFirstCsvEntry(entries);
-
-    QVERIFY(selected != nullptr);
-    QCOMPARE(selected->path, std::string("nested/HYG.CSV"));
-
-    const std::vector<skygate::ephemeris::ZipEntryMetadata> fallbackEntries {
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "catalog/",
-        },
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "README.txt",
-        },
-    };
-    selected = skygate::ephemeris::CatalogZipEntrySelector::selectFirstCsvEntry(fallbackEntries);
-
-    QVERIFY(selected != nullptr);
-    QCOMPARE(selected->path, std::string("README.txt"));
-
-    const std::vector<skygate::ephemeris::ZipEntryMetadata> unusableEntries {
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "catalog/",
-        },
-        skygate::ephemeris::ZipEntryMetadata {
-            .path = "secret.csv",
-            .generalPurposeFlag = 0x1U,
-        },
-    };
-
-    QVERIFY(
-        skygate::ephemeris::CatalogZipEntrySelector::selectFirstCsvEntry(unusableEntries)
-        == nullptr
-    );
-}
-
-void CatalogArchiveCodecTests::extractorRejectsSizeMismatches()
-{
-    const std::string zipData = makeZip({
-        ZipEntrySpec {
-            .path = "hyg.csv",
-            .data = "hip,ra,dec,mag\n6,1,2,3\n",
-        },
-    });
-    const auto entries = skygate::ephemeris::ZipDirectoryReader::readEntries(zipData);
-    QVERIFY(entries.has_value());
-    QCOMPARE(entries->size(), std::size_t(1));
-
-    auto entry = entries->front();
-    const auto extracted = skygate::ephemeris::ZipEntryExtractor::extract(zipData, entry);
-
-    QVERIFY(extracted.has_value());
-    QVERIFY(extracted->find("6,1,2,3") != std::string::npos);
-
-    ++entry.uncompressedSize;
-    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entry).has_value());
-}
-
 void CatalogArchiveCodecTests::choosesCsvEntryOverEarlierNonCsvEntry()
 {
-    const std::string zipData = makeZip({
-        ZipEntrySpec {
+    const std::string zipData = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "README.txt",
             .data = "not a catalog",
         },
-        ZipEntrySpec {
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "catalog/hyg.csv",
             .data = "hip,ra,dec,mag\n7,1,2,3\n",
         },
@@ -322,12 +90,12 @@ void CatalogArchiveCodecTests::choosesCsvEntryOverEarlierNonCsvEntry()
 
 void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvExtensionCaseInsensitively()
 {
-    const std::string zipData = makeZip({
-        ZipEntrySpec {
+    const std::string zipData = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "catalog/",
             .data = {},
         },
-        ZipEntrySpec {
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "catalog/HYG.CSV",
             .data = "hip,ra,dec,mag\n8,1,2,3\n",
         },
@@ -341,8 +109,8 @@ void CatalogArchiveCodecTests::ignoresDirectoriesAndMatchesCsvExtensionCaseInsen
 
 void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptLocalHeaders()
 {
-    const std::string unsupportedZip = makeZip({
-        ZipEntrySpec {
+    const std::string unsupportedZip = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "hyg.csv",
             .data = "hip,ra,dec,mag\n9,1,2,3\n",
             .compressionMethod = 12U,
@@ -350,8 +118,8 @@ void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptLocalHeade
     });
     QVERIFY(!skygate::ephemeris::ZipCodec {}.extractFirstCsvEntry(unsupportedZip).has_value());
 
-    std::string corruptZip = makeZip({
-        ZipEntrySpec {
+    std::string corruptZip = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec {
             .path = "hyg.csv",
             .data = "hip,ra,dec,mag\n10,1,2,3\n",
         },
@@ -362,9 +130,9 @@ void CatalogArchiveCodecTests::rejectsUnsupportedCompressionAndCorruptLocalHeade
 
 void CatalogArchiveCodecTests::findsEndOfCentralDirectoryWithComment()
 {
-    const std::string zipData = makeZip(
+    const std::string zipData = skygate::ephemeris::tests::makeZip(
         {
-            ZipEntrySpec {
+            skygate::ephemeris::tests::ZipEntrySpec {
                 .path = "hyg.csv",
                 .data = "hip,ra,dec,mag\n11,1,2,3\n",
             },
@@ -376,126 +144,6 @@ void CatalogArchiveCodecTests::findsEndOfCentralDirectoryWithComment()
 
     QVERIFY(zipEntry.has_value());
     QVERIFY(zipEntry->find("11,1,2,3") != std::string::npos);
-}
-
-void CatalogArchiveCodecTests::inflaterRejectsInvalidInputsAndHonorsOptions()
-{
-    using namespace skygate::ephemeris;
-
-    constexpr std::array<unsigned char, 17> kRawDeflate {
-        0x4b, 0xcc, 0x29, 0xc8, 0x48, 0xd4, 0x49, 0x4a, 0x2d, 0x49, 0xe4, 0x32,
-        0xd4, 0x31, 0xe2, 0x02, 0x00
-    };
-    const std::string_view rawDeflate(
-        reinterpret_cast<const char*>(kRawDeflate.data()),
-        kRawDeflate.size()
-    );
-
-    const auto inflated = CompressedDataInflater::inflate(
-        rawDeflate,
-        CompressedDataFormat::RawDeflate,
-        CompressedDataInflateOptions {
-            .expectedOutputBytes = 15U,
-            .allowEmptyOutput = false
-        }
-    );
-    QVERIFY(inflated.has_value());
-    QCOMPARE(*inflated, std::string("alpha,beta\n1,2\n"));
-
-    QVERIFY(!CompressedDataInflater::inflate("", CompressedDataFormat::RawDeflate).has_value());
-    QVERIFY(!CompressedDataInflater::inflate("not compressed", CompressedDataFormat::RawDeflate).has_value());
-    QVERIFY(!CompressedDataInflater::inflate(
-        rawDeflate,
-        CompressedDataFormat::RawDeflate,
-        CompressedDataInflateOptions {
-            .expectedOutputBytes = 16U,
-            .allowEmptyOutput = false
-        }
-    ).has_value());
-    QVERIFY(!CompressedDataInflater::inflate(
-        rawDeflate,
-        CompressedDataFormat::RawDeflate,
-        CompressedDataInflateOptions {
-            .expectedOutputBytes = std::numeric_limits<std::size_t>::max(),
-            .allowEmptyOutput = false
-        }
-    ).has_value());
-
-    constexpr std::array<unsigned char, 2> kEmptyRawDeflate {0x03, 0x00};
-    const std::string_view emptyRawDeflate(
-        reinterpret_cast<const char*>(kEmptyRawDeflate.data()),
-        kEmptyRawDeflate.size()
-    );
-    QVERIFY(!CompressedDataInflater::inflate(
-        emptyRawDeflate,
-        CompressedDataFormat::RawDeflate
-    ).has_value());
-    const auto emptyInflated = CompressedDataInflater::inflate(
-        emptyRawDeflate,
-        CompressedDataFormat::RawDeflate,
-        CompressedDataInflateOptions {
-            .expectedOutputBytes = 0U,
-            .allowEmptyOutput = true
-        }
-    );
-    QVERIFY(emptyInflated.has_value());
-    QVERIFY(emptyInflated->empty());
-}
-
-void CatalogArchiveCodecTests::extractorRejectsBoundaryMetadata()
-{
-    const std::string zipData = makeZip({
-        ZipEntrySpec {
-            .path = "hyg.csv",
-            .data = "hip,ra,dec,mag\n12,1,2,3\n",
-        },
-        ZipEntrySpec {
-            .path = "empty.csv",
-            .data = {},
-        },
-    });
-    const auto entries = skygate::ephemeris::ZipDirectoryReader::readEntries(zipData);
-    QVERIFY(entries.has_value());
-    QCOMPARE(entries->size(), std::size_t(2));
-
-    auto entryPastEnd = entries->front();
-    entryPastEnd.localHeaderOffset = zipData.size();
-    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entryPastEnd).has_value());
-
-    auto entryOversized = entries->front();
-    entryOversized.compressedSize = zipData.size();
-    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entryOversized).has_value());
-
-    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entries->at(1)).has_value());
-}
-
-void CatalogArchiveCodecTests::directoryReaderRejectsMalformedStructures()
-{
-    QVERIFY(!skygate::ephemeris::ZipDirectoryReader::readEntries("not a zip").has_value());
-
-    std::string truncatedCentralDirectory = makeZip({
-        ZipEntrySpec {
-            .path = "hyg.csv",
-            .data = "hip,ra,dec,mag\n13,1,2,3\n",
-        },
-    });
-    truncatedCentralDirectory.resize(truncatedCentralDirectory.size() - 10U);
-    QVERIFY(!skygate::ephemeris::ZipDirectoryReader::readEntries(
-        truncatedCentralDirectory
-    ).has_value());
-
-    std::string invalidCentralSignature = makeZip({
-        ZipEntrySpec {
-            .path = "hyg.csv",
-            .data = "hip,ra,dec,mag\n14,1,2,3\n",
-        },
-    });
-    const auto centralOffset = invalidCentralSignature.find("PK\x01\x02", 0, 4);
-    QVERIFY(centralOffset != std::string::npos);
-    invalidCentralSignature[centralOffset] = '\0';
-    QVERIFY(!skygate::ephemeris::ZipDirectoryReader::readEntries(
-        invalidCentralSignature
-    ).has_value());
 }
 
 QTEST_APPLESS_MAIN(CatalogArchiveCodecTests)

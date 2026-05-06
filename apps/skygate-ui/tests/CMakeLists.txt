@@ -165,8 +165,20 @@ add_skygate_ui_qtest(
 )
 add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests SkyActiveCatalogBuilderTests.cpp)
 add_skygate_ui_qtest(
-    skygate-ui-catalog-download-workflow-tests
-    CatalogDownloadWorkflowTests.cpp
+    skygate-ui-catalog-download-service-tests
+    CatalogDownloadServiceTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-coordinator-download-tests
+    CatalogCoordinatorDownloadTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-import-workflow-tests
+    SkyCatalogImportWorkflowTests.cpp
     LABELS integration
     TIMEOUT 60
 )
@@ -271,8 +283,15 @@ add_skygate_ui_qtest(
     ENVIRONMENT ${skygateQmlTestEnvironment}
 )
 add_skygate_ui_qtest(
-    skygate-ui-qml-overlay-rendering-tests
-    QmlOverlayRenderingTests.cpp
+    skygate-ui-qml-sky-overlay-layer-payload-rendering-tests
+    QmlSkyOverlayLayerPayloadRenderingTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-sky-overlay-layer-inspector-interaction-tests
+    QmlSkyOverlayLayerInspectorInteractionTests.cpp
     LABELS qml integration slow
     TIMEOUT 120
     ENVIRONMENT ${skygateQmlTestEnvironment}
@@ -325,7 +344,8 @@ foreach(qml_test_target IN ITEMS
     skygate-ui-qml-preferences-location-time-tests
     skygate-ui-qml-preferences-window-tests
     skygate-ui-qml-preference-control-tests
-    skygate-ui-qml-overlay-rendering-tests
+    skygate-ui-qml-sky-overlay-layer-payload-rendering-tests
+    skygate-ui-qml-sky-overlay-layer-inspector-interaction-tests
     skygate-ui-qml-viewport-rendering-tests
     skygate-ui-qml-main-window-rendering-tests
     skygate-ui-qml-smoke-tests

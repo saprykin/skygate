@@ -102,6 +102,21 @@ add_skygate_ephemeris_qtest(
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-archive-inflater-tests
+    CatalogArchiveInflaterTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-archive-zip-directory-tests
+    CatalogArchiveZipDirectoryTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-archive-zip-entry-extractor-tests
+    CatalogArchiveZipEntryExtractorTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-property-tests
     CatalogArchivePropertyTests.cpp
     TIMEOUT 45
