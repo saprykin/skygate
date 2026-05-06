@@ -51,6 +51,7 @@ Item {
 
             PreferencesComboBox {
                 id: themeCombo
+                objectName: "themeCombo"
                 Layout.fillWidth: true
                 Layout.columnSpan: 3
                 model: root.themeLabels()

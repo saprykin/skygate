@@ -4,6 +4,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
+#include "SkyTimeController.hpp"
 
 #include <QDateTime>
 #include <QTimeZone>
@@ -33,6 +34,7 @@ bool SkyContextController::saveSettings() const
     snapshot.elevationMeters = m_location.context.observer.elevationMeters;
     snapshot.locationSourceText = locationSourceText();
     snapshot.selectedCityId = m_location.selectedCityId;
+    snapshot.displayTimeZoneId = m_timeController->timeZoneId();
     snapshot.projectionTypeText = projectionTypeText();
     snapshot.themeId = themeId();
     snapshot.overlayLayers = overlayLayerVisibility();
@@ -100,6 +102,7 @@ bool SkyContextController::loadSettings()
         }
 
         setProjectionTypeText(stateSnapshot->projectionTypeText);
+        m_timeController->setInitialTimeZoneId(stateSnapshot->displayTimeZoneId);
         setThemeId(stateSnapshot->themeId);
         if (m_overlayLayerSettings != nullptr) {
             m_overlayLayerSettings->setVisibility(stateSnapshot->overlayLayers);

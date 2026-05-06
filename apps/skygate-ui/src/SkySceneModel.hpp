@@ -21,6 +21,7 @@
 #include <span>
 
 class SkyContextController;
+class SkyTimeController;
 
 class SkySceneModel final : public QObject {
     Q_OBJECT
@@ -106,6 +107,7 @@ private:
         SkySceneFramePipelineInput frameInput;
         std::span<const std::uint8_t> catalogSourceIds;
         QStringList catalogSourceLabels;
+        const SkyTimeController* timeController = nullptr;
         QString selectedSearchTargetKind;
         QString selectedSearchTargetId;
         QString trackedTargetKind;
@@ -132,6 +134,7 @@ private:
     QMetaObject::Connection m_selectedSearchTargetChangedConnection;
     QMetaObject::Connection m_trackedTargetChangedConnection;
     QMetaObject::Connection m_themeChangedConnection;
+    QMetaObject::Connection m_timeZoneChangedConnection;
     double m_viewportWidth = 0.0;
     double m_viewportHeight = 0.0;
     SkySceneFramePipeline m_framePipeline;

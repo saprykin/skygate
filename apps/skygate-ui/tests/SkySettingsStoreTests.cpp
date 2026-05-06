@@ -77,6 +77,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.elevationMeters = 409.0;
     savedSnapshot.locationSourceText = "City";
     savedSnapshot.selectedCityId = "ch-zurich";
+    savedSnapshot.displayTimeZoneId = "Europe/Zurich";
     savedSnapshot.projectionTypeText = "Perspective";
     savedSnapshot.themeId = "night-vision";
     savedSnapshot.overlayLayers.horizon = false;
@@ -108,6 +109,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
     QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);
     QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
+    QCOMPARE(loadedSnapshot->displayTimeZoneId, savedSnapshot.displayTimeZoneId);
     QCOMPARE(loadedSnapshot->projectionTypeText, savedSnapshot.projectionTypeText);
     QCOMPARE(loadedSnapshot->themeId, savedSnapshot.themeId);
     QVERIFY(loadedSnapshot->overlayLayers.equals(savedSnapshot.overlayLayers));
@@ -181,6 +183,7 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     QCOMPARE(loadedSnapshot->latitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->longitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->elevationMeters, 0.0);
+    QCOMPARE(loadedSnapshot->displayTimeZoneId, QString());
     QCOMPARE(loadedSnapshot->projectionTypeText, QString("FishEyePrototype"));
     QCOMPARE(loadedSnapshot->themeId, QString("unknown-theme"));
     QCOMPARE(loadedSnapshot->overlayLayers.horizon, true);
@@ -207,6 +210,7 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
     QCOMPARE(loadedSnapshot->live, true);
     QCOMPARE(loadedSnapshot->searchToolbarCollapsed, true);
     QCOMPARE(loadedSnapshot->timelineToolbarCollapsed, false);
+    QCOMPARE(loadedSnapshot->displayTimeZoneId, QString());
     QCOMPARE(loadedSnapshot->overlayLayers.horizon, true);
     QCOMPARE(loadedSnapshot->overlayLayers.altAzGrid, false);
     QCOMPARE(loadedSnapshot->overlayLayers.deepSkyLabels, true);

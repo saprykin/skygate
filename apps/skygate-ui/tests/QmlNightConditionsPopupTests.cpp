@@ -1,4 +1,5 @@
 #include "QmlTestSupport.hpp"
+#include "SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -43,6 +44,7 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
     QVERIFY(controller->setUtcDateTimeText("2024-03-21", "12:00:00"));
     controller->setLatitudeText("47.3769");
     controller->setLongitudeText("8.5417");
@@ -81,6 +83,8 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Sun")) != nullptr);
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Moon")) != nullptr);
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Sunset")) != nullptr);
+    QTRY_VERIFY(firstVisibleItemContainingText(root, QStringLiteral("UTC+06:00")) != nullptr);
+    QVERIFY(controller->nightConditions().value("locationText").toString().contains("UTC+06:00"));
     QVERIFY(controller->nightConditions().value("valid").toBool());
 
     QTest::keyClick(exposed.window(), Qt::Key_Escape);

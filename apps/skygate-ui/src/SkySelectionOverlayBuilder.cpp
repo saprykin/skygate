@@ -1,6 +1,7 @@
 #include "SkySelectionOverlayBuilder.hpp"
 
 #include "SkySceneShared.hpp"
+#include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 #include "skygate/ephemeris/ObservationEventCalculator.hpp"
@@ -197,14 +198,6 @@ QString formatUtcTime(const skygate::core::UtcTimePoint& utcTime)
     ).toString("yyyy-MM-dd HH:mm:ss 'UTC'");
 }
 
-QDateTime toUtcDateTime(const skygate::core::UtcTimePoint& utcTime)
-{
-    return QDateTime::fromSecsSinceEpoch(
-        utcTime.time_since_epoch().count(),
-        QTimeZone::UTC
-    );
-}
-
 QString formatObservationStatus(
     const skygate::ephemeris::ObservationEventStatus status
 )
@@ -240,46 +233,25 @@ QString formatObservationEvent(const skygate::ephemeris::ObservationEvent& event
     return formatObservationStatus(event.status);
 }
 
-QString formatObservationRiseSet(
-    const skygate::ephemeris::ObservationEvent& rise,
-    const skygate::ephemeris::ObservationEvent& set
+QString formatObservationEvent(
+    const skygate::ephemeris::ObservationEvent& event,
+    const SkyTimeController* timeController
 )
 {
-    using skygate::ephemeris::ObservationEventStatus;
-
     if (
-        rise.status != ObservationEventStatus::Available
-        && rise.status == set.status
+        event.status == skygate::ephemeris::ObservationEventStatus::Available
+        && event.utcTime.has_value()
+        && timeController != nullptr
     ) {
-        return formatObservationStatus(rise.status);
+        return timeController->formatUtcTime(*event.utcTime);
     }
 
-    if (
-        rise.status == ObservationEventStatus::Available
-        && set.status == ObservationEventStatus::Available
-        && rise.utcTime.has_value()
-        && set.utcTime.has_value()
-    ) {
-        const QDateTime riseUtc = toUtcDateTime(*rise.utcTime);
-        const QDateTime setUtc = toUtcDateTime(*set.utcTime);
-        if (riseUtc.date() == setUtc.date()) {
-            return QString("%1 %2 / %3 UTC").arg(
-                riseUtc.toString("yyyy-MM-dd"),
-                riseUtc.toString("HH:mm:ss"),
-                setUtc.toString("HH:mm:ss")
-            );
-        }
-        return QString("%1 / %2 UTC").arg(
-            riseUtc.toString("yyyy-MM-dd HH:mm:ss"),
-            setUtc.toString("yyyy-MM-dd HH:mm:ss")
-        );
-    }
-
-    return QString("%1 / %2").arg(formatObservationEvent(rise), formatObservationEvent(set));
+    return formatObservationEvent(event);
 }
 
 QString formatObservationCulmination(
-    const skygate::ephemeris::ObservationCulmination& culmination
+    const skygate::ephemeris::ObservationCulmination& culmination,
+    const SkyTimeController* timeController
 )
 {
     if (
@@ -288,7 +260,9 @@ QString formatObservationCulmination(
         && culmination.altitudeDeg.has_value()
     ) {
         return QString("%1 at %2 deg").arg(
-            formatUtcTime(*culmination.utcTime),
+            timeController != nullptr
+                ? timeController->formatUtcTime(*culmination.utcTime)
+                : formatUtcTime(*culmination.utcTime),
             formatFiniteNumber(*culmination.altitudeDeg, 1)
         );
     }
@@ -315,11 +289,18 @@ void appendObservationEventFields(
         body
     );
     fields.push_back(inspectorField(
-        "Rise / Set",
-        formatObservationRiseSet(events.nextRise, events.nextSet)
+        "Rise",
+        formatObservationEvent(events.nextRise, input.timeController)
+    ));
+    fields.push_back(inspectorField(
+        "Set",
+        formatObservationEvent(events.nextSet, input.timeController)
     ));
     fields.push_back(
-        inspectorField("Culmination", formatObservationCulmination(events.culmination))
+        inspectorField(
+            "Culmination",
+            formatObservationCulmination(events.culmination, input.timeController)
+        )
     );
 }
 

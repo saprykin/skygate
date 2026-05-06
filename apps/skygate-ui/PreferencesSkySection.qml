@@ -67,6 +67,26 @@ Item {
         }
 
         Label {
+            text: "Timezone"
+            color: skyContext.theme.formLabelText
+            font.family: "Avenir Next"
+            font.pixelSize: 11
+            Layout.alignment: Qt.AlignVCenter
+        }
+
+        PreferencesTimeZonePicker {
+            Layout.fillWidth: true
+            Layout.columnSpan: 3
+            placeholderText: "Choose a timezone"
+            catalogModel: root.settingsDraft.skyContextController.time.timeZoneCatalogModel
+            selectedTimeZoneId: root.settingsDraft.timeZoneId
+            selectedText: root.settingsDraft.timeZoneDisplayText
+            onTimeZoneChosen: function(timeZoneId, displayText) {
+                root.settingsDraft.selectTimeZone(timeZoneId, displayText)
+            }
+        }
+
+        Label {
             text: "Latitude"
             color: skyContext.theme.formLabelText
             font.family: "Avenir Next"

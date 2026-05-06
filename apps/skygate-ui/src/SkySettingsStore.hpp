@@ -27,6 +27,7 @@ public:
         double elevationMeters = 0.0;
         QString locationSourceText;
         QString selectedCityId;
+        QString displayTimeZoneId;
         QString projectionTypeText;
         QString themeId;
         SkyOverlayLayerVisibility overlayLayers;

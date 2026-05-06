@@ -1,5 +1,6 @@
 #include "QmlTestSupport.hpp"
 
+#include <algorithm>
 #include <optional>
 
 #include <QDateTime>
@@ -157,7 +158,8 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
                     "targetId": "messier_031",
                     "fields": [
                         { "label": "Type", "value": "Galaxy" },
-                        { "label": "Rise / Set", "value": "2024-06-02 23:58:00 / 2024-06-03 04:12:00 UTC" },
+                        { "label": "Rise", "value": "2024-06-02 23:58:00 UTC" },
+                        { "label": "Set", "value": "2024-06-03 04:12:00 UTC" },
                         { "label": "Culmination", "value": "2024-06-02 11:47:00 UTC at 72.4 deg" },
                         { "label": "Source", "value": "OpenNGC" }
                     ],
@@ -198,14 +200,15 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("M31")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Type")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Galaxy")) != nullptr);
-    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Rise / Set")) != nullptr);
-    auto* riseSetValue = firstVisibleItemWithText(
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Rise")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Set")) != nullptr);
+    auto* riseValue = firstVisibleItemWithText(
         root,
-        QStringLiteral("2024-06-02 23:58:00 / 2024-06-03 04:12:00 UTC")
+        QStringLiteral("2024-06-02 23:58:00 UTC")
     );
-    QVERIFY(riseSetValue != nullptr);
-    QCOMPARE(riseSetValue->property("text").toString().count(QStringLiteral("UTC")), 1);
-    QVERIFY(!riseSetValue->property("truncated").toBool());
+    QVERIFY(riseValue != nullptr);
+    QCOMPARE(riseValue->property("text").toString().count(QStringLiteral("UTC")), 1);
+    QVERIFY(!riseValue->property("truncated").toBool());
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Culmination")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("2024-06-02 11:47:00 UTC at 72.4 deg")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Andromeda Galaxy")) != nullptr);
@@ -275,7 +278,8 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
                     "targetId": "sun",
                     "fields": [
                         { "label": "Type", "value": "Star" },
-                        { "label": "Rise / Set", "value": "Always above" },
+                        { "label": "Rise", "value": "Always above" },
+                        { "label": "Set", "value": "Always above" },
                         { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                     ]
                 })
@@ -293,7 +297,8 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
                         "targetId": "sun",
                         "fields": [
                             { "label": "Type", "value": "Star" },
-                            { "label": "Rise / Set", "value": "Always above" },
+                            { "label": "Rise", "value": "Always above" },
+                            { "label": "Set", "value": "Always above" },
                             { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                         ]
                     }
@@ -310,7 +315,8 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
                         "targetId": "sun",
                         "fields": [
                             { "label": "Type", "value": "Star" },
-                            { "label": "Rise / Set", "value": "Always above" },
+                            { "label": "Rise", "value": "Always above" },
+                            { "label": "Set", "value": "Always above" },
                             { "label": "Culmination", "value": "2024-06-02 03:12:00 UTC at 84.0 deg" }
                         ]
                     }
@@ -529,6 +535,26 @@ void QmlRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry()
     QVERIFY(controller != nullptr);
     controller->setMagnitudeCutoff(8.0);
     controller->setViewCenter(45.0, 180.0);
+
+    if (propertyName == QStringLiteral("deepSkyObjects")) {
+        controller->setLive(false);
+        QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
+        controller->setLatitudeText(QStringLiteral("47.3769"));
+        controller->setLongitudeText(QStringLiteral("8.5417"));
+        controller->setElevationText(QStringLiteral("408.0"));
+
+        const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+        const auto m31StateIt = std::find_if(
+            snapshot.states.begin(),
+            snapshot.states.end(),
+            [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
+                return snapshot.bodyAt(state.bodyIndex).id == "messier_031";
+            }
+        );
+        QVERIFY(m31StateIt != snapshot.states.end());
+        controller->setViewCenter(m31StateIt->horizontal.altitudeDeg, m31StateIt->horizontal.azimuthDeg);
+    }
+
     auto sceneModel = makeSceneModel(*controller);
     QVERIFY(sceneModel != nullptr);
 

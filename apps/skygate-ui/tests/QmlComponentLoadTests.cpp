@@ -116,6 +116,43 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
+    QTest::newRow("PreferencesSkySection")
+        << QStringLiteral("PreferencesSkySection")
+        << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 520
+                SkySettingsDraft {
+                    id: draft
+                    skyContextController: skyContext
+                    Component.onCompleted: resetFromContext()
+                }
+                PreferencesSkySection {
+                    anchors.fill: parent
+                    settingsDraft: draft
+                }
+            }
+        )");
+
+    QTest::newRow("PreferencesTimeZonePicker")
+        << QStringLiteral("PreferencesTimeZonePicker")
+        << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 120
+                PreferencesTimeZonePicker {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    catalogModel: skyContext.time.timeZoneCatalogModel
+                    selectedTimeZoneId: skyContext.time.timeZoneId
+                    selectedText: skyContext.time.timeZoneId + " - " + skyContext.time.timeZoneDetailText
+                }
+            }
+        )");
+
     QTest::newRow("SkyOverlayLayer")
         << QStringLiteral("SkyOverlayLayer")
         << QStringLiteral(R"(

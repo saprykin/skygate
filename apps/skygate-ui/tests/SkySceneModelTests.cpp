@@ -4,6 +4,7 @@
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkyRenderBuilders.hpp"
 #include "SkySceneModel.hpp"
+#include "SkyTimeController.hpp"
 #include "SkyTheme.hpp"
 #include "catalog/SkyActiveCatalogBuilder.hpp"
 
@@ -201,6 +202,7 @@ void SkySceneModelTests::buildsFrameAndSupportsHitTesting()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -262,6 +264,7 @@ void SkySceneModelTests::reusesSnapshotAcrossViewChanges()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -311,6 +314,7 @@ void SkySceneModelTests::showsSearchSelectionMarkerForFocusedBody()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -357,6 +361,7 @@ void SkySceneModelTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -394,8 +399,8 @@ void SkySceneModelTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
     QCOMPARE(inspectorFieldValue(inspector, "Magnitude"), QString("2.3"));
     QVERIFY(!inspectorFieldValue(inspector, "Alt / Az").isEmpty());
     QVERIFY(!inspectorFieldValue(inspector, "RA / Dec").isEmpty());
-    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains("UTC"));
-    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains(" / "));
+    QVERIFY(inspectorFieldValue(inspector, "Rise").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Set").contains("UTC"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
     QVERIFY(inspectorFieldValue(inspector, "Angular size").isEmpty());
@@ -433,6 +438,7 @@ void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -448,8 +454,8 @@ void SkySceneModelTests::searchSelectionBuildsInspectorNearMarker()
     const QVariantMap selectionMarker = sceneModel.selectionMarker();
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
     QCOMPARE(inspector.value("title").toString(), QString("Demo Target"));
-    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains("UTC"));
-    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains(" / "));
+    QVERIFY(inspectorFieldValue(inspector, "Rise").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Set").contains("UTC"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
     QVERIFY(sceneModel.renderLineSpan().size() > 0U);
@@ -485,6 +491,7 @@ void SkySceneModelTests::circumpolarInspectorShowsObservationFallbacks()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -498,7 +505,8 @@ void SkySceneModelTests::circumpolarInspectorShowsObservationFallbacks()
 
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
     QCOMPARE(inspector.value("title").toString(), QString("Demo Circumpolar"));
-    QCOMPARE(inspectorFieldValue(inspector, "Rise / Set"), QString("Always above"));
+    QCOMPARE(inspectorFieldValue(inspector, "Rise"), QString("Always above"));
+    QCOMPARE(inspectorFieldValue(inspector, "Set"), QString("Always above"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
 }
@@ -531,6 +539,7 @@ void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
         initializationOptions,
         nullptr
     );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     controller.setLive(false);
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:00:00"));
     controller.setLatitudeText("47.3769");
@@ -547,6 +556,19 @@ void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
     QVERIFY(!initialInspector.value("pinned").toBool());
     const double initialX = initialInspector.value("x").toDouble();
     const double initialY = initialInspector.value("y").toDouble();
+    const std::uint64_t snapshotBeforeTimeZoneChange = sceneModel.snapshotGeneration();
+    QVERIFY(inspectorFieldValue(initialInspector, "Rise").contains("UTC"));
+    QVERIFY(inspectorFieldValue(initialInspector, "Set").contains("UTC"));
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
+    QCOMPARE(sceneModel.snapshotGeneration(), snapshotBeforeTimeZoneChange);
+    QVERIFY(
+        inspectorFieldValue(
+            sceneModel.selectedObjectInspector(),
+            "Rise"
+        ).contains("UTC+06:00")
+    );
+    QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
+    QCOMPARE(sceneModel.snapshotGeneration(), snapshotBeforeTimeZoneChange);
 
     controller.panViewBy(2.0, 0.0);
     const QVariantMap followedInspector = sceneModel.selectedObjectInspector();
@@ -561,7 +583,7 @@ void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
     QVERIFY(pinnedInspector.value("pinned").toBool());
     QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);
     QCOMPARE(pinnedInspector.value("y").toDouble(), 140.0);
-    const QString pinnedRiseSetText = inspectorFieldValue(pinnedInspector, "Rise / Set");
+    const QString pinnedRiseText = inspectorFieldValue(pinnedInspector, "Rise");
 
     controller.panViewBy(2.0, 0.0);
     pinnedInspector = sceneModel.selectedObjectInspector();
@@ -574,8 +596,8 @@ void SkySceneModelTests::inspectorFollowsObjectUnlessPinned()
     QVERIFY(pinnedInspector.value("pinned").toBool());
     QCOMPARE(pinnedInspector.value("x").toDouble(), 120.0);
     QCOMPARE(pinnedInspector.value("y").toDouble(), 140.0);
-    QVERIFY(inspectorFieldValue(pinnedInspector, "Rise / Set").contains("UTC"));
-    QVERIFY(inspectorFieldValue(pinnedInspector, "Rise / Set") != pinnedRiseSetText);
+    QVERIFY(inspectorFieldValue(pinnedInspector, "Rise").contains("UTC"));
+    QVERIFY(inspectorFieldValue(pinnedInspector, "Rise") != pinnedRiseText);
 
     sceneModel.setSelectedObjectInspectorPinned(false);
     const QVariantMap unpinnedInspector = sceneModel.selectedObjectInspector();

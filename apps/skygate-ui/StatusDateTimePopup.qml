@@ -20,8 +20,8 @@ FocusScope {
     z: 1000
 
     function syncFromController() {
-        stagedDateText = skyContextController.utcDateText
-        stagedTimeText = skyContextController.utcTimeText
+        stagedDateText = skyContextController.time.dateText
+        stagedTimeText = skyContextController.time.timeText
         errorText = ""
     }
 
@@ -41,7 +41,7 @@ FocusScope {
     }
 
     function applyChanges() {
-        const validationError = skyContextController.validateUtcDateTimeText(
+        const validationError = skyContextController.time.validateDateTimeText(
             stagedDateText,
             stagedTimeText
         )
@@ -50,12 +50,12 @@ FocusScope {
             return
         }
 
-        if (skyContextController.setUtcDateTimeText(stagedDateText, stagedTimeText)) {
+        if (skyContextController.time.setDateTimeText(stagedDateText, stagedTimeText)) {
             close()
             return
         }
 
-        errorText = "Enter a valid UTC date and time."
+        errorText = "Enter a valid date and time."
     }
 
     Keys.onEscapePressed: close()
@@ -92,7 +92,7 @@ FocusScope {
 
             Label {
                 Layout.fillWidth: true
-                text: "Set UTC Date/Time"
+                text: "Set Date/Time"
                 color: theme.textPrimary
                 font.family: "Avenir Next"
                 font.pixelSize: 13
@@ -101,7 +101,11 @@ FocusScope {
 
             Label {
                 Layout.fillWidth: true
-                text: "Applies a fixed UTC until you jump back to Now. BCE dates use proleptic Gregorian years."
+                text: "Interpreted as "
+                      + dateTimePopup.skyContextController.time.timeZoneId
+                      + " · "
+                      + dateTimePopup.skyContextController.time.timeZoneLabel
+                      + ". BCE dates use proleptic Gregorian years."
                 color: theme.textSecondary
                 font.family: "Avenir Next"
                 font.pixelSize: 10
@@ -109,7 +113,7 @@ FocusScope {
             }
 
             Label {
-                text: "UTC Date"
+                text: "Date"
                 color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
@@ -133,7 +137,7 @@ FocusScope {
             }
 
             Label {
-                text: "UTC Time"
+                text: "Time"
                 color: theme.formLabelText
                 font.family: "Avenir Next"
                 font.pixelSize: 10
@@ -184,7 +188,7 @@ FocusScope {
                     text: "Now"
                     onClicked: {
                         dateTimePopup.errorText = ""
-                        dateTimePopup.skyContextController.goLiveNow()
+                        dateTimePopup.skyContextController.time.goLiveNow()
                         dateTimePopup.close()
                     }
                 }

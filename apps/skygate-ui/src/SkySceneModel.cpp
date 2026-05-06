@@ -1,6 +1,7 @@
 #include "SkySceneModel.hpp"
 
 #include "SkyContextController.hpp"
+#include "SkyTimeController.hpp"
 
 #include <QColor>
 #include <QPointF>
@@ -177,6 +178,15 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             &SkyContextController::themeChanged,
             this,
             &SkySceneModel::rebuildSceneFrame
+        );
+        m_timeZoneChangedConnection = connect(
+            m_skyContextController->timeController(),
+            &SkyTimeController::timeZoneChanged,
+            this,
+            [this] {
+                m_sceneCompositionKey.reset();
+                rebuildSceneFrame();
+            }
         );
     }
 
@@ -358,11 +368,15 @@ void SkySceneModel::disconnectFromContextController()
     if (m_themeChangedConnection) {
         disconnect(m_themeChangedConnection);
     }
+    if (m_timeZoneChangedConnection) {
+        disconnect(m_timeZoneChangedConnection);
+    }
 
     m_skyContextChangedConnection = {};
     m_selectedSearchTargetChangedConnection = {};
     m_trackedTargetChangedConnection = {};
     m_themeChangedConnection = {};
+    m_timeZoneChangedConnection = {};
 }
 
 bool SkySceneModel::clearSceneFrame()
@@ -415,6 +429,7 @@ std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() c
         },
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),
         .catalogSourceLabels = m_skyContextController->catalogSourceLabels(),
+        .timeController = m_skyContextController->timeController(),
         .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
         .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId(),
         .trackedTargetKind = m_skyContextController->trackedTargetKind(),
@@ -606,6 +621,7 @@ SkySelectionOverlayInput SkySceneModel::buildSelectionInput(
     return SkySelectionOverlayInput {
         .snapshot = frameResult.snapshot,
         .ephemerisEngine = input.frameInput.ephemerisEngine,
+        .timeController = input.timeController,
         .preparedProjection = frameResult.preparedProjection,
         .stateIndexByBodyId = frameResult.stateIndexByBodyId,
         .skyContext = input.frameInput.skyContext,

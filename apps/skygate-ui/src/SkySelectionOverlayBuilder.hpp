@@ -15,9 +15,12 @@
 #include <optional>
 #include <span>
 
+class SkyTimeController;
+
 struct SkySelectionOverlayInput final {
     const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
+    const SkyTimeController* timeController = nullptr;
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
     const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
     std::optional<skygate::core::SkyContext> skyContext;

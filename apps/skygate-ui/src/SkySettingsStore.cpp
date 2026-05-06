@@ -204,6 +204,7 @@ bool SkySettingsStore::saveState(const StateSnapshot& snapshot) const
         snapshot.locationSourceText
     );
     settings.setValue(SkyContextSettings::key("selectedCityId"), snapshot.selectedCityId);
+    settings.setValue(SkyContextSettings::key("displayTimeZoneId"), snapshot.displayTimeZoneId);
     settings.setValue(
         SkyContextSettings::key("projectionType"),
         snapshot.projectionTypeText
@@ -354,6 +355,10 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
     snapshot.selectedCityId = settings.value(
         SkyContextSettings::key("selectedCityId"),
         snapshot.selectedCityId
+    ).toString();
+    snapshot.displayTimeZoneId = settings.value(
+        SkyContextSettings::key("displayTimeZoneId"),
+        snapshot.displayTimeZoneId
     ).toString();
     snapshot.projectionTypeText = settings.value(
         SkyContextSettings::key("projectionType"),

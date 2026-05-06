@@ -4,6 +4,7 @@
 #include "SkyLogging.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
+#include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
@@ -274,6 +275,7 @@ private slots:
     void invalidSavedThemeFallsBackToDefault();
     void setThemeIdUpdatesPaletteAndEmitsSignals();
     void loggingSettingsApplyAndPersist();
+    void invalidSavedTimeZoneFallsBackToUtc();
     void restoresSavedOverlayLayerVisibility();
     void setUtcDateTimeTextAppliesAtomically();
     void setUtcDateTimeTextAcceptsBceInput();
@@ -570,6 +572,7 @@ void SkyContextControllerTests::loggingSettingsApplyAndPersist()
     controller->setLogToTerminal(false);
     controller->setLogToFile(true);
     controller->setLogFilePath(logFilePath);
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
 
     QCOMPARE(controller->logToTerminal(), false);
     QCOMPARE(controller->logToFile(), true);
@@ -582,6 +585,7 @@ void SkyContextControllerTests::loggingSettingsApplyAndPersist()
 
     QVERIFY(controller->saveSettings());
     const auto restoredController = createController(true);
+    QCOMPARE(restoredController->timeController()->timeZoneId(), QString("Asia/Bishkek"));
     QCOMPARE(restoredController->logToTerminal(), false);
     QCOMPARE(restoredController->logToFile(), true);
     QCOMPARE(restoredController->logFilePath(), logFilePath);
@@ -589,6 +593,18 @@ void SkyContextControllerTests::loggingSettingsApplyAndPersist()
     QCOMPARE(activeConfiguration.logToTerminal, false);
     QCOMPARE(activeConfiguration.logToFile, true);
     QCOMPARE(activeConfiguration.logFilePath, logFilePath);
+}
+
+void SkyContextControllerTests::invalidSavedTimeZoneFallsBackToUtc()
+{
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.displayTimeZoneId = QStringLiteral("Skygate/InvalidZone");
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+
+    QCOMPARE(controller->timeController()->timeZoneId(), QString("UTC"));
 }
 
 void SkyContextControllerTests::restoresSavedOverlayLayerVisibility()
@@ -1228,19 +1244,27 @@ void SkyContextControllerTests::nightConditionsPopulateAndRefreshForValidObserve
 {
     const auto controller = createController();
     configureFocusTestContext(*controller);
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
     QVERIFY(controller->setUtcDateTimeText("2024-03-21", "12:00:00"));
 
     controller->refreshNightConditions();
     const QVariantMap initialConditions = controller->nightConditions();
     QVERIFY(initialConditions.value("valid").toBool());
     QCOMPARE(initialConditions.value("sunRows").toList().size(), 6);
-    QVERIFY(initialConditions.value("locationText").toString().contains("UTC"));
+    QVERIFY(initialConditions.value("locationText").toString().contains("UTC+06:00"));
     QVERIFY(initialConditions.value("moonPhaseText").toString().contains("%"));
     QVERIFY(initialConditions.value("moonRiseText").toString() != "--");
     QVERIFY(initialConditions.value("moonSetText").toString() != "--");
     QVERIFY(
         QStringList({"sun", "twilight", "moon"}).contains(controller->nightConditionsIconKind())
     );
+
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("UTC")));
+    const QVariantMap utcConditions = controller->nightConditions();
+    QVERIFY(utcConditions.value("valid").toBool());
+    QVERIFY(utcConditions.value("locationText").toString().contains("UTC"));
+    QVERIFY(!utcConditions.value("locationText").toString().contains("UTC+06:00"));
+    QVERIFY(utcConditions != initialConditions);
 
     QVERIFY(controller->setUtcDateTimeText("2024-03-22", "12:00:00"));
     controller->refreshNightConditions();

@@ -1,6 +1,7 @@
 #include "SkyContextController.hpp"
 
 #include "SkyContextControllerSupport.hpp"
+#include "SkyTimeController.hpp"
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
 #include <QDateTime>
@@ -26,108 +27,120 @@ namespace {
     return std::nullopt;
 }
 
-[[nodiscard]] QString formatEventValue(
-    const skygate::ephemeris::ObservationEvent& event
-)
-{
-    using skygate::ephemeris::ObservationEventStatus;
+class NightConditionsMapBuilder final {
+public:
+    NightConditionsMapBuilder(
+        const skygate::core::SkyContext& context,
+        const SkyTimeController* timeController
+    )
+        : m_context(context)
+        , m_timeController(timeController)
+    {
+    }
 
-    switch (event.status) {
-    case ObservationEventStatus::Available:
-        if (event.utcTime.has_value()) {
-            return skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(
-                *event.utcTime
-            ).toString("HH:mm");
+    [[nodiscard]] QVariantMap placeholderMap() const
+    {
+        return QVariantMap {
+            {QStringLiteral("valid"), false},
+            {QStringLiteral("locationText"), locationText()},
+            {QStringLiteral("sunRows"), QVariantList {}},
+            {QStringLiteral("moonPhaseText"), QStringLiteral("--")},
+            {QStringLiteral("moonRiseText"), QStringLiteral("--")},
+            {QStringLiteral("moonSetText"), QStringLiteral("--")}
+        };
+    }
+
+    [[nodiscard]] QVariantMap conditionsMap(
+        const skygate::ephemeris::NightConditions& conditions
+    ) const
+    {
+        if (!conditions.valid) {
+            return placeholderMap();
         }
-        return "--";
-    case ObservationEventStatus::AlwaysAbove:
-        return "Always up";
-    case ObservationEventStatus::AlwaysBelow:
-        return "Always down";
-    case ObservationEventStatus::NoEventInSearchWindow:
-        return "No event";
-    case ObservationEventStatus::InvalidInput:
-    case ObservationEventStatus::Unresolved:
+
+        QVariantList sunRows;
+        sunRows.push_back(eventRow(QStringLiteral("Sunset"), conditions.sunset));
+        sunRows.push_back(eventRow(QStringLiteral("Civil dusk"), conditions.civilDusk));
+        sunRows.push_back(eventRow(QStringLiteral("Nautical dusk"), conditions.nauticalDusk));
+        sunRows.push_back(eventRow(QStringLiteral("Astro dusk"), conditions.astronomicalDusk));
+        sunRows.push_back(eventRow(QStringLiteral("Astro dawn"), conditions.astronomicalDawn));
+        sunRows.push_back(eventRow(QStringLiteral("Sunrise"), conditions.sunrise));
+
+        return QVariantMap {
+            {QStringLiteral("valid"), true},
+            {QStringLiteral("locationText"), locationText()},
+            {QStringLiteral("sunRows"), sunRows},
+            {
+                QStringLiteral("moonPhaseText"),
+                QString("%1 | %2%")
+                    .arg(QString::fromStdString(conditions.moonPhaseName))
+                    .arg(qRound(conditions.moonIlluminationPercent))
+            },
+            {QStringLiteral("moonRiseText"), formatEventValue(conditions.moonrise)},
+            {QStringLiteral("moonSetText"), formatEventValue(conditions.moonset)}
+        };
+    }
+
+private:
+    [[nodiscard]] QString formatEventValue(
+        const skygate::ephemeris::ObservationEvent& event
+    ) const
+    {
+        using skygate::ephemeris::ObservationEventStatus;
+
+        switch (event.status) {
+        case ObservationEventStatus::Available:
+            if (event.utcTime.has_value()) {
+                return m_timeController != nullptr
+                    ? m_timeController->formatUtcTime(*event.utcTime, false)
+                    : skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(
+                        *event.utcTime
+                    ).toString("HH:mm");
+            }
+            return "--";
+        case ObservationEventStatus::AlwaysAbove:
+            return "Always up";
+        case ObservationEventStatus::AlwaysBelow:
+            return "Always down";
+        case ObservationEventStatus::NoEventInSearchWindow:
+            return "No event";
+        case ObservationEventStatus::InvalidInput:
+        case ObservationEventStatus::Unresolved:
+            return "--";
+        }
+
         return "--";
     }
 
-    return "--";
-}
-
-[[nodiscard]] QVariantMap eventRow(
-    const QString& label,
-    const skygate::ephemeris::ObservationEvent& event
-)
-{
-    return QVariantMap {
-        {QStringLiteral("label"), label},
-        {QStringLiteral("value"), formatEventValue(event)}
-    };
-}
-
-[[nodiscard]] QVariantMap placeholderConditionsMap(
-    const skygate::core::SkyContext& context
-)
-{
-    return QVariantMap {
-        {QStringLiteral("valid"), false},
-        {
-            QStringLiteral("locationText"),
-            QString("UTC | Lat %1 Lon %2")
-                .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
-                    context.observer.latitudeDeg
-                ))
-                .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
-                    context.observer.longitudeDeg
-                ))
-        },
-        {QStringLiteral("sunRows"), QVariantList {}},
-        {QStringLiteral("moonPhaseText"), QStringLiteral("--")},
-        {QStringLiteral("moonRiseText"), QStringLiteral("--")},
-        {QStringLiteral("moonSetText"), QStringLiteral("--")}
-    };
-}
-
-[[nodiscard]] QVariantMap conditionsMap(
-    const skygate::core::SkyContext& context,
-    const skygate::ephemeris::NightConditions& conditions
-)
-{
-    if (!conditions.valid) {
-        return placeholderConditionsMap(context);
+    [[nodiscard]] QVariantMap eventRow(
+        const QString& label,
+        const skygate::ephemeris::ObservationEvent& event
+    ) const
+    {
+        return QVariantMap {
+            {QStringLiteral("label"), label},
+            {QStringLiteral("value"), formatEventValue(event)}
+        };
     }
 
-    QVariantList sunRows;
-    sunRows.push_back(eventRow(QStringLiteral("Sunset"), conditions.sunset));
-    sunRows.push_back(eventRow(QStringLiteral("Civil dusk"), conditions.civilDusk));
-    sunRows.push_back(eventRow(QStringLiteral("Nautical dusk"), conditions.nauticalDusk));
-    sunRows.push_back(eventRow(QStringLiteral("Astro dusk"), conditions.astronomicalDusk));
-    sunRows.push_back(eventRow(QStringLiteral("Astro dawn"), conditions.astronomicalDawn));
-    sunRows.push_back(eventRow(QStringLiteral("Sunrise"), conditions.sunrise));
+    [[nodiscard]] QString locationText() const
+    {
+        return QString("%1 | Lat %2 Lon %3")
+            .arg(m_timeController != nullptr
+                ? m_timeController->timeZoneLabel()
+                : QStringLiteral("UTC"))
+            .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
+                m_context.observer.latitudeDeg
+            ))
+            .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
+                m_context.observer.longitudeDeg
+            ));
+    }
 
-    return QVariantMap {
-        {QStringLiteral("valid"), true},
-        {
-            QStringLiteral("locationText"),
-            QString("UTC | Lat %1 Lon %2")
-                .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
-                    context.observer.latitudeDeg
-                ))
-                .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
-                    context.observer.longitudeDeg
-                ))
-        },
-        {QStringLiteral("sunRows"), sunRows},
-        {
-            QStringLiteral("moonPhaseText"),
-            QString("%1 | %2%")
-                .arg(QString::fromStdString(conditions.moonPhaseName))
-                .arg(qRound(conditions.moonIlluminationPercent))
-        },
-        {QStringLiteral("moonRiseText"), formatEventValue(conditions.moonrise)},
-        {QStringLiteral("moonSetText"), formatEventValue(conditions.moonset)}
-    };
-}
+private:
+    const skygate::core::SkyContext& m_context;
+    const SkyTimeController* m_timeController = nullptr;
+};
 
 }  // namespace
 
@@ -158,12 +171,12 @@ void SkyContextController::refreshNightConditions()
     const auto sunIndex = bodyIndexById(bodies, "sun");
     const auto moonIndex = bodyIndexById(bodies, "moon");
     const auto* engine = ephemerisEngine();
+    const NightConditionsMapBuilder mapBuilder(m_location.context, m_timeController.get());
 
-    QVariantMap nextConditions = placeholderConditionsMap(m_location.context);
+    QVariantMap nextConditions = mapBuilder.placeholderMap();
     if (engine != nullptr && sunIndex.has_value() && moonIndex.has_value()) {
         const skygate::ephemeris::NightConditionsCalculator calculator;
-        nextConditions = conditionsMap(
-            m_location.context,
+        nextConditions = mapBuilder.conditionsMap(
             calculator.compute(*engine, m_location.context, *sunIndex, *moonIndex)
         );
     }

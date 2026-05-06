@@ -1,4 +1,5 @@
 #include "QmlTestSupport.hpp"
+#include "SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -29,6 +30,7 @@ void QmlDateTimePopupTests::dateTimePopupValidatesAppliesAndCancels()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Europe/Zurich")));
 
     QQmlEngine engine;
     setupEngine(engine, *controller);
@@ -60,6 +62,7 @@ void QmlDateTimePopupTests::dateTimePopupValidatesAppliesAndCancels()
     QVERIFY(popup != nullptr);
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
     QTRY_VERIFY(popup->property("opened").toBool());
+    QVERIFY(firstVisibleItemContainingText(root, QStringLiteral("Europe/Zurich")) != nullptr);
     popup->setProperty("stagedDateText", QStringLiteral("bad-date"));
     popup->setProperty("stagedTimeText", QStringLiteral("12:00:00"));
     QVERIFY(QMetaObject::invokeMethod(popup, "applyChanges"));
@@ -70,8 +73,9 @@ void QmlDateTimePopupTests::dateTimePopupValidatesAppliesAndCancels()
     popup->setProperty("stagedTimeText", QStringLiteral("03:04:05"));
     QVERIFY(QMetaObject::invokeMethod(popup, "applyChanges"));
     QTRY_VERIFY(!popup->property("opened").toBool());
-    QCOMPARE(controller->utcDateText(), QString("2024-01-02"));
-    QCOMPARE(controller->utcTimeText(), QString("03:04:05"));
+    QCOMPARE(controller->timeController()->dateText(), QString("2024-01-02"));
+    QCOMPARE(controller->timeController()->timeText(), QString("03:04:05"));
+    QCOMPARE(controller->utcTimeText(), QString("02:04:05"));
 
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
     QTRY_VERIFY(popup->property("opened").toBool());
@@ -84,6 +88,7 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("UTC")));
     QVERIFY(controller->setUtcDateTimeText("2024-01-02", "03:04:05"));
     controller->setLive(false);
 
@@ -134,8 +139,8 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
     QVERIFY(QMetaObject::invokeMethod(timeInput, "forceActiveFocus"));
     QTest::keyClick(exposed.window(), Qt::Key_Return);
     QTRY_VERIFY(!popup->property("opened").toBool());
-    QCOMPARE(controller->utcDateText(), QString("2025-05-06"));
-    QCOMPARE(controller->utcTimeText(), QString("07:08:09"));
+    QCOMPARE(controller->timeController()->dateText(), QString("2025-05-06"));
+    QCOMPARE(controller->timeController()->timeText(), QString("07:08:09"));
 
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
     QTRY_VERIFY(popup->property("opened").toBool());

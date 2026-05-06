@@ -1,4 +1,5 @@
 #include "SkySelectionOverlayBuilder.hpp"
+#include "SkyTimeController.hpp"
 
 #include <QtTest/QtTest>
 
@@ -238,13 +239,16 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
 {
     const SkySelectionOverlayBuilder builder;
     const auto fixture = makeFixture();
+    SkyTimeController timeController;
+    QVERIFY(timeController.setTimeZoneId(QStringLiteral("Asia/Bishkek")));
     auto input = makeInput(fixture);
+    input.timeController = &timeController;
     input.selectedObjectTargetId = "selected";
 
     QVariantMap inspector = builder.buildSelectedObjectInspector(input);
-    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains("UTC"));
-    QVERIFY(inspectorFieldValue(inspector, "Rise / Set").contains(" / "));
-    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
+    QVERIFY(inspectorFieldValue(inspector, "Rise").contains("UTC+06:00"));
+    QVERIFY(inspectorFieldValue(inspector, "Set").contains("UTC+06:00"));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
     QVERIFY(inspectorFieldValue(inspector, "Next rise").isEmpty());
     QVERIFY(inspectorFieldValue(inspector, "Next set").isEmpty());
@@ -252,8 +256,9 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
 
     input.selectedObjectTargetId = "circumpolar";
     inspector = builder.buildSelectedObjectInspector(input);
-    QCOMPARE(inspectorFieldValue(inspector, "Rise / Set"), QString("Always above"));
-    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC"));
+    QCOMPARE(inspectorFieldValue(inspector, "Rise"), QString("Always above"));
+    QCOMPARE(inspectorFieldValue(inspector, "Set"), QString("Always above"));
+    QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("deg"));
 }
 

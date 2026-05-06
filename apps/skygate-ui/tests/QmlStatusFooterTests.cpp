@@ -1,4 +1,5 @@
 #include "QmlTestSupport.hpp"
+#include "SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -174,6 +175,8 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
+    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30")));
     controller->setLive(false);
 
     QQmlEngine engine;
@@ -211,6 +214,19 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
     ExposedQuickWindow exposed(root);
     (void)exposed;
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: Off")) != nullptr);
+    QTRY_VERIFY(
+        firstVisibleItemWithText(
+            root,
+            QStringLiteral("2026-05-06 15:30:30 UTC+06:00")
+        ) != nullptr
+    );
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("UTC")));
+    QTRY_VERIFY(
+        firstVisibleItemWithText(
+            root,
+            QStringLiteral("2026-05-06 09:30:30 UTC")
+        ) != nullptr
+    );
     QCOMPARE(pointingHandItems(root).size(), 2);
 
     controller->setLive(true);

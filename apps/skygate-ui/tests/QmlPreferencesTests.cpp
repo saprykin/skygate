@@ -1,4 +1,5 @@
 #include "QmlTestSupport.hpp"
+#include "SkyTimeController.hpp"
 
 using namespace skygate::ui::tests;
 
@@ -16,6 +17,7 @@ private slots:
     void appearanceCheckboxChangesRender_data();
     void appearanceCheckboxChangesRender();
     void locationCoordinateChangesPropagateToSkyView();
+    void timeZonePickerFiltersSelectsAndApplies();
     void settingsDraftCurrentDeviceApplyAndSyncWork();
     void preferencesWindowShellNavigatesAppliesAndCloses();
     void saveAndRestoreState();
@@ -111,6 +113,7 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     controller->setLatitudeText(QStringLiteral("47.000000"));
     controller->setLongitudeText(QStringLiteral("8.000000"));
     controller->setElevationText(QStringLiteral("400"));
+    QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Europe/Zurich")));
     controller->overlayLayers()->setProperty("horizon", true);
     controller->setLogToTerminal(false);
     controller->setLogToFile(true);
@@ -130,6 +133,8 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     QVERIFY(QMetaObject::invokeMethod(object.get(), "resetFromContext"));
     QCOMPARE(object->property("latitudeText").toString(), QString("47.000000"));
     QCOMPARE(object->property("longitudeText").toString(), QString("8.000000"));
+    QCOMPARE(object->property("timeZoneId").toString(), QString("Europe/Zurich"));
+    QVERIFY(object->property("timeZoneDisplayText").toString().contains("Europe/Zurich"));
     QCOMPARE(object->property("overlayHorizon").toBool(), true);
     QCOMPARE(object->property("logToTerminal").toBool(), false);
     QCOMPARE(object->property("logToFile").toBool(), true);
@@ -142,6 +147,7 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     object->setProperty("longitudeText", QStringLiteral("34.500000"));
     object->setProperty("elevationText", QStringLiteral("88"));
     object->setProperty("locationSourceText", QStringLiteral("Custom"));
+    object->setProperty("timeZoneId", QStringLiteral("Asia/Bishkek"));
     object->setProperty("projectionTypeText", QStringLiteral("AzimuthalEquidistant"));
     object->setProperty("overlayHorizon", false);
     object->setProperty("catalogPresetIndex", 2);
@@ -154,6 +160,7 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
     QCOMPARE(controller->latitudeText(), QString("12.500000"));
     QCOMPARE(controller->longitudeText(), QString("34.500000"));
     QCOMPARE(controller->elevationText(), QString("88.0"));
+    QCOMPARE(controller->timeController()->timeZoneId(), QString("Asia/Bishkek"));
     QCOMPARE(controller->projectionTypeText(), QString("AzimuthalEquidistant"));
     QCOMPARE(controller->overlayLayers()->property("horizon").toBool(), false);
     QCOMPARE(controller->catalogPresetIndex(), 2);
@@ -169,6 +176,7 @@ void QmlPreferencesTests::settingsDraftApplyAndResetRoundTrip()
         object->property("catalogUrlText").toString(),
         QString("https://example.test/stars.csv")
     );
+    QCOMPARE(object->property("timeZoneId").toString(), QString("Asia/Bishkek"));
     QCOMPARE(
         object->property("logFilePath").toString(),
         QString("/tmp/skygate-qml-test-updated.log")
@@ -564,6 +572,75 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
+void QmlPreferencesTests::timeZonePickerFiltersSelectsAndApplies()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(engine, QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 520
+            property alias draft: draft
+            SkySettingsDraft {
+                id: draft
+                skyContextController: skyContext
+                Component.onCompleted: resetFromContext()
+            }
+            PreferencesSkySection {
+                anchors.fill: parent
+                settingsDraft: draft
+            }
+        }
+    )"), QStringLiteral("PreferencesTimeZonePickerTest.qml"));
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    ExposedQuickWindow exposed(root);
+    QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
+    QVERIFY(draft != nullptr);
+
+    auto* pickerMouse = qobject_cast<QQuickItem*>(
+        firstObjectWithObjectName(root, QStringLiteral("timeZonePickerMouse"))
+    );
+    QVERIFY(pickerMouse != nullptr);
+    const QPointF pickerCenter = pickerMouse->mapToScene(
+        QPointF(pickerMouse->width() / 2.0, pickerMouse->height() / 2.0)
+    );
+    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, pickerCenter.toPoint());
+
+    const auto searchInputs = objectsWithPlaceholder(
+        root,
+        QStringLiteral("Filter by timezone, label, or offset")
+    );
+    QCOMPARE(searchInputs.size(), 1);
+    auto* searchInput = qobject_cast<QQuickItem*>(searchInputs.front());
+    QVERIFY(searchInput != nullptr);
+    replaceText(exposed.window(), searchInput, QStringLiteral("bishkek"));
+    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Asia/Bishkek")) != nullptr);
+
+    auto* delegateMouse = qobject_cast<QQuickItem*>(
+        firstObjectWithObjectName(root, QStringLiteral("timeZoneDelegateMouse_Asia/Bishkek"))
+    );
+    QVERIFY(delegateMouse != nullptr);
+    const QPointF delegateCenter = delegateMouse->mapToScene(
+        QPointF(delegateMouse->width() / 2.0, delegateMouse->height() / 2.0)
+    );
+    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, delegateCenter.toPoint());
+
+    QTRY_COMPARE(draft->property("timeZoneId").toString(), QString("Asia/Bishkek"));
+    QVERIFY(draft->property("timeZoneDisplayText").toString().contains("UTC+06:00"));
+    QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
+    QCOMPARE(controller->timeController()->timeZoneId(), QString("Asia/Bishkek"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
 void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
 {
     QQmlEngine engine;
@@ -590,6 +667,16 @@ void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
                 property bool deepSkyLabels: true
             }
             QtObject {
+                id: fakeTime
+                property string timeZoneId: "Europe/Zurich"
+                property string timeZoneDetailText: "CET - UTC+01:00"
+                property var timeZoneCatalogModel: null
+                function setTimeZoneId(value) {
+                    timeZoneId = value
+                    return true
+                }
+            }
+            QtObject {
                 id: fakeController
                 property string latitudeText: "47.376900"
                 property string longitudeText: "8.541700"
@@ -602,6 +689,7 @@ void QmlPreferencesTests::settingsDraftCurrentDeviceApplyAndSyncWork()
                 property bool logToTerminal: true
                 property bool logToFile: false
                 property string logFilePath: "/tmp/fake-skygate.log"
+                property var time: fakeTime
                 property var overlayLayers: overlayLayers
                 property int lastCatalogPresetIndex: -1
                 property string lastCatalogUrlText: ""
@@ -778,6 +866,7 @@ void QmlPreferencesTests::saveAndRestoreState()
     object->setProperty("catalogUrlText", QStringLiteral("file:///tmp/stars.csv"));
     object->setProperty("deepSkyCatalogPresetIndex", 2);
     object->setProperty("deepSkyCatalogUrlText", QStringLiteral("file:///tmp/dso.csv"));
+    object->setProperty("timeZoneId", QStringLiteral("Asia/Bishkek"));
     QVERIFY(QMetaObject::invokeMethod(object.get(), "applyToContext"));
     QVERIFY(controller->saveSettings());
 
@@ -795,6 +884,7 @@ void QmlPreferencesTests::saveAndRestoreState()
     QCOMPARE(restoredController->catalogUrlText(), QString("file:///tmp/stars.csv"));
     QCOMPARE(restoredController->deepSkyCatalogPresetIndex(), 2);
     QCOMPARE(restoredController->deepSkyCatalogUrlText(), QString("file:///tmp/dso.csv"));
+    QCOMPARE(restoredController->timeController()->timeZoneId(), QString("Asia/Bishkek"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

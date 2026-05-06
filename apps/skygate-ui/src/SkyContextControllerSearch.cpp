@@ -1,5 +1,7 @@
 #include "SkyContextController.hpp"
 
+#include "SkyTimeController.hpp"
+
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 #include "skygate/core/SystemTimeSource.hpp"
 
@@ -153,6 +155,7 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
     const bool shouldEmitLiveChanged = !m_timeline.live;
 
     m_location.context.utcTime = nextUtc;
+    m_timeController->setUtcDateTime(currentUtc.toUTC());
     m_timeline.live = true;
     m_timeline.catchingUpToCurrentUtc = false;
     m_timeline.speedRemainderSeconds = 0.0;

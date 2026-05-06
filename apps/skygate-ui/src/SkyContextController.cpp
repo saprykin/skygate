@@ -6,6 +6,7 @@
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
+#include "SkyTimeController.hpp"
 
 #include <QDateTime>
 
@@ -44,6 +45,7 @@ SkyContextController::SkyContextController(
     , m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this))
     , m_themePalette(std::make_unique<SkyThemePalette>(this))
     , m_themeRepository(std::make_unique<SkyThemeRepository>())
+    , m_timeController(std::make_unique<SkyTimeController>(this))
     , m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this))
     , m_settingsStore(std::make_unique<SkySettingsStore>())
     , m_catalogManager(std::make_unique<SkyCatalogManager>(
@@ -65,6 +67,27 @@ SkyContextController::SkyContextController(
         &SkyOverlayLayerSettings::visibilityChanged,
         this,
         &SkyContextController::skyContextChanged
+    );
+    connect(
+        m_timeController.get(),
+        &SkyTimeController::utcDateTimeChangeRequested,
+        this,
+        [this](const QDateTime& utcDateTime) {
+            setCurrentUtc(utcDateTime);
+            setLive(false);
+        }
+    );
+    connect(
+        m_timeController.get(),
+        &SkyTimeController::goLiveNowRequested,
+        this,
+        &SkyContextController::goLiveNow
+    );
+    connect(
+        m_timeController.get(),
+        &SkyTimeController::timeZoneChanged,
+        this,
+        &SkyContextController::refreshNightConditions
     );
 
     connect(
@@ -114,6 +137,7 @@ SkyContextController::SkyContextController(
     m_view.projection = skygate::core::createProjection(m_view.projectionType);
     const skygate::core::SystemTimeSource systemTimeSource;
     m_location.context.utcTime = systemTimeSource.nowUtc();
+    m_timeController->setUtcTimePoint(m_location.context.utcTime);
     if (initializationOptions.loadSettings) {
         loadSettings();
     }
@@ -285,6 +309,11 @@ QVariantList SkyContextController::themeOptions() const
 QObject* SkyContextController::theme() const noexcept
 {
     return m_themePalette.get();
+}
+
+SkyTimeController* SkyContextController::timeController() const noexcept
+{
+    return m_timeController.get();
 }
 
 QObject* SkyContextController::overlayLayers() const noexcept

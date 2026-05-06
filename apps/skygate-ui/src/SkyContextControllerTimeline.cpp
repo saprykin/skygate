@@ -1,6 +1,7 @@
 #include "SkyContextController.hpp"
 
 #include "SkyContextControllerSupport.hpp"
+#include "SkyTimeController.hpp"
 
 #include <QCoreApplication>
 
@@ -376,6 +377,7 @@ void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
     }
 
     m_location.context.utcTime = nextUtc;
+    m_timeController->setUtcDateTime(utcTime.toUTC());
     emit utcDateTextChanged();
     emit utcTimeTextChanged();
     emit nightConditionsChanged();

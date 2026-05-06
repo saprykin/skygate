@@ -269,10 +269,11 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     const QVariantList themeOptions = controller->themeOptions();
     QVERIFY(themeOptions.size() >= 2);
     const QString nextThemeId = themeOptions.at(1).toMap().value("id").toString();
-    const auto themeCombos = comboBoxesWithCount(preferencesWindow, themeOptions.size());
-    QCOMPARE(themeCombos.size(), 1);
-    themeCombos.front()->setProperty("currentIndex", 1);
-    QVERIFY(QMetaObject::invokeMethod(themeCombos.front(), "activated", Q_ARG(int, 1)));
+    QObject* themeCombo = firstObjectWithObjectName(preferencesWindow, QStringLiteral("themeCombo"));
+    QVERIFY(themeCombo != nullptr);
+    QCOMPARE(themeCombo->property("count").toInt(), themeOptions.size());
+    themeCombo->setProperty("currentIndex", 1);
+    QVERIFY(QMetaObject::invokeMethod(themeCombo, "activated", Q_ARG(int, 1)));
 
     const auto applyButtons = invokableButtonsWithText(preferencesWindow, QStringLiteral("Apply"));
     QCOMPARE(applyButtons.size(), 1);

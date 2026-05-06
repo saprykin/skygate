@@ -224,10 +224,11 @@ Rectangle {
                 anchors.fill: parent
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
-                text: footerRoot.skyContextController.utcDateText
+                text: footerRoot.skyContextController.time.dateText
                       + " "
-                      + footerRoot.skyContextController.utcTimeText
-                      + " UTC"
+                      + footerRoot.skyContextController.time.timeText
+                      + " "
+                      + footerRoot.skyContextController.time.timeZoneLabel
                 color: theme.footerTimeText
                 font.family: "Menlo"
                 elide: Text.ElideLeft

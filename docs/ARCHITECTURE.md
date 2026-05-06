@@ -66,6 +66,8 @@ This module is the application layer and the most stateful part of the system.
     and location status.
   - Owns `SkySettingsStore`, `SkyCatalogManager`, and the bundled city catalog
     model used by Preferences.
+  - Owns `SkyTimeController`, the QML-facing date/time surface for display
+    timezone selection, civil-time formatting, and fixed-time entry.
   - Uses a `QTimer` for live timeline updates.
   - Optionally requests a one-shot observer location update through Qt
     Positioning when the persisted location source is `Current Device`.
@@ -113,7 +115,8 @@ This module is the application layer and the most stateful part of the system.
     catalog model.
 - `StatusFooter`
   - Current context and catalog status summary.
-  - Hosts the clickable UTC text that opens the compact fixed-time popup.
+  - Hosts the clickable selected-timezone text that opens the compact
+    fixed-time popup.
 
 This is intentionally a hybrid UI architecture: heavy drawing happens in C++
 scene graph code, while transient UI and chrome stay in QML.
@@ -137,12 +140,17 @@ scene graph code, while transient UI and chrome stay in QML.
   - Persists controller state in `QSettings`.
   - Persists location source and selected city id alongside raw observer
     coordinates so device/city/custom modes survive relaunch.
+  - Persists the selected display timezone as an IANA timezone id; UTC remains
+    the internal calculation and storage time basis.
   - Persists downloaded/imported catalog rows in an app-data cache file and
     stores related metadata in `QSettings`.
 - `LocationCatalogModel`
   - Loads a bundled CSV of major cities from Qt resources.
   - Exposes a flat, filterable `QAbstractListModel` with country headers and
     city rows for the Preferences location picker.
+- `TimeZoneCatalogModel`
+  - Uses Qt's timezone database to expose a searchable IANA timezone list for
+    Preferences.
 
 ### `skygate-core`
 This module provides stable, UI-independent core types and projection logic.

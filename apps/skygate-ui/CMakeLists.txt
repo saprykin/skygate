@@ -36,6 +36,12 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkySelectionOverlayBuilder.hpp
     src/SkyTheme.cpp
     src/SkyTheme.hpp
+    src/SkyTimeController.cpp
+    src/SkyTimeController.hpp
+    src/TimeZoneAliasCatalog.cpp
+    src/TimeZoneAliasCatalog.hpp
+    src/TimeZoneCatalogModel.cpp
+    src/TimeZoneCatalogModel.hpp
     src/catalog/SkyActiveCatalogBuilder.cpp
     src/catalog/SkyActiveCatalogBuilder.hpp
     src/catalog/SkyCatalogCacheController.cpp
@@ -136,6 +142,7 @@ qt_add_qml_module(skygate-ui
         TimelineToolbar.qml
         PreferencesSkySection.qml
         PreferencesTextField.qml
+        PreferencesTimeZonePicker.qml
         PreferencesWindow.qml
     RESOURCES
         resources/icons/skygate-icon-512.png

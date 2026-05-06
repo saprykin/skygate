@@ -266,6 +266,16 @@ inline QList<QObject*> objectsWithText(QObject* root, const QString& text)
     return matches;
 }
 
+inline QObject* firstObjectWithObjectName(QObject* root, const QString& objectName)
+{
+    for (QObject* object : objectTree(root)) {
+        if (object->objectName() == objectName) {
+            return object;
+        }
+    }
+    return nullptr;
+}
+
 inline QList<QObject*> invokableButtonsWithText(QObject* root, const QString& text)
 {
     QList<QObject*> matches;
@@ -296,6 +306,21 @@ inline QQuickItem* firstVisibleItemWithText(QObject* root, const QString& text)
     for (QObject* object : objectsWithText(root, text)) {
         auto* item = qobject_cast<QQuickItem*>(object);
         if (item != nullptr && item->isVisible()) {
+            return item;
+        }
+    }
+    return nullptr;
+}
+
+inline QQuickItem* firstVisibleItemContainingText(QObject* root, const QString& text)
+{
+    for (QObject* object : objectTree(root)) {
+        auto* item = qobject_cast<QQuickItem*>(object);
+        if (
+            item != nullptr
+            && item->isVisible()
+            && object->property("text").toString().contains(text)
+        ) {
             return item;
         }
     }

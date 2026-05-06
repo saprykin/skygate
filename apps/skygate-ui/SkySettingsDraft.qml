@@ -10,6 +10,8 @@ QtObject {
     property string locationSourceText: ""
     property string selectedCityId: ""
     property string selectedCityDisplayText: ""
+    property string timeZoneId: ""
+    property string timeZoneDisplayText: ""
     property string projectionTypeText: ""
     property string themeId: ""
     property bool overlayHorizon: true
@@ -46,6 +48,11 @@ QtObject {
         longitudeText = Number(longitudeDeg).toFixed(6)
     }
 
+    function selectTimeZone(nextTimeZoneId, displayText) {
+        timeZoneId = nextTimeZoneId
+        timeZoneDisplayText = displayText
+    }
+
     function useCustomCoordinates() {
         if (locationSourceText !== "Custom") {
             locationSourceText = "Custom"
@@ -61,6 +68,10 @@ QtObject {
         locationSourceText = skyContextController.locationSourceText
         selectedCityId = skyContextController.selectedCityId
         selectedCityDisplayText = skyContextController.selectedCityDisplayText
+        timeZoneId = skyContextController.time.timeZoneId
+        timeZoneDisplayText = skyContextController.time.timeZoneId
+            + " - "
+            + skyContextController.time.timeZoneDetailText
         projectionTypeText = skyContextController.projectionTypeText
         themeId = skyContextController.themeId
         overlayHorizon = skyContextController.overlayLayers.horizon
@@ -109,6 +120,7 @@ QtObject {
         }
 
         skyContextController.setProjectionTypeText(projectionTypeText)
+        skyContextController.time.setTimeZoneId(timeZoneId)
         skyContextController.setThemeId(themeId)
         skyContextController.overlayLayers.horizon = overlayHorizon
         skyContextController.overlayLayers.altAzGrid = overlayAltAzGrid

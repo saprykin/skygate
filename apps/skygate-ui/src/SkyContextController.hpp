@@ -13,6 +13,7 @@
 #include "SkyContextState.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
+#include "SkyTimeController.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -32,6 +33,7 @@ class SkySettingsStore;
 
 class SkyContextController final : public QObject {
     Q_OBJECT
+    Q_PROPERTY(SkyTimeController* time READ timeController CONSTANT)
     Q_PROPERTY(bool live READ live WRITE setLive NOTIFY liveChanged)
     Q_PROPERTY(
         bool timelineToolbarCollapsed
@@ -50,8 +52,6 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(double magnitudeCutoff READ magnitudeCutoff WRITE setMagnitudeCutoff NOTIFY magnitudeCutoffChanged)
     Q_PROPERTY(double viewCenterAltitudeDeg READ viewCenterAltitudeDeg NOTIFY viewDirectionChanged)
     Q_PROPERTY(double viewCenterAzimuthDeg READ viewCenterAzimuthDeg NOTIFY viewDirectionChanged)
-    Q_PROPERTY(QString utcDateText READ utcDateText NOTIFY utcDateTextChanged)
-    Q_PROPERTY(QString utcTimeText READ utcTimeText NOTIFY utcTimeTextChanged)
     Q_PROPERTY(QString latitudeText READ latitudeText NOTIFY latitudeTextChanged)
     Q_PROPERTY(QString longitudeText READ longitudeText NOTIFY longitudeTextChanged)
     Q_PROPERTY(QString elevationText READ elevationText NOTIFY elevationTextChanged)
@@ -172,6 +172,7 @@ public:
     [[nodiscard]] QString themeId() const;
     [[nodiscard]] QVariantList themeOptions() const;
     [[nodiscard]] QObject* theme() const noexcept;
+    [[nodiscard]] SkyTimeController* timeController() const noexcept;
     [[nodiscard]] QObject* overlayLayers() const noexcept;
     [[nodiscard]] bool logToTerminal() const noexcept;
     [[nodiscard]] bool logToFile() const noexcept;
@@ -219,11 +220,11 @@ public:
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
-    Q_INVOKABLE QString validateUtcDateTimeText(
+    [[nodiscard]] QString validateUtcDateTimeText(
         const QString& utcDateText,
         const QString& utcTimeText
     ) const;
-    Q_INVOKABLE bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
+    [[nodiscard]] bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);
     Q_INVOKABLE void setElevationText(const QString& elevationText);
@@ -322,6 +323,7 @@ private:
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
     std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;
+    std::unique_ptr<SkyTimeController> m_timeController;
     std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
