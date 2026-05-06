@@ -2,20 +2,6 @@
 
 using namespace skygate::ui::tests;
 
-namespace {
-
-QObject* pinchHandler(QObject* root)
-{
-    for (QObject* object : objectTree(root)) {
-        if (object->metaObject()->indexOfSignal("scaleChanged(qreal)") >= 0) {
-            return object;
-        }
-    }
-    return nullptr;
-}
-
-}  // namespace
-
 class QmlInteractionLayerTests final : public QObject {
     Q_OBJECT
 
@@ -219,7 +205,10 @@ void QmlInteractionLayerTests::pinchScaleHandlerZoomsAndClearsHover()
     QVERIFY(root != nullptr);
     QObject* fakeController = qvariant_cast<QObject*>(root->property("fakeController"));
     QObject* interaction = qvariant_cast<QObject*>(root->property("interaction"));
-    QObject* handler = pinchHandler(root);
+    QObject* handler = firstObjectWithObjectName(
+        root,
+        QStringLiteral("skyInteractionPinchHandler")
+    );
     QVERIFY(fakeController != nullptr);
     QVERIFY(interaction != nullptr);
     QVERIFY(handler != nullptr);

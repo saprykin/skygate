@@ -10,8 +10,6 @@
 
 #include <QDateTime>
 
-#include "skygate/core/SystemTimeSource.hpp"
-
 #include <memory>
 #include <utility>
 
@@ -41,10 +39,15 @@ SkyContextController::SkyContextController(
     QObject* parent
 )
     : QObject(parent)
+    , m_timeSource(
+          initializationOptions.timeSource != nullptr
+              ? initializationOptions.timeSource
+              : &m_systemTimeSource
+      )
     , m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this))
     , m_themePalette(std::make_unique<SkyThemePalette>(this))
     , m_themeRepository(std::make_unique<SkyThemeRepository>())
-    , m_timeController(std::make_unique<SkyTimeController>(this))
+    , m_timeController(std::make_unique<SkyTimeController>(*m_timeSource, this))
     , m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this))
     , m_settingsStore(std::make_unique<SkySettingsStore>())
     , m_catalogManager(std::make_unique<SkyCatalogManager>(
@@ -133,8 +136,7 @@ SkyContextController::SkyContextController(
     );
     refreshObjectSearchModel();
 
-    const skygate::core::SystemTimeSource systemTimeSource;
-    m_location.setUtcTime(systemTimeSource.nowUtc());
+    m_location.setUtcTime(m_timeSource->nowUtc());
     m_timeController->setUtcTimePoint(m_location.utcTime());
     if (initializationOptions.loadSettings) {
         loadSettings();

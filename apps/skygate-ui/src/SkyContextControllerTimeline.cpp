@@ -5,7 +5,6 @@
 
 #include <QCoreApplication>
 
-#include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 
 #include <algorithm>
@@ -20,13 +19,10 @@
 
 using namespace skygate::ui::internal;
 
-namespace {
-QDateTime currentUtcDateTime()
+QDateTime SkyContextController::currentUtcDateTime() const
 {
-    const skygate::core::SystemTimeSource systemTimeSource;
-    return SkyContextTimeCodec::toQDateTimeUtc(systemTimeSource.nowUtc());
+    return SkyContextTimeCodec::toQDateTimeUtc(m_timeSource->nowUtc());
 }
-} // namespace
 
 void SkyContextController::setLive(bool live)
 {

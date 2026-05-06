@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Rectangle {
     id: footerRoot
+    objectName: "statusFooter"
     readonly property var theme: skyContextController.theme
     required property var skyContextController
     required property var sceneModel
@@ -25,6 +26,7 @@ Rectangle {
 
     Row {
         id: statusLeftRow
+        objectName: "statusFooterLeftRow"
         anchors.left: parent.left
         anchors.leftMargin: 12
         anchors.right: statusRightCluster.left
@@ -33,14 +35,17 @@ Rectangle {
         spacing: 20
 
         Label {
+            objectName: "statusFooterLiveLabel"
             text: footerRoot.skyContextController.live ? "Live: On" : "Live: Off"
             color: footerRoot.skyContextController.live ? theme.footerLiveText : theme.footerPausedText
         }
         Label {
+            objectName: "statusFooterLocationLabel"
             text: footerRoot.skyContextController.locationStatusText
             color: theme.footerLocationText
         }
         Label {
+            objectName: "statusFooterCoordinatesLabel"
             text: "Lat " + footerRoot.skyContextController.latitudeText
                   + " | Lon " + footerRoot.skyContextController.longitudeText
                   + " | Elev " + footerRoot.skyContextController.elevationText + " m"
@@ -56,6 +61,7 @@ Rectangle {
 
     Row {
         id: statusRightCluster
+        objectName: "statusFooterRightCluster"
         anchors.right: parent.right
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
@@ -64,6 +70,7 @@ Rectangle {
 
         Item {
             id: statusTimeArea
+            objectName: "statusFooterTimeArea"
             width: 280
             height: footerRoot.height
 
@@ -78,6 +85,7 @@ Rectangle {
 
                 Rectangle {
                     id: nightConditionsHighlight
+                    objectName: "nightConditionsHighlight"
                     anchors.centerIn: parent
                     width: 26
                     height: 26
@@ -94,6 +102,7 @@ Rectangle {
 
                 Canvas {
                     id: nightConditionsIcon
+                    objectName: "nightConditionsIcon"
                     anchors.centerIn: nightConditionsHighlight
                     width: 22
                     height: 22
@@ -135,6 +144,7 @@ Rectangle {
 
             Item {
                 id: trackingIndicator
+                objectName: "trackingIndicator"
                 visible: footerRoot.skyContextController.hasTrackedTarget
                 anchors.right: nightConditionsButton.left
                 anchors.rightMargin: -2
@@ -144,6 +154,7 @@ Rectangle {
 
                 Rectangle {
                     id: trackingHighlight
+                    objectName: "trackingHighlight"
                     anchors.centerIn: parent
                     width: 26
                     height: 26
@@ -157,6 +168,7 @@ Rectangle {
 
                 Canvas {
                     id: trackingIcon
+                    objectName: "trackingIcon"
                     anchors.centerIn: trackingHighlight
                     width: 22
                     height: 22
@@ -221,6 +233,7 @@ Rectangle {
 
             Label {
                 id: statusTimeLabel
+                objectName: "statusTimeLabel"
                 anchors.fill: parent
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignRight
@@ -237,6 +250,7 @@ Rectangle {
 
             Rectangle {
                 id: statusTimeHighlight
+                objectName: "statusTimeHighlight"
                 anchors.right: parent.right
                 anchors.rightMargin: -10
                 anchors.verticalCenter: parent.verticalCenter

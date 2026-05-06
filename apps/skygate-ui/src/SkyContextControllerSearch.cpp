@@ -3,7 +3,6 @@
 #include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
-#include "skygate/core/SystemTimeSource.hpp"
 
 #include <cmath>
 
@@ -22,12 +21,6 @@ QString normalizedLookupKey(const std::string& value)
 bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
 {
     return std::isfinite(horizontal.altitudeDeg) && std::isfinite(horizontal.azimuthDeg);
-}
-
-QDateTime currentUtcDateTime()
-{
-    const skygate::core::SystemTimeSource systemTimeSource;
-    return skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(systemTimeSource.nowUtc());
 }
 
 const skygate::ephemeris::CelestialBodyState* findBodyStateById(

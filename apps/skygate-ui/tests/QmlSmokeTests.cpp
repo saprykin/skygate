@@ -1,6 +1,7 @@
 #include "SkyContextController.hpp"
 #include "SkySceneModel.hpp"
 #include "SkyViewportItem.hpp"
+#include "QmlObjectTreeTestSupport.hpp"
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
@@ -65,6 +66,31 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
 
     QVERIFY(!objectCreationFailed);
     QVERIFY(!engine.rootObjects().isEmpty());
+    QObject* rootObject = engine.rootObjects().front();
+    QVERIFY(
+        skygate::ui::tests::firstObjectWithObjectName(
+            rootObject,
+            QStringLiteral("statusFooter")
+        ) != nullptr
+    );
+    QVERIFY(
+        skygate::ui::tests::firstObjectWithObjectName(
+            rootObject,
+            QStringLiteral("dateTimePopup")
+        ) != nullptr
+    );
+    QVERIFY(
+        skygate::ui::tests::firstObjectWithObjectName(
+            rootObject,
+            QStringLiteral("nightConditionsPopup")
+        ) != nullptr
+    );
+    QVERIFY(
+        skygate::ui::tests::firstObjectWithObjectName(
+            rootObject,
+            QStringLiteral("skyInteractionLayer")
+        ) != nullptr
+    );
 }
 
 int main(int argc, char* argv[])

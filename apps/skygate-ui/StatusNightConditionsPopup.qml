@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 FocusScope {
     id: nightConditionsPopup
+    objectName: "nightConditionsPopup"
     readonly property var theme: skyContextController.theme
     readonly property var conditions: skyContextController.nightConditions
     required property var skyContextController
@@ -33,6 +34,7 @@ FocusScope {
     Keys.onEscapePressed: close()
 
     Timer {
+        objectName: "nightConditionsPopupRefreshTimer"
         interval: 60000
         repeat: true
         running: nightConditionsPopup.opened
@@ -40,12 +42,14 @@ FocusScope {
     }
 
     MouseArea {
+        objectName: "nightConditionsPopupScrim"
         anchors.fill: parent
         onClicked: nightConditionsPopup.close()
     }
 
     Rectangle {
         id: popupCard
+        objectName: "nightConditionsPopupCard"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: nightConditionsPopup.popupRightMargin
@@ -59,17 +63,20 @@ FocusScope {
         implicitHeight: popupLayout.implicitHeight + 20
 
         MouseArea {
+            objectName: "nightConditionsPopupCardMouseArea"
             anchors.fill: parent
             onClicked: mouse.accepted = true
         }
 
         ColumnLayout {
             id: popupLayout
+            objectName: "nightConditionsPopupLayout"
             anchors.fill: parent
             anchors.margins: 10
             spacing: 8
 
             Label {
+                objectName: "nightConditionsPopupTitle"
                 Layout.fillWidth: true
                 text: "Night Conditions"
                 color: theme.textPrimary
@@ -79,6 +86,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "nightConditionsLocationLabel"
                 Layout.fillWidth: true
                 text: nightConditionsPopup.conditions.locationText || "UTC"
                 color: theme.textSecondary
@@ -88,12 +96,14 @@ FocusScope {
             }
 
             Rectangle {
+                objectName: "nightConditionsSunDivider"
                 Layout.fillWidth: true
                 height: 1
                 color: theme.dividerColor
             }
 
             Label {
+                objectName: "nightConditionsSunHeader"
                 Layout.fillWidth: true
                 text: "Sun"
                 color: theme.formLabelText
@@ -106,10 +116,12 @@ FocusScope {
                 model: nightConditionsPopup.conditions.sunRows || []
 
                 RowLayout {
+                    objectName: "nightConditionsSunRow_" + modelData.label
                     Layout.fillWidth: true
                     spacing: 8
 
                     Label {
+                        objectName: "nightConditionsSunRowLabel_" + modelData.label
                         Layout.fillWidth: true
                         text: modelData.label
                         color: theme.textSecondary
@@ -119,6 +131,7 @@ FocusScope {
                     }
 
                     Label {
+                        objectName: "nightConditionsSunRowValue_" + modelData.label
                         text: modelData.value
                         color: theme.textPrimary
                         font.family: "Menlo"
@@ -128,12 +141,14 @@ FocusScope {
             }
 
             Rectangle {
+                objectName: "nightConditionsMoonDivider"
                 Layout.fillWidth: true
                 height: 1
                 color: theme.dividerColor
             }
 
             Label {
+                objectName: "nightConditionsMoonHeader"
                 Layout.fillWidth: true
                 text: "Moon"
                 color: theme.formLabelText
@@ -143,6 +158,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "nightConditionsMoonPhaseLabel"
                 Layout.fillWidth: true
                 text: nightConditionsPopup.conditions.moonPhaseText || "--"
                 color: theme.textPrimary
@@ -152,10 +168,12 @@ FocusScope {
             }
 
             RowLayout {
+                objectName: "nightConditionsMoonRiseSetRow"
                 Layout.fillWidth: true
                 spacing: 8
 
                 Label {
+                    objectName: "nightConditionsMoonRiseLabel"
                     Layout.fillWidth: true
                     text: "Rise"
                     color: theme.textSecondary
@@ -164,6 +182,7 @@ FocusScope {
                 }
 
                 Label {
+                    objectName: "nightConditionsMoonRiseValue"
                     text: nightConditionsPopup.conditions.moonRiseText || "--"
                     color: theme.textPrimary
                     font.family: "Menlo"
@@ -171,6 +190,7 @@ FocusScope {
                 }
 
                 Label {
+                    objectName: "nightConditionsMoonSetLabel"
                     Layout.leftMargin: 10
                     text: "Set"
                     color: theme.textSecondary
@@ -179,6 +199,7 @@ FocusScope {
                 }
 
                 Label {
+                    objectName: "nightConditionsMoonSetValue"
                     text: nightConditionsPopup.conditions.moonSetText || "--"
                     color: theme.textPrimary
                     font.family: "Menlo"
@@ -187,6 +208,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "nightConditionsUnavailableLabel"
                 Layout.fillWidth: true
                 visible: nightConditionsPopup.conditions.valid === false
                 text: "Conditions unavailable for the current location or catalog."

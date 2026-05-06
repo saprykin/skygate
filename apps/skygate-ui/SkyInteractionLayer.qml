@@ -2,6 +2,7 @@ import QtQuick
 
 MouseArea {
     id: interactionLayer
+    objectName: "skyInteractionLayer"
     required property Item viewportItem
     required property var skyContextController
     required property var skySceneModel
@@ -79,6 +80,7 @@ MouseArea {
     }
 
     PinchHandler {
+        objectName: "skyInteractionPinchHandler"
         target: null
 
         onScaleChanged: function(delta) {

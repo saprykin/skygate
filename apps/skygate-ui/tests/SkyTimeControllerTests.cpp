@@ -2,13 +2,32 @@
 
 #include "SkyTimeController.hpp"
 
+#include "skygate/core/ITimeSource.hpp"
+
 #include <QSignalSpy>
 #include <QTimeZone>
+
+#include <chrono>
+
+namespace {
+
+constexpr qint64 kFixedUtcEpochSeconds = 1'778'064'600;
+
+class FixedTimeSource final : public skygate::core::ITimeSource {
+public:
+    [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
+    {
+        return skygate::core::UtcTimePoint(std::chrono::seconds(kFixedUtcEpochSeconds));
+    }
+};
+
+}  // namespace
 
 class SkyTimeControllerTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void usesInjectedTimeSourceForInitialUtc();
     void defaultsToSystemTimeZoneOrUtc();
     void rejectsInvalidTimeZoneIds();
     void changingTimeZonePreservesUtcInstant();
@@ -17,6 +36,17 @@ private slots:
     void validatesBceInput();
     void emitsSignalsOnlyWhenValuesChange();
 };
+
+void SkyTimeControllerTests::usesInjectedTimeSourceForInitialUtc()
+{
+    FixedTimeSource timeSource;
+    SkyTimeController controller(timeSource);
+
+    QCOMPARE(
+        controller.utcDateTime(),
+        QDateTime::fromSecsSinceEpoch(kFixedUtcEpochSeconds, QTimeZone::UTC)
+    );
+}
 
 void SkyTimeControllerTests::defaultsToSystemTimeZoneOrUtc()
 {

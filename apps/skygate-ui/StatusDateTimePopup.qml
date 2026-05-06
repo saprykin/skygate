@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 FocusScope {
     id: dateTimePopup
+    objectName: "dateTimePopup"
     readonly property var theme: skyContextController.theme
     required property var skyContextController
     property bool opened: false
@@ -61,12 +62,14 @@ FocusScope {
     Keys.onEscapePressed: close()
 
     MouseArea {
+        objectName: "dateTimePopupScrim"
         anchors.fill: parent
         onClicked: dateTimePopup.close()
     }
 
     Rectangle {
         id: popupCard
+        objectName: "dateTimePopupCard"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: dateTimePopup.popupRightMargin
@@ -80,17 +83,20 @@ FocusScope {
         implicitHeight: popupLayout.implicitHeight + 20
 
         MouseArea {
+            objectName: "dateTimePopupCardMouseArea"
             anchors.fill: parent
             onClicked: mouse.accepted = true
         }
 
         ColumnLayout {
             id: popupLayout
+            objectName: "dateTimePopupLayout"
             anchors.fill: parent
             anchors.margins: 10
             spacing: 8
 
             Label {
+                objectName: "dateTimePopupTitle"
                 Layout.fillWidth: true
                 text: "Set Date/Time"
                 color: theme.textPrimary
@@ -100,6 +106,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "dateTimePopupTimeZoneDescription"
                 Layout.fillWidth: true
                 text: "Interpreted as "
                       + dateTimePopup.skyContextController.time.timeZoneId
@@ -113,6 +120,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "dateTimePopupDateLabel"
                 text: "Date"
                 color: theme.formLabelText
                 font.family: "Avenir Next"
@@ -121,6 +129,7 @@ FocusScope {
 
             PreferencesTextField {
                 id: dateField
+                objectName: "dateTimePopupDateField"
                 Layout.fillWidth: true
                 placeholderText: "YYYY-MM-DD or YYYY-MM-DD BCE"
 
@@ -137,6 +146,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "dateTimePopupTimeLabel"
                 text: "Time"
                 color: theme.formLabelText
                 font.family: "Avenir Next"
@@ -145,6 +155,7 @@ FocusScope {
 
             PreferencesTextField {
                 id: timeField
+                objectName: "dateTimePopupTimeField"
                 Layout.fillWidth: true
                 placeholderText: "HH:mm:ss"
 
@@ -164,6 +175,7 @@ FocusScope {
             }
 
             Label {
+                objectName: "dateTimePopupErrorLabel"
                 Layout.fillWidth: true
                 visible: dateTimePopup.errorText !== ""
                 text: dateTimePopup.errorText
@@ -174,16 +186,19 @@ FocusScope {
             }
 
             Row {
+                objectName: "dateTimePopupActionsRow"
                 Layout.alignment: Qt.AlignRight
                 spacing: 6
 
                 PreferencesActionButton {
+                    objectName: "dateTimePopupCancelButton"
                     width: 72
                     text: "Cancel"
                     onClicked: dateTimePopup.cancel()
                 }
 
                 PreferencesActionButton {
+                    objectName: "dateTimePopupNowButton"
                     width: 64
                     text: "Now"
                     onClicked: {
@@ -194,6 +209,7 @@ FocusScope {
                 }
 
                 PreferencesActionButton {
+                    objectName: "dateTimePopupApplyButton"
                     width: 86
                     primary: true
                     text: "Apply"

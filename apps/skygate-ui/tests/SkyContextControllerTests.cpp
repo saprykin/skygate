@@ -7,6 +7,7 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
+#include "skygate/core/ITimeSource.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
@@ -14,6 +15,7 @@
 #include <QDateTime>
 #include <QSettings>
 #include <QSignalSpy>
+#include <QTimeZone>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -28,6 +30,37 @@
 #include <vector>
 
 namespace {
+
+QDateTime fixedNowUtc()
+{
+    return QDateTime(QDate(2026, 5, 6), QTime(9, 30, 0), QTimeZone::UTC);
+}
+
+class FakeTimeSource final : public skygate::core::ITimeSource {
+public:
+    explicit FakeTimeSource(const QDateTime& nowUtc = fixedNowUtc())
+        : m_nowUtc(nowUtc.toUTC())
+    {
+    }
+
+    [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
+    {
+        return skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(m_nowUtc);
+    }
+
+    void setNowUtc(const QDateTime& nowUtc)
+    {
+        m_nowUtc = nowUtc.toUTC();
+    }
+
+    void advanceSeconds(const int seconds)
+    {
+        m_nowUtc = m_nowUtc.addSecs(seconds);
+    }
+
+private:
+    QDateTime m_nowUtc;
+};
 
 skygate::ephemeris::CelestialBody makeBody(
     std::string id,
@@ -58,11 +91,15 @@ std::unique_ptr<skygate::ephemeris::IEphemerisEngine> createTestEphemerisEngine(
     return skygate::ephemeris::createEphemerisEngine(starCatalog);
 }
 
-SkyContextController::InitializationOptions controllerInitializationOptions(bool loadSettings)
+SkyContextController::InitializationOptions controllerInitializationOptions(
+    bool loadSettings,
+    const skygate::core::ITimeSource* timeSource = nullptr
+)
 {
     SkyContextController::InitializationOptions initializationOptions;
     initializationOptions.loadSettings = loadSettings;
     initializationOptions.initializeLocation = false;
+    initializationOptions.timeSource = timeSource;
     return initializationOptions;
 }
 
@@ -70,6 +107,13 @@ std::unique_ptr<SkyContextController> createController(
     std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
     bool loadSettings = false
+);
+
+std::unique_ptr<SkyContextController> createController(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
+    bool loadSettings,
+    const skygate::core::ITimeSource* timeSource
 );
 
 std::unique_ptr<SkyContextController> createControllerWithOptions(
@@ -83,16 +127,46 @@ std::unique_ptr<SkyContextController> createController(bool loadSettings = false
     return createController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
 }
 
+std::unique_ptr<SkyContextController> createControllerWithTimeSource(
+    const skygate::core::ITimeSource& timeSource,
+    const bool loadSettings = false
+)
+{
+    auto starCatalog = createTestCatalog();
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    return createController(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        loadSettings,
+        &timeSource
+    );
+}
+
+std::unique_ptr<SkyContextController> createController(
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
+    const bool loadSettings,
+    const skygate::core::ITimeSource* timeSource
+)
+{
+    return std::make_unique<SkyContextController>(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        controllerInitializationOptions(loadSettings, timeSource),
+        nullptr
+    );
+}
+
 std::unique_ptr<SkyContextController> createController(
     std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine,
     const bool loadSettings
 )
 {
-    return std::make_unique<SkyContextController>(
+    return createController(
         std::move(starCatalog),
         std::move(ephemerisEngine),
-        controllerInitializationOptions(loadSettings),
+        loadSettings,
         nullptr
     );
 }
@@ -141,7 +215,8 @@ void configureFocusTestContext(SkyContextController& controller)
 
 std::unique_ptr<SkyContextController> createSingleBodyController(
     const std::string& id = "demo_target",
-    const std::string& displayName = "Demo Target"
+    const std::string& displayName = "Demo Target",
+    const skygate::core::ITimeSource* timeSource = nullptr
 )
 {
     auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
@@ -159,7 +234,12 @@ std::unique_ptr<SkyContextController> createSingleBodyController(
     Q_ASSERT(starCatalog != nullptr);
 
     auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    auto controller = createController(
+        std::move(starCatalog),
+        std::move(ephemerisEngine),
+        false,
+        timeSource
+    );
     configureFocusTestContext(*controller);
     return controller;
 }
@@ -229,7 +309,7 @@ public:
     )
     {
         QGeoCoordinate coordinate(latitudeDeg, longitudeDeg, altitudeMeters);
-        QGeoPositionInfo positionInfo(coordinate, QDateTime::currentDateTimeUtc());
+        QGeoPositionInfo positionInfo(coordinate, fixedNowUtc());
         m_lastPosition = positionInfo;
         emit positionUpdated(positionInfo);
     }
@@ -746,12 +826,13 @@ void SkyContextControllerTests::manualTimelineSteppingCrossesBceBoundaryWithoutY
 
 void SkyContextControllerTests::livePlaybackUsesManualStepWhileCatchingUp()
 {
-    const auto controller = createController();
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithTimeSource(timeSource);
     controller->setLive(false);
     controller->setStepSeconds(60);
     controller->setSpeedMultiplier(2.0);
 
-    const QDateTime startUtc = QDateTime::currentDateTimeUtc().addSecs(-5 * 60);
+    const QDateTime startUtc = fixedNowUtc().addSecs(-5 * 60);
     QVERIFY(controller->setUtcDateTimeText(
         startUtc.toString("yyyy-MM-dd"),
         startUtc.toString("HH:mm:ss")
@@ -773,12 +854,13 @@ void SkyContextControllerTests::livePlaybackUsesManualStepWhileCatchingUp()
 
 void SkyContextControllerTests::livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp()
 {
-    const auto controller = createController();
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithTimeSource(timeSource);
     controller->setLive(false);
     controller->setStepSeconds(60);
     controller->setSpeedMultiplier(2.0);
 
-    const QDateTime startUtc = QDateTime::currentDateTimeUtc().addSecs(-30);
+    const QDateTime startUtc = fixedNowUtc().addSecs(-30);
     QVERIFY(controller->setUtcDateTimeText(
         startUtc.toString("yyyy-MM-dd"),
         startUtc.toString("HH:mm:ss")
@@ -791,7 +873,7 @@ void SkyContextControllerTests::livePlaybackDoesNotOvershootCurrentUtcWhenCatchi
     QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
 
     const qint64 currentTimelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    const qint64 currentUtcSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
+    const qint64 currentUtcSeconds = fixedNowUtc().toSecsSinceEpoch();
     QVERIFY(currentTimelineSeconds <= currentUtcSeconds);
 
     controller->setLive(false);
@@ -799,12 +881,13 @@ void SkyContextControllerTests::livePlaybackDoesNotOvershootCurrentUtcWhenCatchi
 
 void SkyContextControllerTests::livePlaybackFallsBackToOneSecondTicksAfterCatchUp()
 {
-    const auto controller = createController();
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithTimeSource(timeSource);
     controller->setLive(false);
     controller->setStepSeconds(60);
     controller->setSpeedMultiplier(4.0);
 
-    const QDateTime startUtc = QDateTime::currentDateTimeUtc().addSecs(-2);
+    const QDateTime startUtc = fixedNowUtc().addSecs(-2);
     QVERIFY(controller->setUtcDateTimeText(
         startUtc.toString("yyyy-MM-dd"),
         startUtc.toString("HH:mm:ss")
@@ -829,7 +912,8 @@ void SkyContextControllerTests::livePlaybackFallsBackToOneSecondTicksAfterCatchU
 
 void SkyContextControllerTests::goLiveNowJumpsToCurrentUtcAndEnablesLive()
 {
-    const auto controller = createController();
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithTimeSource(timeSource);
     controller->setLive(false);
     controller->setStepSeconds(60);
 
@@ -842,13 +926,12 @@ void SkyContextControllerTests::goLiveNowJumpsToCurrentUtcAndEnablesLive()
     QVERIFY(controller->live());
 
     const qint64 timelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    const qint64 currentUtcSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
-    QVERIFY(timelineSeconds >= currentUtcSeconds - 1);
-    QVERIFY(timelineSeconds <= currentUtcSeconds + 1);
+    QCOMPARE(timelineSeconds, fixedNowUtc().toSecsSinceEpoch());
 }
 
 void SkyContextControllerTests::restoresLiveSettingsAtCurrentUtc()
 {
+    FakeTimeSource timeSource;
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.live = true;
@@ -856,14 +939,11 @@ void SkyContextControllerTests::restoresLiveSettingsAtCurrentUtc()
         QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
     QVERIFY(store.saveState(snapshot));
 
-    const qint64 beforeCreateSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
-    const auto controller = createController(true);
-    const qint64 afterCreateSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
+    const auto controller = createControllerWithTimeSource(timeSource, true);
 
     QVERIFY(controller->live());
     const qint64 timelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    QVERIFY(timelineSeconds >= beforeCreateSeconds - 1);
-    QVERIFY(timelineSeconds <= afterCreateSeconds + 1);
+    QCOMPARE(timelineSeconds, fixedNowUtc().toSecsSinceEpoch());
     QVERIFY(timelineSeconds != snapshot.utcEpochSeconds);
 }
 
@@ -1029,7 +1109,8 @@ void SkyContextControllerTests::focusSearchTargetIgnoresInvalidTargets()
 
 void SkyContextControllerTests::trackSearchTargetSetsLiveCurrentTimeAndCentersBody()
 {
-    const auto controller = createSingleBodyController();
+    FakeTimeSource timeSource;
+    const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
     controller->setLive(false);
     QVERIFY(controller->setUtcDateTimeText("2000-01-01", "00:00:00"));
     controller->setViewCenter(12.0, 123.0);
@@ -1045,9 +1126,7 @@ void SkyContextControllerTests::trackSearchTargetSetsLiveCurrentTimeAndCentersBo
     QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
 
     const qint64 timelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    const qint64 currentUtcSeconds = QDateTime::currentDateTimeUtc().toSecsSinceEpoch();
-    QVERIFY(timelineSeconds >= currentUtcSeconds - 2);
-    QVERIFY(timelineSeconds <= currentUtcSeconds + 2);
+    QCOMPARE(timelineSeconds, fixedNowUtc().toSecsSinceEpoch());
 
     const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
     const auto* targetState = findStateById(snapshot, "demo_target");

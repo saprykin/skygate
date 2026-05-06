@@ -3,20 +3,6 @@
 
 using namespace skygate::ui::tests;
 
-namespace {
-
-QQuickItem* itemByObjectName(QObject* root, const QString& objectName)
-{
-    for (QObject* object : objectTree(root)) {
-        if (object->objectName() == objectName) {
-            return qobject_cast<QQuickItem*>(object);
-        }
-    }
-    return nullptr;
-}
-
-}  // namespace
-
 class QmlNightConditionsPopupTests final : public QObject {
     Q_OBJECT
 
@@ -79,11 +65,29 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
 
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
     QTRY_VERIFY(popup->property("opened").toBool());
-    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Night Conditions")) != nullptr);
-    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Sun")) != nullptr);
-    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Moon")) != nullptr);
-    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Sunset")) != nullptr);
-    QTRY_VERIFY(firstVisibleItemContainingText(root, QStringLiteral("UTC+06:00")) != nullptr);
+    QTRY_VERIFY(
+        firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsPopupTitle")) != nullptr
+    );
+    QTRY_VERIFY(
+        firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsSunHeader")) != nullptr
+    );
+    QTRY_VERIFY(
+        firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMoonHeader")) != nullptr
+    );
+    QTRY_VERIFY(
+        firstQuickItemWithObjectName(
+            root,
+            QStringLiteral("nightConditionsSunRowLabel_Sunset")
+        ) != nullptr
+    );
+    auto* locationLabel = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("nightConditionsLocationLabel")
+    );
+    QVERIFY(locationLabel != nullptr);
+    QTRY_VERIFY(
+        locationLabel->property("text").toString().contains(QStringLiteral("UTC+06:00"))
+    );
     QVERIFY(controller->nightConditions().value("locationText").toString().contains("UTC+06:00"));
     QVERIFY(controller->nightConditions().value("valid").toBool());
 
@@ -178,8 +182,8 @@ void QmlNightConditionsPopupTests::footerNightAndDateTimePopupsAreMutuallyExclus
     QVERIFY(root != nullptr);
 
     ExposedQuickWindow exposed(root);
-    QQuickItem* night = itemByObjectName(root, QStringLiteral("nightConditionsMouse"));
-    QQuickItem* time = itemByObjectName(root, QStringLiteral("statusTimeMouse"));
+    QQuickItem* night = firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMouse"));
+    QQuickItem* time = firstQuickItemWithObjectName(root, QStringLiteral("statusTimeMouse"));
     QVERIFY(night != nullptr);
     QVERIFY(time != nullptr);
 

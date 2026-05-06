@@ -6,6 +6,7 @@
 #include <QVariantMap>
 
 #include "skygate/core/Types.hpp"
+#include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
@@ -135,6 +136,7 @@ public:
         bool initializeLocation = true;
         QGeoPositionInfoSource* positionSource = nullptr;
         bool requestLocationPermission = true;
+        const skygate::core::ITimeSource* timeSource = nullptr;
     };
 
     explicit SkyContextController(
@@ -290,6 +292,7 @@ signals:
     void skyContextChanged();
 
 private:
+    [[nodiscard]] QDateTime currentUtcDateTime() const;
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
@@ -315,6 +318,8 @@ private:
     );
 
 private:
+    skygate::core::SystemTimeSource m_systemTimeSource;
+    const skygate::core::ITimeSource* m_timeSource = nullptr;
     skygate::ui::internal::SkyTimelineController m_timeline;
     skygate::ui::internal::SkyViewController m_view;
     skygate::ui::internal::SkyLocationController m_location;

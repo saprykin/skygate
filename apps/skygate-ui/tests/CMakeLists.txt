@@ -80,6 +80,7 @@ add_skygate_ui_qtest(
 )
 add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests LocationCatalogModelTests.cpp)
 add_skygate_ui_qtest(skygate-ui-time-zone-catalog-model-tests TimeZoneCatalogModelTests.cpp)
+add_skygate_ui_qtest(skygate-ui-log-capture-tests LogCaptureTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-context-controller-tests
     SkyContextControllerTests.cpp

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <QList>
 #include <QMessageLogContext>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
@@ -12,18 +15,28 @@ public:
     explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
         : m_minimumType(minimumType)
     {
-        s_current = this;
-        m_previousHandler = qInstallMessageHandler(&LogCapture::handler);
+        QMutexLocker lock(&s_mutex);
+        if (s_captures.isEmpty()) {
+            s_previousHandler = qInstallMessageHandler(&LogCapture::handler);
+        }
+        s_captures.push_back(this);
     }
 
     ~LogCapture()
     {
-        qInstallMessageHandler(m_previousHandler);
-        s_current = nullptr;
+        QMutexLocker lock(&s_mutex);
+        s_captures.removeAll(this);
+        if (s_captures.isEmpty()) {
+            const QtMessageHandler previousHandler = s_previousHandler;
+            s_previousHandler = nullptr;
+            lock.unlock();
+            qInstallMessageHandler(previousHandler);
+        }
     }
 
     [[nodiscard]] QString joinedMessages() const
     {
+        QMutexLocker lock(&s_mutex);
         return m_messages.join('\n');
     }
 
@@ -52,22 +65,23 @@ private:
         const QString& message
     )
     {
-        if (
-            s_current != nullptr
-            && severityRank(type) >= severityRank(s_current->m_minimumType)
-        ) {
-            s_current->m_messages.push_back(QStringLiteral("%1 %2").arg(
-                QString::fromUtf8(context.category != nullptr ? context.category : "default"),
-                message
-            ));
+        QMutexLocker lock(&s_mutex);
+        for (LogCapture* capture : s_captures) {
+            if (severityRank(type) >= severityRank(capture->m_minimumType)) {
+                capture->m_messages.push_back(QStringLiteral("%1 %2").arg(
+                    QString::fromUtf8(context.category != nullptr ? context.category : "default"),
+                    message
+                ));
+            }
         }
     }
 
 private:
-    QtMessageHandler m_previousHandler = nullptr;
     QtMsgType m_minimumType = QtWarningMsg;
     QStringList m_messages;
-    static inline LogCapture* s_current = nullptr;
+    static inline QMutex s_mutex;
+    static inline QList<LogCapture*> s_captures;
+    static inline QtMessageHandler s_previousHandler = nullptr;
 };
 
 }  // namespace skygate::ui::tests

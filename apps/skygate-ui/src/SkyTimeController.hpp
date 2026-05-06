@@ -12,6 +12,10 @@
 class QAbstractItemModel;
 class TimeZoneCatalogModel;
 
+namespace skygate::core {
+class ITimeSource;
+}
+
 class SkyTimeController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString dateText READ dateText NOTIFY dateTextChanged)
@@ -23,6 +27,10 @@ class SkyTimeController final : public QObject {
 
 public:
     explicit SkyTimeController(QObject* parent = nullptr);
+    explicit SkyTimeController(
+        const skygate::core::ITimeSource& timeSource,
+        QObject* parent = nullptr
+    );
     ~SkyTimeController() override;
 
     [[nodiscard]] QString dateText() const;

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <QList>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QStringList>
 #include <QtGlobal>
 
@@ -15,18 +18,28 @@ public:
     explicit QmlWarningScope(const Forwarding forwarding = Forwarding::Enabled) :
         m_forwarding(forwarding)
     {
-        s_currentScope = this;
-        m_previousHandler = qInstallMessageHandler(&QmlWarningScope::messageHandler);
+        QMutexLocker lock(&s_mutex);
+        if (s_scopes.isEmpty()) {
+            s_previousHandler = qInstallMessageHandler(&QmlWarningScope::messageHandler);
+        }
+        s_scopes.push_back(this);
     }
 
     ~QmlWarningScope()
     {
-        qInstallMessageHandler(m_previousHandler);
-        s_currentScope = nullptr;
+        QMutexLocker lock(&s_mutex);
+        s_scopes.removeAll(this);
+        if (s_scopes.isEmpty()) {
+            const QtMessageHandler previousHandler = s_previousHandler;
+            s_previousHandler = nullptr;
+            lock.unlock();
+            qInstallMessageHandler(previousHandler);
+        }
     }
 
     [[nodiscard]] QStringList messages() const
     {
+        QMutexLocker lock(&s_mutex);
         return m_messages;
     }
 
@@ -37,24 +50,35 @@ private:
         const QString& message
     )
     {
-        if (s_currentScope != nullptr && type == QtWarningMsg) {
-            s_currentScope->m_messages.push_back(message);
+        QtMessageHandler previousHandler = nullptr;
+        bool forwardToPreviousHandler = true;
+
+        {
+            QMutexLocker lock(&s_mutex);
+            for (qsizetype index = s_scopes.size() - 1; index >= 0; --index) {
+                QmlWarningScope* scope = s_scopes.at(index);
+                if (type == QtWarningMsg) {
+                    scope->m_messages.push_back(message);
+                }
+                if (scope->m_forwarding == Forwarding::Disabled) {
+                    forwardToPreviousHandler = false;
+                    break;
+                }
+            }
+            previousHandler = s_previousHandler;
         }
 
-        if (
-            s_currentScope != nullptr
-            && s_currentScope->m_forwarding == Forwarding::Enabled
-            && s_currentScope->m_previousHandler != nullptr
-        ) {
-            s_currentScope->m_previousHandler(type, context, message);
+        if (forwardToPreviousHandler && previousHandler != nullptr) {
+            previousHandler(type, context, message);
         }
     }
 
 private:
     Forwarding m_forwarding = Forwarding::Enabled;
-    QtMessageHandler m_previousHandler = nullptr;
     QStringList m_messages;
-    static inline QmlWarningScope* s_currentScope = nullptr;
+    static inline QMutex s_mutex;
+    static inline QList<QmlWarningScope*> s_scopes;
+    static inline QtMessageHandler s_previousHandler = nullptr;
 };
 
 }  // namespace skygate::ui::tests

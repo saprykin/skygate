@@ -168,17 +168,6 @@ inline QQuickItem* quickItemProperty(QObject* object, const char* propertyName)
     return qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(object->property(propertyName)));
 }
 
-inline QList<QObject*> objectsWithPlaceholder(QObject* root, const QString& placeholderText)
-{
-    QList<QObject*> matches;
-    for (QObject* object : objectTree(root)) {
-        if (object->property("placeholderText").toString() == placeholderText) {
-            matches.push_back(object);
-        }
-    }
-    return matches;
-}
-
 inline QList<QObject*> checkBoxes(QObject* root)
 {
     QList<QObject*> matches;

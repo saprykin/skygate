@@ -123,17 +123,21 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
     QTRY_VERIFY(popup->property("opened").toBool());
     QCOMPARE(popup->property("stagedDateText").toString(), QString("2024-01-02"));
     QCOMPARE(popup->property("stagedTimeText").toString(), QString("03:04:05"));
-    const auto applyButtons = invokableButtonsWithText(root, QStringLiteral("Apply"));
-    QCOMPARE(applyButtons.size(), 1);
-    QVERIFY(applyButtons.front()->property("enabled").toBool());
+    QObject* applyButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("dateTimePopupApplyButton")
+    );
+    QVERIFY(applyButton != nullptr);
+    QVERIFY(applyButton->property("enabled").toBool());
     popup->setProperty("stagedDateText", QString());
     QCoreApplication::processEvents();
-    QTRY_VERIFY(!applyButtons.front()->property("enabled").toBool());
+    QTRY_VERIFY(!applyButton->property("enabled").toBool());
 
     popup->setProperty("stagedDateText", QStringLiteral("2025-05-06"));
     popup->setProperty("stagedTimeText", QStringLiteral("07:08:09"));
-    auto* timeInput = qobject_cast<QQuickItem*>(
-        objectsWithPlaceholder(root, QStringLiteral("HH:mm:ss")).front()
+    auto* timeInput = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("dateTimePopupTimeField")
     );
     QVERIFY(timeInput != nullptr);
     QVERIFY(QMetaObject::invokeMethod(timeInput, "forceActiveFocus"));
@@ -150,9 +154,9 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
     controller->setLive(false);
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
     QTRY_VERIFY(popup->property("opened").toBool());
-    const auto nowButtons = invokableButtonsWithText(root, QStringLiteral("Now"));
-    QCOMPARE(nowButtons.size(), 1);
-    QVERIFY(activateControl(nowButtons.front()));
+    QObject* nowButton = firstObjectWithObjectName(root, QStringLiteral("dateTimePopupNowButton"));
+    QVERIFY(nowButton != nullptr);
+    QVERIFY(activateControl(nowButton));
     QTRY_VERIFY(!popup->property("opened").toBool());
     QTRY_VERIFY(controller->live());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));

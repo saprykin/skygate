@@ -2,6 +2,9 @@
 
 #include "TimeZoneCatalogModel.hpp"
 
+#include "skygate/core/ITimeSource.hpp"
+#include "skygate/core/SystemTimeSource.hpp"
+
 #include <QDate>
 #include <QRegularExpression>
 #include <QTime>
@@ -62,6 +65,20 @@ QTimeZone validTimeZoneOrFallback(const QString& timeZoneId)
     return QTimeZone::utc();
 }
 
+const skygate::core::SystemTimeSource& defaultTimeSource()
+{
+    static const skygate::core::SystemTimeSource timeSource;
+    return timeSource;
+}
+
+QDateTime toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
+{
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+        utcTime.time_since_epoch()
+    );
+    return QDateTime::fromSecsSinceEpoch(seconds.count(), QTimeZone::UTC);
+}
+
 QString timeZoneLabel(const QTimeZone& timeZone, const QDateTime& zonedDateTime)
 {
     QString label = timeZone.abbreviation(zonedDateTime).trimmed();
@@ -84,8 +101,16 @@ QString timeZoneLabel(const QTimeZone& timeZone, const QDateTime& zonedDateTime)
 } // namespace
 
 SkyTimeController::SkyTimeController(QObject* parent)
+    : SkyTimeController(defaultTimeSource(), parent)
+{
+}
+
+SkyTimeController::SkyTimeController(
+    const skygate::core::ITimeSource& timeSource,
+    QObject* parent
+)
     : QObject(parent)
-    , m_utcDateTime(QDateTime::currentDateTimeUtc())
+    , m_utcDateTime(toQDateTimeUtc(timeSource.nowUtc()))
     , m_timeZone(validTimeZoneOrFallback({}))
     , m_timeZoneCatalogModel(new TimeZoneCatalogModel(this))
 {
