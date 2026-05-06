@@ -2,13 +2,17 @@
 #include "catalog/StellariumLabelRefExtractor.hpp"
 #include "catalog/StellariumLineRefExtractor.hpp"
 
+#include <QJsonArray>
 #include <QByteArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QtTest/QtTest>
 
+#include <limits>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -45,6 +49,9 @@ private slots:
     void prefersCommonNameFieldsInOrder();
     void supportsArrayFormConstellations();
     void parsesStrictHipText();
+    void rejectsMalformedHipText();
+    void parsesHipIdentifiersFromJsonValues();
+    void rejectsInvalidHipPolylinesAndCollectsNestedObjects();
 };
 
 void StellariumExtractorTests::extractsLineRefs()
@@ -189,10 +196,79 @@ void StellariumExtractorTests::supportsArrayFormConstellations()
 
 void StellariumExtractorTests::parsesStrictHipText()
 {
-    const auto hip = skygate::ephemeris::StellariumHipParser::parseStrictHipText("hip_24436");
+    const auto hip = skygate::ephemeris::StellariumHipParser::parseStrictHipText(" hip __ 24436 ");
 
     QVERIFY(hip.has_value());
     QCOMPARE(*hip, 24436);
+}
+
+void StellariumExtractorTests::rejectsMalformedHipText()
+{
+    const std::vector<QString> malformedValues {
+        "",
+        "   ",
+        "hip",
+        "hip_",
+        "hip_0",
+        "hip_-1",
+        "hip_12a",
+        "not_hip",
+        QString::number(std::numeric_limits<qint64>::max())
+    };
+
+    for (const QString& value : malformedValues) {
+        QVERIFY(!skygate::ephemeris::StellariumHipParser::parseStrictHipText(value).has_value());
+    }
+}
+
+void StellariumExtractorTests::parsesHipIdentifiersFromJsonValues()
+{
+    using skygate::ephemeris::StellariumHipParser;
+
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonValue(123)), 123);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonValue("hip 456")), 456);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject {{"HIP", 789}}), 789);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject {{"id", "hip_2468"}}), 2468);
+    QCOMPARE(*StellariumHipParser::parseHipIdentifier(QJsonObject {{"star", QJsonObject {{"hip", 1357}}}}), 1357);
+
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonValue(12.5)).has_value());
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonValue(-1)).has_value());
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonValue()).has_value());
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject {{"other", 1}}).has_value());
+    QVERIFY(!StellariumHipParser::parseHipIdentifier(QJsonObject {{"hip", "bad"}}).has_value());
+}
+
+void StellariumExtractorTests::rejectsInvalidHipPolylinesAndCollectsNestedObjects()
+{
+    using skygate::ephemeris::StellariumHipParser;
+
+    QVERIFY(!StellariumHipParser::parseHipPolyline(QJsonArray {1}).has_value());
+    QVERIFY(!StellariumHipParser::parseHipPolyline(QJsonArray {1, "not_hip"}).has_value());
+
+    const auto parsedPolyline = StellariumHipParser::parseHipPolyline(QJsonArray {
+        QJsonObject {{"hip", 1}},
+        "hip_2",
+        3
+    });
+    QVERIFY(parsedPolyline.has_value());
+    QCOMPARE(*parsedPolyline, std::vector<int>({1, 2, 3}));
+
+    std::vector<std::vector<int>> polylines;
+    StellariumHipParser::collectHipPolylines(
+        QJsonObject {
+            {"constellations", QJsonArray {
+                QJsonObject {{"lines", QJsonArray {QJsonArray {10, 11, 12}}}},
+                QJsonObject {{"line", QJsonArray {QJsonArray {"hip 20", "hip_21"}}}},
+                QJsonObject {{"nested", QJsonObject {{"segments", QJsonArray {QJsonArray {30, 31}}}}}},
+            }}
+        },
+        polylines
+    );
+
+    QCOMPARE(polylines.size(), std::size_t(3));
+    QCOMPARE(polylines[0], std::vector<int>({10, 11, 12}));
+    QCOMPARE(polylines[1], std::vector<int>({20, 21}));
+    QCOMPARE(polylines[2], std::vector<int>({30, 31}));
 }
 
 QTEST_APPLESS_MAIN(StellariumExtractorTests)

@@ -17,6 +17,8 @@ private slots:
     void loadsHygCatalogBySourceRequest();
     void loadsHygCatalogBySourceTypeWithProgress();
     void reportsDiagnosticsForSelectionAndErrors();
+    void leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput();
+    void rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes();
 };
 
 void CatalogFactoryTests::loadsBundledCatalogBySourceType()
@@ -111,6 +113,58 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
     QVERIFY(
         invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns
     );
+}
+
+void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput()
+{
+    const auto disabledSelection = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag\n"
+        "1,11,Alpha,1.0,2.0,3.0\n"
+        "2,22,Beta,4.0,5.0,6.0\n",
+        {},
+        skygate::ephemeris::CatalogSelectionOptions {
+            .mode = skygate::ephemeris::CatalogSelectionMode::None,
+            .maxBodyCount = 1U
+        }
+    );
+    QVERIFY(disabledSelection.isSuccess());
+    QVERIFY(disabledSelection.catalog != nullptr);
+    QCOMPARE(disabledSelection.catalog->bodies().size(), std::size_t(2));
+    QCOMPARE(disabledSelection.diagnostics.truncatedBodyCount, std::size_t(0));
+
+    const auto oversizedSelection = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag\n"
+        "1,11,Alpha,1.0,2.0,3.0\n"
+        "2,22,Beta,4.0,5.0,6.0\n",
+        {},
+        skygate::ephemeris::CatalogSelectionOptions {
+            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude,
+            .maxBodyCount = 10U
+        }
+    );
+    QVERIFY(oversizedSelection.isSuccess());
+    QVERIFY(oversizedSelection.catalog != nullptr);
+    QCOMPARE(oversizedSelection.catalog->bodies().size(), std::size_t(2));
+    QCOMPARE(oversizedSelection.diagnostics.selectedBodyCount, std::size_t(2));
+    QCOMPARE(oversizedSelection.diagnostics.truncatedBodyCount, std::size_t(0));
+}
+
+void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes()
+{
+    QVERIFY(skygate::ephemeris::createStarCatalogFromBodies({}) == nullptr);
+
+    const auto unsupported = skygate::ephemeris::loadStarCatalog(
+        static_cast<skygate::ephemeris::CatalogSourceType>(255U),
+        "unused"
+    );
+    QVERIFY(!unsupported.isSuccess());
+    QVERIFY(
+        unsupported.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat
+    );
+    QVERIFY(!unsupported.errorDetail.empty());
+    QVERIFY(unsupported.catalog == nullptr);
 }
 
 QTEST_APPLESS_MAIN(CatalogFactoryTests)

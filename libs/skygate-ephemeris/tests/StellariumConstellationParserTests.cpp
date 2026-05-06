@@ -10,7 +10,9 @@ class StellariumConstellationParserTests final : public QObject {
 
 private slots:
     void rejectsLegacyRowsPayload();
+    void rejectsEmptyWhitespaceAndMalformedJsonPayloads();
     void parsesIndexJsonPayload();
+    void parsesObjectRootWithoutConstellationArray();
     void providesBundledFallbackData();
 };
 
@@ -25,6 +27,19 @@ void StellariumConstellationParserTests::rejectsLegacyRowsPayload()
     QVERIFY(result.constellationCount == 0U);
     QVERIFY(result.lineRefs.empty());
     QVERIFY(result.labelRefs.empty());
+}
+
+void StellariumConstellationParserTests::rejectsEmptyWhitespaceAndMalformedJsonPayloads()
+{
+    const skygate::ephemeris::StellariumConstellationParser parser;
+
+    for (const std::string_view payload : {"", "   \n\t  ", "[1, 2, 3]", "{ not json" }) {
+        const auto result = parser.parse(payload);
+
+        QVERIFY(result.constellationCount == 0U);
+        QVERIFY(result.lineRefs.empty());
+        QVERIFY(result.labelRefs.empty());
+    }
 }
 
 void StellariumConstellationParserTests::parsesIndexJsonPayload()
@@ -47,6 +62,23 @@ void StellariumConstellationParserTests::parsesIndexJsonPayload()
     QVERIFY(result.labelRefs.size() == 1U);
     QVERIFY(result.labelRefs[0].first == "Orion");
     QVERIFY(result.labelRefs[0].second.size() == 3U);
+}
+
+void StellariumConstellationParserTests::parsesObjectRootWithoutConstellationArray()
+{
+    constexpr std::string_view kJsonPayload = R"({
+        "constellations": {
+            "lines": [[1, 2, 3]],
+            "line": [[4, 5]]
+        }
+    })";
+
+    const skygate::ephemeris::StellariumConstellationParser parser;
+    const auto result = parser.parse(kJsonPayload);
+
+    QVERIFY(result.constellationCount == 0U);
+    QVERIFY(result.lineRefs.size() == 3U);
+    QVERIFY(result.labelRefs.empty());
 }
 
 void StellariumConstellationParserTests::providesBundledFallbackData()

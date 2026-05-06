@@ -79,6 +79,7 @@ class EphemerisEngineFallbackTests final : public QObject {
 private slots:
     void usesFallbackBodyLookupAndFixedCoordinatePriority();
     void usesInterfaceDefaultBodyLookupCaseInsensitive();
+    void usesInterfaceDefaultBodyLookupByIndex();
     void skipsHorizontalCoordinatesForInvalidObserver();
     void fixedCoordinatesOverrideExplicitSourceDispatch();
 };
@@ -171,6 +172,19 @@ void EphemerisEngineFallbackTests::usesInterfaceDefaultBodyLookupCaseInsensitive
     QCOMPARE(state->equatorial.rightAscensionHours, 2.0);
 
     QVERIFY(!engine.computeBodyState(context, "missing").has_value());
+}
+
+void EphemerisEngineFallbackTests::usesInterfaceDefaultBodyLookupByIndex()
+{
+    const SnapshotOnlyEngine engine;
+    const skygate::core::SkyContext context;
+
+    const auto state = engine.computeBodyState(context, 0U);
+    QVERIFY(state.has_value());
+    QCOMPARE(state->bodyIndex, 0U);
+    QCOMPARE(state->horizontal.altitudeDeg, 4.0);
+
+    QVERIFY(!engine.computeBodyState(context, 42U).has_value());
 }
 
 void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver()

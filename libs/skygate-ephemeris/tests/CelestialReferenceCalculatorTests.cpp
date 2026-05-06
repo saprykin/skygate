@@ -14,6 +14,7 @@ class CelestialReferenceCalculatorTests final : public QObject {
 
 private slots:
     void computesFiniteEclipticAndEquatorialPoints();
+    void declinationCircleFallsBackForNonPositiveSampleCounts();
     void circumpolarBoundaryDeclinationFollowsHemisphere();
     void constellationLabelCenterAveragesAnchorVectors();
 };
@@ -52,6 +53,34 @@ void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoint
     QVERIFY(equatorialPoint.altitudeDeg <= 90.0);
     QVERIFY(equatorialPoint.azimuthDeg >= 0.0);
     QVERIFY(equatorialPoint.azimuthDeg < 360.0);
+}
+
+void CelestialReferenceCalculatorTests::declinationCircleFallsBackForNonPositiveSampleCounts()
+{
+    skygate::core::GeoLocation observer;
+    observer.latitudeDeg = 47.3769;
+    observer.longitudeDeg = 8.5417;
+    observer.elevationMeters = 408.0;
+    const skygate::core::UtcTimePoint utcTime(std::chrono::seconds(1'717'276'800));
+
+    const auto fallbackPoint =
+        skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+            5,
+            0,
+            12.0,
+            observer,
+            utcTime
+        );
+    const auto equivalentPoint =
+        skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(
+            0.0,
+            12.0,
+            observer,
+            utcTime
+        );
+
+    QVERIFY(std::abs(fallbackPoint.altitudeDeg - equivalentPoint.altitudeDeg) < 1e-9);
+    QVERIFY(std::abs(fallbackPoint.azimuthDeg - equivalentPoint.azimuthDeg) < 1e-9);
 }
 
 void CelestialReferenceCalculatorTests::circumpolarBoundaryDeclinationFollowsHemisphere()

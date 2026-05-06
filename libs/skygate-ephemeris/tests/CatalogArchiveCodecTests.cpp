@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -112,6 +113,9 @@ private slots:
     void ignoresDirectoriesAndMatchesCsvExtensionCaseInsensitively();
     void rejectsUnsupportedCompressionAndCorruptLocalHeaders();
     void findsEndOfCentralDirectoryWithComment();
+    void inflaterRejectsInvalidInputsAndHonorsOptions();
+    void extractorRejectsBoundaryMetadata();
+    void directoryReaderRejectsMalformedStructures();
 };
 
 void CatalogArchiveCodecTests::inflatesGzipCsvPayloads()
@@ -372,6 +376,126 @@ void CatalogArchiveCodecTests::findsEndOfCentralDirectoryWithComment()
 
     QVERIFY(zipEntry.has_value());
     QVERIFY(zipEntry->find("11,1,2,3") != std::string::npos);
+}
+
+void CatalogArchiveCodecTests::inflaterRejectsInvalidInputsAndHonorsOptions()
+{
+    using namespace skygate::ephemeris;
+
+    constexpr std::array<unsigned char, 17> kRawDeflate {
+        0x4b, 0xcc, 0x29, 0xc8, 0x48, 0xd4, 0x49, 0x4a, 0x2d, 0x49, 0xe4, 0x32,
+        0xd4, 0x31, 0xe2, 0x02, 0x00
+    };
+    const std::string_view rawDeflate(
+        reinterpret_cast<const char*>(kRawDeflate.data()),
+        kRawDeflate.size()
+    );
+
+    const auto inflated = CompressedDataInflater::inflate(
+        rawDeflate,
+        CompressedDataFormat::RawDeflate,
+        CompressedDataInflateOptions {
+            .expectedOutputBytes = 15U,
+            .allowEmptyOutput = false
+        }
+    );
+    QVERIFY(inflated.has_value());
+    QCOMPARE(*inflated, std::string("alpha,beta\n1,2\n"));
+
+    QVERIFY(!CompressedDataInflater::inflate("", CompressedDataFormat::RawDeflate).has_value());
+    QVERIFY(!CompressedDataInflater::inflate("not compressed", CompressedDataFormat::RawDeflate).has_value());
+    QVERIFY(!CompressedDataInflater::inflate(
+        rawDeflate,
+        CompressedDataFormat::RawDeflate,
+        CompressedDataInflateOptions {
+            .expectedOutputBytes = 16U,
+            .allowEmptyOutput = false
+        }
+    ).has_value());
+    QVERIFY(!CompressedDataInflater::inflate(
+        rawDeflate,
+        CompressedDataFormat::RawDeflate,
+        CompressedDataInflateOptions {
+            .expectedOutputBytes = std::numeric_limits<std::size_t>::max(),
+            .allowEmptyOutput = false
+        }
+    ).has_value());
+
+    constexpr std::array<unsigned char, 2> kEmptyRawDeflate {0x03, 0x00};
+    const std::string_view emptyRawDeflate(
+        reinterpret_cast<const char*>(kEmptyRawDeflate.data()),
+        kEmptyRawDeflate.size()
+    );
+    QVERIFY(!CompressedDataInflater::inflate(
+        emptyRawDeflate,
+        CompressedDataFormat::RawDeflate
+    ).has_value());
+    const auto emptyInflated = CompressedDataInflater::inflate(
+        emptyRawDeflate,
+        CompressedDataFormat::RawDeflate,
+        CompressedDataInflateOptions {
+            .expectedOutputBytes = 0U,
+            .allowEmptyOutput = true
+        }
+    );
+    QVERIFY(emptyInflated.has_value());
+    QVERIFY(emptyInflated->empty());
+}
+
+void CatalogArchiveCodecTests::extractorRejectsBoundaryMetadata()
+{
+    const std::string zipData = makeZip({
+        ZipEntrySpec {
+            .path = "hyg.csv",
+            .data = "hip,ra,dec,mag\n12,1,2,3\n",
+        },
+        ZipEntrySpec {
+            .path = "empty.csv",
+            .data = {},
+        },
+    });
+    const auto entries = skygate::ephemeris::ZipDirectoryReader::readEntries(zipData);
+    QVERIFY(entries.has_value());
+    QCOMPARE(entries->size(), std::size_t(2));
+
+    auto entryPastEnd = entries->front();
+    entryPastEnd.localHeaderOffset = zipData.size();
+    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entryPastEnd).has_value());
+
+    auto entryOversized = entries->front();
+    entryOversized.compressedSize = zipData.size();
+    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entryOversized).has_value());
+
+    QVERIFY(!skygate::ephemeris::ZipEntryExtractor::extract(zipData, entries->at(1)).has_value());
+}
+
+void CatalogArchiveCodecTests::directoryReaderRejectsMalformedStructures()
+{
+    QVERIFY(!skygate::ephemeris::ZipDirectoryReader::readEntries("not a zip").has_value());
+
+    std::string truncatedCentralDirectory = makeZip({
+        ZipEntrySpec {
+            .path = "hyg.csv",
+            .data = "hip,ra,dec,mag\n13,1,2,3\n",
+        },
+    });
+    truncatedCentralDirectory.resize(truncatedCentralDirectory.size() - 10U);
+    QVERIFY(!skygate::ephemeris::ZipDirectoryReader::readEntries(
+        truncatedCentralDirectory
+    ).has_value());
+
+    std::string invalidCentralSignature = makeZip({
+        ZipEntrySpec {
+            .path = "hyg.csv",
+            .data = "hip,ra,dec,mag\n14,1,2,3\n",
+        },
+    });
+    const auto centralOffset = invalidCentralSignature.find("PK\x01\x02", 0, 4);
+    QVERIFY(centralOffset != std::string::npos);
+    invalidCentralSignature[centralOffset] = '\0';
+    QVERIFY(!skygate::ephemeris::ZipDirectoryReader::readEntries(
+        invalidCentralSignature
+    ).has_value());
 }
 
 QTEST_APPLESS_MAIN(CatalogArchiveCodecTests)
