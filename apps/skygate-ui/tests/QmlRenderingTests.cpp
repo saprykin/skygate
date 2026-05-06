@@ -702,7 +702,24 @@ void QmlRenderingTests::skyViewportItemRendersNonBlankScene()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
-    controller->setViewCenter(45.0, 180.0);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-09-01"), QStringLiteral("22:00:00")));
+    controller->setLatitudeText(QStringLiteral("47.3769"));
+    controller->setLongitudeText(QStringLiteral("8.5417"));
+    controller->setElevationText(QStringLiteral("408.0"));
+    controller->setMagnitudeCutoff(8.0);
+
+    const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
+    const auto m31StateIt = std::find_if(
+        snapshot.states.begin(),
+        snapshot.states.end(),
+        [&snapshot](const skygate::ephemeris::CelestialBodyState& state) {
+            return snapshot.bodyAt(state.bodyIndex).id == "messier_031";
+        }
+    );
+    QVERIFY(m31StateIt != snapshot.states.end());
+    controller->setViewCenter(m31StateIt->horizontal.altitudeDeg, m31StateIt->horizontal.azimuthDeg);
+
     auto sceneModel = makeSceneModel(*controller);
     QVERIFY(sceneModel != nullptr);
 
