@@ -1,25 +1,28 @@
 #pragma once
 
-#include "SkyRenderFrame.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
+#include "SkyRenderFrame.hpp"
+#include "SkyRenderHorizontalLookup.hpp"
 #include "SkyTheme.hpp"
+
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
-#include <span>
+namespace skygate::ui::internal {
 
-class SkyRenderFrameBuilder final {
+class SkyRenderBodyBuilder final {
 public:
-    [[nodiscard]] SkyRenderFrame buildFrame(
+    void appendBodies(
+        SkyRenderFrame& frame,
+        SkyRenderHorizontalLookup* horizontalLookup,
         const skygate::ephemeris::SkySnapshot& snapshot,
         const skygate::core::PreparedProjection& projection,
-        std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
         double magnitudeCutoff,
         double viewportWidth,
         double viewportHeight,
-        const skygate::ui::internal::SkyThemeRenderPalette& renderTheme,
+        const SkyThemeRenderPalette& renderTheme,
         const SkyOverlayLayerVisibility& overlayLayers
     ) const;
 };
+
+}  // namespace skygate::ui::internal

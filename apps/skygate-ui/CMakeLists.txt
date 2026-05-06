@@ -34,6 +34,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkySceneShared.hpp
     src/SkySelectionOverlayBuilder.cpp
     src/SkySelectionOverlayBuilder.hpp
+    src/SkyConstellationRenderBuilder.cpp
+    src/SkyConstellationRenderBuilder.hpp
     src/SkyTheme.cpp
     src/SkyTheme.hpp
     src/SkyTimeController.cpp
@@ -62,8 +64,15 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyContextControllerNightConditions.cpp
     src/SkyContextControllerSearch.cpp
     src/SkyContextState.hpp
+    src/SkyRenderBodyBuilder.cpp
+    src/SkyRenderBodyBuilder.hpp
     src/SkyRenderBuilders.cpp
     src/SkyRenderBuilders.hpp
+    src/SkyRenderFrame.hpp
+    src/SkyRenderHorizontalLookup.cpp
+    src/SkyRenderHorizontalLookup.hpp
+    src/SkyRenderLabels.cpp
+    src/SkyRenderLabels.hpp
     src/SkyContextControllerSettings.cpp
     src/SkyContextControllerSupport.cpp
     src/SkyContextControllerSupport.hpp

@@ -139,11 +139,11 @@ SkyObjectTrailInput makeInput(
     return input;
 }
 
-int countLabelsOfKind(const QVariantList& labels, const QString& kind)
+int countLabelsOfKind(const std::vector<SkyRenderLabel>& labels, const QString& kind)
 {
     int count = 0;
-    for (const QVariant& label : labels) {
-        if (label.toMap().value("kind").toString() == kind) {
+    for (const SkyRenderLabel& label : labels) {
+        if (label.kind == kind) {
             ++count;
         }
     }

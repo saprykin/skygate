@@ -1,5 +1,7 @@
 #include "SkyObjectTrailBuilder.hpp"
 
+#include "SkyRenderLabels.hpp"
+
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/core/math/LinePattern.hpp"
 #include "skygate/core/math/ProjectedPolylineBuilder.hpp"
@@ -7,7 +9,7 @@
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <QColor>
-#include <QVariantMap>
+#include <QString>
 
 #include <algorithm>
 #include <array>
@@ -110,13 +112,14 @@ void appendFutureTrailTick(
         color
     );
 
-    QVariantMap entry;
-    entry.insert("kind", "trailTick");
-    entry.insert("x", point.x);
-    entry.insert("y", point.y);
-    entry.insert("text", QString("+%1h").arg(offsetMinutes / 60));
-    entry.insert("color", color);
-    frame.labels.push_back(entry);
+    skygate::ui::internal::appendSkyRenderLabel(
+        frame.labels,
+        "trailTick",
+        point.x,
+        point.y,
+        QString("+%1h").arg(offsetMinutes / 60),
+        color
+    );
 }
 
 }  // namespace

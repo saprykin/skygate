@@ -51,6 +51,17 @@ bool overlayItemsContainText(const QVariantList& overlayItems, const QString& te
     return false;
 }
 
+bool overlayItemsContainText(const std::vector<SkyRenderLabel>& overlayItems, const QString& text)
+{
+    for (const SkyRenderLabel& overlayItem : overlayItems) {
+        if (overlayItem.text == text) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool overlayItemsContainKind(const QVariantList& overlayItems, const QString& kind)
 {
     for (const QVariant& overlayItem : overlayItems) {
@@ -899,6 +910,10 @@ void SkySceneModelTests::unresolvedBodySelectionDoesNotBuildTrail()
     controller.setLatitudeText("47.3769");
     controller.setLongitudeText("8.5417");
     controller.setElevationText("408.0");
+
+    auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());
+    QVERIFY(overlayLayers != nullptr);
+    overlayLayers->setConstellationLines(false);
 
     SkySceneModel sceneModel;
     sceneModel.setSkyContextController(&controller);

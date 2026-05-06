@@ -1,6 +1,7 @@
 #include "SkySceneModel.hpp"
 
 #include "SkyContextController.hpp"
+#include "SkyRenderLabels.hpp"
 #include "SkyTimeController.hpp"
 
 #include <QColor>
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 namespace {
 
@@ -117,6 +119,24 @@ void appendReferenceLayerLabel(
         text,
         color
     ));
+}
+
+QVariantList renderLabelsToOverlayItems(const std::span<const SkyRenderLabel> labels)
+{
+    QVariantList overlayItems;
+    overlayItems.reserve(static_cast<qsizetype>(labels.size()));
+    for (const SkyRenderLabel& label : labels) {
+        QVariantMap entry;
+        if (!label.kind.isEmpty()) {
+            entry.insert("kind", label.kind);
+        }
+        entry.insert("x", label.x);
+        entry.insert("y", label.y);
+        entry.insert("text", label.text);
+        entry.insert("color", label.color);
+        overlayItems.push_back(std::move(entry));
+    }
+    return overlayItems;
 }
 
 }  // namespace
@@ -522,7 +542,7 @@ QVariantList SkySceneModel::buildOverlayItems(
     const SceneBuildInput& input
 ) const
 {
-    QVariantList overlayItems = sceneFrame.frame.labels;
+    QVariantList overlayItems = renderLabelsToOverlayItems(sceneFrame.frame.labels);
 
     if (!sceneFrame.preparedProjection.has_value()) {
         return overlayItems;

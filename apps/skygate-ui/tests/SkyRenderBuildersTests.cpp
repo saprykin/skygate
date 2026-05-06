@@ -115,10 +115,10 @@ SkyRenderFrame buildFrame(
     );
 }
 
-bool labelsContainText(const QVariantList& labels, const QString& text)
+bool labelsContainText(const std::vector<SkyRenderLabel>& labels, const QString& text)
 {
-    for (const QVariant& label : labels) {
-        if (label.toMap().value("text").toString() == text) {
+    for (const SkyRenderLabel& label : labels) {
+        if (label.text == text) {
             return true;
         }
     }

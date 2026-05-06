@@ -138,7 +138,7 @@ bool SkySceneFramePipeline::clear()
         || !m_frame.points.empty()
         || !m_frame.lines.empty()
         || !m_frame.glyphs.empty()
-        || !m_frame.labels.isEmpty();
+        || !m_frame.labels.empty();
     m_cachedEphemerisEngine = nullptr;
     m_snapshotCacheKey.reset();
     m_renderFrameKey.reset();
