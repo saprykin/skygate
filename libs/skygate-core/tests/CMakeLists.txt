@@ -1,6 +1,14 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
 function(add_skygate_core_qtest target_name source_file)
+    cmake_parse_arguments(
+        TEST
+        ""
+        "TIMEOUT"
+        "ENVIRONMENT;LABELS"
+        ${ARGN}
+    )
+
     add_executable(${target_name}
         ${source_file}
     )
@@ -19,6 +27,25 @@ function(add_skygate_core_qtest target_name source_file)
         NAME ${target_name}
         COMMAND $<TARGET_FILE:${target_name}>
     )
+
+    if(NOT TEST_LABELS)
+        set(TEST_LABELS unit)
+    endif()
+    if(NOT TEST_TIMEOUT)
+        set(TEST_TIMEOUT 30)
+    endif()
+
+    list(REMOVE_DUPLICATES TEST_LABELS)
+    set_tests_properties(${target_name}
+        PROPERTIES
+            LABELS "${TEST_LABELS}"
+            TIMEOUT "${TEST_TIMEOUT}"
+    )
+    if(TEST_ENVIRONMENT)
+        set_property(TEST ${target_name}
+            PROPERTY ENVIRONMENT "${TEST_ENVIRONMENT}"
+        )
+    endif()
 endfunction()
 
 add_skygate_core_qtest(skygate-core-geolocation-tests GeoLocationTests.cpp)

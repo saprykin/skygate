@@ -244,17 +244,20 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     window->show();
     QVERIFY(QTest::qWaitForWindowExposed(window));
     QTRY_VERIFY(window->isVisible());
-    const auto closeButtons = invokableButtonsWithText(window, QStringLiteral("Close"));
-    QCOMPARE(closeButtons.size(), 1);
-    QVERIFY(activateControl(closeButtons.front()));
+    QObject* closeButton = firstObjectWithObjectName(window, QStringLiteral("aboutCloseButton"));
+    QVERIFY(closeButton != nullptr);
+    QVERIFY(activateControl(closeButton));
     QTRY_VERIFY(!window->isVisible());
 
     window->show();
     QVERIFY(QTest::qWaitForWindowExposed(window));
     QTRY_VERIFY(window->isVisible());
-    const auto xButtons = invokableButtonsWithText(window, QString::fromUtf8("\xE2\x9C\x95"));
-    QCOMPARE(xButtons.size(), 1);
-    QVERIFY(activateControl(xButtons.front()));
+    QObject* closeIconButton = firstObjectWithObjectName(
+        window,
+        QStringLiteral("aboutCloseIconButton")
+    );
+    QVERIFY(closeIconButton != nullptr);
+    QVERIFY(activateControl(closeIconButton));
     QTRY_VERIFY(!window->isVisible());
 
     window->show();

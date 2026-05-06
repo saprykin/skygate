@@ -5,6 +5,7 @@ import com.skygate.app 1.0
 
 ApplicationWindow {
     id: root
+    objectName: "mainWindow"
     width: 1100
     height: 760
     visible: true
@@ -15,6 +16,7 @@ ApplicationWindow {
             title: "&App"
 
             MenuItem {
+                objectName: "aboutMenuItem"
                 text: "&About SkyGate"
                 onTriggered: {
                     aboutWindow.visible = true
@@ -26,6 +28,7 @@ ApplicationWindow {
             MenuSeparator {}
 
             MenuItem {
+                objectName: "preferencesMenuItem"
                 text: "&Preferences..."
                 onTriggered: preferencesWindow.openWindow()
             }
@@ -34,11 +37,13 @@ ApplicationWindow {
 
     AboutWindow {
         id: aboutWindow
+        objectName: "aboutWindow"
         transientParentWindow: root
     }
 
     PreferencesWindow {
         id: preferencesWindow
+        objectName: "preferencesWindow"
         skyContextController: skyContext
         transientParentWindow: root
     }
@@ -127,12 +132,14 @@ ApplicationWindow {
 
         SkyViewportItem {
             id: skyViewport
+            objectName: "skyViewport"
             anchors.fill: parent
             skySceneModel: skyScene
         }
 
         SkyInteractionLayer {
             id: interactionLayer
+            objectName: "skyInteractionLayer"
             viewportItem: skyViewport
             skyContextController: skyContext
             skySceneModel: skyScene
@@ -140,6 +147,7 @@ ApplicationWindow {
 
         SearchToolbar {
             id: searchToolbar
+            objectName: "searchToolbar"
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.margins: 14
@@ -149,6 +157,7 @@ ApplicationWindow {
 
         TimelineToolbar {
             id: timelineToolbar
+            objectName: "timelineToolbar"
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.margins: 14
@@ -157,6 +166,7 @@ ApplicationWindow {
         }
 
         SkyOverlayLayer {
+            objectName: "skyOverlayLayer"
             anchors.fill: parent
             sceneModel: skyScene
             interactionLayer: interactionLayer

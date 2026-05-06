@@ -17,6 +17,36 @@
 
 using namespace skygate::ui::tests;
 
+namespace {
+
+FakeNetworkReply* onlyIssuedReply(FakeNetworkAccessManager& networkAccessManager)
+{
+    const QList<FakeNetworkReply*> replies = networkAccessManager.issuedReplies();
+    if (replies.size() != 1) {
+        QTest::qFail(
+            qPrintable(QString("Expected 1 issued reply, got %1").arg(replies.size())),
+            __FILE__,
+            __LINE__
+        );
+        return nullptr;
+    }
+    return replies.front();
+}
+
+void waitForFakeReplyFinished(FakeNetworkReply* reply)
+{
+    QVERIFY(reply != nullptr);
+    if (!reply->isFinished()) {
+        QSignalSpy finishedSpy(reply, &QNetworkReply::finished);
+        if (!reply->isFinished()) {
+            QVERIFY(finishedSpy.wait(1000));
+        }
+    }
+    QVERIFY(reply->isFinished());
+}
+
+}  // namespace
+
 class CatalogDownloadWorkflowTests final : public QObject {
     Q_OBJECT
 
@@ -27,6 +57,7 @@ private slots:
     void downloadServiceRejectsEmptyAndOversizedPayloads();
     void downloadServiceDoesNotCallDestroyedCallbackContext();
     void downloadServiceStopsRetryAfterDestroyedCallbackContext();
+    void downloadServiceRetriesAfterAbortedReply();
     void downloadServiceCompletesConcurrentRequestsIndependently();
     void downloadServiceConcurrentFallbackChainsRemainIsolated();
     void coordinatorParsesSuccessfulDownloadedCatalog();
@@ -205,11 +236,14 @@ void CatalogDownloadWorkflowTests::downloadServiceDoesNotCallDestroyedCallbackCo
     );
 
     QVERIFY(statusCalled);
+    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
     callbackContext.reset();
-    QTest::qWait(50);
+    waitForFakeReplyFinished(reply);
     QCoreApplication::processEvents();
 
     QVERIFY(!completionCalled);
+    QCOMPARE(networkAccessManager.finishedUrls(), QStringList({"https://example.test/slow.csv"}));
+    QVERIFY(networkAccessManager.abortedUrls().isEmpty());
 }
 
 void CatalogDownloadWorkflowTests::downloadServiceStopsRetryAfterDestroyedCallbackContext()
@@ -242,12 +276,69 @@ void CatalogDownloadWorkflowTests::downloadServiceStopsRetryAfterDestroyedCallba
     );
 
     QCOMPARE(networkAccessManager.requestedUrls().size(), 1);
+    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
     callbackContext.reset();
-    QTest::qWait(60);
+    waitForFakeReplyFinished(reply);
     QCoreApplication::processEvents();
 
     QVERIFY(!completionCalled);
     QCOMPARE(networkAccessManager.requestedUrls().size(), 1);
+    QCOMPARE(networkAccessManager.finishedUrls(), QStringList({"https://example.test/slow-fail.csv"}));
+    QVERIFY(networkAccessManager.abortedUrls().isEmpty());
+}
+
+void CatalogDownloadWorkflowTests::downloadServiceRetriesAfterAbortedReply()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/cancelled.csv",
+        {
+            .payload = sampleHygCsvPayload({1, 1, "Cancelled", "1.0", "2.0", "3.0"}),
+            .delayMs = 500
+        }
+    );
+    networkAccessManager.enqueueResponse(
+        "https://example.test/ok-after-cancel.csv",
+        {.payload = sampleHygCsvPayload({2, 2, "Recovered", "4.0", "5.0", "6.0"})}
+    );
+    CatalogDownloadService service(&networkAccessManager);
+
+    CatalogDownloadService::DownloadResult finalResult;
+    QStringList statuses;
+    bool completed = false;
+    service.downloadFirstSuccessfulFromUrls(
+        {"https://example.test/cancelled.csv", "https://example.test/ok-after-cancel.csv"},
+        this,
+        [&statuses](const QString& status) {
+            statuses.push_back(status);
+        },
+        [&finalResult, &completed](CatalogDownloadService::DownloadResult result) {
+            finalResult = std::move(result);
+            completed = true;
+        }
+    );
+
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({"https://example.test/cancelled.csv"}));
+    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog source failed https://example.test/cancelled.csv Operation canceled HTTP 0"
+    );
+    reply->abort();
+    QVERIFY(reply->isAborted());
+
+    QTRY_VERIFY(completed);
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/ok-after-cancel.csv"));
+    QVERIFY(finalResult.payload.contains("Recovered"));
+    QCOMPARE(networkAccessManager.requestedUrls(), QStringList({
+        "https://example.test/cancelled.csv",
+        "https://example.test/ok-after-cancel.csv"
+    }));
+    QCOMPARE(networkAccessManager.finishedUrls().front(), QString("https://example.test/cancelled.csv"));
+    QCOMPARE(networkAccessManager.abortedUrls(), QStringList({"https://example.test/cancelled.csv"}));
+    QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const QString& status) {
+        return status.contains("Operation canceled");
+    }));
 }
 
 void CatalogDownloadWorkflowTests::downloadServiceCompletesConcurrentRequestsIndependently()
@@ -504,11 +595,14 @@ void CatalogDownloadWorkflowTests::importWorkflowDoesNotCompleteConstellationAft
         }
     );
 
+    FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
     callbackContext.reset();
-    QTest::qWait(60);
+    waitForFakeReplyFinished(reply);
     QCoreApplication::processEvents();
 
     QVERIFY(!completionCalled);
+    QCOMPARE(networkAccessManager.finishedUrls(), QStringList({"https://example.test/slow-index.json"}));
+    QVERIFY(networkAccessManager.abortedUrls().isEmpty());
 }
 
 void CatalogDownloadWorkflowTests::importWorkflowFallsBackForMalformedConstellationPayload()

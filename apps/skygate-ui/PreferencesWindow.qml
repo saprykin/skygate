@@ -6,6 +6,7 @@ import com.skygate.app 1.0
 
 Window {
     id: preferencesWindow
+    objectName: "preferencesWindow"
     title: "Preferences"
     width: 588
     height: 430
@@ -48,6 +49,7 @@ Window {
 
     PreferencesDraft {
         id: preferencesDraft
+        objectName: "preferencesDraft"
         skyContextController: preferencesWindow.skyContextController
     }
 
@@ -153,6 +155,7 @@ Window {
 
                 ToolButton {
                     id: closeIconButton
+                    objectName: "preferencesCloseButton"
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.topMargin: 9
@@ -219,24 +222,28 @@ Window {
                         }
 
                         PreferencesSectionButton {
+                            objectName: "preferencesGeneralSectionButton"
                             label: "General"
                             active: preferencesWindow.selectedPage === 0
                             onClicked: preferencesWindow.selectedPage = 0
                         }
 
                         PreferencesSectionButton {
+                            objectName: "preferencesSkySectionButton"
                             label: "Sky"
                             active: preferencesWindow.selectedPage === 1
                             onClicked: preferencesWindow.selectedPage = 1
                         }
 
                         PreferencesSectionButton {
+                            objectName: "preferencesAppearanceSectionButton"
                             label: "Appearance"
                             active: preferencesWindow.selectedPage === 2
                             onClicked: preferencesWindow.selectedPage = 2
                         }
 
                         PreferencesSectionButton {
+                            objectName: "preferencesCatalogSectionButton"
                             label: "Catalog"
                             active: preferencesWindow.selectedPage === 3
                             onClicked: preferencesWindow.selectedPage = 3
@@ -267,6 +274,7 @@ Window {
                         spacing: 4
 
                         StackLayout {
+                            objectName: "preferencesSectionStack"
                             currentIndex: preferencesWindow.selectedPage
                             Layout.fillWidth: true
                             Layout.fillHeight: true
@@ -392,6 +400,7 @@ Window {
                     }
 
                     PreferencesActionButton {
+                        objectName: "preferencesApplyButton"
                         Layout.preferredWidth: 116
                         Layout.preferredHeight: 32
                         primary: true

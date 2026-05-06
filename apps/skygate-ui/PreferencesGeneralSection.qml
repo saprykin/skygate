@@ -57,6 +57,7 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
+                        objectName: "logToTerminalCheckBox"
                         checked: root.preferencesDraft.logToTerminal
                         onToggled: root.preferencesDraft.logToTerminal = checked
                     }
@@ -74,6 +75,7 @@ Item {
                     spacing: 7
 
                     PreferencesCheckBox {
+                        objectName: "logToFileCheckBox"
                         checked: root.preferencesDraft.logToFile
                         onToggled: root.preferencesDraft.logToFile = checked
                     }
@@ -116,6 +118,7 @@ Item {
                 }
 
                 PreferencesActionButton {
+                    objectName: "logFileBrowseButton"
                     text: "Browse..."
                     implicitWidth: 88
                     enabled: root.preferencesDraft.logToFile

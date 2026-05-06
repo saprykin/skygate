@@ -5,6 +5,7 @@ import QtQuick.Window
 
 Window {
     id: aboutWindow
+    objectName: "aboutWindow"
     title: "About SkyGate"
     width: 420
     height: 388
@@ -64,6 +65,7 @@ Window {
 
                 ToolButton {
                     id: closeButton
+                    objectName: "aboutCloseIconButton"
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.topMargin: 8
@@ -242,6 +244,7 @@ Window {
                 }
 
                 PreferencesActionButton {
+                    objectName: "aboutCloseButton"
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 4
                     Layout.bottomMargin: 8

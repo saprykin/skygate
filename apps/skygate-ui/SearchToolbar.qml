@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Item {
     id: toolbarRoot
+    objectName: "searchToolbar"
     required property var skyContextController
     readonly property var theme: skyContextController.theme
     property var onRequestExpand: null
@@ -67,6 +68,7 @@ Item {
 
     Rectangle {
         id: searchToolbarPanel
+        objectName: "searchToolbarPanel"
         anchors.top: parent.top
         anchors.left: searchToolbarToggle.right
         anchors.leftMargin: 6
@@ -100,6 +102,7 @@ Item {
 
             PreferencesTextField {
                 id: searchField
+                objectName: "searchField"
                 width: 420
                 implicitHeight: toolbarRoot.controlHeight
                 placeholderText: "Search planets, stars, HIP, constellations"
@@ -132,6 +135,7 @@ Item {
 
             Button {
                 id: clearButton
+                objectName: "searchClearButton"
                 visible: searchField.text.length > 0
                 enabled: visible
                 text: "✕"
@@ -172,6 +176,7 @@ Item {
 
     ToolButton {
         id: searchToolbarToggle
+        objectName: "searchToolbarToggle"
         anchors.verticalCenter: searchToolbarPanel.verticalCenter
         anchors.left: parent.left
         width: 30
@@ -219,6 +224,7 @@ Item {
 
     Rectangle {
         id: resultsDropdown
+        objectName: "searchResultsDropdown"
         anchors.top: searchToolbarPanel.bottom
         anchors.topMargin: 6
         anchors.left: searchToolbarPanel.left
@@ -250,6 +256,7 @@ Item {
 
         ListView {
             id: resultsListView
+            objectName: "searchResultsListView"
             anchors.fill: parent
             anchors.margins: 6
             clip: true
@@ -259,6 +266,7 @@ Item {
 
             delegate: Rectangle {
                 id: resultDelegate
+                objectName: "searchResultDelegate_" + targetId
                 required property string displayText
                 required property string detailText
                 required property string targetKind
@@ -319,6 +327,7 @@ Item {
 
         Label {
             id: emptyLabel
+            objectName: "searchEmptyLabel"
             anchors.centerIn: parent
             visible: resultsListView.count === 0
             text: "No matching objects"

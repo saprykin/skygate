@@ -6,18 +6,10 @@ namespace {
 
 QQuickItem* searchResultDelegate(QObject* root, const QString& targetId)
 {
-    for (QObject* object : objectTree(root)) {
-        auto* item = qobject_cast<QQuickItem*>(object);
-        if (
-            item != nullptr
-            && item->isVisible()
-            && object->property("targetId").toString() == targetId
-            && object->metaObject()->indexOfMethod("activate()") >= 0
-        ) {
-            return item;
-        }
-    }
-    return nullptr;
+    return firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("searchResultDelegate_%1").arg(targetId)
+    );
 }
 
 }  // namespace
@@ -70,11 +62,7 @@ void QmlToolbarTests::searchToolbarFiltersActivatesAndClearsResults()
     QVERIFY(toolbar != nullptr);
 
     ExposedQuickWindow exposed(toolbar);
-    auto* searchField = qobject_cast<QQuickItem*>(firstObjectWithProperty(
-        toolbar,
-        "placeholderText",
-        QStringLiteral("Search planets, stars, HIP, constellations")
-    ));
+    auto* searchField = firstQuickItemWithObjectName(toolbar, QStringLiteral("searchField"));
     QVERIFY(searchField != nullptr);
 
     QVERIFY(QMetaObject::invokeMethod(searchField, "forceActiveFocus"));
@@ -96,12 +84,12 @@ void QmlToolbarTests::searchToolbarFiltersActivatesAndClearsResults()
     QTest::keyClick(exposed.window(), Qt::Key_Return);
     QTRY_COMPARE(controller->selectedSearchTargetId(), targetId);
 
-    const auto clearButtons = invokableButtonsWithText(
+    QObject* clearButton = firstObjectWithObjectName(
         toolbar,
-        QString::fromUtf8("\xE2\x9C\x95")
+        QStringLiteral("searchClearButton")
     );
-    QVERIFY(!clearButtons.empty());
-    QVERIFY(clearButtons.front()->property("visible").toBool());
+    QVERIFY(clearButton != nullptr);
+    QVERIFY(clearButton->property("visible").toBool());
     QVERIFY(QMetaObject::invokeMethod(searchField, "forceActiveFocus"));
     QTest::keyClick(exposed.window(), Qt::Key_Escape);
     QTRY_COMPARE(searchField->property("text").toString(), QString());
@@ -142,29 +130,20 @@ void QmlToolbarTests::searchToolbarToggleRequestsExpandAndClearsSearch()
     QVERIFY(root != nullptr);
 
     ExposedQuickWindow exposed(root);
-    auto* searchField = qobject_cast<QQuickItem*>(firstObjectWithProperty(
-        root,
-        "placeholderText",
-        QStringLiteral("Search planets, stars, HIP, constellations")
-    ));
+    auto* searchField = firstQuickItemWithObjectName(root, QStringLiteral("searchField"));
     QVERIFY(searchField != nullptr);
     QVERIFY(QMetaObject::invokeMethod(searchField, "forceActiveFocus"));
     commitText(exposed.window(), QStringLiteral("Vega"));
     QTRY_COMPARE(searchModel->filterText(), QString("Vega"));
 
-    const auto toggles = invokableButtonsWithText(root, QString::fromUtf8("\xE2\x96\xB6"));
-    QCOMPARE(toggles.size(), 1);
-    QVERIFY(activateControl(toggles.front()));
+    QObject* toggle = firstObjectWithObjectName(root, QStringLiteral("searchToolbarToggle"));
+    QVERIFY(toggle != nullptr);
+    QVERIFY(activateControl(toggle));
     QTRY_VERIFY(controller->searchToolbarCollapsed());
     QTRY_COMPARE(searchField->property("text").toString(), QString());
     QCOMPARE(searchModel->filterText(), QString());
 
-    const auto collapsedToggles = invokableButtonsWithText(
-        root,
-        QString::fromUtf8("\xE2\x97\x80")
-    );
-    QCOMPARE(collapsedToggles.size(), 1);
-    QVERIFY(activateControl(collapsedToggles.front()));
+    QVERIFY(activateControl(toggle));
     QTRY_VERIFY(!controller->searchToolbarCollapsed());
     QCOMPARE(root->property("requestExpandCount").toInt(), 1);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
@@ -201,18 +180,16 @@ void QmlToolbarTests::searchToolbarDelegateClickEmptyStateAndTrackingClearWork()
     QVERIFY(root != nullptr);
 
     ExposedQuickWindow exposed(root);
-    auto* searchField = qobject_cast<QQuickItem*>(firstObjectWithProperty(
-        root,
-        "placeholderText",
-        QStringLiteral("Search planets, stars, HIP, constellations")
-    ));
+    auto* searchField = firstQuickItemWithObjectName(root, QStringLiteral("searchField"));
     QVERIFY(searchField != nullptr);
 
     QVERIFY(QMetaObject::invokeMethod(searchField, "forceActiveFocus"));
     commitText(exposed.window(), QStringLiteral("definitely-no-sky-object"));
     QTRY_COMPARE(searchModel->filterText(), QString("definitely-no-sky-object"));
     QTRY_COMPARE(searchModel->rowCount(), 0);
-    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("No matching objects")) != nullptr);
+    auto* emptyLabel = firstQuickItemWithObjectName(root, QStringLiteral("searchEmptyLabel"));
+    QVERIFY(emptyLabel != nullptr);
+    QTRY_VERIFY(emptyLabel->isVisible());
 
     replaceText(exposed.window(), searchField, QStringLiteral("Sirius"));
     QTRY_VERIFY(searchModel->rowCount() > 0);
@@ -275,42 +252,52 @@ void QmlToolbarTests::timelineToolbarControlsUpdateController()
     ExposedQuickWindow exposed(root);
     (void)exposed;
 
-    const auto pauseButtons = invokableButtonsWithText(root, QStringLiteral("Pause"));
-    QVERIFY(!pauseButtons.empty());
-    QVERIFY(QMetaObject::invokeMethod(pauseButtons.front(), "click"));
+    QObject* playPauseButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("timelinePlayPauseButton")
+    );
+    QVERIFY(playPauseButton != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(playPauseButton, "click"));
     QTRY_VERIFY(!controller->live());
 
-    const auto playButtons = invokableButtonsWithText(root, QStringLiteral("Play"));
-    QVERIFY(!playButtons.empty());
-    QVERIFY(QMetaObject::invokeMethod(playButtons.front(), "click"));
+    QVERIFY(QMetaObject::invokeMethod(playPauseButton, "click"));
     QTRY_VERIFY(controller->live());
 
-    const auto stepForwardButtons = invokableButtonsWithText(root, QStringLiteral(">"));
-    QVERIFY(!stepForwardButtons.empty());
-    QVERIFY(QMetaObject::invokeMethod(stepForwardButtons.front(), "click"));
+    QObject* stepForwardButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("timelineStepForwardButton")
+    );
+    QVERIFY(stepForwardButton != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(stepForwardButton, "click"));
     QTRY_VERIFY(controller->utcTimeText() != originalTimeText);
-    const auto stepBackwardButtons = invokableButtonsWithText(root, QStringLiteral("<"));
-    QVERIFY(!stepBackwardButtons.empty());
-    QVERIFY(QMetaObject::invokeMethod(stepBackwardButtons.front(), "click"));
+    QObject* stepBackwardButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("timelineStepBackwardButton")
+    );
+    QVERIFY(stepBackwardButton != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(stepBackwardButton, "click"));
     QTRY_COMPARE(controller->utcTimeText(), originalTimeText);
 
-    const auto speedCombos = comboBoxesWithCount(root, 6);
-    const auto stepCombos = comboBoxesWithCount(root, 5);
-    const auto magnitudeCombos = comboBoxesWithCount(root, 7);
-    QCOMPARE(speedCombos.size(), 1);
-    QCOMPARE(stepCombos.size(), 1);
-    QCOMPARE(magnitudeCombos.size(), 1);
+    QObject* speedCombo = firstObjectWithObjectName(root, QStringLiteral("timelineSpeedCombo"));
+    QObject* stepCombo = firstObjectWithObjectName(root, QStringLiteral("timelineStepCombo"));
+    QObject* magnitudeCombo = firstObjectWithObjectName(
+        root,
+        QStringLiteral("timelineMagnitudeCombo")
+    );
+    QVERIFY(speedCombo != nullptr);
+    QVERIFY(stepCombo != nullptr);
+    QVERIFY(magnitudeCombo != nullptr);
 
-    speedCombos.front()->setProperty("currentIndex", 3);
-    QVERIFY(QMetaObject::invokeMethod(speedCombos.front(), "activated", Q_ARG(int, 3)));
+    speedCombo->setProperty("currentIndex", 3);
+    QVERIFY(QMetaObject::invokeMethod(speedCombo, "activated", Q_ARG(int, 3)));
     QCOMPARE(controller->speedMultiplier(), 2.0);
 
-    stepCombos.front()->setProperty("currentIndex", 4);
-    QVERIFY(QMetaObject::invokeMethod(stepCombos.front(), "activated", Q_ARG(int, 4)));
+    stepCombo->setProperty("currentIndex", 4);
+    QVERIFY(QMetaObject::invokeMethod(stepCombo, "activated", Q_ARG(int, 4)));
     QCOMPARE(controller->stepSeconds(), 3600);
 
-    magnitudeCombos.front()->setProperty("currentIndex", 5);
-    QVERIFY(QMetaObject::invokeMethod(magnitudeCombos.front(), "activated", Q_ARG(int, 5)));
+    magnitudeCombo->setProperty("currentIndex", 5);
+    QVERIFY(QMetaObject::invokeMethod(magnitudeCombo, "activated", Q_ARG(int, 5)));
     QCOMPARE(controller->magnitudeCutoff(), 7.0);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
@@ -352,40 +339,41 @@ void QmlToolbarTests::timelineToolbarToggleResetAndContextSyncWork()
     ExposedQuickWindow exposed(root);
     (void)exposed;
 
-    const auto speedCombos = comboBoxesWithCount(root, 6);
-    const auto stepCombos = comboBoxesWithCount(root, 5);
-    const auto magnitudeCombos = comboBoxesWithCount(root, 7);
-    QCOMPARE(speedCombos.size(), 1);
-    QCOMPARE(stepCombos.size(), 1);
-    QCOMPARE(magnitudeCombos.size(), 1);
-    QTRY_COMPARE(speedCombos.front()->property("currentIndex").toInt(), 5);
-    QCOMPARE(stepCombos.front()->property("currentIndex").toInt(), 4);
-    QCOMPARE(magnitudeCombos.front()->property("currentIndex").toInt(), 6);
+    QObject* speedCombo = firstObjectWithObjectName(root, QStringLiteral("timelineSpeedCombo"));
+    QObject* stepCombo = firstObjectWithObjectName(root, QStringLiteral("timelineStepCombo"));
+    QObject* magnitudeCombo = firstObjectWithObjectName(
+        root,
+        QStringLiteral("timelineMagnitudeCombo")
+    );
+    QVERIFY(speedCombo != nullptr);
+    QVERIFY(stepCombo != nullptr);
+    QVERIFY(magnitudeCombo != nullptr);
+    QTRY_COMPARE(speedCombo->property("currentIndex").toInt(), 5);
+    QCOMPARE(stepCombo->property("currentIndex").toInt(), 4);
+    QCOMPARE(magnitudeCombo->property("currentIndex").toInt(), 6);
 
     controller->setSpeedMultiplier(0.5);
     controller->setStepSeconds(10);
     controller->setMagnitudeCutoff(3.0);
-    QTRY_COMPARE(speedCombos.front()->property("currentIndex").toInt(), 1);
-    QCOMPARE(stepCombos.front()->property("currentIndex").toInt(), 1);
-    QCOMPARE(magnitudeCombos.front()->property("currentIndex").toInt(), 1);
+    QTRY_COMPARE(speedCombo->property("currentIndex").toInt(), 1);
+    QCOMPARE(stepCombo->property("currentIndex").toInt(), 1);
+    QCOMPARE(magnitudeCombo->property("currentIndex").toInt(), 1);
 
-    const auto resetButtons = invokableButtonsWithText(root, QStringLiteral("Reset"));
-    QCOMPARE(resetButtons.size(), 1);
-    QVERIFY(activateControl(resetButtons.front()));
+    QObject* resetButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("timelineResetViewButton")
+    );
+    QVERIFY(resetButton != nullptr);
+    QVERIFY(activateControl(resetButton));
     QTRY_COMPARE(controller->viewCenterAltitudeDeg(), 45.0);
     QCOMPARE(controller->viewCenterAzimuthDeg(), 180.0);
 
-    const auto expandedToggles = invokableButtonsWithText(
-        root,
-        QString::fromUtf8("\xE2\x97\x80")
-    );
-    QCOMPARE(expandedToggles.size(), 1);
-    QVERIFY(activateControl(expandedToggles.front()));
+    QObject* toggle = firstObjectWithObjectName(root, QStringLiteral("timelineToolbarToggle"));
+    QVERIFY(toggle != nullptr);
+    QVERIFY(activateControl(toggle));
     QTRY_VERIFY(controller->timelineToolbarCollapsed());
 
-    const auto collapsedToggles = invokableButtonsWithText(root, QString::fromUtf8("\xE2\x96\xB6"));
-    QCOMPARE(collapsedToggles.size(), 1);
-    QVERIFY(activateControl(collapsedToggles.front()));
+    QVERIFY(activateControl(toggle));
     QTRY_VERIFY(!controller->timelineToolbarCollapsed());
     QCOMPARE(root->property("requestExpandCount").toInt(), 1);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));

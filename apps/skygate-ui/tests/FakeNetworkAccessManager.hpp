@@ -2,9 +2,11 @@
 
 #include <QByteArray>
 #include <QHash>
+#include <QList>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPointer>
 #include <QQueue>
 #include <QString>
 #include <QStringList>
@@ -41,14 +43,28 @@ public:
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 
         QTimer::singleShot(response.delayMs, this, [this] {
-            if (!m_payload.isEmpty()) {
-                emit readyRead();
-            }
-            emit finished();
+            finish();
         });
     }
 
-    void abort() override {}
+    void abort() override
+    {
+        if (isFinished()) {
+            return;
+        }
+
+        m_aborted = true;
+        m_payload.clear();
+        m_offset = 0;
+        setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 0);
+        setError(QNetworkReply::OperationCanceledError, QStringLiteral("Operation canceled"));
+        finish();
+    }
+
+    [[nodiscard]] bool isAborted() const noexcept
+    {
+        return m_aborted;
+    }
 
     [[nodiscard]] qint64 bytesAvailable() const override
     {
@@ -72,8 +88,27 @@ protected:
     }
 
 private:
+    void finish()
+    {
+        if (isFinished()) {
+            return;
+        }
+
+        setFinished(true);
+        if (error() != QNetworkReply::NoError && !m_errorSignalEmitted) {
+            m_errorSignalEmitted = true;
+            emit errorOccurred(error());
+        }
+        if (!m_payload.isEmpty()) {
+            emit readyRead();
+        }
+        emit finished();
+    }
+
     QByteArray m_payload;
     qsizetype m_offset = 0;
+    bool m_aborted = false;
+    bool m_errorSignalEmitted = false;
 };
 
 class FakeNetworkAccessManager final : public QNetworkAccessManager {
@@ -86,6 +121,28 @@ public:
     [[nodiscard]] QStringList requestedUrls() const
     {
         return m_requestedUrls;
+    }
+
+    [[nodiscard]] QStringList finishedUrls() const
+    {
+        return m_finishedUrls;
+    }
+
+    [[nodiscard]] QStringList abortedUrls() const
+    {
+        return m_abortedUrls;
+    }
+
+    [[nodiscard]] QList<FakeNetworkReply*> issuedReplies() const
+    {
+        QList<FakeNetworkReply*> replies;
+        replies.reserve(m_issuedReplies.size());
+        for (const QPointer<FakeNetworkReply>& reply : m_issuedReplies) {
+            if (!reply.isNull()) {
+                replies.push_back(reply.data());
+            }
+        }
+        return replies;
     }
 
 protected:
@@ -109,12 +166,24 @@ protected:
             response.errorText = QStringLiteral("No fake response registered");
             response.httpStatusCode = 404;
         }
-        return new FakeNetworkReply(request, std::move(response), this);
+        auto* reply = new FakeNetworkReply(request, std::move(response), this);
+        m_issuedReplies.push_back(reply);
+        QObject::connect(reply, &QNetworkReply::finished, this, [this, reply] {
+            const QString url = reply->url().toString();
+            m_finishedUrls.push_back(url);
+            if (reply->isAborted()) {
+                m_abortedUrls.push_back(url);
+            }
+        });
+        return reply;
     }
 
 private:
     QHash<QString, QQueue<FakeNetworkResponse>> m_responses;
     QStringList m_requestedUrls;
+    QStringList m_finishedUrls;
+    QStringList m_abortedUrls;
+    QList<QPointer<FakeNetworkReply>> m_issuedReplies;
 };
 
 }  // namespace skygate::ui::tests

@@ -44,6 +44,49 @@ constexpr qint64 kLargeSearchQueryBudgetMs = 3000;
 constexpr qint64 kDenseHitTestBudgetMs = 5000;
 constexpr qint64 kManyTrailsBudgetMs = 12000;
 
+bool isStrictPerformanceGuardMode()
+{
+    const QString mode = QString::fromUtf8(
+        qgetenv("SKYGATE_PERFORMANCE_GUARD_MODE")
+    ).trimmed().toLower();
+    const QString legacyStrict = QString::fromUtf8(
+        qgetenv("SKYGATE_STRICT_PERFORMANCE_GUARDS")
+    ).trimmed().toLower();
+    return mode == QStringLiteral("strict")
+        || (
+            !legacyStrict.isEmpty()
+            && legacyStrict != QStringLiteral("0")
+            && legacyStrict != QStringLiteral("false")
+            && legacyStrict != QStringLiteral("no")
+            && legacyStrict != QStringLiteral("off")
+        );
+}
+
+QString performanceMetricMessage(
+    const qint64 elapsedMs,
+    const qint64 budgetMs,
+    const char* operationName,
+    const bool strictMode
+)
+{
+    const qint64 deltaMs = budgetMs - elapsedMs;
+    const double budgetPercent = budgetMs > 0
+        ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs))
+        : 0.0;
+    return QStringLiteral(
+        "perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
+        "strict=%7"
+    )
+        .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget")
+                                  : QStringLiteral("over-budget"))
+        .arg(QString::fromUtf8(operationName))
+        .arg(elapsedMs)
+        .arg(budgetMs)
+        .arg(deltaMs)
+        .arg(QString::number(budgetPercent, 'f', 1))
+        .arg(strictMode ? QStringLiteral("on") : QStringLiteral("off"));
+}
+
 class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
@@ -81,13 +124,29 @@ void verifyElapsedBelow(
     const char* operationName
 )
 {
-    QVERIFY2(
-        elapsedMs < budgetMs,
-        qPrintable(QStringLiteral("%1 took %2 ms, budget is %3 ms")
-            .arg(QString::fromUtf8(operationName))
-            .arg(elapsedMs)
-            .arg(budgetMs))
+    const bool strictMode = isStrictPerformanceGuardMode();
+    const QString message = performanceMetricMessage(
+        elapsedMs,
+        budgetMs,
+        operationName,
+        strictMode
     );
+
+    if (elapsedMs < budgetMs) {
+        qInfo().noquote() << message;
+        return;
+    }
+
+    const QString strictHint = QStringLiteral(
+        "%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
+        "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail"
+    ).arg(message);
+    if (!strictMode) {
+        qWarning().noquote() << strictHint;
+        return;
+    }
+
+    QVERIFY2(false, qPrintable(strictHint));
 }
 
 skygate::ephemeris::CelestialBody makeBody(

@@ -68,6 +68,7 @@ Item {
         }
 
         MouseArea {
+            objectName: "cityPickerMouse"
             anchors.fill: parent
             enabled: root.enabled
             hoverEnabled: true
@@ -113,6 +114,7 @@ Item {
 
             PreferencesTextField {
                 id: searchField
+                objectName: "citySearchField"
                 Layout.fillWidth: true
                 placeholderText: "Filter by city or country"
                 onTextChanged: {
@@ -134,6 +136,7 @@ Item {
 
                 ListView {
                     id: cityListView
+                    objectName: "cityListView"
                     anchors.fill: parent
                     clip: true
                     model: root.catalogModel
@@ -196,6 +199,7 @@ Item {
 
                         MouseArea {
                             id: delegateMouse
+                            objectName: "cityDelegateMouse_" + cityId
                             anchors.fill: parent
                             enabled: selectable
                             hoverEnabled: selectable
@@ -214,6 +218,7 @@ Item {
                 }
 
                 Label {
+                    objectName: "cityEmptyLabel"
                     anchors.centerIn: parent
                     visible: cityListView.count === 0
                     text: "No matching cities"

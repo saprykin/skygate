@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Item {
     id: overlayRoot
+    objectName: "skyOverlayLayer"
     readonly property var theme: skyContext.theme
     required property var sceneModel
     required property var interactionLayer
@@ -125,6 +126,7 @@ Item {
 
     Rectangle {
         id: hoverObjectLabel
+        objectName: "hoverObjectLabel"
         visible: interactionLayer.hoveredObjectLabel.length > 0
         x: Math.min(interactionLayer.hoverX + 14, Math.max(0, parent.width - width - 8))
         y: Math.min(interactionLayer.hoverY + 14, Math.max(0, parent.height - height - 8))
@@ -148,6 +150,7 @@ Item {
 
     Item {
         id: searchSelectionMarker
+        objectName: "searchSelectionMarker"
         visible: selectionMarkerData && selectionMarkerData.kind === "searchSelection"
         x: (selectionMarkerData && selectionMarkerData.x !== undefined)
             ? selectionMarkerData.x - (width * 0.5)
@@ -190,6 +193,7 @@ Item {
 
     Rectangle {
         id: objectInspector
+        objectName: "objectInspector"
         readonly property bool hasInspector: inspectorData
             && inspectorData.visible === true
             && inspectorData.title !== undefined
@@ -319,6 +323,7 @@ Item {
 
                 ToolButton {
                     id: centerInspectorButton
+                    objectName: "objectInspectorCenterButton"
                     width: 64
                     height: 22
                     text: "Center"
@@ -360,6 +365,9 @@ Item {
 
                 ToolButton {
                     id: trackInspectorButton
+                    objectName: overlayRoot.inspectorIsTracked
+                        ? "objectInspectorUntrackButton"
+                        : "objectInspectorTrackButton"
                     width: 64
                     height: 22
                     text: overlayRoot.inspectorIsTracked ? "Untrack" : "Track"
@@ -410,6 +418,9 @@ Item {
 
                 ToolButton {
                     id: pinInspectorButton
+                    objectName: objectInspector.inspectorPinned
+                        ? "objectInspectorUnpinButton"
+                        : "objectInspectorPinButton"
                     width: 52
                     height: 22
                     text: objectInspector.inspectorPinned ? "Unpin" : "Pin"
@@ -458,6 +469,7 @@ Item {
 
                 ToolButton {
                     id: closeInspectorButton
+                    objectName: "objectInspectorCloseButton"
                     width: 22
                     height: 22
                     text: "x"
@@ -563,6 +575,8 @@ Item {
 
         delegate: Item {
             id: overlayDelegateRoot
+            objectName: (modelData.kind === "cardinal" ? "cardinalOverlayLabel_" : "skyOverlayLabel_")
+                + modelData.text
             required property var modelData
             readonly property bool isCardinal: modelData.kind === "cardinal"
             readonly property color labelColor: modelData.color

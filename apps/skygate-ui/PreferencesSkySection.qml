@@ -29,6 +29,7 @@ Item {
 
         PreferencesComboBox {
             id: locationSourceCombo
+            objectName: "locationSourceCombo"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             model: root.preferencesDraft.skyContextController.locationSourceOptions
@@ -53,6 +54,7 @@ Item {
         }
 
         PreferencesCityPicker {
+            objectName: "cityPicker"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             visible: root.preferencesDraft.locationSourceText === "City"
@@ -75,6 +77,7 @@ Item {
         }
 
         PreferencesTimeZonePicker {
+            objectName: "timeZonePicker"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             placeholderText: "Choose a timezone"
@@ -96,6 +99,7 @@ Item {
 
         PreferencesTextField {
             id: latitudeInput
+            objectName: "latitudeInput"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             placeholderText: "-90..90"
@@ -127,6 +131,7 @@ Item {
 
         PreferencesTextField {
             id: longitudeInput
+            objectName: "longitudeInput"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             placeholderText: "-180..180"
@@ -158,6 +163,7 @@ Item {
 
         PreferencesTextField {
             id: elevationInput
+            objectName: "elevationInput"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             placeholderText: "meters"
@@ -190,6 +196,7 @@ Item {
 
         PreferencesComboBox {
             id: projectionCombo
+            objectName: "projectionCombo"
             Layout.fillWidth: true
             Layout.columnSpan: 3
             model: ["Stereographic", "AzimuthalEquidistant", "Perspective"]

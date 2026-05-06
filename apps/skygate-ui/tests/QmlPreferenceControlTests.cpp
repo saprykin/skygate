@@ -6,18 +6,7 @@ namespace {
 
 QQuickItem* cityDelegate(QObject* root)
 {
-    for (QObject* object : objectTree(root)) {
-        auto* item = qobject_cast<QQuickItem*>(object);
-        if (
-            item != nullptr
-            && item->isVisible()
-            && !object->property("cityId").toString().isEmpty()
-            && object->property("selectable").toBool()
-        ) {
-            return item;
-        }
-    }
-    return nullptr;
+    return firstQuickItemWithObjectName(root, QStringLiteral("cityDelegateMouse_ch-zurich"));
 }
 
 void clickItemCenter(QWindow* window, QQuickItem* item)
@@ -197,13 +186,11 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
     ExposedQuickWindow exposed(root);
     auto* picker = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("picker")));
     QVERIFY(picker != nullptr);
-    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, QPoint(16, 16));
+    auto* pickerMouse = firstQuickItemWithObjectName(root, QStringLiteral("cityPickerMouse"));
+    QVERIFY(pickerMouse != nullptr);
+    clickItemCenter(exposed.window(), pickerMouse);
 
-    auto* filterField = qobject_cast<QQuickItem*>(firstObjectWithProperty(
-        root,
-        "placeholderText",
-        QStringLiteral("Filter by city or country")
-    ));
+    auto* filterField = firstQuickItemWithObjectName(root, QStringLiteral("citySearchField"));
     QVERIFY(filterField != nullptr);
     QTRY_VERIFY(filterField->hasActiveFocus());
     replaceText(exposed.window(), filterField, QStringLiteral("Zurich"));

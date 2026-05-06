@@ -1,6 +1,14 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
 function(add_skygate_ui_qtest target_name source_file)
+    cmake_parse_arguments(
+        TEST
+        ""
+        "TIMEOUT"
+        "ENVIRONMENT;LABELS"
+        ${ARGN}
+    )
+
     add_executable(${target_name}
         ${source_file}
     )
@@ -19,41 +27,203 @@ function(add_skygate_ui_qtest target_name source_file)
         NAME ${target_name}
         COMMAND $<TARGET_FILE:${target_name}>
     )
+
+    if(NOT TEST_LABELS)
+        set(TEST_LABELS unit)
+    endif()
+    if(NOT TEST_TIMEOUT)
+        set(TEST_TIMEOUT 30)
+    endif()
+
+    list(REMOVE_DUPLICATES TEST_LABELS)
+    set_tests_properties(${target_name}
+        PROPERTIES
+            LABELS "${TEST_LABELS}"
+            TIMEOUT "${TEST_TIMEOUT}"
+    )
+    if(TEST_ENVIRONMENT)
+        set_property(TEST ${target_name}
+            PROPERTY ENVIRONMENT "${TEST_ENVIRONMENT}"
+        )
+    endif()
 endfunction()
 
-add_skygate_ui_qtest(skygate-ui-scene-model-tests SkySceneModelTests.cpp)
+set(skygateUiPackagedAppSmokeWorkDir
+    "${CMAKE_CURRENT_BINARY_DIR}/skygate-ui-packaged-app-smoke"
+)
+
+add_test(
+    NAME skygate-ui-packaged-app-smoke
+    COMMAND
+        ${CMAKE_COMMAND}
+            -DSKYGATE_UI_EXECUTABLE=$<TARGET_FILE:skygate-ui>
+            -DSKYGATE_SMOKE_WORK_DIR=${skygateUiPackagedAppSmokeWorkDir}
+            -DSKYGATE_SMOKE_OUTPUT_FILE=${skygateUiPackagedAppSmokeWorkDir}/output.log
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/PackagedAppSmoke.cmake
+)
+
+set_tests_properties(skygate-ui-packaged-app-smoke PROPERTIES
+    LABELS "integration;platform"
+    SKIP_REGULAR_EXPRESSION "SKYGATE_SMOKE_SKIP:"
+    TIMEOUT 15
+)
+
+set(skygateQmlTestEnvironment
+    QML_DISABLE_DISK_CACHE=1
+    QT_QUICK_CONTROLS_STYLE=Basic
+)
+
+add_skygate_ui_qtest(
+    skygate-ui-scene-model-tests
+    SkySceneModelTests.cpp
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-location-catalog-model-tests LocationCatalogModelTests.cpp)
 add_skygate_ui_qtest(skygate-ui-time-zone-catalog-model-tests TimeZoneCatalogModelTests.cpp)
-add_skygate_ui_qtest(skygate-ui-context-controller-tests SkyContextControllerTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-context-controller-tests
+    SkyContextControllerTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-time-controller-tests SkyTimeControllerTests.cpp)
-add_skygate_ui_qtest(skygate-ui-logging-tests SkyLoggingTests.cpp)
-add_skygate_ui_qtest(skygate-ui-settings-store-tests SkySettingsStoreTests.cpp)
-add_skygate_ui_qtest(skygate-ui-object-search-model-tests SkyObjectSearchModelTests.cpp)
-add_skygate_ui_qtest(skygate-ui-theme-repository-tests SkyThemeRepositoryTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-logging-tests
+    SkyLoggingTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-settings-store-tests
+    SkySettingsStoreTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-object-search-model-tests
+    SkyObjectSearchModelTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-theme-repository-tests
+    SkyThemeRepositoryTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
 add_skygate_ui_qtest(skygate-ui-overlay-layer-settings-tests SkyOverlayLayerSettingsTests.cpp)
-add_skygate_ui_qtest(skygate-ui-catalog-cache-controller-tests SkyCatalogCacheControllerTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-cache-controller-tests
+    SkyCatalogCacheControllerTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
 add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests SkyActiveCatalogBuilderTests.cpp)
-add_skygate_ui_qtest(skygate-ui-catalog-download-workflow-tests CatalogDownloadWorkflowTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-download-workflow-tests
+    CatalogDownloadWorkflowTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-catalog-payload-parse-service-tests CatalogPayloadParseServiceTests.cpp)
-add_skygate_ui_qtest(skygate-ui-performance-guard-tests PerformanceGuardTests.cpp)
-add_skygate_ui_qtest(skygate-ui-sky-catalog-manager-tests SkyCatalogManagerTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-performance-guard-tests
+    PerformanceGuardTests.cpp
+    LABELS integration perf platform slow advisory
+    TIMEOUT 120
+)
+add_skygate_ui_qtest(
+    skygate-ui-sky-catalog-manager-tests
+    SkyCatalogManagerTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests SkyObjectTrailBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests SkyRenderBuildersTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-catalog-internals-tests SkyCatalogInternalsTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-scene-composition-tests SkySceneCompositionTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-scene-frame-pipeline-tests SkySceneFramePipelineTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-scene-overlay-adapter-tests SkySceneOverlayAdapterTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-selection-overlay-builder-tests SkySelectionOverlayBuilderTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-component-load-tests QmlComponentLoadTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-date-time-popup-tests QmlDateTimePopupTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-interaction-layer-tests QmlInteractionLayerTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-main-window-tests QmlMainWindowTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-night-conditions-popup-tests QmlNightConditionsPopupTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-preferences-tests QmlPreferencesTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-preference-control-tests QmlPreferenceControlTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-rendering-tests QmlRenderingTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-smoke-tests QmlSmokeTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-status-footer-tests QmlStatusFooterTests.cpp)
-add_skygate_ui_qtest(skygate-ui-qml-toolbar-tests QmlToolbarTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-settings-codecs-tests SkySettingsCodecsTests.cpp)
+add_skygate_ui_qtest(skygate-ui-sky-viewport-internals-tests SkyViewportInternalsTests.cpp)
+add_skygate_ui_qtest(
+    skygate-ui-qml-component-load-tests
+    QmlComponentLoadTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-date-time-popup-tests
+    QmlDateTimePopupTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-interaction-layer-tests
+    QmlInteractionLayerTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-main-window-tests
+    QmlMainWindowTests.cpp
+    LABELS qml integration
+    TIMEOUT 90
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-night-conditions-popup-tests
+    QmlNightConditionsPopupTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-preferences-tests
+    QmlPreferencesTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-preference-control-tests
+    QmlPreferenceControlTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-rendering-tests
+    QmlRenderingTests.cpp
+    LABELS qml integration slow
+    TIMEOUT 120
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-smoke-tests
+    QmlSmokeTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-status-footer-tests
+    QmlStatusFooterTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
+add_skygate_ui_qtest(
+    skygate-ui-qml-toolbar-tests
+    QmlToolbarTests.cpp
+    LABELS qml integration
+    TIMEOUT 60
+    ENVIRONMENT ${skygateQmlTestEnvironment}
+)
 
 foreach(qml_test_target IN ITEMS
     skygate-ui-qml-component-load-tests

@@ -107,6 +107,11 @@ inline QObject* firstObjectWithObjectName(QObject* root, const QString& objectNa
     return nullptr;
 }
 
+inline QQuickItem* firstQuickItemWithObjectName(QObject* root, const QString& objectName)
+{
+    return qobject_cast<QQuickItem*>(firstObjectWithObjectName(root, objectName));
+}
+
 inline QList<QObject*> invokableButtonsWithText(QObject* root, const QString& text)
 {
     QList<QObject*> matches;

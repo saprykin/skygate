@@ -216,19 +216,14 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("N")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Sirius")) != nullptr);
 
-    const auto objects = objectTree(root);
-    const auto selectionMarkerIt = std::find_if(
-        objects.begin(),
-        objects.end(),
-        [](QObject* object) {
-            auto* item = qobject_cast<QQuickItem*>(object);
-            return item != nullptr
-                && item->isVisible()
-                && qFuzzyCompare(item->width(), 34.0)
-                && qFuzzyCompare(item->height(), 34.0);
-        }
+    auto* selectionMarker = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("searchSelectionMarker")
     );
-    QVERIFY(selectionMarkerIt != objects.end());
+    QVERIFY(selectionMarker != nullptr);
+    QVERIFY(selectionMarker->isVisible());
+    QCOMPARE(selectionMarker->width(), 34.0);
+    QCOMPARE(selectionMarker->height(), 34.0);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -354,58 +349,59 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
     auto* cardinal = firstVisibleItemWithText(root, QStringLiteral("N"));
     QVERIFY(cardinal != nullptr);
     QVERIFY(cardinal->mapToScene(QPointF(0.0, 0.0)).y() > 180.0);
-    QObject* inspectorObject = firstObjectWithMetaProperties(
-        root,
-        {"hasInspector", "inspectorPinned"}
-    );
-    auto* inspectorItem = qobject_cast<QQuickItem*>(inspectorObject);
+    auto* inspectorItem = firstQuickItemWithObjectName(root, QStringLiteral("objectInspector"));
     QVERIFY(inspectorItem != nullptr);
     QVERIFY(inspectorItem->x() + inspectorItem->width() <= root->width() - 8.0);
     QVERIFY(inspectorItem->y() >= 8.0);
 
-    const auto objects = objectTree(root);
-    const auto selectionMarkerIt = std::find_if(
-        objects.begin(),
-        objects.end(),
-        [](QObject* object) {
-            auto* item = qobject_cast<QQuickItem*>(object);
-            return item != nullptr
-                && item->isVisible()
-                && qFuzzyCompare(item->width(), 34.0)
-                && qFuzzyCompare(item->height(), 34.0);
-        }
+    auto* selectionMarker = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("searchSelectionMarker")
     );
-    QVERIFY(selectionMarkerIt != objects.end());
-    auto* selectionMarker = qobject_cast<QQuickItem*>(*selectionMarkerIt);
     QVERIFY(selectionMarker != nullptr);
     QCOMPARE(selectionMarker->x(), -12.0);
     QCOMPARE(selectionMarker->y(), -12.0);
 
-    const auto centerButtons = invokableButtonsWithText(root, QStringLiteral("Center"));
-    QCOMPARE(centerButtons.size(), 1);
-    QVERIFY(activateControl(centerButtons.front()));
+    QObject* centerButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("objectInspectorCenterButton")
+    );
+    QVERIFY(centerButton != nullptr);
+    QVERIFY(activateControl(centerButton));
     QTRY_COMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("sun"));
 
-    const auto trackButtons = invokableButtonsWithText(root, QStringLiteral("Track"));
-    QCOMPARE(trackButtons.size(), 1);
-    QVERIFY(activateControl(trackButtons.front()));
+    QObject* trackButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("objectInspectorTrackButton")
+    );
+    QVERIFY(trackButton != nullptr);
+    QVERIFY(activateControl(trackButton));
     QTRY_VERIFY(controller->hasTrackedTarget());
     QCOMPARE(controller->trackedTargetId(), QString("sun"));
 
-    const auto untrackButtons = invokableButtonsWithText(root, QStringLiteral("Untrack"));
-    QCOMPARE(untrackButtons.size(), 1);
-    QVERIFY(activateControl(untrackButtons.front()));
+    QObject* untrackButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("objectInspectorUntrackButton")
+    );
+    QVERIFY(untrackButton != nullptr);
+    QVERIFY(activateControl(untrackButton));
     QTRY_VERIFY(!controller->hasTrackedTarget());
 
-    const auto pinButtons = invokableButtonsWithText(root, QStringLiteral("Pin"));
-    QCOMPARE(pinButtons.size(), 1);
-    QVERIFY(activateControl(pinButtons.front()));
+    QObject* pinButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("objectInspectorPinButton")
+    );
+    QVERIFY(pinButton != nullptr);
+    QVERIFY(activateControl(pinButton));
     QTRY_VERIFY(scene->property("movedX").toReal() >= 0.0);
 
-    const auto unpinButtons = invokableButtonsWithText(root, QStringLiteral("Unpin"));
-    QCOMPARE(unpinButtons.size(), 1);
-    QVERIFY(activateControl(unpinButtons.front()));
+    QObject* unpinButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("objectInspectorUnpinButton")
+    );
+    QVERIFY(unpinButton != nullptr);
+    QVERIFY(activateControl(unpinButton));
     QTRY_VERIFY(scene->property("unpinned").toBool());
 
     const QPoint dragStart = inspectorItem->mapToScene(QPointF(30.0, 20.0)).toPoint();
@@ -421,9 +417,12 @@ void QmlRenderingTests::skyOverlayLayerInspectorActionsAndAvoidanceWork()
     QVERIFY(scene->property("movedX").toReal() < root->width());
     QVERIFY(scene->property("movedY").toReal() >= 8.0);
 
-    const auto closeButtons = invokableButtonsWithText(root, QStringLiteral("x"));
-    QCOMPARE(closeButtons.size(), 1);
-    QVERIFY(activateControl(closeButtons.front()));
+    QObject* closeButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("objectInspectorCloseButton")
+    );
+    QVERIFY(closeButton != nullptr);
+    QVERIFY(activateControl(closeButton));
     QTRY_VERIFY(scene->property("cleared").toBool());
     QVERIFY(controller->selectedSearchTargetId().isEmpty());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
@@ -735,11 +734,7 @@ void QmlRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds(
         QVERIFY2(itemsFit, qPrintable(failure));
     }
 
-    QObject* aboutItem = firstObjectWithProperty(
-        rootWindow,
-        "text",
-        QStringLiteral("&About SkyGate")
-    );
+    QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("aboutMenuItem"));
     QVERIFY(aboutItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(renderingTriggerMenuItem(aboutItem));
@@ -753,10 +748,9 @@ void QmlRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds(
     QString failure;
     QVERIFY2(visibleQuickItemsFitWithinWindow(*aboutWindow, &failure), qPrintable(failure));
 
-    QObject* preferencesItem = firstObjectWithProperty(
+    QObject* preferencesItem = firstObjectWithObjectName(
         rootWindow,
-        "text",
-        QStringLiteral("&Preferences...")
+        QStringLiteral("preferencesMenuItem")
     );
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");

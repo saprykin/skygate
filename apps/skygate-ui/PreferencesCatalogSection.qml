@@ -26,6 +26,7 @@ Item {
 
             PreferencesComboBox {
                 id: catalogPresetCombo
+                objectName: "starCatalogPresetCombo"
                 Layout.fillWidth: true
                 model: [
                     "Bundled (recommended)",
@@ -41,6 +42,7 @@ Item {
             }
 
             PreferencesActionButton {
+                objectName: "starCatalogUseButton"
                 Layout.preferredWidth: 150
                 text: "Use catalog"
                 enabled: !catalogBusy && catalogPresetCombo.currentIndex !== 2
@@ -68,6 +70,7 @@ Item {
             }
 
             PreferencesActionButton {
+                objectName: "starCatalogClearCacheButton"
                 Layout.preferredWidth: 150
                 Layout.alignment: Qt.AlignVCenter
                 text: "Clear Catalog Cache"
@@ -92,6 +95,7 @@ Item {
 
             PreferencesTextField {
                 id: catalogUrlInput
+                objectName: "starCatalogUrlInput"
                 visible: catalogPresetCombo.currentIndex === 2
                 Layout.preferredHeight: visible ? implicitHeight : 0
                 Layout.fillWidth: true
@@ -118,6 +122,7 @@ Item {
             }
 
             PreferencesActionButton {
+                objectName: "starCatalogDownloadButton"
                 visible: catalogPresetCombo.currentIndex === 2
                 Layout.preferredWidth: 150
                 Layout.preferredHeight: visible ? implicitHeight : 0
@@ -137,6 +142,7 @@ Item {
 
             PreferencesComboBox {
                 id: deepSkyCatalogPresetCombo
+                objectName: "deepSkyCatalogPresetCombo"
                 Layout.fillWidth: true
                 model: [
                     "Bundled Messier",
@@ -158,6 +164,7 @@ Item {
             }
 
             PreferencesActionButton {
+                objectName: "deepSkyCatalogUseButton"
                 Layout.preferredWidth: 150
                 text: "Use catalog"
                 enabled: !catalogBusy && deepSkyCatalogPresetCombo.currentIndex !== 2
@@ -185,6 +192,7 @@ Item {
             }
 
             PreferencesActionButton {
+                objectName: "deepSkyCatalogClearCacheButton"
                 Layout.preferredWidth: 150
                 Layout.alignment: Qt.AlignVCenter
                 text: "Clear Catalog Cache"
@@ -208,6 +216,7 @@ Item {
 
             PreferencesTextField {
                 id: deepSkyCatalogUrlInput
+                objectName: "deepSkyCatalogUrlInput"
                 visible: deepSkyCatalogPresetCombo.currentIndex === 2
                 Layout.preferredHeight: visible ? implicitHeight : 0
                 Layout.fillWidth: true
@@ -234,6 +243,7 @@ Item {
             }
 
             PreferencesActionButton {
+                objectName: "deepSkyCatalogDownloadButton"
                 visible: deepSkyCatalogPresetCombo.currentIndex === 2
                 Layout.preferredWidth: 150
                 Layout.preferredHeight: visible ? implicitHeight : 0

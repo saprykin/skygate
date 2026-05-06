@@ -114,6 +114,7 @@ Item {
 
             PreferencesTextField {
                 id: searchField
+                objectName: "timeZoneSearchField"
                 Layout.fillWidth: true
                 placeholderText: "Filter by timezone, label, or offset"
                 onTextChanged: {
@@ -135,6 +136,7 @@ Item {
 
                 ListView {
                     id: timeZoneListView
+                    objectName: "timeZoneListView"
                     anchors.fill: parent
                     clip: true
                     model: root.catalogModel
@@ -200,6 +202,7 @@ Item {
                 }
 
                 Label {
+                    objectName: "timeZoneEmptyLabel"
                     anchors.centerIn: parent
                     visible: timeZoneListView.count === 0
                     text: "No matching timezones"

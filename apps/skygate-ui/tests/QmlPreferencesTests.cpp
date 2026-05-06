@@ -73,25 +73,26 @@ void QmlPreferencesTests::catalogSectionBindsDraftAndControls()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    const auto combos = comboBoxesWithCount(root, 3);
-    QVERIFY(combos.size() >= 2);
-    QObject* catalogCombo = combos.front();
+    QObject* catalogCombo = firstObjectWithObjectName(
+        root,
+        QStringLiteral("starCatalogPresetCombo")
+    );
+    QVERIFY(catalogCombo != nullptr);
     QCOMPARE(catalogCombo->property("currentIndex").toInt(), 0);
 
-    const auto useButtons = invokableButtonsWithText(root, QStringLiteral("Use catalog"));
-    QVERIFY(useButtons.size() >= 2);
-    QVERIFY(useButtons.front()->property("enabled").toBool());
+    QObject* useButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogUseButton"));
+    QVERIFY(useButton != nullptr);
+    QVERIFY(useButton->property("enabled").toBool());
 
     draft->setProperty("catalogPresetIndex", 2);
     QCoreApplication::processEvents();
     QTRY_COMPARE(catalogCombo->property("currentIndex").toInt(), 2);
-    QVERIFY(!useButtons.front()->property("enabled").toBool());
+    QVERIFY(!useButton->property("enabled").toBool());
 
-    auto* catalogUrlInput = qobject_cast<QQuickItem*>(firstObjectWithProperty(
+    auto* catalogUrlInput = firstQuickItemWithObjectName(
         root,
-        "placeholderText",
-        QStringLiteral("https://example.com/skygate-catalog.txt or HYG CSV URL")
-    ));
+        QStringLiteral("starCatalogUrlInput")
+    );
     QVERIFY(catalogUrlInput != nullptr);
     QTRY_VERIFY(catalogUrlInput->isVisible());
 
@@ -101,9 +102,12 @@ void QmlPreferencesTests::catalogSectionBindsDraftAndControls()
     commitText(exposed.window(), QString::fromUtf8(kCatalogUrl));
     QTRY_COMPARE(draft->property("catalogUrlText").toString(), QString(kCatalogUrl));
 
-    const auto downloadButtons = invokableButtonsWithText(root, QStringLiteral("Download"));
-    QVERIFY(downloadButtons.size() >= 2);
-    QVERIFY(downloadButtons.front()->property("enabled").toBool());
+    QObject* downloadButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("starCatalogDownloadButton")
+    );
+    QVERIFY(downloadButton != nullptr);
+    QVERIFY(downloadButton->property("enabled").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -236,9 +240,12 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     draft->setProperty("catalogPresetIndex", 2);
     draft->setProperty("catalogUrlText", starCatalogUrl);
     QCoreApplication::processEvents();
-    auto downloadButtons = invokableButtonsWithText(root, QStringLiteral("Download"));
-    QVERIFY(downloadButtons.size() >= 2);
-    QVERIFY(activateControl(downloadButtons.front()));
+    QObject* starDownloadButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("starCatalogDownloadButton")
+    );
+    QVERIFY(starDownloadButton != nullptr);
+    QVERIFY(activateControl(starDownloadButton));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
     QTRY_VERIFY(catalogContainsDisplayName(
         controller->catalogBodies(),
@@ -249,9 +256,12 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     draft->setProperty("deepSkyCatalogPresetIndex", 2);
     draft->setProperty("deepSkyCatalogUrlText", deepSkyCatalogUrl);
     QCoreApplication::processEvents();
-    downloadButtons = invokableButtonsWithText(root, QStringLiteral("Download"));
-    QVERIFY(downloadButtons.size() >= 2);
-    QVERIFY(activateControl(downloadButtons.at(1)));
+    QObject* deepSkyDownloadButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("deepSkyCatalogDownloadButton")
+    );
+    QVERIFY(deepSkyDownloadButton != nullptr);
+    QVERIFY(activateControl(deepSkyDownloadButton));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
     QTRY_VERIFY(catalogContainsAlias(controller->catalogBodies(), QStringLiteral("Custom Galaxy")));
     QVERIFY(QFileInfo::exists(m_settings.cachePath(QStringLiteral("deep-sky-cache.csv"))));
@@ -275,28 +285,44 @@ void QmlPreferencesTests::catalogSectionDownloadsAppliesClearsAndRestoresCatalog
     draft->setProperty("catalogPresetIndex", 0);
     draft->setProperty("deepSkyCatalogPresetIndex", 0);
     QCoreApplication::processEvents();
-    const auto useButtons = invokableButtonsWithText(root, QStringLiteral("Use catalog"));
-    QVERIFY(useButtons.size() >= 2);
-    QVERIFY(activateControl(useButtons.front()));
+    QObject* starUseButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("starCatalogUseButton")
+    );
+    QVERIFY(starUseButton != nullptr);
+    QVERIFY(activateControl(starUseButton));
     QTRY_VERIFY(!catalogContainsDisplayName(
         controller->catalogBodies(),
         QStringLiteral("Downloaded Star")
     ));
     QVERIFY(controller->catalogStatusText().contains("Bundled"));
 
-    QVERIFY(activateControl(useButtons.at(1)));
+    QObject* deepSkyUseButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("deepSkyCatalogUseButton")
+    );
+    QVERIFY(deepSkyUseButton != nullptr);
+    QVERIFY(activateControl(deepSkyUseButton));
     QTRY_VERIFY(!catalogContainsAlias(
         controller->catalogBodies(),
         QStringLiteral("Custom Galaxy")
     ));
 
-    const auto clearButtons = invokableButtonsWithText(root, QStringLiteral("Clear Catalog Cache"));
-    QVERIFY(clearButtons.size() >= 2);
-    QVERIFY(activateControl(clearButtons.front()));
+    QObject* starClearButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("starCatalogClearCacheButton")
+    );
+    QVERIFY(starClearButton != nullptr);
+    QVERIFY(activateControl(starClearButton));
     QTRY_VERIFY(!QFileInfo::exists(m_settings.cachePath(QStringLiteral("star-cache.csv"))));
     QVERIFY(controller->catalogStatusText().contains("Star catalog cache cleared"));
 
-    QVERIFY(activateControl(clearButtons.at(1)));
+    QObject* deepSkyClearButton = firstObjectWithObjectName(
+        root,
+        QStringLiteral("deepSkyCatalogClearCacheButton")
+    );
+    QVERIFY(deepSkyClearButton != nullptr);
+    QVERIFY(activateControl(deepSkyClearButton));
     QVERIFY(controller->catalogStatusText().contains("Deep-sky catalog cache cleared"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
@@ -338,20 +364,21 @@ void QmlPreferencesTests::generalLoggingControlsBindDraft()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    const auto boxes = checkBoxes(root);
-    QCOMPARE(boxes.size(), 2);
-    boxes.at(0)->setProperty("checked", false);
-    QVERIFY(QMetaObject::invokeMethod(boxes.at(0), "toggled"));
-    boxes.at(1)->setProperty("checked", true);
-    QVERIFY(QMetaObject::invokeMethod(boxes.at(1), "toggled"));
+    QObject* terminalBox = firstObjectWithObjectName(
+        root,
+        QStringLiteral("logToTerminalCheckBox")
+    );
+    QObject* fileBox = firstObjectWithObjectName(root, QStringLiteral("logToFileCheckBox"));
+    QVERIFY(terminalBox != nullptr);
+    QVERIFY(fileBox != nullptr);
+    terminalBox->setProperty("checked", false);
+    QVERIFY(QMetaObject::invokeMethod(terminalBox, "toggled"));
+    fileBox->setProperty("checked", true);
+    QVERIFY(QMetaObject::invokeMethod(fileBox, "toggled"));
     QCOMPARE(draft->property("logToTerminal").toBool(), false);
     QCOMPARE(draft->property("logToFile").toBool(), true);
 
-    auto* logFileInput = qobject_cast<QQuickItem*>(firstObjectWithProperty(
-        root,
-        "objectName",
-        QStringLiteral("logFilePathField")
-    ));
+    auto* logFileInput = firstQuickItemWithObjectName(root, QStringLiteral("logFilePathField"));
     QVERIFY(logFileInput != nullptr);
     QVERIFY2(logFileInput->width() >= 260.0, "Log file field should stay wide enough to read paths");
     logFileInput->setProperty("text", QStringLiteral("/tmp/skygate-qml-preferences.log"));
@@ -361,9 +388,9 @@ void QmlPreferencesTests::generalLoggingControlsBindDraft()
         QString("/tmp/skygate-qml-preferences.log")
     );
 
-    const auto browseButtons = invokableButtonsWithText(root, QStringLiteral("Browse..."));
-    QCOMPARE(browseButtons.size(), 1);
-    QVERIFY(browseButtons.front()->property("enabled").toBool());
+    QObject* browseButton = firstObjectWithObjectName(root, QStringLiteral("logFileBrowseButton"));
+    QVERIFY(browseButton != nullptr);
+    QVERIFY(browseButton->property("enabled").toBool());
 
     QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
     QCOMPARE(controller->logToTerminal(), false);
@@ -412,10 +439,11 @@ void QmlPreferencesTests::appearanceThemeSwitchWorks()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    const auto themeCombos = comboBoxesWithCount(root, themeOptions.size());
-    QCOMPARE(themeCombos.size(), 1);
-    themeCombos.front()->setProperty("currentIndex", 1);
-    QVERIFY(QMetaObject::invokeMethod(themeCombos.front(), "activated", Q_ARG(int, 1)));
+    QObject* themeCombo = firstObjectWithObjectName(root, QStringLiteral("themeCombo"));
+    QVERIFY(themeCombo != nullptr);
+    QCOMPARE(themeCombo->property("count").toInt(), themeOptions.size());
+    themeCombo->setProperty("currentIndex", 1);
+    QVERIFY(QMetaObject::invokeMethod(themeCombo, "activated", Q_ARG(int, 1)));
     QCOMPARE(draft->property("themeId").toString(), nextThemeId);
 
     QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
@@ -426,24 +454,34 @@ void QmlPreferencesTests::appearanceThemeSwitchWorks()
 
 void QmlPreferencesTests::appearanceCheckboxChangesRender_data()
 {
-    QTest::addColumn<int>("checkboxIndex");
+    QTest::addColumn<QString>("checkboxObjectName");
     QTest::addColumn<QString>("name");
 
-    QTest::newRow("horizon") << 0 << QStringLiteral("Horizon");
-    QTest::newRow("alt-az-grid") << 1 << QStringLiteral("Alt/Az grid");
-    QTest::newRow("constellation-lines") << 2 << QStringLiteral("Constellation lines");
-    QTest::newRow("constellation-labels") << 3 << QStringLiteral("Constellation labels");
-    QTest::newRow("solar-system-labels") << 4 << QStringLiteral("Solar system labels");
-    QTest::newRow("deep-sky-objects") << 5 << QStringLiteral("Deep sky objects");
-    QTest::newRow("deep-sky-labels") << 6 << QStringLiteral("Deep sky labels");
-    QTest::newRow("ecliptic") << 7 << QStringLiteral("Ecliptic");
-    QTest::newRow("celestial-equator") << 8 << QStringLiteral("Celestial equator");
-    QTest::newRow("circumpolar-boundary") << 9 << QStringLiteral("Circumpolar boundary");
+    QTest::newRow("horizon")
+        << QStringLiteral("overlayHorizonCheckBox") << QStringLiteral("Horizon");
+    QTest::newRow("alt-az-grid")
+        << QStringLiteral("overlayAltAzGridCheckBox") << QStringLiteral("Alt/Az grid");
+    QTest::newRow("constellation-lines")
+        << QStringLiteral("overlayConstellationLinesCheckBox") << QStringLiteral("Constellation lines");
+    QTest::newRow("constellation-labels")
+        << QStringLiteral("overlayConstellationLabelsCheckBox") << QStringLiteral("Constellation labels");
+    QTest::newRow("solar-system-labels")
+        << QStringLiteral("overlaySolarSystemLabelsCheckBox") << QStringLiteral("Solar system labels");
+    QTest::newRow("deep-sky-objects")
+        << QStringLiteral("overlayDeepSkyObjectsCheckBox") << QStringLiteral("Deep sky objects");
+    QTest::newRow("deep-sky-labels")
+        << QStringLiteral("overlayDeepSkyLabelsCheckBox") << QStringLiteral("Deep sky labels");
+    QTest::newRow("ecliptic")
+        << QStringLiteral("overlayEclipticCheckBox") << QStringLiteral("Ecliptic");
+    QTest::newRow("celestial-equator")
+        << QStringLiteral("overlayCelestialEquatorCheckBox") << QStringLiteral("Celestial equator");
+    QTest::newRow("circumpolar-boundary")
+        << QStringLiteral("overlayCircumpolarBoundaryCheckBox") << QStringLiteral("Circumpolar boundary");
 }
 
 void QmlPreferencesTests::appearanceCheckboxChangesRender()
 {
-    QFETCH(int, checkboxIndex);
+    QFETCH(QString, checkboxObjectName);
     QFETCH(QString, name);
 
     auto controller = makeController();
@@ -483,13 +521,13 @@ void QmlPreferencesTests::appearanceCheckboxChangesRender()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    const auto boxes = checkBoxes(root);
-    QVERIFY(boxes.size() >= 10);
+    QObject* checkBox = firstObjectWithObjectName(root, checkboxObjectName);
+    QVERIFY(checkBox != nullptr);
     const SkyViewRenderSignature baseline = renderSignature(*controller, *sceneModel);
 
-    const bool previousChecked = boxes.at(checkboxIndex)->property("checked").toBool();
-    boxes.at(checkboxIndex)->setProperty("checked", !previousChecked);
-    QVERIFY(QMetaObject::invokeMethod(boxes.at(checkboxIndex), "toggled"));
+    const bool previousChecked = checkBox->property("checked").toBool();
+    checkBox->setProperty("checked", !previousChecked);
+    QVERIFY(QMetaObject::invokeMethod(checkBox, "toggled"));
     QVERIFY(QMetaObject::invokeMethod(draft, "applyToContext"));
     const SkyViewRenderSignature changed = renderSignature(*controller, *sceneModel);
     QVERIFY2(
@@ -537,26 +575,26 @@ void QmlPreferencesTests::locationCoordinateChangesPropagateToSkyView()
 
     renderSignature(*controller, *sceneModel);
     const std::uint64_t baselineSnapshotGeneration = sceneModel->snapshotGeneration();
-    const auto latitudeInputs = objectsWithPlaceholder(root, QStringLiteral("-90..90"));
-    const auto longitudeInputs = objectsWithPlaceholder(root, QStringLiteral("-180..180"));
-    const auto elevationInputs = objectsWithPlaceholder(root, QStringLiteral("meters"));
-    QCOMPARE(latitudeInputs.size(), 1);
-    QCOMPARE(longitudeInputs.size(), 1);
-    QCOMPARE(elevationInputs.size(), 1);
+    auto* latitudeInput = firstQuickItemWithObjectName(root, QStringLiteral("latitudeInput"));
+    auto* longitudeInput = firstQuickItemWithObjectName(root, QStringLiteral("longitudeInput"));
+    auto* elevationInput = firstQuickItemWithObjectName(root, QStringLiteral("elevationInput"));
+    QVERIFY(latitudeInput != nullptr);
+    QVERIFY(longitudeInput != nullptr);
+    QVERIFY(elevationInput != nullptr);
 
     replaceText(
         exposed.window(),
-        qobject_cast<QQuickItem*>(latitudeInputs.front()),
+        latitudeInput,
         QStringLiteral("12.5")
     );
     replaceText(
         exposed.window(),
-        qobject_cast<QQuickItem*>(longitudeInputs.front()),
+        longitudeInput,
         QStringLiteral("34.5")
     );
     replaceText(
         exposed.window(),
-        qobject_cast<QQuickItem*>(elevationInputs.front()),
+        elevationInput,
         QStringLiteral("88")
     );
     QCOMPARE(draft->property("locationSourceText").toString(), QString("Custom"));
@@ -613,12 +651,10 @@ void QmlPreferencesTests::timeZonePickerFiltersSelectsAndApplies()
     );
     QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, pickerCenter.toPoint());
 
-    const auto searchInputs = objectsWithPlaceholder(
+    auto* searchInput = firstQuickItemWithObjectName(
         root,
-        QStringLiteral("Filter by timezone, label, or offset")
+        QStringLiteral("timeZoneSearchField")
     );
-    QCOMPARE(searchInputs.size(), 1);
-    auto* searchInput = qobject_cast<QQuickItem*>(searchInputs.front());
     QVERIFY(searchInput != nullptr);
     replaceText(exposed.window(), searchInput, QStringLiteral("bishkek"));
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Asia/Bishkek")) != nullptr);
@@ -783,10 +819,7 @@ void QmlPreferencesTests::preferencesWindowShellNavigatesAppliesAndCloses()
     auto* window = qobject_cast<QQuickWindow*>(object.get());
     QVERIFY(window != nullptr);
 
-    QObject* draft = firstObjectWithMetaProperties(
-        window,
-        {"overlayHorizon", "catalogPresetIndex", "deepSkyCatalogPresetIndex"}
-    );
+    QObject* draft = firstObjectWithObjectName(window, QStringLiteral("preferencesDraft"));
     QVERIFY(draft != nullptr);
     draft->setProperty("latitudeText", QStringLiteral("1.000000"));
 
@@ -795,7 +828,10 @@ void QmlPreferencesTests::preferencesWindowShellNavigatesAppliesAndCloses()
     QTRY_VERIFY(window->isVisible());
     QCOMPARE(draft->property("latitudeText").toString(), QString("47.000000"));
 
-    QObject* catalogSection = firstObjectWithProperty(window, "label", QStringLiteral("Catalog"));
+    QObject* catalogSection = firstObjectWithObjectName(
+        window,
+        QStringLiteral("preferencesCatalogSectionButton")
+    );
     QVERIFY(catalogSection != nullptr);
     QVERIFY(activateControl(catalogSection));
     QTRY_COMPARE(window->property("selectedPage").toInt(), 3);
@@ -804,14 +840,19 @@ void QmlPreferencesTests::preferencesWindowShellNavigatesAppliesAndCloses()
         QString("Catalog source and download settings")
     );
 
-    QObject* skySection = firstObjectWithProperty(window, "label", QStringLiteral("Sky"));
+    QObject* skySection = firstObjectWithObjectName(
+        window,
+        QStringLiteral("preferencesSkySectionButton")
+    );
     QVERIFY(skySection != nullptr);
     QVERIFY(activateControl(skySection));
     QTRY_COMPARE(window->property("selectedPage").toInt(), 1);
 
-    const auto applyButtons = invokableButtonsWithText(window, QStringLiteral("Apply"));
-    QCOMPARE(applyButtons.size(), 1);
-    QObject* applyButton = applyButtons.front();
+    QObject* applyButton = firstObjectWithObjectName(
+        window,
+        QStringLiteral("preferencesApplyButton")
+    );
+    QVERIFY(applyButton != nullptr);
     draft->setProperty("locationSourceText", QStringLiteral("City"));
     draft->setProperty("selectedCityId", QString());
     QCoreApplication::processEvents();

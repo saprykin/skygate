@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Item {
     id: toolbarRoot
+    objectName: "timelineToolbar"
     required property var skyContextController
     readonly property var theme: skyContextController.theme
     property var onRequestExpand: null
@@ -66,6 +67,7 @@ Item {
 
     Rectangle {
         id: timelineToolbarPanel
+        objectName: "timelineToolbarPanel"
         anchors.top: parent.top
         anchors.right: timelineToolbarToggle.left
         anchors.rightMargin: 6
@@ -211,6 +213,7 @@ Item {
             }
 
             TimelineToolbarButton {
+                objectName: "timelinePlayPauseButton"
                 text: skyContextController.live ? "Pause" : "Play"
                 onClicked: skyContextController.togglePlayPause()
                 ToolTip.visible: hovered
@@ -221,6 +224,7 @@ Item {
             }
 
             TimelineToolbarButton {
+                objectName: "timelineStepBackwardButton"
                 text: "<"
                 onClicked: skyContextController.stepBackward()
                 ToolTip.visible: hovered
@@ -229,6 +233,7 @@ Item {
             }
 
             TimelineToolbarButton {
+                objectName: "timelineStepForwardButton"
                 text: ">"
                 onClicked: skyContextController.stepForward()
                 ToolTip.visible: hovered
@@ -238,6 +243,7 @@ Item {
 
             TimelineToolbarCombo {
                 id: speedCombo
+                objectName: "timelineSpeedCombo"
                 model: ["0.25x", "0.5x", "1x", "2x", "4x", "8x"]
                 implicitWidth: 78
                 onActivated: skyContextController.setSpeedMultiplier(toolbarRoot.speedValues[currentIndex])
@@ -248,6 +254,7 @@ Item {
 
             TimelineToolbarCombo {
                 id: stepCombo
+                objectName: "timelineStepCombo"
                 model: ["1s", "10s", "1m", "5m", "1h"]
                 implicitWidth: 74
                 onActivated: skyContextController.setStepSeconds(toolbarRoot.stepValues[currentIndex])
@@ -257,6 +264,7 @@ Item {
             }
 
             TimelineToolbarButton {
+                objectName: "timelineResetViewButton"
                 text: "Reset"
                 onClicked: skyContextController.resetViewDirection()
                 ToolTip.visible: hovered
@@ -266,6 +274,7 @@ Item {
 
             TimelineToolbarCombo {
                 id: magnitudeCombo
+                objectName: "timelineMagnitudeCombo"
                 model: ["2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0"]
                 implicitWidth: 70
                 onActivated: skyContextController.setMagnitudeCutoff(
@@ -280,6 +289,7 @@ Item {
 
     ToolButton {
         id: timelineToolbarToggle
+        objectName: "timelineToolbarToggle"
         anchors.verticalCenter: timelineToolbarPanel.verticalCenter
         anchors.right: parent.right
         width: 30

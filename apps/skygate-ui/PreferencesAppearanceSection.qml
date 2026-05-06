@@ -80,6 +80,7 @@ Item {
             }
 
             PreferencesCheckBox {
+                objectName: "overlayHorizonCheckBox"
                 checked: root.preferencesDraft.overlayHorizon
                 onToggled: root.preferencesDraft.overlayHorizon = checked
             }
@@ -91,6 +92,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                objectName: "overlayAltAzGridCheckBox"
                 checked: root.preferencesDraft.overlayAltAzGrid
                 onToggled: root.preferencesDraft.overlayAltAzGrid = checked
             }
@@ -103,6 +105,7 @@ Item {
             }
 
             PreferencesCheckBox {
+                objectName: "overlayConstellationLinesCheckBox"
                 checked: root.preferencesDraft.overlayConstellationLines
                 onToggled: root.preferencesDraft.overlayConstellationLines = checked
             }
@@ -114,6 +117,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                objectName: "overlayConstellationLabelsCheckBox"
                 checked: root.preferencesDraft.overlayConstellationLabels
                 onToggled: root.preferencesDraft.overlayConstellationLabels = checked
             }
@@ -126,6 +130,7 @@ Item {
             }
 
             PreferencesCheckBox {
+                objectName: "overlaySolarSystemLabelsCheckBox"
                 checked: root.preferencesDraft.overlaySolarSystemLabels
                 onToggled: root.preferencesDraft.overlaySolarSystemLabels = checked
             }
@@ -137,6 +142,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                objectName: "overlayDeepSkyObjectsCheckBox"
                 checked: root.preferencesDraft.overlayDeepSkyObjects
                 onToggled: root.preferencesDraft.overlayDeepSkyObjects = checked
             }
@@ -149,6 +155,7 @@ Item {
             }
 
             PreferencesCheckBox {
+                objectName: "overlayDeepSkyLabelsCheckBox"
                 checked: root.preferencesDraft.overlayDeepSkyLabels
                 onToggled: root.preferencesDraft.overlayDeepSkyLabels = checked
             }
@@ -160,6 +167,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                objectName: "overlayEclipticCheckBox"
                 checked: root.preferencesDraft.overlayEcliptic
                 onToggled: root.preferencesDraft.overlayEcliptic = checked
             }
@@ -172,6 +180,7 @@ Item {
             }
 
             PreferencesCheckBox {
+                objectName: "overlayCelestialEquatorCheckBox"
                 checked: root.preferencesDraft.overlayCelestialEquator
                 onToggled: root.preferencesDraft.overlayCelestialEquator = checked
             }
@@ -183,6 +192,7 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
             PreferencesCheckBox {
+                objectName: "overlayCircumpolarBoundaryCheckBox"
                 checked: root.preferencesDraft.overlayCircumpolarBoundary
                 onToggled: root.preferencesDraft.overlayCircumpolarBoundary = checked
             }

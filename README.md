@@ -137,6 +137,12 @@ With the included `ui-debug` preset build tree, the equivalent command is:
 ctest --test-dir build-make/ui-debug --output-on-failure
 ```
 
+Tests carry CTest labels such as `unit`, `integration`, `qml`, `perf`,
+`platform`, and `slow`. Use `ctest --test-dir build-make/ui-debug -LE slow
+--output-on-failure` for the default non-slow suite, or `ctest --test-dir
+build-make/ui-debug -L slow --output-on-failure` for slow guard/rendering
+coverage.
+
 ## CMake Presets
 
 The repository includes `CMakePresets.json` with `core-debug`, `ui-debug`, and
