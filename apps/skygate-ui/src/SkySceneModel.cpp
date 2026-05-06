@@ -1,145 +1,9 @@
 #include "SkySceneModel.hpp"
 
 #include "SkyContextController.hpp"
-#include "SkyRenderLabels.hpp"
 #include "SkyTimeController.hpp"
 
-#include <QColor>
-#include <QPointF>
-#include <QVariantMap>
-
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
-
-#include <array>
 #include <cmath>
-#include <cstdint>
-#include <limits>
-#include <utility>
-
-namespace {
-
-constexpr int kReferenceLabelSampleCount = 96;
-constexpr double kReferenceLabelEdgeMarginPx = 36.0;
-
-QVariantMap overlayEntry(
-    const QString& kind,
-    const double x,
-    const double y,
-    const QString& text,
-    const QColor& color
-)
-{
-    QVariantMap entry;
-    entry.insert("kind", kind);
-    entry.insert("x", x);
-    entry.insert("y", y);
-    entry.insert("text", text);
-    entry.insert("color", color);
-    return entry;
-}
-
-QColor cardinalColor(
-    const double azimuthDeg,
-    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
-)
-{
-    if (azimuthDeg == 0.0) {
-        return renderTheme.cardinalNorthLine;
-    }
-    if (azimuthDeg == 90.0) {
-        return renderTheme.cardinalEastLine;
-    }
-    if (azimuthDeg == 180.0) {
-        return renderTheme.cardinalSouthLine;
-    }
-    return renderTheme.cardinalWestLine;
-}
-
-bool pointIsInsideLabelMargin(
-    const skygate::core::ScreenPoint& point,
-    const skygate::core::ProjectionParams& params
-) noexcept
-{
-    return point.x >= kReferenceLabelEdgeMarginPx
-        && point.x <= (params.viewportWidth - kReferenceLabelEdgeMarginPx)
-        && point.y >= kReferenceLabelEdgeMarginPx
-        && point.y <= (params.viewportHeight - kReferenceLabelEdgeMarginPx);
-}
-
-template <typename CoordinateAt>
-void appendReferenceLayerLabel(
-    QVariantList& overlayItems,
-    const skygate::core::PreparedProjection& preparedProjection,
-    const QString& text,
-    const QColor& color,
-    CoordinateAt coordinateAt
-)
-{
-    const auto& params = preparedProjection.params();
-    const double targetX = params.viewportWidth * 0.72;
-    const double targetY = params.viewportHeight * 0.34;
-
-    std::optional<QPointF> bestPoint;
-    double bestScore = std::numeric_limits<double>::max();
-    std::optional<QPointF> fallbackPoint;
-    double fallbackScore = std::numeric_limits<double>::max();
-
-    for (int index = 0; index < kReferenceLabelSampleCount; ++index) {
-        const auto projected = preparedProjection.project(coordinateAt(index));
-        if (!projected.isVisible) {
-            continue;
-        }
-
-        const double score = skygate::core::squaredDistance2d(
-            projected.x,
-            projected.y,
-            targetX,
-            targetY
-        );
-        if (score < fallbackScore) {
-            fallbackPoint = QPointF(projected.x, projected.y);
-            fallbackScore = score;
-        }
-        if (pointIsInsideLabelMargin(projected, params) && score < bestScore) {
-            bestPoint = QPointF(projected.x, projected.y);
-            bestScore = score;
-        }
-    }
-
-    const std::optional<QPointF>& labelPoint = bestPoint.has_value() ? bestPoint : fallbackPoint;
-    if (!labelPoint.has_value()) {
-        return;
-    }
-
-    overlayItems.push_back(overlayEntry(
-        "referenceLine",
-        labelPoint->x(),
-        labelPoint->y(),
-        text,
-        color
-    ));
-}
-
-QVariantList renderLabelsToOverlayItems(const std::span<const SkyRenderLabel> labels)
-{
-    QVariantList overlayItems;
-    overlayItems.reserve(static_cast<qsizetype>(labels.size()));
-    for (const SkyRenderLabel& label : labels) {
-        QVariantMap entry;
-        if (!label.kind.isEmpty()) {
-            entry.insert("kind", label.kind);
-        }
-        entry.insert("x", label.x);
-        entry.insert("y", label.y);
-        entry.insert("text", label.text);
-        entry.insert("color", label.color);
-        overlayItems.push_back(std::move(entry));
-    }
-    return overlayItems;
-}
-
-}  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent)
     : QObject(parent)
@@ -162,7 +26,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
     m_skyContextController = controller;
     static_cast<void>(m_framePipeline.clear());
     m_hitTargetIndex.clear();
-    m_sceneCompositionKey.reset();
+    m_sceneComposer.reset();
     m_sceneFrame = {};
     m_selectedObjectTargetId.clear();
     m_selectedObjectInspectorPinned = false;
@@ -180,7 +44,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             [this] {
                 m_selectedObjectTargetId.clear();
                 m_selectedObjectInspectorPinned = false;
-                m_sceneCompositionKey.reset();
+                m_sceneComposer.reset();
                 rebuildSceneFrame();
             }
         );
@@ -189,7 +53,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             &SkyContextController::trackedTargetChanged,
             this,
             [this] {
-                m_sceneCompositionKey.reset();
+                m_sceneComposer.reset();
                 rebuildSceneFrame();
             }
         );
@@ -204,7 +68,7 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
             &SkyTimeController::timeZoneChanged,
             this,
             [this] {
-                m_sceneCompositionKey.reset();
+                m_sceneComposer.reset();
                 rebuildSceneFrame();
             }
         );
@@ -299,7 +163,7 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
     }
     m_selectedObjectTargetId = QString::fromStdString(body.id);
     m_selectedObjectInspectorPinned = false;
-    m_sceneCompositionKey.reset();
+    m_sceneComposer.reset();
     rebuildSceneFrame();
     return true;
 }
@@ -315,7 +179,7 @@ void SkySceneModel::clearSelectedObjectInspector()
         return;
     }
 
-    m_sceneCompositionKey.reset();
+    m_sceneComposer.reset();
     rebuildSceneFrame();
 }
 
@@ -337,7 +201,7 @@ void SkySceneModel::setSelectedObjectInspectorPinned(const bool pinned)
     }
 
     m_selectedObjectInspectorPinned = pinned;
-    m_sceneCompositionKey.reset();
+    m_sceneComposer.reset();
     rebuildSceneFrame();
 }
 
@@ -350,7 +214,7 @@ void SkySceneModel::moveSelectedObjectInspector(const double x, const double y)
     m_selectedObjectInspectorPinnedX = x;
     m_selectedObjectInspectorPinnedY = y;
     m_selectedObjectInspectorPinned = true;
-    m_sceneCompositionKey.reset();
+    m_sceneComposer.reset();
     rebuildSceneFrame();
 }
 
@@ -411,12 +275,12 @@ bool SkySceneModel::clearSceneFrame()
         || !m_sceneFrame.selectionMarker.isEmpty()
         || !m_sceneFrame.selectedObjectInspector.isEmpty();
     m_hitTargetIndex.clear();
-    m_sceneCompositionKey.reset();
+    m_sceneComposer.reset();
     m_sceneFrame = {};
     return hadSceneFrame;
 }
 
-std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() const
+std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
 {
     if (
         m_skyContextController == nullptr
@@ -431,7 +295,7 @@ std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() c
         return std::nullopt;
     }
 
-    return SceneBuildInput {
+    return SkySceneCompositionInput {
         .frameInput = SkySceneFramePipelineInput {
             .ephemerisEngine = ephemerisEngine,
             .skyContext = m_skyContextController->skyContext(),
@@ -450,10 +314,16 @@ std::optional<SkySceneModel::SceneBuildInput> SkySceneModel::buildSceneInput() c
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),
         .catalogSourceLabels = m_skyContextController->catalogSourceLabels(),
         .timeController = m_skyContextController->timeController(),
+        .selectedObjectTargetId = m_selectedObjectTargetId,
         .selectedSearchTargetKind = m_skyContextController->selectedSearchTargetKind(),
         .selectedSearchTargetId = m_skyContextController->selectedSearchTargetId(),
         .trackedTargetKind = m_skyContextController->trackedTargetKind(),
-        .trackedTargetId = m_skyContextController->trackedTargetId()
+        .trackedTargetId = m_skyContextController->trackedTargetId(),
+        .inspectorPinnedX = m_selectedObjectInspectorPinnedX,
+        .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
+        .inspectorPinned = m_selectedObjectInspectorPinned,
+        .viewportWidth = m_viewportWidth,
+        .viewportHeight = m_viewportHeight
     };
 }
 
@@ -482,185 +352,14 @@ void SkySceneModel::rebuildSceneFrame()
     m_sceneFrame.preparedProjection = *frameResult->preparedProjection;
     m_sceneFrame.snapshot = frameResult->snapshot;
 
-    const SkySelectionOverlayInput selectionInput = buildSelectionInput(*input, *frameResult);
-    const auto trailTargetBodyIndex =
-        m_selectionOverlayBuilder.activeTrailTargetBodyIndex(selectionInput);
-    const SceneCompositionKey compositionKey {
-        .renderFrameGeneration = frameResult->renderFrameGeneration,
-        .trailTargetBodyIndex = trailTargetBodyIndex,
-        .selectedObjectTargetId = m_selectedObjectTargetId,
-        .selectedSearchTargetKind = input->selectedSearchTargetKind,
-        .selectedSearchTargetId = input->selectedSearchTargetId,
-        .trackedTargetKind = input->trackedTargetKind,
-        .trackedTargetId = input->trackedTargetId,
-        .inspectorPinnedX = m_selectedObjectInspectorPinnedX,
-        .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
-        .inspectorPinned = m_selectedObjectInspectorPinned
-    };
-    if (
-        !frameResult->updated
-        && m_sceneCompositionKey.has_value()
-        && m_sceneCompositionKey.value().equals(compositionKey)
-    ) {
+    const SkySceneCompositionResult compositionResult =
+        m_sceneComposer.rebuild(m_sceneFrame, *input, *frameResult);
+    if (!compositionResult.changed) {
         return;
     }
 
-    const bool frameContentChanged = frameResult->updated
-        || !m_sceneCompositionKey.has_value()
-        || m_sceneCompositionKey->renderFrameGeneration != compositionKey.renderFrameGeneration
-        || m_sceneCompositionKey->trailTargetBodyIndex != compositionKey.trailTargetBodyIndex;
-    if (frameContentChanged) {
-        m_sceneFrame.frame = *frameResult->frame;
-        if (trailTargetBodyIndex.has_value()) {
-            m_objectTrailBuilder.appendTrail(
-                m_sceneFrame.frame,
-                SkyObjectTrailInput {
-                    .ephemerisEngine = input->frameInput.ephemerisEngine,
-                    .preparedProjection = frameResult->preparedProjection,
-                    .skyContext = input->frameInput.skyContext,
-                    .renderTheme = input->frameInput.renderTheme,
-                    .targetBodyIndex = *trailTargetBodyIndex,
-                    .viewportWidth = m_viewportWidth,
-                    .viewportHeight = m_viewportHeight
-                }
-            );
-        }
-
+    if (compositionResult.frameContentChanged) {
         m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
-        m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, *input);
     }
-    m_sceneFrame.selectionMarker =
-        m_selectionOverlayBuilder.buildSelectionMarker(selectionInput);
-    m_sceneFrame.selectedObjectInspector =
-        m_selectionOverlayBuilder.buildSelectedObjectInspector(selectionInput);
-    m_sceneCompositionKey = compositionKey;
     emit sceneFrameChanged();
-}
-
-QVariantList SkySceneModel::buildOverlayItems(
-    const SceneFrameData& sceneFrame,
-    const SceneBuildInput& input
-) const
-{
-    QVariantList overlayItems = renderLabelsToOverlayItems(sceneFrame.frame.labels);
-
-    if (!sceneFrame.preparedProjection.has_value()) {
-        return overlayItems;
-    }
-
-    const auto& overlayLayers = input.frameInput.overlayLayers;
-    const auto& renderTheme = input.frameInput.renderTheme;
-    const auto& skyContext = input.frameInput.skyContext;
-
-    if (overlayLayers.ecliptic) {
-        appendReferenceLayerLabel(
-            overlayItems,
-            *sceneFrame.preparedProjection,
-            "Ecliptic",
-            renderTheme.eclipticLine,
-            [&skyContext](const int index) {
-                const double eclipticLongitudeDeg = 360.0 * static_cast<double>(index)
-                    / static_cast<double>(kReferenceLabelSampleCount);
-                return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-                    eclipticLongitudeDeg,
-                    skyContext.observer,
-                    skyContext.utcTime
-                );
-            }
-        );
-    }
-
-    if (overlayLayers.celestialEquator) {
-        appendReferenceLayerLabel(
-            overlayItems,
-            *sceneFrame.preparedProjection,
-            "Celestial equator",
-            renderTheme.celestialEquatorLine,
-            [&skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index,
-                    kReferenceLabelSampleCount,
-                    0.0,
-                    skyContext.observer,
-                    skyContext.utcTime
-                );
-            }
-        );
-    }
-
-    if (overlayLayers.circumpolarBoundary && skyContext.observer.isValid()) {
-        const double boundaryDeclinationDeg =
-            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
-                skyContext.observer
-            );
-        appendReferenceLayerLabel(
-            overlayItems,
-            *sceneFrame.preparedProjection,
-            "Circumpolar",
-            renderTheme.circumpolarBoundaryLine,
-            [boundaryDeclinationDeg, &skyContext](const int index) {
-                return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index,
-                    kReferenceLabelSampleCount,
-                    boundaryDeclinationDeg,
-                    skyContext.observer,
-                    skyContext.utcTime
-                );
-            }
-        );
-    }
-
-    if (!overlayLayers.horizon) {
-        return overlayItems;
-    }
-
-    constexpr std::array<const char*, 4> kCardinalLabels {"N", "E", "S", "W"};
-    constexpr std::array<double, 4> kCardinalAzimuths {0.0, 90.0, 180.0, 270.0};
-    for (std::size_t index = 0; index < kCardinalLabels.size(); ++index) {
-        const auto projected = sceneFrame.preparedProjection->project(
-            skygate::core::HorizontalCoordinate {
-                .altitudeDeg = 0.0,
-                .azimuthDeg = kCardinalAzimuths[index]
-            }
-        );
-        if (!projected.isVisible) {
-            continue;
-        }
-
-        overlayItems.push_back(overlayEntry(
-            "cardinal",
-            projected.x,
-            projected.y,
-            QString::fromUtf8(kCardinalLabels[index]),
-            cardinalColor(kCardinalAzimuths[index], renderTheme)
-        ));
-    }
-
-    return overlayItems;
-}
-
-SkySelectionOverlayInput SkySceneModel::buildSelectionInput(
-    const SceneBuildInput& input,
-    const SkySceneFramePipelineResult& frameResult
-) const
-{
-    return SkySelectionOverlayInput {
-        .snapshot = frameResult.snapshot,
-        .ephemerisEngine = input.frameInput.ephemerisEngine,
-        .timeController = input.timeController,
-        .preparedProjection = frameResult.preparedProjection,
-        .stateIndexByBodyId = frameResult.stateIndexByBodyId,
-        .skyContext = input.frameInput.skyContext,
-        .constellationLabelRefs = input.frameInput.constellationLabelRefs,
-        .catalogSourceIds = input.catalogSourceIds,
-        .catalogSourceLabels = input.catalogSourceLabels,
-        .selectedObjectTargetId = m_selectedObjectTargetId,
-        .selectedSearchTargetKind = input.selectedSearchTargetKind,
-        .selectedSearchTargetId = input.selectedSearchTargetId,
-        .trackedTargetKind = input.trackedTargetKind,
-        .trackedTargetId = input.trackedTargetId,
-        .inspectorPinnedX = m_selectedObjectInspectorPinnedX,
-        .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
-        .inspectorPinned = m_selectedObjectInspectorPinned
-    };
 }

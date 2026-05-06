@@ -4,11 +4,10 @@
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
+#include "catalog/SkyCatalogText.hpp"
 
-#include <QLocale>
 #include <QNetworkAccessManager>
 
-#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
@@ -57,19 +56,12 @@ QString SkyCatalogManager::statusText() const
 
 QString SkyCatalogManager::datasetInfoText() const
 {
-    const QLocale locale = QLocale::system();
-    return QString("Objects: %1 | Constellations: %2").arg(
-        locale.toString(static_cast<qulonglong>(m_bodyCount)),
-        locale.toString(static_cast<qulonglong>(m_constellationCount))
-    );
+    return SkyCatalogText::datasetInfo(m_bodyCount, m_constellationRefs.count());
 }
 
 QString SkyCatalogManager::deepSkyCatalogInfoText() const
 {
-    const QLocale locale = QLocale::system();
-    return QString("Objects: %1").arg(
-        locale.toString(static_cast<qulonglong>(m_deepSkyCatalogFoundObjectCount))
-    );
+    return SkyCatalogText::deepSkyCatalogInfo(m_deepSkyCatalogFoundObjectCount);
 }
 
 bool SkyCatalogManager::downloadingCatalog() const noexcept
@@ -114,7 +106,7 @@ std::size_t SkyCatalogManager::bodyCount() const noexcept
 
 std::size_t SkyCatalogManager::constellationCount() const noexcept
 {
-    return m_constellationCount;
+    return m_constellationRefs.count();
 }
 
 std::uint64_t SkyCatalogManager::catalogRevision() const noexcept
@@ -145,13 +137,13 @@ std::span<const std::uint8_t> SkyCatalogManager::sourceIds() const noexcept
 std::span<const SkyCatalogManager::ConstellationLineRef>
 SkyCatalogManager::constellationLineRefs() const noexcept
 {
-    return std::span<const ConstellationLineRef>(m_constellationLineRefs);
+    return m_constellationRefs.lineRefs();
 }
 
 std::span<const SkyCatalogManager::ConstellationLabelRef>
 SkyCatalogManager::constellationLabelRefs() const noexcept
 {
-    return std::span<const ConstellationLabelRef>(m_constellationLabelRefs);
+    return m_constellationRefs.labelRefs();
 }
 
 void SkyCatalogManager::setCatalogPresetIndex(const int catalogPresetIndex)
@@ -189,7 +181,7 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
 
     const SkyCatalogPreset preset = SkyCatalogPresets::catalogPreset(presetId);
     if (!preset.known) {
-        m_statusText = QString("Catalog: Unknown preset '%1'").arg(presetId);
+        m_statusText = SkyCatalogText::unknownCatalogPreset(presetId);
         emit statusTextChanged();
         return;
     }
@@ -218,7 +210,7 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
 
     const SkyDeepSkyCatalogPreset preset = SkyCatalogPresets::deepSkyCatalogPreset(presetId);
     if (!preset.known) {
-        m_statusText = QString("Catalog: Unknown deep-sky preset '%1'").arg(presetId);
+        m_statusText = SkyCatalogText::unknownDeepSkyPreset(presetId);
         emit statusTextChanged();
         return;
     }
@@ -254,7 +246,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 bool SkyCatalogManager::clearCatalogCache()
 {
     if (m_downloadingCatalog || m_catalogProcessing) {
-        m_statusText = "Catalog: Cannot clear cache while download is in progress";
+        m_statusText = SkyCatalogText::cacheClearBlocked();
         emit statusTextChanged();
         return false;
     }
@@ -264,9 +256,7 @@ bool SkyCatalogManager::clearCatalogCache()
     if (cacheCleared) {
         m_cachedCatalogPayload.clear();
     }
-    m_statusText = cacheCleared
-        ? "Catalog: Star catalog cache cleared"
-        : "Catalog: Star catalog cache clear failed";
+    m_statusText = SkyCatalogText::starCacheClearResult(cacheCleared);
     emit statusTextChanged();
     return cacheCleared;
 }
@@ -274,7 +264,7 @@ bool SkyCatalogManager::clearCatalogCache()
 bool SkyCatalogManager::clearDeepSkyCatalogCache()
 {
     if (m_downloadingCatalog || m_catalogProcessing) {
-        m_statusText = "Catalog: Cannot clear cache while download is in progress";
+        m_statusText = SkyCatalogText::cacheClearBlocked();
         emit statusTextChanged();
         return false;
     }
@@ -284,9 +274,7 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
     if (cacheCleared) {
         m_cachedDeepSkyCatalogPayload.clear();
     }
-    m_statusText = cacheCleared
-        ? "Catalog: Deep-sky catalog cache cleared"
-        : "Catalog: Deep-sky catalog cache clear failed";
+    m_statusText = SkyCatalogText::deepSkyCacheClearResult(cacheCleared);
     emit statusTextChanged();
     return cacheCleared;
 }
@@ -336,9 +324,9 @@ bool SkyCatalogManager::restoreCatalogCache()
 
         if (
             restoreResult.constellationCount.has_value()
-            && restoreResult.constellationCount.value() != m_constellationCount
+            && restoreResult.constellationCount.value() != m_constellationRefs.count()
         ) {
-            m_constellationCount = restoreResult.constellationCount.value();
+            m_constellationRefs.setCount(restoreResult.constellationCount.value());
             emit datasetInfoTextChanged();
         }
         emit catalogChanged();
@@ -386,10 +374,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
             m_statusText = statusText;
             emit statusTextChanged();
 
-            const bool isProcessing = statusText.startsWith(
-                "Catalog: Processing",
-                Qt::CaseInsensitive
-            );
+            const bool isProcessing = SkyCatalogText::isProcessingStatus(statusText);
             if (m_catalogProcessing != isProcessing) {
                 m_catalogProcessing = isProcessing;
                 emit catalogProcessingChanged();
@@ -412,15 +397,10 @@ void SkyCatalogManager::downloadCatalogFromUrls(
             m_cachedCatalogPayload = std::move(result.payload);
             applyCatalog(std::move(result.catalog), result.sourceLabel);
             if (result.diagnostics.truncatedBodyCount > 0U) {
-                const QLocale locale = QLocale::system();
-                m_statusText = QString("%1 | Brightness filter kept %2 of %3 objects").arg(
+                m_statusText = SkyCatalogText::brightnessFilterSummary(
                     m_statusText,
-                    locale.toString(
-                        static_cast<qulonglong>(result.diagnostics.selectedBodyCount)
-                    ),
-                    locale.toString(
-                        static_cast<qulonglong>(result.diagnostics.parsedBodyCount)
-                    )
+                    result.diagnostics.selectedBodyCount,
+                    result.diagnostics.parsedBodyCount
                 );
                 emit statusTextChanged();
             }
@@ -437,13 +417,9 @@ void SkyCatalogManager::downloadCatalogFromUrls(
                 constellationLineUrlTexts,
                 this,
                 [this, catalogSummaryText](const QString& statusText) {
-                    QString normalizedStatusText = statusText;
-                    if (normalizedStatusText.startsWith("Catalog: ")) {
-                        normalizedStatusText.remove(0, 9);
-                    }
-                    m_statusText = QString("%1 | Constellation lines: %2").arg(
+                    m_statusText = SkyCatalogText::constellationLineSummary(
                         catalogSummaryText,
-                        normalizedStatusText
+                        statusText
                     );
                     emit statusTextChanged();
                 },
@@ -452,11 +428,11 @@ void SkyCatalogManager::downloadCatalogFromUrls(
                         setConstellationLineRefs(std::move(lineResult.lineRefs));
                         setConstellationLabelRefs(std::move(lineResult.labelRefs));
                         if (lineResult.constellationCount > 0U) {
-                            m_constellationCount = lineResult.constellationCount;
+                            m_constellationRefs.setCount(lineResult.constellationCount);
                             emit datasetInfoTextChanged();
                         }
                     }
-                    m_statusText = QString("%1 | Constellation lines: %2").arg(
+                    m_statusText = SkyCatalogText::constellationLineSummary(
                         catalogSummaryText,
                         lineResult.statusSuffix
                     );
@@ -500,10 +476,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
             m_statusText = statusText;
             emit statusTextChanged();
 
-            const bool isProcessing = statusText.startsWith(
-                "Catalog: Processing",
-                Qt::CaseInsensitive
-            );
+            const bool isProcessing = SkyCatalogText::isProcessingStatus(statusText);
             if (m_catalogProcessing != isProcessing) {
                 m_catalogProcessing = isProcessing;
                 emit catalogProcessingChanged();
@@ -528,11 +501,10 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
             m_deepSkyCatalogFoundObjectCount = result.foundObjectCount;
             applyDeepSkyCatalog(std::move(result.catalog), result.sourceLabel);
             if (result.foundObjectCount > 0U) {
-                const QLocale locale = QLocale::system();
-                m_statusText = QString("%1 | %2 found %3 objects").arg(
+                m_statusText = SkyCatalogText::deepSkyFoundSummary(
                     m_statusText,
                     result.sourceLabel,
-                    locale.toString(static_cast<qulonglong>(result.foundObjectCount))
+                    result.foundObjectCount
                 );
                 emit statusTextChanged();
             }
@@ -542,10 +514,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(
 
 void SkyCatalogManager::resetConstellationLineRefs()
 {
-    const skygate::ephemeris::BundledConstellationData bundledConstellationData;
-    m_constellationLineRefs = bundledConstellationData.lineRefs();
-    m_constellationLabelRefs = bundledConstellationData.labelRefs();
-    m_constellationCount = m_constellationLabelRefs.size();
+    m_constellationRefs.resetToBundled();
     ++m_catalogRevision;
 }
 
@@ -557,7 +526,7 @@ void SkyCatalogManager::setConstellationLineRefs(
         resetConstellationLineRefs();
         return;
     }
-    m_constellationLineRefs = std::move(lineRefs);
+    m_constellationRefs.setLineRefs(std::move(lineRefs));
     ++m_catalogRevision;
 }
 
@@ -565,7 +534,7 @@ void SkyCatalogManager::setConstellationLabelRefs(
     std::vector<ConstellationLabelRef> labelRefs
 )
 {
-    m_constellationLabelRefs = std::move(labelRefs);
+    m_constellationRefs.setLabelRefs(std::move(labelRefs));
     ++m_catalogRevision;
 }
 
@@ -589,9 +558,9 @@ void SkyCatalogManager::persistCatalogCache() const
     request.deepSkySourceLabel = m_deepSkySourceLabel;
     request.catalogPayload = m_cachedCatalogPayload;
     request.deepSkyCatalogPayload = m_cachedDeepSkyCatalogPayload;
-    request.constellationLineRefs = m_constellationLineRefs;
-    request.constellationLabelRefs = m_constellationLabelRefs;
-    request.constellationCount = m_constellationCount;
+    request.constellationLineRefs = m_constellationRefs.lineRefVector();
+    request.constellationLabelRefs = m_constellationRefs.labelRefVector();
+    request.constellationCount = m_constellationRefs.count();
     m_cacheController->persist(request);
 }
 
@@ -603,7 +572,7 @@ void SkyCatalogManager::applyCatalog(
 {
     if (catalog == nullptr) {
         m_bodyCount = 0;
-        m_constellationCount = 0;
+        m_constellationRefs.setCount(0);
         m_deepSkyObjectCount = 0;
         m_sourceLabels.clear();
         m_sourceIds.clear();
@@ -644,7 +613,7 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
 
     if (m_sourceCatalog == nullptr) {
         m_bodyCount = 0;
-        m_constellationCount = 0;
+        m_constellationRefs.setCount(0);
         m_deepSkyObjectCount = 0;
         m_sourceLabels.clear();
         m_sourceIds.clear();
@@ -658,7 +627,7 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
         .sourceCatalog = *m_sourceCatalog,
         .deepSkyCatalog = m_deepSkyCatalog.get(),
         .useBundledDeepSkyCatalog = m_deepSkyCatalogPresetIndex == 0,
-        .currentConstellationCount = m_constellationCount,
+        .currentConstellationCount = m_constellationRefs.count(),
         .knownDeepSkyObjectCount = m_deepSkyCatalogFoundObjectCount,
         .sourceLabel = m_sourceLabel,
         .deepSkySourceLabel = m_deepSkySourceLabel
@@ -666,7 +635,7 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
     auto buildResult = SkyActiveCatalogBuilder::build(request);
     if (!buildResult.isSuccess()) {
         m_bodyCount = 0;
-        m_constellationCount = 0;
+        m_constellationRefs.setCount(0);
         m_deepSkyObjectCount = 0;
         m_statusText = buildResult.errorText;
         emit statusTextChanged();
@@ -678,7 +647,7 @@ void SkyCatalogManager::rebuildActiveCatalog(const bool persistCatalog)
     m_ephemerisEngine = std::move(buildResult.ephemerisEngine);
     ++m_catalogRevision;
     m_bodyCount = buildResult.bodyCount;
-    m_constellationCount = buildResult.constellationCount;
+    m_constellationRefs.setCount(buildResult.constellationCount);
     m_deepSkyObjectCount = buildResult.deepSkyObjectCount;
     m_deepSkyCatalogFoundObjectCount = buildResult.foundDeepSkyObjectCount;
     m_sourceLabels = buildResult.sourceLabels;

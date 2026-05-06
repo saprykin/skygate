@@ -3,25 +3,20 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
-#include <QStringList>
+#include <QString>
 #include <QVariantList>
 #include <QVariantMap>
 
 #include "SkyHitTargetIndex.hpp"
-#include "SkyObjectTrailBuilder.hpp"
-#include "SkyRenderBuilders.hpp"
-#include "SkySceneFramePipeline.hpp"
-#include "SkySelectionOverlayBuilder.hpp"
+#include "SkySceneComposition.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
 #include <optional>
 #include <span>
 
 class SkyContextController;
-class SkyTimeController;
 
 class SkySceneModel final : public QObject {
     Q_OBJECT
@@ -67,66 +62,10 @@ signals:
     void sceneFrameChanged();
 
 private:
-    struct SceneCompositionKey final {
-        std::uint64_t renderFrameGeneration = 0;
-        std::optional<std::uint32_t> trailTargetBodyIndex;
-        QString selectedObjectTargetId;
-        QString selectedSearchTargetKind;
-        QString selectedSearchTargetId;
-        QString trackedTargetKind;
-        QString trackedTargetId;
-        double inspectorPinnedX = 0.0;
-        double inspectorPinnedY = 0.0;
-        bool inspectorPinned = false;
-
-        [[nodiscard]] bool equals(const SceneCompositionKey& other) const noexcept
-        {
-            return renderFrameGeneration == other.renderFrameGeneration
-                && trailTargetBodyIndex == other.trailTargetBodyIndex
-                && selectedObjectTargetId == other.selectedObjectTargetId
-                && selectedSearchTargetKind == other.selectedSearchTargetKind
-                && selectedSearchTargetId == other.selectedSearchTargetId
-                && trackedTargetKind == other.trackedTargetKind
-                && trackedTargetId == other.trackedTargetId
-                && inspectorPinnedX == other.inspectorPinnedX
-                && inspectorPinnedY == other.inspectorPinnedY
-                && inspectorPinned == other.inspectorPinned;
-        }
-    };
-
-    struct SceneFrameData final {
-        std::optional<skygate::core::PreparedProjection> preparedProjection;
-        const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
-        SkyRenderFrame frame;
-        QVariantList overlayItems;
-        QVariantMap selectionMarker;
-        QVariantMap selectedObjectInspector;
-    };
-
-    struct SceneBuildInput final {
-        SkySceneFramePipelineInput frameInput;
-        std::span<const std::uint8_t> catalogSourceIds;
-        QStringList catalogSourceLabels;
-        const SkyTimeController* timeController = nullptr;
-        QString selectedSearchTargetKind;
-        QString selectedSearchTargetId;
-        QString trackedTargetKind;
-        QString trackedTargetId;
-    };
-
-private:
     void disconnectFromContextController();
     void rebuildSceneFrame();
     [[nodiscard]] bool clearSceneFrame();
-    [[nodiscard]] std::optional<SceneBuildInput> buildSceneInput() const;
-    [[nodiscard]] QVariantList buildOverlayItems(
-        const SceneFrameData& sceneFrame,
-        const SceneBuildInput& input
-    ) const;
-    [[nodiscard]] SkySelectionOverlayInput buildSelectionInput(
-        const SceneBuildInput& input,
-        const SkySceneFramePipelineResult& frameResult
-    ) const;
+    [[nodiscard]] std::optional<SkySceneCompositionInput> buildSceneInput() const;
 
 private:
     QPointer<SkyContextController> m_skyContextController;
@@ -139,10 +78,8 @@ private:
     double m_viewportHeight = 0.0;
     SkySceneFramePipeline m_framePipeline;
     SkyHitTargetIndex m_hitTargetIndex;
-    SkySelectionOverlayBuilder m_selectionOverlayBuilder;
-    SkyObjectTrailBuilder m_objectTrailBuilder;
-    std::optional<SceneCompositionKey> m_sceneCompositionKey;
-    SceneFrameData m_sceneFrame;
+    SkySceneComposer m_sceneComposer;
+    SkySceneFrameData m_sceneFrame;
     QString m_selectedObjectTargetId;
     double m_selectedObjectInspectorPinnedX = 0.0;
     double m_selectedObjectInspectorPinnedY = 0.0;

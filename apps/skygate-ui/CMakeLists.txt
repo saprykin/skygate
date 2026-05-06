@@ -27,6 +27,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyObjectTrailBuilder.hpp
     src/SkyCatalogManager.cpp
     src/SkyCatalogManager.hpp
+    src/SkySceneComposition.cpp
+    src/SkySceneComposition.hpp
     src/SkySceneFramePipeline.cpp
     src/SkySceneFramePipeline.hpp
     src/SkySceneModel.cpp
@@ -48,12 +50,16 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyActiveCatalogBuilder.hpp
     src/catalog/SkyCatalogCacheController.cpp
     src/catalog/SkyCatalogCacheController.hpp
+    src/catalog/SkyCatalogConstellationStore.cpp
+    src/catalog/SkyCatalogConstellationStore.hpp
     src/catalog/CatalogDownloadService.cpp
     src/catalog/CatalogDownloadService.hpp
     src/catalog/SkyCatalogImportWorkflow.cpp
     src/catalog/SkyCatalogImportWorkflow.hpp
     src/catalog/SkyCatalogPresets.cpp
     src/catalog/SkyCatalogPresets.hpp
+    src/catalog/SkyCatalogText.cpp
+    src/catalog/SkyCatalogText.hpp
     src/catalog/CatalogPayloadParseService.cpp
     src/catalog/CatalogPayloadParseService.hpp
     src/SkyContextController.cpp
@@ -77,10 +83,18 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkyContextControllerSupport.cpp
     src/SkyContextControllerSupport.hpp
     src/SkyContextControllerTimeline.cpp
+    src/SkySettingsSnapshotCodecs.cpp
+    src/SkySettingsSnapshotCodecs.hpp
     src/SkySettingsStore.cpp
     src/SkySettingsStore.hpp
+    src/SkySettingsValueCodecs.cpp
+    src/SkySettingsValueCodecs.hpp
+    src/SkyViewportGeometry.cpp
+    src/SkyViewportGeometry.hpp
     src/SkyViewportItem.cpp
     src/SkyViewportItem.hpp
+    src/SkyViewportSceneGraph.cpp
+    src/SkyViewportSceneGraph.hpp
 )
 
 target_include_directories(skygate-ui-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

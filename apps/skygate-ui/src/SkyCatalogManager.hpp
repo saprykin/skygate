@@ -1,13 +1,13 @@
 #pragma once
 
 #include "SkySettingsStore.hpp"
+#include "catalog/SkyCatalogConstellationStore.hpp"
 
 #include <QByteArray>
 #include <QObject>
 #include <QString>
 #include <QStringList>
 
-#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
@@ -123,13 +123,11 @@ private:
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
     std::size_t m_bodyCount = 0;
-    std::size_t m_constellationCount = 0;
     std::size_t m_deepSkyObjectCount = 0;
     std::size_t m_deepSkyCatalogFoundObjectCount = 0;
     QStringList m_sourceLabels;
     std::vector<std::uint8_t> m_sourceIds;
     QByteArray m_cachedCatalogPayload;
     QByteArray m_cachedDeepSkyCatalogPayload;
-    std::vector<ConstellationLineRef> m_constellationLineRefs;
-    std::vector<ConstellationLabelRef> m_constellationLabelRefs;
+    skygate::ui::internal::SkyCatalogConstellationStore m_constellationRefs;
 };
