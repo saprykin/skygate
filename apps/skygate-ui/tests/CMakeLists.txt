@@ -195,6 +195,7 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 60
 )
+add_skygate_ui_qtest(skygate-ui-sky-catalog-runtime-tests SkyCatalogRuntimeTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests SkyObjectTrailBuilderTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-render-builders-tests SkyRenderBuildersTests.cpp)

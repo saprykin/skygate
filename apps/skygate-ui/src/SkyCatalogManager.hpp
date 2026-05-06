@@ -1,7 +1,6 @@
 #pragma once
 
 #include "SkySettingsStore.hpp"
-#include "catalog/SkyCatalogConstellationStore.hpp"
 
 #include <QByteArray>
 #include <QObject>
@@ -10,17 +9,24 @@
 
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
+#include "skygate/ephemeris/ConstellationData.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
-#include <vector>
 
 class QNetworkAccessManager;
 
 namespace skygate::ui::internal {
 class SkyCatalogCacheController;
 class SkyCatalogImportWorkflow;
+class SkyCatalogRuntime;
+struct SkyCatalogRuntimeBuildOptions;
+struct SkyCatalogRuntimeResult;
+struct SkyCatalogImportResult;
+struct SkyDeepSkyCatalogImportResult;
+struct SkyConstellationLineImportResult;
 }
 
 class SkyCatalogManager final : public QObject {
@@ -87,9 +93,9 @@ private:
     void applyDeepSkyCatalog(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
         const QString& sourceLabel,
+        std::size_t foundObjectCount = 0,
         bool persistCatalog = true
     );
-    void rebuildActiveCatalog(bool persistCatalog);
     void downloadCatalogFromUrls(
         const QStringList& urlTexts,
         const QString& sourceLabel,
@@ -99,35 +105,46 @@ private:
         const QStringList& urlTexts,
         const QString& sourceLabel
     );
+    void setStatusText(const QString& statusText);
+    void setDownloadingCatalog(bool downloadingCatalog);
+    void setCatalogProcessing(bool catalogProcessing);
+    void handleCatalogImportStatus(const QString& statusText);
+    void handleCatalogImportFinished(
+        skygate::ui::internal::SkyCatalogImportResult result,
+        const QStringList& constellationLineUrlTexts
+    );
+    void downloadConstellationLinesAfterCatalog(
+        const QStringList& constellationLineUrlTexts,
+        const QString& catalogSummaryText
+    );
+    void handleConstellationLineImportStatus(
+        const QString& catalogSummaryText,
+        const QString& statusText
+    );
+    void handleConstellationLineImportFinished(
+        const QString& catalogSummaryText,
+        skygate::ui::internal::SkyConstellationLineImportResult lineResult
+    );
+    void handleDeepSkyImportFinished(
+        skygate::ui::internal::SkyDeepSkyCatalogImportResult result
+    );
+    [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
+    void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
     void resetConstellationLineRefs();
-    void setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
-    void setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
     void persistCatalogCache() const;
 
 private:
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_sourceCatalog;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_deepSkyCatalog;
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    std::unique_ptr<skygate::ui::internal::SkyCatalogRuntime> m_runtime;
     std::unique_ptr<skygate::ui::internal::SkyCatalogCacheController> m_cacheController;
     std::unique_ptr<skygate::ui::internal::SkyCatalogImportWorkflow> m_importWorkflow;
     QNetworkAccessManager* m_networkAccessManager = nullptr;
     QString m_statusText;
-    QString m_sourceLabel = "Bundled";
-    QString m_deepSkySourceLabel = "Bundled Messier";
     int m_catalogPresetIndex = 0;
     int m_deepSkyCatalogPresetIndex = 0;
     QString m_catalogUrlText;
     QString m_deepSkyCatalogUrlText;
-    std::uint64_t m_catalogRevision = 0;
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
-    std::size_t m_bodyCount = 0;
-    std::size_t m_deepSkyObjectCount = 0;
-    std::size_t m_deepSkyCatalogFoundObjectCount = 0;
-    QStringList m_sourceLabels;
-    std::vector<std::uint8_t> m_sourceIds;
     QByteArray m_cachedCatalogPayload;
     QByteArray m_cachedDeepSkyCatalogPayload;
-    skygate::ui::internal::SkyCatalogConstellationStore m_constellationRefs;
 };
