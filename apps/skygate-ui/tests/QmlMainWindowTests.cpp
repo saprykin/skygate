@@ -217,7 +217,10 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     controller->setLive(false);
-    controller->setUtcDateTimeText(QStringLiteral("2024-06-01"), QStringLiteral("22:00:00"));
+    QVERIFY(controller->setUtcDateTimeText(
+        QStringLiteral("2024-06-01"),
+        QStringLiteral("22:00:00")
+    ));
     controller->setViewCenter(45.0, 180.0);
     auto sceneModel = makeSceneModel(*controller);
     QVERIFY(sceneModel != nullptr);
