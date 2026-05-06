@@ -144,13 +144,11 @@ SkySelectionOverlayInput makeInput(const OverlayFixture& fixture)
     };
 }
 
-QString inspectorFieldValue(const QVariantMap& inspector, const QString& label)
+QString inspectorFieldValue(const SkySelectedObjectInspector& inspector, const QString& label)
 {
-    const QVariantList fields = inspector.value("fields").toList();
-    for (const QVariant& value : fields) {
-        const QVariantMap field = value.toMap();
-        if (field.value("label").toString() == label) {
-            return field.value("value").toString();
+    for (const SkyInspectorField& field : inspector.fields) {
+        if (field.label == label) {
+            return field.value;
         }
     }
     return {};
@@ -181,18 +179,18 @@ void SkySelectionOverlayBuilderTests::markerPriorityPrefersSelectedThenTrackedTh
     input.selectedSearchTargetKind = "body";
     input.selectedSearchTargetId = "search";
 
-    const QVariantMap selectedMarker = builder.buildSelectionMarker(input);
-    QVERIFY(!selectedMarker.isEmpty());
+    const SkySelectionMarker selectedMarker = builder.buildSelectionMarkerData(input);
+    QVERIFY(selectedMarker.visible);
 
     input.selectedObjectTargetId.clear();
-    const QVariantMap trackedMarker = builder.buildSelectionMarker(input);
-    QVERIFY(!trackedMarker.isEmpty());
-    QVERIFY(trackedMarker.value("x").toDouble() != selectedMarker.value("x").toDouble());
+    const SkySelectionMarker trackedMarker = builder.buildSelectionMarkerData(input);
+    QVERIFY(trackedMarker.visible);
+    QVERIFY(trackedMarker.x != selectedMarker.x);
 
     input.trackedTargetId.clear();
-    const QVariantMap searchMarker = builder.buildSelectionMarker(input);
-    QVERIFY(!searchMarker.isEmpty());
-    QVERIFY(searchMarker.value("x").toDouble() != trackedMarker.value("x").toDouble());
+    const SkySelectionMarker searchMarker = builder.buildSelectionMarkerData(input);
+    QVERIFY(searchMarker.visible);
+    QVERIFY(searchMarker.x != trackedMarker.x);
 }
 
 void SkySelectionOverlayBuilderTests::constellationLabelMarkerUsesLabelReferences()
@@ -203,10 +201,10 @@ void SkySelectionOverlayBuilderTests::constellationLabelMarkerUsesLabelReference
     input.selectedSearchTargetKind = "constellationLabel";
     input.selectedSearchTargetId = "Orion";
 
-    QVERIFY(!builder.buildSelectionMarker(input).isEmpty());
+    QVERIFY(builder.buildSelectionMarkerData(input).visible);
 
     input.selectedSearchTargetId = "Missing";
-    QVERIFY(builder.buildSelectionMarker(input).isEmpty());
+    QVERIFY(!builder.buildSelectionMarkerData(input).visible);
 }
 
 void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks()
@@ -216,21 +214,21 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
 
-    const QVariantMap inspector = builder.buildSelectedObjectInspector(input);
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
 
-    QCOMPARE(inspector.value("title").toString(), QString("M31"));
+    QCOMPARE(inspector.title, QString("M31"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
     QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Deep Sky"));
     QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("44.0 / 181.0 deg"));
     QCOMPARE(inspectorFieldValue(inspector, "RA / Dec"), QString("23h 59m 59s / -12d 30m 00s"));
-    QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
-    QVERIFY(!inspector.value("aliases").toString().contains("M31"));
+    QVERIFY(inspector.aliases.contains("Andromeda Galaxy"));
+    QVERIFY(!inspector.aliases.contains("M31"));
 
     fixture.sourceIds = {0U, 0U, 0U, 99U};
     input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
     QCOMPARE(
-        inspectorFieldValue(builder.buildSelectedObjectInspector(input), "Source"),
+        inspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"),
         QString("Catalog")
     );
 }
@@ -245,7 +243,7 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
     input.timeController = &timeController;
     input.selectedObjectTargetId = "selected";
 
-    QVariantMap inspector = builder.buildSelectedObjectInspector(input);
+    SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
     QVERIFY(inspectorFieldValue(inspector, "Rise").contains("UTC+06:00"));
     QVERIFY(inspectorFieldValue(inspector, "Set").contains("UTC+06:00"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
@@ -255,7 +253,7 @@ void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallb
     QVERIFY(inspectorFieldValue(inspector, "Max altitude").isEmpty());
 
     input.selectedObjectTargetId = "circumpolar";
-    inspector = builder.buildSelectedObjectInspector(input);
+    inspector = builder.buildSelectedObjectInspectorData(input);
     QCOMPARE(inspectorFieldValue(inspector, "Rise"), QString("Always above"));
     QCOMPARE(inspectorFieldValue(inspector, "Set"), QString("Always above"));
     QVERIFY(inspectorFieldValue(inspector, "Culmination").contains("UTC+06:00"));
@@ -277,16 +275,16 @@ void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
 
-    QVERIFY(builder.buildSelectedObjectInspector(input).isEmpty());
+    QVERIFY(!builder.buildSelectedObjectInspectorData(input).visible);
 
     input.inspectorPinned = true;
     input.inspectorPinnedX = 123.0;
     input.inspectorPinnedY = 456.0;
-    const QVariantMap inspector = builder.buildSelectedObjectInspector(input);
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
 
-    QVERIFY(inspector.value("visible").toBool());
-    QCOMPARE(inspector.value("x").toDouble(), 123.0);
-    QCOMPARE(inspector.value("y").toDouble(), 456.0);
+    QVERIFY(inspector.visible);
+    QCOMPARE(inspector.x, 123.0);
+    QCOMPARE(inspector.y, 456.0);
     QCOMPARE(inspectorFieldValue(inspector, "Alt / Az"), QString("-- / -- deg"));
     QCOMPARE(inspectorFieldValue(inspector, "RA / Dec"), QString("-- / --"));
 }

@@ -10,28 +10,30 @@
 #include <QDateTime>
 #include <QPointF>
 #include <QTimeZone>
-#include <QVariantList>
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
+#include <vector>
 
 namespace {
 
-QVariantMap selectionMarkerEntry(const double x, const double y)
+SkySelectionMarker selectionMarkerEntry(const double x, const double y)
 {
-    QVariantMap entry;
-    entry.insert("kind", "searchSelection");
-    entry.insert("x", x);
-    entry.insert("y", y);
-    return entry;
+    return SkySelectionMarker {
+        .visible = true,
+        .kind = "searchSelection",
+        .x = x,
+        .y = y
+    };
 }
 
-QVariantMap inspectorField(const QString& label, const QString& value)
+SkyInspectorField inspectorField(const QString& label, const QString& value)
 {
-    QVariantMap field;
-    field.insert("label", label);
-    field.insert("value", value);
-    return field;
+    return SkyInspectorField {
+        .label = label,
+        .value = value
+    };
 }
 
 std::optional<QPointF> selectedBodyPoint(
@@ -322,7 +324,7 @@ QString formatObservationCulmination(
 }
 
 void appendObservationEventFields(
-    QVariantList& fields,
+    std::vector<SkyInspectorField>& fields,
     const SkySelectionOverlayInput& input,
     const skygate::ephemeris::CelestialBody& body,
     const std::uint32_t bodyIndex
@@ -435,7 +437,7 @@ bool hasSelectionInputs(const SkySelectionOverlayInput& input)
 
 }  // namespace
 
-QVariantMap SkySelectionOverlayBuilder::buildSelectionMarker(
+SkySelectionMarker SkySelectionOverlayBuilder::buildSelectionMarkerData(
     const SkySelectionOverlayInput& input
 ) const
 {
@@ -484,7 +486,7 @@ QVariantMap SkySelectionOverlayBuilder::buildSelectionMarker(
     return selectionMarkerEntry(markerPoint->x(), markerPoint->y());
 }
 
-QVariantMap SkySelectionOverlayBuilder::buildSelectedObjectInspector(
+SkySelectedObjectInspector SkySelectionOverlayBuilder::buildSelectedObjectInspectorData(
     const SkySelectionOverlayInput& input
 ) const
 {
@@ -530,7 +532,7 @@ QVariantMap SkySelectionOverlayBuilder::buildSelectedObjectInspector(
         inspectorY = projected.y + 18.0;
     }
 
-    QVariantList fields;
+    std::vector<SkyInspectorField> fields;
     fields.push_back(inspectorField("Type", celestialBodyTypeText(body)));
     fields.push_back(inspectorField("Magnitude", formatMagnitude(body.visualMagnitude)));
     fields.push_back(inspectorField("Alt / Az", formatHorizontalCoordinate(state.horizontal)));
@@ -549,17 +551,17 @@ QVariantMap SkySelectionOverlayBuilder::buildSelectedObjectInspector(
         sourceLabelForBodyIndex(input.catalogSourceIds, input.catalogSourceLabels, state.bodyIndex)
     ));
 
-    QVariantMap inspector;
-    inspector.insert("visible", true);
-    inspector.insert("x", inspectorX);
-    inspector.insert("y", inspectorY);
-    inspector.insert("targetKind", "body");
-    inspector.insert("targetId", QString::fromStdString(body.id));
-    inspector.insert("title", QString::fromStdString(body.displayName));
-    inspector.insert("pinned", input.inspectorPinned);
-    inspector.insert("fields", fields);
-    inspector.insert("aliases", aliasesText(body));
-    return inspector;
+    return SkySelectedObjectInspector {
+        .visible = true,
+        .x = inspectorX,
+        .y = inspectorY,
+        .targetKind = "body",
+        .targetId = QString::fromStdString(body.id),
+        .title = QString::fromStdString(body.displayName),
+        .pinned = input.inspectorPinned,
+        .fields = std::move(fields),
+        .aliases = aliasesText(body)
+    };
 }
 
 QString SkySelectionOverlayBuilder::activeTrailTargetBodyId(

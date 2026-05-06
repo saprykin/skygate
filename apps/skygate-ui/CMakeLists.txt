@@ -33,6 +33,9 @@ qt_add_library(skygate-ui-lib STATIC
     src/SkySceneFramePipeline.hpp
     src/SkySceneModel.cpp
     src/SkySceneModel.hpp
+    src/SkySceneOverlayAdapter.cpp
+    src/SkySceneOverlayAdapter.hpp
+    src/SkySceneOverlayData.hpp
     src/SkySceneShared.hpp
     src/SkySelectionOverlayBuilder.cpp
     src/SkySelectionOverlayBuilder.hpp

@@ -1,24 +1,20 @@
 #include "SkySceneComposition.hpp"
 
-#include "SkyRenderLabels.hpp"
-
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
 #include <QColor>
 #include <QPointF>
-#include <QVariantMap>
 
 #include <array>
 #include <limits>
-#include <utility>
 
 namespace {
 
 constexpr int kReferenceLabelSampleCount = 96;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
 
-QVariantMap overlayEntry(
+SkyOverlayItem overlayEntry(
     const QString& kind,
     const double x,
     const double y,
@@ -26,13 +22,13 @@ QVariantMap overlayEntry(
     const QColor& color
 )
 {
-    QVariantMap entry;
-    entry.insert("kind", kind);
-    entry.insert("x", x);
-    entry.insert("y", y);
-    entry.insert("text", text);
-    entry.insert("color", color);
-    return entry;
+    return SkyOverlayItem {
+        .kind = kind,
+        .x = x,
+        .y = y,
+        .text = text,
+        .color = color
+    };
 }
 
 QColor cardinalColor(
@@ -65,7 +61,7 @@ bool pointIsInsideLabelMargin(
 
 template <typename CoordinateAt>
 void appendReferenceLayerLabel(
-    QVariantList& overlayItems,
+    std::vector<SkyOverlayItem>& overlayItems,
     const skygate::core::PreparedProjection& preparedProjection,
     const QString& text,
     const QColor& color,
@@ -117,20 +113,20 @@ void appendReferenceLayerLabel(
     ));
 }
 
-QVariantList renderLabelsToOverlayItems(const std::span<const SkyRenderLabel> labels)
+std::vector<SkyOverlayItem> renderLabelsToOverlayItems(
+    const std::span<const SkyRenderLabel> labels
+)
 {
-    QVariantList overlayItems;
-    overlayItems.reserve(static_cast<qsizetype>(labels.size()));
+    std::vector<SkyOverlayItem> overlayItems;
+    overlayItems.reserve(labels.size());
     for (const SkyRenderLabel& label : labels) {
-        QVariantMap entry;
-        if (!label.kind.isEmpty()) {
-            entry.insert("kind", label.kind);
-        }
-        entry.insert("x", label.x);
-        entry.insert("y", label.y);
-        entry.insert("text", label.text);
-        entry.insert("color", label.color);
-        overlayItems.push_back(std::move(entry));
+        overlayItems.push_back(SkyOverlayItem {
+            .kind = label.kind,
+            .x = label.x,
+            .y = label.y,
+            .text = label.text,
+            .color = label.color
+        });
     }
     return overlayItems;
 }
@@ -212,9 +208,9 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     }
 
     sceneFrame.selectionMarker =
-        m_selectionOverlayBuilder.buildSelectionMarker(selectionInput);
+        m_selectionOverlayBuilder.buildSelectionMarkerData(selectionInput);
     sceneFrame.selectedObjectInspector =
-        m_selectionOverlayBuilder.buildSelectedObjectInspector(selectionInput);
+        m_selectionOverlayBuilder.buildSelectedObjectInspectorData(selectionInput);
     m_compositionKey = compositionKey;
     return SkySceneCompositionResult {
         .changed = true,
@@ -222,12 +218,12 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     };
 }
 
-QVariantList SkySceneComposer::buildOverlayItems(
+std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
     const SkySceneFrameData& sceneFrame,
     const SkySceneCompositionInput& input
 ) const
 {
-    QVariantList overlayItems = renderLabelsToOverlayItems(sceneFrame.frame.labels);
+    std::vector<SkyOverlayItem> overlayItems = renderLabelsToOverlayItems(sceneFrame.frame.labels);
 
     if (!sceneFrame.preparedProjection.has_value()) {
         return overlayItems;

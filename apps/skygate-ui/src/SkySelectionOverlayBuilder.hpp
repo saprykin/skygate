@@ -3,7 +3,8 @@
 #include <QHash>
 #include <QString>
 #include <QStringList>
-#include <QVariantMap>
+
+#include "SkySceneOverlayData.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
 #include "skygate/core/Types.hpp"
@@ -39,10 +40,10 @@ struct SkySelectionOverlayInput final {
 
 class SkySelectionOverlayBuilder final {
 public:
-    [[nodiscard]] QVariantMap buildSelectionMarker(
+    [[nodiscard]] SkySelectionMarker buildSelectionMarkerData(
         const SkySelectionOverlayInput& input
     ) const;
-    [[nodiscard]] QVariantMap buildSelectedObjectInspector(
+    [[nodiscard]] SkySelectedObjectInspector buildSelectedObjectInspectorData(
         const SkySelectionOverlayInput& input
     ) const;
     [[nodiscard]] QString activeTrailTargetBodyId(

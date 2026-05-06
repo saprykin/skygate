@@ -9,6 +9,7 @@
 
 #include "SkyHitTargetIndex.hpp"
 #include "SkySceneComposition.hpp"
+#include "SkySceneOverlayAdapter.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
 
@@ -79,7 +80,11 @@ private:
     SkySceneFramePipeline m_framePipeline;
     SkyHitTargetIndex m_hitTargetIndex;
     SkySceneComposer m_sceneComposer;
+    SkySceneOverlayAdapter m_sceneOverlayAdapter;
     SkySceneFrameData m_sceneFrame;
+    QVariantList m_overlayItems;
+    QVariantMap m_selectionMarker;
+    QVariantMap m_selectedObjectInspector;
     QString m_selectedObjectTargetId;
     double m_selectedObjectInspectorPinnedX = 0.0;
     double m_selectedObjectInspectorPinnedY = 0.0;

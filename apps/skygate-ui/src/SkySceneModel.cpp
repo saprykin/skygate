@@ -80,17 +80,17 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
 
 QVariantList SkySceneModel::overlayItems() const
 {
-    return m_sceneFrame.overlayItems;
+    return m_overlayItems;
 }
 
 QVariantMap SkySceneModel::selectionMarker() const
 {
-    return m_sceneFrame.selectionMarker;
+    return m_selectionMarker;
 }
 
 QVariantMap SkySceneModel::selectedObjectInspector() const
 {
-    return m_sceneFrame.selectedObjectInspector;
+    return m_selectedObjectInspector;
 }
 
 std::uint64_t SkySceneModel::snapshotGeneration() const noexcept
@@ -172,7 +172,7 @@ void SkySceneModel::clearSelectedObjectInspector()
 {
     const bool hadSelection = !m_selectedObjectTargetId.isEmpty()
         || m_selectedObjectInspectorPinned
-        || !m_sceneFrame.selectedObjectInspector.isEmpty();
+        || m_sceneFrame.selectedObjectInspector.visible;
     m_selectedObjectTargetId.clear();
     m_selectedObjectInspectorPinned = false;
     if (!hadSelection) {
@@ -190,14 +190,14 @@ void SkySceneModel::setSelectedObjectInspectorPinned(const bool pinned)
     }
 
     if (pinned) {
-        if (m_sceneFrame.selectedObjectInspector.isEmpty()) {
+        if (!m_sceneFrame.selectedObjectInspector.visible) {
             return;
         }
 
         m_selectedObjectInspectorPinnedX =
-            m_sceneFrame.selectedObjectInspector.value("x").toDouble();
+            m_sceneFrame.selectedObjectInspector.x;
         m_selectedObjectInspectorPinnedY =
-            m_sceneFrame.selectedObjectInspector.value("y").toDouble();
+            m_sceneFrame.selectedObjectInspector.y;
     }
 
     m_selectedObjectInspectorPinned = pinned;
@@ -271,12 +271,18 @@ bool SkySceneModel::clearSceneFrame()
         || !m_sceneFrame.frame.points.empty()
         || !m_sceneFrame.frame.lines.empty()
         || !m_sceneFrame.frame.glyphs.empty()
-        || !m_sceneFrame.overlayItems.isEmpty()
-        || !m_sceneFrame.selectionMarker.isEmpty()
-        || !m_sceneFrame.selectedObjectInspector.isEmpty();
+        || !m_sceneFrame.overlayItems.empty()
+        || m_sceneFrame.selectionMarker.visible
+        || m_sceneFrame.selectedObjectInspector.visible
+        || !m_overlayItems.isEmpty()
+        || !m_selectionMarker.isEmpty()
+        || !m_selectedObjectInspector.isEmpty();
     m_hitTargetIndex.clear();
     m_sceneComposer.reset();
     m_sceneFrame = {};
+    m_overlayItems = {};
+    m_selectionMarker = {};
+    m_selectedObjectInspector = {};
     return hadSceneFrame;
 }
 
@@ -361,5 +367,10 @@ void SkySceneModel::rebuildSceneFrame()
     if (compositionResult.frameContentChanged) {
         m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
     }
+    m_overlayItems = m_sceneOverlayAdapter.overlayItems(m_sceneFrame.overlayItems);
+    m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
+    m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(
+        m_sceneFrame.selectedObjectInspector
+    );
     emit sceneFrameChanged();
 }

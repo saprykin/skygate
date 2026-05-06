@@ -2,11 +2,10 @@
 
 #include <QString>
 #include <QStringList>
-#include <QVariantList>
-#include <QVariantMap>
 
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneFramePipeline.hpp"
+#include "SkySceneOverlayData.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
@@ -15,6 +14,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <vector>
 
 class SkyTimeController;
 
@@ -22,9 +22,9 @@ struct SkySceneFrameData final {
     std::optional<skygate::core::PreparedProjection> preparedProjection;
     const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
     SkyRenderFrame frame;
-    QVariantList overlayItems;
-    QVariantMap selectionMarker;
-    QVariantMap selectedObjectInspector;
+    std::vector<SkyOverlayItem> overlayItems;
+    SkySelectionMarker selectionMarker;
+    SkySelectedObjectInspector selectedObjectInspector;
 };
 
 struct SkySceneCompositionInput final {
@@ -75,7 +75,7 @@ private:
         [[nodiscard]] bool equals(const CompositionKey& other) const noexcept;
     };
 
-    [[nodiscard]] QVariantList buildOverlayItems(
+    [[nodiscard]] std::vector<SkyOverlayItem> buildOverlayItems(
         const SkySceneFrameData& sceneFrame,
         const SkySceneCompositionInput& input
     ) const;
