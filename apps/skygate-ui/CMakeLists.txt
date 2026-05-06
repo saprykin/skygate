@@ -234,6 +234,41 @@ add_custom_target(run-skygate-ui
     COMMENT "Run skygate-ui"
 )
 
+install(TARGETS skygate-ui
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+qt_generate_deploy_qml_app_script(
+    TARGET skygate-ui
+    OUTPUT_SCRIPT skygateUiDeployScript
+    MACOS_BUNDLE_POST_BUILD
+    NO_UNSUPPORTED_PLATFORM_ERROR
+    DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
+)
+install(SCRIPT ${skygateUiDeployScript})
+
+if(WIN32)
+    set(skygateRuntimeDllCopyScript
+        "${CMAKE_CURRENT_BINARY_DIR}/copy-skygate-ui-runtime-dlls-$<CONFIG>.cmake"
+    )
+    string(CONCAT skygateRuntimeDllCopyScriptContent
+        "set(SKYGATE_RUNTIME_DLLS \"$<TARGET_RUNTIME_DLLS:skygate-ui>\")\n"
+        "set(SKYGATE_RUNTIME_OUTPUT_DIR \"$<TARGET_FILE_DIR:skygate-ui>\")\n"
+        "include(\"${CMAKE_SOURCE_DIR}/cmake/SkyGateCopyRuntimeDlls.cmake\")\n"
+    )
+    file(GENERATE
+        OUTPUT "${skygateRuntimeDllCopyScript}"
+        CONTENT "${skygateRuntimeDllCopyScriptContent}"
+    )
+    add_custom_command(TARGET skygate-ui POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND}
+                -P "${skygateRuntimeDllCopyScript}"
+        COMMENT "Copy SkyGate runtime DLLs"
+    )
+endif()
+
 if(APPLE)
     add_custom_target(run-skygate-ui-bundle
         COMMAND open $<TARGET_BUNDLE_DIR:skygate-ui>

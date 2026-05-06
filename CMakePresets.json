@@ -18,6 +18,37 @@
             }
         },
         {
+            "name": "windows-vcpkg-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            }
+        },
+        {
+            "name": "macos-vcpkg-base",
+            "hidden": true,
+            "inherits": "base",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
             "name": "core-debug",
             "inherits": "base",
             "displayName": "Core Debug",
@@ -44,6 +75,94 @@
                 "SKYGATE_BUILD_UI": "OFF",
                 "SKYGATE_BUILD_TESTS": "ON",
                 "SKYGATE_ENABLE_COVERAGE": "ON"
+            }
+        },
+        {
+            "name": "core-debug-windows-vcpkg",
+            "inherits": "windows-vcpkg-base",
+            "displayName": "Core Debug (Windows vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF"
+            }
+        },
+        {
+            "name": "ui-debug-windows-vcpkg",
+            "inherits": "windows-vcpkg-base",
+            "displayName": "UI Debug (Windows vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "ON"
+            }
+        },
+        {
+            "name": "ui-release-windows-vcpkg",
+            "inherits": "windows-vcpkg-base",
+            "displayName": "UI Release (Windows vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "SKYGATE_BUILD_UI": "ON",
+                "SKYGATE_BUILD_TESTS": "OFF"
+            }
+        },
+        {
+            "name": "core-debug-macos-vcpkg",
+            "inherits": "macos-vcpkg-base",
+            "displayName": "Core Debug (macOS vcpkg zlib)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF"
+            }
+        },
+        {
+            "name": "ui-debug-macos-vcpkg",
+            "inherits": "macos-vcpkg-base",
+            "displayName": "UI Debug (macOS vcpkg zlib)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "ON"
+            }
+        },
+        {
+            "name": "ui-release-macos-vcpkg",
+            "inherits": "macos-vcpkg-base",
+            "displayName": "UI Release (macOS vcpkg zlib)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}",
+                "SKYGATE_BUILD_UI": "ON",
+                "SKYGATE_BUILD_TESTS": "OFF"
             }
         }
     ],
@@ -79,6 +198,132 @@
             "configurePreset": "core-coverage",
             "targets": [
                 "skygate-coverage-html"
+            ]
+        },
+        {
+            "name": "core-debug-windows-vcpkg",
+            "configurePreset": "core-debug-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "ui-debug-windows-vcpkg",
+            "configurePreset": "ui-debug-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "ui-run-windows-vcpkg",
+            "configurePreset": "ui-debug-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "targets": [
+                "run-skygate-ui"
+            ]
+        },
+        {
+            "name": "ui-release-windows-vcpkg",
+            "configurePreset": "ui-release-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "ui-install-windows-vcpkg",
+            "configurePreset": "ui-release-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "targets": [
+                "install"
+            ]
+        },
+        {
+            "name": "ui-package-windows-vcpkg",
+            "configurePreset": "ui-release-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "targets": [
+                "package"
+            ]
+        },
+        {
+            "name": "core-debug-macos-vcpkg",
+            "configurePreset": "core-debug-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "ui-debug-macos-vcpkg",
+            "configurePreset": "ui-debug-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "ui-run-macos-vcpkg",
+            "configurePreset": "ui-debug-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "targets": [
+                "run-skygate-ui"
+            ]
+        },
+        {
+            "name": "ui-release-macos-vcpkg",
+            "configurePreset": "ui-release-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "ui-install-macos-vcpkg",
+            "configurePreset": "ui-release-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "targets": [
+                "install"
+            ]
+        },
+        {
+            "name": "ui-package-macos-vcpkg",
+            "configurePreset": "ui-release-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "targets": [
+                "package"
             ]
         }
     ]

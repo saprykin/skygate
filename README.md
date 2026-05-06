@@ -208,6 +208,39 @@ in your shell or IDE configuration rather than editing the tracked presets.
 `CMakeUserPresets.json` is also supported for local-only overrides and should
 not be checked in.
 
+Windows builds should use the vcpkg-backed presets. Install vcpkg, set
+`VCPKG_ROOT`, make Qt and Ninja discoverable, then configure one of the Windows
+presets:
+
+```powershell
+$env:VCPKG_ROOT = "C:\src\vcpkg"
+cmake --preset ui-debug-windows-vcpkg
+cmake --build --preset ui-debug-windows-vcpkg
+```
+
+The checked-in `vcpkg.json` manifest declares zlib, which is required for gzip
+and ZIP catalog import. The Windows vcpkg presets use the `x64-windows` triplet
+by default, so runtime DLLs from vcpkg are copied next to the build-tree
+executable for `ui-run-windows-vcpkg` and are also collected during install and
+package deployment.
+
+macOS can use vcpkg for zlib the same way while keeping Qt outside vcpkg.
+Install vcpkg, set `VCPKG_ROOT`, and point `CMAKE_PREFIX_PATH` at your normal
+Qt installation:
+
+```bash
+export VCPKG_ROOT="$HOME/src/vcpkg"
+export CMAKE_PREFIX_PATH="$HOME/Qt/6.x/macos"
+cmake --preset ui-debug-macos-vcpkg
+cmake --build --preset ui-debug-macos-vcpkg
+```
+
+The macOS vcpkg presets do not pin `VCPKG_TARGET_TRIPLET`; vcpkg will use its
+native default. Set `VCPKG_DEFAULT_TRIPLET=arm64-osx` or
+`VCPKG_DEFAULT_TRIPLET=x64-osx` in your environment if you need to force one.
+Qt is still resolved through `CMAKE_PREFIX_PATH` or `Qt6_DIR`, not through the
+manifest.
+
 ## Packaging
 
 On macOS, a DMG packaging target is available when `macdeployqt` is installed
@@ -216,6 +249,27 @@ and discoverable:
 ```bash
 cmake --build build --target package-skygate-ui-dmg
 ```
+
+All platforms with UI builds also get standard CMake install and ZIP package
+targets. On Windows, build the release vcpkg package like this:
+
+```powershell
+cmake --preset ui-release-windows-vcpkg
+cmake --build --preset ui-install-windows-vcpkg
+cmake --build --preset ui-package-windows-vcpkg
+```
+
+On macOS with vcpkg-managed zlib:
+
+```bash
+cmake --preset ui-release-macos-vcpkg
+cmake --build --preset ui-install-macos-vcpkg
+cmake --build --preset ui-package-macos-vcpkg
+```
+
+The install/package flow uses Qt's QML deployment support, so the output
+contains the application executable, Qt runtime files, QML modules/plugins, and
+vcpkg runtime dependencies such as zlib.
 
 ## Notes
 

@@ -3,5 +3,6 @@
 .qtcreator/
 build/
 build-*/
+install/
 CMakeLists.txt.user
 CMakeUserPresets.json

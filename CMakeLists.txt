@@ -7,6 +7,8 @@ project(skygate VERSION ${SKYGATE_APP_VERSION} LANGUAGES CXX)
 set(SKYGATE_QML_MODULE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 set(SKYGATE_GIT_HASH "unknown")
 
+include(GNUInstallDirs)
+
 find_package(Git QUIET)
 if(Git_FOUND)
     execute_process(
@@ -53,3 +55,17 @@ if(SKYGATE_BUILD_TESTS)
 endif()
 
 skygate_add_coverage_targets()
+
+if(SKYGATE_BUILD_UI)
+    set(CPACK_PACKAGE_NAME "SkyGate")
+    set(CPACK_PACKAGE_VENDOR "SkyGate")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SkyGate desktop sky visualization application")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "SkyGate")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    set(CPACK_PACKAGE_FILE_NAME
+        "SkyGate-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}"
+    )
+    set(CPACK_GENERATOR "ZIP")
+    include(CPack)
+endif()

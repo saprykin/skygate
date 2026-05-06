@@ -1,5 +1,12 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core)
-find_package(ZLIB REQUIRED)
+find_package(ZLIB QUIET)
+if(NOT ZLIB_FOUND)
+    message(FATAL_ERROR
+        "SkyGate requires zlib for gzip and ZIP catalog import. "
+        "Install vcpkg, set VCPKG_ROOT, and configure with one of the "
+        "*-vcpkg presets, or provide a system zlib through CMAKE_PREFIX_PATH."
+    )
+endif()
 
 add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/CatalogLoadResult.hpp
