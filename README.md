@@ -143,10 +143,55 @@ Tests carry CTest labels such as `unit`, `integration`, `qml`, `perf`,
 build-make/ui-debug -L slow --output-on-failure` for slow guard/rendering
 coverage.
 
+### Coverage
+
+Coverage instrumentation is opt-in and does not affect normal builds. The
+recommended local workflow uses the `core-coverage` preset, which builds the
+non-UI libraries and tests with `SKYGATE_ENABLE_COVERAGE=ON`:
+
+```bash
+cmake --preset core-coverage
+cmake --build --preset core-coverage
+```
+
+On AppleClang/Clang builds, CMake enables LLVM source coverage with
+`-fprofile-instr-generate -fcoverage-mapping`. If `llvm-cov` and
+`llvm-profdata` are discoverable, including through `xcrun` on macOS, the build
+also provides report targets:
+
+```bash
+cmake --build --preset core-coverage-text
+cmake --build --preset core-coverage-html
+```
+
+The text report is written to
+`build-make/core-coverage/coverage/coverage.txt`, and the HTML report starts at
+`build-make/core-coverage/coverage/html/index.html`. Both report targets run
+the registered CTest suite first with `LLVM_PROFILE_FILE` set to collect raw
+profiles.
+
+Without presets, configure coverage explicitly:
+
+```bash
+cmake -S . -B build-coverage \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DSKYGATE_BUILD_UI=OFF \
+  -DSKYGATE_BUILD_TESTS=ON \
+  -DSKYGATE_ENABLE_COVERAGE=ON \
+  -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
+
+cmake --build build-coverage --target skygate-coverage-html
+```
+
+GCC builds use `--coverage` instrumentation. If `gcovr` is installed locally,
+the same `skygate-coverage-text` and `skygate-coverage-html` targets generate
+reports under the build tree. No coverage workflow requires network access.
+
 ## CMake Presets
 
 The repository includes `CMakePresets.json` with `core-debug`, `ui-debug`, and
-`ui-run` presets. They keep a stable local workflow and use the existing
+`ui-run` presets, plus `core-coverage` report presets for opt-in coverage
+builds. They keep a stable local workflow and use the existing
 `build-make/<preset>` layout.
 
 The shared preset file is portable and does not check in developer-specific Qt

@@ -34,6 +34,17 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "ON"
             }
+        },
+        {
+            "name": "core-coverage",
+            "inherits": "base",
+            "displayName": "Core Coverage",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_BUILD_TESTS": "ON",
+                "SKYGATE_ENABLE_COVERAGE": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -50,6 +61,24 @@
             "configurePreset": "ui-debug",
             "targets": [
                 "run-skygate-ui"
+            ]
+        },
+        {
+            "name": "core-coverage",
+            "configurePreset": "core-coverage"
+        },
+        {
+            "name": "core-coverage-text",
+            "configurePreset": "core-coverage",
+            "targets": [
+                "skygate-coverage-text"
+            ]
+        },
+        {
+            "name": "core-coverage-html",
+            "configurePreset": "core-coverage",
+            "targets": [
+                "skygate-coverage-html"
             ]
         }
     ]

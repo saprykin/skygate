@@ -26,8 +26,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(SkyGateCoverage)
+
 option(SKYGATE_BUILD_UI "Build Qt UI application" ON)
 option(SKYGATE_BUILD_TESTS "Build tests" ON)
+option(SKYGATE_ENABLE_COVERAGE "Build tests with coverage instrumentation" OFF)
+
+skygate_enable_coverage()
 
 add_subdirectory(libs/skygate-core)
 add_subdirectory(libs/skygate-ephemeris)
@@ -38,9 +44,12 @@ endif()
 
 if(SKYGATE_BUILD_TESTS)
     enable_testing()
+    add_subdirectory(tests/support)
     add_subdirectory(libs/skygate-core/tests)
     add_subdirectory(libs/skygate-ephemeris/tests)
     if(SKYGATE_BUILD_UI)
         add_subdirectory(apps/skygate-ui/tests)
     endif()
 endif()
+
+skygate_add_coverage_targets()

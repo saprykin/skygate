@@ -20,6 +20,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
             Qt6::Test
             skygate::ephemeris
             skygate::core
+            skygate::test-support
     )
 
     target_include_directories(${target_name}

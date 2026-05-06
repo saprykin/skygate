@@ -19,6 +19,7 @@ function(add_skygate_ui_qtest target_name source_file)
         PRIVATE
             Qt6::Test
             skygate::uiapp
+            skygate::test-support
     )
 
     target_compile_features(${target_name} PRIVATE cxx_std_20)

@@ -1,9 +1,13 @@
 #include "QmlTestSupport.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 
+#include <QColor>
 #include <QDateTime>
+#include <QList>
+#include <QRect>
 #include <QTimeZone>
 
 using namespace skygate::ui::tests;
@@ -52,6 +56,192 @@ bool renderingTriggerMenuItem(QObject* menuItem)
         return QMetaObject::invokeMethod(menuItem, "triggered");
     }
     return false;
+}
+
+int renderingMaxRgbChannelDistance(const QColor& lhs, const QColor& rhs)
+{
+    return std::max({
+        std::abs(lhs.red() - rhs.red()),
+        std::abs(lhs.green() - rhs.green()),
+        std::abs(lhs.blue() - rhs.blue()),
+    });
+}
+
+bool renderingColorsAreNear(
+    const QColor& lhs,
+    const QColor& rhs,
+    const int maxChannelDistance
+)
+{
+    return renderingMaxRgbChannelDistance(lhs, rhs) <= maxChannelDistance;
+}
+
+QRectF renderingQuickItemSceneRect(const QQuickItem& item)
+{
+    return QRectF(
+        item.mapToScene(QPointF(0.0, 0.0)),
+        item.mapToScene(QPointF(item.width(), item.height()))
+    ).normalized();
+}
+
+QRect renderingImageRectForSceneRect(
+    const QQuickWindow& window,
+    const QImage& image,
+    const QRectF& sceneRect
+)
+{
+    if (window.width() <= 0 || window.height() <= 0 || image.isNull()) {
+        return {};
+    }
+
+    const double scaleX = static_cast<double>(image.width()) / static_cast<double>(window.width());
+    const double scaleY = static_cast<double>(image.height()) / static_cast<double>(window.height());
+    const int left = static_cast<int>(std::floor(sceneRect.left() * scaleX));
+    const int top = static_cast<int>(std::floor(sceneRect.top() * scaleY));
+    const int right = static_cast<int>(std::ceil(sceneRect.right() * scaleX));
+    const int bottom = static_cast<int>(std::ceil(sceneRect.bottom() * scaleY));
+    return QRect(QPoint(left, top), QPoint(right, bottom))
+        .normalized()
+        .intersected(QRect(0, 0, image.width(), image.height()));
+}
+
+QPoint renderingImagePointForScenePoint(
+    const QQuickWindow& window,
+    const QImage& image,
+    const QPointF& scenePoint
+)
+{
+    if (window.width() <= 0 || window.height() <= 0 || image.isNull()) {
+        return {};
+    }
+
+    const double scaleX = static_cast<double>(image.width()) / static_cast<double>(window.width());
+    const double scaleY = static_cast<double>(image.height()) / static_cast<double>(window.height());
+    return QPoint(
+        qBound(0, static_cast<int>(std::round(scenePoint.x() * scaleX)), image.width() - 1),
+        qBound(0, static_cast<int>(std::round(scenePoint.y() * scaleY)), image.height() - 1)
+    );
+}
+
+bool renderingImageRegionContainsColorNear(
+    const QImage& image,
+    const QRect& imageRect,
+    const QColor& targetColor,
+    const int maxChannelDistance
+)
+{
+    if (image.isNull() || imageRect.isEmpty()) {
+        return false;
+    }
+
+    for (int y = imageRect.top(); y <= imageRect.bottom(); ++y) {
+        for (int x = imageRect.left(); x <= imageRect.right(); ++x) {
+            if (
+                renderingColorsAreNear(
+                    image.pixelColor(x, y),
+                    targetColor,
+                    maxChannelDistance
+                )
+            ) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool renderingItemRegionContainsColorNear(
+    const QQuickWindow& window,
+    const QImage& image,
+    const QQuickItem& item,
+    const QColor& targetColor,
+    const int maxChannelDistance
+)
+{
+    return renderingImageRegionContainsColorNear(
+        image,
+        renderingImageRectForSceneRect(window, image, renderingQuickItemSceneRect(item)),
+        targetColor,
+        maxChannelDistance
+    );
+}
+
+bool renderingScenePointIsColorNear(
+    const QQuickWindow& window,
+    const QImage& image,
+    const QPointF& scenePoint,
+    const QColor& targetColor,
+    const int maxChannelDistance
+)
+{
+    if (image.isNull()) {
+        return false;
+    }
+
+    const QPoint imagePoint = renderingImagePointForScenePoint(window, image, scenePoint);
+    return renderingColorsAreNear(
+        image.pixelColor(imagePoint),
+        targetColor,
+        maxChannelDistance
+    );
+}
+
+QList<QColor> renderingExpectedGeometryColors(
+    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme,
+    const QString& propertyName
+)
+{
+    if (propertyName == QStringLiteral("horizon")) {
+        return {renderTheme.horizonLine};
+    }
+    if (propertyName == QStringLiteral("altAzGrid")) {
+        return {renderTheme.gridAltitudeLine, renderTheme.gridAzimuthLine};
+    }
+    if (propertyName == QStringLiteral("ecliptic")) {
+        return {renderTheme.eclipticLine};
+    }
+    if (propertyName == QStringLiteral("celestialEquator")) {
+        return {renderTheme.celestialEquatorLine};
+    }
+    if (propertyName == QStringLiteral("circumpolarBoundary")) {
+        return {renderTheme.circumpolarBoundaryLine};
+    }
+    if (propertyName == QStringLiteral("deepSkyObjects")) {
+        return {renderTheme.bodyDeepSkyObject};
+    }
+    return {};
+}
+
+bool renderingHasVisibleGeometryWithColor(
+    const QSGNode* paintNode,
+    const QColor& color,
+    const QSizeF& viewportSize,
+    QString* failure
+)
+{
+    const SkyViewGeometryProbe probe = geometryMaterialColorProbe(paintNode, color);
+    if (!probe.hasGeometry()) {
+        if (failure != nullptr) {
+            *failure = QStringLiteral("No scene-graph geometry used color %1; actual colors: %2")
+                .arg(color.name(QColor::HexArgb), geometryMaterialColorNames(paintNode).join(", "));
+        }
+        return false;
+    }
+
+    if (!geometryProbeIntersectsViewport(probe, viewportSize)) {
+        if (failure != nullptr) {
+            *failure = QStringLiteral("Scene-graph geometry for %1 at [%2,%3 %4x%5] misses %6x%7")
+                .arg(color.name(QColor::HexArgb))
+                .arg(probe.bounds.x())
+                .arg(probe.bounds.y())
+                .arg(probe.bounds.width())
+                .arg(probe.bounds.height())
+                .arg(viewportSize.width())
+                .arg(viewportSize.height());
+        }
+        return false;
+    }
+    return true;
 }
 
 bool windowHasMultipleSampledColors(QQuickWindow& window)
@@ -224,6 +414,86 @@ void QmlRenderingTests::skyOverlayLayerRendersPayloads()
     QVERIFY(selectionMarker->isVisible());
     QCOMPARE(selectionMarker->width(), 34.0);
     QCOMPARE(selectionMarker->height(), 34.0);
+
+    auto* inspectorItem = firstQuickItemWithObjectName(root, QStringLiteral("objectInspector"));
+    QVERIFY(inspectorItem != nullptr);
+    auto* hoverLabel = firstQuickItemWithObjectName(root, QStringLiteral("hoverObjectLabel"));
+    QVERIFY(hoverLabel != nullptr);
+    auto* vegaLabel = firstQuickItemWithObjectName(root, QStringLiteral("skyOverlayLabel_Vega"));
+    QVERIFY(vegaLabel != nullptr);
+    auto* cardinalLabel = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("cardinalOverlayLabel_N")
+    );
+    QVERIFY(cardinalLabel != nullptr);
+
+    const QImage overlayImage = exposed.window()->grabWindow();
+    QVERIFY(!overlayImage.isNull());
+    QObject* theme = controller->theme();
+    QVERIFY(theme != nullptr);
+    QVERIFY2(
+        renderingScenePointIsColorNear(
+            *exposed.window(),
+            overlayImage,
+            selectionMarker->mapToScene(QPointF(
+                selectionMarker->width() * 0.5,
+                selectionMarker->height() * 0.5
+            )),
+            theme->property("selectionMarkerCenter").value<QColor>(),
+            12
+        ),
+        "Search selection marker center did not paint with the expected highlight color"
+    );
+    QVERIFY2(
+        renderingItemRegionContainsColorNear(
+            *exposed.window(),
+            overlayImage,
+            *selectionMarker,
+            theme->property("selectionMarkerBorder").value<QColor>(),
+            16
+        ),
+        "Search selection marker ring did not paint with the expected border color"
+    );
+    QVERIFY2(
+        renderingItemRegionContainsColorNear(
+            *exposed.window(),
+            overlayImage,
+            *inspectorItem,
+            theme->property("toolbarDropdownBackground").value<QColor>(),
+            4
+        ),
+        "Object inspector region did not paint its panel background"
+    );
+    QVERIFY2(
+        renderingItemRegionContainsColorNear(
+            *exposed.window(),
+            overlayImage,
+            *hoverLabel,
+            theme->property("overlayTooltipBorder").value<QColor>(),
+            24
+        ),
+        "Hover tooltip region did not paint its border"
+    );
+    QVERIFY2(
+        renderingItemRegionContainsColorNear(
+            *exposed.window(),
+            overlayImage,
+            *vegaLabel,
+            theme->property("overlayLabelText").value<QColor>(),
+            24
+        ),
+        "Sky overlay label region did not paint its label/border color"
+    );
+    QVERIFY2(
+        renderingItemRegionContainsColorNear(
+            *exposed.window(),
+            overlayImage,
+            *cardinalLabel,
+            theme->property("overlayLabelText").value<QColor>(),
+            24
+        ),
+        "Cardinal overlay label region did not paint its label/border color"
+    );
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -446,6 +716,27 @@ void QmlRenderingTests::skyViewportItemRendersNonBlankScene()
     std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     QVERIFY(nodeTreeSize(paintNode.get()) > 3);
+    const SkyViewGeometryProbe sceneProbe = geometryProbe(paintNode.get());
+    QVERIFY2(
+        geometryProbeIntersectsViewport(sceneProbe, viewport.size()),
+        qPrintable(QStringLiteral("Viewport geometry bounds [%1,%2 %3x%4] missed %5x%6")
+            .arg(sceneProbe.bounds.x())
+            .arg(sceneProbe.bounds.y())
+            .arg(sceneProbe.bounds.width())
+            .arg(sceneProbe.bounds.height())
+            .arg(viewport.width())
+            .arg(viewport.height()))
+    );
+    QString failure;
+    QVERIFY2(
+        renderingHasVisibleGeometryWithColor(
+            paintNode.get(),
+            controller->renderTheme().gridAzimuthLine,
+            viewport.size(),
+            &failure
+        ),
+        qPrintable(failure)
+    );
 }
 
 void QmlRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndFrameChanges()
@@ -473,6 +764,7 @@ void QmlRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndFrameChan
     const int populatedVertexCount = geometryVertexCount(paintNode.get());
     QVERIFY(populatedNodeCount > 3);
     QVERIFY(populatedVertexCount > 0);
+    QVERIFY(geometryProbeIntersectsViewport(geometryProbe(paintNode.get()), viewport.size()));
 
     viewport.setWidth(320.0);
     viewport.setHeight(240.0);
@@ -482,6 +774,7 @@ void QmlRenderingTests::skyViewportItemHandlesModelLifecycleGeometryAndFrameChan
     paintNode.reset(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     QVERIFY(geometryVertexCount(paintNode.get()) > 0);
+    QVERIFY(geometryProbeIntersectsViewport(geometryProbe(paintNode.get()), viewport.size()));
 
     QObject* overlayLayers = controller->overlayLayers();
     QVERIFY(overlayLayers != nullptr);
@@ -580,6 +873,14 @@ void QmlRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry()
     std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     const int baselineVertexCount = geometryVertexCount(paintNode.get());
+    const QList<QColor> expectedColors = renderingExpectedGeometryColors(
+        controller->renderTheme(),
+        propertyName
+    );
+    QVERIFY(!expectedColors.isEmpty());
+    for (const QColor& color : expectedColors) {
+        QCOMPARE(geometryMaterialColorProbe(paintNode.get(), color).vertexCount, 0);
+    }
 
     const QByteArray layerPropertyName = propertyName.toUtf8();
     QVERIFY(overlayLayers->setProperty(layerPropertyName.constData(), true));
@@ -594,6 +895,18 @@ void QmlRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry()
         enabledVertexCount > baselineVertexCount,
         qPrintable(QString("%1 did not add scene-graph geometry").arg(propertyName))
     );
+    for (const QColor& color : expectedColors) {
+        QString failure;
+        QVERIFY2(
+            renderingHasVisibleGeometryWithColor(
+                paintNode.get(),
+                color,
+                viewport.size(),
+                &failure
+            ),
+            qPrintable(QStringLiteral("%1: %2").arg(propertyName, failure))
+        );
+    }
 }
 
 void QmlRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry_data()
@@ -671,6 +984,14 @@ void QmlRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry()
     const int baselineVertexCount = geometryVertexCount(paintNode.get());
     const int baselineNodeCount = nodeTreeSize(paintNode.get());
     const int baselineOverlayItemCount = sceneModel->overlayItems().size();
+    const QList<QColor> expectedColors = renderingExpectedGeometryColors(
+        controller->renderTheme(),
+        propertyName
+    );
+    QVERIFY(!expectedColors.isEmpty());
+    for (const QColor& color : expectedColors) {
+        QCOMPARE(geometryMaterialColorProbe(paintNode.get(), color).vertexCount, 0);
+    }
 
     const QByteArray layerPropertyName = propertyName.toUtf8();
     QVERIFY(overlayLayers->setProperty(layerPropertyName.constData(), true));
@@ -686,6 +1007,18 @@ void QmlRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry()
     );
     QVERIFY(nodeTreeSize(paintNode.get()) >= baselineNodeCount);
     QVERIFY(sceneModel->overlayItems().size() > baselineOverlayItemCount);
+    for (const QColor& color : expectedColors) {
+        QString failure;
+        QVERIFY2(
+            renderingHasVisibleGeometryWithColor(
+                paintNode.get(),
+                color,
+                viewport.size(),
+                &failure
+            ),
+            qPrintable(QStringLiteral("%1: %2").arg(propertyName, failure))
+        );
+    }
 
     bool hasReferenceLabel = false;
     for (const QVariant& item : sceneModel->overlayItems()) {
@@ -732,6 +1065,64 @@ void QmlRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControlsInBounds(
             }
         }
         QVERIFY2(itemsFit, qPrintable(failure));
+
+        const QImage windowImage = rootWindow->grabWindow();
+        QVERIFY(!windowImage.isNull());
+        QObject* theme = controller->theme();
+        QVERIFY(theme != nullptr);
+        auto* footer = firstQuickItemWithObjectName(rootWindow, QStringLiteral("statusFooter"));
+        QVERIFY(footer != nullptr);
+        QCOMPARE(footer->height(), 48.0);
+        QVERIFY2(
+            renderingScenePointIsColorNear(
+                *rootWindow,
+                windowImage,
+                footer->mapToScene(QPointF(4.0, footer->height() * 0.5)),
+                theme->property("footerBackground").value<QColor>(),
+                4
+            ),
+            "Status footer did not paint the expected background at a stable empty edge"
+        );
+
+        for (const QString& objectName : {
+            QStringLiteral("searchToolbarToggle"),
+            QStringLiteral("timelineToolbarToggle"),
+        }) {
+            auto* toggle = firstQuickItemWithObjectName(rootWindow, objectName);
+            QVERIFY(toggle != nullptr);
+            QVERIFY2(
+                renderingItemRegionContainsColorNear(
+                    *rootWindow,
+                    windowImage,
+                    *toggle,
+                    theme->property("toolbarToggleBorder").value<QColor>(),
+                    24
+                ),
+                qPrintable(QStringLiteral("%1 did not paint its toggle border").arg(objectName))
+            );
+        }
+
+        auto* searchToggle = firstQuickItemWithObjectName(
+            rootWindow,
+            QStringLiteral("searchToolbarToggle")
+        );
+        auto* timelineToggle = firstQuickItemWithObjectName(
+            rootWindow,
+            QStringLiteral("timelineToolbarToggle")
+        );
+        auto* viewport = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyViewport"));
+        QVERIFY(searchToggle != nullptr);
+        QVERIFY(timelineToggle != nullptr);
+        QVERIFY(viewport != nullptr);
+        QVERIFY(renderingQuickItemSceneRect(*searchToggle).intersects(
+            renderingQuickItemSceneRect(*viewport)
+        ));
+        QVERIFY(renderingQuickItemSceneRect(*timelineToggle).intersects(
+            renderingQuickItemSceneRect(*viewport)
+        ));
+        QVERIFY(!renderingQuickItemSceneRect(*searchToggle).intersects(
+            renderingQuickItemSceneRect(*timelineToggle)
+        ));
     }
 
     QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("aboutMenuItem"));
