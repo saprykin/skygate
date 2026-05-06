@@ -485,24 +485,30 @@ void SkySceneModel::rebuildSceneFrame()
         return;
     }
 
-    m_sceneFrame.frame = *frameResult->frame;
-    if (trailTargetBodyIndex.has_value()) {
-        m_objectTrailBuilder.appendTrail(
-            m_sceneFrame.frame,
-            SkyObjectTrailInput {
-                .ephemerisEngine = input->frameInput.ephemerisEngine,
-                .preparedProjection = frameResult->preparedProjection,
-                .skyContext = input->frameInput.skyContext,
-                .renderTheme = input->frameInput.renderTheme,
-                .targetBodyIndex = *trailTargetBodyIndex,
-                .viewportWidth = m_viewportWidth,
-                .viewportHeight = m_viewportHeight
-            }
-        );
-    }
+    const bool frameContentChanged = frameResult->updated
+        || !m_sceneCompositionKey.has_value()
+        || m_sceneCompositionKey->renderFrameGeneration != compositionKey.renderFrameGeneration
+        || m_sceneCompositionKey->trailTargetBodyIndex != compositionKey.trailTargetBodyIndex;
+    if (frameContentChanged) {
+        m_sceneFrame.frame = *frameResult->frame;
+        if (trailTargetBodyIndex.has_value()) {
+            m_objectTrailBuilder.appendTrail(
+                m_sceneFrame.frame,
+                SkyObjectTrailInput {
+                    .ephemerisEngine = input->frameInput.ephemerisEngine,
+                    .preparedProjection = frameResult->preparedProjection,
+                    .skyContext = input->frameInput.skyContext,
+                    .renderTheme = input->frameInput.renderTheme,
+                    .targetBodyIndex = *trailTargetBodyIndex,
+                    .viewportWidth = m_viewportWidth,
+                    .viewportHeight = m_viewportHeight
+                }
+            );
+        }
 
-    m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
-    m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, *input);
+        m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
+        m_sceneFrame.overlayItems = buildOverlayItems(m_sceneFrame, *input);
+    }
     m_sceneFrame.selectionMarker =
         m_selectionOverlayBuilder.buildSelectionMarker(selectionInput);
     m_sceneFrame.selectedObjectInspector =
