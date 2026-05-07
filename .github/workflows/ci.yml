@@ -80,3 +80,59 @@ jobs:
       - name: Print compiler cache stats
         if: always()
         run: ccache --show-stats
+
+  windows-core:
+    name: Windows core build and tests
+    runs-on: windows-2022
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: desktop
+          arch: win64_msvc2022_64
+          archives: qtbase
+          cache: true
+
+      - name: Configure vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot -and (Test-Path "C:\vcpkg")) {
+            $vcpkgRoot = "C:\vcpkg"
+          }
+          if (-not $vcpkgRoot) {
+            throw "Could not find vcpkg on the Windows runner."
+          }
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Configure
+        run: >
+          cmake --preset core-debug-windows-vcpkg
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+
+      - name: Build
+        run: cmake --build --preset core-debug-windows-vcpkg --parallel
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $vcpkgDebugBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\debug\bin"
+          $vcpkgReleaseBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\bin"
+          $env:PATH = "$vcpkgDebugBin;$vcpkgReleaseBin;$env:PATH"
+          ctest --test-dir build-ninja/core-debug-windows-vcpkg --parallel 2 -LE slow --output-on-failure --no-tests=error
