@@ -129,3 +129,71 @@ jobs:
               --title "${{ steps.package.outputs.release_title }}" \
               --generate-notes
           fi
+
+  macos-dmg:
+    name: macOS DMG
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: desktop
+          archives: qtbase qtdeclarative qtpositioning
+          cache: true
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Resolve package metadata
+        id: package
+        run: |
+          short_sha="${GITHUB_SHA::12}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            artifact_name="SkyGate-macOS-DMG-${GITHUB_REF_NAME}"
+            release_title="SkyGate ${GITHUB_REF_NAME}"
+          else
+            artifact_name="SkyGate-macOS-DMG-latest-${short_sha}"
+            release_title=""
+          fi
+
+          echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_title=${release_title}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build-macos-dmg
+          -DCMAKE_BUILD_TYPE=Release
+          -DSKYGATE_BUILD_UI=ON
+          -DSKYGATE_BUILD_TESTS=OFF
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+
+      - name: Build DMG
+        run: cmake --build build-macos-dmg --target package-skygate-ui-dmg --parallel
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: build-macos-dmg/apps/skygate-ui/*.dmg
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" build-macos-dmg/apps/skygate-ui/*.dmg --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" build-macos-dmg/apps/skygate-ui/*.dmg \
+              --title "${{ steps.package.outputs.release_title }}" \
+              --generate-notes
+          fi

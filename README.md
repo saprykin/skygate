@@ -278,8 +278,9 @@ The script configures a release UI build, installs it into an AppDir, downloads
 AppImage under `dist/`. It expects CMake, Ninja, curl, zlib development files,
 standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop install.
 The manual `Package` GitHub Actions workflow builds the same AppImage as a
-downloadable artifact. Pushes to `master` produce `latest-<sha>` artifacts, and
-`v*` tags publish versioned AppImages to GitHub Releases.
+downloadable artifact alongside the macOS DMG. Pushes to `master` produce
+`latest-<sha>` artifacts, and `v*` tags publish versioned AppImages and DMGs to
+GitHub Releases.
 
 On macOS with vcpkg-managed zlib:
 
