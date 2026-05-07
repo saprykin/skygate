@@ -139,9 +139,9 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
     QVERIFY(aboutItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(renderingTriggerMenuItem(aboutItem));
-    auto* aboutWindow = qobject_cast<QQuickWindow*>(renderingObjectWithWindowTitle(
+    auto* aboutWindow = qobject_cast<QQuickWindow*>(renderingWindowWithObjectName(
         rootWindow,
-        QStringLiteral("About SkyGate")
+        QStringLiteral("aboutWindow")
     ));
     QVERIFY(aboutWindow != nullptr);
     QTRY_VERIFY(aboutWindow->isVisible());
@@ -156,9 +156,9 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(renderingTriggerMenuItem(preferencesItem));
-    auto* preferencesWindow = qobject_cast<QQuickWindow*>(renderingObjectWithWindowTitle(
+    auto* preferencesWindow = qobject_cast<QQuickWindow*>(renderingWindowWithObjectName(
         rootWindow,
-        QStringLiteral("Preferences")
+        QStringLiteral("preferencesWindow")
     ));
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->isVisible());

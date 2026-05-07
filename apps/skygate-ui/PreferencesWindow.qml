@@ -17,7 +17,7 @@ Window {
     required property var skyContextController
     property Window transientParentWindow
     transientParent: transientParentWindow
-    flags: Qt.Dialog
+    flags: Qt.Dialog | Qt.FramelessWindowHint
     modality: Qt.WindowModal
 
     property color cardBackground: skyContext.theme.cardBackground
@@ -128,6 +128,12 @@ Window {
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 64
+
+                DragHandler {
+                    target: null
+                    acceptedButtons: Qt.LeftButton
+                    onActiveChanged: if (active) preferencesWindow.startSystemMove()
+                }
 
                 ColumnLayout {
                     anchors.fill: parent

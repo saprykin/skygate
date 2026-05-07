@@ -16,10 +16,10 @@ using namespace skygate::ui::tests;
 
 namespace {
 
-QObject* renderingObjectWithWindowTitle(QObject* root, const QString& title)
+QObject* renderingWindowWithObjectName(QObject* root, const QString& objectName)
 {
     for (QObject* object : objectTree(root)) {
-        if (qobject_cast<QWindow*>(object) != nullptr && object->property("title") == title) {
+        if (qobject_cast<QWindow*>(object) != nullptr && object->objectName() == objectName) {
             return object;
         }
     }

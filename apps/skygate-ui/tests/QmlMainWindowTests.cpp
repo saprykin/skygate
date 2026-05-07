@@ -20,10 +20,10 @@ private:
 
 namespace {
 
-QObject* objectWithWindowTitle(QObject* root, const QString& title)
+QObject* windowWithObjectName(QObject* root, const QString& objectName)
 {
     for (QObject* object : objectTree(root)) {
-        if (qobject_cast<QWindow*>(object) != nullptr && object->property("title") == title) {
+        if (qobject_cast<QWindow*>(object) != nullptr && object->objectName() == objectName) {
             return object;
         }
     }
@@ -187,7 +187,7 @@ void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
     QVERIFY(aboutItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(triggerMenuItem(aboutItem));
-    QObject* aboutWindow = objectWithWindowTitle(rootWindow, QStringLiteral("About SkyGate"));
+    QObject* aboutWindow = windowWithObjectName(rootWindow, QStringLiteral("aboutWindow"));
     QVERIFY(aboutWindow != nullptr);
     QTRY_VERIFY(aboutWindow->property("visible").toBool());
 
@@ -198,7 +198,10 @@ void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(triggerMenuItem(preferencesItem));
-    QObject* preferencesWindow = objectWithWindowTitle(rootWindow, QStringLiteral("Preferences"));
+    QObject* preferencesWindow = windowWithObjectName(
+        rootWindow,
+        QStringLiteral("preferencesWindow")
+    );
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
     auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
@@ -247,7 +250,10 @@ void QmlMainWindowTests::compactAppMenuOpensAboutAndPreferencesWindows()
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(activateControl(preferencesItem));
     QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
-    QObject* preferencesWindow = objectWithWindowTitle(rootWindow, QStringLiteral("Preferences"));
+    QObject* preferencesWindow = windowWithObjectName(
+        rootWindow,
+        QStringLiteral("preferencesWindow")
+    );
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
 
@@ -260,7 +266,7 @@ void QmlMainWindowTests::compactAppMenuOpensAboutAndPreferencesWindows()
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(activateControl(aboutItem));
     QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
-    QObject* aboutWindow = objectWithWindowTitle(rootWindow, QStringLiteral("About SkyGate"));
+    QObject* aboutWindow = windowWithObjectName(rootWindow, QStringLiteral("aboutWindow"));
     QVERIFY(aboutWindow != nullptr);
     QTRY_VERIFY(aboutWindow->property("visible").toBool());
 
@@ -296,7 +302,10 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(triggerMenuItem(preferencesItem));
-    QObject* preferencesWindow = objectWithWindowTitle(rootWindow, QStringLiteral("Preferences"));
+    QObject* preferencesWindow = windowWithObjectName(
+        rootWindow,
+        QStringLiteral("preferencesWindow")
+    );
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
     auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
