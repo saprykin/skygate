@@ -147,12 +147,19 @@ jobs:
     name: Windows
     runs-on: windows-2022
     timeout-minutes: 35
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}\.sccache
+      SCCACHE_CACHE_SIZE: 500M
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
           lfs: true
+
+      - name: Install system dependencies
+        shell: pwsh
+        run: choco install sccache --yes --no-progress
 
       - name: Set up MSVC
         uses: TheMrMilchmann/setup-msvc-dev@v4
@@ -180,6 +187,19 @@ jobs:
           }
           "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
 
+      - name: Prepare compiler cache
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force $env:SCCACHE_DIR
+
+      - name: Restore compiler cache
+        uses: actions/cache@v5
+        with:
+          path: .sccache
+          key: windows-core-sccache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            windows-core-sccache-${{ github.ref_name }}-
+            windows-core-sccache-
+
       - name: Verify test fixtures
         run: git lfs fsck
 
@@ -187,6 +207,7 @@ jobs:
         run: >
           cmake --preset core-debug-windows-vcpkg
           -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
         run: cmake --build --preset core-debug-windows-vcpkg --parallel
@@ -198,3 +219,7 @@ jobs:
           $vcpkgReleaseBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\bin"
           $env:PATH = "$vcpkgDebugBin;$vcpkgReleaseBin;$env:PATH"
           ctest --test-dir build-ninja/core-debug-windows-vcpkg --parallel 2 -LE slow --output-on-failure --no-tests=error
+
+      - name: Print compiler cache stats
+        if: always()
+        run: sccache --show-stats
