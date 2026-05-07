@@ -41,6 +41,8 @@ git push origin vX.Y.Z
   - `SkyGate-*-Darwin-*.dmg`
   - `SkyGate-*-Windows-*.msi`
   - `SkyGate-*-Windows-*.zip`
+- Manual package workflow artifacts are retained for 30 days. Tagged release
+  assets attached to GitHub Releases are retained permanently unless removed.
 
 ## Release Notes
 

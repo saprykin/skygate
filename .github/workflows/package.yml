@@ -186,6 +186,7 @@ jobs:
           name: ${{ steps.package.outputs.artifact_name }}
           path: dist/*.AppImage
           if-no-files-found: error
+          retention-days: 30
 
       - name: Publish GitHub Release
         if: github.ref_type == 'tag'
@@ -309,6 +310,7 @@ jobs:
           name: ${{ steps.package.outputs.artifact_name }}
           path: build-macos-dmg/apps/skygate-ui/*.dmg
           if-no-files-found: error
+          retention-days: 30
 
       - name: Publish GitHub Release
         if: github.ref_type == 'tag'
@@ -449,6 +451,7 @@ jobs:
             build-ninja/ui-release-windows-vcpkg/*.msi
             build-ninja/ui-release-windows-vcpkg/*.zip
           if-no-files-found: error
+          retention-days: 30
 
       - name: Publish GitHub Release
         if: github.ref_type == 'tag'
