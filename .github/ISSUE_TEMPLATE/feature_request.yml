@@ -1,0 +1,55 @@
+name: Feature Request
+description: Suggest an improvement or new SkyGate capability.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping shape SkyGate. Describe the user need first, then the implementation idea if you have one.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What user need or workflow would this improve?
+      placeholder: I want to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: What should SkyGate do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Other ways to solve this, if any.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Sky view and interaction
+        - Catalogs and import
+        - Ephemeris and calculations
+        - Preferences and settings
+        - Packaging and release
+        - Tests and developer workflow
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Mockups, screenshots, references, or constraints.

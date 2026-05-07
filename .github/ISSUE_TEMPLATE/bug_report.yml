@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a reproducible SkyGate problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a SkyGate issue. Clear reproduction steps help us fix it faster.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: SkyGate crashes when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the exact steps that trigger the problem.
+      placeholder: |
+        1. Open SkyGate
+        2. Set location to...
+        3. Click...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What happened instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: SkyGate Version
+      description: Use the About window or run `SkyGate --version` if available.
+      placeholder: 1.0.0
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Screenshots
+      description: Attach logs, screenshots, or a short screen recording if useful.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Catalogs, settings, display scale, hardware, or anything else that seems relevant.
