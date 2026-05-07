@@ -4,6 +4,7 @@
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/core/math/SphericalGeometry.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <unordered_map>
