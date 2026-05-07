@@ -1,0 +1,221 @@
+name: Package Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-metadata:
+    name: Release Metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+      tag_version: ${{ steps.version.outputs.tag_version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate release tag version
+        id: version
+        run: |
+          app_version="$(sed -nE 's/^set\(SKYGATE_APP_VERSION "([^"]+)".*/\1/p' CMakeLists.txt)"
+          if [[ -z "${app_version}" ]]; then
+            echo "Could not resolve SKYGATE_APP_VERSION from CMakeLists.txt." >&2
+            exit 1
+          fi
+
+          tag_version=""
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+              echo "Release tags must use vX.Y.Z format: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "${tag_version}" != "${app_version}" ]]; then
+              echo "Release tag ${GITHUB_REF_NAME} does not match SKYGATE_APP_VERSION ${app_version}." >&2
+              exit 1
+            fi
+          fi
+
+          echo "app_version=${app_version}" >> "${GITHUB_OUTPUT}"
+          echo "tag_version=${tag_version}" >> "${GITHUB_OUTPUT}"
+
+  windows-installer:
+    name: Windows Installer
+    runs-on: windows-2022
+    timeout-minutes: 45
+    needs: release-metadata
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Set up MSVC
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: choco install wixtoolset --yes --no-progress
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          target: desktop
+          arch: win64_msvc2022_64
+          archives: qtbase qtdeclarative qtpositioning
+          cache: true
+
+      - name: Configure vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot -and (Test-Path "C:\vcpkg")) {
+            $vcpkgRoot = "C:\vcpkg"
+          }
+          if (-not $vcpkgRoot) {
+            throw "Could not find vcpkg on the Windows runner."
+          }
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Resolve package metadata
+        id: package
+        shell: pwsh
+        run: |
+          $shortSha = $env:GITHUB_SHA.Substring(0, 12)
+          $architecture = "x86_64"
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $artifactName = "SkyGate-Windows-$architecture-Installer-$env:GITHUB_REF_NAME"
+            $releaseTitle = "SkyGate $env:GITHUB_REF_NAME"
+          } else {
+            $artifactName = "SkyGate-Windows-$architecture-Installer-latest-$shortSha"
+            $releaseTitle = ""
+          }
+
+          "architecture=$architecture" >> $env:GITHUB_OUTPUT
+          "artifact_name=$artifactName" >> $env:GITHUB_OUTPUT
+          "release_title=$releaseTitle" >> $env:GITHUB_OUTPUT
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake --preset ui-release-windows-vcpkg
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DSKYGATE_PACKAGE_ARCHITECTURE="${{ steps.package.outputs.architecture }}"
+
+      - name: Build installer packages
+        run: cmake --build --preset ui-package-windows-vcpkg --parallel
+
+      - name: Smoke test installer packages
+        shell: pwsh
+        run: |
+          $packageDir = "build-ninja/ui-release-windows-vcpkg"
+          $msiPackages = @(Get-ChildItem -Path $packageDir -Filter *.msi)
+          if ($msiPackages.Count -ne 1) {
+            throw "Expected exactly one MSI, found $($msiPackages.Count)."
+          }
+
+          $msiPackage = $msiPackages[0]
+          if ($msiPackage.Name -notlike "*Windows-${{ steps.package.outputs.architecture }}*") {
+            throw "Package name does not include platform architecture: $($msiPackage.Name)"
+          }
+          if ($msiPackage.Length -le 0) {
+            throw "Package is empty: $($msiPackage.FullName)"
+          }
+
+          $extractDir = Join-Path $env:RUNNER_TEMP "skygate-windows-package"
+          $msiLog = Join-Path $env:RUNNER_TEMP "skygate-windows-package-extract.log"
+          Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+          Remove-Item -Force $msiLog -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $extractDir | Out-Null
+          $msiExtract = Start-Process -FilePath msiexec.exe `
+            -ArgumentList @(
+              "/a",
+              "$($msiPackage.FullName)",
+              "/qn",
+              "/norestart",
+              "TARGETDIR=$extractDir",
+              "/L*v",
+              "$msiLog"
+            ) `
+            -Wait `
+            -PassThru
+          if ($msiExtract.ExitCode -ne 0) {
+            if (Test-Path $msiLog) {
+              Get-Content $msiLog
+            }
+            throw "MSI administrative extraction failed with exit code $($msiExtract.ExitCode)."
+          }
+
+          $executable = Get-ChildItem -Path $extractDir -Recurse -Filter skygate-ui.exe | Select-Object -First 1
+          if (-not $executable) {
+            throw "MSI package does not contain skygate-ui.exe."
+          }
+          $qtCore = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Core.dll | Select-Object -First 1
+          if (-not $qtCore) {
+            throw "MSI package does not contain Qt6Core.dll."
+          }
+          $qtQuick = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Quick.dll | Select-Object -First 1
+          if (-not $qtQuick) {
+            throw "MSI package does not contain Qt6Quick.dll."
+          }
+          $zlib = Get-ChildItem -Path $extractDir -Recurse -File |
+            Where-Object { $_.Name -in @("z.dll", "zlib1.dll") } |
+            Select-Object -First 1
+          if (-not $zlib) {
+            throw "MSI package does not contain a zlib runtime DLL."
+          }
+          $versionOutput = & $($executable.FullName) --version
+          Write-Output $versionOutput
+          if ($versionOutput -notmatch "SkyGate ${{ needs.release-metadata.outputs.app_version }}") {
+            throw "Unexpected packaged app version output: $versionOutput"
+          }
+
+      - name: Upload installer packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: build-ninja/ui-release-windows-vcpkg/*.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $packages = @(
+            Get-ChildItem -Path build-ninja/ui-release-windows-vcpkg -Filter *.msi
+          )
+          if (-not $packages) {
+            throw "No Windows packages were produced."
+          }
+
+          gh release view "$env:GITHUB_REF_NAME" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "$env:GITHUB_REF_NAME" @($packages.FullName) --clobber
+          } else {
+            gh release create "$env:GITHUB_REF_NAME" @($packages.FullName) `
+              --title "${{ steps.package.outputs.release_title }}" `
+              --generate-notes
+          }

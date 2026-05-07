@@ -1,0 +1,190 @@
+name: Package macOS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-metadata:
+    name: Release Metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+      tag_version: ${{ steps.version.outputs.tag_version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate release tag version
+        id: version
+        run: |
+          app_version="$(sed -nE 's/^set\(SKYGATE_APP_VERSION "([^"]+)".*/\1/p' CMakeLists.txt)"
+          if [[ -z "${app_version}" ]]; then
+            echo "Could not resolve SKYGATE_APP_VERSION from CMakeLists.txt." >&2
+            exit 1
+          fi
+
+          tag_version=""
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+              echo "Release tags must use vX.Y.Z format: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "${tag_version}" != "${app_version}" ]]; then
+              echo "Release tag ${GITHUB_REF_NAME} does not match SKYGATE_APP_VERSION ${app_version}." >&2
+              exit 1
+            fi
+          fi
+
+          echo "app_version=${app_version}" >> "${GITHUB_OUTPUT}"
+          echo "tag_version=${tag_version}" >> "${GITHUB_OUTPUT}"
+
+  macos-dmg:
+    name: macOS DMG
+    runs-on: macos-15
+    timeout-minutes: 45
+    needs: release-metadata
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.0'
+          target: desktop
+          archives: qtbase qtdeclarative qtpositioning
+          cache: true
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Resolve package metadata
+        id: package
+        run: |
+          short_sha="${GITHUB_SHA::12}"
+          architecture="$(uname -m)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            artifact_name="SkyGate-macOS-${architecture}-DMG-${GITHUB_REF_NAME}"
+            release_title="SkyGate ${GITHUB_REF_NAME}"
+          else
+            artifact_name="SkyGate-macOS-${architecture}-DMG-latest-${short_sha}"
+            release_title=""
+          fi
+
+          echo "architecture=${architecture}" >> "${GITHUB_OUTPUT}"
+          echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_title=${release_title}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build-macos-dmg
+          -DCMAKE_BUILD_TYPE=Release
+          -DSKYGATE_BUILD_UI=ON
+          -DSKYGATE_BUILD_TESTS=OFF
+          -DSKYGATE_PACKAGE_ARCHITECTURE="${{ steps.package.outputs.architecture }}"
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+
+      - name: Build DMG
+        run: cmake --build build-macos-dmg --target package-skygate-ui-dmg --parallel
+
+      - name: Smoke test DMG
+        run: |
+          dmg_count="$(find build-macos-dmg/apps/skygate-ui -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')"
+          if [[ "${dmg_count}" != "1" ]]; then
+            echo "Expected exactly one DMG, found ${dmg_count}" >&2
+            find build-macos-dmg/apps/skygate-ui -maxdepth 1 -type f -name '*.dmg' -print
+            exit 1
+          fi
+
+          dmg="$(find build-macos-dmg/apps/skygate-ui -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          [[ "${dmg}" == *"Darwin-${{ steps.package.outputs.architecture }}"*.dmg ]]
+
+          mount_dir="$(mktemp -d)"
+          mount_device=""
+          cleanup() {
+            detach_target="${mount_device:-${mount_dir}}"
+            for attempt in 1 2 3; do
+              hdiutil detach "${detach_target}" -quiet && break
+              hdiutil detach "${detach_target}" -quiet -force && break
+              sleep 1
+            done
+
+            if mount | grep -F " on ${mount_dir} " >/dev/null; then
+              echo "DMG remained mounted at ${mount_dir}; leaving mount directory in place." >&2
+            else
+              rm -rf "${mount_dir}"
+            fi
+          }
+          trap cleanup EXIT
+
+          attach_output="$(hdiutil attach "${dmg}" -nobrowse -readonly -mountpoint "${mount_dir}")"
+          echo "${attach_output}"
+          mount_device="$(awk -v mount_dir="${mount_dir}" '$NF == mount_dir { print $1; exit }' <<< "${attach_output}")"
+          app="${mount_dir}/SkyGate.app"
+          executable="${app}/Contents/MacOS/SkyGate"
+          test -d "${app}"
+          test -x "${executable}"
+          test -f "${app}/Contents/Info.plist"
+          test -f "${app}/Contents/Resources/Skygate.icns"
+          test -d "${app}/Contents/Frameworks/QtCore.framework"
+          lipo -info "${executable}" | grep -q "${{ steps.package.outputs.architecture }}"
+          otool -L "${executable}" | grep -q '@rpath/QtCore.framework'
+          version_output="$("${executable}" --version)"
+          echo "${version_output}"
+          grep -q "SkyGate ${{ needs.release-metadata.outputs.app_version }}" <<< "${version_output}"
+
+      - name: Inspect packaged app
+        run: |
+          app="build-macos-dmg/apps/skygate-ui/SkyGate-dmg/SkyGate.app"
+          executable="${app}/Contents/MacOS/SkyGate"
+          if [[ ! -x "${executable}" ]]; then
+            echo "Missing packaged executable: ${executable}" >&2
+            exit 1
+          fi
+
+          file "${executable}"
+          lipo -info "${executable}"
+          otool -L "${executable}"
+          find "${app}/Contents/Frameworks" -maxdepth 3 -type f -print | while IFS= read -r file_path; do
+            if [[ -x "${file_path}" ]]; then
+              file "${file_path}"
+            fi
+          done
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: build-macos-dmg/apps/skygate-ui/*.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" build-macos-dmg/apps/skygate-ui/*.dmg --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" build-macos-dmg/apps/skygate-ui/*.dmg \
+              --title "${{ steps.package.outputs.release_title }}" \
+              --generate-notes
+          fi

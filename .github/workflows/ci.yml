@@ -81,68 +81,6 @@ jobs:
         if: always()
         run: ccache --show-stats
 
-  macos-core:
-    name: macOS
-    runs-on: macos-15
-    timeout-minutes: 35
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 500M
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          lfs: true
-
-      - name: Install system dependencies
-        run: brew install ccache
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.0'
-          target: desktop
-          archives: qtbase
-          cache: true
-
-      - name: Prepare compiler cache
-        run: mkdir -p "$CCACHE_DIR"
-
-      - name: Restore compiler cache
-        uses: actions/cache@v5
-        with:
-          path: .ccache
-          key: macos-core-ccache-${{ github.ref_name }}-${{ github.sha }}
-          restore-keys: |
-            macos-core-ccache-${{ github.ref_name }}-
-            macos-core-ccache-
-
-      - name: Verify test fixtures
-        run: git lfs fsck
-
-      - name: Configure
-        run: >
-          cmake --preset core-debug
-          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
-          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-          -DSKYGATE_BUILD_TESTS=ON
-
-      - name: Build
-        run: cmake --build --preset core-debug --parallel
-
-      - name: Test
-        run: >
-          ctest --test-dir build-make/core-debug
-          --parallel 2
-          -LE slow
-          --output-on-failure
-          --no-tests=error
-
-      - name: Print compiler cache stats
-        if: always()
-        run: ccache --show-stats
-
   windows-core:
     name: Windows
     runs-on: windows-2022

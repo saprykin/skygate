@@ -1,0 +1,202 @@
+name: Package Linux
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-metadata:
+    name: Release Metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+      tag_version: ${{ steps.version.outputs.tag_version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate release tag version
+        id: version
+        run: |
+          app_version="$(sed -nE 's/^set\(SKYGATE_APP_VERSION "([^"]+)".*/\1/p' CMakeLists.txt)"
+          if [[ -z "${app_version}" ]]; then
+            echo "Could not resolve SKYGATE_APP_VERSION from CMakeLists.txt." >&2
+            exit 1
+          fi
+
+          tag_version=""
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+              echo "Release tags must use vX.Y.Z format: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "${tag_version}" != "${app_version}" ]]; then
+              echo "Release tag ${GITHUB_REF_NAME} does not match SKYGATE_APP_VERSION ${app_version}." >&2
+              exit 1
+            fi
+          fi
+
+          echo "app_version=${app_version}" >> "${GITHUB_OUTPUT}"
+          echo "tag_version=${tag_version}" >> "${GITHUB_OUTPUT}"
+
+  linux-appimage:
+    name: Linux AppImage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    needs: release-metadata
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            cmake \
+            curl \
+            file \
+            git \
+            libdbus-1-dev \
+            libegl1-mesa-dev \
+            libfontconfig1 \
+            libfreetype6 \
+            libgl-dev \
+            libgl1 \
+            libglib2.0-0 \
+            libglx-dev \
+            libice6 \
+            libopengl-dev \
+            libsm6 \
+            libx11-xcb1 \
+            libxau6 \
+            libxcb-cursor0 \
+            libxcb-glx0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-shm0 \
+            libxcb-sync1 \
+            libxcb-xfixes0 \
+            libxcb-xinerama0 \
+            libxcb1 \
+            libxcursor1 \
+            libxdmcp6 \
+            libxext6 \
+            libxfixes3 \
+            libxi6 \
+            libxinerama1 \
+            libxkbcommon-x11-0 \
+            libxkbcommon0 \
+            libxrandr2 \
+            libxrender1 \
+            mesa-common-dev \
+            ninja-build \
+            zlib1g-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.0'
+          target: desktop
+          archives: icu qtbase qtdeclarative
+          cache: true
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Resolve package metadata
+        id: package
+        run: |
+          short_sha="${GITHUB_SHA::12}"
+          architecture="$(uname -m)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME}"
+            artifact_name="SkyGate-Linux-${architecture}-AppImage-${GITHUB_REF_NAME}"
+            release_title="SkyGate ${GITHUB_REF_NAME}"
+          else
+            version="latest-${short_sha}"
+            artifact_name="SkyGate-Linux-${architecture}-AppImage-latest-${short_sha}"
+            release_title=""
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_title=${release_title}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build AppImage
+        env:
+          SKYGATE_APPIMAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: ./packaging/linux/build-appimage.sh
+
+      - name: Smoke test AppImage
+        run: |
+          mapfile -t appimages < <(find dist -maxdepth 1 -type f -name '*.AppImage' -print)
+          if [[ "${#appimages[@]}" -ne 1 ]]; then
+            printf 'Expected exactly one AppImage, found %d\n' "${#appimages[@]}" >&2
+            printf '%s\n' "${appimages[@]}"
+            exit 1
+          fi
+
+          appimage="${appimages[0]}"
+          expected_architecture="$(uname -m)"
+          case "${expected_architecture}" in
+            x86_64)
+              expected_architecture="x86_64"
+              ;;
+            aarch64|arm64)
+              expected_architecture="aarch64"
+              ;;
+          esac
+
+          [[ "${appimage}" == *"Linux-${expected_architecture}.AppImage" ]]
+          test -x "${appimage}"
+          rm -rf squashfs-root
+          "${appimage}" --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+          test -f squashfs-root/*.desktop
+          test -x squashfs-root/usr/bin/skygate-ui
+          test -f squashfs-root/usr/share/icons/hicolor/512x512/apps/skygate.png
+          version_output="$(APPIMAGE_EXTRACT_AND_RUN=1 "${appimage}" --version)"
+          echo "${version_output}"
+          grep -q "SkyGate ${{ needs.release-metadata.outputs.app_version }}" <<< "${version_output}"
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/*.AppImage --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/*.AppImage \
+              --title "${{ steps.package.outputs.release_title }}" \
+              --generate-notes
+          fi
