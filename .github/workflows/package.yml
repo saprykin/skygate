@@ -14,10 +14,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-metadata:
+    name: Release Metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+      tag_version: ${{ steps.version.outputs.tag_version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate release tag version
+        id: version
+        run: |
+          app_version="$(sed -nE 's/^set\(SKYGATE_APP_VERSION "([^"]+)".*/\1/p' CMakeLists.txt)"
+          if [[ -z "${app_version}" ]]; then
+            echo "Could not resolve SKYGATE_APP_VERSION from CMakeLists.txt." >&2
+            exit 1
+          fi
+
+          tag_version=""
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+              echo "Release tags must use vX.Y.Z format: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "${tag_version}" != "${app_version}" ]]; then
+              echo "Release tag ${GITHUB_REF_NAME} does not match SKYGATE_APP_VERSION ${app_version}." >&2
+              exit 1
+            fi
+          fi
+
+          echo "app_version=${app_version}" >> "${GITHUB_OUTPUT}"
+          echo "tag_version=${tag_version}" >> "${GITHUB_OUTPUT}"
+
   linux-appimage:
     name: Linux AppImage
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    needs: release-metadata
 
     steps:
       - name: Check out repository
@@ -162,6 +201,7 @@ jobs:
     name: macOS DMG
     runs-on: macos-15
     timeout-minutes: 45
+    needs: release-metadata
 
     steps:
       - name: Check out repository
@@ -281,6 +321,7 @@ jobs:
     name: Windows Installer
     runs-on: windows-2022
     timeout-minutes: 45
+    needs: release-metadata
 
     steps:
       - name: Check out repository
