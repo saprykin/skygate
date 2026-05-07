@@ -35,6 +35,17 @@ option(SKYGATE_BUILD_UI "Build Qt UI application" ON)
 option(SKYGATE_BUILD_TESTS "Build tests" ON)
 option(SKYGATE_ENABLE_COVERAGE "Build tests with coverage instrumentation" OFF)
 
+set(SKYGATE_PACKAGE_ARCHITECTURE "" CACHE STRING "Architecture label used in package file names")
+if(SKYGATE_PACKAGE_ARCHITECTURE)
+    set(skygatePackageArchitecture "${SKYGATE_PACKAGE_ARCHITECTURE}")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+    set(skygatePackageArchitecture "arm64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    set(skygatePackageArchitecture "x86_64")
+else()
+    set(skygatePackageArchitecture "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
 skygate_enable_coverage()
 
 add_subdirectory(libs/skygate-core)
@@ -68,7 +79,7 @@ if(SKYGATE_BUILD_UI)
     set(CPACK_RESOURCE_FILE_LICENSE "${skygatePackageLicenseFile}")
     set(CPACK_PACKAGE_EXECUTABLES "skygate-ui" "SkyGate")
     set(CPACK_PACKAGE_FILE_NAME
-        "SkyGate-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}"
+        "SkyGate-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${skygatePackageArchitecture}"
     )
     if(WIN32)
         set(CPACK_GENERATOR "ZIP;WIX")

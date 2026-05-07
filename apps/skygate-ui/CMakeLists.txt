@@ -353,7 +353,7 @@ if(APPLE)
 
     if(skygateMacDeployQtExecutable)
         set(skygateDmgStagingDir "${CMAKE_CURRENT_BINARY_DIR}/SkyGate-dmg")
-        set(skygateDmgFileName "SkyGate-${PROJECT_VERSION}-${SKYGATE_GIT_HASH}.dmg")
+        set(skygateDmgFileName "SkyGate-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${skygatePackageArchitecture}-${SKYGATE_GIT_HASH}.dmg")
         set(skygateDmgPath "${CMAKE_CURRENT_BINARY_DIR}/${skygateDmgFileName}")
 
         add_custom_target(package-skygate-ui-dmg
