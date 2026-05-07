@@ -10,7 +10,8 @@ private slots:
     void init();
     void responsiveToolbarPolicyKeepsControlsSeparated();
     void topToolbarsStayAboveOverlay();
-    void menuActionsOpenAboutAndPreferencesWindows();
+    void nativeMenuActionsOpenSharedAboutAndPreferencesWindows();
+    void compactAppMenuOpensAboutAndPreferencesWindows();
     void mainWindowPreferenceSearchAndTrackingJourney();
 
 private:
@@ -103,6 +104,12 @@ void QmlMainWindowTests::responsiveToolbarPolicyKeepsControlsSeparated()
     QVERIFY(QMetaObject::invokeMethod(rootWindow, "prepareSearchToolbarExpand"));
     QVERIFY(!controller->timelineToolbarCollapsed());
 
+    controller->setSearchToolbarCollapsed(false);
+    controller->setTimelineToolbarCollapsed(false);
+    QCoreApplication::processEvents();
+    QVERIFY(QMetaObject::invokeMethod(rootWindow, "prepareTimelineToolbarExpand"));
+    QVERIFY(!controller->searchToolbarCollapsed());
+
     rootWindow->setWidth(520);
     rootWindow->setHeight(620);
     controller->setSearchToolbarCollapsed(false);
@@ -142,18 +149,21 @@ void QmlMainWindowTests::topToolbarsStayAboveOverlay()
         rootWindow,
         QStringLiteral("timelineToolbar")
     );
+    auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
     auto* overlayLayer = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyOverlayLayer"));
 
     QVERIFY(searchToolbar != nullptr);
     QVERIFY(timelineToolbar != nullptr);
+    QVERIFY(appMenuButton != nullptr);
     QVERIFY(overlayLayer != nullptr);
     QVERIFY(searchToolbar->z() > overlayLayer->z());
     QVERIFY(timelineToolbar->z() > overlayLayer->z());
+    QVERIFY(appMenuButton->z() > overlayLayer->z());
     QCOMPARE(timelineToolbar->z(), searchToolbar->z());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
-void QmlMainWindowTests::menuActionsOpenAboutAndPreferencesWindows()
+void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
 {
     auto controller = makeController();
     QVERIFY(controller != nullptr);
@@ -164,6 +174,14 @@ void QmlMainWindowTests::menuActionsOpenAboutAndPreferencesWindows()
     const QmlWarningScope warnings;
     auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
     QVERIFY(rootWindow != nullptr);
+
+    QObject* nativeMenuBar = firstObjectWithObjectName(rootWindow, QStringLiteral("nativeMenuBar"));
+    QVERIFY(nativeMenuBar != nullptr);
+#ifdef Q_OS_MACOS
+    QVERIFY(nativeMenuBar->property("visible").toBool());
+#else
+    QVERIFY(!nativeMenuBar->property("visible").toBool());
+#endif
 
     QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("aboutMenuItem"));
     QVERIFY(aboutItem != nullptr);
@@ -185,6 +203,66 @@ void QmlMainWindowTests::menuActionsOpenAboutAndPreferencesWindows()
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
     auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
     QVERIFY(preferencesQuickWindow != nullptr);
+
+    QStringList unexpectedWarnings = warnings.messages();
+    unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));
+    QVERIFY2(unexpectedWarnings.isEmpty(), qPrintable(unexpectedWarnings.join('\n')));
+}
+
+void QmlMainWindowTests::compactAppMenuOpensAboutAndPreferencesWindows()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+
+    auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
+    QVERIFY(appMenuButton != nullptr);
+    QVERIFY(appMenuButton->isVisible());
+
+    QObject* appMenuPopup = firstObjectWithObjectName(rootWindow, QStringLiteral("appMenuPopup"));
+    QVERIFY(appMenuPopup != nullptr);
+    QVERIFY(!appMenuPopup->property("opened").toBool());
+
+    QVERIFY(activateControl(appMenuButton));
+    QTRY_VERIFY(appMenuPopup->property("opened").toBool());
+
+    QVERIFY(activateControl(appMenuButton));
+    QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
+    QTest::qWait(160);
+
+    QVERIFY(activateControl(appMenuButton));
+    QTRY_VERIFY(appMenuPopup->property("opened").toBool());
+
+    QObject* preferencesItem = firstObjectWithObjectName(
+        rootWindow,
+        QStringLiteral("appMenuPreferencesItem")
+    );
+    QVERIFY(preferencesItem != nullptr);
+    QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
+    QVERIFY(activateControl(preferencesItem));
+    QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
+    QObject* preferencesWindow = objectWithWindowTitle(rootWindow, QStringLiteral("Preferences"));
+    QVERIFY(preferencesWindow != nullptr);
+    QTRY_VERIFY(preferencesWindow->property("visible").toBool());
+
+    QVERIFY(activateControl(appMenuButton));
+    QTRY_VERIFY(appMenuPopup->property("opened").toBool());
+
+    QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("appMenuAboutItem"));
+    QVERIFY(aboutItem != nullptr);
+    QCOMPARE(aboutItem->property("text").toString(), QString("About"));
+    QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
+    QVERIFY(activateControl(aboutItem));
+    QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
+    QObject* aboutWindow = objectWithWindowTitle(rootWindow, QStringLiteral("About SkyGate"));
+    QVERIFY(aboutWindow != nullptr);
+    QTRY_VERIFY(aboutWindow->property("visible").toBool());
 
     QStringList unexpectedWarnings = warnings.messages();
     unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));

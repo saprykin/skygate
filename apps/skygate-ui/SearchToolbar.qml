@@ -12,6 +12,12 @@ Item {
     property alias dropdownItem: resultsDropdown
     readonly property var searchModel: skyContextController.objectSearchModel
     readonly property real controlHeight: 38
+    readonly property real naturalSearchFieldWidth: Math.max(
+        searchPlaceholderMetrics.advanceWidth * 1.6
+            + searchField.leftPadding
+            + searchField.rightPadding,
+        controlHeight * 8
+    )
     readonly property real expandedTotalWidth: searchToolbarPanel.expandedWidth
         + searchToolbarToggle.implicitWidth + 6
     property bool suppressFilterSync: false
@@ -103,7 +109,7 @@ Item {
             PreferencesTextField {
                 id: searchField
                 objectName: "searchField"
-                width: 420
+                width: toolbarRoot.naturalSearchFieldWidth
                 implicitHeight: toolbarRoot.controlHeight
                 placeholderText: "Search planets, stars, HIP, constellations"
                 onTextChanged: {
@@ -131,6 +137,12 @@ Item {
                     searchField.focus = false
                     event.accepted = true
                 }
+            }
+
+            TextMetrics {
+                id: searchPlaceholderMetrics
+                font: searchField.font
+                text: searchField.placeholderText
             }
 
             Button {

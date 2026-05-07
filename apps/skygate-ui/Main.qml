@@ -12,19 +12,20 @@ ApplicationWindow {
     minimumHeight: 420
     visible: true
     title: "SkyGate"
+    readonly property bool nativeMenuBarVisible: Qt.platform.os === "osx"
 
     menuBar: MenuBar {
+        objectName: "nativeMenuBar"
+        visible: root.nativeMenuBarVisible
+        height: visible ? implicitHeight : 0
+
         Menu {
             title: "&App"
 
             MenuItem {
                 objectName: "aboutMenuItem"
                 text: "&About SkyGate"
-                onTriggered: {
-                    aboutWindow.visible = true
-                    aboutWindow.raise()
-                    aboutWindow.requestActivate()
-                }
+                onTriggered: root.openAboutWindow()
             }
 
             MenuSeparator {}
@@ -32,7 +33,7 @@ ApplicationWindow {
             MenuItem {
                 objectName: "preferencesMenuItem"
                 text: "&Preferences..."
-                onTriggered: preferencesWindow.openWindow()
+                onTriggered: root.openPreferencesWindow()
             }
         }
     }
@@ -90,31 +91,77 @@ ApplicationWindow {
         popupBottomMargin: 8
     }
 
-    function topToolbarExpandedBounds() {
+    function openAboutWindow() {
+        aboutWindow.visible = true
+        aboutWindow.raise()
+        aboutWindow.requestActivate()
+    }
+
+    function openPreferencesWindow() {
+        preferencesWindow.openWindow()
+    }
+
+    function toolbarItemRight(toolbar, item) {
+        return toolbar.x + item.x + item.width
+    }
+
+    function toolbarItemLeft(toolbar, item) {
+        return toolbar.x + item.x
+    }
+
+    function topToolbarVisibleBounds() {
         return {
-            searchRight: searchToolbar.x + searchToolbar.expandedTotalWidth,
-            timelineLeft: timelineToolbar.x
+            searchRight: searchToolbarVisibleRight(),
+            timelineLeft: timelineToolbarVisibleLeft()
         }
     }
 
     function expandedToolbarsWouldOverlap() {
-        const bounds = topToolbarExpandedBounds()
+        const bounds = topToolbarVisibleBounds()
         return bounds.searchRight > bounds.timelineLeft
     }
 
+    function searchToolbarExpandedRight() {
+        return searchToolbar.x + searchToolbar.expandedTotalWidth
+    }
+
+    function searchToolbarVisibleRight() {
+        return skyContext.searchToolbarCollapsed
+            ? toolbarItemRight(searchToolbar, searchToolbar.toggleItem)
+            : Math.max(
+                  toolbarItemRight(searchToolbar, searchToolbar.toggleItem),
+                  toolbarItemRight(searchToolbar, searchToolbar.panelItem)
+              )
+    }
+
+    function timelineToolbarExpandedLeft() {
+        return toolbarItemLeft(timelineToolbar, timelineToolbar.toggleItem)
+            - timelineToolbar.panelItem.expandedWidth
+            - 6
+    }
+
+    function timelineToolbarVisibleLeft() {
+        return skyContext.timelineToolbarCollapsed
+            ? toolbarItemLeft(timelineToolbar, timelineToolbar.toggleItem)
+            : Math.min(
+                  toolbarItemLeft(timelineToolbar, timelineToolbar.toggleItem),
+                  toolbarItemLeft(timelineToolbar, timelineToolbar.panelItem)
+              )
+    }
+
     function prepareSearchToolbarExpand() {
-        if (!skyContext.timelineToolbarCollapsed && expandedToolbarsWouldOverlap()) {
+        if (searchToolbarExpandedRight() > timelineToolbarVisibleLeft()) {
             skyContext.setTimelineToolbarCollapsed(true)
         }
     }
 
     function prepareTimelineToolbarExpand() {
-        if (!skyContext.searchToolbarCollapsed && expandedToolbarsWouldOverlap()) {
+        if (searchToolbarVisibleRight() > timelineToolbarExpandedLeft()) {
             skyContext.setSearchToolbarCollapsed(true)
         }
     }
 
-    function enforceToolbarFit() {
+    function collapseTimelineIfBothToolbarsOverlap() {
         if (!skyContext.searchToolbarCollapsed
                 && !skyContext.timelineToolbarCollapsed
                 && expandedToolbarsWouldOverlap()) {
@@ -122,8 +169,8 @@ ApplicationWindow {
         }
     }
 
-    onWidthChanged: Qt.callLater(enforceToolbarFit)
-    Component.onCompleted: Qt.callLater(enforceToolbarFit)
+    onWidthChanged: Qt.callLater(collapseTimelineIfBothToolbarsOverlap)
+    Component.onCompleted: Qt.callLater(collapseTimelineIfBothToolbarsOverlap)
 
     Rectangle {
         anchors.fill: parent
@@ -147,12 +194,24 @@ ApplicationWindow {
             skySceneModel: skyScene
         }
 
+        SkyAppMenuButton {
+            id: appMenuButton
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.topMargin: 18
+            anchors.leftMargin: 14
+            theme: skyContext.theme
+            onPreferencesRequested: root.openPreferencesWindow()
+            onAboutRequested: root.openAboutWindow()
+        }
+
         SearchToolbar {
             id: searchToolbar
             objectName: "searchToolbar"
             anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.margins: 14
+            anchors.left: appMenuButton.right
+            anchors.topMargin: 14
+            anchors.leftMargin: 6
             skyContextController: skyContext
             onRequestExpand: root.prepareSearchToolbarExpand
         }
@@ -173,6 +232,7 @@ ApplicationWindow {
             sceneModel: skyScene
             interactionLayer: interactionLayer
             avoidItems: [
+                appMenuButton,
                 searchToolbar.panelItem,
                 searchToolbar.toggleItem,
                 searchToolbar.dropdownItem,

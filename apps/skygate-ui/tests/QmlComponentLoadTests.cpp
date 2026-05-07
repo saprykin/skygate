@@ -47,6 +47,21 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
+    QTest::newRow("SkyAppMenuButton")
+        << QStringLiteral("SkyAppMenuButton")
+        << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 120
+                height: 80
+                SkyAppMenuButton {
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    theme: skyContext.theme
+                }
+            }
+        )");
+
     QTest::newRow("TimelineToolbar")
         << QStringLiteral("TimelineToolbar")
         << QStringLiteral(R"(

@@ -76,6 +76,7 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
         );
 
         for (const QString& objectName : {
+            QStringLiteral("appMenuButton"),
             QStringLiteral("searchToolbarToggle"),
             QStringLiteral("timelineToolbarToggle"),
         }) {
@@ -93,6 +94,10 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
             );
         }
 
+        auto* appMenuButton = firstQuickItemWithObjectName(
+            rootWindow,
+            QStringLiteral("appMenuButton")
+        );
         auto* searchToggle = firstQuickItemWithObjectName(
             rootWindow,
             QStringLiteral("searchToolbarToggle")
@@ -102,9 +107,13 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
             QStringLiteral("timelineToolbarToggle")
         );
         auto* viewport = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyViewport"));
+        QVERIFY(appMenuButton != nullptr);
         QVERIFY(searchToggle != nullptr);
         QVERIFY(timelineToggle != nullptr);
         QVERIFY(viewport != nullptr);
+        QVERIFY(renderingQuickItemSceneRect(*appMenuButton).intersects(
+            renderingQuickItemSceneRect(*viewport)
+        ));
         QVERIFY(renderingQuickItemSceneRect(*searchToggle).intersects(
             renderingQuickItemSceneRect(*viewport)
         ));
@@ -114,6 +123,16 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
         QVERIFY(!renderingQuickItemSceneRect(*searchToggle).intersects(
             renderingQuickItemSceneRect(*timelineToggle)
         ));
+        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(
+            renderingQuickItemSceneRect(*searchToggle)
+        ));
+        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(
+            renderingQuickItemSceneRect(*timelineToggle)
+        ));
+        QVERIFY(std::abs(
+            renderingQuickItemSceneRect(*appMenuButton).top()
+            - renderingQuickItemSceneRect(*searchToggle).top()
+        ) < 0.5);
     }
 
     QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("aboutMenuItem"));

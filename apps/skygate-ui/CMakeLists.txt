@@ -178,6 +178,7 @@ qt_add_qml_module(skygate-ui
         PreferencesGroupTitle.qml
         PreferencesSectionButton.qml
         SearchToolbar.qml
+        SkyAppMenuButton.qml
         SkyHoverLabel.qml
         SkyInteractionLayer.qml
         SkyObjectInspector.qml
