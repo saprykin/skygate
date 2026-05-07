@@ -34,7 +34,7 @@ class SkySettingsStore;
 
 class SkyContextController final : public QObject {
     Q_OBJECT
-    Q_PROPERTY(SkyTimeController* time READ timeController CONSTANT)
+    Q_PROPERTY(QObject* time READ timeController CONSTANT)
     Q_PROPERTY(bool live READ live WRITE setLive NOTIFY liveChanged)
     Q_PROPERTY(
         bool timelineToolbarCollapsed

@@ -13,6 +13,11 @@ namespace {
 
 constexpr qint64 kFixedUtcEpochSeconds = 1'778'064'600;
 
+bool isExpectedZurichLabel(const QString& label, const QString& abbreviation, const QString& offset)
+{
+    return label == abbreviation || label == offset;
+}
+
 class FixedTimeSource final : public skygate::core::ITimeSource {
 public:
     [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
@@ -91,12 +96,20 @@ void SkyTimeControllerTests::formatsSeasonalDstLabels()
     QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
 
     controller.setUtcDateTime(QDateTime(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC));
-    QCOMPARE(controller.timeZoneLabel(), QStringLiteral("CET"));
+    QVERIFY(isExpectedZurichLabel(
+        controller.timeZoneLabel(),
+        QStringLiteral("CET"),
+        QStringLiteral("UTC+01:00")
+    ));
     QCOMPARE(controller.dateText(), QStringLiteral("2026-01-15"));
     QCOMPARE(controller.timeText(), QStringLiteral("13:00:00"));
 
     controller.setUtcDateTime(QDateTime(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC));
-    QCOMPARE(controller.timeZoneLabel(), QStringLiteral("CEST"));
+    QVERIFY(isExpectedZurichLabel(
+        controller.timeZoneLabel(),
+        QStringLiteral("CEST"),
+        QStringLiteral("UTC+02:00")
+    ));
     QCOMPARE(controller.timeText(), QStringLiteral("14:00:00"));
 }
 

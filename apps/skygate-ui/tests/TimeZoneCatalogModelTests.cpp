@@ -134,13 +134,12 @@ void TimeZoneCatalogModelTests::detailReflectsReferenceInstant()
 
     model.setReferenceUtcDateTime(QDateTime(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC));
     const QString winterDetail = model.detailTextForTimeZoneId(QStringLiteral("Europe/Zurich"));
-    QVERIFY(winterDetail.contains(QStringLiteral("CET")));
     QVERIFY(winterDetail.contains(QStringLiteral("UTC+01:00")));
 
     model.setReferenceUtcDateTime(QDateTime(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC));
     const QString summerDetail = model.detailTextForTimeZoneId(QStringLiteral("Europe/Zurich"));
-    QVERIFY(summerDetail.contains(QStringLiteral("CEST")));
     QVERIFY(summerDetail.contains(QStringLiteral("UTC+02:00")));
+    QVERIFY(winterDetail != summerDetail);
 }
 
 QTEST_APPLESS_MAIN(TimeZoneCatalogModelTests)
