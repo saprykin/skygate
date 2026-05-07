@@ -253,13 +253,18 @@ cmake --build build --target package-skygate-ui-dmg
 ```
 
 All platforms with UI builds also get standard CMake install and ZIP package
-targets. On Windows, build the release vcpkg package like this:
+targets. On Windows, the package target also produces a WiX MSI installer when
+the WiX Toolset is installed and discoverable by CPack. Build the release vcpkg
+package like this:
 
 ```powershell
 cmake --preset ui-release-windows-vcpkg
 cmake --build --preset ui-install-windows-vcpkg
 cmake --build --preset ui-package-windows-vcpkg
 ```
+
+The Windows package output includes a portable ZIP and, when WiX is available,
+an `.msi` installer.
 
 On macOS with vcpkg-managed zlib:
 
