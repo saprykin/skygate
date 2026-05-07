@@ -8,11 +8,11 @@ Window {
     objectName: "aboutWindow"
     title: "About SkyGate"
     width: 420
-    height: 388
+    height: 372
     minimumWidth: 420
-    minimumHeight: 388
+    minimumHeight: 372
     maximumWidth: 420
-    maximumHeight: 388
+    maximumHeight: 372
     visible: false
     readonly property var theme: skyContext.theme
     color: theme.windowBackground
@@ -110,7 +110,7 @@ Window {
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
                 Layout.topMargin: 2
-                Layout.bottomMargin: 14
+                Layout.bottomMargin: 8
                 spacing: 8
 
                 Item {
@@ -216,7 +216,7 @@ Window {
                     objectName: "aboutCloseButton"
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 4
-                    Layout.bottomMargin: 8
+                    Layout.bottomMargin: 0
                     Layout.preferredWidth: 112
                     Layout.preferredHeight: 32
                     primary: true
