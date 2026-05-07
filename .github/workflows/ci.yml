@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   linux-core:
-    name: Linux core build and tests
+    name: Linux
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -82,7 +82,7 @@ jobs:
         run: ccache --show-stats
 
   windows-core:
-    name: Windows core build and tests
+    name: Windows
     runs-on: windows-2022
     timeout-minutes: 35
 
