@@ -49,12 +49,26 @@ grade ephemerides for the far past.
 - Qt 6.5 or newer with `Core`, `Gui`, `Qml`, `Quick`, `Network`, and `Test`
 - `Qt Positioning` (optional, enables the `Current Device` location mode)
 - Zlib
+- vcpkg (recommended on Windows and macOS for the zlib dependency)
 
 ## Build
 
-SkyGate uses standard CMake. If CMake cannot find Qt automatically, point
-`CMAKE_PREFIX_PATH` at your Qt installation root such as
-`/path/to/Qt/6.x/<platform>`.
+SkyGate uses standard CMake. Qt is resolved from your Qt installation, not from
+vcpkg. If CMake cannot find Qt automatically, point `CMAKE_PREFIX_PATH` at your
+Qt installation root such as `/path/to/Qt/6.x/<platform>`.
+
+On Linux, install zlib from your system package manager. On Windows and macOS,
+the recommended local workflow is to use the checked-in vcpkg presets so zlib is
+provided by `vcpkg.json`:
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+export CMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
+```
+
+Use the platform-specific presets below for Windows and macOS when possible.
+The plain `cmake -S` example remains useful for custom setups where zlib is
+already discoverable without vcpkg.
 
 ```bash
 cmake -S . -B build \
