@@ -192,6 +192,7 @@ qt_add_qml_module(skygate-ui
         PreferencesWindow.qml
     RESOURCES
         resources/icons/skygate-icon-512.png
+        resources/icons/skygate-about-icon-512.png
 )
 
 target_link_libraries(skygate-ui-lib

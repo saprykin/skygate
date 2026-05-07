@@ -111,53 +111,16 @@ Window {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: 76
                     Layout.preferredHeight: 76
-                    clip: true
-                    readonly property rect aboutLogoVisibleRect: Qt.rect(42, 37, 427, 437)
-                    readonly property real aboutLogoRenderSize: Math.ceil(
-                        (width * 512) / aboutLogoVisibleRect.height
-                    )
-                    readonly property real aboutLogoVisibleWidth: (
-                        aboutLogoRenderSize * aboutLogoVisibleRect.width
-                    ) / 512
-                    readonly property real aboutLogoVisibleHeight: (
-                        aboutLogoRenderSize * aboutLogoVisibleRect.height
-                    ) / 512
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 18
-                        color: theme.logoPanelBackground
-                        opacity: 0.62
-                        border.width: 1
-                        border.color: theme.logoPanelBorder
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        radius: 17
-                        color: "transparent"
-                        border.width: 1
-                        border.color: theme.logoPanelAccentBorder
-                        opacity: 0.72
-                    }
 
                     Image {
                         id: aboutLogoImage
-                        width: parent.aboutLogoRenderSize
-                        height: parent.aboutLogoRenderSize
-                        x: Math.round(
-                            ((parent.width - parent.aboutLogoVisibleWidth) * 0.5)
-                            - ((parent.aboutLogoRenderSize * parent.aboutLogoVisibleRect.x) / 512)
-                        )
-                        y: Math.round(
-                            ((parent.height - parent.aboutLogoVisibleHeight) * 0.5)
-                            - ((parent.aboutLogoRenderSize * parent.aboutLogoVisibleRect.y) / 512)
-                        )
-                        source: "resources/icons/skygate-icon-512.png"
+                        anchors.fill: parent
+                        source: "resources/icons/skygate-about-icon-512.png"
+                        sourceSize.width: width * Screen.devicePixelRatio
+                        sourceSize.height: height * Screen.devicePixelRatio
                         fillMode: Image.PreserveAspectFit
                         smooth: true
-                        mipmap: false
+                        mipmap: true
                     }
                 }
 
