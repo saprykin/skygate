@@ -41,7 +41,7 @@ jobs:
         with:
           version: '6.8.3'
           target: desktop
-          archives: qtbase
+          archives: icu qtbase
           cache: true
 
       - name: Restore compiler cache
