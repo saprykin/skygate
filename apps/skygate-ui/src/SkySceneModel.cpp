@@ -3,7 +3,22 @@
 #include "SkyContextController.hpp"
 #include "SkyTimeController.hpp"
 
+#include <QElapsedTimer>
+#include <QLoggingCategory>
+
 #include <cmath>
+
+namespace {
+
+Q_LOGGING_CATEGORY(skygatePerfLog, "skygate.perf")
+
+bool performanceLoggingEnabled()
+{
+    static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
+    return enabled;
+}
+
+}  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent)
     : QObject(parent)
@@ -335,10 +350,19 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
 
 void SkySceneModel::rebuildSceneFrame()
 {
+    QElapsedTimer timer;
+    if (performanceLoggingEnabled()) {
+        timer.start();
+    }
+
     const auto input = buildSceneInput();
     if (!input.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
+        }
+        if (performanceLoggingEnabled()) {
+            qCInfo(skygatePerfLog) << "scene rebuild skipped no-input elapsedMs="
+                << timer.nsecsElapsed() / 1000000.0;
         }
         return;
     }
@@ -351,6 +375,10 @@ void SkySceneModel::rebuildSceneFrame()
     if (!frameResult.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
+        }
+        if (performanceLoggingEnabled()) {
+            qCInfo(skygatePerfLog) << "scene rebuild skipped no-frame elapsedMs="
+                << timer.nsecsElapsed() / 1000000.0;
         }
         return;
     }
@@ -373,4 +401,16 @@ void SkySceneModel::rebuildSceneFrame()
         m_sceneFrame.selectedObjectInspector
     );
     emit sceneFrameChanged();
+
+    if (performanceLoggingEnabled()) {
+        qCInfo(skygatePerfLog)
+            << "scene rebuild elapsedMs=" << timer.nsecsElapsed() / 1000000.0
+            << "pipelineUpdated=" << frameResult->updated
+            << "frameContentChanged=" << compositionResult.frameContentChanged
+            << "points=" << static_cast<qsizetype>(m_sceneFrame.frame.points.size())
+            << "lines=" << static_cast<qsizetype>(m_sceneFrame.frame.lines.size())
+            << "glyphs=" << static_cast<qsizetype>(m_sceneFrame.frame.glyphs.size())
+            << "labels=" << static_cast<qsizetype>(m_sceneFrame.frame.labels.size())
+            << "overlays=" << static_cast<qsizetype>(m_sceneFrame.overlayItems.size());
+    }
 }
