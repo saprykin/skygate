@@ -74,6 +74,17 @@ void QmlNightConditionsPopupTests::nightConditionsPopupOpensClosesAndRendersRows
     QTRY_VERIFY(
         firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMoonHeader")) != nullptr
     );
+    auto* moonRiseRow = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("nightConditionsMoonRiseRow")
+    );
+    auto* moonSetRow = firstQuickItemWithObjectName(
+        root,
+        QStringLiteral("nightConditionsMoonSetRow")
+    );
+    QVERIFY(moonRiseRow != nullptr);
+    QVERIFY(moonSetRow != nullptr);
+    QVERIFY(moonSetRow->y() > moonRiseRow->y());
     QTRY_VERIFY(
         firstQuickItemWithObjectName(
             root,

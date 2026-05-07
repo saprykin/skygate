@@ -167,43 +167,55 @@ FocusScope {
                 elide: Text.ElideRight
             }
 
-            RowLayout {
-                objectName: "nightConditionsMoonRiseSetRow"
+            ColumnLayout {
+                objectName: "nightConditionsMoonRiseSetRows"
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: 4
 
-                Label {
-                    objectName: "nightConditionsMoonRiseLabel"
+                RowLayout {
+                    objectName: "nightConditionsMoonRiseRow"
                     Layout.fillWidth: true
-                    text: "Rise"
-                    color: theme.textSecondary
-                    font.family: "Avenir Next"
-                    font.pixelSize: 11
+                    spacing: 8
+
+                    Label {
+                        objectName: "nightConditionsMoonRiseLabel"
+                        Layout.fillWidth: true
+                        text: "Rise"
+                        color: theme.textSecondary
+                        font.family: "Avenir Next"
+                        font.pixelSize: 11
+                    }
+
+                    Label {
+                        objectName: "nightConditionsMoonRiseValue"
+                        text: nightConditionsPopup.conditions.moonRiseText || "--"
+                        color: theme.textPrimary
+                        font.family: "Menlo"
+                        font.pixelSize: 11
+                    }
                 }
 
-                Label {
-                    objectName: "nightConditionsMoonRiseValue"
-                    text: nightConditionsPopup.conditions.moonRiseText || "--"
-                    color: theme.textPrimary
-                    font.family: "Menlo"
-                    font.pixelSize: 11
-                }
+                RowLayout {
+                    objectName: "nightConditionsMoonSetRow"
+                    Layout.fillWidth: true
+                    spacing: 8
 
-                Label {
-                    objectName: "nightConditionsMoonSetLabel"
-                    Layout.leftMargin: 10
-                    text: "Set"
-                    color: theme.textSecondary
-                    font.family: "Avenir Next"
-                    font.pixelSize: 11
-                }
+                    Label {
+                        objectName: "nightConditionsMoonSetLabel"
+                        Layout.fillWidth: true
+                        text: "Set"
+                        color: theme.textSecondary
+                        font.family: "Avenir Next"
+                        font.pixelSize: 11
+                    }
 
-                Label {
-                    objectName: "nightConditionsMoonSetValue"
-                    text: nightConditionsPopup.conditions.moonSetText || "--"
-                    color: theme.textPrimary
-                    font.family: "Menlo"
-                    font.pixelSize: 11
+                    Label {
+                        objectName: "nightConditionsMoonSetValue"
+                        text: nightConditionsPopup.conditions.moonSetText || "--"
+                        color: theme.textPrimary
+                        font.family: "Menlo"
+                        font.pixelSize: 11
+                    }
                 }
             }
 
