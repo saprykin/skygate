@@ -266,13 +266,26 @@ jobs:
           [[ "${dmg}" == *"Darwin-${{ steps.package.outputs.architecture }}"*.dmg ]]
 
           mount_dir="$(mktemp -d)"
+          mount_device=""
           cleanup() {
-            hdiutil detach "${mount_dir}" -quiet || true
-            rm -rf "${mount_dir}"
+            detach_target="${mount_device:-${mount_dir}}"
+            for attempt in 1 2 3; do
+              hdiutil detach "${detach_target}" -quiet && break
+              hdiutil detach "${detach_target}" -quiet -force && break
+              sleep 1
+            done
+
+            if mount | grep -F " on ${mount_dir} " >/dev/null; then
+              echo "DMG remained mounted at ${mount_dir}; leaving mount directory in place." >&2
+            else
+              rm -rf "${mount_dir}"
+            fi
           }
           trap cleanup EXIT
 
-          hdiutil attach "${dmg}" -nobrowse -readonly -mountpoint "${mount_dir}"
+          attach_output="$(hdiutil attach "${dmg}" -nobrowse -readonly -mountpoint "${mount_dir}")"
+          echo "${attach_output}"
+          mount_device="$(awk -v mount_dir="${mount_dir}" '$NF == mount_dir { print $1; exit }' <<< "${attach_output}")"
           app="${mount_dir}/SkyGate.app"
           executable="${app}/Contents/MacOS/SkyGate"
           test -d "${app}"
@@ -416,11 +429,27 @@ jobs:
           }
 
           $extractDir = Join-Path $env:RUNNER_TEMP "skygate-windows-package"
+          $msiLog = Join-Path $env:RUNNER_TEMP "skygate-windows-package-extract.log"
           Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+          Remove-Item -Force $msiLog -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $extractDir | Out-Null
-          & msiexec.exe /a "$($msiPackage.FullName)" /qn "TARGETDIR=$extractDir"
-          if ($LASTEXITCODE -ne 0) {
-            throw "MSI administrative extraction failed with exit code $LASTEXITCODE."
+          $msiExtract = Start-Process -FilePath msiexec.exe `
+            -ArgumentList @(
+              "/a",
+              "$($msiPackage.FullName)",
+              "/qn",
+              "/norestart",
+              "TARGETDIR=$extractDir",
+              "/L*v",
+              "$msiLog"
+            ) `
+            -Wait `
+            -PassThru
+          if ($msiExtract.ExitCode -ne 0) {
+            if (Test-Path $msiLog) {
+              Get-Content $msiLog
+            }
+            throw "MSI administrative extraction failed with exit code $($msiExtract.ExitCode)."
           }
 
           $executable = Get-ChildItem -Path $extractDir -Recurse -Filter skygate-ui.exe | Select-Object -First 1
