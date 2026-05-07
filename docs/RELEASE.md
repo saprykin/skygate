@@ -63,5 +63,5 @@ git push origin vX.Y.Z
 
 - Add macOS code signing and notarization.
 - Add Windows code signing.
-- Add a non-GUI `--version` or `--smoke-test` startup mode for package runtime
-  checks in CI.
+- Expand package runtime checks if a deeper non-GUI `--smoke-test` mode becomes
+  useful.

@@ -20,6 +20,8 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
+#include <cstdio>
+#include <cstring>
 #include <utility>
 
 #ifndef SKYGATE_APP_VERSION
@@ -37,6 +39,17 @@
 namespace {
 
 Q_LOGGING_CATEGORY(skygateAppLog, "skygate.app")
+
+bool hasArgument(const int argc, char* argv[], const char* expectedArgument) noexcept
+{
+    for (int index = 1; index < argc; ++index) {
+        if (std::strcmp(argv[index], expectedArgument) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 struct StartupLoggingConfiguration final {
     skygate::ui::SkyLoggingConfiguration configuration;
@@ -162,6 +175,16 @@ StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& argum
 
 int main(int argc, char* argv[])
 {
+    if (hasArgument(argc, argv, "--version")) {
+        std::printf(
+            "SkyGate %s (git %s, Qt %s)\n",
+            SKYGATE_APP_VERSION,
+            SKYGATE_GIT_HASH,
+            qVersion()
+        );
+        return EXIT_SUCCESS;
+    }
+
     // Prevent stale cached QML artifacts from surfacing outdated warnings at launch.
 #if !defined(NDEBUG)
     qputenv("QML_DISABLE_DISK_CACHE", "1");

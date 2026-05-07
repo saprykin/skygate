@@ -29,6 +29,7 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 - Release tag validation to keep `v*` tags aligned with the CMake application
   version.
 - Package smoke checks for AppImage, DMG, and Windows installer artifacts.
+- Non-GUI `--version` output for packaged executable runtime checks.
 - Compiler caches for Linux, macOS, and Windows CI jobs.
 - Linux AppImage packaging support.
 - Windows WiX MSI packaging support.

@@ -176,6 +176,9 @@ jobs:
           test -f squashfs-root/*.desktop
           test -x squashfs-root/usr/bin/skygate-ui
           test -f squashfs-root/usr/share/icons/hicolor/512x512/apps/skygate.png
+          version_output="$(APPIMAGE_EXTRACT_AND_RUN=1 "${appimage}" --version)"
+          echo "${version_output}"
+          grep -q "SkyGate ${{ needs.release-metadata.outputs.app_version }}" <<< "${version_output}"
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
@@ -278,6 +281,9 @@ jobs:
           test -d "${app}/Contents/Frameworks/QtCore.framework"
           lipo -info "${executable}" | grep -q "${{ steps.package.outputs.architecture }}"
           otool -L "${executable}" | grep -q '@rpath/QtCore.framework'
+          version_output="$("${executable}" --version)"
+          echo "${version_output}"
+          grep -q "SkyGate ${{ needs.release-metadata.outputs.app_version }}" <<< "${version_output}"
 
       - name: Inspect packaged app
         run: |
@@ -428,6 +434,11 @@ jobs:
           $qtQuick = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Quick.dll | Select-Object -First 1
           if (-not $qtQuick) {
             throw "ZIP package does not contain Qt6Quick.dll."
+          }
+          $versionOutput = & $($executable.FullName) --version
+          Write-Output $versionOutput
+          if ($versionOutput -notmatch "SkyGate ${{ needs.release-metadata.outputs.app_version }}") {
+            throw "Unexpected packaged app version output: $versionOutput"
           }
 
       - name: Upload installer packages
