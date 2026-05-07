@@ -403,39 +403,43 @@ jobs:
         run: |
           $packageDir = "build-ninja/ui-release-windows-vcpkg"
           $msiPackages = @(Get-ChildItem -Path $packageDir -Filter *.msi)
-          $zipPackages = @(Get-ChildItem -Path $packageDir -Filter *.zip)
           if ($msiPackages.Count -ne 1) {
             throw "Expected exactly one MSI, found $($msiPackages.Count)."
           }
-          if ($zipPackages.Count -ne 1) {
-            throw "Expected exactly one ZIP, found $($zipPackages.Count)."
-          }
 
-          foreach ($package in @($msiPackages + $zipPackages)) {
-            if ($package.Name -notlike "*Windows-${{ steps.package.outputs.architecture }}*") {
-              throw "Package name does not include platform architecture: $($package.Name)"
-            }
-            if ($package.Length -le 0) {
-              throw "Package is empty: $($package.FullName)"
-            }
+          $msiPackage = $msiPackages[0]
+          if ($msiPackage.Name -notlike "*Windows-${{ steps.package.outputs.architecture }}*") {
+            throw "Package name does not include platform architecture: $($msiPackage.Name)"
+          }
+          if ($msiPackage.Length -le 0) {
+            throw "Package is empty: $($msiPackage.FullName)"
           }
 
           $extractDir = Join-Path $env:RUNNER_TEMP "skygate-windows-package"
           Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $extractDir | Out-Null
-          Expand-Archive -Path $zipPackages[0].FullName -DestinationPath $extractDir
+          & msiexec.exe /a "$($msiPackage.FullName)" /qn "TARGETDIR=$extractDir"
+          if ($LASTEXITCODE -ne 0) {
+            throw "MSI administrative extraction failed with exit code $LASTEXITCODE."
+          }
 
           $executable = Get-ChildItem -Path $extractDir -Recurse -Filter skygate-ui.exe | Select-Object -First 1
           if (-not $executable) {
-            throw "ZIP package does not contain skygate-ui.exe."
+            throw "MSI package does not contain skygate-ui.exe."
           }
           $qtCore = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Core.dll | Select-Object -First 1
           if (-not $qtCore) {
-            throw "ZIP package does not contain Qt6Core.dll."
+            throw "MSI package does not contain Qt6Core.dll."
           }
           $qtQuick = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Quick.dll | Select-Object -First 1
           if (-not $qtQuick) {
-            throw "ZIP package does not contain Qt6Quick.dll."
+            throw "MSI package does not contain Qt6Quick.dll."
+          }
+          $zlib = Get-ChildItem -Path $extractDir -Recurse -File |
+            Where-Object { $_.Name -in @("z.dll", "zlib1.dll") } |
+            Select-Object -First 1
+          if (-not $zlib) {
+            throw "MSI package does not contain a zlib runtime DLL."
           }
           $versionOutput = & $($executable.FullName) --version
           Write-Output $versionOutput
@@ -447,9 +451,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.package.outputs.artifact_name }}
-          path: |
-            build-ninja/ui-release-windows-vcpkg/*.msi
-            build-ninja/ui-release-windows-vcpkg/*.zip
+          path: build-ninja/ui-release-windows-vcpkg/*.msi
           if-no-files-found: error
           retention-days: 30
 
@@ -461,7 +463,6 @@ jobs:
         run: |
           $packages = @(
             Get-ChildItem -Path build-ninja/ui-release-windows-vcpkg -Filter *.msi
-            Get-ChildItem -Path build-ninja/ui-release-windows-vcpkg -Filter *.zip
           )
           if (-not $packages) {
             throw "No Windows packages were produced."

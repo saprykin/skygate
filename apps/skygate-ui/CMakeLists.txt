@@ -157,6 +157,10 @@ if(APPLE)
     )
 endif()
 
+if(WIN32)
+    target_sources(skygate-ui PRIVATE windows/SkyGate.rc)
+endif()
+
 qt_add_qml_module(skygate-ui
     URI com.skygate.app
     VERSION ${SKYGATE_QML_MODULE_VERSION}
@@ -310,11 +314,28 @@ elseif(WIN32)
 endif()
 
 if(WIN32)
+    set(skygateVcpkgRuntimeDllDirectories)
+    set(skygateVcpkgInstalledDir)
+    if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+        set(skygateVcpkgInstalledDir "${VCPKG_INSTALLED_DIR}")
+    elseif(DEFINED _VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+        set(skygateVcpkgInstalledDir "${_VCPKG_INSTALLED_DIR}")
+    elseif(DEFINED VCPKG_TARGET_TRIPLET)
+        set(skygateVcpkgInstalledDir "${CMAKE_BINARY_DIR}/vcpkg_installed")
+    endif()
+    if(skygateVcpkgInstalledDir AND DEFINED VCPKG_TARGET_TRIPLET)
+        list(APPEND skygateVcpkgRuntimeDllDirectories
+            "${skygateVcpkgInstalledDir}/${VCPKG_TARGET_TRIPLET}/bin"
+            "$<$<CONFIG:Debug>:${skygateVcpkgInstalledDir}/${VCPKG_TARGET_TRIPLET}/debug/bin>"
+        )
+    endif()
+
     set(skygateRuntimeDllCopyScript
         "${CMAKE_CURRENT_BINARY_DIR}/copy-skygate-ui-runtime-dlls-$<CONFIG>.cmake"
     )
     string(CONCAT skygateRuntimeDllCopyScriptContent
         "set(SKYGATE_RUNTIME_DLLS \"$<TARGET_RUNTIME_DLLS:skygate-ui>\")\n"
+        "set(SKYGATE_RUNTIME_DLL_DIRECTORIES \"${skygateVcpkgRuntimeDllDirectories}\")\n"
         "set(SKYGATE_RUNTIME_OUTPUT_DIR \"$<TARGET_FILE_DIR:skygate-ui>\")\n"
         "include(\"${CMAKE_SOURCE_DIR}/cmake/SkyGateCopyRuntimeDlls.cmake\")\n"
     )
@@ -334,6 +355,7 @@ if(WIN32)
     )
     string(CONCAT skygateRuntimeDllInstallScriptContent
         "set(SKYGATE_RUNTIME_DLLS \"$<TARGET_RUNTIME_DLLS:skygate-ui>\")\n"
+        "set(SKYGATE_RUNTIME_DLL_DIRECTORIES \"${skygateVcpkgRuntimeDllDirectories}\")\n"
         "set(SKYGATE_RUNTIME_OUTPUT_DIR \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}\")\n"
         "include(\"${CMAKE_SOURCE_DIR}/cmake/SkyGateCopyRuntimeDlls.cmake\")\n"
     )

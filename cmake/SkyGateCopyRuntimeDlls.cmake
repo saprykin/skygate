@@ -7,3 +7,17 @@ foreach(skygateRuntimeDll IN LISTS SKYGATE_RUNTIME_DLLS)
         file(COPY "${skygateRuntimeDll}" DESTINATION "${SKYGATE_RUNTIME_OUTPUT_DIR}")
     endif()
 endforeach()
+
+foreach(skygateRuntimeDllDirectory IN LISTS SKYGATE_RUNTIME_DLL_DIRECTORIES)
+    if(IS_DIRECTORY "${skygateRuntimeDllDirectory}")
+        file(GLOB skygateRuntimeDirectoryDlls
+            "${skygateRuntimeDllDirectory}/*.dll"
+        )
+        foreach(skygateRuntimeDirectoryDll IN LISTS skygateRuntimeDirectoryDlls)
+            file(COPY
+                "${skygateRuntimeDirectoryDll}"
+                DESTINATION "${SKYGATE_RUNTIME_OUTPUT_DIR}"
+            )
+        endforeach()
+    endif()
+endforeach()

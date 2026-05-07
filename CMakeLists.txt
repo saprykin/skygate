@@ -82,7 +82,10 @@ if(SKYGATE_BUILD_UI)
         "SkyGate-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${skygatePackageArchitecture}"
     )
     if(WIN32)
-        set(CPACK_GENERATOR "ZIP;WIX")
+        set(CPACK_GENERATOR "WIX")
+        set(CPACK_WIX_PRODUCT_ICON
+            "${CMAKE_CURRENT_SOURCE_DIR}/apps/skygate-ui/resources/icons/Skygate.ico"
+        )
         set(CPACK_WIX_UPGRADE_GUID "4E48F5D2-389E-4116-85B8-91E98366365E")
         set(CPACK_WIX_ROOT_FEATURE_TITLE "SkyGate")
         set(CPACK_WIX_ROOT_FEATURE_DESCRIPTION "SkyGate desktop sky visualization application")
