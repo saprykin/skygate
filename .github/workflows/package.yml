@@ -217,3 +217,107 @@ jobs:
               --title "${{ steps.package.outputs.release_title }}" \
               --generate-notes
           fi
+
+  windows-installer:
+    name: Windows Installer
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Set up MSVC
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: choco install wixtoolset --yes --no-progress
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          target: desktop
+          arch: win64_msvc2022_64
+          archives: qtbase qtdeclarative qtpositioning
+          cache: true
+
+      - name: Configure vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkgRoot -and (Test-Path "C:\vcpkg")) {
+            $vcpkgRoot = "C:\vcpkg"
+          }
+          if (-not $vcpkgRoot) {
+            throw "Could not find vcpkg on the Windows runner."
+          }
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Resolve package metadata
+        id: package
+        shell: pwsh
+        run: |
+          $shortSha = $env:GITHUB_SHA.Substring(0, 12)
+          $architecture = "x86_64"
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $artifactName = "SkyGate-Windows-$architecture-Installer-$env:GITHUB_REF_NAME"
+            $releaseTitle = "SkyGate $env:GITHUB_REF_NAME"
+          } else {
+            $artifactName = "SkyGate-Windows-$architecture-Installer-latest-$shortSha"
+            $releaseTitle = ""
+          }
+
+          "architecture=$architecture" >> $env:GITHUB_OUTPUT
+          "artifact_name=$artifactName" >> $env:GITHUB_OUTPUT
+          "release_title=$releaseTitle" >> $env:GITHUB_OUTPUT
+
+      - name: Configure
+        shell: pwsh
+        run: >
+          cmake --preset ui-release-windows-vcpkg
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DSKYGATE_PACKAGE_ARCHITECTURE="${{ steps.package.outputs.architecture }}"
+
+      - name: Build installer packages
+        run: cmake --build --preset ui-package-windows-vcpkg --parallel
+
+      - name: Upload installer packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: |
+            build-ninja/ui-release-windows-vcpkg/*.msi
+            build-ninja/ui-release-windows-vcpkg/*.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $packages = @(
+            Get-ChildItem -Path build-ninja/ui-release-windows-vcpkg -Filter *.msi
+            Get-ChildItem -Path build-ninja/ui-release-windows-vcpkg -Filter *.zip
+          )
+          if (-not $packages) {
+            throw "No Windows packages were produced."
+          }
+
+          gh release view "$env:GITHUB_REF_NAME" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "$env:GITHUB_REF_NAME" @($packages.FullName) --clobber
+          } else {
+            gh release create "$env:GITHUB_REF_NAME" @($packages.FullName) `
+              --title "${{ steps.package.outputs.release_title }}" `
+              --generate-notes
+          }
