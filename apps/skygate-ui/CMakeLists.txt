@@ -234,19 +234,66 @@ add_custom_target(run-skygate-ui
     COMMENT "Run skygate-ui"
 )
 
+unset(skygateMacDeployQtExecutable)
+if(APPLE)
+    if(DEFINED MACDEPLOYQT_EXECUTABLE AND EXISTS "${MACDEPLOYQT_EXECUTABLE}")
+        set(skygateMacDeployQtExecutable "${MACDEPLOYQT_EXECUTABLE}")
+    endif()
+    if(NOT skygateMacDeployQtExecutable)
+        find_program(skygateMacDeployQtExecutable
+            NAMES macdeployqt
+            HINTS "${Qt6_DIR}/../../../bin"
+        )
+    endif()
+endif()
+
+unset(skygateWinDeployQtExecutable)
+if(WIN32)
+    if(DEFINED WINDEPLOYQT_EXECUTABLE AND EXISTS "${WINDEPLOYQT_EXECUTABLE}")
+        set(skygateWinDeployQtExecutable "${WINDEPLOYQT_EXECUTABLE}")
+    endif()
+    if(NOT skygateWinDeployQtExecutable)
+        find_program(skygateWinDeployQtExecutable
+            NAMES windeployqt
+            HINTS "${Qt6_DIR}/../../../bin"
+        )
+    endif()
+endif()
+
 install(TARGETS skygate-ui
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-qt_generate_deploy_qml_app_script(
-    TARGET skygate-ui
-    OUTPUT_SCRIPT skygateUiDeployScript
-    MACOS_BUNDLE_POST_BUILD
-    NO_UNSUPPORTED_PLATFORM_ERROR
-    DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
-)
-install(SCRIPT ${skygateUiDeployScript})
+if(APPLE AND skygateMacDeployQtExecutable)
+    install(CODE "
+        set(skygateInstalledBundle \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_FILE_NAME:skygate-ui>.app\")
+        execute_process(
+            COMMAND \"${skygateMacDeployQtExecutable}\" \"\${skygateInstalledBundle}\" \"-qmldir=${CMAKE_CURRENT_SOURCE_DIR}\"
+            RESULT_VARIABLE skygateDeployResult
+        )
+        if(NOT skygateDeployResult EQUAL 0)
+            message(FATAL_ERROR \"macdeployqt failed for \${skygateInstalledBundle}.\")
+        endif()
+    ")
+elseif(APPLE)
+    message(WARNING "macdeployqt not found; install/package targets will not deploy Qt runtime files.")
+endif()
+
+if(WIN32 AND skygateWinDeployQtExecutable)
+    install(CODE "
+        set(skygateInstalledExecutable \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:skygate-ui>\")
+        execute_process(
+            COMMAND \"${skygateWinDeployQtExecutable}\" --qmldir \"${CMAKE_CURRENT_SOURCE_DIR}\" \"\${skygateInstalledExecutable}\"
+            RESULT_VARIABLE skygateDeployResult
+        )
+        if(NOT skygateDeployResult EQUAL 0)
+            message(FATAL_ERROR \"windeployqt failed for \${skygateInstalledExecutable}.\")
+        endif()
+    ")
+elseif(WIN32)
+    message(WARNING "windeployqt not found; install/package targets will not deploy Qt runtime files.")
+endif()
 
 if(WIN32)
     set(skygateRuntimeDllCopyScript
@@ -267,6 +314,20 @@ if(WIN32)
                 -P "${skygateRuntimeDllCopyScript}"
         COMMENT "Copy SkyGate runtime DLLs"
     )
+
+    set(skygateRuntimeDllInstallScript
+        "${CMAKE_CURRENT_BINARY_DIR}/install-skygate-ui-runtime-dlls-$<CONFIG>.cmake"
+    )
+    string(CONCAT skygateRuntimeDllInstallScriptContent
+        "set(SKYGATE_RUNTIME_DLLS \"$<TARGET_RUNTIME_DLLS:skygate-ui>\")\n"
+        "set(SKYGATE_RUNTIME_OUTPUT_DIR \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}\")\n"
+        "include(\"${CMAKE_SOURCE_DIR}/cmake/SkyGateCopyRuntimeDlls.cmake\")\n"
+    )
+    file(GENERATE
+        OUTPUT "${skygateRuntimeDllInstallScript}"
+        CONTENT "${skygateRuntimeDllInstallScriptContent}"
+    )
+    install(SCRIPT "${skygateRuntimeDllInstallScript}")
 endif()
 
 if(APPLE)
@@ -276,17 +337,6 @@ if(APPLE)
         USES_TERMINAL
         COMMENT "Run skygate-ui bundle"
     )
-
-    unset(skygateMacDeployQtExecutable)
-    if(DEFINED MACDEPLOYQT_EXECUTABLE AND EXISTS "${MACDEPLOYQT_EXECUTABLE}")
-        set(skygateMacDeployQtExecutable "${MACDEPLOYQT_EXECUTABLE}")
-    endif()
-    if(NOT skygateMacDeployQtExecutable)
-        find_program(skygateMacDeployQtExecutable
-            NAMES macdeployqt
-            HINTS "${Qt6_DIR}/../../../bin"
-        )
-    endif()
 
     if(skygateMacDeployQtExecutable)
         set(skygateDmgStagingDir "${CMAKE_CURRENT_BINARY_DIR}/SkyGate-dmg")
