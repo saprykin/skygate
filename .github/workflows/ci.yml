@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      CCACHE_DIR: ~/.cache/ccache
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 500M
 
     steps:
@@ -46,10 +46,13 @@ jobs:
           archives: icu qtbase
           cache: true
 
+      - name: Prepare compiler cache
+        run: mkdir -p "$CCACHE_DIR"
+
       - name: Restore compiler cache
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
+          path: .ccache
           key: linux-core-ccache-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: |
             linux-core-ccache-${{ github.ref_name }}-
