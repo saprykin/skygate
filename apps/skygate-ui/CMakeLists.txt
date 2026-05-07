@@ -282,7 +282,7 @@ if(APPLE AND skygateMacDeployQtExecutable)
     install(CODE "
         set(skygateInstalledBundle \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_FILE_NAME:skygate-ui>.app\")
         execute_process(
-            COMMAND \"${skygateMacDeployQtExecutable}\" \"\${skygateInstalledBundle}\" \"-qmldir=${CMAKE_CURRENT_SOURCE_DIR}\"
+            COMMAND \"${skygateMacDeployQtExecutable}\" \"\${skygateInstalledBundle}\" \"-qmldir=${CMAKE_CURRENT_SOURCE_DIR}\" -appstore-compliant
             RESULT_VARIABLE skygateDeployResult
         )
         if(NOT skygateDeployResult EQUAL 0)
@@ -361,7 +361,7 @@ if(APPLE)
             COMMAND ${CMAKE_COMMAND} -E make_directory "${skygateDmgStagingDir}"
             COMMAND ${CMAKE_COMMAND} -E copy_directory "$<TARGET_BUNDLE_DIR:skygate-ui>" "${skygateDmgStagingDir}/SkyGate.app"
             COMMAND ${CMAKE_COMMAND} -E create_symlink "/Applications" "${skygateDmgStagingDir}/Applications"
-            COMMAND "${skygateMacDeployQtExecutable}" "${skygateDmgStagingDir}/SkyGate.app" -qmldir="${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMAND "${skygateMacDeployQtExecutable}" "${skygateDmgStagingDir}/SkyGate.app" -qmldir="${CMAKE_CURRENT_SOURCE_DIR}" -appstore-compliant
             COMMAND hdiutil create -volname "SkyGate" -srcfolder "${skygateDmgStagingDir}" -ov -format UDZO "${skygateDmgPath}"
             DEPENDS skygate-ui
             USES_TERMINAL
