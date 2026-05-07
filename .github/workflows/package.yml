@@ -109,6 +109,35 @@ jobs:
           SKYGATE_APPIMAGE_VERSION: ${{ steps.package.outputs.version }}
         run: ./packaging/linux/build-appimage.sh
 
+      - name: Smoke test AppImage
+        run: |
+          mapfile -t appimages < <(find dist -maxdepth 1 -type f -name '*.AppImage' -print)
+          if [[ "${#appimages[@]}" -ne 1 ]]; then
+            printf 'Expected exactly one AppImage, found %d\n' "${#appimages[@]}" >&2
+            printf '%s\n' "${appimages[@]}"
+            exit 1
+          fi
+
+          appimage="${appimages[0]}"
+          expected_architecture="$(uname -m)"
+          case "${expected_architecture}" in
+            x86_64)
+              expected_architecture="x86_64"
+              ;;
+            aarch64|arm64)
+              expected_architecture="aarch64"
+              ;;
+          esac
+
+          [[ "${appimage}" == *"Linux-${expected_architecture}.AppImage" ]]
+          test -x "${appimage}"
+          rm -rf squashfs-root
+          "${appimage}" --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+          test -f squashfs-root/*.desktop
+          test -x squashfs-root/usr/bin/skygate-ui
+          test -f squashfs-root/usr/share/icons/hicolor/512x512/apps/skygate.png
+
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
         with:
@@ -179,6 +208,36 @@ jobs:
 
       - name: Build DMG
         run: cmake --build build-macos-dmg --target package-skygate-ui-dmg --parallel
+
+      - name: Smoke test DMG
+        run: |
+          dmg_count="$(find build-macos-dmg/apps/skygate-ui -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')"
+          if [[ "${dmg_count}" != "1" ]]; then
+            echo "Expected exactly one DMG, found ${dmg_count}" >&2
+            find build-macos-dmg/apps/skygate-ui -maxdepth 1 -type f -name '*.dmg' -print
+            exit 1
+          fi
+
+          dmg="$(find build-macos-dmg/apps/skygate-ui -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          [[ "${dmg}" == *"Darwin-${{ steps.package.outputs.architecture }}"*.dmg ]]
+
+          mount_dir="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "${mount_dir}" -quiet || true
+            rm -rf "${mount_dir}"
+          }
+          trap cleanup EXIT
+
+          hdiutil attach "${dmg}" -nobrowse -readonly -mountpoint "${mount_dir}"
+          app="${mount_dir}/SkyGate.app"
+          executable="${app}/Contents/MacOS/SkyGate"
+          test -d "${app}"
+          test -x "${executable}"
+          test -f "${app}/Contents/Info.plist"
+          test -f "${app}/Contents/Resources/Skygate.icns"
+          test -d "${app}/Contents/Frameworks/QtCore.framework"
+          lipo -info "${executable}" | grep -q "${{ steps.package.outputs.architecture }}"
+          otool -L "${executable}" | grep -q '@rpath/QtCore.framework'
 
       - name: Inspect packaged app
         run: |
@@ -289,6 +348,46 @@ jobs:
 
       - name: Build installer packages
         run: cmake --build --preset ui-package-windows-vcpkg --parallel
+
+      - name: Smoke test installer packages
+        shell: pwsh
+        run: |
+          $packageDir = "build-ninja/ui-release-windows-vcpkg"
+          $msiPackages = @(Get-ChildItem -Path $packageDir -Filter *.msi)
+          $zipPackages = @(Get-ChildItem -Path $packageDir -Filter *.zip)
+          if ($msiPackages.Count -ne 1) {
+            throw "Expected exactly one MSI, found $($msiPackages.Count)."
+          }
+          if ($zipPackages.Count -ne 1) {
+            throw "Expected exactly one ZIP, found $($zipPackages.Count)."
+          }
+
+          foreach ($package in @($msiPackages + $zipPackages)) {
+            if ($package.Name -notlike "*Windows-${{ steps.package.outputs.architecture }}*") {
+              throw "Package name does not include platform architecture: $($package.Name)"
+            }
+            if ($package.Length -le 0) {
+              throw "Package is empty: $($package.FullName)"
+            }
+          }
+
+          $extractDir = Join-Path $env:RUNNER_TEMP "skygate-windows-package"
+          Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $extractDir | Out-Null
+          Expand-Archive -Path $zipPackages[0].FullName -DestinationPath $extractDir
+
+          $executable = Get-ChildItem -Path $extractDir -Recurse -Filter skygate-ui.exe | Select-Object -First 1
+          if (-not $executable) {
+            throw "ZIP package does not contain skygate-ui.exe."
+          }
+          $qtCore = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Core.dll | Select-Object -First 1
+          if (-not $qtCore) {
+            throw "ZIP package does not contain Qt6Core.dll."
+          }
+          $qtQuick = Get-ChildItem -Path $extractDir -Recurse -Filter Qt6Quick.dll | Select-Object -First 1
+          if (-not $qtQuick) {
+            throw "ZIP package does not contain Qt6Quick.dll."
+          }
 
       - name: Upload installer packages
         uses: actions/upload-artifact@v7
