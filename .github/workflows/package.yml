@@ -1,10 +1,15 @@
 name: Package
 
 on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: package-${{ github.workflow }}-${{ github.ref }}
@@ -82,14 +87,45 @@ jobs:
       - name: Verify test fixtures
         run: git lfs fsck
 
+      - name: Resolve package metadata
+        id: package
+        run: |
+          short_sha="${GITHUB_SHA::12}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME}"
+            artifact_name="SkyGate-Linux-AppImage-${GITHUB_REF_NAME}"
+            release_title="SkyGate ${GITHUB_REF_NAME}"
+          else
+            version="latest-${short_sha}"
+            artifact_name="SkyGate-Linux-AppImage-latest-${short_sha}"
+            release_title=""
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "artifact_name=${artifact_name}" >> "${GITHUB_OUTPUT}"
+          echo "release_title=${release_title}" >> "${GITHUB_OUTPUT}"
+
       - name: Build AppImage
         env:
-          SKYGATE_APPIMAGE_VERSION: ${{ github.sha }}
+          SKYGATE_APPIMAGE_VERSION: ${{ steps.package.outputs.version }}
         run: ./packaging/linux/build-appimage.sh
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
         with:
-          name: SkyGate-Linux-AppImage
+          name: ${{ steps.package.outputs.artifact_name }}
           path: dist/*.AppImage
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/*.AppImage --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/*.AppImage \
+              --title "${{ steps.package.outputs.release_title }}" \
+              --generate-notes
+          fi
