@@ -60,7 +60,8 @@
                 "rhs": "Linux"
             },
             "cacheVariables": {
-                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_LINK_DEPENDS_USE_LINKER": "FALSE"
             }
         },
         {
