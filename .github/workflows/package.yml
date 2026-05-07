@@ -1,0 +1,95 @@
+name: Package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-appimage:
+    name: Linux AppImage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            cmake \
+            curl \
+            file \
+            git \
+            libdbus-1-dev \
+            libegl1-mesa-dev \
+            libfontconfig1 \
+            libfreetype6 \
+            libgl-dev \
+            libgl1 \
+            libglib2.0-0 \
+            libglx-dev \
+            libice6 \
+            libopengl-dev \
+            libsm6 \
+            libx11-xcb1 \
+            libxau6 \
+            libxcb-cursor0 \
+            libxcb-glx0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-shm0 \
+            libxcb-sync1 \
+            libxcb-xfixes0 \
+            libxcb-xinerama0 \
+            libxcb1 \
+            libxcursor1 \
+            libxdmcp6 \
+            libxext6 \
+            libxfixes3 \
+            libxi6 \
+            libxinerama1 \
+            libxkbcommon-x11-0 \
+            libxkbcommon0 \
+            libxrandr2 \
+            libxrender1 \
+            mesa-common-dev \
+            ninja-build \
+            zlib1g-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: desktop
+          archives: icu qtbase qtdeclarative
+          cache: true
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Build AppImage
+        env:
+          SKYGATE_APPIMAGE_VERSION: ${{ github.sha }}
+        run: ./packaging/linux/build-appimage.sh
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: SkyGate-Linux-AppImage
+          path: dist/*.AppImage
+          if-no-files-found: error

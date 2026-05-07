@@ -266,6 +266,18 @@ cmake --build --preset ui-package-windows-vcpkg
 The Windows package output includes a portable ZIP and, when WiX is available,
 an `.msi` installer.
 
+On Linux, build a release AppImage with:
+
+```bash
+export CMAKE_PREFIX_PATH=/path/to/Qt/6.x/gcc_64
+./packaging/linux/build-appimage.sh
+```
+
+The script configures a release UI build, installs it into an AppDir, downloads
+`linuxdeploy` plus the Qt plugin, bundles Qt/QML dependencies, and writes the
+AppImage under `dist/`. It expects CMake, Ninja, curl, zlib development files,
+standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop install.
+
 On macOS with vcpkg-managed zlib:
 
 ```bash

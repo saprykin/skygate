@@ -4,5 +4,6 @@
 build/
 build-*/
 install/
+dist/
 CMakeLists.txt.user
 CMakeUserPresets.json

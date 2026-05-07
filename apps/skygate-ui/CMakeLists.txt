@@ -265,6 +265,19 @@ install(TARGETS skygate-ui
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+if(UNIX AND NOT APPLE)
+    install(FILES linux/com.skygate.SkyGate.desktop
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+    )
+
+    foreach(skygateIconSize IN ITEMS 16 32 64 128 256 512 1024)
+        install(FILES resources/icons/skygate-icon-${skygateIconSize}.png
+            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/${skygateIconSize}x${skygateIconSize}/apps
+            RENAME skygate.png
+        )
+    endforeach()
+endif()
+
 if(APPLE AND skygateMacDeployQtExecutable)
     install(CODE "
         set(skygateInstalledBundle \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_FILE_NAME:skygate-ui>.app\")

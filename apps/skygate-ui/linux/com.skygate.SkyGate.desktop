@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SkyGate
+Comment=Interactive desktop sky visualization
+Exec=skygate-ui
+Icon=skygate
+Terminal=false
+Categories=Education;Science;Astronomy;
