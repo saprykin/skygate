@@ -8,6 +8,8 @@ ApplicationWindow {
     objectName: "mainWindow"
     width: 1100
     height: 760
+    minimumWidth: 560
+    minimumHeight: 420
     visible: true
     title: "SkyGate"
 

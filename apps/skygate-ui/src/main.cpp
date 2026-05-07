@@ -1,6 +1,7 @@
 #include "SkyContextController.hpp"
 #include "SkyLogging.hpp"
 #include "SkySceneModel.hpp"
+#include "SkySettingsStore.hpp"
 #include "SkyViewportItem.hpp"
 #include "MacDockIcon.hpp"
 
@@ -15,6 +16,7 @@
 #include <QSize>
 #include <QSysInfo>
 #include <QWindow>
+#include <QVariantMap>
 #include <qqml.h>
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -250,6 +252,7 @@ int main(int argc, char* argv[])
     }
     SkySceneModel skySceneModel;
     skySceneModel.setSkyContextController(&skyContextController);
+    SkySettingsStore settingsStore;
     QObject::connect(
         &app,
         &QCoreApplication::aboutToQuit,
@@ -263,6 +266,11 @@ int main(int argc, char* argv[])
     qmlRegisterType<SkyViewportItem>("com.skygate.app", 1, 0, "SkyViewportItem");
 
     QQmlApplicationEngine engine;
+    const QSize initialMainWindowSize = settingsStore.loadMainWindowSize();
+    engine.setInitialProperties(QVariantMap {
+        {QStringLiteral("width"), initialMainWindowSize.width()},
+        {QStringLiteral("height"), initialMainWindowSize.height()}
+    });
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);
     engine.rootContext()->setContextProperty("skyScene", &skySceneModel);
     engine.rootContext()->setContextProperty(
@@ -282,6 +290,14 @@ int main(int argc, char* argv[])
     for (QObject* rootObject : engine.rootObjects()) {
         if (QWindow* rootWindow = qobject_cast<QWindow*>(rootObject)) {
             rootWindow->setIcon(appIcon);
+            QObject::connect(
+                &app,
+                &QGuiApplication::lastWindowClosed,
+                rootWindow,
+                [rootWindow, &settingsStore] {
+                    (void)settingsStore.saveMainWindowSize(rootWindow->size());
+                }
+            );
         }
     }
     return app.exec();

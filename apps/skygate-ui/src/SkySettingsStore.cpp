@@ -20,6 +20,31 @@ namespace {
 Q_LOGGING_CATEGORY(skygateSettingsLog, "skygate.settings")
 Q_LOGGING_CATEGORY(skygateCatalogCacheLog, "skygate.catalog.cache")
 
+constexpr int kDefaultMainWindowWidth = 1100;
+constexpr int kDefaultMainWindowHeight = 760;
+constexpr int kMinimumMainWindowWidth = 560;
+constexpr int kMinimumMainWindowHeight = 420;
+
+QString appSettingsKey(const char* name)
+{
+    return QStringLiteral("app/%1").arg(QString::fromUtf8(name));
+}
+
+QSize normalizedMainWindowSize(const QSize& size) noexcept
+{
+    return QSize(
+        size.width() >= kMinimumMainWindowWidth ? size.width() : kDefaultMainWindowWidth,
+        size.height() >= kMinimumMainWindowHeight ? size.height() : kDefaultMainWindowHeight
+    );
+}
+
+int readWindowDimension(QSettings& settings, const QString& key, const int fallback)
+{
+    bool ok = false;
+    const int value = settings.value(key, fallback).toInt(&ok);
+    return ok ? value : fallback;
+}
+
 void appendCachePath(QStringList& cachePaths, const QString& path)
 {
     if (!path.isEmpty() && !cachePaths.contains(path)) {
@@ -60,6 +85,29 @@ std::optional<SkySettingsStore::StateSnapshot> SkySettingsStore::loadState() con
 {
     QSettings settings;
     return loadStateSnapshot(settings);
+}
+
+bool SkySettingsStore::saveMainWindowSize(const QSize& size) const
+{
+    QSettings settings;
+    const QSize normalizedSize = normalizedMainWindowSize(size);
+    settings.setValue(appSettingsKey("mainWindowWidth"), normalizedSize.width());
+    settings.setValue(appSettingsKey("mainWindowHeight"), normalizedSize.height());
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateSettingsLog) << "Failed to save SkyGate main window size";
+        return false;
+    }
+    return true;
+}
+
+QSize SkySettingsStore::loadMainWindowSize() const
+{
+    QSettings settings;
+    return normalizedMainWindowSize(QSize(
+        readWindowDimension(settings, appSettingsKey("mainWindowWidth"), kDefaultMainWindowWidth),
+        readWindowDimension(settings, appSettingsKey("mainWindowHeight"), kDefaultMainWindowHeight)
+    ));
 }
 
 bool SkySettingsStore::clearCatalogCache() const

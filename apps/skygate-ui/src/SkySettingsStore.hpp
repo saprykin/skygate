@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QSize>
 #include <QString>
 #include <QtGlobal>
 
@@ -54,6 +55,8 @@ public:
 public:
     [[nodiscard]] bool saveState(const StateSnapshot& snapshot) const;
     [[nodiscard]] std::optional<StateSnapshot> loadState() const;
+    [[nodiscard]] bool saveMainWindowSize(const QSize& size) const;
+    [[nodiscard]] QSize loadMainWindowSize() const;
     [[nodiscard]] bool clearCatalogCache() const;
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
     [[nodiscard]] bool saveCatalogCache(const CatalogCacheSnapshot& snapshot) const;
