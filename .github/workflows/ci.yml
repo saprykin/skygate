@@ -81,6 +81,45 @@ jobs:
         if: always()
         run: ccache --show-stats
 
+  macos-core:
+    name: macOS
+    runs-on: macos-15
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          target: desktop
+          archives: qtbase
+          cache: true
+
+      - name: Verify test fixtures
+        run: git lfs fsck
+
+      - name: Configure
+        run: >
+          cmake --preset core-debug
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          -DSKYGATE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build --preset core-debug --parallel
+
+      - name: Test
+        run: >
+          ctest --test-dir build-make/core-debug
+          --parallel 2
+          -LE slow
+          --output-on-failure
+          --no-tests=error
+
   windows-core:
     name: Windows
     runs-on: windows-2022
