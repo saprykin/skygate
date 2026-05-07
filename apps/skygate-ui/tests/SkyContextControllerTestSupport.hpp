@@ -254,8 +254,6 @@ double azimuthDifferenceDeg(const double lhs, const double rhs)
 
 #if SKYGATE_HAS_POSITIONING
 class FakePositionSource final : public QGeoPositionInfoSource {
-    Q_OBJECT
-
 public:
     explicit FakePositionSource(QObject* parent = nullptr)
         : QGeoPositionInfoSource(parent)
@@ -336,4 +334,3 @@ private:
 #endif
 
 }  // namespace
-
