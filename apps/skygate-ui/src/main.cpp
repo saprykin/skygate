@@ -163,7 +163,9 @@ StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& argum
 int main(int argc, char* argv[])
 {
     // Prevent stale cached QML artifacts from surfacing outdated warnings at launch.
+#if !defined(NDEBUG)
     qputenv("QML_DISABLE_DISK_CACHE", "1");
+#endif
     qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
 
     QGuiApplication app(argc, argv);

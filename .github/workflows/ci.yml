@@ -41,7 +41,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.11.0'
           target: desktop
           archives: icu qtbase
           cache: true
@@ -95,7 +95,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.11.0'
           target: desktop
           archives: qtbase
           cache: true
@@ -139,7 +139,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.11.0'
           target: desktop
           arch: win64_msvc2022_64
           archives: qtbase

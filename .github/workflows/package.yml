@@ -77,7 +77,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.11.0'
           target: desktop
           archives: icu qtbase qtdeclarative
           cache: true
@@ -142,7 +142,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.11.0'
           target: desktop
           archives: qtbase qtdeclarative qtpositioning
           cache: true
@@ -175,6 +175,24 @@ jobs:
 
       - name: Build DMG
         run: cmake --build build-macos-dmg --target package-skygate-ui-dmg --parallel
+
+      - name: Inspect packaged app
+        run: |
+          app="build-macos-dmg/apps/skygate-ui/SkyGate-dmg/SkyGate.app"
+          executable="${app}/Contents/MacOS/SkyGate"
+          if [[ ! -x "${executable}" ]]; then
+            echo "Missing packaged executable: ${executable}" >&2
+            exit 1
+          fi
+
+          file "${executable}"
+          lipo -info "${executable}"
+          otool -L "${executable}"
+          find "${app}/Contents/Frameworks" -maxdepth 3 -type f -print | while IFS= read -r file_path; do
+            if [[ -x "${file_path}" ]]; then
+              file "${file_path}"
+            fi
+          done
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7
