@@ -49,12 +49,42 @@
             }
         },
         {
+            "name": "ci-linux-base",
+            "hidden": true,
+            "inherits": "base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+            }
+        },
+        {
             "name": "core-debug",
             "inherits": "base",
             "displayName": "Core Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF"
+            }
+        },
+        {
+            "name": "ci-core-debug",
+            "inherits": "ci-linux-base",
+            "displayName": "CI Core Debug",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_BUILD_TESTS": "ON"
             }
         },
         {
@@ -170,6 +200,15 @@
         {
             "name": "core-debug",
             "configurePreset": "core-debug"
+        },
+        {
+            "name": "ci-core-debug",
+            "configurePreset": "ci-core-debug",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
         },
         {
             "name": "ui-debug",
