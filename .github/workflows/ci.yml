@@ -93,7 +93,7 @@ jobs:
           lfs: true
 
       - name: Set up MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
 
