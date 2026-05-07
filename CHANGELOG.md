@@ -24,7 +24,7 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 - Object rise, set, culmination, and angle details.
 - Configurable terminal/file logging with log-level controls.
 - Linux, macOS, and Windows GitHub Actions CI builds.
-- Manual and tag-triggered package workflow for AppImage, DMG, MSI, and ZIP
+- Manual and tag-triggered package workflow for AppImage, DMG, and MSI
   artifacts.
 - Release tag validation to keep `v*` tags aligned with the CMake application
   version.
@@ -35,6 +35,7 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 - Linux AppImage packaging support.
 - Windows WiX MSI packaging support.
 - vcpkg-backed zlib dependency management for Windows and macOS packaging.
+- Main window size persistence across app launches.
 - Extensive Qt, QML, catalog, ephemeris, geometry, property, regression, and
   performance guard tests.
 
@@ -77,11 +78,12 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
   paths, and LFS-backed fixtures.
 - macOS deployment warnings from private SQL plugins.
 - Packaged macOS viewport pan performance.
+- Windows packages now embed SkyGate icons and include vcpkg runtime DLLs
+  required by the installer payload.
 
 ### Documentation
 
-- Updated README packaging instructions for AppImage, DMG, Windows ZIP, and
-  WiX MSI outputs.
+- Updated README packaging instructions for AppImage, DMG, and WiX MSI outputs.
 - Added a release checklist covering version bumps, changelog updates, tag
   validation, package workflows, and artifact verification.
 - Expanded architecture documentation for the current scene, catalog, settings,

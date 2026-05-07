@@ -17,7 +17,7 @@ are cut from `master` with tags named `vX.Y.Z`.
 - Download and smoke-test the manual package artifacts:
   - Linux AppImage starts on a compatible Linux machine.
   - macOS DMG opens and `SkyGate.app` starts.
-  - Windows ZIP or MSI installs/starts on Windows.
+  - Windows MSI installs/starts on Windows.
 
 ## Tag And Package
 
@@ -40,7 +40,6 @@ git push origin vX.Y.Z
   - `SkyGate-*-Linux-*.AppImage`
   - `SkyGate-*-Darwin-*.dmg`
   - `SkyGate-*-Windows-*.msi`
-  - `SkyGate-*-Windows-*.zip`
 - Manual package workflow artifacts are retained for 30 days. Tagged release
   assets attached to GitHub Releases are retained permanently unless removed.
 

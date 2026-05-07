@@ -266,10 +266,9 @@ and discoverable:
 cmake --build build --target package-skygate-ui-dmg
 ```
 
-All platforms with UI builds also get standard CMake install and ZIP package
-targets. On Windows, the package target also produces a WiX MSI installer when
-the WiX Toolset is installed and discoverable by CPack. Build the release vcpkg
-package like this:
+All platforms with UI builds get standard CMake install targets. On Windows,
+the package target produces a WiX MSI installer when the WiX Toolset is
+installed and discoverable by CPack. Build the release vcpkg package like this:
 
 ```powershell
 cmake --preset ui-release-windows-vcpkg
@@ -277,8 +276,7 @@ cmake --build --preset ui-install-windows-vcpkg
 cmake --build --preset ui-package-windows-vcpkg
 ```
 
-The Windows package output includes a portable ZIP and, when WiX is available,
-an `.msi` installer.
+The Windows package output is an `.msi` installer.
 
 On Linux, build a release AppImage with:
 
@@ -294,7 +292,7 @@ standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop install.
 The manual `Package` GitHub Actions workflow builds the same AppImage as a
 downloadable artifact alongside the macOS DMG and Windows installer packages.
 Manual runs produce `latest-<sha>` artifacts, and `v*` tags publish versioned
-AppImages, DMGs, MSIs, and ZIPs to GitHub Releases. See
+AppImages, DMGs, and MSIs to GitHub Releases. See
 [docs/RELEASE.md](docs/RELEASE.md) for the release checklist and
 [CHANGELOG.md](CHANGELOG.md) for release notes.
 
