@@ -23,8 +23,20 @@
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <string>
 #include <utility>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 #ifndef SKYGATE_APP_VERSION
 #define SKYGATE_APP_VERSION "0.0.0"
@@ -51,6 +63,39 @@ bool hasArgument(const int argc, char* argv[], const char* expectedArgument) noe
     }
 
     return false;
+}
+
+void writeVersionOutput(const char* appVersion, const char* gitHash, const char* qtVersion)
+{
+#if defined(_WIN32)
+    const std::string output = std::string("SkyGate ") + appVersion + " (git "
+        + gitHash + ", Qt " + qtVersion + ")\n";
+    const auto writeToStdout = [&output]() noexcept {
+        const HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdoutHandle == nullptr || stdoutHandle == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+
+        DWORD bytesWritten = 0;
+        return WriteFile(
+            stdoutHandle,
+            output.data(),
+            static_cast<DWORD>(output.size()),
+            &bytesWritten,
+            nullptr
+        ) != 0;
+    };
+
+    if (writeToStdout()) {
+        return;
+    }
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        writeToStdout();
+        FreeConsole();
+    }
+#else
+    std::printf("SkyGate %s (git %s, Qt %s)\n", appVersion, gitHash, qtVersion);
+#endif
 }
 
 struct StartupLoggingConfiguration final {
@@ -178,12 +223,7 @@ StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& argum
 int main(int argc, char* argv[])
 {
     if (hasArgument(argc, argv, "--version")) {
-        std::printf(
-            "SkyGate %s (git %s, Qt %s)\n",
-            SKYGATE_APP_VERSION,
-            SKYGATE_GIT_HASH,
-            qVersion()
-        );
+        writeVersionOutput(SKYGATE_APP_VERSION, SKYGATE_GIT_HASH, qVersion());
         return EXIT_SUCCESS;
     }
 

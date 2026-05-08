@@ -184,8 +184,22 @@ jobs:
           if (-not $zlib) {
             throw "MSI package does not contain a zlib runtime DLL."
           }
-          $versionOutput = & $($executable.FullName) --version
+          $versionStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+          $versionStartInfo.FileName = $executable.FullName
+          $versionStartInfo.ArgumentList.Add("--version")
+          $versionStartInfo.RedirectStandardOutput = $true
+          $versionStartInfo.RedirectStandardError = $true
+          $versionStartInfo.UseShellExecute = $false
+          $versionStartInfo.CreateNoWindow = $true
+          $versionProcess = [System.Diagnostics.Process]::Start($versionStartInfo)
+          $versionStdout = $versionProcess.StandardOutput.ReadToEnd()
+          $versionStderr = $versionProcess.StandardError.ReadToEnd()
+          $versionProcess.WaitForExit()
+          $versionOutput = "$versionStdout`n$versionStderr".Trim()
           Write-Output $versionOutput
+          if ($versionProcess.ExitCode -ne 0) {
+            throw "Packaged app --version failed with exit code $($versionProcess.ExitCode): $versionOutput"
+          }
           if ($versionOutput -notmatch "SkyGate ${{ needs.release-metadata.outputs.app_version }}") {
             throw "Unexpected packaged app version output: $versionOutput"
           }

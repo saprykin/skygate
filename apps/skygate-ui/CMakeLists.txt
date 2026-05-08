@@ -159,6 +159,7 @@ endif()
 
 if(WIN32)
     target_sources(skygate-ui PRIVATE windows/SkyGate.rc)
+    set_target_properties(skygate-ui PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
 qt_add_qml_module(skygate-ui
