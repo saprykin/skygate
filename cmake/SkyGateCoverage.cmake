@@ -184,11 +184,22 @@ function(skygate_add_coverage_targets)
         )
 
         if(SKYGATE_GCOVR_EXECUTABLE)
+            set(skygateGcovrCoverageFilters
+                --filter "${CMAKE_SOURCE_DIR}/libs/.*"
+                --filter "${CMAKE_SOURCE_DIR}/apps/.*"
+                --exclude "${CMAKE_SOURCE_DIR}/.*/tests/.*"
+                --exclude "${CMAKE_BINARY_DIR}/.*"
+                --exclude ".*/moc_[^/]*\\.cpp$"
+                --exclude ".*/qrc_[^/]*\\.cpp$"
+                --exclude ".*/\\.rcc/.*"
+            )
+
             add_custom_target(skygate-coverage-text
                 COMMAND
                     "${SKYGATE_GCOVR_EXECUTABLE}"
                         --root "${CMAKE_SOURCE_DIR}"
                         --object-directory "${CMAKE_BINARY_DIR}"
+                        ${skygateGcovrCoverageFilters}
                         --txt
                         --output "${skygateCoverageDir}/coverage.txt"
                 DEPENDS skygate-coverage-run
@@ -202,6 +213,7 @@ function(skygate_add_coverage_targets)
                     "${SKYGATE_GCOVR_EXECUTABLE}"
                         --root "${CMAKE_SOURCE_DIR}"
                         --object-directory "${CMAKE_BINARY_DIR}"
+                        ${skygateGcovrCoverageFilters}
                         --html-details
                         --output "${skygateCoverageDir}/html/index.html"
                 DEPENDS skygate-coverage-run
@@ -214,6 +226,7 @@ function(skygate_add_coverage_targets)
                     "${SKYGATE_GCOVR_EXECUTABLE}"
                         --root "${CMAKE_SOURCE_DIR}"
                         --object-directory "${CMAKE_BINARY_DIR}"
+                        ${skygateGcovrCoverageFilters}
                         --xml-pretty
                         --output "${skygateCoverageDir}/coverage.xml"
                 DEPENDS skygate-coverage-run
