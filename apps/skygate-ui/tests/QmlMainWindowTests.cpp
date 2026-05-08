@@ -10,6 +10,7 @@ private slots:
     void init();
     void responsiveToolbarPolicyKeepsControlsSeparated();
     void topToolbarsStayAboveOverlay();
+    void footerPopupToolbarToggleClickClosesPopupAndTogglesToolbar();
     void nativeMenuActionsOpenSharedAboutAndPreferencesWindows();
     void compactAppMenuOpensAboutAndPreferencesWindows();
     void mainWindowPreferenceSearchAndTrackingJourney();
@@ -160,6 +161,66 @@ void QmlMainWindowTests::topToolbarsStayAboveOverlay()
     QVERIFY(timelineToolbar->z() > overlayLayer->z());
     QVERIFY(appMenuButton->z() > overlayLayer->z());
     QCOMPARE(timelineToolbar->z(), searchToolbar->z());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlMainWindowTests::footerPopupToolbarToggleClickClosesPopupAndTogglesToolbar()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+    auto sceneModel = makeSceneModel(*controller);
+    QVERIFY(sceneModel != nullptr);
+
+    QQmlApplicationEngine engine;
+    const QmlWarningScope warnings;
+    auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
+    QVERIFY(rootWindow != nullptr);
+
+    auto* timeMouse = firstQuickItemWithObjectName(rootWindow, QStringLiteral("statusTimeMouse"));
+    auto* nightMouse = firstQuickItemWithObjectName(
+        rootWindow,
+        QStringLiteral("nightConditionsMouse")
+    );
+    auto* searchToggle = firstQuickItemWithObjectName(
+        rootWindow,
+        QStringLiteral("searchToolbarToggle")
+    );
+    auto* timelineToggle = firstQuickItemWithObjectName(
+        rootWindow,
+        QStringLiteral("timelineToolbarToggle")
+    );
+    QObject* datePopup = firstObjectWithObjectName(rootWindow, QStringLiteral("dateTimePopup"));
+    QObject* nightPopup = firstObjectWithObjectName(
+        rootWindow,
+        QStringLiteral("nightConditionsPopup")
+    );
+
+    QVERIFY(timeMouse != nullptr);
+    QVERIFY(nightMouse != nullptr);
+    QVERIFY(searchToggle != nullptr);
+    QVERIFY(timelineToggle != nullptr);
+    QVERIFY(datePopup != nullptr);
+    QVERIFY(nightPopup != nullptr);
+
+    const auto clickCenter = [](QQuickItem* item) {
+        return item->mapToScene(QPointF(item->width() / 2.0, item->height() / 2.0)).toPoint();
+    };
+
+    QTest::mouseClick(rootWindow, Qt::LeftButton, Qt::NoModifier, clickCenter(timeMouse));
+    QTRY_VERIFY(datePopup->property("opened").toBool());
+    QVERIFY(!controller->searchToolbarCollapsed());
+
+    QTest::mouseClick(rootWindow, Qt::LeftButton, Qt::NoModifier, clickCenter(searchToggle));
+    QTRY_VERIFY(controller->searchToolbarCollapsed());
+    QTRY_VERIFY(!datePopup->property("opened").toBool());
+
+    QTest::mouseClick(rootWindow, Qt::LeftButton, Qt::NoModifier, clickCenter(nightMouse));
+    QTRY_VERIFY(nightPopup->property("opened").toBool());
+    QVERIFY(!controller->timelineToolbarCollapsed());
+
+    QTest::mouseClick(rootWindow, Qt::LeftButton, Qt::NoModifier, clickCenter(timelineToggle));
+    QTRY_VERIFY(controller->timelineToolbarCollapsed());
+    QTRY_VERIFY(!nightPopup->property("opened").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

@@ -77,20 +77,6 @@ ApplicationWindow {
         }
     }
 
-    StatusDateTimePopup {
-        id: dateTimePopup
-        skyContextController: skyContext
-        popupRightMargin: 8
-        popupBottomMargin: 8
-    }
-
-    StatusNightConditionsPopup {
-        id: nightConditionsPopup
-        skyContextController: skyContext
-        popupRightMargin: 96
-        popupBottomMargin: 8
-    }
-
     function openAboutWindow() {
         aboutWindow.visible = true
         aboutWindow.raise()
@@ -169,6 +155,11 @@ ApplicationWindow {
         }
     }
 
+    function closeFooterPopups() {
+        dateTimePopup.close()
+        nightConditionsPopup.close()
+    }
+
     onWidthChanged: Qt.callLater(collapseTimelineIfBothToolbarsOverlap)
     Component.onCompleted: Qt.callLater(collapseTimelineIfBothToolbarsOverlap)
 
@@ -214,6 +205,7 @@ ApplicationWindow {
             anchors.leftMargin: 6
             skyContextController: skyContext
             onRequestExpand: root.prepareSearchToolbarExpand
+            onToggleClicked: root.closeFooterPopups()
         }
 
         TimelineToolbar {
@@ -224,6 +216,7 @@ ApplicationWindow {
             anchors.margins: 14
             skyContextController: skyContext
             onRequestExpand: root.prepareTimelineToolbarExpand
+            onToggleClicked: root.closeFooterPopups()
         }
 
         SkyOverlayLayer {
@@ -240,5 +233,25 @@ ApplicationWindow {
                 timelineToolbar.toggleItem
             ]
         }
+    }
+
+    StatusDateTimePopup {
+        id: dateTimePopup
+        skyContextController: skyContext
+        popupRightMargin: 8
+        popupBottomMargin: 8
+        scrimTopMargin: Math.max(
+            appMenuButton.y + appMenuButton.height,
+            searchToolbar.y + searchToolbar.height,
+            timelineToolbar.y + timelineToolbar.height
+        ) + 8
+    }
+
+    StatusNightConditionsPopup {
+        id: nightConditionsPopup
+        skyContextController: skyContext
+        popupRightMargin: 96
+        popupBottomMargin: 8
+        scrimTopMargin: dateTimePopup.scrimTopMargin
     }
 }

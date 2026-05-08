@@ -13,6 +13,7 @@ FocusScope {
     property string errorText: ""
     property real popupRightMargin: 8
     property real popupBottomMargin: 56
+    property real scrimTopMargin: 0
     readonly property bool hasInput: stagedDateText.trim() !== "" && stagedTimeText.trim() !== ""
 
     anchors.fill: parent
@@ -64,6 +65,7 @@ FocusScope {
     MouseArea {
         objectName: "dateTimePopupScrim"
         anchors.fill: parent
+        anchors.topMargin: dateTimePopup.scrimTopMargin
         onClicked: dateTimePopup.close()
     }
 

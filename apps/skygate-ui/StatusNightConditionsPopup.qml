@@ -11,6 +11,7 @@ FocusScope {
     property bool opened: false
     property real popupRightMargin: 8
     property real popupBottomMargin: 56
+    property real scrimTopMargin: 0
 
     anchors.fill: parent
     visible: opened
@@ -44,6 +45,7 @@ FocusScope {
     MouseArea {
         objectName: "nightConditionsPopupScrim"
         anchors.fill: parent
+        anchors.topMargin: nightConditionsPopup.scrimTopMargin
         onClicked: nightConditionsPopup.close()
     }
 

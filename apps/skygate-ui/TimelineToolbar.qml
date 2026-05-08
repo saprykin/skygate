@@ -11,6 +11,7 @@ Item {
     property alias toggleItem: timelineToolbarToggle
     readonly property real expandedTotalWidth: timelineToolbarToggle.implicitWidth
         + timelineToolbarPanel.expandedWidth + 6
+    signal toggleClicked()
 
     readonly property var speedValues: [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
     readonly property var stepValues: [1, 10, 60, 300, 3600]
@@ -308,6 +309,7 @@ Item {
             skyContextController.setTimelineToolbarCollapsed(
                 !skyContextController.timelineToolbarCollapsed
             )
+            toolbarRoot.toggleClicked()
         }
         ToolTip.visible: hovered
         ToolTip.delay: 250

@@ -21,6 +21,7 @@ Item {
     readonly property real expandedTotalWidth: searchToolbarPanel.expandedWidth
         + searchToolbarToggle.implicitWidth + 6
     property bool suppressFilterSync: false
+    signal toggleClicked()
     z: 20
 
     function clearSearch() {
@@ -207,6 +208,7 @@ Item {
             skyContextController.setSearchToolbarCollapsed(
                 !skyContextController.searchToolbarCollapsed
             )
+            toolbarRoot.toggleClicked()
         }
         ToolTip.visible: hovered
         ToolTip.delay: 250
