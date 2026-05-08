@@ -186,13 +186,15 @@ also provides report targets:
 ```bash
 cmake --build --preset core-coverage-text
 cmake --build --preset core-coverage-html
+cmake --build --preset core-coverage-codecov
 ```
 
 The text report is written to
 `build-make/core-coverage/coverage/coverage.txt`, and the HTML report starts at
-`build-make/core-coverage/coverage/html/index.html`. Both report targets run
-the registered CTest suite first with `LLVM_PROFILE_FILE` set to collect raw
-profiles.
+`build-make/core-coverage/coverage/html/index.html`. The Codecov report target
+writes `coverage.lcov` for LLVM builds or `coverage.xml` for GCC builds under
+the same coverage directory. Report targets run the registered CTest suite first
+with `LLVM_PROFILE_FILE` set to collect raw profiles on LLVM builds.
 
 Without presets, configure coverage explicitly:
 
@@ -208,8 +210,10 @@ cmake --build build-coverage --target skygate-coverage-html
 ```
 
 GCC builds use `--coverage` instrumentation. If `gcovr` is installed locally,
-the same `skygate-coverage-text` and `skygate-coverage-html` targets generate
-reports under the build tree. No coverage workflow requires network access.
+the same `skygate-coverage-text`, `skygate-coverage-html`, and
+`skygate-coverage-codecov` targets generate reports under the build tree. Local
+coverage workflows do not require network access; GitHub Actions uploads the
+Codecov report on non-PR coverage runs with GitHub OIDC authentication.
 
 ## CMake Presets
 
