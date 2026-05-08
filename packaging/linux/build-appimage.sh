@@ -50,9 +50,21 @@ downloadTool \
     "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${appImageArch}.AppImage" \
     "${linuxdeployQtPlugin}"
 
+qtRootDir="${QT_ROOT_DIR:-}"
+if [[ -z "${qtRootDir}" && -n "${CMAKE_PREFIX_PATH:-}" ]]; then
+    qtPrefixCandidates="${CMAKE_PREFIX_PATH//;/:}"
+    IFS=':' read -r -a qtPrefixPaths <<< "${qtPrefixCandidates}"
+    for qtPrefixPath in "${qtPrefixPaths[@]}"; do
+        if [[ -x "${qtPrefixPath}/bin/qmake" || -x "${qtPrefixPath}/bin/qmake6" ]]; then
+            qtRootDir="${qtPrefixPath}"
+            break
+        fi
+    done
+fi
+
 prefixPath="${CMAKE_PREFIX_PATH:-}"
-if [[ -n "${QT_ROOT_DIR:-}" ]]; then
-    prefixPath="${QT_ROOT_DIR}${prefixPath:+;${prefixPath}}"
+if [[ -n "${qtRootDir}" ]]; then
+    prefixPath="${qtRootDir}${prefixPath:+;${prefixPath}}"
 fi
 
 cmakeArgs=(
@@ -93,12 +105,16 @@ fi
 
 mkdir -p "${distDir}"
 
-if [[ -z "${QMAKE:-}" && -n "${QT_ROOT_DIR:-}" && -x "${QT_ROOT_DIR}/bin/qmake" ]]; then
-    export QMAKE="${QT_ROOT_DIR}/bin/qmake"
+if [[ -z "${QMAKE:-}" && -n "${qtRootDir}" ]]; then
+    if [[ -x "${qtRootDir}/bin/qmake" ]]; then
+        export QMAKE="${qtRootDir}/bin/qmake"
+    elif [[ -x "${qtRootDir}/bin/qmake6" ]]; then
+        export QMAKE="${qtRootDir}/bin/qmake6"
+    fi
 fi
 
-if [[ -n "${QT_ROOT_DIR:-}" && -d "${QT_ROOT_DIR}/lib" ]]; then
-    export LD_LIBRARY_PATH="${QT_ROOT_DIR}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+if [[ -n "${qtRootDir}" && -d "${qtRootDir}/lib" ]]; then
+    export LD_LIBRARY_PATH="${qtRootDir}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 fi
 
 export APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}"
