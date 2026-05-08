@@ -137,7 +137,7 @@ jobs:
         run: cmake --build --preset core-coverage-codecov --parallel
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: build-make/core-coverage/coverage/coverage.xml
           flags: core
