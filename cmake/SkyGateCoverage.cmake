@@ -204,6 +204,7 @@ function(skygate_add_coverage_targets)
                         --output "${skygateCoverageDir}/coverage.txt"
                 DEPENDS skygate-coverage-run
                 USES_TERMINAL
+                VERBATIM
                 COMMENT "Generate SkyGate gcovr text coverage report"
             )
 
@@ -218,6 +219,7 @@ function(skygate_add_coverage_targets)
                         --output "${skygateCoverageDir}/html/index.html"
                 DEPENDS skygate-coverage-run
                 USES_TERMINAL
+                VERBATIM
                 COMMENT "Generate SkyGate gcovr HTML coverage report"
             )
 
@@ -231,6 +233,7 @@ function(skygate_add_coverage_targets)
                         --output "${skygateCoverageDir}/coverage.xml"
                 DEPENDS skygate-coverage-run
                 USES_TERMINAL
+                VERBATIM
                 COMMENT "Generate SkyGate gcovr XML coverage report for Codecov"
             )
         else()
