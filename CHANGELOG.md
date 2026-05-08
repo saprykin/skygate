@@ -7,6 +7,8 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-08
+
 ### Added
 
 - Search across sky objects, with target selection and object tracking.
