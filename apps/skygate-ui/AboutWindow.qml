@@ -17,9 +17,10 @@ Window {
     readonly property var theme: skyContext.theme
     color: theme.windowBackground
     property Window transientParentWindow
-    transientParent: transientParentWindow
-    flags: Qt.Dialog | Qt.FramelessWindowHint
-    modality: Qt.WindowModal
+    readonly property bool useAttachedDialog: Qt.platform.os !== "linux"
+    transientParent: useAttachedDialog ? transientParentWindow : null
+    flags: (useAttachedDialog ? Qt.Dialog : Qt.Window) | Qt.FramelessWindowHint
+    modality: useAttachedDialog ? Qt.WindowModal : Qt.NonModal
     readonly property int currentYear: (new Date()).getFullYear()
 
     Shortcut {

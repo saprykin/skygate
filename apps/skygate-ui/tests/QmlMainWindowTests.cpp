@@ -251,6 +251,8 @@ void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
     QObject* aboutWindow = windowWithObjectName(rootWindow, QStringLiteral("aboutWindow"));
     QVERIFY(aboutWindow != nullptr);
     QTRY_VERIFY(aboutWindow->property("visible").toBool());
+    auto* aboutQuickWindow = qobject_cast<QQuickWindow*>(aboutWindow);
+    QVERIFY(aboutQuickWindow != nullptr);
 
     QObject* preferencesItem = firstObjectWithObjectName(
         rootWindow,
@@ -267,6 +269,18 @@ void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
     auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
     QVERIFY(preferencesQuickWindow != nullptr);
+
+#ifdef Q_OS_LINUX
+    QCOMPARE(aboutQuickWindow->transientParent(), nullptr);
+    QCOMPARE(aboutQuickWindow->modality(), Qt::NonModal);
+    QCOMPARE(preferencesQuickWindow->transientParent(), nullptr);
+    QCOMPARE(preferencesQuickWindow->modality(), Qt::NonModal);
+#else
+    QCOMPARE(aboutQuickWindow->transientParent(), rootWindow);
+    QCOMPARE(aboutQuickWindow->modality(), Qt::WindowModal);
+    QCOMPARE(preferencesQuickWindow->transientParent(), rootWindow);
+    QCOMPARE(preferencesQuickWindow->modality(), Qt::WindowModal);
+#endif
 
     QStringList unexpectedWarnings = warnings.messages();
     unexpectedWarnings.removeAll(QStringLiteral("This plugin does not support raise()"));

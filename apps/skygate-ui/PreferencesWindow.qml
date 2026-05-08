@@ -16,9 +16,10 @@ Window {
     color: skyContext.theme.windowBackground
     required property var skyContextController
     property Window transientParentWindow
-    transientParent: transientParentWindow
-    flags: Qt.Dialog | Qt.FramelessWindowHint
-    modality: Qt.WindowModal
+    readonly property bool useAttachedDialog: Qt.platform.os !== "linux"
+    transientParent: useAttachedDialog ? transientParentWindow : null
+    flags: (useAttachedDialog ? Qt.Dialog : Qt.Window) | Qt.FramelessWindowHint
+    modality: useAttachedDialog ? Qt.WindowModal : Qt.NonModal
 
     property color cardBackground: skyContext.theme.cardBackground
     property color cardBackgroundBottom: skyContext.theme.cardBackgroundBottom
