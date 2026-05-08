@@ -9,6 +9,14 @@ SkyGate is a Qt 6 desktop application for exploring an interactive sky view.
 It combines reusable projection math and ephemeris libraries with a Qt Quick UI
 that renders stars, constellations, the horizon, and overlay labels.
 
+<p align="center">
+  <img
+    src="docs/assets/skygate-screenshot.png"
+    alt="SkyGate interactive sky view with constellations, horizon, and object labels"
+    width="900"
+  />
+</p>
+
 ## Highlights
 
 - Interactive sky map with pan, zoom, hover, and label overlays
