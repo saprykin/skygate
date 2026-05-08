@@ -194,8 +194,10 @@ The text report is written to
 `build-make/core-coverage/coverage/coverage.txt`, and the HTML report starts at
 `build-make/core-coverage/coverage/html/index.html`. The Codecov report target
 writes `coverage.lcov` for LLVM builds or `coverage.xml` for GCC builds under
-the same coverage directory. Report targets run the registered CTest suite first
-with `LLVM_PROFILE_FILE` set to collect raw profiles on LLVM builds.
+the same coverage directory. Coverage reports focus on production sources under
+`libs` and `apps`, excluding tests, build-tree files, and generated Qt sources.
+Report targets run the registered CTest suite first with `LLVM_PROFILE_FILE`
+set to collect raw profiles on LLVM builds.
 
 Without presets, configure coverage explicitly:
 
