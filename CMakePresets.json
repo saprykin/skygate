@@ -241,6 +241,13 @@
             ]
         },
         {
+            "name": "core-coverage-codecov",
+            "configurePreset": "core-coverage",
+            "targets": [
+                "skygate-coverage-codecov"
+            ]
+        },
+        {
             "name": "core-debug-windows-vcpkg",
             "configurePreset": "core-debug-windows-vcpkg",
             "condition": {

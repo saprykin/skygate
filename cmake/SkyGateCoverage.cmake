@@ -157,6 +157,22 @@ function(skygate_add_coverage_targets)
             USES_TERMINAL
             COMMENT "Generate SkyGate LLVM HTML coverage report"
         )
+
+        add_custom_target(skygate-coverage-codecov
+            COMMAND
+                ${CMAKE_COMMAND}
+                    "-DSKYGATE_LLVM_COV_EXECUTABLE=${SKYGATE_LLVM_COV_EXECUTABLE}"
+                    "-DSKYGATE_LLVM_PROFDATA_EXECUTABLE=${SKYGATE_LLVM_PROFDATA_EXECUTABLE}"
+                    "-DSKYGATE_COVERAGE_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+                    "-DSKYGATE_COVERAGE_BINARY_DIR=${CMAKE_BINARY_DIR}"
+                    "-DSKYGATE_COVERAGE_OUTPUT_DIR=${skygateCoverageDir}"
+                    "-DSKYGATE_COVERAGE_FORMAT=lcov"
+                    "-DSKYGATE_COVERAGE_OBJECTS=$<JOIN:${skygateCoverageObjectPaths},,>"
+                    -P "${CMAKE_SOURCE_DIR}/cmake/SkyGateCoverageReport.cmake"
+            DEPENDS skygate-coverage-run
+            USES_TERMINAL
+            COMMENT "Generate SkyGate LLVM LCOV coverage report for Codecov"
+        )
     elseif(SKYGATE_COVERAGE_ENGINE STREQUAL "gcov")
         add_custom_target(skygate-coverage-run
             COMMAND ${CMAKE_COMMAND} -E rm -rf "${skygateCoverageDir}"
@@ -192,10 +208,22 @@ function(skygate_add_coverage_targets)
                 USES_TERMINAL
                 COMMENT "Generate SkyGate gcovr HTML coverage report"
             )
+
+            add_custom_target(skygate-coverage-codecov
+                COMMAND
+                    "${SKYGATE_GCOVR_EXECUTABLE}"
+                        --root "${CMAKE_SOURCE_DIR}"
+                        --object-directory "${CMAKE_BINARY_DIR}"
+                        --xml-pretty
+                        --output "${skygateCoverageDir}/coverage.xml"
+                DEPENDS skygate-coverage-run
+                USES_TERMINAL
+                COMMENT "Generate SkyGate gcovr XML coverage report for Codecov"
+            )
         else()
             message(WARNING
                 "gcovr was not found; coverage instrumentation and skygate-coverage-run are enabled, "
-                "but text/html report targets will not be generated."
+                "but report targets will not be generated."
             )
         endif()
     endif()

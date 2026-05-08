@@ -120,6 +120,32 @@ elseif(SKYGATE_COVERAGE_FORMAT STREQUAL "html")
     endif()
 
     message(STATUS "Coverage HTML report written to ${skygateHtmlReportDir}/index.html")
+elseif(SKYGATE_COVERAGE_FORMAT STREQUAL "lcov")
+    execute_process(
+        COMMAND
+            "${SKYGATE_LLVM_COV_EXECUTABLE}"
+                export
+                "${skygatePrimaryCoverageObject}"
+                ${skygateAdditionalCoverageObjects}
+                "-instr-profile=${skygateCoverageProfdata}"
+                "-ignore-filename-regex=${skygateIgnoreFilenameRegex}"
+                -format=lcov
+                "${SKYGATE_COVERAGE_SOURCE_DIR}/libs"
+                "${SKYGATE_COVERAGE_SOURCE_DIR}/apps"
+        RESULT_VARIABLE skygateCoverageResult
+        OUTPUT_VARIABLE skygateCoverageOutput
+        ERROR_VARIABLE skygateCoverageError
+    )
+    if(NOT skygateCoverageResult EQUAL 0)
+        message(FATAL_ERROR
+            "llvm-cov export failed with exit code ${skygateCoverageResult}.\n"
+            "${skygateCoverageOutput}\n${skygateCoverageError}"
+        )
+    endif()
+
+    set(skygateLcovReport "${SKYGATE_COVERAGE_OUTPUT_DIR}/coverage.lcov")
+    file(WRITE "${skygateLcovReport}" "${skygateCoverageOutput}")
+    message(STATUS "Coverage LCOV report written to ${skygateLcovReport}")
 else()
     message(FATAL_ERROR "Unsupported coverage format: ${SKYGATE_COVERAGE_FORMAT}")
 endif()
