@@ -11,8 +11,8 @@ that renders stars, constellations, the horizon, and overlay labels.
 
 <p align="center">
   <img
-    src="docs/assets/skygate-screenshot.png"
-    alt="SkyGate interactive sky view with constellations, horizon, and object labels"
+    src="docs/assets/skygate_screenshot.png"
+    alt="SkyGate sky map with constellations and object labels"
     width="900"
   />
 </p>
