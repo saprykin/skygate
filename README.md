@@ -213,7 +213,7 @@ GCC builds use `--coverage` instrumentation. If `gcovr` is installed locally,
 the same `skygate-coverage-text`, `skygate-coverage-html`, and
 `skygate-coverage-codecov` targets generate reports under the build tree. Local
 coverage workflows do not require network access; GitHub Actions uploads the
-Codecov report when `CODECOV_TOKEN` is configured for the repository.
+Codecov report on non-PR coverage runs with GitHub OIDC authentication.
 
 ## CMake Presets
 
