@@ -86,6 +86,10 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 - Updated README packaging instructions for AppImage, DMG, and WiX MSI outputs.
 - Added a release checklist covering version bumps, changelog updates, tag
   validation, package workflows, and artifact verification.
+- Clarified release documentation around the separate Linux, macOS, and Windows
+  package workflows.
+- Documented the macOS quarantine removal command required for unsigned,
+  non-notarized DMG installs.
 - Expanded architecture documentation for the current scene, catalog, settings,
   and rendering boundaries.
 

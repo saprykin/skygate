@@ -11,9 +11,10 @@ are cut from `master` with tags named `vX.Y.Z`.
   `## [X.Y.Z] - YYYY-MM-DD` section.
 - Leave a fresh empty `[Unreleased]` section for the next cycle.
 - Commit the version and changelog updates.
-- Confirm CI is green on `master` for Linux, macOS, and Windows.
-- Run the manual `Package` workflow once from `master` if a preflight package
-  check is desired.
+- Confirm CI is green on `master` for Linux and Windows, and run the manual
+  `CI macOS` workflow if a macOS core preflight is desired.
+- Run the manual `Package Linux`, `Package macOS`, and `Package Windows`
+  workflows from `master` if a preflight package check is desired.
 - Download and smoke-test the manual package artifacts:
   - Linux AppImage starts on a compatible Linux machine.
   - macOS DMG opens and `SkyGate.app` starts.
@@ -28,9 +29,12 @@ git tag -a vX.Y.Z -m "SkyGate vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-- The tag version must match `SKYGATE_APP_VERSION` in `CMakeLists.txt`. The
-  `Package` workflow validates this before building artifacts.
-- Wait for the tag-triggered `Package` workflow to complete.
+- The tag version must match `SKYGATE_APP_VERSION` in `CMakeLists.txt`. Each
+  package workflow validates this before building artifacts.
+- Wait for the tag-triggered package workflows to complete:
+  - `Package Linux`
+  - `Package macOS`
+  - `Package Windows`
 - Confirm all package jobs are green:
   - Linux AppImage
   - macOS DMG
