@@ -223,7 +223,11 @@ computation.
 
 #### Snapshot model
 - `IEphemerisEngine`
-  - Computes a `SkySnapshot` from a `core::SkyContext`.
+  - Pure interface for computing a `SkySnapshot` from a `core::SkyContext`
+    and resolving individual body states.
+- `EphemerisEngineQueries`
+  - Explicit fallback helper for implementations that resolve a body by
+    scanning a computed snapshot.
 - `SkySnapshot`
   - Current context
   - shared immutable catalog body vector
