@@ -32,7 +32,7 @@ void CatalogBodyNormalization::apply(CelestialBody& body)
         body.ephemerisSource = CelestialBodyEphemerisSource::Planet;
         break;
     case CelestialBodyType::Star:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Star;
+        body.ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
         break;
     case CelestialBodyType::Constellation:
         body.ephemerisSource = CelestialBodyEphemerisSource::Constellation;

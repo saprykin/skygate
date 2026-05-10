@@ -5,7 +5,6 @@
 #include "engine/KnownConstellationLookup.hpp"
 #include "engine/MoonEquatorialCalculator.hpp"
 #include "engine/PlanetEquatorialCalculator.hpp"
-#include "engine/StarEquatorialCalculator.hpp"
 #include "engine/SunEquatorialCalculator.hpp"
 
 #include <limits>
@@ -114,7 +113,7 @@ private:
         case CelestialBodyEphemerisSource::Planet:
             return m_planetCalculator.compute(body.id, utcTime);
         case CelestialBodyEphemerisSource::Star:
-            return m_starCalculator.compute(body.id);
+            break;
         case CelestialBodyEphemerisSource::Constellation:
             return m_knownConstellationLookup.equatorialById(body.id);
         case CelestialBodyEphemerisSource::Unresolved:
@@ -128,7 +127,6 @@ private:
     SunEquatorialCalculator m_sunCalculator;
     MoonEquatorialCalculator m_moonCalculator;
     PlanetEquatorialCalculator m_planetCalculator;
-    StarEquatorialCalculator m_starCalculator;
     KnownConstellationLookup m_knownConstellationLookup;
 };
 

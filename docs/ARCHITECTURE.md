@@ -244,8 +244,9 @@ Its responsibilities are:
   - `SunEquatorialCalculator`
   - `MoonEquatorialCalculator`
   - `PlanetEquatorialCalculator`
-  - `StarEquatorialCalculator`
   - `KnownConstellationLookup`
+- consume catalog-owned `fixedEquatorial` coordinates for fixed stars and deep
+  sky objects
 - convert equatorial coordinates to horizontal coordinates via
   `CoordinateTransform`
 
