@@ -109,7 +109,7 @@ private:
 
         switch (body.ephemerisSource) {
         case CelestialBodyEphemerisSource::FixedEquatorial:
-            return body.fixedEquatorial;
+            break;
         case CelestialBodyEphemerisSource::Sun:
             return m_sunCalculator.compute(utcTime);
         case CelestialBodyEphemerisSource::Moon:
