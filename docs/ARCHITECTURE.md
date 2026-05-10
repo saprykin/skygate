@@ -244,9 +244,8 @@ Its responsibilities are:
   - `SunEquatorialCalculator`
   - `MoonEquatorialCalculator`
   - `PlanetEquatorialCalculator`
-  - `KnownConstellationLookup`
-- consume catalog-owned `fixedEquatorial` coordinates for fixed stars and deep
-  sky objects
+- consume catalog-owned `fixedEquatorial` coordinates for fixed stars,
+  constellations, and deep sky objects
 - convert equatorial coordinates to horizontal coordinates via
   `CoordinateTransform`
 
@@ -271,6 +270,10 @@ The pipeline is:
 4. Parsed bodies are normalized by `CatalogBodyNormalization`.
 5. Optional selection/truncation can keep only the brightest bodies.
 6. The final catalog is materialized as `InMemoryStarCatalog`.
+
+Constellation catalog bodies are positioned only when the catalog provides a
+representative fixed-equatorial anchor. Unanchored constellation bodies remain
+unresolved instead of falling back to engine-owned representative coordinates.
 
 The public catalog API intentionally has only narrow front doors:
 

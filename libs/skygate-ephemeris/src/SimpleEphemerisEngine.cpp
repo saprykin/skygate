@@ -2,7 +2,6 @@
 
 #include "common/StringUtilities.hpp"
 #include "engine/CoordinateTransform.hpp"
-#include "engine/KnownConstellationLookup.hpp"
 #include "engine/MoonEquatorialCalculator.hpp"
 #include "engine/PlanetEquatorialCalculator.hpp"
 #include "engine/SunEquatorialCalculator.hpp"
@@ -103,6 +102,10 @@ private:
         const core::UtcTimePoint& utcTime
     ) const
     {
+        if (body.fixedEquatorial.has_value()) {
+            return body.fixedEquatorial;
+        }
+
         switch (body.ephemerisSource) {
         case CelestialBodyEphemerisSource::FixedEquatorial:
             return body.fixedEquatorial;
@@ -115,7 +118,7 @@ private:
         case CelestialBodyEphemerisSource::Star:
             break;
         case CelestialBodyEphemerisSource::Constellation:
-            return m_knownConstellationLookup.equatorialById(body.id);
+            break;
         case CelestialBodyEphemerisSource::Unresolved:
             break;
         }
@@ -127,7 +130,6 @@ private:
     SunEquatorialCalculator m_sunCalculator;
     MoonEquatorialCalculator m_moonCalculator;
     PlanetEquatorialCalculator m_planetCalculator;
-    KnownConstellationLookup m_knownConstellationLookup;
 };
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine()

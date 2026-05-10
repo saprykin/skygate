@@ -35,7 +35,7 @@ void CatalogBodyNormalization::apply(CelestialBody& body)
         body.ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
         break;
     case CelestialBodyType::Constellation:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Constellation;
+        body.ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
         break;
     case CelestialBodyType::DeepSkyObject:
         body.ephemerisSource = body.fixedEquatorial.has_value()
