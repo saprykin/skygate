@@ -13,7 +13,7 @@ private slots:
     void catalogTextFormatsStableStatusMessages();
     void catalogTextComposesSummaryDetails();
     void constellationStoreKeepsCustomRefsAndCounts();
-    void constellationStoreClearsRefsWhenCustomLinesAreEmpty();
+    void constellationStoreFallsBackToMinimalLinesWhenCustomLinesAreEmpty();
 };
 
 void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
@@ -99,7 +99,7 @@ void SkyCatalogInternalsTests::constellationStoreKeepsCustomRefsAndCounts()
     QCOMPARE(store.labelRefVector().front().first, std::string("Demo"));
 }
 
-void SkyCatalogInternalsTests::constellationStoreClearsRefsWhenCustomLinesAreEmpty()
+void SkyCatalogInternalsTests::constellationStoreFallsBackToMinimalLinesWhenCustomLinesAreEmpty()
 {
     skygate::ui::internal::SkyCatalogConstellationStore store;
     store.setLineRefs({{"custom_a", "custom_b"}});
@@ -108,9 +108,10 @@ void SkyCatalogInternalsTests::constellationStoreClearsRefsWhenCustomLinesAreEmp
 
     store.setLineRefs({});
 
-    QVERIFY(store.lineRefs().empty());
-    QVERIFY(store.labelRefs().empty());
-    QCOMPARE(store.count(), 0U);
+    QVERIFY(!store.lineRefs().empty());
+    QVERIFY(!store.labelRefs().empty());
+    QCOMPARE(store.count(), store.labelRefs().size());
+    QVERIFY(store.lineRefVector().front().first != std::string("custom_a"));
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogInternalsTests)

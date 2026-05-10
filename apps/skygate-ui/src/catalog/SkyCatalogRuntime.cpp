@@ -184,7 +184,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::resetConstellationLineRefs()
 {
-    m_constellationRefs.clear();
+    m_constellationRefs.resetToFallback();
     ++m_catalogRevision;
     return SkyCatalogRuntimeResult {
         .catalogChanged = true

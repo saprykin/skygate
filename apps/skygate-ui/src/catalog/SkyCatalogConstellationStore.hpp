@@ -13,7 +13,7 @@ public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
     using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
 
-    void clear();
+    void resetToFallback();
     void setLineRefs(std::vector<ConstellationLineRef> lineRefs);
     void setLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
     void setCount(std::size_t count) noexcept;
