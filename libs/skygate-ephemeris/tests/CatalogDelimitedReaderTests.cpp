@@ -1,5 +1,5 @@
-#include "catalog/CsvRowTokenizer.hpp"
-#include "catalog/DelimitedCatalogReader.hpp"
+#include "catalog/io/CsvRowTokenizer.hpp"
+#include "catalog/io/DelimitedCatalogReader.hpp"
 
 #include <QtTest/QtTest>
 

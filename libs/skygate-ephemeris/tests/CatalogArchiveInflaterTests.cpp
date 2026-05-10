@@ -1,4 +1,4 @@
-#include "catalog/CompressedDataInflater.hpp"
+#include "catalog/io/CompressedDataInflater.hpp"
 
 #include <QtTest/QtTest>
 

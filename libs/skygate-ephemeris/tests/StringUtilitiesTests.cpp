@@ -1,4 +1,4 @@
-#include "common/StringUtilities.hpp"
+#include "StringUtilities.hpp"
 
 #include <QtTest/QtTest>
 

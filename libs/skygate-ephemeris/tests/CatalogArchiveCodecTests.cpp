@@ -1,6 +1,6 @@
 #include "CatalogArchiveTestSupport.hpp"
 
-#include "catalog/ZipCodec.hpp"
+#include "catalog/io/zip/ZipCodec.hpp"
 
 #include <QtTest/QtTest>
 

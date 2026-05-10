@@ -1,4 +1,4 @@
-#include "catalog/CatalogParsingUtilities.hpp"
+#include "catalog/normalize/CatalogParsingUtilities.hpp"
 
 #include <QtTest/QtTest>
 

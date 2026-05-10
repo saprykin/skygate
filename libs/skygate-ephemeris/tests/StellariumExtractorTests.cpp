@@ -1,6 +1,6 @@
-#include "catalog/StellariumHipParser.hpp"
-#include "catalog/StellariumLabelRefExtractor.hpp"
-#include "catalog/StellariumLineRefExtractor.hpp"
+#include "catalog/stellarium/StellariumHipParser.hpp"
+#include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
+#include "catalog/stellarium/StellariumLineRefExtractor.hpp"
 
 #include <QJsonArray>
 #include <QByteArray>

@@ -1,4 +1,4 @@
-#include "catalog/CatalogPayloadFormatDetector.hpp"
+#include "catalog/io/CatalogPayloadFormatDetector.hpp"
 
 #include <QtTest/QtTest>
 

@@ -27,55 +27,55 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/ObservationEventCalculator.hpp
     include/skygate/ephemeris/StellariumConstellationParser.hpp
     include/skygate/ephemeris/Types.hpp
-    src/common/StringUtilities.hpp
-    src/catalog/CatalogBodyNormalization.hpp
-    src/catalog/CatalogBodyParseResult.hpp
-    src/catalog/BundledCatalogParser.hpp
-    src/catalog/CatalogIdentity.hpp
-    src/catalog/CatalogParsingUtilities.hpp
-    src/catalog/CatalogPayloadFormatDetector.hpp
-    src/catalog/CatalogZipEntrySelector.hpp
-    src/catalog/CompressedDataInflater.hpp
-    src/catalog/CoreBodyCatalogAugmenter.hpp
-    src/catalog/DeepSkyCatalogMerger.hpp
-    src/catalog/DelimitedCatalogReader.hpp
-    src/catalog/OpenNgcObjectMapper.hpp
-    src/catalog/StellariumHipParser.hpp
-    src/catalog/StellariumLabelRefExtractor.hpp
-    src/catalog/StellariumLineRefExtractor.hpp
-    src/catalog/ZipBinaryUtilities.hpp
-    src/common/StringUtilities.cpp
-    src/catalog/CatalogBodyNormalization.cpp
-    src/catalog/CatalogIdentity.cpp
+    src/StringUtilities.hpp
+    src/catalog/normalize/CatalogBodyNormalization.hpp
+    src/catalog/model/CatalogBodyParseResult.hpp
+    src/catalog/bundled/BundledCatalogParser.hpp
+    src/catalog/model/CatalogIdentity.hpp
+    src/catalog/normalize/CatalogParsingUtilities.hpp
+    src/catalog/io/CatalogPayloadFormatDetector.hpp
+    src/catalog/io/CatalogZipEntrySelector.hpp
+    src/catalog/io/CompressedDataInflater.hpp
+    src/catalog/composition/CoreBodyCatalogAugmenter.hpp
+    src/catalog/composition/DeepSkyCatalogMerger.hpp
+    src/catalog/io/DelimitedCatalogReader.hpp
+    src/catalog/opengc/OpenNgcObjectMapper.hpp
+    src/catalog/stellarium/StellariumHipParser.hpp
+    src/catalog/stellarium/StellariumLabelRefExtractor.hpp
+    src/catalog/stellarium/StellariumLineRefExtractor.hpp
+    src/catalog/io/zip/ZipBinaryUtilities.hpp
+    src/StringUtilities.cpp
+    src/catalog/normalize/CatalogBodyNormalization.cpp
+    src/catalog/model/CatalogIdentity.cpp
     src/catalog/CatalogComposer.cpp
-    src/catalog/CatalogParsingUtilities.cpp
+    src/catalog/normalize/CatalogParsingUtilities.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp
-    src/catalog/CatalogPayloadFormatDetector.cpp
+    src/catalog/io/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogPayloadParser.cpp
-    src/catalog/CatalogZipEntrySelector.cpp
-    src/catalog/CompressedDataInflater.cpp
-    src/catalog/ConstellationDataCodec.cpp
-    src/catalog/CoreBodyCatalogAugmenter.cpp
-    src/catalog/DeepSkyCatalogMerger.cpp
-    src/catalog/DelimitedCatalogReader.cpp
-    src/catalog/FallbackConstellationData.cpp
-    src/catalog/CsvRowTokenizer.hpp
-    src/catalog/GzipCodec.hpp
-    src/catalog/HygCatalogParser.hpp
-    src/catalog/HygGzipCatalogParser.hpp
-    src/catalog/InMemoryStarCatalog.hpp
-    src/catalog/OpenNgcObjectMapper.cpp
-    src/catalog/OpenNgcCatalogParser.hpp
-    src/catalog/ZipCodec.hpp
-    src/catalog/ZipDirectoryReader.cpp
-    src/catalog/ZipDirectoryReader.hpp
-    src/catalog/ZipEntryExtractor.cpp
-    src/catalog/ZipEntryExtractor.hpp
-    src/catalog/StellariumConstellationParser.cpp
-    src/catalog/StellariumHipParser.cpp
-    src/catalog/StellariumLabelRefExtractor.cpp
-    src/catalog/StellariumLineRefExtractor.cpp
+    src/catalog/io/CatalogZipEntrySelector.cpp
+    src/catalog/io/CompressedDataInflater.cpp
+    src/catalog/constellation/ConstellationDataCodec.cpp
+    src/catalog/composition/CoreBodyCatalogAugmenter.cpp
+    src/catalog/composition/DeepSkyCatalogMerger.cpp
+    src/catalog/io/DelimitedCatalogReader.cpp
+    src/catalog/bundled/FallbackConstellationData.cpp
+    src/catalog/io/CsvRowTokenizer.hpp
+    src/catalog/io/GzipCodec.hpp
+    src/catalog/hyg/HygCatalogParser.hpp
+    src/catalog/hyg/HygGzipCatalogParser.hpp
+    src/catalog/model/InMemoryStarCatalog.hpp
+    src/catalog/opengc/OpenNgcObjectMapper.cpp
+    src/catalog/opengc/OpenNgcCatalogParser.hpp
+    src/catalog/io/zip/ZipCodec.hpp
+    src/catalog/io/zip/ZipDirectoryReader.cpp
+    src/catalog/io/zip/ZipDirectoryReader.hpp
+    src/catalog/io/zip/ZipEntryExtractor.cpp
+    src/catalog/io/zip/ZipEntryExtractor.hpp
+    src/catalog/stellarium/StellariumConstellationParser.cpp
+    src/catalog/stellarium/StellariumHipParser.cpp
+    src/catalog/stellarium/StellariumLabelRefExtractor.cpp
+    src/catalog/stellarium/StellariumLineRefExtractor.cpp
     src/engine/AstronomicalTime.hpp
     src/engine/EclipticToEquatorialCalculator.hpp
     src/engine/EquatorialToHorizontalCalculator.hpp
@@ -88,14 +88,14 @@ add_library(skygate-ephemeris STATIC
     src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp
     src/SimpleEphemerisEngine.cpp
-    src/catalog/BundledCatalogParser.cpp
-    src/catalog/CsvRowTokenizer.cpp
-    src/catalog/GzipCodec.cpp
-    src/catalog/HygCatalogParser.cpp
-    src/catalog/HygGzipCatalogParser.cpp
-    src/catalog/InMemoryStarCatalog.cpp
-    src/catalog/OpenNgcCatalogParser.cpp
-    src/catalog/ZipCodec.cpp
+    src/catalog/bundled/BundledCatalogParser.cpp
+    src/catalog/io/CsvRowTokenizer.cpp
+    src/catalog/io/GzipCodec.cpp
+    src/catalog/hyg/HygCatalogParser.cpp
+    src/catalog/hyg/HygGzipCatalogParser.cpp
+    src/catalog/model/InMemoryStarCatalog.cpp
+    src/catalog/opengc/OpenNgcCatalogParser.cpp
+    src/catalog/io/zip/ZipCodec.cpp
     src/engine/AstronomicalTime.cpp
     src/engine/EclipticToEquatorialCalculator.cpp
     src/engine/EquatorialToHorizontalCalculator.cpp

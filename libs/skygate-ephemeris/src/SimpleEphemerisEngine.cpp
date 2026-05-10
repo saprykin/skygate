@@ -1,6 +1,6 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
-#include "common/StringUtilities.hpp"
+#include "StringUtilities.hpp"
 #include "engine/EquatorialToHorizontalCalculator.hpp"
 #include "engine/MoonEquatorialCalculator.hpp"
 #include "engine/PlanetEquatorialCalculator.hpp"
