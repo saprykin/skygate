@@ -101,7 +101,16 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
         ),
         makeBody("unknown_star", "Unknown Star", skygate::ephemeris::CelestialBodyType::Star, 0.0),
         makeBody("planet_x", "Planet X", skygate::ephemeris::CelestialBodyType::Planet, 0.0),
-        makeBody("orion", "Orion", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+        makeBody(
+            "orion",
+            "Orion",
+            skygate::ephemeris::CelestialBodyType::Constellation,
+            1.0,
+            skygate::core::EquatorialCoordinate {
+                .rightAscensionHours = 5.5833,
+                .declinationDeg = 5.0
+            }
+        ),
         makeBody(
             "unknown_constellation",
             "Unknown Constellation",
@@ -132,6 +141,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     const auto* planetX = findStateById(snapshot, "planet_x");
     const auto* orion = findStateById(snapshot, "orion");
     const auto* unknownConstellation = findStateById(snapshot, "unknown_constellation");
+    const auto bodies = snapshot.bodies();
 
     QVERIFY(sunById != nullptr);
     QVERIFY(std::isfinite(sunById->equatorial.rightAscensionHours));
@@ -154,10 +164,18 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(std::isnan(planetX->equatorial.declinationDeg));
 
     QVERIFY(orion != nullptr);
+    QVERIFY(
+        bodies[orion->bodyIndex].ephemerisSource
+        == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    );
     QVERIFY(isNear(orion->equatorial.rightAscensionHours, 5.5833, 1e-4));
     QVERIFY(isNear(orion->equatorial.declinationDeg, 5.0, 1e-4));
 
     QVERIFY(unknownConstellation != nullptr);
+    QVERIFY(
+        bodies[unknownConstellation->bodyIndex].ephemerisSource
+        == skygate::ephemeris::CelestialBodyEphemerisSource::Unresolved
+    );
     QVERIFY(std::isnan(unknownConstellation->equatorial.rightAscensionHours));
 }
 
