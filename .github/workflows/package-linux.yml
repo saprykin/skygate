@@ -131,7 +131,7 @@ jobs:
           architecture="$(uname -m)"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${{ needs.release-metadata.outputs.app_version }}"
-            artifact_name="SkyGate-Linux-${architecture}-AppImage-${GITHUB_REF_NAME}"
+            artifact_name="SkyGate-Linux-${architecture}-AppImage-${version}"
             release_title="SkyGate ${GITHUB_REF_NAME}"
           else
             version="latest-${short_sha}"
