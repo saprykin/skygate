@@ -9,10 +9,6 @@ std::optional<CelestialBodyState> EphemerisEngineQueries::findBodyStateById(
     const std::string_view bodyId
 )
 {
-    if (bodyId.empty()) {
-        return std::nullopt;
-    }
-
     for (const CelestialBodyState& state : snapshot.states) {
         const CelestialBody& body = snapshot.bodyAt(state.bodyIndex);
         if (strings::equalsIgnoreAsciiCase(body.id, bodyId)) {

@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -104,6 +105,7 @@ class EphemerisEngineFallbackTests final : public QObject {
 private slots:
     void usesFallbackBodyLookupAndFixedCoordinatePriority();
     void usesExplicitSnapshotLookupCaseInsensitive();
+    void keepsExplicitSnapshotLookupBehaviorForEmptyIds();
     void usesExplicitSnapshotLookupByIndex();
     void skipsHorizontalCoordinatesForInvalidObserver();
     void fixedCoordinatesOverrideExplicitSourceDispatch();
@@ -215,6 +217,41 @@ void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupCaseInsensitive()
     QCOMPARE(state->equatorial.rightAscensionHours, 2.0);
 
     QVERIFY(!engine.computeBodyState(context, "missing").has_value());
+}
+
+void EphemerisEngineFallbackTests::keepsExplicitSnapshotLookupBehaviorForEmptyIds()
+{
+    auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+        std::vector<skygate::ephemeris::CelestialBody> {
+            makeBody(
+                "",
+                "Unnamed",
+                skygate::ephemeris::CelestialBodyType::Star,
+                1.0,
+                skygate::core::EquatorialCoordinate {
+                    .rightAscensionHours = 6.0,
+                    .declinationDeg = 7.0
+                }
+            )
+        }
+    );
+
+    skygate::ephemeris::SkySnapshot snapshot;
+    snapshot.catalogBodies = std::move(bodies);
+    snapshot.states.push_back(
+        skygate::ephemeris::CelestialBodyState {
+            .bodyIndex = 0,
+            .equatorial = {
+                .rightAscensionHours = 6.0,
+                .declinationDeg = 7.0
+            }
+        }
+    );
+
+    const auto state = skygate::ephemeris::EphemerisEngineQueries::findBodyStateById(snapshot, "");
+    QVERIFY(state.has_value());
+    QCOMPARE(state->bodyIndex, 0U);
+    QCOMPARE(state->equatorial.declinationDeg, 7.0);
 }
 
 void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupByIndex()
