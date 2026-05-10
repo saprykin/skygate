@@ -3,7 +3,6 @@
 #include <QtTest/QtTest>
 
 #include "skygate/core/math/ViewportMath.hpp"
-
 #include <algorithm>
 #include <memory>
 #include <string>
