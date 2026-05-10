@@ -1,3 +1,4 @@
+#include "ConstellationTestSupport.hpp"
 #include "SkyContextControllerTestSupport.hpp"
 
 class SkyContextControllerSearchTrackingTests final : public QObject {
@@ -69,72 +70,9 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersBodyResult
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersConstellationLabelResult()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody(
-            "hip_27989",
-            "HIP 27989",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
-        ),
-        makeBody(
-            "hip_25336",
-            "HIP 25336",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.1,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
-        ),
-        makeBody(
-            "hip_25930",
-            "HIP 25930",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.2,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
-        ),
-        makeBody(
-            "hip_26311",
-            "HIP 26311",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.3,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
-        ),
-        makeBody(
-            "hip_26727",
-            "HIP 26727",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.4,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
-        ),
-        makeBody(
-            "hip_24436",
-            "HIP 24436",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.5,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 5.5,
-                .declinationDeg = 5.0
-            }
-        ),
-    });
-    QVERIFY(starCatalog != nullptr);
-
-    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    const auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine));
+    QVERIFY(skygate::ui::tests::seedOrionConstellationCache());
+    const auto controller = createController();
+    skygate::ui::tests::restoreSeededCatalogCache(*controller);
     configureFocusTestContext(*controller);
 
     const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
