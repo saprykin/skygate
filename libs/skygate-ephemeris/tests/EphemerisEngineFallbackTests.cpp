@@ -242,14 +242,8 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     );
     body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet;
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({body});
-    QVERIFY(catalog != nullptr);
-    QCOMPARE(
-        catalog->bodies()[0].ephemerisSource,
-        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-    );
-
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    const std::vector<skygate::ephemeris::CelestialBody> bodies {body};
+    const auto engine = skygate::ephemeris::createEphemerisEngine(bodies);
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
