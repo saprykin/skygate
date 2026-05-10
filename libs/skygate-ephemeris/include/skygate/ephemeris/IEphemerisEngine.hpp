@@ -18,12 +18,12 @@ public:
     [[nodiscard]] virtual std::optional<CelestialBodyState> computeBodyState(
         const core::SkyContext& context,
         std::string_view bodyId
-    ) const;
+    ) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState> computeBodyState(
         const core::SkyContext& context,
         std::uint32_t bodyIndex
-    ) const;
+    ) const = 0;
 };
 
 }  // namespace skygate::ephemeris
