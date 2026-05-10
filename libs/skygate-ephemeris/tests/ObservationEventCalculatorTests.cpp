@@ -1,4 +1,4 @@
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -58,7 +58,7 @@ double currentLocalSiderealHours(const skygate::core::SkyContext& context)
 {
     return skygate::core::AngleMath::normalizeHours(
         skygate::core::AngleMath::normalizeDegrees(
-            skygate::ephemeris::JulianDateTime::greenwichMeanSiderealTimeDeg(context.utcTime)
+            skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(context.utcTime)
             + context.observer.longitudeDeg
         ) / 15.0
     );
