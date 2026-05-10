@@ -1,9 +1,14 @@
-#include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/StellariumConstellationParser.hpp"
 
 #include <QtTest/QtTest>
 
+#include <span>
 #include <string>
+#include <string_view>
+
+namespace {
+
+}  // namespace
 
 class StellariumConstellationParserTests final : public QObject {
     Q_OBJECT
@@ -13,7 +18,6 @@ private slots:
     void rejectsEmptyWhitespaceAndMalformedJsonPayloads();
     void parsesIndexJsonPayload();
     void parsesObjectRootWithoutConstellationArray();
-    void providesBundledFallbackData();
 };
 
 void StellariumConstellationParserTests::rejectsLegacyRowsPayload()
@@ -79,16 +83,6 @@ void StellariumConstellationParserTests::parsesObjectRootWithoutConstellationArr
     QVERIFY(result.constellationCount == 0U);
     QVERIFY(result.lineRefs.size() == 3U);
     QVERIFY(result.labelRefs.empty());
-}
-
-void StellariumConstellationParserTests::providesBundledFallbackData()
-{
-    const skygate::ephemeris::BundledConstellationData bundledData;
-    const auto lineRefs = bundledData.lineRefs();
-    const auto labelRefs = bundledData.labelRefs();
-
-    QVERIFY(!lineRefs.empty());
-    QVERIFY(!labelRefs.empty());
 }
 
 QTEST_APPLESS_MAIN(StellariumConstellationParserTests)

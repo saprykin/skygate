@@ -112,7 +112,8 @@ void SkyCatalogManagerTests::bundledPresetResetsCatalogAndConstellationRefs()
     QCOMPARE(manager.catalogPresetIndex(), 0);
     QCOMPARE(manager.sourceLabel(), QString("Bundled"));
     QVERIFY(manager.catalogRevision() > originalRevision);
-    QVERIFY(manager.constellationLineRefs().size() > 0U);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationLabelRefs().empty());
     QVERIFY(catalogSpy.count() >= 1);
 }
 
