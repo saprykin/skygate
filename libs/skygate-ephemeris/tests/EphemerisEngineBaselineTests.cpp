@@ -1,4 +1,5 @@
 #include "TestHelpers.hpp"
+#include "skygate/ephemeris/CatalogComposer.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
@@ -37,6 +38,7 @@ class EphemerisEngineBaselineTests final : public QObject {
 private slots:
     void computesFiniteSolarSystemCoordinates();
     void movingBodiesChangeAcrossDays();
+    void computesCatalogOwnedReferenceStarCoordinates();
     void supportsNullCatalogAndImportedFixedCoordinates();
     void computesSingleBodyStateByCaseInsensitiveIdAndIndex();
 };
@@ -148,6 +150,41 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
     QVERIFY(moon != nullptr);
     QVERIFY(nextMoon != nullptr);
     QVERIFY(std::abs(moon->equatorial.rightAscensionHours - nextMoon->equatorial.rightAscensionHours) > 1e-4);
+}
+
+void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates()
+{
+    const auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, -26.74),
+    });
+    QVERIFY(sourceCatalog != nullptr);
+
+    auto activeCatalog = skygate::ephemeris::composeActiveCatalog({
+        .sourceCatalog = *sourceCatalog
+    });
+    QVERIFY(activeCatalog.isSuccess());
+
+    using namespace skygate::ephemeris::tests;
+    const auto* siriusBody = findBodyById(activeCatalog.catalog->bodies(), "sirius");
+    QVERIFY(siriusBody != nullptr);
+    QCOMPARE(
+        siriusBody->ephemerisSource,
+        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    );
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*activeCatalog.catalog);
+    QVERIFY(engine != nullptr);
+
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
+
+    const auto state = engine->computeBodyState(context, "SIRIUS");
+    QVERIFY(state.has_value());
+    QVERIFY(isNear(state->equatorial.rightAscensionHours, 6.7525, 1e-8));
+    QVERIFY(isNear(state->equatorial.declinationDeg, -16.7161, 1e-8));
+    QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
 }
 
 void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinates()

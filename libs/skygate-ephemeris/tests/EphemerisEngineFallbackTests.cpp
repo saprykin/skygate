@@ -183,6 +183,10 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(isNear(fixedSun->equatorial.declinationDeg, 2.5, 1e-8));
 
     QVERIFY(unknownStar != nullptr);
+    QCOMPARE(
+        snapshot.bodyAt(unknownStar->bodyIndex).ephemerisSource,
+        skygate::ephemeris::CelestialBodyEphemerisSource::Unresolved
+    );
     QVERIFY(std::isnan(unknownStar->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(unknownStar->equatorial.declinationDeg));
 

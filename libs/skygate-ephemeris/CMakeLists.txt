@@ -80,7 +80,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/JulianDateTime.hpp
     src/engine/MoonEquatorialCalculator.hpp
     src/engine/PlanetEquatorialCalculator.hpp
-    src/engine/StarEquatorialCalculator.hpp
     src/engine/SunEquatorialCalculator.hpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
@@ -101,7 +100,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/JulianDateTime.cpp
     src/engine/MoonEquatorialCalculator.cpp
     src/engine/PlanetEquatorialCalculator.cpp
-    src/engine/StarEquatorialCalculator.cpp
     src/engine/SunEquatorialCalculator.cpp
     src/BodyTrailCalculator.cpp
 )
