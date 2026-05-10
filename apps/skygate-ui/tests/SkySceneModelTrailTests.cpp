@@ -1,20 +1,39 @@
 #include <QtTest>
 
+#include "ConstellationTestSupport.hpp"
 #include "SkySceneModelTestSupport.hpp"
 
 using skygate::ui::tests::makeBody;
 using skygate::ui::tests::makeFixedBody;
+using skygate::ui::tests::restoreSeededCatalogCache;
+using skygate::ui::tests::seedOrionConstellationCache;
+using skygate::ui::tests::SettingsTestFixture;
 using skygate::ui::tests::SkySceneModelTestHarness;
 
 class SkySceneModelTrailTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void initTestCase();
+    void init();
     void selectedBodyBuildsTrailAndClearsIt();
     void trackedBodyTrailSurvivesClearedSearchSelection();
     void constellationSelectionDoesNotBuildTrail();
     void unresolvedBodySelectionDoesNotBuildTrail();
+
+private:
+    SettingsTestFixture m_settings;
 };
+
+void SkySceneModelTrailTests::initTestCase()
+{
+    QVERIFY(m_settings.initialize(QStringLiteral("SkySceneModelTrailTests")));
+}
+
+void SkySceneModelTrailTests::init()
+{
+    m_settings.resetForCurrentTest();
+}
 
 void SkySceneModelTrailTests::selectedBodyBuildsTrailAndClearsIt()
 {
@@ -72,58 +91,20 @@ void SkySceneModelTrailTests::trackedBodyTrailSurvivesClearedSearchSelection()
 
 void SkySceneModelTrailTests::constellationSelectionDoesNotBuildTrail()
 {
+    QVERIFY(seedOrionConstellationCache());
     SkySceneModelTestHarness harness({
         makeFixedBody(
-            "hip_27989",
-            "HIP 27989",
+            "placeholder",
+            "Placeholder",
             skygate::ephemeris::CelestialBodyType::Star,
-            1.9,
-            5.5,
-            5.0
-        ),
-        makeFixedBody(
-            "hip_25336",
-            "HIP 25336",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.1,
-            5.5,
-            5.0
-        ),
-        makeFixedBody(
-            "hip_25930",
-            "HIP 25930",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.2,
-            5.5,
-            5.0
-        ),
-        makeFixedBody(
-            "hip_26311",
-            "HIP 26311",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.3,
-            5.5,
-            5.0
-        ),
-        makeFixedBody(
-            "hip_26727",
-            "HIP 26727",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.4,
-            5.5,
-            5.0
-        ),
-        makeFixedBody(
-            "hip_24436",
-            "HIP 24436",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.5,
-            5.5,
-            5.0
+            6.0,
+            1.0,
+            1.0
         ),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
+    restoreSeededCatalogCache(controller);
     const SkySceneModel& sceneModel = harness.sceneModel();
 
     auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller.overlayLayers());

@@ -1,5 +1,6 @@
 #include "TestHelpers.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/EphemerisEngineQueries.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
@@ -9,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -69,6 +71,30 @@ public:
         );
         return snapshot;
     }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext& context,
+        const std::string_view bodyId
+    ) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(
+            *this,
+            context,
+            bodyId
+        );
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext& context,
+        const std::uint32_t bodyIndex
+    ) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(
+            *this,
+            context,
+            bodyIndex
+        );
+    }
 };
 
 }  // namespace
@@ -78,8 +104,9 @@ class EphemerisEngineFallbackTests final : public QObject {
 
 private slots:
     void usesFallbackBodyLookupAndFixedCoordinatePriority();
-    void usesInterfaceDefaultBodyLookupCaseInsensitive();
-    void usesInterfaceDefaultBodyLookupByIndex();
+    void usesExplicitSnapshotLookupCaseInsensitive();
+    void keepsExplicitSnapshotLookupBehaviorForEmptyIds();
+    void usesExplicitSnapshotLookupByIndex();
     void skipsHorizontalCoordinatesForInvalidObserver();
     void fixedCoordinatesOverrideExplicitSourceDispatch();
 };
@@ -179,7 +206,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(std::isnan(unknownConstellation->equatorial.rightAscensionHours));
 }
 
-void EphemerisEngineFallbackTests::usesInterfaceDefaultBodyLookupCaseInsensitive()
+void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupCaseInsensitive()
 {
     const SnapshotOnlyEngine engine;
     const skygate::core::SkyContext context;
@@ -192,7 +219,42 @@ void EphemerisEngineFallbackTests::usesInterfaceDefaultBodyLookupCaseInsensitive
     QVERIFY(!engine.computeBodyState(context, "missing").has_value());
 }
 
-void EphemerisEngineFallbackTests::usesInterfaceDefaultBodyLookupByIndex()
+void EphemerisEngineFallbackTests::keepsExplicitSnapshotLookupBehaviorForEmptyIds()
+{
+    auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+        std::vector<skygate::ephemeris::CelestialBody> {
+            makeBody(
+                "",
+                "Unnamed",
+                skygate::ephemeris::CelestialBodyType::Star,
+                1.0,
+                skygate::core::EquatorialCoordinate {
+                    .rightAscensionHours = 6.0,
+                    .declinationDeg = 7.0
+                }
+            )
+        }
+    );
+
+    skygate::ephemeris::SkySnapshot snapshot;
+    snapshot.catalogBodies = std::move(bodies);
+    snapshot.states.push_back(
+        skygate::ephemeris::CelestialBodyState {
+            .bodyIndex = 0,
+            .equatorial = {
+                .rightAscensionHours = 6.0,
+                .declinationDeg = 7.0
+            }
+        }
+    );
+
+    const auto state = skygate::ephemeris::EphemerisEngineQueries::findBodyStateById(snapshot, "");
+    QVERIFY(state.has_value());
+    QCOMPARE(state->bodyIndex, 0U);
+    QCOMPARE(state->equatorial.declinationDeg, 7.0);
+}
+
+void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupByIndex()
 {
     const SnapshotOnlyEngine engine;
     const skygate::core::SkyContext context;

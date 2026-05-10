@@ -2,12 +2,15 @@
 
 #include <QtTest/QtTest>
 
+#include "skygate/ephemeris/EphemerisEngineQueries.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -39,6 +42,30 @@ public:
             .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0}
         });
         return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext& context,
+        const std::string_view bodyId
+    ) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(
+            *this,
+            context,
+            bodyId
+        );
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext& context,
+        const std::uint32_t bodyIndex
+    ) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(
+            *this,
+            context,
+            bodyIndex
+        );
     }
 
     [[nodiscard]] int computeCount() const noexcept

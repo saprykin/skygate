@@ -10,6 +10,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -93,6 +94,14 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        std::string_view
+    ) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
         const skygate::core::SkyContext& context,
         const std::uint32_t bodyIndex
     ) const override
@@ -136,6 +145,14 @@ public:
             );
         snapshot.states.push_back(*computeBodyState(context, 0U));
         return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        std::string_view
+    ) const override
+    {
+        return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(

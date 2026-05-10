@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <optional>
+#include <string_view>
 
 namespace {
 
@@ -24,6 +25,14 @@ public:
     {
         (void) context;
         return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        std::string_view
+    ) const override
+    {
+        return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
@@ -75,6 +84,14 @@ public:
     {
         (void) context;
         return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        std::string_view
+    ) const override
+    {
+        return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(

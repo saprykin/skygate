@@ -22,6 +22,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class PerformanceGuardTests final : public QObject {
@@ -95,6 +96,14 @@ public:
     {
         (void) context;
         return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        std::string_view
+    ) const override
+    {
+        return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(

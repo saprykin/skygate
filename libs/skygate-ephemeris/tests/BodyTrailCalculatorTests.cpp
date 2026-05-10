@@ -5,6 +5,7 @@
 #include <chrono>
 #include <limits>
 #include <optional>
+#include <string_view>
 
 namespace {
 
@@ -15,6 +16,14 @@ public:
     ) const override
     {
         return skygate::ephemeris::SkySnapshot {.context = context};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+        const skygate::core::SkyContext&,
+        std::string_view
+    ) const override
+    {
+        return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
@@ -114,6 +123,14 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
         ) const override
         {
             return skygate::ephemeris::SkySnapshot {.context = context};
+        }
+
+        [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
+            const skygate::core::SkyContext&,
+            std::string_view
+        ) const override
+        {
+            return std::nullopt;
         }
 
         [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
