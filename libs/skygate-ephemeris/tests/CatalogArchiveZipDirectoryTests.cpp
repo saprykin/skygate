@@ -1,7 +1,7 @@
 #include "CatalogArchiveTestSupport.hpp"
 
-#include "catalog/CatalogZipEntrySelector.hpp"
-#include "catalog/ZipDirectoryReader.hpp"
+#include "catalog/io/CatalogZipEntrySelector.hpp"
+#include "catalog/io/zip/ZipDirectoryReader.hpp"
 
 #include <QtTest/QtTest>
 

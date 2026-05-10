@@ -1,10 +1,10 @@
 #include "skygate/ephemeris/CatalogLoader.hpp"
 
-#include "catalog/BundledCatalogParser.hpp"
-#include "catalog/CatalogBodyParseResult.hpp"
-#include "catalog/HygCatalogParser.hpp"
-#include "catalog/HygGzipCatalogParser.hpp"
-#include "catalog/OpenNgcCatalogParser.hpp"
+#include "catalog/bundled/BundledCatalogParser.hpp"
+#include "catalog/model/CatalogBodyParseResult.hpp"
+#include "catalog/hyg/HygCatalogParser.hpp"
+#include "catalog/hyg/HygGzipCatalogParser.hpp"
+#include "catalog/opengc/OpenNgcCatalogParser.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <algorithm>

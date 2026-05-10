@@ -1,4 +1,4 @@
-#include "catalog/OpenNgcObjectMapper.hpp"
+#include "catalog/opengc/OpenNgcObjectMapper.hpp"
 
 #include <QtTest/QtTest>
 
