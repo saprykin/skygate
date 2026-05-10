@@ -9,7 +9,7 @@ namespace skygate::ephemeris {
 using ConstellationLineRef = std::pair<std::string, std::string>;
 using ConstellationLabelRef = std::pair<std::string, std::vector<std::string>>;
 
-class BundledConstellationData final {
+class FallbackConstellationData final {
 public:
     [[nodiscard]] std::vector<ConstellationLineRef> lineRefs() const;
     [[nodiscard]] std::vector<ConstellationLabelRef> labelRefs() const;

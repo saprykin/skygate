@@ -305,12 +305,14 @@ private layers: `ZipDirectoryReader` parses central-directory metadata,
 #### Constellation data
 Constellation lines and label anchors have two sources:
 
-- bundled fallback data via `BundledConstellationData`
+- minimal fallback data via `FallbackConstellationData`
 - optional downloaded Stellarium skyculture data parsed by
   `StellariumConstellationParser`
 
 `SkyCatalogManager` prefers downloaded constellation data when available and
-persists it with the catalog cache.
+persists it with the catalog cache. The fallback data is intentionally minimal:
+it includes reference-star anchors for the bundled catalog path and a small HIP
+subset for HYG catalogs when Stellarium data is unavailable.
 
 `StellariumConstellationParser` is a small orchestration entrypoint over
 private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and

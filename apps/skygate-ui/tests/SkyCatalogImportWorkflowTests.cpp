@@ -111,7 +111,7 @@ void SkyCatalogImportWorkflowTests::fallsBackForMalformedConstellationPayload()
     skygate::ui::internal::SkyConstellationLineImportResult finalResult;
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Constellation line parse failed; using bundled fallback. Payload preview: not-json"
+        "Constellation line parse failed; using minimal fallback. Payload preview: not-json"
     );
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(

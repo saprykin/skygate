@@ -165,7 +165,7 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
                     : lineResult.errorText;
                 result.statusSuffix = QString("fallback default (%1)").arg(reason);
                 qCWarning(skygateCatalogParseLog).noquote()
-                    << "Constellation line download unavailable; using bundled fallback:" << reason;
+                    << "Constellation line download unavailable; using minimal fallback:" << reason;
                 completionHandler(std::move(result));
                 return;
             }
@@ -183,7 +183,7 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
                     payloadPreview
                 );
                 qCWarning(skygateCatalogParseLog).noquote()
-                    << "Constellation line parse failed; using bundled fallback. Payload preview:"
+                    << "Constellation line parse failed; using minimal fallback. Payload preview:"
                     << payloadPreview;
                 completionHandler(std::move(result));
                 return;

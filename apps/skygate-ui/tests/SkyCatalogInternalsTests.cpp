@@ -13,7 +13,7 @@ private slots:
     void catalogTextFormatsStableStatusMessages();
     void catalogTextComposesSummaryDetails();
     void constellationStoreKeepsCustomRefsAndCounts();
-    void constellationStoreFallsBackToBundledLinesWhenCustomLinesAreEmpty();
+    void constellationStoreFallsBackToMinimalLinesWhenCustomLinesAreEmpty();
 };
 
 void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
@@ -99,7 +99,7 @@ void SkyCatalogInternalsTests::constellationStoreKeepsCustomRefsAndCounts()
     QCOMPARE(store.labelRefVector().front().first, std::string("Demo"));
 }
 
-void SkyCatalogInternalsTests::constellationStoreFallsBackToBundledLinesWhenCustomLinesAreEmpty()
+void SkyCatalogInternalsTests::constellationStoreFallsBackToMinimalLinesWhenCustomLinesAreEmpty()
 {
     skygate::ui::internal::SkyCatalogConstellationStore store;
     store.setLineRefs({{"custom_a", "custom_b"}});

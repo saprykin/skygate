@@ -12,15 +12,11 @@ struct ConstellationLineIdRef {
     std::string_view endId;
 };
 
-constexpr std::array<ConstellationLineIdRef, 57> kBundledConstellationLineRefs = {{
-    // Bundled fallback.
-    {.startId = "sirius", .endId = "procyon"},
-    {.startId = "procyon", .endId = "betelgeuse"},
+constexpr std::array<ConstellationLineIdRef, 51> kFallbackConstellationLineRefs = {{
+    // Minimal fallback, resolved by CoreBodyCatalogAugmenter reference stars.
     {.startId = "betelgeuse", .endId = "rigel"},
-    {.startId = "rigel", .endId = "sirius"},
-    {.startId = "betelgeuse", .endId = "capella"},
-    {.startId = "capella", .endId = "vega"},
-    {.startId = "vega", .endId = "arcturus"},
+
+    // HIP fallback, resolved when a HYG catalog is active but Stellarium data is unavailable.
     // Orion.
     {.startId = "hip_27989", .endId = "hip_25336"},
     {.startId = "hip_27989", .endId = "hip_26727"},
@@ -85,20 +81,32 @@ constexpr std::array<ConstellationLineIdRef, 57> kBundledConstellationLineRefs =
 
 }  // namespace
 
-std::vector<ConstellationLineRef> BundledConstellationData::lineRefs() const
+std::vector<ConstellationLineRef> FallbackConstellationData::lineRefs() const
 {
     std::vector<ConstellationLineRef> refs;
-    refs.reserve(kBundledConstellationLineRefs.size());
-    for (const auto& lineRef : kBundledConstellationLineRefs) {
+    refs.reserve(kFallbackConstellationLineRefs.size());
+    for (const auto& lineRef : kFallbackConstellationLineRefs) {
         refs.emplace_back(std::string(lineRef.startId), std::string(lineRef.endId));
     }
     return refs;
 }
 
-std::vector<ConstellationLabelRef> BundledConstellationData::labelRefs() const
+std::vector<ConstellationLabelRef> FallbackConstellationData::labelRefs() const
 {
     return {
-        {"Orion", {"hip_27989", "hip_25336", "hip_25930", "hip_26311", "hip_26727", "hip_24436"}},
+        {
+            "Orion",
+            {
+                "betelgeuse",
+                "rigel",
+                "hip_27989",
+                "hip_25336",
+                "hip_25930",
+                "hip_26311",
+                "hip_26727",
+                "hip_24436"
+            }
+        },
         {"Ursa Major", {"hip_67301", "hip_65378", "hip_62956", "hip_59774", "hip_54061", "hip_53910", "hip_58001"}},
         {"Ursa Minor", {"hip_11767", "hip_79822", "hip_77055", "hip_75097", "hip_72607", "hip_85822", "hip_82080"}},
         {"Cassiopeia", {"hip_746", "hip_3179", "hip_4427", "hip_6686", "hip_8886"}},
@@ -108,6 +116,12 @@ std::vector<ConstellationLabelRef> BundledConstellationData::labelRefs() const
         {"Leo", {"hip_49669", "hip_54872", "hip_57632", "hip_50583"}},
         {"Andromeda", {"hip_677", "hip_3092", "hip_5447", "hip_9640"}},
         {"Scorpius", {"hip_78265", "hip_78401", "hip_78820", "hip_80763", "hip_85927", "hip_86228"}},
+        {"Canis Major", {"sirius"}},
+        {"Canis Minor", {"procyon"}},
+        {"Auriga", {"capella"}},
+        {"Lyra", {"vega"}},
+        {"Bootes", {"arcturus"}},
+        {"Carina", {"canopus"}},
     };
 }
 
