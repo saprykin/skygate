@@ -43,7 +43,7 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("PreferencesDraft.qml"),
+        QStringLiteral("preferences/PreferencesDraft.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);
@@ -105,6 +105,7 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
 void QmlPreferencesDraftTests::preferencesDraftCurrentDeviceApplyAndSyncWork()
 {
     QQmlEngine engine;
+    engine.addImportPath(QStringLiteral(SKYGATE_QML_IMPORT_DIR));
     engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
 
     const QmlWarningScope warnings;
@@ -235,7 +236,7 @@ void QmlPreferencesDraftTests::saveAndRestoreState()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("PreferencesDraft.qml"),
+        QStringLiteral("preferences/PreferencesDraft.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);

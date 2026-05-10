@@ -2,13 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import com.skygate.app 1.0
 
 Item {
     id: root
     readonly property var theme: skyContext.theme
     property var catalogModel
-    property string placeholderText: "Choose a timezone"
-    property string selectedTimeZoneId: ""
+    property string placeholderText: "Choose a city"
+    property string selectedCityId: ""
     property string selectedText: ""
     readonly property var hostWindow: Window.window
     readonly property real popupSpacing: 4
@@ -28,7 +29,7 @@ Item {
                                                )
                                              : 320
 
-    signal timeZoneChosen(string timeZoneId, string displayText)
+    signal cityChosen(string cityId, string displayText, double latitudeDeg, double longitudeDeg)
 
     implicitHeight: 32
 
@@ -38,7 +39,7 @@ Item {
         radius: 8
         color: root.enabled ? root.theme.inputBackground : root.theme.inputBackgroundDisabled
         border.width: 1
-        border.color: timeZonePopup.opened ? root.theme.inputBorderFocus : root.theme.inputBorder
+        border.color: cityPopup.opened ? root.theme.inputBorderFocus : root.theme.inputBorder
         opacity: root.enabled ? 1.0 : 0.72
 
         Text {
@@ -68,17 +69,17 @@ Item {
         }
 
         MouseArea {
-            objectName: "timeZonePickerMouse"
+            objectName: "cityPickerMouse"
             anchors.fill: parent
             enabled: root.enabled
             hoverEnabled: true
             cursorShape: root.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: timeZonePopup.open()
+            onClicked: cityPopup.open()
         }
     }
 
     Popup {
-        id: timeZonePopup
+        id: cityPopup
         readonly property real desiredHeight: 320
         readonly property bool openAbove: root.availableSpaceBelow < desiredHeight
                                           && root.availableSpaceAbove > root.availableSpaceBelow
@@ -114,9 +115,9 @@ Item {
 
             PreferencesTextField {
                 id: searchField
-                objectName: "timeZoneSearchField"
+                objectName: "citySearchField"
                 Layout.fillWidth: true
-                placeholderText: "Filter by timezone, label, or offset"
+                placeholderText: "Filter by city or country"
                 onTextChanged: {
                     if (root.catalogModel) {
                         root.catalogModel.filterText = text
@@ -130,29 +131,36 @@ Item {
                     0,
                     Math.min(
                         240,
-                        timeZonePopup.availableHeight - searchField.implicitHeight - popupLayout.spacing
+                        cityPopup.availableHeight - searchField.implicitHeight - popupLayout.spacing
                     )
                 )
 
                 ListView {
-                    id: timeZoneListView
-                    objectName: "timeZoneListView"
+                    id: cityListView
+                    objectName: "cityListView"
                     anchors.fill: parent
                     clip: true
                     model: root.catalogModel
                     spacing: 2
 
                     delegate: Rectangle {
+                        required property string rowKind
                         required property string displayText
                         required property string detailText
-                        required property string timeZoneId
+                        required property string cityId
+                        required property double latitudeDeg
+                        required property double longitudeDeg
                         required property bool selectable
 
-                        width: timeZoneListView.width
-                        height: 42
-                        radius: 8
+                        width: cityListView.width
+                        height: selectable ? 42 : 26
+                        radius: selectable ? 8 : 0
                         color: {
-                            if (root.selectedTimeZoneId === timeZoneId) {
+                            if (!selectable) {
+                                return "transparent"
+                            }
+
+                            if (root.selectedCityId === cityId) {
                                 return root.theme.listItemBackgroundSelected
                             }
 
@@ -164,20 +172,24 @@ Item {
                         Column {
                             anchors.left: parent.left
                             anchors.right: parent.right
-                            anchors.leftMargin: 9
+                            anchors.leftMargin: selectable ? 9 : 2
                             anchors.rightMargin: 9
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 1
+                            spacing: selectable ? 1 : 0
 
                             Text {
                                 text: displayText
-                                color: root.theme.listItemPrimaryText
+                                color: selectable
+                                    ? root.theme.listItemPrimaryText
+                                    : root.theme.listItemSectionText
                                 font.family: "Avenir Next"
-                                font.pixelSize: 11
+                                font.pixelSize: selectable ? 11 : 10
+                                font.weight: selectable ? Font.Normal : Font.DemiBold
                                 elide: Text.ElideRight
                             }
 
                             Text {
+                                visible: selectable
                                 text: detailText
                                 color: root.theme.listItemSecondaryText
                                 font.family: "Avenir Next"
@@ -188,24 +200,29 @@ Item {
 
                         MouseArea {
                             id: delegateMouse
-                            objectName: "timeZoneDelegateMouse_" + timeZoneId
+                            objectName: "cityDelegateMouse_" + cityId
                             anchors.fill: parent
                             enabled: selectable
                             hoverEnabled: selectable
                             cursorShape: selectable ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onClicked: {
-                                root.timeZoneChosen(timeZoneId, displayText + " - " + detailText)
-                                timeZonePopup.close()
+                                root.cityChosen(
+                                    cityId,
+                                    displayText + ", " + detailText,
+                                    latitudeDeg,
+                                    longitudeDeg
+                                )
+                                cityPopup.close()
                             }
                         }
                     }
                 }
 
                 Label {
-                    objectName: "timeZoneEmptyLabel"
+                    objectName: "cityEmptyLabel"
                     anchors.centerIn: parent
-                    visible: timeZoneListView.count === 0
-                    text: "No matching timezones"
+                    visible: cityListView.count === 0
+                    text: "No matching cities"
                     color: root.theme.emptyStateText
                     font.family: "Avenir Next"
                     font.pixelSize: 11
