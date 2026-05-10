@@ -130,8 +130,8 @@ jobs:
           short_sha="${GITHUB_SHA::12}"
           architecture="$(uname -m)"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version="${GITHUB_REF_NAME}"
-            artifact_name="SkyGate-Linux-${architecture}-AppImage-${GITHUB_REF_NAME}"
+            version="${{ needs.release-metadata.outputs.app_version }}"
+            artifact_name="SkyGate-Linux-${architecture}-AppImage-${version}"
             release_title="SkyGate ${GITHUB_REF_NAME}"
           else
             version="latest-${short_sha}"
@@ -168,7 +168,13 @@ jobs:
               ;;
           esac
 
-          [[ "${appimage}" == *"Linux-${expected_architecture}.AppImage" ]]
+          expected_appimage="dist/SkyGate-${{ steps.package.outputs.version }}-Linux-${expected_architecture}.AppImage"
+          if [[ "${appimage}" != "${expected_appimage}" ]]; then
+            echo "Unexpected AppImage filename: ${appimage}" >&2
+            echo "Expected: ${expected_appimage}" >&2
+            exit 1
+          fi
+
           test -x "${appimage}"
           rm -rf squashfs-root
           "${appimage}" --appimage-extract >/dev/null
