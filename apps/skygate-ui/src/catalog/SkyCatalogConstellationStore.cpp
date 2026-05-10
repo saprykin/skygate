@@ -4,12 +4,11 @@
 
 namespace skygate::ui::internal {
 
-void SkyCatalogConstellationStore::resetToBundled()
+void SkyCatalogConstellationStore::clear()
 {
-    const skygate::ephemeris::BundledConstellationData bundledConstellationData;
-    m_lineRefs = bundledConstellationData.lineRefs();
-    m_labelRefs = bundledConstellationData.labelRefs();
-    m_count = m_labelRefs.size();
+    m_lineRefs.clear();
+    m_labelRefs.clear();
+    m_count = 0;
 }
 
 void SkyCatalogConstellationStore::setLineRefs(
@@ -17,7 +16,7 @@ void SkyCatalogConstellationStore::setLineRefs(
 )
 {
     if (lineRefs.empty()) {
-        resetToBundled();
+        clear();
         return;
     }
 

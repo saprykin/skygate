@@ -303,14 +303,15 @@ private layers: `ZipDirectoryReader` parses central-directory metadata,
 `ZipEntryExtractor` validates local headers and inflates entry payloads.
 
 #### Constellation data
-Constellation lines and label anchors have two sources:
+Constellation lines and label anchors have one persisted/imported source:
 
-- bundled fallback data via `BundledConstellationData`
 - optional downloaded Stellarium skyculture data parsed by
   `StellariumConstellationParser`
 
 `SkyCatalogManager` prefers downloaded constellation data when available and
-persists it with the catalog cache.
+persists it with the catalog cache. When Stellarium constellation data is not
+available or cannot be parsed, the app keeps constellation refs empty rather
+than rendering hand-authored bundled outlines.
 
 `StellariumConstellationParser` is a small orchestration entrypoint over
 private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and
