@@ -1,7 +1,7 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
 #include "common/StringUtilities.hpp"
-#include "engine/CoordinateTransform.hpp"
+#include "engine/EquatorialToHorizontalCalculator.hpp"
 #include "engine/KnownConstellationLookup.hpp"
 #include "engine/MoonEquatorialCalculator.hpp"
 #include "engine/PlanetEquatorialCalculator.hpp"
@@ -87,7 +87,7 @@ private:
         if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
             state.equatorial = *equatorial;
             if (context.observer.isValid()) {
-                state.horizontal = CoordinateTransform::equatorialToHorizontal(
+                state.horizontal = EquatorialToHorizontalCalculator::compute(
                     *equatorial,
                     context.observer,
                     context.utcTime

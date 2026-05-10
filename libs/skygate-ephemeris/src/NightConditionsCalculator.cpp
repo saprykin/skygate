@@ -1,6 +1,6 @@
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <algorithm>
@@ -27,7 +27,7 @@ constexpr double kTwoPi = 6.28318530717958647692;
 [[nodiscard]] double normalizedLunarCycleFraction(const core::UtcTimePoint& utcTime) noexcept
 {
     const double daysSinceKnownNewMoon =
-        JulianDateTime::julianDayFromUtc(utcTime) - kKnownNewMoonJulianDay;
+        AstronomicalTime::julianDayFromUtc(utcTime) - kKnownNewMoonJulianDay;
     double fraction = std::fmod(daysSinceKnownNewMoon / kSynodicMonthDays, 1.0);
     if (fraction < 0.0) {
         fraction += 1.0;

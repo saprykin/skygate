@@ -4,7 +4,7 @@
 
 namespace skygate::ephemeris {
 
-class JulianDateTime final {
+class AstronomicalTime final {
 public:
     [[nodiscard]] static double julianDayFromUtc(const core::UtcTimePoint& utcTime) noexcept;
     [[nodiscard]] static double daysSinceJ2000(const core::UtcTimePoint& utcTime) noexcept;

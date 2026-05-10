@@ -75,9 +75,10 @@ add_library(skygate-ephemeris STATIC
     src/catalog/StellariumHipParser.cpp
     src/catalog/StellariumLabelRefExtractor.cpp
     src/catalog/StellariumLineRefExtractor.cpp
-    src/engine/CoordinateTransform.hpp
+    src/engine/AstronomicalTime.hpp
+    src/engine/EclipticToEquatorialCalculator.hpp
+    src/engine/EquatorialToHorizontalCalculator.hpp
     src/engine/FixedEquatorialLookup.hpp
-    src/engine/JulianDateTime.hpp
     src/engine/KnownConstellationLookup.hpp
     src/engine/MoonEquatorialCalculator.hpp
     src/engine/PlanetEquatorialCalculator.hpp
@@ -96,9 +97,10 @@ add_library(skygate-ephemeris STATIC
     src/catalog/InMemoryStarCatalog.cpp
     src/catalog/OpenNgcCatalogParser.cpp
     src/catalog/ZipCodec.cpp
-    src/engine/CoordinateTransform.cpp
+    src/engine/AstronomicalTime.cpp
+    src/engine/EclipticToEquatorialCalculator.cpp
+    src/engine/EquatorialToHorizontalCalculator.cpp
     src/engine/FixedEquatorialLookup.cpp
-    src/engine/JulianDateTime.cpp
     src/engine/KnownConstellationLookup.cpp
     src/engine/MoonEquatorialCalculator.cpp
     src/engine/PlanetEquatorialCalculator.cpp

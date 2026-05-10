@@ -247,8 +247,12 @@ Its responsibilities are:
   - `KnownConstellationLookup`
 - consume catalog-owned `fixedEquatorial` coordinates for fixed stars and deep
   sky objects
+- convert ecliptic coordinates to equatorial coordinates via
+  `EclipticToEquatorialCalculator`
 - convert equatorial coordinates to horizontal coordinates via
-  `CoordinateTransform`
+  `EquatorialToHorizontalCalculator`
+- centralize Julian day, J2000, obliquity, and sidereal-time helpers in
+  `AstronomicalTime`
 
 #### Catalog ingestion pipeline
 Catalog import supports multiple payload shapes:

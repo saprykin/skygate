@@ -4,18 +4,12 @@
 
 namespace skygate::ephemeris {
 
-class CoordinateTransform final {
+class EclipticToEquatorialCalculator final {
 public:
     [[nodiscard]] static core::EquatorialCoordinate eclipticToEquatorial(
         double eclipticLongitudeDeg,
         double eclipticLatitudeDeg,
         double obliquityDeg
-    ) noexcept;
-
-    [[nodiscard]] static core::HorizontalCoordinate equatorialToHorizontal(
-        const core::EquatorialCoordinate& equatorial,
-        const core::GeoLocation& observer,
-        const core::UtcTimePoint& utcTime
     ) noexcept;
 };
 
