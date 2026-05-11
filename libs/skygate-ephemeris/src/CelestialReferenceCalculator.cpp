@@ -1,7 +1,8 @@
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
-#include "engine/CoordinateTransform.hpp"
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
+#include "engine/EclipticToEquatorialCalculator.hpp"
+#include "engine/EquatorialToHorizontalCalculator.hpp"
 
 #include <cmath>
 
@@ -13,11 +14,15 @@ core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
     const core::UtcTimePoint& utcTime
 ) noexcept
 {
-    const double obliquityDeg = JulianDateTime::meanObliquityDeg(
-        JulianDateTime::daysSinceJ2000(utcTime)
+    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(
+        AstronomicalTime::daysSinceJ2000(utcTime)
     );
-    return CoordinateTransform::equatorialToHorizontal(
-        CoordinateTransform::eclipticToEquatorial(eclipticLongitudeDeg, 0.0, obliquityDeg),
+    return EquatorialToHorizontalCalculator::compute(
+        EclipticToEquatorialCalculator::compute(
+            eclipticLongitudeDeg,
+            0.0,
+            obliquityDeg
+        ),
         observer,
         utcTime
     );
@@ -30,7 +35,7 @@ core::HorizontalCoordinate CelestialReferenceCalculator::equatorialPoint(
     const core::UtcTimePoint& utcTime
 ) noexcept
 {
-    return CoordinateTransform::equatorialToHorizontal(
+    return EquatorialToHorizontalCalculator::compute(
         core::EquatorialCoordinate {
             .rightAscensionHours = rightAscensionHours,
             .declinationDeg = declinationDeg

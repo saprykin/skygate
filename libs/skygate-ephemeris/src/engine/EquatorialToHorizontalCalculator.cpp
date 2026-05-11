@@ -1,45 +1,19 @@
-#include "engine/CoordinateTransform.hpp"
+#include "engine/EquatorialToHorizontalCalculator.hpp"
 
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 
 #include <cmath>
 
 namespace skygate::ephemeris {
 
-core::EquatorialCoordinate CoordinateTransform::eclipticToEquatorial(
-    const double eclipticLongitudeDeg,
-    const double eclipticLatitudeDeg,
-    const double obliquityDeg
-) noexcept
-{
-    const double lonRad = core::AngleMath::toRadians(eclipticLongitudeDeg);
-    const double latRad = core::AngleMath::toRadians(eclipticLatitudeDeg);
-    const double epsRad = core::AngleMath::toRadians(obliquityDeg);
-
-    const double xEcl = std::cos(lonRad) * std::cos(latRad);
-    const double yEcl = std::sin(lonRad) * std::cos(latRad);
-    const double zEcl = std::sin(latRad);
-
-    const double xEq = xEcl;
-    const double yEq = yEcl * std::cos(epsRad) - zEcl * std::sin(epsRad);
-    const double zEq = yEcl * std::sin(epsRad) + zEcl * std::cos(epsRad);
-
-    core::EquatorialCoordinate equatorial;
-    equatorial.rightAscensionHours = core::AngleMath::normalizeHours(
-        core::AngleMath::toDegrees(std::atan2(yEq, xEq)) / 15.0
-    );
-    equatorial.declinationDeg = core::AngleMath::toDegrees(std::asin(zEq));
-    return equatorial;
-}
-
-core::HorizontalCoordinate CoordinateTransform::equatorialToHorizontal(
+core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
     const core::EquatorialCoordinate& equatorial,
     const core::GeoLocation& observer,
     const core::UtcTimePoint& utcTime
 ) noexcept
 {
-    const double gmstDeg = JulianDateTime::greenwichMeanSiderealTimeDeg(utcTime);
+    const double gmstDeg = AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
     const double localSiderealDeg = core::AngleMath::normalizeDegrees(gmstDeg + observer.longitudeDeg);
     const double hourAngleDeg = core::AngleMath::normalizeDegreesSigned(
         localSiderealDeg - equatorial.rightAscensionHours * 15.0

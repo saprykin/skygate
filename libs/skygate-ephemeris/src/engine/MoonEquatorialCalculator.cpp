@@ -1,7 +1,7 @@
 #include "engine/MoonEquatorialCalculator.hpp"
 
-#include "engine/CoordinateTransform.hpp"
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
+#include "engine/EclipticToEquatorialCalculator.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 
 #include <cmath>
@@ -10,7 +10,7 @@ namespace skygate::ephemeris {
 
 core::EquatorialCoordinate MoonEquatorialCalculator::compute(const core::UtcTimePoint& utcTime) const noexcept
 {
-    const double daysSinceJ2000 = JulianDateTime::daysSinceJ2000(utcTime);
+    const double daysSinceJ2000 = AstronomicalTime::daysSinceJ2000(utcTime);
     const double ascendingNodeDeg = core::AngleMath::normalizeDegrees(
         125.1228 - 0.0529538083 * daysSinceJ2000
     );
@@ -59,10 +59,10 @@ core::EquatorialCoordinate MoonEquatorialCalculator::compute(const core::UtcTime
         std::atan2(zH, std::sqrt(xH * xH + yH * yH))
     );
 
-    return CoordinateTransform::eclipticToEquatorial(
+    return EclipticToEquatorialCalculator::compute(
         eclipticLongitudeDeg,
         eclipticLatitudeDeg,
-        JulianDateTime::meanObliquityDeg(daysSinceJ2000)
+        AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
     );
 }
 

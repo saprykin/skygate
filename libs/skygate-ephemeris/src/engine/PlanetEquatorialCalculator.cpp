@@ -1,7 +1,7 @@
 #include "engine/PlanetEquatorialCalculator.hpp"
 
-#include "engine/CoordinateTransform.hpp"
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
+#include "engine/EclipticToEquatorialCalculator.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 
 #include <array>
@@ -35,8 +35,8 @@ std::optional<core::EquatorialCoordinate> PlanetEquatorialCalculator::compute(
     const core::UtcTimePoint& utcTime
 ) const noexcept
 {
-    const double daysSinceJ2000 = JulianDateTime::daysSinceJ2000(utcTime);
-    const double obliquityDeg = JulianDateTime::meanObliquityDeg(daysSinceJ2000);
+    const double daysSinceJ2000 = AstronomicalTime::daysSinceJ2000(utcTime);
+    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
 
     for (const PlanetApproximateOrbit& planet : kPlanetApproximateOrbits) {
         if (bodyId != planet.id) {
@@ -50,7 +50,7 @@ std::optional<core::EquatorialCoordinate> PlanetEquatorialCalculator::compute(
             core::AngleMath::toRadians(eclipticLongitudeDeg + planet.latitudePhaseDeg)
         );
 
-        return CoordinateTransform::eclipticToEquatorial(
+        return EclipticToEquatorialCalculator::compute(
             eclipticLongitudeDeg,
             eclipticLatitudeDeg,
             obliquityDeg
