@@ -71,13 +71,13 @@ jobs:
       - name: Build
         run: cmake --build --preset ci-core-debug --parallel
 
-      - name: Test
+      - name: Test full suite
         run: >
           ctest --test-dir build-ninja/ci-core-debug
           --parallel 2
-          -LE slow
           --output-on-failure
           --no-tests=error
+          -E '^skygate-ui-qml-main-window-tests$'
 
       - name: Print compiler cache stats
         if: always()
@@ -226,13 +226,13 @@ jobs:
       - name: Build
         run: cmake --build --preset core-debug-windows-vcpkg --parallel
 
-      - name: Test
+      - name: Test full suite
         shell: pwsh
         run: |
           $vcpkgDebugBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\debug\bin"
           $vcpkgReleaseBin = "$PWD\build-ninja\core-debug-windows-vcpkg\vcpkg_installed\x64-windows\bin"
           $env:PATH = "$vcpkgDebugBin;$vcpkgReleaseBin;$env:PATH"
-          ctest --test-dir build-ninja/core-debug-windows-vcpkg --parallel 2 -LE slow --output-on-failure --no-tests=error
+          ctest --test-dir build-ninja/core-debug-windows-vcpkg --parallel 2 --output-on-failure --no-tests=error -E '^skygate-ui-qml-main-window-tests$'
 
       - name: Print compiler cache stats
         if: always()
