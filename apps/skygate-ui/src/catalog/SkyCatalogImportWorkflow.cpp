@@ -146,7 +146,7 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
 {
     if (m_catalogCoordinator == nullptr) {
         SkyConstellationLineImportResult result;
-        result.statusSuffix = "fallback default (Catalog: Network unavailable)";
+        result.statusSuffix = "no constellation data (Catalog: Network unavailable)";
         completionHandler(std::move(result));
         return;
     }
@@ -163,9 +163,9 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
                 const QString reason = lineResult.errorText.isEmpty()
                     ? QString("unavailable")
                     : lineResult.errorText;
-                result.statusSuffix = QString("fallback default (%1)").arg(reason);
+                result.statusSuffix = QString("no constellation data (%1)").arg(reason);
                 qCWarning(skygateCatalogParseLog).noquote()
-                    << "Constellation line download unavailable; using minimal fallback:" << reason;
+                    << "Constellation line download unavailable; no bundled fallback:" << reason;
                 completionHandler(std::move(result));
                 return;
             }
@@ -179,11 +179,11 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
                 if (payloadPreview.isEmpty()) {
                     payloadPreview = "<empty>";
                 }
-                result.statusSuffix = QString("fallback default (parse failed: %1)").arg(
+                result.statusSuffix = QString("no constellation data (parse failed: %1)").arg(
                     payloadPreview
                 );
                 qCWarning(skygateCatalogParseLog).noquote()
-                    << "Constellation line parse failed; using minimal fallback. Payload preview:"
+                    << "Constellation line parse failed; no bundled fallback. Payload preview:"
                     << payloadPreview;
                 completionHandler(std::move(result));
                 return;

@@ -59,7 +59,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
     src/catalog/composition/DeepSkyCatalogMerger.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
-    src/catalog/bundled/FallbackConstellationData.cpp
     src/catalog/io/CsvRowTokenizer.hpp
     src/catalog/io/GzipCodec.hpp
     src/catalog/hyg/HygCatalogParser.hpp

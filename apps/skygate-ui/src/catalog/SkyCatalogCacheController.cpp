@@ -161,7 +161,7 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
                 << "labels" << static_cast<qulonglong>(result.constellationLabelRefs.size());
         } else {
             qCWarning(skygateCatalogCacheLog)
-                << "Saved constellation line cache unreadable; using minimal fallback";
+                << "Saved constellation line cache unreadable; clearing constellation refs";
         }
     } else if (cacheSnapshot->constellationLineSchemaVersion > 0) {
         result.resetConstellationLineRefs = true;

@@ -320,16 +320,15 @@ payload/archive IO in `io/` and `io/zip/`. Shared string helpers live directly
 under `libs/skygate-ephemeris/src`.
 
 #### Constellation data
-Constellation lines and label anchors have two sources:
+Constellation lines and label anchors have one persisted/imported source:
 
-- minimal fallback data via `FallbackConstellationData`
 - optional downloaded Stellarium skyculture data parsed by
   `StellariumConstellationParser`
 
 `SkyCatalogManager` prefers downloaded constellation data when available and
-persists it with the catalog cache. The fallback data is intentionally minimal:
-it includes reference-star anchors for the bundled catalog path and a small HIP
-subset for HYG catalogs when Stellarium data is unavailable.
+persists it with the catalog cache. When Stellarium constellation data is not
+available or cannot be parsed, the app keeps constellation refs empty rather
+than rendering hand-authored bundled outlines.
 
 `StellariumConstellationParser` is a small orchestration entrypoint over
 private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and
