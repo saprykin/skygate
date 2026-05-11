@@ -1,4 +1,5 @@
 #include "engine/AstronomicalTime.hpp"
+#include "engine/EclipticToEquatorialCalculator.hpp"
 #include "engine/EquatorialToHorizontalCalculator.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
@@ -56,6 +57,7 @@ private slots:
     void solarSystemBodiesMatchGoldenApproximation();
     void solarSystemBodiesMatchGoldenApproximationAcrossContexts();
     void solarSystemBodiesStayNearExternalReferenceValues();
+    void eclipticToEquatorialPreservesSeasonalAnchors();
     void equatorialToHorizontalPlacesTransitAtZenith();
     void observerLongitudeChangesLocalSiderealHourAngle();
     void rightAscensionWrapsAcrossTwentyFourHours();
@@ -283,6 +285,31 @@ void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues(
             reference.id
         );
     }
+}
+
+void EphemerisRegressionTests::eclipticToEquatorialPreservesSeasonalAnchors()
+{
+    constexpr double kObliquityDeg = 23.4393;
+
+    const auto vernalEquinox = skygate::ephemeris::EclipticToEquatorialCalculator::compute(
+        0.0,
+        0.0,
+        kObliquityDeg
+    );
+    const auto northernSolstice = skygate::ephemeris::EclipticToEquatorialCalculator::compute(
+        90.0,
+        0.0,
+        kObliquityDeg
+    );
+    const auto southernSolstice = skygate::ephemeris::EclipticToEquatorialCalculator::compute(
+        270.0,
+        0.0,
+        kObliquityDeg
+    );
+
+    compareEquatorial(vernalEquinox, 0.0, 0.0);
+    compareEquatorial(northernSolstice, 6.0, kObliquityDeg);
+    compareEquatorial(southernSolstice, 18.0, -kObliquityDeg);
 }
 
 void EphemerisRegressionTests::equatorialToHorizontalPlacesTransitAtZenith()

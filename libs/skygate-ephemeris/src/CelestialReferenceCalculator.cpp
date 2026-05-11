@@ -18,7 +18,7 @@ core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
         AstronomicalTime::daysSinceJ2000(utcTime)
     );
     return EquatorialToHorizontalCalculator::compute(
-        EclipticToEquatorialCalculator::eclipticToEquatorial(
+        EclipticToEquatorialCalculator::compute(
             eclipticLongitudeDeg,
             0.0,
             obliquityDeg

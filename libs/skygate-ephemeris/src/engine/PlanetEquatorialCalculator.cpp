@@ -50,7 +50,7 @@ std::optional<core::EquatorialCoordinate> PlanetEquatorialCalculator::compute(
             core::AngleMath::toRadians(eclipticLongitudeDeg + planet.latitudePhaseDeg)
         );
 
-        return EclipticToEquatorialCalculator::eclipticToEquatorial(
+        return EclipticToEquatorialCalculator::compute(
             eclipticLongitudeDeg,
             eclipticLatitudeDeg,
             obliquityDeg

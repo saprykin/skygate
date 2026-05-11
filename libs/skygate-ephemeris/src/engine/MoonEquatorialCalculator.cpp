@@ -59,7 +59,7 @@ core::EquatorialCoordinate MoonEquatorialCalculator::compute(const core::UtcTime
         std::atan2(zH, std::sqrt(xH * xH + yH * yH))
     );
 
-    return EclipticToEquatorialCalculator::eclipticToEquatorial(
+    return EclipticToEquatorialCalculator::compute(
         eclipticLongitudeDeg,
         eclipticLatitudeDeg,
         AstronomicalTime::meanObliquityDeg(daysSinceJ2000)

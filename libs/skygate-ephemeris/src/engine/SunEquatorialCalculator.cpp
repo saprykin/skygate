@@ -23,7 +23,7 @@ core::EquatorialCoordinate SunEquatorialCalculator::compute(const core::UtcTimeP
         meanLongitudeDeg + 1.915 * std::sin(meanAnomalyRad) + 0.020 * std::sin(2.0 * meanAnomalyRad)
     );
 
-    return EclipticToEquatorialCalculator::eclipticToEquatorial(
+    return EclipticToEquatorialCalculator::compute(
         eclipticLongitudeDeg,
         0.0,
         AstronomicalTime::meanObliquityDeg(daysSinceJ2000)

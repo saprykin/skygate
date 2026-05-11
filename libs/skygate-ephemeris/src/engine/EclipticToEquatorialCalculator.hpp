@@ -6,7 +6,7 @@ namespace skygate::ephemeris {
 
 class EclipticToEquatorialCalculator final {
 public:
-    [[nodiscard]] static core::EquatorialCoordinate eclipticToEquatorial(
+    [[nodiscard]] static core::EquatorialCoordinate compute(
         double eclipticLongitudeDeg,
         double eclipticLatitudeDeg,
         double obliquityDeg
