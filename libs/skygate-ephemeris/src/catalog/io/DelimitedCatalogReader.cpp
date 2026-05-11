@@ -7,12 +7,8 @@
 
 namespace skygate::ephemeris {
 
-DelimitedCatalogReader::Row::Row(
-    QVector<QStringView> columns,
-    const QHash<QString, qsizetype>& headerIndex
-) noexcept
-    : m_columns(std::move(columns))
-    , m_headerIndex(headerIndex)
+DelimitedCatalogReader::Row::Row(QVector<QStringView> columns, const QHash<QString, qsizetype>& headerIndex) noexcept
+    : m_columns(std::move(columns)), m_headerIndex(headerIndex)
 {
 }
 
@@ -40,9 +36,7 @@ qsizetype DelimitedCatalogReader::Row::columnIndex(const QString& name) const
 }
 
 CatalogBodyParseResult DelimitedCatalogReader::read(
-    const std::string_view payload,
-    const DelimitedCatalogReaderOptions& options,
-    const RowHandler& rowHandler
+    const std::string_view payload, const DelimitedCatalogReaderOptions& options, const RowHandler& rowHandler
 )
 {
     CatalogBodyParseResult result;
@@ -52,11 +46,9 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
         return result;
     }
 
-    const std::size_t plausibleRowBytes = std::max<std::size_t>(options.minPlausibleRowBytes, 1U);
-    const std::size_t maxAllowedRowCount = std::max(
-        options.minRowCountLimit,
-        (payload.size() / plausibleRowBytes) + 1U
-    );
+    const std::size_t expectedBytesPerDataRow = std::max<std::size_t>(options.minExpectedBytesPerDataRow, 1U);
+    const std::size_t maxAllowedRowCount =
+        std::max(options.rowCountLimitFloor, (payload.size() / expectedBytesPerDataRow) + 1U);
 
     std::size_t cursor = 0;
     std::size_t processedRowCount = 0;
@@ -67,13 +59,10 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
         const std::size_t newline = payload.find('\n', cursor);
         const std::size_t lineEnd = newline == std::string_view::npos ? payload.size() : newline;
         const std::string_view rawLine = payload.substr(cursor, lineEnd - cursor);
-        const QString line = QString::fromUtf8(
-            rawLine.data(),
-            static_cast<qsizetype>(rawLine.size())
-        ).trimmed();
+        const QString line = QString::fromUtf8(rawLine.data(), static_cast<qsizetype>(rawLine.size())).trimmed();
 
         if (!line.isEmpty()) {
-            QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView {line}, options.separator);
+            QVector<QStringView> columns = CsvRowTokenizer::splitColumns(QStringView{line}, options.separator);
             if (!hasHeader) {
                 for (qsizetype i = 0; i < columns.size(); ++i) {
                     QString header = CsvRowTokenizer::decodeField(columns.at(i)).trimmed();
@@ -89,9 +78,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
                 const bool hasRequiredColumns = std::all_of(
                     options.requiredColumns.begin(),
                     options.requiredColumns.end(),
-                    [&headerIndex](const QString& columnName) {
-                        return headerIndex.contains(columnName.toLower());
-                    }
+                    [&headerIndex](const QString& columnName) { return headerIndex.contains(columnName.toLower()); }
                 );
                 if (!hasRequiredColumns) {
                     result.errorCode = CatalogLoadErrorCode::MissingRequiredColumns;
