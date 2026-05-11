@@ -301,7 +301,7 @@ Messier data or download/update the OpenNGC preset. Bundled Messier data is
 included only when the active composition request enables the bundled deep-sky
 fallback. `composeActiveCatalog(...)` rebuilds the active `IStarCatalog`
 through private composition policies: `CoreBodyCatalogAugmenter` adds bundled
-Sun, Moon, planets, and reference-line stars when needed, while
+Sun, Moon, planets, and bundled bright stars when needed, while
 `DeepSkyCatalogMerger` applies DSO alias replacement and source-kind tracking.
 OpenNGC records are parsed and deduplicated in `libs/skygate-ephemeris`, not in
 QML or scene graph code.

@@ -11,7 +11,7 @@
 namespace skygate::ephemeris {
 namespace {
 
-struct ReferenceLineStar final {
+struct BundledBrightStar final {
     std::string_view id;
     std::string_view displayName;
     double rightAscensionHours;
@@ -19,7 +19,7 @@ struct ReferenceLineStar final {
     double visualMagnitude;
 };
 
-constexpr std::array<ReferenceLineStar, 8> kReferenceLineStars {{
+constexpr std::array<BundledBrightStar, 8> kBundledBrightStars{{
     {"sirius", "Sirius", 6.7525, -16.7161, -1.46},
     {"canopus", "Canopus", 6.3992, -52.6957, -0.74},
     {"arcturus", "Arcturus", 14.2610, 19.1825, -0.05},
@@ -37,16 +37,13 @@ bool isSunOrMoonType(const CelestialBodyType type)
 
 CatalogCompositionSource sourceKindForBody(const CelestialBody& body)
 {
-    return catalog_identity::isAnalyticSolarSystemBody(body)
-        ? CatalogCompositionSource::BuiltInEphemeris
-        : CatalogCompositionSource::Primary;
+    return catalog_identity::isAnalyticSolarSystemBody(body) ? CatalogCompositionSource::BuiltInEphemeris
+                                                             : CatalogCompositionSource::Primary;
 }
 
 }  // namespace
 
-CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
-    const std::span<const CelestialBody> bodies
-)
+CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<const CelestialBody> bodies)
 {
     CatalogAugmentationResult result;
     result.bodies.assign(bodies.begin(), bodies.end());
@@ -58,9 +55,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
     const std::size_t starCount = static_cast<std::size_t>(std::count_if(
         result.bodies.begin(),
         result.bodies.end(),
-        [](const CelestialBody& body) {
-            return body.type == CelestialBodyType::Star;
-        }
+        [](const CelestialBody& body) { return body.type == CelestialBodyType::Star; }
     ));
 
     std::unique_ptr<IStarCatalog> bundledCatalog = createBundledStarCatalog();
@@ -69,11 +64,8 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
     }
 
     for (const CelestialBody& body : bundledCatalog->bodies()) {
-        if (
-            !isSunOrMoonType(body.type)
-            && body.type != CelestialBodyType::Planet
-            && body.type != CelestialBodyType::DeepSkyObject
-        ) {
+        if (!isSunOrMoonType(body.type) && body.type != CelestialBodyType::Planet
+            && body.type != CelestialBodyType::DeepSkyObject) {
             continue;
         }
 
@@ -90,7 +82,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
     }
 
     if (starCount == 0U) {
-        for (const ReferenceLineStar& star : kReferenceLineStars) {
+        for (const BundledBrightStar& star : kBundledBrightStars) {
             if (catalog_identity::containsBodyId(result.bodies, star.id)) {
                 continue;
             }
@@ -100,9 +92,8 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(
             body.displayName = star.displayName;
             body.type = CelestialBodyType::Star;
             body.visualMagnitude = star.visualMagnitude;
-            body.fixedEquatorial = core::EquatorialCoordinate {
-                .rightAscensionHours = star.rightAscensionHours,
-                .declinationDeg = star.declinationDeg
+            body.fixedEquatorial = core::EquatorialCoordinate{
+                .rightAscensionHours = star.rightAscensionHours, .declinationDeg = star.declinationDeg
             };
 
             result.sourceKinds.push_back(CatalogCompositionSource::BuiltInEphemeris);
