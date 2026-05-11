@@ -1,4 +1,5 @@
 import QtQuick
+import com.skygate.app 1.0
 pragma ComponentBehavior: Bound
 
 Item {

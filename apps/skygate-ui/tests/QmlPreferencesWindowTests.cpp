@@ -36,7 +36,7 @@ void QmlPreferencesWindowTests::preferencesWindowShellNavigatesAppliesAndCloses(
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("PreferencesWindow.qml"),
+        QStringLiteral("windows/PreferencesWindow.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import com.skygate.app 1.0
 
 Window {
     id: aboutWindow
@@ -122,7 +123,7 @@ Window {
                     Image {
                         id: aboutLogoImage
                         anchors.fill: parent
-                        source: "resources/icons/skygate-about-icon-512.png"
+                        source: "../../resources/icons/skygate-about-icon-512.png"
                         sourceSize.width: width * Screen.devicePixelRatio
                         sourceSize.height: height * Screen.devicePixelRatio
                         fillMode: Image.PreserveAspectFit

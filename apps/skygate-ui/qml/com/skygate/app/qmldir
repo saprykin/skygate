@@ -1,0 +1,31 @@
+module com.skygate.app
+
+Main 1.0 ../../../Main.qml
+AboutWindow 1.0 ../../../windows/AboutWindow.qml
+PreferencesWindow 1.0 ../../../windows/PreferencesWindow.qml
+PreferencesDraft 1.0 ../../../preferences/PreferencesDraft.qml
+PreferencesGeneralSection 1.0 ../../../preferences/PreferencesGeneralSection.qml
+PreferencesSkySection 1.0 ../../../preferences/PreferencesSkySection.qml
+PreferencesAppearanceSection 1.0 ../../../preferences/PreferencesAppearanceSection.qml
+PreferencesCatalogSection 1.0 ../../../preferences/PreferencesCatalogSection.qml
+PreferencesCityPicker 1.0 ../../../preferences/PreferencesCityPicker.qml
+PreferencesTimeZonePicker 1.0 ../../../preferences/PreferencesTimeZonePicker.qml
+PreferencesActionButton 1.0 ../../../controls/PreferencesActionButton.qml
+PreferencesCheckBox 1.0 ../../../controls/PreferencesCheckBox.qml
+PreferencesComboBox 1.0 ../../../controls/PreferencesComboBox.qml
+PreferencesGroupTitle 1.0 ../../../controls/PreferencesGroupTitle.qml
+PreferencesSectionButton 1.0 ../../../controls/PreferencesSectionButton.qml
+PreferencesTextField 1.0 ../../../controls/PreferencesTextField.qml
+SkyHoverLabel 1.0 ../../../sky/SkyHoverLabel.qml
+SkyInteractionLayer 1.0 ../../../sky/SkyInteractionLayer.qml
+SkyObjectInspector 1.0 ../../../sky/SkyObjectInspector.qml
+SkyObjectInspectorButton 1.0 ../../../sky/SkyObjectInspectorButton.qml
+SkyOverlayLabel 1.0 ../../../sky/SkyOverlayLabel.qml
+SkyOverlayLayer 1.0 ../../../sky/SkyOverlayLayer.qml
+SkySelectionMarker 1.0 ../../../sky/SkySelectionMarker.qml
+SearchToolbar 1.0 ../../../toolbars/SearchToolbar.qml
+SkyAppMenuButton 1.0 ../../../toolbars/SkyAppMenuButton.qml
+TimelineToolbar 1.0 ../../../toolbars/TimelineToolbar.qml
+StatusDateTimePopup 1.0 ../../../status/StatusDateTimePopup.qml
+StatusFooter 1.0 ../../../status/StatusFooter.qml
+StatusNightConditionsPopup 1.0 ../../../status/StatusNightConditionsPopup.qml

@@ -43,7 +43,7 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("PreferencesDraft.qml"),
+        QStringLiteral("preferences/PreferencesDraft.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);
@@ -235,7 +235,7 @@ void QmlPreferencesDraftTests::saveAndRestoreState()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("PreferencesDraft.qml"),
+        QStringLiteral("preferences/PreferencesDraft.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);
