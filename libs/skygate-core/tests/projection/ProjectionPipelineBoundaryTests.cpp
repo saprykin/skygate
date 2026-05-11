@@ -1,4 +1,4 @@
-#include "../src/projections/ProjectionPipeline.hpp"
+#include "../../src/projections/ProjectionPipeline.hpp"
 
 #include <QtTest/QtTest>
 
