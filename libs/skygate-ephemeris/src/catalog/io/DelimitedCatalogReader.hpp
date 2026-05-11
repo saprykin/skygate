@@ -20,8 +20,8 @@ struct DelimitedCatalogReaderOptions {
     QChar separator = ',';
     std::vector<QString> requiredColumns;
     CatalogLoadErrorCode invalidErrorCode = CatalogLoadErrorCode::UnsupportedFormat;
-    std::size_t minRowCountLimit = 0;
-    std::size_t minPlausibleRowBytes = 1;
+    std::size_t rowCountLimitFloor = 0;
+    std::size_t minExpectedBytesPerDataRow = 1;
     std::string emptyInputDetail;
     std::string missingColumnsDetail;
     std::string rowLimitDetail;
@@ -31,10 +31,7 @@ class DelimitedCatalogReader final {
 public:
     class Row final {
     public:
-        Row(
-            QVector<QStringView> columns,
-            const QHash<QString, qsizetype>& headerIndex
-        ) noexcept;
+        Row(QVector<QStringView> columns, const QHash<QString, qsizetype>& headerIndex) noexcept;
 
         [[nodiscard]] QString decodeColumn(const QString& name) const;
         [[nodiscard]] QString decodeColumn(qsizetype columnIndex) const;
@@ -47,11 +44,8 @@ public:
 
     using RowHandler = std::function<bool(const Row& row, CatalogBodyParseResult& result)>;
 
-    [[nodiscard]] static CatalogBodyParseResult read(
-        std::string_view payload,
-        const DelimitedCatalogReaderOptions& options,
-        const RowHandler& rowHandler
-    );
+    [[nodiscard]] static CatalogBodyParseResult
+    read(std::string_view payload, const DelimitedCatalogReaderOptions& options, const RowHandler& rowHandler);
 };
 
 }  // namespace skygate::ephemeris
