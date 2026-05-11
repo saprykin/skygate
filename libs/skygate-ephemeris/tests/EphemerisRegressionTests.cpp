@@ -1,5 +1,6 @@
-#include "engine/CoordinateTransform.hpp"
-#include "engine/JulianDateTime.hpp"
+#include "engine/AstronomicalTime.hpp"
+#include "engine/EclipticToEquatorialCalculator.hpp"
+#include "engine/EquatorialToHorizontalCalculator.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
@@ -56,6 +57,7 @@ private slots:
     void solarSystemBodiesMatchGoldenApproximation();
     void solarSystemBodiesMatchGoldenApproximationAcrossContexts();
     void solarSystemBodiesStayNearExternalReferenceValues();
+    void eclipticToEquatorialPreservesSeasonalAnchors();
     void equatorialToHorizontalPlacesTransitAtZenith();
     void observerLongitudeChangesLocalSiderealHourAngle();
     void rightAscensionWrapsAcrossTwentyFourHours();
@@ -285,13 +287,38 @@ void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues(
     }
 }
 
+void EphemerisRegressionTests::eclipticToEquatorialPreservesSeasonalAnchors()
+{
+    constexpr double kObliquityDeg = 23.4393;
+
+    const auto vernalEquinox = skygate::ephemeris::EclipticToEquatorialCalculator::compute(
+        0.0,
+        0.0,
+        kObliquityDeg
+    );
+    const auto northernSolstice = skygate::ephemeris::EclipticToEquatorialCalculator::compute(
+        90.0,
+        0.0,
+        kObliquityDeg
+    );
+    const auto southernSolstice = skygate::ephemeris::EclipticToEquatorialCalculator::compute(
+        270.0,
+        0.0,
+        kObliquityDeg
+    );
+
+    compareEquatorial(vernalEquinox, 0.0, 0.0);
+    compareEquatorial(northernSolstice, 6.0, kObliquityDeg);
+    compareEquatorial(southernSolstice, 18.0, -kObliquityDeg);
+}
+
 void EphemerisRegressionTests::equatorialToHorizontalPlacesTransitAtZenith()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
     const double transitRightAscensionHours =
-        skygate::ephemeris::JulianDateTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+        skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
-    const auto horizontal = skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+    const auto horizontal = skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = transitRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
@@ -306,16 +333,16 @@ void EphemerisRegressionTests::observerLongitudeChangesLocalSiderealHourAngle()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
     const double greenwichRightAscensionHours =
-        skygate::ephemeris::JulianDateTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+        skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
     const auto greenwichHorizontal =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
     );
     const auto eastLongitudeHorizontal =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 15.0, .elevationMeters = 0.0},
         j2000NoonUtc
@@ -330,13 +357,13 @@ void EphemerisRegressionTests::rightAscensionWrapsAcrossTwentyFourHours()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
 
-    const auto zeroRightAscension = skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+    const auto zeroRightAscension = skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
     );
     const auto wrappedRightAscension =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = 24.0, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
@@ -350,16 +377,16 @@ void EphemerisRegressionTests::negativeLongitudeMirrorsPositiveLongitude()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
     const double greenwichRightAscensionHours =
-        skygate::ephemeris::JulianDateTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+        skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
     const auto eastLongitudeHorizontal =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = 15.0, .elevationMeters = 0.0},
         j2000NoonUtc
     );
     const auto westLongitudeHorizontal =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
         {.latitudeDeg = 0.0, .longitudeDeg = -15.0, .elevationMeters = 0.0},
         j2000NoonUtc
@@ -376,13 +403,13 @@ void EphemerisRegressionTests::polarObserverPlacesMatchingCelestialPoleAtZenith(
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
 
     const auto northPoleHorizontal =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = 12.0, .declinationDeg = 90.0},
         {.latitudeDeg = 90.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
     );
     const auto southPoleHorizontal =
-        skygate::ephemeris::CoordinateTransform::equatorialToHorizontal(
+        skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = 12.0, .declinationDeg = -90.0},
         {.latitudeDeg = -90.0, .longitudeDeg = 0.0, .elevationMeters = 0.0},
         j2000NoonUtc
