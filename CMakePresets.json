@@ -89,6 +89,21 @@
             }
         },
         {
+            "name": "ci-ui-debug",
+            "inherits": "ci-linux-base",
+            "displayName": "CI UI Debug",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "ON",
+                "SKYGATE_BUILD_TESTS": "ON"
+            }
+        },
+        {
             "name": "ui-debug",
             "inherits": "base",
             "displayName": "UI Debug",
@@ -205,6 +220,15 @@
         {
             "name": "ci-core-debug",
             "configurePreset": "ci-core-debug",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "ci-ui-debug",
+            "configurePreset": "ci-ui-debug",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",

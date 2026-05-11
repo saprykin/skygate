@@ -53,19 +53,19 @@ jobs:
 
       - name: Configure
         run: >
-          cmake --preset core-debug
+          cmake --preset ui-debug
           -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DSKYGATE_BUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build --preset core-debug --parallel
+        run: cmake --build --preset ui-debug --parallel
 
-      - name: Test
+      - name: Run full test suite
         run: >
-          ctest --test-dir build-make/core-debug
+          ctest --test-dir build-make/ui-debug
           --parallel 2
-          -LE slow
+          -E '^skygate-ui-qml-main-window-tests$'
           --output-on-failure
           --no-tests=error
 
