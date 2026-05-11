@@ -1,7 +1,7 @@
 #include "catalog/hyg/HygGzipCatalogParser.hpp"
 
-#include "catalog/io/GzipCodec.hpp"
 #include "catalog/hyg/HygCatalogParser.hpp"
+#include "catalog/io/CompressedDataInflater.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
@@ -13,10 +13,8 @@ Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 }  // namespace
 
-CatalogBodyParseResult HygGzipCatalogParser::parse(
-    const std::string_view gzipData,
-    const HygParseProgressCallback& progressCallback
-) const
+CatalogBodyParseResult
+HygGzipCatalogParser::parse(const std::string_view gzipData, const HygParseProgressCallback& progressCallback) const
 {
     CatalogBodyParseResult result;
     if (gzipData.empty()) {
@@ -27,8 +25,7 @@ CatalogBodyParseResult HygGzipCatalogParser::parse(
         return result;
     }
 
-    const GzipCodec gzipCodec;
-    const auto uncompressedData = gzipCodec.gunzip(gzipData);
+    const auto uncompressedData = CompressedDataInflater::inflate(gzipData, CompressedDataFormat::Gzip);
     if (!uncompressedData.has_value()) {
         result.errorCode = CatalogLoadErrorCode::InvalidGzipData;
         result.errorDetail = "Gzip catalog payload could not be decompressed.";
