@@ -78,7 +78,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/AstronomicalTime.hpp
     src/engine/EclipticToEquatorialCalculator.hpp
     src/engine/EquatorialToHorizontalCalculator.hpp
-    src/engine/FixedEquatorialLookup.hpp
     src/engine/MoonEquatorialCalculator.hpp
     src/engine/PlanetEquatorialCalculator.hpp
     src/engine/SunEquatorialCalculator.hpp
@@ -99,7 +98,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/AstronomicalTime.cpp
     src/engine/EclipticToEquatorialCalculator.cpp
     src/engine/EquatorialToHorizontalCalculator.cpp
-    src/engine/FixedEquatorialLookup.cpp
     src/engine/MoonEquatorialCalculator.cpp
     src/engine/PlanetEquatorialCalculator.cpp
     src/engine/SunEquatorialCalculator.cpp
