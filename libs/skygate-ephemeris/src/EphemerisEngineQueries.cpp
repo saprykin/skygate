@@ -1,6 +1,6 @@
 #include "skygate/ephemeris/EphemerisEngineQueries.hpp"
 
-#include "common/StringUtilities.hpp"
+#include "StringUtilities.hpp"
 
 namespace skygate::ephemeris {
 

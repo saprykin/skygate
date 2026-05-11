@@ -26,6 +26,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     target_include_directories(${target_name}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/../src
+            ${CMAKE_CURRENT_SOURCE_DIR}/support
     )
 
     target_compile_features(${target_name} PRIVATE cxx_std_20)
@@ -61,136 +62,136 @@ endfunction()
 
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-payload-parser-tests
-    CatalogPayloadParserTests.cpp
+    catalog/CatalogPayloadParserTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-property-tests
-    CatalogPropertyTests.cpp
+    catalog/CatalogPropertyTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-fixture-corpus-tests
-    CatalogFixtureCorpusTests.cpp
+    catalog/CatalogFixtureCorpusTests.cpp
     LABELS integration
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-performance-guard-tests
-    CatalogPerformanceGuardTests.cpp
+    catalog/CatalogPerformanceGuardTests.cpp
     LABELS perf advisory slow
     TIMEOUT 90
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-delimited-reader-tests
-    CatalogDelimitedReaderTests.cpp
+    catalog/io/CatalogDelimitedReaderTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-string-utilities-tests
-    StringUtilitiesTests.cpp
+    engine/StringUtilitiesTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-parsing-utilities-tests
-    CatalogParsingUtilitiesTests.cpp
+    catalog/CatalogParsingUtilitiesTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-payload-format-detector-tests
-    CatalogPayloadFormatDetectorTests.cpp
+    catalog/CatalogPayloadFormatDetectorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-codec-tests
-    CatalogArchiveCodecTests.cpp
+    catalog/io/CatalogArchiveCodecTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-inflater-tests
-    CatalogArchiveInflaterTests.cpp
+    catalog/io/CatalogArchiveInflaterTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-zip-directory-tests
-    CatalogArchiveZipDirectoryTests.cpp
+    catalog/io/CatalogArchiveZipDirectoryTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-zip-entry-extractor-tests
-    CatalogArchiveZipEntryExtractorTests.cpp
+    catalog/io/CatalogArchiveZipEntryExtractorTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-property-tests
-    CatalogArchivePropertyTests.cpp
+    catalog/io/CatalogArchivePropertyTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-stellarium-extractor-tests
-    StellariumExtractorTests.cpp
+    catalog/stellarium/StellariumExtractorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-open-ngc-object-mapper-tests
-    OpenNgcObjectMapperTests.cpp
+    catalog/opengc/OpenNgcObjectMapperTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-open-ngc-parser-edge-tests
-    OpenNgcParserEdgeTests.cpp
+    catalog/opengc/OpenNgcParserEdgeTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-hyg-catalog-tests
-    HygCatalogParserTests.cpp
+    catalog/hyg/HygCatalogParserTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-hyg-gzip-tests
-    HygCatalogGzipTests.cpp
+    catalog/hyg/HygCatalogGzipTests.cpp
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-stellarium-parser-tests
-    StellariumConstellationParserTests.cpp
+    catalog/stellarium/StellariumConstellationParserTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-factory-tests
-    CatalogFactoryTests.cpp
+    catalog/CatalogFactoryTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-composer-tests
-    CatalogComposerTests.cpp
+    catalog/CatalogComposerTests.cpp
     LABELS integration
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-constellation-data-codec-tests
-    ConstellationDataCodecTests.cpp
+    catalog/constellation/ConstellationDataCodecTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-body-trail-calculator-tests
-    BodyTrailCalculatorTests.cpp
+    engine/BodyTrailCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-celestial-reference-tests
-    CelestialReferenceCalculatorTests.cpp
+    engine/CelestialReferenceCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-observation-event-calculator-tests
-    ObservationEventCalculatorTests.cpp
+    events/ObservationEventCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-night-conditions-calculator-tests
-    NightConditionsCalculatorTests.cpp
+    events/NightConditionsCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-baseline-tests
-    EphemerisEngineBaselineTests.cpp
+    engine/EphemerisEngineBaselineTests.cpp
     LABELS integration
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-fallback-tests
-    EphemerisEngineFallbackTests.cpp
+    engine/EphemerisEngineFallbackTests.cpp
     LABELS integration
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-regression-tests
-    EphemerisRegressionTests.cpp
+    engine/EphemerisRegressionTests.cpp
     LABELS integration
     TIMEOUT 45
 )

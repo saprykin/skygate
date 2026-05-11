@@ -1,8 +1,8 @@
 #include "skygate/ephemeris/CatalogComposer.hpp"
 
-#include "catalog/CatalogIdentity.hpp"
-#include "catalog/CoreBodyCatalogAugmenter.hpp"
-#include "catalog/DeepSkyCatalogMerger.hpp"
+#include "catalog/model/CatalogIdentity.hpp"
+#include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
+#include "catalog/composition/DeepSkyCatalogMerger.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <algorithm>

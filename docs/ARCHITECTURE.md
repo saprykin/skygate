@@ -311,6 +311,14 @@ private layers: `ZipDirectoryReader` parses central-directory metadata,
 `CatalogZipEntrySelector` applies the catalog CSV choice policy, and
 `ZipEntryExtractor` validates local headers and inflates entry payloads.
 
+Private catalog implementation files are grouped by responsibility under
+`libs/skygate-ephemeris/src/catalog`: orchestration facades at the catalog root,
+data model helpers in `model/`, normalization in `normalize/`, active-catalog
+composition in `composition/`, source-specific parsers in `bundled/`, `hyg/`,
+`opengc/`, and `stellarium/`, constellation codecs in `constellation/`, and
+payload/archive IO in `io/` and `io/zip/`. Shared string helpers live directly
+under `libs/skygate-ephemeris/src`.
+
 #### Constellation data
 Constellation lines and label anchors have one persisted/imported source:
 

@@ -1,7 +1,7 @@
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
-#include "catalog/CatalogBodyNormalization.hpp"
-#include "catalog/InMemoryStarCatalog.hpp"
+#include "catalog/normalize/CatalogBodyNormalization.hpp"
+#include "catalog/model/InMemoryStarCatalog.hpp"
 #include "skygate/ephemeris/CatalogLoader.hpp"
 
 #include <memory>

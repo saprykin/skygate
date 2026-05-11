@@ -1,6 +1,6 @@
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
-#include "common/StringUtilities.hpp"
+#include "StringUtilities.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/core/math/SphericalGeometry.hpp"
 

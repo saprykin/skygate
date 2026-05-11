@@ -1,7 +1,7 @@
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 
-#include "catalog/CatalogPayloadFormatDetector.hpp"
-#include "catalog/ZipCodec.hpp"
+#include "catalog/io/CatalogPayloadFormatDetector.hpp"
+#include "catalog/io/zip/ZipCodec.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
