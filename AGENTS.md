@@ -4,8 +4,7 @@
 This file defines coding and collaboration rules for agents working in this
 repository.
 
-## General Coding Style (C++)
-- Use 4-space indentation.
+## C++ Conventions
 - Use UTF-8 and prefer ASCII in source unless non-ASCII is required.
 - Prefer `.hpp` headers and `#pragma once`.
 - Prefer one class per header/source pair where practical.
@@ -21,16 +20,12 @@ repository.
 - Prefer unnamed-namespace helpers for `.cpp`-local and test-local functions.
 - Keep public library headers under `libs/*/include/skygate/...`. Keep
   internal-only helpers in `src/` where practical.
-
-## Naming Conventions
 - Types/classes: `PascalCase`.
 - Interface classes: prefix with `I` (example: `IRenderer`, `IProjection`).
 - Methods/functions: `camelCase`.
 - Member variables: `m_camelCase`.
 - Local variables/parameters: `camelCase`.
 - Constants/macros: `kPascalCase` for constants, avoid macros unless necessary.
-
-## Property Access Pattern
 - Setters are prefixed with `set` (example: `setLatitude(double latitude)`).
 - Getters use the property name directly (example: `latitude() const`).
 - Boolean getters may use `is`/`has` when clearer (example: `isPaused() const`).
@@ -70,6 +65,8 @@ repository.
 ## Agent Workflow
 - Make minimal, focused changes.
 - Do not rewrite unrelated files.
+- After changing any C++ source or header, run `clang-format` on the touched
+  C++ files before considering the change complete.
 - Prefer existing presets and build trees over inventing new local workflow
   instructions.
 - Update documentation when behavior, contracts, or architecture meaningfully
