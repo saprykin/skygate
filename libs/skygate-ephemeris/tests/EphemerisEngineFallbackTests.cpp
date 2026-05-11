@@ -308,14 +308,37 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     );
     body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet;
 
-    const std::vector<skygate::ephemeris::CelestialBody> bodies {body};
-    const auto engine = skygate::ephemeris::createEphemerisEngine(bodies);
-    QVERIFY(engine != nullptr);
-
     skygate::core::SkyContext context;
     context.observer.latitudeDeg = 10.0;
     context.observer.longitudeDeg = 20.0;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1710000000));
+
+    const std::vector<skygate::ephemeris::CelestialBody> bodies {body};
+    const auto directEngine = skygate::ephemeris::createEphemerisEngine(bodies);
+    QVERIFY(directEngine != nullptr);
+
+    const auto directState = directEngine->computeBodyState(context, "mars");
+    QVERIFY(directState.has_value());
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        directState->equatorial.rightAscensionHours,
+        3.25,
+        1e-9
+    ));
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        directState->equatorial.declinationDeg,
+        -12.5,
+        1e-9
+    ));
+
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({body});
+    QVERIFY(catalog != nullptr);
+    QCOMPARE(
+        catalog->bodies()[0].ephemerisSource,
+        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    );
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
 
     const auto state = engine->computeBodyState(context, "mars");
     QVERIFY(state.has_value());
