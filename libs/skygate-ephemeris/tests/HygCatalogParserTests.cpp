@@ -31,6 +31,10 @@ void HygCatalogParserTests::parsesBasicRows()
     QVERIFY(bodies.size() == 2U);
     QVERIFY(bodies[0].id == "hip_32349");
     QVERIFY(bodies[0].fixedEquatorial.has_value());
+    QCOMPARE(
+        bodies[0].ephemerisSource,
+        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    );
 }
 
 void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
