@@ -56,6 +56,10 @@ Normal frame production works like this:
 
 ### `skygate-ui`
 This module is the application layer and the most stateful part of the system.
+`apps/skygate-ui/src/main.cpp` stays with the executable target. The
+`skygate-ui-lib` sources under `apps/skygate-ui/src` are grouped by subsystem:
+`app`, `catalog`, `diagnostics`, `location`, `platform`, `render`, `scene`,
+`search`, `selection`, `settings`, `theme`, and `time`.
 
 #### Main presentation objects
 - `SkyContextController`
@@ -476,10 +480,11 @@ The repository keeps tests close to each module:
     factory/composer behavior, celestial reference calculations, engine
     baselines/fallbacks, and fixed-date ephemeris regression checks.
 - `apps/skygate-ui/tests`
-  - scene-model behavior, controller/search/location/theme/overlay models,
-    settings persistence, active catalog building, catalog cache restore/persist
-    behavior, fake-network catalog download/coordinator workflows, and a minimal
-    QML smoke test for the main module.
+  - grouped by matching UI responsibility folders plus shared `support`
+    fixtures: scene-model behavior, controller/search/location/theme/overlay
+    models, settings persistence, active catalog building, catalog cache
+    restore/persist behavior, fake-network catalog download/coordinator
+    workflows, and QML load/interaction/rendering smoke coverage.
 
 This mirrors the architectural split and keeps rendering-independent logic
 testable without a running UI. Network-facing catalog tests use deterministic
