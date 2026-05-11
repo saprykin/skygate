@@ -22,10 +22,6 @@
 #define SKYGATE_QML_SOURCE_DIR ""
 #endif
 
-#ifndef SKYGATE_QML_IMPORT_DIR
-#define SKYGATE_QML_IMPORT_DIR ""
-#endif
-
 class QmlSmokeTests final : public QObject {
     Q_OBJECT
 
@@ -47,7 +43,6 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
     skySceneModel.setSkyContextController(&skyContextController);
 
     QQmlApplicationEngine engine;
-    engine.addImportPath(QStringLiteral(SKYGATE_QML_IMPORT_DIR));
     engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);
     engine.rootContext()->setContextProperty("skyScene", &skySceneModel);

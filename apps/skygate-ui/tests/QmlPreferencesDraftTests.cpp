@@ -105,7 +105,6 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
 void QmlPreferencesDraftTests::preferencesDraftCurrentDeviceApplyAndSyncWork()
 {
     QQmlEngine engine;
-    engine.addImportPath(QStringLiteral(SKYGATE_QML_IMPORT_DIR));
     engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
 
     const QmlWarningScope warnings;

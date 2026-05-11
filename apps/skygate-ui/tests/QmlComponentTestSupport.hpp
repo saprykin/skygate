@@ -22,10 +22,6 @@
 
 namespace skygate::ui::tests {
 
-#ifndef SKYGATE_QML_IMPORT_DIR
-#define SKYGATE_QML_IMPORT_DIR ""
-#endif
-
 inline QString componentErrors(const QQmlComponent& component)
 {
     QStringList messages;
@@ -89,7 +85,6 @@ inline void setupEngine(
     SkySceneModel* sceneModel = nullptr
 )
 {
-    engine.addImportPath(QStringLiteral(SKYGATE_QML_IMPORT_DIR));
     engine.addImportPath(QStringLiteral(SKYGATE_QML_SOURCE_DIR));
     engine.rootContext()->setContextProperty("skyContext", &controller);
     if (sceneModel != nullptr) {

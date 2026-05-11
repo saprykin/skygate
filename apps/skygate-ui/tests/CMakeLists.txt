@@ -356,6 +356,5 @@ foreach(qml_test_target IN ITEMS
     target_compile_definitions(${qml_test_target}
         PRIVATE
             SKYGATE_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../qml"
-            SKYGATE_QML_IMPORT_DIR="${CMAKE_CURRENT_BINARY_DIR}/.."
     )
 endforeach()
