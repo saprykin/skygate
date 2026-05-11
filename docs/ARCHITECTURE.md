@@ -95,7 +95,7 @@ This module is the application layer and the most stateful part of the system.
     data into `updatePaintNode()`.
 
 #### QML composition
-`apps/skygate-ui/Main.qml` composes several layers:
+`apps/skygate-ui/qml/Main.qml` composes several layers:
 
 - `SkyViewportItem`
   - Base rendered star field and line work.

@@ -54,7 +54,7 @@ void QmlToolbarTests::searchToolbarFiltersActivatesAndClearsResults()
     const QmlWarningScope warnings;
     auto object = createFileComponent(
         engine,
-        QStringLiteral("SearchToolbar.qml"),
+        QStringLiteral("toolbars/SearchToolbar.qml"),
         {{QStringLiteral("skyContextController"), QVariant::fromValue<QObject*>(controller.get())}}
     );
     QVERIFY(object != nullptr);

@@ -232,7 +232,7 @@ void QmlComponentLoadTests::aboutWindowLoadsWithBuildMetadata()
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
 
     const QmlWarningScope warnings;
-    auto object = createFileComponent(engine, QStringLiteral("AboutWindow.qml"));
+    auto object = createFileComponent(engine, QStringLiteral("windows/AboutWindow.qml"));
     QVERIFY(object != nullptr);
     QCOMPARE(object->property("title").toString(), QStringLiteral("About SkyGate"));
     QVERIFY(firstObjectWithProperty(object.get(), "text", QStringLiteral("SkyGate")) != nullptr);
@@ -251,7 +251,7 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral("test-git"));
 
     const QmlWarningScope warnings;
-    auto object = createFileComponent(engine, QStringLiteral("AboutWindow.qml"));
+    auto object = createFileComponent(engine, QStringLiteral("windows/AboutWindow.qml"));
     QVERIFY(object != nullptr);
     auto* window = qobject_cast<QQuickWindow*>(object.get());
     QVERIFY(window != nullptr);
