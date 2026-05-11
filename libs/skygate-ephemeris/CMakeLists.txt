@@ -60,7 +60,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/composition/DeepSkyCatalogMerger.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
     src/catalog/io/CsvRowTokenizer.hpp
-    src/catalog/io/GzipCodec.hpp
     src/catalog/hyg/HygCatalogParser.hpp
     src/catalog/hyg/HygGzipCatalogParser.hpp
     src/catalog/model/InMemoryStarCatalog.hpp
@@ -89,7 +88,6 @@ add_library(skygate-ephemeris STATIC
     src/SimpleEphemerisEngine.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
-    src/catalog/io/GzipCodec.cpp
     src/catalog/hyg/HygCatalogParser.cpp
     src/catalog/hyg/HygGzipCatalogParser.cpp
     src/catalog/model/InMemoryStarCatalog.cpp
