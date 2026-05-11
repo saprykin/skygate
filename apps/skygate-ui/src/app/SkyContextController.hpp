@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QAbstractItemModel>
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
@@ -23,7 +24,6 @@
 #include <vector>
 
 class QDateTime;
-class QAbstractItemModel;
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
 class LocationCatalogModel;
