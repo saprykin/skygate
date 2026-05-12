@@ -1,4 +1,4 @@
-#include "engine/AstronomicalTime.hpp"
+#include "engine/simple/AstronomicalTime.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -17,24 +17,15 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
-skygate::core::SkyContext makeContext(
-    const double latitudeDeg = 47.0,
-    const double longitudeDeg = 8.0
-)
+skygate::core::SkyContext makeContext(const double latitudeDeg = 47.0, const double longitudeDeg = 8.0)
 {
     skygate::core::SkyContext context;
-    context.observer = {
-        .latitudeDeg = latitudeDeg,
-        .longitudeDeg = longitudeDeg,
-        .elevationMeters = 400.0
-    };
+    context.observer = {.latitudeDeg = latitudeDeg, .longitudeDeg = longitudeDeg, .elevationMeters = 400.0};
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
     return context;
 }
 
-skygate::ephemeris::CelestialBody makeFixedBody(
-    const skygate::core::EquatorialCoordinate& equatorial
-)
+skygate::ephemeris::CelestialBody makeFixedBody(const skygate::core::EquatorialCoordinate& equatorial)
 {
     skygate::ephemeris::CelestialBody body;
     body.id = "target";
@@ -45,9 +36,7 @@ skygate::ephemeris::CelestialBody makeFixedBody(
     return body;
 }
 
-std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(
-    const skygate::ephemeris::CelestialBody& body
-)
+std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(const skygate::ephemeris::CelestialBody& body)
 {
     auto catalog = skygate::ephemeris::createStarCatalogFromBodies({body});
     Q_ASSERT(catalog != nullptr);
@@ -60,7 +49,8 @@ double currentLocalSiderealHours(const skygate::core::SkyContext& context)
         skygate::core::AngleMath::normalizeDegrees(
             skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(context.utcTime)
             + context.observer.longitudeDeg
-        ) / 15.0
+        )
+        / 15.0
     );
 }
 
@@ -79,32 +69,25 @@ void verifyCrossingAltitude(
 
 class MovingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
-        const skygate::core::SkyContext& context
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = context;
-        snapshot.catalogBodies =
-            std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-                std::vector<skygate::ephemeris::CelestialBody> {makeFixedBody({})}
-            );
+        snapshot.catalogBodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+            std::vector<skygate::ephemeris::CelestialBody>{makeFixedBody({})}
+        );
         snapshot.states.push_back(*computeBodyState(context, 0U));
         return snapshot;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext&,
-        std::string_view
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext& context,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
         if (bodyIndex != 0U) {
             return std::nullopt;
@@ -113,13 +96,10 @@ public:
         ++sampleCount;
         const double seconds = static_cast<double>(context.utcTime.time_since_epoch().count());
         const double phase = std::fmod(seconds, 86400.0) / 86400.0;
-        return skygate::ephemeris::CelestialBodyState {
+        return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = 0U,
             .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
-            .horizontal = {
-                .altitudeDeg = 35.0 * std::sin(2.0 * kPi * (phase - 0.25)),
-                .azimuthDeg = 180.0
-            }
+            .horizontal = {.altitudeDeg = 35.0 * std::sin(2.0 * kPi * (phase - 0.25)), .azimuthDeg = 180.0}
         };
     }
 
@@ -128,43 +108,33 @@ public:
 
 class ConstantAltitudeEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit ConstantAltitudeEngine(const double altitudeDeg) :
-        m_altitudeDeg(altitudeDeg)
-    {
-    }
+    explicit ConstantAltitudeEngine(const double altitudeDeg) : m_altitudeDeg(altitudeDeg) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
-        const skygate::core::SkyContext& context
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = context;
-        snapshot.catalogBodies =
-            std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-                std::vector<skygate::ephemeris::CelestialBody> {makeFixedBody({})}
-            );
+        snapshot.catalogBodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+            std::vector<skygate::ephemeris::CelestialBody>{makeFixedBody({})}
+        );
         snapshot.states.push_back(*computeBodyState(context, 0U));
         return snapshot;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext&,
-        std::string_view
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext&,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, const std::uint32_t bodyIndex) const override
     {
         if (bodyIndex != 0U) {
             return std::nullopt;
         }
 
-        return skygate::ephemeris::CelestialBodyState {
+        return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = 0U,
             .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
             .horizontal = {.altitudeDeg = m_altitudeDeg, .azimuthDeg = 180.0}
@@ -195,10 +165,7 @@ void ObservationEventCalculatorTests::normalObjectFindsOrderedEventsAndRefinedHo
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const auto context = makeContext();
-    const auto engine = makeEngineForBody(makeFixedBody({
-        .rightAscensionHours = 8.0,
-        .declinationDeg = 20.0
-    }));
+    const auto engine = makeEngineForBody(makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0}));
     QVERIFY(engine != nullptr);
 
     const auto summary = calculator.compute(*engine, context, 0U);
@@ -224,10 +191,7 @@ void ObservationEventCalculatorTests::circumpolarAndNeverRisingObjectsReportFall
     const skygate::ephemeris::ObservationEventCalculator calculator;
 
     const auto circumpolarContext = makeContext(60.0, 0.0);
-    const auto circumpolarBody = makeFixedBody({
-        .rightAscensionHours = 3.0,
-        .declinationDeg = 80.0
-    });
+    const auto circumpolarBody = makeFixedBody({.rightAscensionHours = 3.0, .declinationDeg = 80.0});
     auto engine = makeEngineForBody(circumpolarBody);
     auto summary = calculator.compute(*engine, circumpolarContext, 0U, circumpolarBody);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
@@ -237,10 +201,7 @@ void ObservationEventCalculatorTests::circumpolarAndNeverRisingObjectsReportFall
     QVERIFY(*summary.culmination.altitudeDeg > 65.0);
 
     const auto neverRisingContext = makeContext(60.0, 0.0);
-    const auto neverRisingBody = makeFixedBody({
-        .rightAscensionHours = 3.0,
-        .declinationDeg = -80.0
-    });
+    const auto neverRisingBody = makeFixedBody({.rightAscensionHours = 3.0, .declinationDeg = -80.0});
     engine = makeEngineForBody(neverRisingBody);
     summary = calculator.compute(*engine, neverRisingContext, 0U, neverRisingBody);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
@@ -254,10 +215,9 @@ void ObservationEventCalculatorTests::currentAboveHorizonSetsBeforeItRisesAgain(
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const auto context = makeContext(0.0, 0.0);
-    const auto engine = makeEngineForBody(makeFixedBody({
-        .rightAscensionHours = currentLocalSiderealHours(context),
-        .declinationDeg = 0.0
-    }));
+    const auto engine = makeEngineForBody(
+        makeFixedBody({.rightAscensionHours = currentLocalSiderealHours(context), .declinationDeg = 0.0})
+    );
 
     const auto summary = calculator.compute(*engine, context, 0U);
 
@@ -272,12 +232,10 @@ void ObservationEventCalculatorTests::currentBelowHorizonRisesBeforeItSetsAgain(
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const auto context = makeContext(0.0, 0.0);
-    const auto engine = makeEngineForBody(makeFixedBody({
-        .rightAscensionHours = skygate::core::AngleMath::normalizeHours(
-            currentLocalSiderealHours(context) + 12.0
-        ),
-        .declinationDeg = 0.0
-    }));
+    const auto engine = makeEngineForBody(makeFixedBody(
+        {.rightAscensionHours = skygate::core::AngleMath::normalizeHours(currentLocalSiderealHours(context) + 12.0),
+         .declinationDeg = 0.0}
+    ));
 
     const auto summary = calculator.compute(*engine, context, 0U);
 
@@ -292,12 +250,10 @@ void ObservationEventCalculatorTests::configurableAltitudeThresholdFindsDifferen
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     const auto context = makeContext(0.0, 0.0);
-    const auto engine = makeEngineForBody(makeFixedBody({
-        .rightAscensionHours = skygate::core::AngleMath::normalizeHours(
-            currentLocalSiderealHours(context) + 12.0
-        ),
-        .declinationDeg = 0.0
-    }));
+    const auto engine = makeEngineForBody(makeFixedBody(
+        {.rightAscensionHours = skygate::core::AngleMath::normalizeHours(currentLocalSiderealHours(context) + 12.0),
+         .declinationDeg = 0.0}
+    ));
 
     const auto horizonSummary = calculator.compute(*engine, context, 0U, 0.0);
     const auto twilightSummary = calculator.compute(*engine, context, 0U, -6.0);
@@ -316,10 +272,7 @@ void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitSt
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     auto context = makeContext();
-    auto engine = makeEngineForBody(makeFixedBody({
-        .rightAscensionHours = 1.0,
-        .declinationDeg = 10.0
-    }));
+    auto engine = makeEngineForBody(makeFixedBody({.rightAscensionHours = 1.0, .declinationDeg = 10.0}));
 
     context.observer.latitudeDeg = 120.0;
     auto summary = calculator.compute(*engine, context, 0U);
@@ -347,32 +300,14 @@ void ObservationEventCalculatorTests::unprovenWindowMissDoesNotReportAlwaysAbove
     const auto context = makeContext(70.0, 0.0);
 
     auto summary = calculator.compute(belowHorizonEngine, context, 0U);
-    QCOMPARE(
-        summary.nextRise.status,
-        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
-    );
-    QCOMPARE(
-        summary.nextSet.status,
-        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
-    );
-    QCOMPARE(
-        summary.culmination.status,
-        skygate::ephemeris::ObservationEventStatus::Available
-    );
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
 
     summary = calculator.compute(aboveHorizonEngine, context, 0U);
-    QCOMPARE(
-        summary.nextRise.status,
-        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
-    );
-    QCOMPARE(
-        summary.nextSet.status,
-        skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow
-    );
-    QCOMPARE(
-        summary.culmination.status,
-        skygate::ephemeris::ObservationEventStatus::Available
-    );
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
 }
 
 void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()

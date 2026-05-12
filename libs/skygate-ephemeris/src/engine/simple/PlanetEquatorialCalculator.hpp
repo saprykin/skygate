@@ -9,10 +9,8 @@ namespace skygate::ephemeris {
 
 class PlanetEquatorialCalculator final {
 public:
-    [[nodiscard]] std::optional<core::EquatorialCoordinate> compute(
-        std::string_view bodyId,
-        const core::UtcTimePoint& utcTime
-    ) const noexcept;
+    [[nodiscard]] std::optional<core::EquatorialCoordinate>
+    compute(std::string_view bodyId, const core::UtcTimePoint& utcTime) const noexcept;
 };
 
 }  // namespace skygate::ephemeris
