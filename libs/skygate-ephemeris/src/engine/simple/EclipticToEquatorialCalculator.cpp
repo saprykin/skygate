@@ -1,4 +1,4 @@
-#include "engine/EclipticToEquatorialCalculator.hpp"
+#include "engine/simple/EclipticToEquatorialCalculator.hpp"
 
 #include "skygate/core/math/AngleMath.hpp"
 
@@ -7,9 +7,7 @@
 namespace skygate::ephemeris {
 
 core::EquatorialCoordinate EclipticToEquatorialCalculator::compute(
-    const double eclipticLongitudeDeg,
-    const double eclipticLatitudeDeg,
-    const double obliquityDeg
+    const double eclipticLongitudeDeg, const double eclipticLatitudeDeg, const double obliquityDeg
 ) noexcept
 {
     const double lonRad = core::AngleMath::toRadians(eclipticLongitudeDeg);
@@ -25,9 +23,8 @@ core::EquatorialCoordinate EclipticToEquatorialCalculator::compute(
     const double zEq = yEcl * std::sin(epsRad) + zEcl * std::cos(epsRad);
 
     core::EquatorialCoordinate equatorial;
-    equatorial.rightAscensionHours = core::AngleMath::normalizeHours(
-        core::AngleMath::toDegrees(std::atan2(yEq, xEq)) / 15.0
-    );
+    equatorial.rightAscensionHours =
+        core::AngleMath::normalizeHours(core::AngleMath::toDegrees(std::atan2(yEq, xEq)) / 15.0);
     equatorial.declinationDeg = core::AngleMath::toDegrees(std::asin(zEq));
     return equatorial;
 }

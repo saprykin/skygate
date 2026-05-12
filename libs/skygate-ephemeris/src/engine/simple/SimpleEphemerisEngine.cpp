@@ -1,10 +1,10 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
 #include "StringUtilities.hpp"
-#include "engine/EquatorialToHorizontalCalculator.hpp"
-#include "engine/MoonEquatorialCalculator.hpp"
-#include "engine/PlanetEquatorialCalculator.hpp"
-#include "engine/SunEquatorialCalculator.hpp"
+#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
+#include "engine/simple/MoonEquatorialCalculator.hpp"
+#include "engine/simple/PlanetEquatorialCalculator.hpp"
+#include "engine/simple/SunEquatorialCalculator.hpp"
 
 #include <limits>
 #include <memory>
@@ -38,10 +38,8 @@ public:
         return snapshot;
     }
 
-    [[nodiscard]] std::optional<CelestialBodyState> computeBodyState(
-        const core::SkyContext& context,
-        const std::string_view bodyId
-    ) const override
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const core::SkyContext& context, const std::string_view bodyId) const override
     {
         if (bodyId.empty()) {
             return std::nullopt;
@@ -57,10 +55,8 @@ public:
         return std::nullopt;
     }
 
-    [[nodiscard]] std::optional<CelestialBodyState> computeBodyState(
-        const core::SkyContext& context,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
         if (bodyIndex >= m_bodies->size()) {
             return std::nullopt;
@@ -70,11 +66,8 @@ public:
     }
 
 private:
-    [[nodiscard]] CelestialBodyState computeStateForBody(
-        const CelestialBody& body,
-        const std::size_t bodyIndex,
-        const core::SkyContext& context
-    ) const
+    [[nodiscard]] CelestialBodyState
+    computeStateForBody(const CelestialBody& body, const std::size_t bodyIndex, const core::SkyContext& context) const
     {
         CelestialBodyState state;
         state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
@@ -86,21 +79,16 @@ private:
         if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
             state.equatorial = *equatorial;
             if (context.observer.isValid()) {
-                state.horizontal = EquatorialToHorizontalCalculator::compute(
-                    *equatorial,
-                    context.observer,
-                    context.utcTime
-                );
+                state.horizontal =
+                    EquatorialToHorizontalCalculator::compute(*equatorial, context.observer, context.utcTime);
             }
         }
 
         return state;
     }
 
-    [[nodiscard]] std::optional<core::EquatorialCoordinate> computeEquatorial(
-        const CelestialBody& body,
-        const core::UtcTimePoint& utcTime
-    ) const
+    [[nodiscard]] std::optional<core::EquatorialCoordinate>
+    computeEquatorial(const CelestialBody& body, const core::UtcTimePoint& utcTime) const
     {
         if (body.fixedEquatorial.has_value()) {
             return body.fixedEquatorial;
@@ -134,7 +122,7 @@ private:
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine()
 {
-    return std::make_unique<SimpleEphemerisEngine>(std::span<const CelestialBody> {});
+    return std::make_unique<SimpleEphemerisEngine>(std::span<const CelestialBody>{});
 }
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog)

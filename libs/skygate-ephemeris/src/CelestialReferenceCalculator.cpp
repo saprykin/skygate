@@ -1,30 +1,20 @@
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 
-#include "engine/AstronomicalTime.hpp"
-#include "engine/EclipticToEquatorialCalculator.hpp"
-#include "engine/EquatorialToHorizontalCalculator.hpp"
+#include "engine/simple/AstronomicalTime.hpp"
+#include "engine/simple/EclipticToEquatorialCalculator.hpp"
+#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 
 #include <cmath>
 
 namespace skygate::ephemeris {
 
 core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
-    const double eclipticLongitudeDeg,
-    const core::GeoLocation& observer,
-    const core::UtcTimePoint& utcTime
+    const double eclipticLongitudeDeg, const core::GeoLocation& observer, const core::UtcTimePoint& utcTime
 ) noexcept
 {
-    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(
-        AstronomicalTime::daysSinceJ2000(utcTime)
-    );
+    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(AstronomicalTime::daysSinceJ2000(utcTime));
     return EquatorialToHorizontalCalculator::compute(
-        EclipticToEquatorialCalculator::compute(
-            eclipticLongitudeDeg,
-            0.0,
-            obliquityDeg
-        ),
-        observer,
-        utcTime
+        EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, 0.0, obliquityDeg), observer, utcTime
     );
 }
 
@@ -36,10 +26,7 @@ core::HorizontalCoordinate CelestialReferenceCalculator::equatorialPoint(
 ) noexcept
 {
     return EquatorialToHorizontalCalculator::compute(
-        core::EquatorialCoordinate {
-            .rightAscensionHours = rightAscensionHours,
-            .declinationDeg = declinationDeg
-        },
+        core::EquatorialCoordinate{.rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg},
         observer,
         utcTime
     );
@@ -57,17 +44,13 @@ core::HorizontalCoordinate CelestialReferenceCalculator::declinationCirclePoint(
         return equatorialPoint(0.0, declinationDeg, observer, utcTime);
     }
 
-    const double rightAscensionHours = 24.0 * static_cast<double>(sampleIndex)
-        / static_cast<double>(sampleCount);
+    const double rightAscensionHours = 24.0 * static_cast<double>(sampleIndex) / static_cast<double>(sampleCount);
     return equatorialPoint(rightAscensionHours, declinationDeg, observer, utcTime);
 }
 
-double CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
-    const core::GeoLocation& observer
-) noexcept
+double CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(const core::GeoLocation& observer) noexcept
 {
-    return (observer.latitudeDeg >= 0.0 ? 1.0 : -1.0)
-        * (90.0 - std::abs(observer.latitudeDeg));
+    return (observer.latitudeDeg >= 0.0 ? 1.0 : -1.0) * (90.0 - std::abs(observer.latitudeDeg));
 }
 
 }  // namespace skygate::ephemeris

@@ -1,4 +1,4 @@
-#include "engine/AstronomicalTime.hpp"
+#include "engine/simple/AstronomicalTime.hpp"
 
 #include "skygate/core/math/AngleMath.hpp"
 
@@ -30,9 +30,7 @@ double AstronomicalTime::meanObliquityDeg(const double daysSinceJ2000) noexcept
 double AstronomicalTime::greenwichMeanSiderealTimeDeg(const core::UtcTimePoint& utcTime) noexcept
 {
     const double julianDay = julianDayFromUtc(utcTime);
-    return core::AngleMath::normalizeDegrees(
-        280.46061837 + 360.98564736629 * (julianDay - kJ2000JulianDay)
-    );
+    return core::AngleMath::normalizeDegrees(280.46061837 + 360.98564736629 * (julianDay - kJ2000JulianDay));
 }
 
 }  // namespace skygate::ephemeris

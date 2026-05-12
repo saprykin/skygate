@@ -1,6 +1,6 @@
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
-#include "engine/AstronomicalTime.hpp"
+#include "engine/simple/AstronomicalTime.hpp"
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 

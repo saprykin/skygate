@@ -8,7 +8,27 @@ if(NOT ZLIB_FOUND)
     )
 endif()
 
+set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
+    src/engine/simple/AstronomicalTime.hpp
+    src/engine/simple/EclipticToEquatorialCalculator.hpp
+    src/engine/simple/EquatorialToHorizontalCalculator.hpp
+    src/engine/simple/MoonEquatorialCalculator.hpp
+    src/engine/simple/PlanetEquatorialCalculator.hpp
+    src/engine/simple/SunEquatorialCalculator.hpp
+    src/engine/simple/SimpleEphemerisEngine.cpp
+    src/engine/simple/AstronomicalTime.cpp
+    src/engine/simple/EclipticToEquatorialCalculator.cpp
+    src/engine/simple/EquatorialToHorizontalCalculator.cpp
+    src/engine/simple/MoonEquatorialCalculator.cpp
+    src/engine/simple/PlanetEquatorialCalculator.cpp
+    src/engine/simple/SunEquatorialCalculator.cpp
+)
+
+set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
+
 add_library(skygate-ephemeris STATIC
+    ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}
+    ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
     include/skygate/ephemeris/CatalogLoadResult.hpp
     include/skygate/ephemeris/BodyTrailCalculator.hpp
     include/skygate/ephemeris/CatalogComposer.hpp
@@ -74,18 +94,11 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumHipParser.cpp
     src/catalog/stellarium/StellariumLabelRefExtractor.cpp
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
-    src/engine/AstronomicalTime.hpp
-    src/engine/EclipticToEquatorialCalculator.hpp
-    src/engine/EquatorialToHorizontalCalculator.hpp
-    src/engine/MoonEquatorialCalculator.hpp
-    src/engine/PlanetEquatorialCalculator.hpp
-    src/engine/SunEquatorialCalculator.hpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
     src/EphemerisEngineQueries.cpp
     src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp
-    src/SimpleEphemerisEngine.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
     src/catalog/hyg/HygCatalogParser.cpp
@@ -93,12 +106,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/model/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
-    src/engine/AstronomicalTime.cpp
-    src/engine/EclipticToEquatorialCalculator.cpp
-    src/engine/EquatorialToHorizontalCalculator.cpp
-    src/engine/MoonEquatorialCalculator.cpp
-    src/engine/PlanetEquatorialCalculator.cpp
-    src/engine/SunEquatorialCalculator.cpp
     src/BodyTrailCalculator.cpp
 )
 
