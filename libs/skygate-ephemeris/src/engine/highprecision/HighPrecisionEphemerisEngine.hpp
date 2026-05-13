@@ -41,11 +41,6 @@ public:
     }
 };
 
-class IEarthOrientationProvider {
-public:
-    virtual ~IEarthOrientationProvider() = default;
-};
-
 class IFrameTransformer;
 
 class IAtmosphericRefractionCalculator {
@@ -110,7 +105,7 @@ struct HighPrecisionEphemerisEngineDependencies {
     std::shared_ptr<const ISolarSystemStateCalculator> solarSystemStateCalculator;
     std::shared_ptr<const IStarAstrometryCalculator> starAstrometryCalculator;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
-    std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider;
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
     std::shared_ptr<const IFrameTransformer> frameTransformer;
     std::shared_ptr<const IApparentPlaceCalculator> apparentPlaceCalculator;
     std::shared_ptr<const IAtmosphericRefractionCalculator> atmosphericRefractionCalculator;
