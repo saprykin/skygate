@@ -1,3 +1,5 @@
+#include "skygate/ephemeris/DeltaTProvider.hpp"
+#include "skygate/ephemeris/EarthOrientationProvider.hpp"
 #include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -30,6 +32,65 @@ namespace {
 {
     const skygate::ephemeris::LeapSecondTableLoadResult result =
         skygate::ephemeris::loadLeapSecondTableFromTextAsset(makeLeapSecondAsset());
+    Q_ASSERT(result.isSuccess());
+    return result.provider;
+}
+
+[[nodiscard]] skygate::ephemeris::EphemerisTextDataAsset makeEarthOrientationAsset()
+{
+    return {
+        .id = "earth-orientation",
+        .version = "test-eop",
+        .provenance = "unit test",
+        .content =
+            "#@ version test-eop\n"
+            "#@ source unit test\n"
+            "#@ expires 2026-07-01\n"
+            "#@ prediction_start 2026-05-01\n"
+            "#@ prediction_end 2026-06-30\n"
+            "effective_utc_date,ut1_minus_utc_seconds,polar_motion_x_arcseconds,polar_motion_y_arcseconds,predicted\n"
+            "2026-04-01,0.10,0.0,0.0,false\n"
+            "2026-04-11,0.30,0.0,0.0,false\n"
+            "2026-05-01,0.50,0.0,0.0,true\n",
+    };
+}
+
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider>
+makeEarthOrientationProvider(const std::optional<skygate::ephemeris::AstronomicalEpoch>& referenceEpoch = std::nullopt)
+{
+    skygate::ephemeris::EarthOrientationDataLoadOptions options;
+    options.referenceEpoch = referenceEpoch;
+    const skygate::ephemeris::EarthOrientationDataLoadResult result =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeEarthOrientationAsset(), options);
+    Q_ASSERT(result.isSuccess());
+    return result.provider;
+}
+
+[[nodiscard]] skygate::ephemeris::EphemerisTextDataAsset makeDeltaTAsset()
+{
+    return {
+        .id = "delta-t",
+        .version = "test-delta-t",
+        .provenance = "unit test",
+        .content = "#@ version test-delta-t\n"
+                   "#@ source unit test\n"
+                   "#@ expires 2027-01-01\n"
+                   "#@ ancient_fallback_start -13200-01-01\n"
+                   "#@ ancient_fallback_end 1600-01-01\n"
+                   "#@ ancient_fallback_source historical model\n"
+                   "#@ ancient_fallback_delta_t_seconds 12000.5\n"
+                   "#@ ancient_fallback_uncertainty_seconds 7200\n"
+                   "effective_utc_date,delta_t_seconds\n"
+                   "1900-01-01,-2.72\n"
+                   "2000-01-01,63.83\n"
+                   "2026-01-01,69.20\n",
+    };
+}
+
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::IDeltaTProvider> makeDeltaTProvider()
+{
+    const skygate::ephemeris::DeltaTDataLoadResult result =
+        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeDeltaTAsset());
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }
@@ -100,6 +161,12 @@ private slots:
     void convertsTtToTdbWithDocumentedApproximation();
     void roundTripsTtAndTdbPreservingPrecision();
     void convertsUtcToTdbThroughTt();
+    void convertsUtcToUt1FromExactEopSample();
+    void interpolatesUtcToUt1FromEopSamples();
+    void convertsUt1ToUtcFromEopSamples();
+    void reportsPredictedAndStaleEopWarnings();
+    void usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange();
+    void reportsMissingEopWhenUt1FallbackIsDisallowed();
 };
 
 void TimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
@@ -342,6 +409,123 @@ void TimeScaleServiceTests::convertsUtcToTdbThroughTt()
     QVERIFY(utcAgain.isSuccess());
     QVERIFY(utcAgain.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
     compareSecondsBetween(utcAgain.epoch, utc, 0.0);
+}
+
+void TimeScaleServiceTests::convertsUtcToUt1FromExactEopSample()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(
+        makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
+    );
+    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 1);
+
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+
+    QVERIFY(ut1.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(ut1.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Valid)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(ut1.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Ut1)
+    );
+    compareSecondsBetween(ut1.epoch, utc, 0.10);
+}
+
+void TimeScaleServiceTests::interpolatesUtcToUt1FromEopSamples()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(
+        makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
+    );
+    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 6);
+
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+
+    QVERIFY(ut1.isSuccess());
+    compareSecondsBetween(ut1.epoch, utc, 0.20);
+}
+
+void TimeScaleServiceTests::convertsUt1ToUtcFromEopSamples()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(
+        makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
+    );
+    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 6);
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+    QVERIFY(ut1.isSuccess());
+
+    const skygate::ephemeris::TimeScaleConversionResult utcAgain =
+        service.convert(ut1.epoch, skygate::ephemeris::TimeScale::Utc);
+
+    QVERIFY(utcAgain.isSuccess());
+    compareSecondsBetween(utcAgain.epoch, utc, 0.0);
+}
+
+void TimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService predictedService(
+        makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
+    );
+    const skygate::ephemeris::TimeScaleConversionResult predicted =
+        predictedService.convert(makeUtcEpoch(2026, 5, 1), skygate::ephemeris::TimeScale::Ut1);
+
+    QVERIFY(predicted.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(predicted.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
+    );
+    QVERIFY(predicted.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataPredicted));
+
+    const skygate::ephemeris::LeapSecondTimeScaleService staleService(
+        makeLeapSecondProvider(), {}, makeEarthOrientationProvider(makeUtcEpoch(2026, 8, 1))
+    );
+    const skygate::ephemeris::TimeScaleConversionResult stale =
+        staleService.convert(makeUtcEpoch(2026, 4, 1), skygate::ephemeris::TimeScale::Ut1);
+
+    QVERIFY(stale.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(stale.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
+    );
+    QVERIFY(stale.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataStale));
+}
+
+void TimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange()
+{
+    skygate::ephemeris::TimeScaleServiceOptions options;
+    options.allowDegradedLeapSecondFallback = true;
+    options.fallbackTaiMinusUtcSeconds = 0;
+    options.allowUt1DeltaTFallback = true;
+    const skygate::ephemeris::LeapSecondTimeScaleService service(
+        makeLeapSecondProvider(), options, makeEarthOrientationProvider(), makeDeltaTProvider()
+    );
+    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(-5000, 1, 1);
+
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+
+    QVERIFY(ut1.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(ut1.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
+    );
+    QVERIFY(ut1.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData));
+    QVERIFY(ut1.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::DeltaTFallbackApplied));
+    compareSecondsBetween(ut1.epoch, utc, -11968.316);
+}
+
+void TimeScaleServiceTests::reportsMissingEopWhenUt1FallbackIsDisallowed()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+
+    const skygate::ephemeris::TimeScaleConversionResult result =
+        service.convert(makeUtcEpoch(2026, 4, 1), skygate::ephemeris::TimeScale::Ut1);
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Failed)
+    );
+    QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataMissing));
+    QVERIFY(!result.diagnosticText.empty());
 }
 
 QTEST_MAIN(TimeScaleServiceTests)

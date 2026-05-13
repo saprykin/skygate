@@ -1,5 +1,7 @@
 #pragma once
 
+#include "skygate/ephemeris/DeltaTProvider.hpp"
+#include "skygate/ephemeris/EarthOrientationProvider.hpp"
 #include "skygate/ephemeris/LeapSecondProvider.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
@@ -37,7 +39,13 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
     LeapSecondFallbackApplied,
     UnsupportedConversion,
     InvalidInput,
-    TdbApproximationApplied
+    TdbApproximationApplied,
+    EarthOrientationDataMissing,
+    EarthOrientationDataStale,
+    EarthOrientationDataPredicted,
+    EpochOutsideEarthOrientationData,
+    DeltaTFallbackApplied,
+    DeltaTUnavailable
 };
 
 [[nodiscard]] constexpr std::string_view timeScaleConversionWarningText(const TimeScaleConversionWarningCode code
@@ -58,6 +66,18 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
         return "The requested time-scale conversion input is invalid.";
     case TimeScaleConversionWarningCode::TdbApproximationApplied:
         return "The TT/TDB conversion used a documented approximation.";
+    case TimeScaleConversionWarningCode::EarthOrientationDataMissing:
+        return "Earth-orientation data is unavailable.";
+    case TimeScaleConversionWarningCode::EarthOrientationDataStale:
+        return "Earth-orientation data is stale for this conversion.";
+    case TimeScaleConversionWarningCode::EarthOrientationDataPredicted:
+        return "Earth-orientation data uses a prediction for this conversion.";
+    case TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData:
+        return "The requested epoch is outside the Earth-orientation data range.";
+    case TimeScaleConversionWarningCode::DeltaTFallbackApplied:
+        return "A degraded Delta T fallback was applied.";
+    case TimeScaleConversionWarningCode::DeltaTUnavailable:
+        return "Delta T data is unavailable for this conversion.";
     }
 
     return "Time-scale conversion warning.";
@@ -93,6 +113,8 @@ struct TimeScaleConversionResult {
 struct TimeScaleServiceOptions {
     bool allowDegradedLeapSecondFallback = false;
     int fallbackTaiMinusUtcSeconds = 0;
+    EarthOrientationSampleOptions earthOrientationSampleOptions{false, false};
+    bool allowUt1DeltaTFallback = false;
 };
 
 class ITimeScaleService {
@@ -109,7 +131,10 @@ public:
 class LeapSecondTimeScaleService final : public ITimeScaleService {
 public:
     explicit LeapSecondTimeScaleService(
-        std::shared_ptr<const ILeapSecondProvider> leapSecondProvider, TimeScaleServiceOptions options = {}
+        std::shared_ptr<const ILeapSecondProvider> leapSecondProvider,
+        TimeScaleServiceOptions options = {},
+        std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider = nullptr,
+        std::shared_ptr<const IDeltaTProvider> deltaTProvider = nullptr
     );
 
     [[nodiscard]] TimeScaleConversionResult
@@ -120,6 +145,8 @@ public:
 
 private:
     std::shared_ptr<const ILeapSecondProvider> m_leapSecondProvider;
+    std::shared_ptr<const IEarthOrientationProvider> m_earthOrientationProvider;
+    std::shared_ptr<const IDeltaTProvider> m_deltaTProvider;
     TimeScaleServiceOptions m_options;
 };
 
