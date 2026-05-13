@@ -7,10 +7,12 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -71,6 +73,12 @@ using namespace skygate::ephemeris::highprecision;
 
 class FakeCalcephKernelProvider final : public ICalcephKernelProvider {
 public:
+    struct Call {
+        AstronomicalEpoch epoch;
+        int targetNaifId = 0;
+        int centerNaifId = 0;
+    };
+
     [[nodiscard]] SolarSystemKernelStateResult
     computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
     {
@@ -78,6 +86,14 @@ public:
         lastEpoch = epoch;
         lastTargetNaifId = targetNaifId;
         lastCenterNaifId = centerNaifId;
+        calls.push_back({
+            .epoch = epoch,
+            .targetNaifId = targetNaifId,
+            .centerNaifId = centerNaifId,
+        });
+        if (const auto match = responses.find({targetNaifId, centerNaifId}); match != responses.end()) {
+            return match->second;
+        }
         return nextResult;
     }
 
@@ -85,6 +101,8 @@ public:
     mutable AstronomicalEpoch lastEpoch;
     mutable int lastTargetNaifId = 0;
     mutable int lastCenterNaifId = 0;
+    mutable std::vector<Call> calls;
+    std::map<std::pair<int, int>, SolarSystemKernelStateResult> responses;
     SolarSystemKernelStateResult nextResult;
 };
 
@@ -148,6 +166,8 @@ private slots:
     void computesGeometricRaDecFromKernelVector();
     void computesGeometricRaDecAgainstHorizonsSmokeFixture();
     void mapsSupportedBodiesToNaifIds();
+    void appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth();
+    void reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult();
     void reportsUnsupportedPlanetIdsWithoutCallingKernel();
     void reportsMissingKernelProvider();
     void propagatesOutOfRangeKernelStatus();
@@ -229,6 +249,62 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
         QCOMPARE(provider->lastTargetNaifId, item.naifId);
         QCOMPARE(provider->lastCenterNaifId, 399);
     }
+}
+
+void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{399, 0}] = makeKernelVector({.xAu = 10.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{499, 0}] = makeKernelVector({.xAu = 10.0, .yAu = 1.0, .zAu = 1.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::LightTime;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QVERIFY(provider->callCount >= 3);
+    QCOMPARE(provider->calls.front().targetNaifId, 499);
+    QCOMPARE(provider->calls.front().centerNaifId, 399);
+    QCOMPARE(provider->calls[1].targetNaifId, 399);
+    QCOMPARE(provider->calls[1].centerNaifId, 0);
+    QCOMPARE(provider->lastTargetNaifId, 499);
+    QCOMPARE(provider->lastCenterNaifId, 0);
+    QVERIFY(
+        provider->lastEpoch.julianDatePart1 + provider->lastEpoch.julianDatePart2
+        < request.epoch.julianDatePart1 + request.epoch.julianDatePart2
+    );
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
+}
+
+void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    provider->responses[{399, 0}].metadata.status = EphemerisResultStatus::Failed;
+    provider->responses[{399, 0}].metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::LightTime;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QCOMPARE(provider->callCount, 2);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
 }
 
 void SolarSystemStateCalculatorTests::reportsUnsupportedPlanetIdsWithoutCallingKernel()
