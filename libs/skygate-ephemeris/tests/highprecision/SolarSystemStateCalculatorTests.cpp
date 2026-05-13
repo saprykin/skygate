@@ -19,6 +19,9 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 
+constexpr double kSpeedOfLightAuPerDay = 173.144632674240;
+constexpr double kPi = 3.141592653589793238462643383279502884;
+
 [[nodiscard]] EphemerisRequest makeRequest()
 {
     EphemerisRequest request;
@@ -116,10 +119,13 @@ public:
     SolarSystemKernelStateResult nextResult;
 };
 
-[[nodiscard]] SolarSystemKernelStateResult makeKernelVector(const SolarSystemKernelVector& vector)
+[[nodiscard]] SolarSystemKernelStateResult makeKernelVector(
+    const SolarSystemKernelVector& vector, const std::optional<SolarSystemKernelVector>& velocity = std::nullopt
+)
 {
     SolarSystemKernelStateResult result;
     result.positionAu = vector;
+    result.velocityAuPerDay = velocity;
     result.metadata.status = EphemerisResultStatus::Valid;
     result.metadata.dataSourceProvenance = "Horizons ICRF geometric fixture";
     return result;
@@ -261,6 +267,12 @@ private slots:
     void appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth();
     void computesLightTimeRaDecAgainstHorizonsFixture();
     void reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult();
+    void appliesStellarAberrationFromEarthVelocity();
+    void skipsStellarAberrationWhenDisabled();
+    void reportsUnavailableStellarAberrationInputsWithoutDroppingGeometricResult();
+    void appliesSolarGravitationalLightDeflection();
+    void skipsSolarGravitationalLightDeflectionWhenDisabled();
+    void reportsUnavailableSolarDeflectionInputsWithoutDroppingGeometricResult();
     void reportsUnsupportedPlanetIdsWithoutCallingKernel();
     void reportsMissingKernelProvider();
     void propagatesOutOfRangeKernelStatus();
@@ -436,6 +448,132 @@ void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDr
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
+}
+
+void SolarSystemStateCalculatorTests::appliesStellarAberrationFromEarthVelocity()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{399, 0}] = makeKernelVector(
+        {.xAu = 0.0, .yAu = 0.0, .zAu = 0.0},
+        SolarSystemKernelVector{.xAu = 0.0, .yAu = kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
+    );
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::StellarAberration;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.equatorial->rightAscensionHours > 0.0);
+    QVERIFY(result.equatorial->rightAscensionHours < 1.0e-3);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarAberration));
+}
+
+void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{399, 0}] = makeKernelVector(
+        {.xAu = 0.0, .yAu = 0.0, .zAu = 0.0},
+        SolarSystemKernelVector{.xAu = 0.0, .yAu = kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
+    );
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarAberration));
+}
+
+void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsWithoutDroppingGeometricResult()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{399, 0}] = makeKernelVector({.xAu = 0.0, .yAu = 0.0, .zAu = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::StellarAberration;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarAberration));
+}
+
+void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = std::cos(0.1), .yAu = std::sin(0.1), .zAu = 0.0});
+    provider->responses[{10, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::GravitationalLightDeflection;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.equatorial->rightAscensionHours > (0.1 * 12.0 / kPi));
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QVERIFY(
+        hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection)
+    );
+}
+
+void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhenDisabled()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = std::cos(0.1), .yAu = std::sin(0.1), .zAu = 0.0});
+    provider->responses[{10, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - (0.1 * 12.0 / kPi)) < 1.0e-12);
+    QVERIFY(
+        !hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection)
+    );
+}
+
+void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWithoutDroppingGeometricResult()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    provider->responses[{10, 399}].metadata.status = EphemerisResultStatus::Failed;
+    provider->responses[{10, 399}].metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::GravitationalLightDeflection;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(
+        !hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection)
+    );
 }
 
 void SolarSystemStateCalculatorTests::reportsUnsupportedPlanetIdsWithoutCallingKernel()

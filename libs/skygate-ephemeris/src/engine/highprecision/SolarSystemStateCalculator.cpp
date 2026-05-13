@@ -2,6 +2,7 @@
 
 #include "StringUtilities.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -13,9 +14,11 @@ namespace {
 
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
+constexpr int kNaifSun = 10;
 constexpr double kHoursPerRadian = 12.0 / 3.141592653589793238462643383279502884;
 constexpr double kDegreesPerRadian = 180.0 / 3.141592653589793238462643383279502884;
 constexpr double kSpeedOfLightAuPerDay = 173.144632674240;
+constexpr double kSolarSchwarzschildRadiusAu = 1.97412574336e-8;
 constexpr int kLightTimeIterationCount = 3;
 
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
@@ -26,7 +29,7 @@ constexpr int kLightTimeIterationCount = 3;
 [[nodiscard]] std::optional<int> naifIdForBody(const CelestialBody& body) noexcept
 {
     if (body.ephemerisSource == CelestialBodyEphemerisSource::Sun || body.type == CelestialBodyType::Sun) {
-        return 10;
+        return kNaifSun;
     }
     if (body.ephemerisSource == CelestialBodyEphemerisSource::Moon || body.type == CelestialBodyType::Moon) {
         return 301;
@@ -102,6 +105,25 @@ makeStatusResult(const EphemerisResultStatus status, const EphemerisWarningCode 
     return std::hypot(std::hypot(vector.xAu, vector.yAu), vector.zAu);
 }
 
+[[nodiscard]] SolarSystemKernelVector scaleVector(const SolarSystemKernelVector& vector, const double scale) noexcept
+{
+    return {
+        .xAu = vector.xAu * scale,
+        .yAu = vector.yAu * scale,
+        .zAu = vector.zAu * scale,
+    };
+}
+
+[[nodiscard]] SolarSystemKernelVector
+addVectors(const SolarSystemKernelVector& lhs, const SolarSystemKernelVector& rhs) noexcept
+{
+    return {
+        .xAu = lhs.xAu + rhs.xAu,
+        .yAu = lhs.yAu + rhs.yAu,
+        .zAu = lhs.zAu + rhs.zAu,
+    };
+}
+
 [[nodiscard]] SolarSystemKernelVector
 relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVector& center) noexcept
 {
@@ -110,6 +132,35 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
         .yAu = target.yAu - center.yAu,
         .zAu = target.zAu - center.zAu,
     };
+}
+
+[[nodiscard]] double dotProduct(const SolarSystemKernelVector& lhs, const SolarSystemKernelVector& rhs) noexcept
+{
+    return lhs.xAu * rhs.xAu + lhs.yAu * rhs.yAu + lhs.zAu * rhs.zAu;
+}
+
+[[nodiscard]] std::optional<SolarSystemKernelVector> unitVector(const SolarSystemKernelVector& vector) noexcept
+{
+    const double distance = vectorDistanceAu(vector);
+    if (!std::isfinite(distance) || distance <= std::numeric_limits<double>::min()) {
+        return std::nullopt;
+    }
+
+    return scaleVector(vector, 1.0 / distance);
+}
+
+[[nodiscard]] std::optional<SolarSystemKernelVector> withDirectionPreservingDistance(
+    const SolarSystemKernelVector& vector, const SolarSystemKernelVector& direction
+) noexcept
+{
+    const double distance = vectorDistanceAu(vector);
+    const std::optional<SolarSystemKernelVector> normalizedDirection = unitVector(direction);
+    if (!std::isfinite(distance) || distance <= std::numeric_limits<double>::min()
+        || !normalizedDirection.has_value()) {
+        return std::nullopt;
+    }
+
+    return scaleVector(*normalizedDirection, distance);
 }
 
 [[nodiscard]] AstronomicalEpoch retardedEpoch(const AstronomicalEpoch& epoch, const double lightTimeDays) noexcept
@@ -151,6 +202,49 @@ void markLightTimeUnavailable(EphemerisResultMetadata& metadata) noexcept
         metadata.status = EphemerisResultStatus::Degraded;
     }
     metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+}
+
+void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
+{
+    if (metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+    }
+    metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+}
+
+[[nodiscard]] std::optional<SolarSystemKernelVector>
+applyStellarAberration(const SolarSystemKernelVector& vector, const SolarSystemKernelVector& observerVelocityAuPerDay)
+{
+    const std::optional<SolarSystemKernelVector> direction = unitVector(vector);
+    if (!direction.has_value()) {
+        return std::nullopt;
+    }
+
+    const SolarSystemKernelVector beta = scaleVector(observerVelocityAuPerDay, 1.0 / kSpeedOfLightAuPerDay);
+    const double directionDotBeta = dotProduct(*direction, beta);
+    const SolarSystemKernelVector transverseBeta = relativeVector(beta, scaleVector(*direction, directionDotBeta));
+    return withDirectionPreservingDistance(vector, addVectors(*direction, transverseBeta));
+}
+
+[[nodiscard]] std::optional<SolarSystemKernelVector>
+applySolarGravitationalDeflection(const SolarSystemKernelVector& vector, const SolarSystemKernelVector& sunVector)
+{
+    const std::optional<SolarSystemKernelVector> targetDirection = unitVector(vector);
+    const std::optional<SolarSystemKernelVector> sunDirection = unitVector(sunVector);
+    const double observerSunDistanceAu = vectorDistanceAu(sunVector);
+    if (!targetDirection.has_value() || !sunDirection.has_value() || !std::isfinite(observerSunDistanceAu)
+        || observerSunDistanceAu <= std::numeric_limits<double>::min()) {
+        return std::nullopt;
+    }
+
+    const double cosineElongation = std::clamp(dotProduct(*targetDirection, *sunDirection), -1.0, 1.0);
+    const double denominator = std::max(1.0 - cosineElongation, 1.0e-12);
+    const double deflectionScale = kSolarSchwarzschildRadiusAu / observerSunDistanceAu / denominator;
+    const SolarSystemKernelVector awayFromSun =
+        relativeVector(scaleVector(*targetDirection, cosineElongation), *sunDirection);
+    return withDirectionPreservingDistance(
+        vector, addVectors(*targetDirection, scaleVector(awayFromSun, deflectionScale))
+    );
 }
 
 }  // namespace
@@ -195,9 +289,17 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     }
 
     SolarSystemKernelVector outputVector = *kernelResult.positionAu;
+    std::optional<SolarSystemKernelStateResult> earthBarycentricState;
+    const auto observerState = [&]() -> const SolarSystemKernelStateResult& {
+        if (!earthBarycentricState.has_value()) {
+            earthBarycentricState =
+                m_kernelProvider->computeGeometricState(input.request.epoch, kNaifEarth, kNaifSolarSystemBarycenter);
+        }
+        return *earthBarycentricState;
+    };
+
     if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::LightTime)) {
-        const SolarSystemKernelStateResult earthState =
-            m_kernelProvider->computeGeometricState(input.request.epoch, kNaifEarth, kNaifSolarSystemBarycenter);
+        const SolarSystemKernelStateResult& earthState = observerState();
         if (!earthState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
             markLightTimeUnavailable(result.metadata);
@@ -226,6 +328,44 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                 result.metadata.appliedCorrections |= EphemerisCorrectionFlags::LightTime;
             } else {
                 markLightTimeUnavailable(result.metadata);
+            }
+        }
+    }
+
+    if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::GravitationalLightDeflection)
+        && *targetNaifId != kNaifSun) {
+        const SolarSystemKernelStateResult sunState =
+            m_kernelProvider->computeGeometricState(input.request.epoch, kNaifSun, kNaifEarth);
+        if (!sunState.positionAu.has_value()) {
+            result.metadata.warningCodeMask |= sunState.metadata.warningCodeMask;
+            markCorrectionUnavailable(result.metadata);
+        } else {
+            mergeKernelMetadata(result.metadata, sunState.metadata);
+            if (const std::optional<SolarSystemKernelVector> deflectedVector =
+                    applySolarGravitationalDeflection(outputVector, *sunState.positionAu);
+                deflectedVector.has_value()) {
+                outputVector = *deflectedVector;
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::GravitationalLightDeflection;
+            } else {
+                markCorrectionUnavailable(result.metadata);
+            }
+        }
+    }
+
+    if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::StellarAberration)) {
+        const SolarSystemKernelStateResult& earthState = observerState();
+        if (!earthState.positionAu.has_value() || !earthState.velocityAuPerDay.has_value()) {
+            result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
+            markCorrectionUnavailable(result.metadata);
+        } else {
+            mergeKernelMetadata(result.metadata, earthState.metadata);
+            if (const std::optional<SolarSystemKernelVector> aberratedVector =
+                    applyStellarAberration(outputVector, *earthState.velocityAuPerDay);
+                aberratedVector.has_value()) {
+                outputVector = *aberratedVector;
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::StellarAberration;
+            } else {
+                markCorrectionUnavailable(result.metadata);
             }
         }
     }

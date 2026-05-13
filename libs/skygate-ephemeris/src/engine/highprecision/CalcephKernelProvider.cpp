@@ -120,6 +120,14 @@ public:
     [[nodiscard]] std::optional<SolarSystemKernelVector>
     computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
     {
+        return computeGeometricStateWithVelocity(epoch, targetNaifId, centerNaifId).positionAu;
+    }
+
+    [[nodiscard]] SolarSystemKernelStateResult computeGeometricStateWithVelocity(
+        const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+    ) const override
+    {
+        SolarSystemKernelStateResult state;
         double positionVelocity[6]{};
         const int result = calceph_compute_unit(
             m_handle,
@@ -131,14 +139,20 @@ public:
             positionVelocity
         );
         if (result == 0) {
-            return std::nullopt;
+            return state;
         }
 
-        return SolarSystemKernelVector{
+        state.positionAu = SolarSystemKernelVector{
             .xAu = positionVelocity[0],
             .yAu = positionVelocity[1],
             .zAu = positionVelocity[2],
         };
+        state.velocityAuPerDay = SolarSystemKernelVector{
+            .xAu = positionVelocity[3],
+            .yAu = positionVelocity[4],
+            .zAu = positionVelocity[5],
+        };
+        return state;
     }
 
 private:
@@ -341,7 +355,10 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
         result.metadata.effectiveDataValidityRange = m_kernelInfo->validityRange;
     }
 
-    result.positionAu = m_kernelHandle->computeGeometricState(epoch, targetNaifId, centerNaifId);
+    const SolarSystemKernelStateResult kernelState =
+        m_kernelHandle->computeGeometricStateWithVelocity(epoch, targetNaifId, centerNaifId);
+    result.positionAu = kernelState.positionAu;
+    result.velocityAuPerDay = kernelState.velocityAuPerDay;
     if (!result.positionAu.has_value()) {
         result.metadata.status = EphemerisResultStatus::Failed;
         result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);

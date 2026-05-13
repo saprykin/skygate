@@ -83,6 +83,14 @@ public:
         static_cast<void>(centerNaifId);
         return std::nullopt;
     }
+
+    [[nodiscard]] virtual SolarSystemKernelStateResult
+    computeGeometricStateWithVelocity(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const
+    {
+        SolarSystemKernelStateResult result;
+        result.positionAu = computeGeometricState(epoch, targetNaifId, centerNaifId);
+        return result;
+    }
 };
 
 struct CalcephKernelOpenResult {
