@@ -1,5 +1,9 @@
 #include "skygate/ephemeris/TimeScaleService.hpp"
 
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+#include "engine/highprecision/ErfaAstrometry.hpp"
+#endif
+
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -13,6 +17,8 @@ namespace {
 
 constexpr double kSecondsPerDay = 86'400.0;
 constexpr double kTtMinusTaiSeconds = 32.184;
+constexpr double kJulianDateJ2000 = 2'451'545.0;
+constexpr double kDegreesToRadians = 0.017453292519943295769;
 
 struct OffsetLookupResult {
     std::optional<int> offsetSeconds;
@@ -45,6 +51,46 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
         .julianDatePart2 = epoch.julianDatePart2 + seconds / kSecondsPerDay,
         .timeScale = targetScale,
     });
+}
+
+[[nodiscard]] double epochJulianDate(const AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.julianDatePart1 + epoch.julianDatePart2;
+}
+
+[[nodiscard]] double fractionalDay(const AstronomicalEpoch& epoch) noexcept
+{
+    const double fraction = epochJulianDate(epoch) - std::floor(epochJulianDate(epoch));
+    return fraction < 0.0 ? fraction + 1.0 : fraction;
+}
+
+[[nodiscard]] double approximateTdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
+{
+    const double daysSinceJ2000 = epochJulianDate(terrestrialTime) - kJulianDateJ2000;
+    const double meanAnomalyRadians = std::fmod(357.53 + 0.9856003 * daysSinceJ2000, 360.0) * kDegreesToRadians;
+    return 0.001657 * std::sin(meanAnomalyRadians) + 0.00001385 * std::sin(2.0 * meanAnomalyRadians);
+}
+
+[[nodiscard]] std::optional<double> tdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
+{
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    const std::optional<double> erfaResult = highprecision::tdbMinusTtSeconds(
+        highprecision::JulianDateParts{
+            .day1 = terrestrialTime.julianDatePart1,
+            .day2 = terrestrialTime.julianDatePart2,
+        },
+        fractionalDay(terrestrialTime)
+    );
+    if (erfaResult.has_value()) {
+        return erfaResult;
+    }
+#endif
+
+    if (!isFiniteEpoch(terrestrialTime)) {
+        return std::nullopt;
+    }
+
+    return approximateTdbMinusTtSeconds(terrestrialTime);
 }
 
 [[nodiscard]] TimeScaleConversionResult successResult(
@@ -250,6 +296,20 @@ void mergeOffsetWarnings(TimeScaleConversionResult& result, const OffsetLookupRe
     }
 }
 
+void mergeConversionWarnings(TimeScaleConversionResult& result, const TimeScaleConversionResult& source) noexcept
+{
+    result.warningCodeMask |= source.warningCodeMask;
+    if (source.status == TimeScaleConversionStatus::Degraded && result.status == TimeScaleConversionStatus::Valid) {
+        result.status = TimeScaleConversionStatus::Degraded;
+    }
+}
+
+void addTdbApproximationWarning(TimeScaleConversionResult& result) noexcept
+{
+    result.status = TimeScaleConversionStatus::Degraded;
+    result.addWarning(TimeScaleConversionWarningCode::TdbApproximationApplied);
+}
+
 }  // namespace
 
 LeapSecondTimeScaleService::LeapSecondTimeScaleService(
@@ -274,9 +334,22 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
 
     switch (epoch.timeScale) {
     case TimeScale::Utc: {
+        if (targetScale == TimeScale::Tdb) {
+            const TimeScaleConversionResult tt = convert(epoch, TimeScale::Tt);
+            if (!tt.isSuccess()) {
+                TimeScaleConversionResult result = tt;
+                result.epoch.timeScale = targetScale;
+                return result;
+            }
+
+            TimeScaleConversionResult tdb = convert(tt.epoch, TimeScale::Tdb);
+            mergeConversionWarnings(tdb, tt);
+            return tdb;
+        }
+
         if (targetScale != TimeScale::Tai && targetScale != TimeScale::Tt) {
             TimeScaleConversionResult result =
-                failureResult(epoch, targetScale, "Only UTC to TAI or TT conversion is currently supported.");
+                failureResult(epoch, targetScale, "Only UTC to TAI, TT, or TDB conversion is currently supported.");
             result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
             return result;
         }
@@ -298,6 +371,18 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
         return result;
     }
     case TimeScale::Tai:
+        if (targetScale == TimeScale::Tdb) {
+            TimeScaleConversionResult tt = convert(epoch, TimeScale::Tt);
+            if (!tt.isSuccess()) {
+                TimeScaleConversionResult result = tt;
+                result.epoch.timeScale = targetScale;
+                return result;
+            }
+
+            TimeScaleConversionResult tdb = convert(tt.epoch, TimeScale::Tdb);
+            mergeConversionWarnings(tdb, tt);
+            return tdb;
+        }
         if (targetScale == TimeScale::Tt) {
             return successResult(addSeconds(epoch, kTtMinusTaiSeconds, TimeScale::Tt));
         }
@@ -319,6 +404,24 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
         }
         break;
     case TimeScale::Tt:
+        if (targetScale == TimeScale::Tdb) {
+            const std::optional<double> tdbMinusTt = tdbMinusTtSeconds(epoch);
+            if (!tdbMinusTt.has_value()) {
+                TimeScaleConversionResult result =
+                    failureResult(epoch, targetScale, "TT to TDB conversion input is invalid.");
+                result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+                return result;
+            }
+
+            TimeScaleConversionResult result = successResult(
+                addSeconds(epoch, *tdbMinusTt, TimeScale::Tdb),
+                TimeScaleConversionStatus::Degraded,
+                timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
+                "TT to TDB conversion used the configured high-precision approximation."
+            );
+            addTdbApproximationWarning(result);
+            return result;
+        }
         if (targetScale == TimeScale::Tai) {
             return successResult(addSeconds(epoch, -kTtMinusTaiSeconds, TimeScale::Tai));
         }
@@ -326,7 +429,35 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             return convert(addSeconds(epoch, -kTtMinusTaiSeconds, TimeScale::Tai), TimeScale::Utc);
         }
         break;
-    case TimeScale::Tdb:
+    case TimeScale::Tdb: {
+        AstronomicalEpoch tt = epoch;
+        tt.timeScale = TimeScale::Tt;
+        for (int iteration = 0; iteration < 3; ++iteration) {
+            const std::optional<double> tdbMinusTt = tdbMinusTtSeconds(tt);
+            if (!tdbMinusTt.has_value()) {
+                TimeScaleConversionResult result =
+                    failureResult(epoch, targetScale, "TDB to TT conversion input is invalid.");
+                result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
+                return result;
+            }
+            tt = addSeconds(epoch, -*tdbMinusTt, TimeScale::Tt);
+        }
+
+        TimeScaleConversionResult result = successResult(
+            tt,
+            TimeScaleConversionStatus::Degraded,
+            timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
+            "TDB to TT conversion used the configured high-precision approximation."
+        );
+        addTdbApproximationWarning(result);
+        if (targetScale == TimeScale::Tt) {
+            return result;
+        }
+
+        TimeScaleConversionResult converted = convert(result.epoch, targetScale);
+        mergeConversionWarnings(converted, result);
+        return converted;
+    }
     case TimeScale::Ut1:
         break;
     }
@@ -397,18 +528,25 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
     if (targetScale == TimeScale::Utc) {
         return successResult(*epoch);
     }
-    if (targetScale != TimeScale::Tai && targetScale != TimeScale::Tt) {
-        TimeScaleConversionResult result =
-            failureResult(*epoch, targetScale, "Only UTC leap-second conversion to TAI or TT is currently supported.");
+    if (targetScale != TimeScale::Tai && targetScale != TimeScale::Tt && targetScale != TimeScale::Tdb) {
+        TimeScaleConversionResult result = failureResult(
+            *epoch, targetScale, "Only UTC leap-second conversion to TAI, TT, or TDB is currently supported."
+        );
         result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
         return result;
     }
 
     const double taiOffset = static_cast<double>(*precedingLookup.offsetSeconds);
-    const double targetOffset = targetScale == TimeScale::Tt ? taiOffset + kTtMinusTaiSeconds : taiOffset;
-    TimeScaleConversionResult result = successResult(addSeconds(*epoch, targetOffset, targetScale));
+    const double targetOffset = targetScale == TimeScale::Tai ? taiOffset : taiOffset + kTtMinusTaiSeconds;
+    TimeScaleConversionResult result =
+        successResult(addSeconds(*epoch, targetOffset, targetScale == TimeScale::Tdb ? TimeScale::Tt : targetScale));
     mergeOffsetWarnings(result, precedingLookup);
     mergeOffsetWarnings(result, nextLookup);
+    if (targetScale == TimeScale::Tdb) {
+        TimeScaleConversionResult tdb = convert(result.epoch, TimeScale::Tdb);
+        mergeConversionWarnings(tdb, result);
+        return tdb;
+    }
     return result;
 }
 
