@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -327,6 +328,11 @@ std::unique_ptr<IEphemerisEngine> createEphemerisEngine()
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog)
 {
     return createEphemerisEngine(catalog.bodies());
+}
+
+std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::initializer_list<CelestialBody> bodies)
+{
+    return createEphemerisEngine(std::span<const CelestialBody>{bodies.begin(), bodies.size()});
 }
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const CelestialBody> bodies)

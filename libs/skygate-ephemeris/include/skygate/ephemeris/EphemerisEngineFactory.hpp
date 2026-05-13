@@ -4,6 +4,7 @@
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
 #include <span>
 #include <string>
@@ -214,6 +215,7 @@ struct EphemerisEngineFactoryResult {
 [[nodiscard]] EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryRequest& request);
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine();
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog);
+[[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::initializer_list<CelestialBody> bodies);
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const CelestialBody> bodies);
 
 }  // namespace skygate::ephemeris
