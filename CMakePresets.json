@@ -74,6 +74,51 @@
             }
         },
         {
+            "name": "linux-vcpkg-base",
+            "hidden": true,
+            "inherits": "base",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
+            "name": "core-debug-linux-vcpkg",
+            "inherits": "linux-vcpkg-base",
+            "displayName": "Core Debug (Linux vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF"
+            }
+        },
+        {
+            "name": "core-debug-highprecision-linux-vcpkg",
+            "inherits": "linux-vcpkg-base",
+            "displayName": "Core Debug High Precision (Linux vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
+                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+            }
+        },
+        {
             "name": "ci-core-debug",
             "inherits": "ci-linux-base",
             "displayName": "CI Core Debug",
@@ -123,6 +168,22 @@
             }
         },
         {
+            "name": "core-debug-highprecision-windows-vcpkg",
+            "inherits": "windows-vcpkg-base",
+            "displayName": "Core Debug High Precision (Windows vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
+                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+            }
+        },
+        {
             "name": "ui-debug-windows-vcpkg",
             "inherits": "windows-vcpkg-base",
             "displayName": "UI Debug (Windows vcpkg)",
@@ -167,6 +228,22 @@
             }
         },
         {
+            "name": "core-debug-highprecision-macos-vcpkg",
+            "inherits": "macos-vcpkg-base",
+            "displayName": "Core Debug High Precision (macOS vcpkg)",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "ON",
+                "VCPKG_MANIFEST_FEATURES": "high-precision-ephemeris"
+            }
+        },
+        {
             "name": "ui-debug-macos-vcpkg",
             "inherits": "macos-vcpkg-base",
             "displayName": "UI Debug (macOS vcpkg zlib)",
@@ -201,6 +278,24 @@
         {
             "name": "core-debug",
             "configurePreset": "core-debug"
+        },
+        {
+            "name": "core-debug-linux-vcpkg",
+            "configurePreset": "core-debug-linux-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "core-debug-highprecision-linux-vcpkg",
+            "configurePreset": "core-debug-highprecision-linux-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
         },
         {
             "name": "ci-core-debug",
@@ -250,6 +345,15 @@
         {
             "name": "core-debug-windows-vcpkg",
             "configurePreset": "core-debug-windows-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "core-debug-highprecision-windows-vcpkg",
+            "configurePreset": "core-debug-highprecision-windows-vcpkg",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -313,6 +417,15 @@
         {
             "name": "core-debug-macos-vcpkg",
             "configurePreset": "core-debug-macos-vcpkg",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "core-debug-highprecision-macos-vcpkg",
+            "configurePreset": "core-debug-highprecision-macos-vcpkg",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",

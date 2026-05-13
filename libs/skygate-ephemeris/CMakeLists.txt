@@ -8,6 +8,11 @@ if(NOT ZLIB_FOUND)
     )
 endif()
 
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    find_package(calceph CONFIG REQUIRED GLOBAL)
+    find_package(zstd CONFIG REQUIRED GLOBAL)
+endif()
+
 set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
     src/engine/simple/AstronomicalTime.hpp
     src/engine/simple/EclipticToEquatorialCalculator.hpp
@@ -25,6 +30,19 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
 )
 
 set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
+
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_library(skygate-ephemeris-highprecision-dependencies INTERFACE)
+    target_link_libraries(skygate-ephemeris-highprecision-dependencies
+        INTERFACE
+            calceph
+            zstd::libzstd
+    )
+    add_library(
+        skygate::ephemeris-highprecision-dependencies
+        ALIAS skygate-ephemeris-highprecision-dependencies
+    )
+endif()
 
 add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}

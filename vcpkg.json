@@ -4,5 +4,14 @@
     "version-string": "1.0.0",
     "dependencies": [
         "zlib"
-    ]
+    ],
+    "features": {
+        "high-precision-ephemeris": {
+            "description": "Dependencies required for high-precision ephemeris builds.",
+            "dependencies": [
+                "calceph",
+                "zstd"
+            ]
+        }
+    }
 }
