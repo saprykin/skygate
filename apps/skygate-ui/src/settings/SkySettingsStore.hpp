@@ -53,6 +53,8 @@ public:
     };
 
     struct EphemerisDataCacheSnapshot final {
+        QString installedKernelAssetId;
+        QString installedKernelProfileId;
         QString installedKernelPath;
         QString installedKernelVersion;
         QString installedEarthOrientationPath;

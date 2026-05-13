@@ -339,6 +339,8 @@ bool SkySettingsStore::saveEphemerisDataCache(const EphemerisDataCacheSnapshot& 
 {
     QSettings settings;
     settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
+    settings.setValue(ephemerisDataCacheKey("installedKernelAssetId"), snapshot.installedKernelAssetId);
+    settings.setValue(ephemerisDataCacheKey("installedKernelProfileId"), snapshot.installedKernelProfileId);
     settings.setValue(ephemerisDataCacheKey("installedKernelPath"), snapshot.installedKernelPath);
     settings.setValue(ephemerisDataCacheKey("installedKernelVersion"), snapshot.installedKernelVersion);
     settings.setValue(ephemerisDataCacheKey("installedEarthOrientationPath"), snapshot.installedEarthOrientationPath);
@@ -371,6 +373,8 @@ SkySettingsStore::EphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisData
 {
     QSettings settings;
     EphemerisDataCacheSnapshot snapshot;
+    snapshot.installedKernelAssetId = settings.value(ephemerisDataCacheKey("installedKernelAssetId")).toString();
+    snapshot.installedKernelProfileId = settings.value(ephemerisDataCacheKey("installedKernelProfileId")).toString();
     snapshot.installedKernelPath = settings.value(ephemerisDataCacheKey("installedKernelPath")).toString();
     snapshot.installedKernelVersion = settings.value(ephemerisDataCacheKey("installedKernelVersion")).toString();
     snapshot.installedEarthOrientationPath =

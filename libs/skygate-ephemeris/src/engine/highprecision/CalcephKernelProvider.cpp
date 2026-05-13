@@ -193,6 +193,12 @@ CalcephKernelProvider::CalcephKernelProvider(
         addDiagnostic(m_diagnostics, "The active ephemeris data snapshot does not expose the selected kernel file.");
         return;
     }
+    if (snapshotAsset->id != manifestAsset->id
+        || (!snapshotAsset->profileId.empty() && snapshotAsset->profileId != profile->id)) {
+        m_status = CalcephKernelProviderStatus::InvalidKernelAsset;
+        addDiagnostic(m_diagnostics, "The active ephemeris data snapshot exposed a different solar-system kernel.");
+        return;
+    }
 
     const std::filesystem::path activePath(snapshotAsset->activePath);
     const QFileInfo activeFileInfo(pathToQString(activePath));
