@@ -1,2 +1,10 @@
 libs/skygate-ephemeris/tests/fixtures/** filter=lfs diff=lfs merge=lfs -text
 libs/skygate-ephemeris/tests/fixtures/ephemeris/*_smoke.* -filter diff -merge text
+*.bsp filter=lfs diff=lfs merge=lfs -text
+*.spk filter=lfs diff=lfs merge=lfs -text
+*.bc filter=lfs diff=lfs merge=lfs -text
+*.bpc filter=lfs diff=lfs merge=lfs -text
+*.bsp.zst filter=lfs diff=lfs merge=lfs -text
+*.spk.zst filter=lfs diff=lfs merge=lfs -text
+*.bc.zst filter=lfs diff=lfs merge=lfs -text
+*.bpc.zst filter=lfs diff=lfs merge=lfs -text

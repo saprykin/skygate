@@ -5,6 +5,9 @@
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
+#include <cmath>
+#include <limits>
+
 namespace {
 
 using namespace skygate::ephemeris::tests;
@@ -12,6 +15,11 @@ using namespace skygate::ephemeris::tests;
 [[nodiscard]] QString smokeFixturePath()
 {
     return QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/geometric_solar_system_smoke.json");
+}
+
+[[nodiscard]] QString smokeCsvFixturePath()
+{
+    return QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/geometric_solar_system_smoke.csv");
 }
 
 [[nodiscard]] QString writeFixture(QTemporaryDir& directory, const QByteArray& payload)
@@ -34,7 +42,9 @@ private slots:
     void rejectsIncompleteMetadata();
     void rejectsLfsPointerPayload();
     void keepsSmokeFixtureAvailableWithoutLfs();
+    void keepsCsvSmokeFixtureAvailableWithoutLfs();
     void computesAngularToleranceAcrossRaDec();
+    void rejectsInvalidAngularToleranceInputs();
 };
 
 void EphemerisFixtureSupportTests::loadsMetadataCompleteRaDecFixture()
@@ -127,6 +137,17 @@ void EphemerisFixtureSupportTests::keepsSmokeFixtureAvailableWithoutLfs()
     QVERIFY(payload.contains("\"metadata\""));
 }
 
+void EphemerisFixtureSupportTests::keepsCsvSmokeFixtureAvailableWithoutLfs()
+{
+    QFile file(smokeCsvFixturePath());
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QByteArray payload = file.readAll();
+
+    QVERIFY(!payload.isEmpty());
+    QVERIFY(!isGitLfsPointerPayload(payload));
+    QVERIFY(payload.contains("JPL Horizons"));
+}
+
 void EphemerisFixtureSupportTests::computesAngularToleranceAcrossRaDec()
 {
     const EphemerisRaDecExpectation expected{
@@ -145,6 +166,28 @@ void EphemerisFixtureSupportTests::computesAngularToleranceAcrossRaDec()
     QVERIFY(angularSeparationDegrees(expected, close) < 0.2);
     QVERIFY(isWithinAngularTolerance(close, expected, 0.2));
     QVERIFY(!isWithinAngularTolerance(far, expected, 0.2));
+}
+
+void EphemerisFixtureSupportTests::rejectsInvalidAngularToleranceInputs()
+{
+    const EphemerisRaDecExpectation expected{
+        .rightAscensionHours = 17.780024903465446,
+        .declinationDegrees = -23.953152259288466,
+    };
+    const EphemerisRaDecExpectation nanRightAscension{
+        .rightAscensionHours = std::numeric_limits<double>::quiet_NaN(),
+        .declinationDegrees = expected.declinationDegrees,
+    };
+    const EphemerisRaDecExpectation infiniteDeclination{
+        .rightAscensionHours = expected.rightAscensionHours,
+        .declinationDegrees = std::numeric_limits<double>::infinity(),
+    };
+
+    QVERIFY(std::isnan(angularSeparationDegrees(nanRightAscension, expected)));
+    QVERIFY(!isWithinAngularTolerance(nanRightAscension, expected, 1.0));
+    QVERIFY(!isWithinAngularTolerance(infiniteDeclination, expected, 1.0));
+    QVERIFY(!isWithinAngularTolerance(expected, expected, std::numeric_limits<double>::quiet_NaN()));
+    QVERIFY(!isWithinAngularTolerance(expected, expected, -1.0));
 }
 
 QTEST_APPLESS_MAIN(EphemerisFixtureSupportTests)
