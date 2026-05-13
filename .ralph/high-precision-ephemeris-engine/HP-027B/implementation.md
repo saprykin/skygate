@@ -19,3 +19,21 @@ READY
 ## Important notes
 - Verification run: `cmake --build build-ralph`
 - Verification run: `ctest --test-dir build-ralph --output-on-failure`
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Missing reference coverage for light-time-corrected output
+    - Action: Fixed
+    - Notes: Added a Horizons-backed Mars light-time fixture with receive-time Earth barycentric state, three retarded Mars barycentric states, expected astrometric RA/Dec, and a dedicated test that validates call epochs and final light-time-corrected output.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/tests/highprecision/SolarSystemStateCalculatorTests.cpp`
+  - `libs/skygate-ephemeris/tests/fixtures/ephemeris/light_time_solar_system_mars.csv`
+  - `.ralph/high-precision-ephemeris-engine/HP-027B/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-027B/fix.md`
+- Tests run after fix:
+  - `cmake --build build-ralph --target skygate-ephemeris-solar-system-state-calculator-tests`: PASS
+  - `ctest --test-dir build-ralph -R skygate-ephemeris-solar-system-state-calculator-tests --output-on-failure`: PASS
+  - `ctest --test-dir build-ralph --output-on-failure`: PASS
+  - `git diff --check ca46d8df3fafb9aecf04e518820b1912432aea4f..HEAD && git diff --check`: PASS
+- Remaining concerns: None.

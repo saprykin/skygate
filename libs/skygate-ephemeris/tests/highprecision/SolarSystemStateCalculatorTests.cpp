@@ -91,7 +91,15 @@ public:
             .targetNaifId = targetNaifId,
             .centerNaifId = centerNaifId,
         });
-        if (const auto match = responses.find({targetNaifId, centerNaifId}); match != responses.end()) {
+        const std::pair key{targetNaifId, centerNaifId};
+        if (const auto sequence = responseSequences.find(key); sequence != responseSequences.end()) {
+            const std::size_t index = responseSequenceIndexes[key]++;
+            if (index < sequence->second.size()) {
+                return sequence->second[index];
+            }
+            return sequence->second.back();
+        }
+        if (const auto match = responses.find(key); match != responses.end()) {
             return match->second;
         }
         return nextResult;
@@ -102,7 +110,9 @@ public:
     mutable int lastTargetNaifId = 0;
     mutable int lastCenterNaifId = 0;
     mutable std::vector<Call> calls;
+    mutable std::map<std::pair<int, int>, std::size_t> responseSequenceIndexes;
     std::map<std::pair<int, int>, SolarSystemKernelStateResult> responses;
+    std::map<std::pair<int, int>, std::vector<SolarSystemKernelStateResult>> responseSequences;
     SolarSystemKernelStateResult nextResult;
 };
 
@@ -123,6 +133,24 @@ struct GeometricFixture {
     double expectedRightAscensionHours = 0.0;
     double expectedDeclinationDeg = 0.0;
     double toleranceDeg = 0.0;
+};
+
+struct LightTimeTargetState {
+    AstronomicalEpoch epoch;
+    SolarSystemKernelVector vector;
+};
+
+struct LightTimeFixture {
+    int targetNaifId = 0;
+    int earthNaifId = 0;
+    int barycenterNaifId = 0;
+    AstronomicalEpoch receiveEpoch;
+    SolarSystemKernelVector geometricVector;
+    SolarSystemKernelVector earthReceiveVector;
+    std::vector<LightTimeTargetState> retardedTargetStates;
+    double expectedRightAscensionHours = 0.0;
+    double expectedDeclinationDeg = 0.0;
+    double tolerance = 0.0;
 };
 
 [[nodiscard]] GeometricFixture loadSmokeFixture()
@@ -157,6 +185,70 @@ struct GeometricFixture {
     Q_UNREACHABLE();
 }
 
+[[nodiscard]] LightTimeFixture loadLightTimeFixture()
+{
+    QFile file(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/light_time_solar_system_mars.csv"));
+    Q_ASSERT(file.open(QIODevice::ReadOnly | QIODevice::Text));
+
+    LightTimeFixture fixture;
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) {
+            continue;
+        }
+
+        const QStringList fields = line.split(QLatin1Char(','));
+        Q_ASSERT(fields.size() == 11);
+        const QString role = fields[1];
+        const int targetNaifId = fields[2].toInt();
+        const int centerNaifId = fields[3].toInt();
+        const AstronomicalEpoch epoch{
+            .julianDatePart1 = fields[4].toDouble(),
+            .julianDatePart2 = 0.0,
+            .timeScale = TimeScale::Tdb,
+        };
+        const SolarSystemKernelVector vector{
+            .xAu = fields[5].toDouble(),
+            .yAu = fields[6].toDouble(),
+            .zAu = fields[7].toDouble(),
+        };
+
+        if (role == QStringLiteral("geometric")) {
+            fixture.targetNaifId = targetNaifId;
+            fixture.earthNaifId = centerNaifId;
+            fixture.receiveEpoch = epoch;
+            fixture.geometricVector = vector;
+        } else if (role == QStringLiteral("earth-receive")) {
+            fixture.earthNaifId = targetNaifId;
+            fixture.barycenterNaifId = centerNaifId;
+            fixture.earthReceiveVector = vector;
+        } else if (role == QStringLiteral("target-retarded")) {
+            fixture.retardedTargetStates.push_back({
+                .epoch = epoch,
+                .vector = vector,
+            });
+        } else if (role == QStringLiteral("expected-light-time")) {
+            fixture.expectedRightAscensionHours = fields[8].toDouble();
+            fixture.expectedDeclinationDeg = fields[9].toDouble();
+            fixture.tolerance = fields[10].toDouble();
+        } else {
+            Q_UNREACHABLE();
+        }
+    }
+
+    Q_ASSERT(fixture.targetNaifId != 0);
+    Q_ASSERT(fixture.earthNaifId != 0);
+    Q_ASSERT(fixture.barycenterNaifId == 0);
+    Q_ASSERT(!fixture.retardedTargetStates.empty());
+    Q_ASSERT(fixture.tolerance > 0.0);
+    return fixture;
+}
+
+[[nodiscard]] double epochTotal(const AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.julianDatePart1 + epoch.julianDatePart2;
+}
+
 }  // namespace
 
 class SolarSystemStateCalculatorTests final : public QObject {
@@ -167,6 +259,7 @@ private slots:
     void computesGeometricRaDecAgainstHorizonsSmokeFixture();
     void mapsSupportedBodiesToNaifIds();
     void appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth();
+    void computesLightTimeRaDecAgainstHorizonsFixture();
     void reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult();
     void reportsUnsupportedPlanetIdsWithoutCallingKernel();
     void reportsMissingKernelProvider();
@@ -277,6 +370,44 @@ void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTarg
     QVERIFY(result.equatorial.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
+}
+
+void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixture()
+{
+    const LightTimeFixture fixture = loadLightTimeFixture();
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{fixture.targetNaifId, fixture.earthNaifId}] = makeKernelVector(fixture.geometricVector);
+    provider->responses[{fixture.earthNaifId, fixture.barycenterNaifId}] = makeKernelVector(fixture.earthReceiveVector);
+    for (const LightTimeTargetState& targetState : fixture.retardedTargetStates) {
+        provider->responseSequences[{fixture.targetNaifId, fixture.barycenterNaifId}].push_back(
+            makeKernelVector(targetState.vector)
+        );
+    }
+    const SolarSystemStateCalculator calculator(provider);
+    EphemerisRequest request = makeRequest();
+    request.epoch = fixture.receiveEpoch;
+    request.options.correctionFlags = EphemerisCorrectionFlags::LightTime;
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+
+    QCOMPARE(provider->callCount, 2 + static_cast<int>(fixture.retardedTargetStates.size()));
+    QCOMPARE(provider->calls[0].targetNaifId, fixture.targetNaifId);
+    QCOMPARE(provider->calls[0].centerNaifId, fixture.earthNaifId);
+    QCOMPARE(provider->calls[1].targetNaifId, fixture.earthNaifId);
+    QCOMPARE(provider->calls[1].centerNaifId, fixture.barycenterNaifId);
+    for (std::size_t index = 0; index < fixture.retardedTargetStates.size(); ++index) {
+        const FakeCalcephKernelProvider::Call& call = provider->calls[index + 2U];
+        QCOMPARE(call.targetNaifId, fixture.targetNaifId);
+        QCOMPARE(call.centerNaifId, fixture.barycenterNaifId);
+        QVERIFY(std::abs(epochTotal(call.epoch) - epochTotal(fixture.retardedTargetStates[index].epoch)) < 1.0e-9);
+    }
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - fixture.expectedRightAscensionHours) < fixture.tolerance);
+    QVERIFY(std::abs(result.equatorial->declinationDeg - fixture.expectedDeclinationDeg) < fixture.tolerance);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
     );
