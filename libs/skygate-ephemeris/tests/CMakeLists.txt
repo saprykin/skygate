@@ -139,6 +139,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;highprecision"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-calceph-kernel-provider-tests
+    highprecision/CalcephKernelProviderTests.cpp
+    LABELS "unit;highprecision"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-data-manifest-tests
     highprecision/EphemerisDataManifestTests.cpp
     LABELS "unit;highprecision"
