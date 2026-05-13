@@ -40,17 +40,15 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/EarthOrientationProvider.cpp
     src/engine/highprecision/EphemerisDataActivation.cpp
     src/engine/highprecision/EphemerisDataManifest.cpp
+    src/engine/highprecision/ErfaAstrometry.hpp
+    src/engine/highprecision/ErfaAstrometry.cpp
+    src/engine/highprecision/FrameTransformer.hpp
+    src/engine/highprecision/FrameTransformer.cpp
     src/engine/highprecision/LeapSecondProvider.cpp
     src/engine/highprecision/SolarSystemStateCalculator.hpp
     src/engine/highprecision/SolarSystemStateCalculator.cpp
     src/engine/highprecision/TimeScaleService.cpp
 )
-if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
-        src/engine/highprecision/ErfaAstrometry.hpp
-        src/engine/highprecision/ErfaAstrometry.cpp
-    )
-endif()
 
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_library(skygate-ephemeris-highprecision-dependencies INTERFACE)

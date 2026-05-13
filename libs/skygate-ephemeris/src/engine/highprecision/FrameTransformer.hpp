@@ -1,0 +1,54 @@
+#pragma once
+
+#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+
+namespace skygate::ephemeris::highprecision {
+
+enum class CelestialReferenceFrame : std::uint8_t {
+    Icrs,
+    Gcrs,
+    Cirs
+};
+
+struct CelestialFrameVector {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+};
+
+struct CelestialFrameTransformRequest {
+    CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
+    CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
+    AstronomicalEpoch epoch;
+    CelestialFrameVector vector;
+};
+
+struct CelestialFrameTransformResult {
+    std::optional<CelestialFrameVector> vector;
+    EphemerisResultMetadata metadata;
+};
+
+class IFrameTransformer {
+public:
+    virtual ~IFrameTransformer() = default;
+
+    [[nodiscard]] virtual CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const = 0;
+};
+
+class ErfaFrameTransformer final : public IFrameTransformer {
+public:
+    explicit ErfaFrameTransformer(std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService);
+
+    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
+    ) const override;
+
+private:
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
+};
+
+}  // namespace skygate::ephemeris::highprecision

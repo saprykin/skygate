@@ -1,8 +1,11 @@
 #pragma once
 
+#include <array>
 #include <optional>
 
 namespace skygate::ephemeris::highprecision {
+
+using Matrix3x3 = std::array<std::array<double, 3>, 3>;
 
 struct JulianDateParts {
     double day1 = 0.0;
@@ -10,6 +13,7 @@ struct JulianDateParts {
 };
 
 [[nodiscard]] std::optional<JulianDateParts> calendarDateToJulianDate(int year, int month, int day) noexcept;
+[[nodiscard]] std::optional<Matrix3x3> celestialToIntermediateMatrix06A(JulianDateParts terrestrialTime) noexcept;
 [[nodiscard]] std::optional<double> tdbMinusTtSeconds(
     JulianDateParts terrestrialTime,
     double ut1FractionOfDay,
