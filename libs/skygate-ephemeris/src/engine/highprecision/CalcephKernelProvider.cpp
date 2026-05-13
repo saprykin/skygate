@@ -117,6 +117,30 @@ public:
     CalcephRuntimeKernelHandle(const CalcephRuntimeKernelHandle&) = delete;
     CalcephRuntimeKernelHandle& operator=(const CalcephRuntimeKernelHandle&) = delete;
 
+    [[nodiscard]] std::optional<SolarSystemKernelVector>
+    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
+    {
+        double positionVelocity[6]{};
+        const int result = calceph_compute_unit(
+            m_handle,
+            epoch.julianDatePart1,
+            epoch.julianDatePart2,
+            targetNaifId,
+            centerNaifId,
+            CALCEPH_USE_NAIFID + CALCEPH_UNIT_AU + CALCEPH_UNIT_DAY,
+            positionVelocity
+        );
+        if (result == 0) {
+            return std::nullopt;
+        }
+
+        return SolarSystemKernelVector{
+            .xAu = positionVelocity[0],
+            .yAu = positionVelocity[1],
+            .zAu = positionVelocity[2],
+        };
+    }
+
 private:
     t_calcephbin* m_handle = nullptr;
 };
@@ -285,6 +309,41 @@ CalcephKernelProviderStatus CalcephKernelProvider::statusForEpoch(const Astronom
     }
 
     return CalcephKernelProviderStatus::Ready;
+}
+
+SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
+    const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+) const
+{
+    SolarSystemKernelStateResult result;
+    result.metadata.dataSourceProvenance = "CALCEPH solar-system kernel";
+
+    const CalcephKernelProviderStatus epochStatus = statusForEpoch(epoch);
+    if (epochStatus != CalcephKernelProviderStatus::Ready) {
+        result.metadata.status = epochStatus == CalcephKernelProviderStatus::OutOfRange
+                                     ? EphemerisResultStatus::OutOfRange
+                                     : EphemerisResultStatus::Failed;
+        result.metadata.addWarning(
+            epochStatus == CalcephKernelProviderStatus::OutOfRange ? EphemerisWarningCode::DataOutOfRange
+                                                                   : EphemerisWarningCode::MissingEphemerisData
+        );
+        return result;
+    }
+
+    if (m_kernelInfo.has_value()) {
+        result.metadata.dataSourceProvenance = m_kernelInfo->provenance;
+        result.metadata.effectiveDataValidityRange = &m_kernelInfo->validityRange;
+    }
+
+    result.positionAu = m_kernelHandle->computeGeometricState(epoch, targetNaifId, centerNaifId);
+    if (!result.positionAu.has_value()) {
+        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return result;
+    }
+
+    result.metadata.status = EphemerisResultStatus::Valid;
+    return result;
 }
 
 std::shared_ptr<const ICalcephKernelRuntime> defaultCalcephKernelRuntime()

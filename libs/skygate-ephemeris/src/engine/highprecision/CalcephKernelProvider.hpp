@@ -74,6 +74,15 @@ struct CalcephKernelInfo {
 class ICalcephKernelHandle {
 public:
     virtual ~ICalcephKernelHandle() = default;
+
+    [[nodiscard]] virtual std::optional<SolarSystemKernelVector>
+    computeGeometricState(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const
+    {
+        static_cast<void>(epoch);
+        static_cast<void>(targetNaifId);
+        static_cast<void>(centerNaifId);
+        return std::nullopt;
+    }
 };
 
 struct CalcephKernelOpenResult {
@@ -114,6 +123,8 @@ public:
     [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept;
     [[nodiscard]] const std::optional<CalcephKernelInfo>& kernelInfo() const noexcept;
     [[nodiscard]] CalcephKernelProviderStatus statusForEpoch(const AstronomicalEpoch& epoch) const noexcept;
+    [[nodiscard]] SolarSystemKernelStateResult
+    computeGeometricState(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
 
 private:
     CalcephKernelProviderStatus m_status = CalcephKernelProviderStatus::MissingKernelAsset;

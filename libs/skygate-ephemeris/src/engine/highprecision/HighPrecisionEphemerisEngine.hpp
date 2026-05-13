@@ -11,9 +11,33 @@
 
 namespace skygate::ephemeris::highprecision {
 
+struct SolarSystemKernelVector {
+    double xAu = 0.0;
+    double yAu = 0.0;
+    double zAu = 0.0;
+};
+
+struct SolarSystemKernelStateResult {
+    std::optional<SolarSystemKernelVector> positionAu;
+    EphemerisResultMetadata metadata;
+};
+
 class ICalcephKernelProvider {
 public:
     virtual ~ICalcephKernelProvider() = default;
+
+    [[nodiscard]] virtual SolarSystemKernelStateResult
+    computeGeometricState(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const
+    {
+        static_cast<void>(epoch);
+        static_cast<void>(targetNaifId);
+        static_cast<void>(centerNaifId);
+
+        SolarSystemKernelStateResult result;
+        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+        return result;
+    }
 };
 
 class ITimeScaleService {
