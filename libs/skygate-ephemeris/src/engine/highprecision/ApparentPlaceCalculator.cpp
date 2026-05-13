@@ -37,7 +37,7 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::DiurnalParallax)) {
         return ApparentPlaceRequestMode::Topocentric;
     }
-    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::EarthOrientation)) {
+    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::PrecessionNutation)) {
         return ApparentPlaceRequestMode::Apparent;
     }
 

@@ -82,9 +82,19 @@ public:
         m_lastSourceFrame = request.sourceFrame;
         m_lastTargetFrame = request.targetFrame;
         return {
-            .vector = request.vector,
-            .metadata = {.status = EphemerisResultStatus::Valid},
+            .vector = m_resultVector.value_or(request.vector),
+            .metadata = m_resultMetadata,
         };
+    }
+
+    void setResultVector(const CelestialFrameVector& vector) noexcept
+    {
+        m_resultVector = vector;
+    }
+
+    void setResultMetadata(const EphemerisResultMetadata& metadata)
+    {
+        m_resultMetadata = metadata;
     }
 
     [[nodiscard]] int callCount() const noexcept
@@ -106,6 +116,8 @@ private:
     mutable int m_callCount = 0;
     mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
     mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
+    std::optional<CelestialFrameVector> m_resultVector;
+    EphemerisResultMetadata m_resultMetadata = {.status = EphemerisResultStatus::Valid};
 };
 
 }  // namespace
@@ -115,9 +127,11 @@ class ApparentPlaceCalculatorTests final : public QObject {
 
 private slots:
     void routesGeometricRequestsToGcrs();
-    void routesAstrometricRequestsToGcrs();
+    void routesRequestsWithoutPrecessionNutationToGcrs();
     void routesAstrometricRequestsWithUnsupportedRefractionToGcrs();
     void routesApparentRequestsToCirs();
+    void appliesPrecessionNutationWhenRequested();
+    void propagatesDegradedTransformMetadataForPrecessionNutation();
     void reportsUnavailableRefractionMode();
 };
 
@@ -146,11 +160,11 @@ void ApparentPlaceCalculatorTests::routesGeometricRequestsToGcrs()
     );
 }
 
-void ApparentPlaceCalculatorTests::routesAstrometricRequestsToGcrs()
+void ApparentPlaceCalculatorTests::routesRequestsWithoutPrecessionNutationToGcrs()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
     const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Astrometric);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::LightTime);
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
 
@@ -176,7 +190,7 @@ void ApparentPlaceCalculatorTests::routesAstrometricRequestsWithUnsupportedRefra
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
     const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
     EphemerisRequest request =
-        makeRequest(EphemerisCorrectionFlags::Astrometric | EphemerisCorrectionFlags::AtmosphericRefraction);
+        makeRequest(EphemerisCorrectionFlags::LightTime | EphemerisCorrectionFlags::AtmosphericRefraction);
     request.options.enableAtmosphericRefraction = true;
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
@@ -220,6 +234,67 @@ void ApparentPlaceCalculatorTests::routesApparentRequestsToCirs()
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
     );
+}
+
+void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
+{
+    auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
+    frameTransformer->setResultVector(CelestialFrameVector{
+        .x = 0.0,
+        .y = 1.0,
+        .z = 0.0,
+    });
+    EphemerisResultMetadata transformMetadata;
+    transformMetadata.status = EphemerisResultStatus::Valid;
+    transformMetadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+    frameTransformer->setResultMetadata(transformMetadata);
+
+    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
+    const EphemerisRequest request =
+        makeRequest(EphemerisCorrectionFlags::LightTime | EphemerisCorrectionFlags::PrecessionNutation);
+
+    const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
+
+    QCOMPARE(frameTransformer->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+    );
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 6.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+}
+
+void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecessionNutation()
+{
+    auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
+    EphemerisResultMetadata transformMetadata;
+    transformMetadata.status = EphemerisResultStatus::Degraded;
+    transformMetadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
+    transformMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    transformMetadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+    frameTransformer->setResultMetadata(transformMetadata);
+
+    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::PrecessionNutation);
+
+    const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
+
+    QCOMPARE(frameTransformer->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation));
 }
 
 void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()
