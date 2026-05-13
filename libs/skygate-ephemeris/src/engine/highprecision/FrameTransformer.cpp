@@ -2,7 +2,9 @@
 
 #include "engine/highprecision/ErfaAstrometry.hpp"
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <utility>
@@ -10,7 +12,8 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial frame transform";
+constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial and terrestrial frame transform";
+constexpr double kArcsecondsToRadians = 4.8481368110953599359e-6;
 
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
 {
@@ -22,15 +25,21 @@ constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A cele
     return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z);
 }
 
-[[nodiscard]] bool isCirsStage(const CelestialReferenceFrame frame) noexcept
+[[nodiscard]] std::uint8_t frameRank(const CelestialReferenceFrame frame) noexcept
 {
-    return frame == CelestialReferenceFrame::Cirs;
-}
+    switch (frame) {
+    case CelestialReferenceFrame::Icrs:
+    case CelestialReferenceFrame::Gcrs:
+        return 0U;
+    case CelestialReferenceFrame::Cirs:
+        return 1U;
+    case CelestialReferenceFrame::Tirs:
+        return 2U;
+    case CelestialReferenceFrame::Itrs:
+        return 3U;
+    }
 
-[[nodiscard]] bool requiresCelestialIntermediateMatrix(const CelestialFrameTransformRequest& request) noexcept
-{
-    return request.sourceFrame != request.targetFrame
-           && (isCirsStage(request.sourceFrame) || isCirsStage(request.targetFrame));
+    return 0U;
 }
 
 [[nodiscard]] CelestialFrameTransformResult makeFailedResult(const EphemerisWarningCode warningCode)
@@ -71,6 +80,58 @@ multiplyTranspose(const Matrix3x3& matrix, const CelestialFrameVector& vector) n
     };
 }
 
+[[nodiscard]] Matrix3x3 earthRotationMatrix(const double earthRotationAngle) noexcept
+{
+    const double sine = std::sin(earthRotationAngle);
+    const double cosine = std::cos(earthRotationAngle);
+    return Matrix3x3{
+        std::array<double, 3>{cosine, sine, 0.0},
+        std::array<double, 3>{-sine, cosine, 0.0},
+        std::array<double, 3>{0.0, 0.0, 1.0},
+    };
+}
+
+void addDegradedWarning(EphemerisResultMetadata& metadata, const EphemerisWarningCode warningCode) noexcept
+{
+    if (metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+    }
+    metadata.addWarning(warningCode);
+}
+
+void mergeTimeScaleWarnings(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
+{
+    if (conversion.status != TimeScaleConversionStatus::Degraded) {
+        return;
+    }
+
+    addDegradedWarning(metadata, EphemerisWarningCode::AccuracyDegraded);
+    if (conversion.hasWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::EarthOrientationDataMissing)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::DeltaTUnavailable)) {
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    }
+    if (conversion.hasWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData)) {
+        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    }
+}
+
+void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const EarthOrientationSample& sample) noexcept
+{
+    if (sample.status != EarthOrientationSampleStatus::Degraded) {
+        return;
+    }
+
+    addDegradedWarning(metadata, EphemerisWarningCode::AccuracyDegraded);
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    }
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
+        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    }
+}
+
 [[nodiscard]] std::optional<AstronomicalEpoch> terrestrialTimeEpoch(
     const AstronomicalEpoch& epoch,
     const skygate::ephemeris::ITimeScaleService* timeScaleService,
@@ -101,18 +162,180 @@ multiplyTranspose(const Matrix3x3& matrix, const CelestialFrameVector& vector) n
     }
 
     if (conversion.status == TimeScaleConversionStatus::Degraded) {
-        metadata.status = EphemerisResultStatus::Degraded;
-        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
+        mergeTimeScaleWarnings(metadata, conversion);
     }
 
     return conversion.epoch;
 }
 
+[[nodiscard]] std::optional<AstronomicalEpoch> epochInScale(
+    const AstronomicalEpoch& epoch,
+    const TimeScale targetScale,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    EphemerisResultMetadata& metadata
+)
+{
+    if (!isFiniteEpoch(epoch)) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+
+    if (epoch.timeScale == targetScale) {
+        return normalizedAstronomicalEpoch(epoch);
+    }
+
+    if (timeScaleService == nullptr) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return std::nullopt;
+    }
+
+    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, targetScale);
+    if (!conversion.isSuccess()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return std::nullopt;
+    }
+
+    mergeTimeScaleWarnings(metadata, conversion);
+    return conversion.epoch;
+}
+
+[[nodiscard]] std::optional<Matrix3x3> celestialIntermediateMatrix(
+    const CelestialFrameTransformRequest& request,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    EphemerisResultMetadata& metadata
+)
+{
+    const std::optional<AstronomicalEpoch> ttEpoch = terrestrialTimeEpoch(request.epoch, timeScaleService, metadata);
+    if (!ttEpoch.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<Matrix3x3> celestialToIntermediate = celestialToIntermediateMatrix06A(JulianDateParts{
+        .day1 = ttEpoch->julianDatePart1,
+        .day2 = ttEpoch->julianDatePart2,
+    });
+    if (!celestialToIntermediate.has_value()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+
+    return celestialToIntermediate;
+}
+
+[[nodiscard]] std::optional<Matrix3x3> intermediateToTerrestrialIntermediateMatrix(
+    const CelestialFrameTransformRequest& request,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    EphemerisResultMetadata& metadata
+)
+{
+    const std::optional<AstronomicalEpoch> ut1Epoch =
+        epochInScale(request.epoch, TimeScale::Ut1, timeScaleService, metadata);
+    if (!ut1Epoch.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<double> earthRotationAngle = earthRotationAngle00(JulianDateParts{
+        .day1 = ut1Epoch->julianDatePart1,
+        .day2 = ut1Epoch->julianDatePart2,
+    });
+    if (!earthRotationAngle.has_value()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+
+    return earthRotationMatrix(*earthRotationAngle);
+}
+
+[[nodiscard]] std::optional<Matrix3x3> terrestrialIntermediateToTerrestrialMatrix(
+    const CelestialFrameTransformRequest& request,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider,
+    EphemerisResultMetadata& metadata
+)
+{
+    const std::optional<AstronomicalEpoch> ttEpoch =
+        epochInScale(request.epoch, TimeScale::Tt, timeScaleService, metadata);
+    const std::optional<AstronomicalEpoch> utcEpoch =
+        epochInScale(request.epoch, TimeScale::Utc, timeScaleService, metadata);
+    if (!ttEpoch.has_value() || !utcEpoch.has_value()) {
+        return std::nullopt;
+    }
+
+    const EarthOrientationSample earthOrientationSample = sampleEarthOrientation(
+        earthOrientationProvider,
+        *utcEpoch,
+        EarthOrientationSampleOptions{
+            .allowOutOfRangeNearestSampleFallback = true,
+            .allowMissingDataZeroFallback = true,
+        }
+    );
+    if (!earthOrientationSample.isSuccess()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return std::nullopt;
+    }
+    mergeEarthOrientationWarnings(metadata, earthOrientationSample);
+
+    const std::optional<double> tioLocator = tioLocatorS00(JulianDateParts{
+        .day1 = ttEpoch->julianDatePart1,
+        .day2 = ttEpoch->julianDatePart2,
+    });
+    if (!tioLocator.has_value()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+
+    const std::optional<Matrix3x3> polarMotionMatrix = polarMotionMatrix00(
+        earthOrientationSample.polarMotionXArcseconds * kArcsecondsToRadians,
+        earthOrientationSample.polarMotionYArcseconds * kArcsecondsToRadians,
+        *tioLocator
+    );
+    if (!polarMotionMatrix.has_value()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+
+    return polarMotionMatrix;
+}
+
+[[nodiscard]] std::optional<Matrix3x3> stageMatrix(
+    const CelestialFrameTransformRequest& request,
+    const std::uint8_t lowerRank,
+    const skygate::ephemeris::ITimeScaleService* timeScaleService,
+    const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider,
+    EphemerisResultMetadata& metadata
+)
+{
+    switch (lowerRank) {
+    case 0U:
+        return celestialIntermediateMatrix(request, timeScaleService, metadata);
+    case 1U:
+        return intermediateToTerrestrialIntermediateMatrix(request, timeScaleService, metadata);
+    case 2U:
+        return terrestrialIntermediateToTerrestrialMatrix(
+            request, timeScaleService, earthOrientationProvider, metadata
+        );
+    default:
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+}
+
 }  // namespace
 
-ErfaFrameTransformer::ErfaFrameTransformer(std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+ErfaFrameTransformer::ErfaFrameTransformer(
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService,
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider
 )
-    : m_timeScaleService(std::move(timeScaleService))
+    : m_timeScaleService(std::move(timeScaleService)), m_earthOrientationProvider(std::move(earthOrientationProvider))
 {
 }
 
@@ -123,42 +346,57 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
         return makeFailedResult(EphemerisWarningCode::ComputationFailed);
     }
 
-    if (!requiresCelestialIntermediateMatrix(request)) {
+    const std::uint8_t sourceRank = frameRank(request.sourceFrame);
+    const std::uint8_t targetRank = frameRank(request.targetFrame);
+    if (sourceRank == targetRank) {
         return makeIdentityResult(request);
     }
 
     CelestialFrameTransformResult result;
     result.metadata.status = EphemerisResultStatus::Valid;
-    result.metadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
 
-    const std::optional<AstronomicalEpoch> ttEpoch =
-        terrestrialTimeEpoch(request.epoch, m_timeScaleService.get(), result.metadata);
-    if (!ttEpoch.has_value()) {
-        return result;
+    CelestialFrameVector transformed = request.vector;
+    if (sourceRank < targetRank) {
+        for (std::uint8_t lowerRank = sourceRank; lowerRank < targetRank; ++lowerRank) {
+            const std::optional<Matrix3x3> matrix = stageMatrix(
+                request, lowerRank, m_timeScaleService.get(), m_earthOrientationProvider.get(), result.metadata
+            );
+            if (!matrix.has_value()) {
+                return result;
+            }
+
+            transformed = multiply(*matrix, transformed);
+            if (lowerRank == 0U) {
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::PrecessionNutation;
+            } else {
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::EarthOrientation;
+            }
+        }
+    } else {
+        for (std::uint8_t lowerRank = sourceRank; lowerRank > targetRank; --lowerRank) {
+            const std::optional<Matrix3x3> matrix = stageMatrix(
+                request,
+                static_cast<std::uint8_t>(lowerRank - 1U),
+                m_timeScaleService.get(),
+                m_earthOrientationProvider.get(),
+                result.metadata
+            );
+            if (!matrix.has_value()) {
+                return result;
+            }
+
+            transformed = multiplyTranspose(*matrix, transformed);
+            if (lowerRank == 1U) {
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::PrecessionNutation;
+            } else {
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::EarthOrientation;
+            }
+        }
     }
 
-    const std::optional<Matrix3x3> celestialToIntermediate = celestialToIntermediateMatrix06A(JulianDateParts{
-        .day1 = ttEpoch->julianDatePart1,
-        .day2 = ttEpoch->julianDatePart2,
-    });
-    if (!celestialToIntermediate.has_value()) {
-        result.metadata.status = EphemerisResultStatus::Failed;
-        result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
-        return result;
-    }
-
-    if (!isCirsStage(request.sourceFrame) && isCirsStage(request.targetFrame)) {
-        result.vector = multiply(*celestialToIntermediate, request.vector);
-        return result;
-    }
-
-    if (isCirsStage(request.sourceFrame) && !isCirsStage(request.targetFrame)) {
-        result.vector = multiplyTranspose(*celestialToIntermediate, request.vector);
-        return result;
-    }
-
-    result.vector = request.vector;
+    result.vector = transformed;
     return result;
 }
 

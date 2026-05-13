@@ -52,6 +52,59 @@ std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const JulianDateParts 
 #endif
 }
 
+std::optional<double> earthRotationAngle00(const JulianDateParts universalTime1) noexcept
+{
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    if (!std::isfinite(universalTime1.day1) || !std::isfinite(universalTime1.day2)) {
+        return std::nullopt;
+    }
+
+    return eraEra00(universalTime1.day1, universalTime1.day2);
+#else
+    static_cast<void>(universalTime1);
+    return std::nullopt;
+#endif
+}
+
+std::optional<double> tioLocatorS00(const JulianDateParts terrestrialTime) noexcept
+{
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    if (!std::isfinite(terrestrialTime.day1) || !std::isfinite(terrestrialTime.day2)) {
+        return std::nullopt;
+    }
+
+    return eraSp00(terrestrialTime.day1, terrestrialTime.day2);
+#else
+    static_cast<void>(terrestrialTime);
+    return std::nullopt;
+#endif
+}
+
+std::optional<Matrix3x3> polarMotionMatrix00(
+    const double polarMotionXRadians, const double polarMotionYRadians, const double tioLocatorRadians
+) noexcept
+{
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    if (!std::isfinite(polarMotionXRadians) || !std::isfinite(polarMotionYRadians)
+        || !std::isfinite(tioLocatorRadians)) {
+        return std::nullopt;
+    }
+
+    double matrix[3][3] = {};
+    eraPom00(polarMotionXRadians, polarMotionYRadians, tioLocatorRadians, matrix);
+    return Matrix3x3{
+        std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
+        std::array<double, 3>{matrix[1][0], matrix[1][1], matrix[1][2]},
+        std::array<double, 3>{matrix[2][0], matrix[2][1], matrix[2][2]},
+    };
+#else
+    static_cast<void>(polarMotionXRadians);
+    static_cast<void>(polarMotionYRadians);
+    static_cast<void>(tioLocatorRadians);
+    return std::nullopt;
+#endif
+}
+
 std::optional<double> tdbMinusTtSeconds(
     const JulianDateParts terrestrialTime,
     const double ut1FractionOfDay,

@@ -7,6 +7,9 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -33,6 +36,24 @@ constexpr double kTolerance = 1.0e-14;
     };
 }
 
+[[nodiscard]] AstronomicalEpoch sofaReferenceUtcEpoch() noexcept
+{
+    return {
+        .julianDatePart1 = 2'400'000.5,
+        .julianDatePart2 = 53'736.0,
+        .timeScale = TimeScale::Utc,
+    };
+}
+
+[[nodiscard]] AstronomicalEpoch sofaReferenceUt1Epoch() noexcept
+{
+    return {
+        .julianDatePart1 = 2'400'000.5,
+        .julianDatePart2 = 53'736.0,
+        .timeScale = TimeScale::Ut1,
+    };
+}
+
 void compareVector(const CelestialFrameVector& actual, const CelestialFrameVector& expected, const double tolerance)
 {
     QVERIFY(std::abs(actual.x - expected.x) <= tolerance);
@@ -48,6 +69,15 @@ public:
         ++convertCallCount;
         lastEpoch = epoch;
         lastTargetScale = targetScale;
+        if (targetScale == TimeScale::Tt && ttResult.has_value()) {
+            return *ttResult;
+        }
+        if (targetScale == TimeScale::Utc && utcResult.has_value()) {
+            return *utcResult;
+        }
+        if (targetScale == TimeScale::Ut1 && ut1Result.has_value()) {
+            return *ut1Result;
+        }
         return nextResult;
     }
 
@@ -63,6 +93,9 @@ public:
     mutable AstronomicalEpoch lastEpoch;
     mutable TimeScale lastTargetScale = TimeScale::Utc;
     TimeScaleConversionResult nextResult;
+    std::optional<TimeScaleConversionResult> ttResult;
+    std::optional<TimeScaleConversionResult> utcResult;
+    std::optional<TimeScaleConversionResult> ut1Result;
 };
 
 [[nodiscard]] TimeScaleConversionResult validTtConversionResult()
@@ -72,6 +105,55 @@ public:
         .status = TimeScaleConversionStatus::Valid,
         .diagnosticText = "unit test conversion",
     };
+}
+
+[[nodiscard]] TimeScaleConversionResult validUtcConversionResult()
+{
+    return {
+        .epoch = sofaReferenceUtcEpoch(),
+        .status = TimeScaleConversionStatus::Valid,
+        .diagnosticText = "unit test UTC conversion",
+    };
+}
+
+[[nodiscard]] TimeScaleConversionResult validUt1ConversionResult()
+{
+    return {
+        .epoch = sofaReferenceUt1Epoch(),
+        .status = TimeScaleConversionStatus::Valid,
+        .diagnosticText = "unit test UT1 conversion",
+    };
+}
+
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider(
+    const bool predicted = false, const EarthOrientationDataStatus status = EarthOrientationDataStatus::Available
+)
+{
+    EarthOrientationDataInfo info;
+    info.version = "unit-test-eop";
+    info.provenance = "SOFA t_erfa_c polar-motion fixture";
+    info.status = status;
+    info.diagnosticText = "Earth-orientation data loaded.";
+
+    EarthOrientationTableEntry entry;
+    entry.effectiveUtcEpoch = sofaReferenceUtcEpoch();
+    entry.ut1MinusUtcSeconds = 0.0;
+    entry.polarMotionXArcseconds = 0.05260995057240829;
+    entry.polarMotionYArcseconds = 0.38372663963244913;
+    entry.predicted = predicted;
+
+    return std::make_shared<TableBackedEarthOrientationProvider>(
+        std::move(info), std::vector<EarthOrientationTableEntry>{entry}
+    );
+}
+
+[[nodiscard]] std::shared_ptr<RecordingTimeScaleService> frameTimeScaleService()
+{
+    auto service = std::make_shared<RecordingTimeScaleService>();
+    service->ttResult = validTtConversionResult();
+    service->utcResult = validUtcConversionResult();
+    service->ut1Result = validUt1ConversionResult();
+    return service;
 }
 
 }  // namespace
@@ -85,6 +167,11 @@ private slots:
     void treatsIcrsAndGcrsAsIdentityCelestialAxes();
     void usesTimeScaleServiceForNonTtEpochs();
     void reportsMissingTimeScaleServiceForNonTtCirsTransforms();
+    void transformsCirsToTirsAgainstSofaReference();
+    void transformsTirsToItrsAgainstSofaReference();
+    void transformsGcrsToItrsAgainstSofaReference();
+    void degradesItrsTransformForPredictedEarthOrientationData();
+    void degradesItrsTransformForMissingEarthOrientationData();
 };
 
 void FrameTransformerTests::transformsGcrsToCirsAgainstSofaReference()
@@ -198,6 +285,121 @@ void FrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms
     QVERIFY(!result.vector.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Failed)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+}
+
+void FrameTransformerTests::transformsCirsToTirsAgainstSofaReference()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Cirs,
+        .targetFrame = CelestialReferenceFrame::Tirs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    compareVector(
+        *result.vector,
+        {
+            .x = -0.18103321990176477,
+            .y = -0.98347698157709784,
+            .z = 0.0,
+        },
+        kTolerance
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::EarthOrientation)
+    );
+}
+
+void FrameTransformerTests::transformsTirsToItrsAgainstSofaReference()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Tirs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    compareVector(
+        *result.vector,
+        {
+            .x = 0.9999999999999674721,
+            .y = 0.1414624947957029801e-10,
+            .z = -0.2550602379741215021e-6,
+        },
+        kTolerance
+    );
+}
+
+void FrameTransformerTests::transformsGcrsToItrsAgainstSofaReference()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Gcrs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    compareVector(
+        *result.vector,
+        {
+            .x = -0.1810332128305897282,
+            .y = -0.9834768134136214897,
+            .z = 0.5773474024748545878e-3,
+        },
+        2.0e-12
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.metadata.appliedCorrections),
+        static_cast<std::uint32_t>(
+            EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation
+        )
+    );
+}
+
+void FrameTransformerTests::degradesItrsTransformForPredictedEarthOrientationData()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider(true));
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Tirs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+}
+
+void FrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), nullptr);
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Tirs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
 }
