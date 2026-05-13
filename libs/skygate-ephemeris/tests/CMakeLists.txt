@@ -80,6 +80,12 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
             LABELS "unit;highprecision"
             TIMEOUT 30
     )
+
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-erfa-smoke-tests
+        highprecision/HighPrecisionErfaSmokeTests.cpp
+        LABELS "unit;highprecision"
+    )
 endif()
 
 add_skygate_ephemeris_qtest(

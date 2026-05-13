@@ -10,6 +10,7 @@
             "description": "Dependencies required for high-precision ephemeris builds.",
             "dependencies": [
                 "calceph",
+                "erfa",
                 "zstd"
             ]
         }
