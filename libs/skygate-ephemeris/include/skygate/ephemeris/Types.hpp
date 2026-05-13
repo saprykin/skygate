@@ -421,8 +421,8 @@ struct EphemerisWarning {
 struct EphemerisResultMetadata {
     EphemerisResultStatus status = EphemerisResultStatus::Valid;
     std::uint32_t warningCodeMask = 0U;
-    std::string_view dataSourceProvenance;
-    const EphemerisDateRange* effectiveDataValidityRange = nullptr;
+    std::string dataSourceProvenance;
+    std::optional<EphemerisDateRange> effectiveDataValidityRange;
     std::optional<double> estimatedAngularUncertaintyArcsec;
     EphemerisCorrectionFlags appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
 

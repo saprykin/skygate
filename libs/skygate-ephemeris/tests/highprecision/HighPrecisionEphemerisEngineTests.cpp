@@ -311,6 +311,7 @@ private slots:
     void exposesMetadataAndCapabilities();
     void dispatchesSolarSystemAndStarBodies();
     void forwardsOptionsThroughCollaboratorsAndResultBuilder();
+    void bypassesApparentPlaceForGeometricSolarSystemRequests();
     void validatesRequestsBeforeDispatchingCalculators();
     void returnsStructuredUnsupportedStatus();
 };
@@ -419,6 +420,34 @@ void HighPrecisionEphemerisEngineTests::forwardsOptionsThroughCollaboratorsAndRe
     QCOMPARE(state->equatorial.rightAscensionHours, 11.25);
     QVERIFY(state->metadata.estimatedAngularUncertaintyArcsec.has_value());
     QCOMPARE(*state->metadata.estimatedAngularUncertaintyArcsec, 0.42);
+}
+
+void HighPrecisionEphemerisEngineTests::bypassesApparentPlaceForGeometricSolarSystemRequests()
+{
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<RecordingSolarSystemCalculator>();
+    auto apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
+    auto resultBuilder = std::make_shared<RecordingResultBuilder>();
+
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::Geometric;
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, request.options, makeDependencies(solarSystemCalculator, {}, apparentPlaceCalculator, resultBuilder)
+    );
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(apparentPlaceCalculator->callCount(), 0);
+    QCOMPARE(resultBuilder->stateCount(), 1);
+    QCOMPARE(state->equatorial.rightAscensionHours, 1.25);
+    QCOMPARE(state->equatorial.declinationDeg, -2.5);
+    QCOMPARE(
+        static_cast<std::uint32_t>(state->metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::Geometric)
+    );
 }
 
 void HighPrecisionEphemerisEngineTests::validatesRequestsBeforeDispatchingCalculators()

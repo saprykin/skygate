@@ -49,15 +49,35 @@ private:
 
 class FakeCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
 public:
-    explicit FakeCalcephKernelHandle(std::shared_ptr<int> closeCount) : m_closeCount(std::move(closeCount)) {}
+    FakeCalcephKernelHandle(std::shared_ptr<int> closeCount, std::shared_ptr<int> computeCount)
+        : m_closeCount(std::move(closeCount)), m_computeCount(std::move(computeCount))
+    {
+    }
 
     ~FakeCalcephKernelHandle() override
     {
         ++*m_closeCount;
     }
 
+    [[nodiscard]] std::optional<skygate::ephemeris::highprecision::SolarSystemKernelVector> computeGeometricState(
+        const skygate::ephemeris::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+    ) const override
+    {
+        static_cast<void>(epoch);
+        static_cast<void>(targetNaifId);
+        static_cast<void>(centerNaifId);
+
+        ++*m_computeCount;
+        return skygate::ephemeris::highprecision::SolarSystemKernelVector{
+            .xAu = 1.0,
+            .yAu = 2.0,
+            .zAu = 3.0,
+        };
+    }
+
 private:
     std::shared_ptr<int> m_closeCount;
+    std::shared_ptr<int> m_computeCount;
 };
 
 class FakeCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
@@ -81,12 +101,13 @@ public:
             return {.diagnostic = "fake open failure"};
         }
 
-        return {.handle = std::make_unique<FakeCalcephKernelHandle>(closeCount)};
+        return {.handle = std::make_unique<FakeCalcephKernelHandle>(closeCount, computeCount)};
     }
 
     mutable int openCount = 0;
     mutable std::filesystem::path lastOpenedPath;
     std::shared_ptr<int> closeCount = std::make_shared<int>(0);
+    std::shared_ptr<int> computeCount = std::make_shared<int>(0);
 
 private:
     bool m_openSucceeds = true;
@@ -206,6 +227,8 @@ private slots:
     void rejectsChecksumMismatchBeforeOpening();
     void reportsOpenFailureForWrongKernelFile();
     void reportsOutOfRangeEpochs();
+    void rejectsNonTdbEpochsBeforeCallingKernel();
+    void returnsOwnedMetadataForGeometricStates();
 };
 
 void CalcephKernelProviderTests::opensSelectedModernKernelAndClosesIt()
@@ -438,6 +461,58 @@ void CalcephKernelProviderTests::reportsOutOfRangeEpochs()
         static_cast<std::uint8_t>(provider.statusForEpoch(epochForDate(3000, 1, 1))),
         static_cast<std::uint8_t>(skygate::ephemeris::highprecision::CalcephKernelProviderStatus::OutOfRange)
     );
+}
+
+void CalcephKernelProviderTests::rejectsNonTdbEpochsBeforeCallingKernel()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    const QString kernelPath = writeKernel(root);
+    const auto runtime = std::make_shared<FakeCalcephKernelRuntime>();
+    const skygate::ephemeris::highprecision::CalcephKernelProvider provider(
+        makeSnapshot(kernelPath), makeManifest(), {}, runtime
+    );
+
+    const skygate::ephemeris::AstronomicalEpoch utcEpoch = epochForDate(2000, 1, 1);
+    const skygate::ephemeris::highprecision::SolarSystemKernelStateResult result =
+        provider.computeGeometricState(utcEpoch, 499, 399);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Failed)
+    );
+    QVERIFY(result.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(!result.positionAu.has_value());
+    QCOMPARE(*runtime->computeCount, 0);
+}
+
+void CalcephKernelProviderTests::returnsOwnedMetadataForGeometricStates()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    const QString kernelPath = writeKernel(root);
+    const auto runtime = std::make_shared<FakeCalcephKernelRuntime>();
+
+    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+    {
+        const skygate::ephemeris::highprecision::CalcephKernelProvider provider(
+            makeSnapshot(kernelPath), makeManifest(), {}, runtime
+        );
+        skygate::ephemeris::AstronomicalEpoch tdbEpoch = epochForDate(2000, 1, 1);
+        tdbEpoch.timeScale = skygate::ephemeris::TimeScale::Tdb;
+
+        result = provider.computeGeometricState(tdbEpoch, 499, 399);
+    }
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
+    );
+    QVERIFY(result.positionAu.has_value());
+    QVERIFY(result.metadata.dataSourceProvenance == std::string{"Installed test data"});
+    QVERIFY(result.metadata.effectiveDataValidityRange.has_value());
+    QVERIFY(result.metadata.effectiveDataValidityRange->id == std::string{"de440s-kernel-range"});
+    QCOMPARE(*runtime->computeCount, 1);
 }
 
 QTEST_APPLESS_MAIN(CalcephKernelProviderTests)

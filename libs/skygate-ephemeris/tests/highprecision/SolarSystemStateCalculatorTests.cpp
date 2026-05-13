@@ -177,7 +177,7 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
         static_cast<std::uint32_t>(result.metadata.appliedCorrections),
         static_cast<std::uint32_t>(EphemerisCorrectionFlags::Geometric)
     );
-    QVERIFY(result.metadata.dataSourceProvenance == std::string_view{"Horizons ICRF geometric fixture"});
+    QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
 }
 
 void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstHorizonsSmokeFixture()
