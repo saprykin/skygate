@@ -54,6 +54,11 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
            || body.type == CelestialBodyType::Star;
 }
 
+[[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
+{
+    return request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections;
+}
+
 void applyDefaultMetadata(EphemerisResultMetadata& metadata) noexcept
 {
     if (metadata.dataSourceProvenance.empty()) {
@@ -288,7 +293,9 @@ HighPrecisionEphemerisEngine::computeStateForBody(const EphemerisRequest& reques
     if (isSolarSystemBody(body) && solarSystemCalculator != nullptr) {
         HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(input);
         HighPrecisionCalculatorResult apparentResult =
-            apparentPlaceCalculator(m_dependencies).apply(input, calculatorResult);
+            requestsApparentPlaceProcessing(request)
+                ? apparentPlaceCalculator(m_dependencies).apply(input, calculatorResult)
+                : calculatorResult;
         return builder.buildState(input, apparentResult);
     }
 

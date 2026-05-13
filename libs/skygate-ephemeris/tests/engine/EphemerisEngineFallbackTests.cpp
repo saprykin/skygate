@@ -157,7 +157,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(std::isfinite(sunById->equatorial.declinationDeg));
     QVERIFY(sunById->metadata.status == skygate::ephemeris::EphemerisResultStatus::Valid);
     QCOMPARE(sunById->metadata.warningCount(), std::size_t{0});
-    QVERIFY(sunById->metadata.dataSourceProvenance == std::string_view{"Simple ephemeris engine"});
+    QVERIFY(sunById->metadata.dataSourceProvenance == std::string{"Simple ephemeris engine"});
 
     QVERIFY(moonById != nullptr);
     QVERIFY(std::isfinite(moonById->equatorial.rightAscensionHours));

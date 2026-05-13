@@ -318,6 +318,12 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
     SolarSystemKernelStateResult result;
     result.metadata.dataSourceProvenance = "CALCEPH solar-system kernel";
 
+    if (epoch.timeScale != TimeScale::Tdb) {
+        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return result;
+    }
+
     const CalcephKernelProviderStatus epochStatus = statusForEpoch(epoch);
     if (epochStatus != CalcephKernelProviderStatus::Ready) {
         result.metadata.status = epochStatus == CalcephKernelProviderStatus::OutOfRange
@@ -332,7 +338,7 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
 
     if (m_kernelInfo.has_value()) {
         result.metadata.dataSourceProvenance = m_kernelInfo->provenance;
-        result.metadata.effectiveDataValidityRange = &m_kernelInfo->validityRange;
+        result.metadata.effectiveDataValidityRange = m_kernelInfo->validityRange;
     }
 
     result.positionAu = m_kernelHandle->computeGeometricState(epoch, targetNaifId, centerNaifId);

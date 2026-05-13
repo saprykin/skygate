@@ -576,7 +576,7 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
     );
     QCOMPARE(metadata.warningCount(), std::size_t{0});
     QVERIFY(!metadata.hasWarnings());
-    QVERIFY(metadata.effectiveDataValidityRange == nullptr);
+    QVERIFY(!metadata.effectiveDataValidityRange.has_value());
     QVERIFY(!metadata.estimatedAngularUncertaintyArcsec.has_value());
 
     skygate::ephemeris::EphemerisDateRange validityRange;
@@ -585,15 +585,16 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
 
     metadata.status = skygate::ephemeris::EphemerisResultStatus::Failed;
     metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed);
-    metadata.dataSourceProvenance = std::string_view{"test source"};
-    metadata.effectiveDataValidityRange = &validityRange;
+    metadata.dataSourceProvenance = "test source";
+    metadata.effectiveDataValidityRange = validityRange;
     metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
 
     QVERIFY(!metadata.isSuccessful());
     QCOMPARE(metadata.warningCount(), std::size_t{1});
     QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed));
-    QVERIFY(metadata.effectiveDataValidityRange == &validityRange);
-    QVERIFY(metadata.dataSourceProvenance == std::string_view{"test source"});
+    QVERIFY(metadata.effectiveDataValidityRange.has_value());
+    QVERIFY(metadata.effectiveDataValidityRange->id == std::string{"modern"});
+    QVERIFY(metadata.dataSourceProvenance == std::string{"test source"});
     QVERIFY(skygate::ephemeris::hasCorrectionFlag(
         metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
     ));
@@ -677,7 +678,7 @@ void EphemerisApiModelTests::simpleEngineExposesMetadataDefaults()
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisResultStatus>);
-static_assert(sizeof(skygate::ephemeris::EphemerisResultMetadata) <= 64);
+static_assert(sizeof(skygate::ephemeris::EphemerisResultMetadata) <= 192);
 
 QTEST_MAIN(EphemerisApiModelTests)
 
