@@ -52,6 +52,17 @@ public:
         std::size_t constellationCount = 0;
     };
 
+    struct EphemerisDataCacheSnapshot final {
+        QString installedKernelPath;
+        QString installedKernelVersion;
+        QString installedEarthOrientationPath;
+        QString installedEarthOrientationVersion;
+        QString installedLeapSecondTableVersion;
+        QString installedDeltaTDataVersion;
+        QString dataRevisionToken = QStringLiteral("bundled");
+        QString lastUpdateResult = QStringLiteral("Bundled fallback");
+    };
+
 public:
     [[nodiscard]] bool saveState(const StateSnapshot& snapshot) const;
     [[nodiscard]] std::optional<StateSnapshot> loadState() const;
@@ -61,4 +72,7 @@ public:
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
     [[nodiscard]] bool saveCatalogCache(const CatalogCacheSnapshot& snapshot) const;
     [[nodiscard]] std::optional<CatalogCacheSnapshot> loadCatalogCache() const;
+    [[nodiscard]] bool saveEphemerisDataCache(const EphemerisDataCacheSnapshot& snapshot) const;
+    [[nodiscard]] EphemerisDataCacheSnapshot loadEphemerisDataCache() const;
+    [[nodiscard]] bool clearEphemerisDataCache() const;
 };
