@@ -54,7 +54,7 @@ void EphemerisApiModelTests::constructsHighPrecisionModelDefaults()
     );
     QCOMPARE(
         static_cast<std::uint32_t>(capabilities.supportedCorrections),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::None)
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
     );
     QVERIFY(!capabilities.supportsSolarSystemBodies);
     QVERIFY(!capabilities.supportsExtendedHistoricalRange);

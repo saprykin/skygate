@@ -121,6 +121,24 @@ add_skygate_ephemeris_qtest(
     skygate-ephemeris-api-model-tests
     engine/EphemerisApiModelTests.cpp
 )
+add_executable(skygate-ephemeris-public-header-macro-compat-tests
+    engine/PublicHeaderMacroCompatTests.cpp
+)
+target_link_libraries(skygate-ephemeris-public-header-macro-compat-tests
+    PRIVATE
+        skygate::ephemeris
+        skygate::core
+)
+target_compile_features(skygate-ephemeris-public-header-macro-compat-tests PRIVATE cxx_std_20)
+add_test(
+    NAME skygate-ephemeris-public-header-macro-compat-tests
+    COMMAND $<TARGET_FILE:skygate-ephemeris-public-header-macro-compat-tests>
+)
+set_tests_properties(skygate-ephemeris-public-header-macro-compat-tests
+    PROPERTIES
+        LABELS unit
+        TIMEOUT 30
+)
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-parsing-utilities-tests
     catalog/CatalogParsingUtilitiesTests.cpp
