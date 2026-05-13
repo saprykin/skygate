@@ -120,6 +120,56 @@ private:
     EphemerisResultMetadata m_resultMetadata = {.status = EphemerisResultStatus::Valid};
 };
 
+class DegradedTtTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    {
+        ++m_convertCallCount;
+        m_lastTargetScale = targetScale;
+        if (targetScale != TimeScale::Tt) {
+            TimeScaleConversionResult result;
+            result.epoch = epoch;
+            result.status = TimeScaleConversionStatus::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+            return result;
+        }
+
+        TimeScaleConversionResult result;
+        result.epoch = normalizedAstronomicalEpoch(AstronomicalEpoch{
+            .julianDatePart1 = epoch.julianDatePart1,
+            .julianDatePart2 = epoch.julianDatePart2,
+            .timeScale = TimeScale::Tt,
+        });
+        result.status = TimeScaleConversionStatus::Degraded;
+        result.diagnosticText = "unit test degraded TT conversion";
+        result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing);
+        return result;
+    }
+
+    [[nodiscard]] TimeScaleConversionResult
+    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    {
+        static_cast<void>(dateTime);
+        static_cast<void>(targetScale);
+        return {};
+    }
+
+    [[nodiscard]] int convertCallCount() const noexcept
+    {
+        return m_convertCallCount;
+    }
+
+    [[nodiscard]] TimeScale lastTargetScale() const noexcept
+    {
+        return m_lastTargetScale;
+    }
+
+private:
+    mutable int m_convertCallCount = 0;
+    mutable TimeScale m_lastTargetScale = TimeScale::Utc;
+};
+
 }  // namespace
 
 class ApparentPlaceCalculatorTests final : public QObject {
@@ -132,6 +182,7 @@ private slots:
     void routesApparentRequestsToCirs();
     void appliesPrecessionNutationWhenRequested();
     void propagatesDegradedTransformMetadataForPrecessionNutation();
+    void propagatesDegradedRealFrameTransformMetadataForPrecessionNutation();
     void reportsUnavailableRefractionMode();
 };
 
@@ -289,6 +340,48 @@ void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecess
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
         static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
     );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation));
+}
+
+void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataForPrecessionNutation()
+{
+    const ErfaFrameTransformer availabilityTransformer(nullptr);
+    const CelestialFrameTransformResult availabilityResult =
+        availabilityTransformer.transformCelestialVector(CelestialFrameTransformRequest{
+            .sourceFrame = CelestialReferenceFrame::Gcrs,
+            .targetFrame = CelestialReferenceFrame::Cirs,
+            .epoch =
+                {
+                    .julianDatePart1 = 2'400'000.5,
+                    .julianDatePart2 = 53'736.0,
+                    .timeScale = TimeScale::Tt,
+                },
+            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+        });
+    if (!availabilityResult.vector.has_value()) {
+        QSKIP("ERFA-backed frame transforms are not available in this build.");
+    }
+
+    auto timeScaleService = std::make_shared<DegradedTtTimeScaleService>();
+    const auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService);
+    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
+    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::PrecessionNutation);
+    request.epoch = {
+        .julianDatePart1 = 2'400'000.5,
+        .julianDatePart2 = 53'736.0,
+        .timeScale = TimeScale::Utc,
+    };
+
+    const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
+
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
+    QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Tt));
+    QVERIFY(result.equatorial.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
