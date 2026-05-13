@@ -21,6 +21,11 @@ public:
     {
         return std::nullopt;
     }
+
+    [[nodiscard]] virtual std::optional<EphemerisTextDataAsset> earthOrientationDataAsset() const
+    {
+        return std::nullopt;
+    }
 };
 
 }  // namespace skygate::ephemeris
