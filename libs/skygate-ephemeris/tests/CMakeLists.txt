@@ -149,6 +149,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;highprecision"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-apparent-radec-validation-tests
+    highprecision/ApparentRaDecValidationTests.cpp
+    LABELS "unit;highprecision;validation;apparent"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-calceph-kernel-provider-tests
     highprecision/CalcephKernelProviderTests.cpp
     LABELS "unit;highprecision"
