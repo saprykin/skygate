@@ -2,6 +2,7 @@
 
 #include "skygate/core/Types.hpp"
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -9,7 +10,6 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
@@ -189,35 +189,53 @@ enum class EphemerisWarningCode : std::uint8_t {
 
 struct EphemerisWarning {
     EphemerisWarningCode code = EphemerisWarningCode::AccuracyDegraded;
-    std::string displayText;
 
-    EphemerisWarning() : displayText(ephemerisWarningText(code)) {}
+    EphemerisWarning() = default;
 
-    explicit EphemerisWarning(const EphemerisWarningCode warningCode)
-        : code(warningCode), displayText(ephemerisWarningText(warningCode))
+    explicit constexpr EphemerisWarning(const EphemerisWarningCode warningCode) noexcept : code(warningCode) {}
+
+    [[nodiscard]] constexpr std::string_view displayText() const noexcept
     {
-    }
-
-    EphemerisWarning(const EphemerisWarningCode warningCode, std::string warningText)
-        : code(warningCode), displayText(std::move(warningText))
-    {
-        if (displayText.empty()) {
-            displayText = std::string(ephemerisWarningText(code));
-        }
+        return ephemerisWarningText(code);
     }
 };
 
+[[nodiscard]] constexpr std::uint32_t ephemerisWarningMask(const EphemerisWarningCode code) noexcept
+{
+    return 1U << static_cast<std::uint8_t>(code);
+}
+
 struct EphemerisResultMetadata {
     EphemerisResultStatus status = EphemerisResultStatus::Valid;
-    std::vector<EphemerisWarning> warnings;
-    std::string dataSourceProvenance;
-    std::optional<EphemerisDateRange> effectiveDataValidityRange;
+    std::uint32_t warningCodeMask = 0U;
+    std::string_view dataSourceProvenance;
+    const EphemerisDateRange* effectiveDataValidityRange = nullptr;
     std::optional<double> estimatedAngularUncertaintyArcsec;
     EphemerisCorrectionFlags appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
 
     [[nodiscard]] bool isSuccessful() const noexcept
     {
         return status == EphemerisResultStatus::Valid || status == EphemerisResultStatus::Degraded;
+    }
+
+    void addWarning(const EphemerisWarningCode code) noexcept
+    {
+        warningCodeMask |= ephemerisWarningMask(code);
+    }
+
+    [[nodiscard]] bool hasWarning(const EphemerisWarningCode code) const noexcept
+    {
+        return (warningCodeMask & ephemerisWarningMask(code)) != 0U;
+    }
+
+    [[nodiscard]] std::size_t warningCount() const noexcept
+    {
+        return static_cast<std::size_t>(std::popcount(warningCodeMask));
+    }
+
+    [[nodiscard]] bool hasWarnings() const noexcept
+    {
+        return warningCodeMask != 0U;
     }
 };
 

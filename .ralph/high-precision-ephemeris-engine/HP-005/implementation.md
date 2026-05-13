@@ -26,3 +26,24 @@ READY
 - `ctest --test-dir build-ralph --output-on-failure -R 'skygate-ephemeris-(engine-baseline|engine-fallback|regression)-tests'` passed.
 - `cmake --build build-ralph -j2` passed.
 - Full `ctest --test-dir build-ralph --output-on-failure` ran 103 tests with 102 passing and the known unrelated `skygate-ui-qml-main-window-tests` failure already tracked as HP-051.
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Heavy metadata is embedded in every per-frame body state
+  - Action: Fixed
+  - Notes: Replaced allocation-prone state metadata fields with compact warning-code bitmask storage, `std::string_view` provenance, and a shared validity-range pointer. Warning display text remains available through `EphemerisWarning::displayText()` and `ephemerisWarningText()`. Simple-engine states now assign static provenance without per-state string allocation.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/include/skygate/ephemeris/Types.hpp`
+  - `libs/skygate-ephemeris/src/engine/simple/SimpleEphemerisEngine.cpp`
+  - `libs/skygate-ephemeris/tests/engine/EphemerisApiModelTests.cpp`
+  - `libs/skygate-ephemeris/tests/engine/EphemerisEngineFallbackTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-005/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-005/fix.md`
+- Tests run after fix:
+  - `cmake --build build-ralph --target skygate-ephemeris-api-model-tests skygate-ephemeris-engine-fallback-tests -j2` passed.
+  - `ctest --test-dir build-ralph --output-on-failure -R 'skygate-ephemeris-(api-model|engine-fallback)-tests'` passed.
+  - `ctest --test-dir build-ralph --output-on-failure -R 'skygate-ephemeris-(engine-baseline|engine-fallback|regression)-tests'` passed.
+  - `cmake --build build-ralph -j2` passed.
+  - Full `ctest --test-dir build-ralph --output-on-failure` ran 103 tests with 102 passing and the known unrelated `skygate-ui-qml-main-window-tests` failure already tracked as HP-051.
+- Remaining concerns: Full CTest still reports the known unrelated HP-051 QML main-window failure.

@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 class EphemerisApiModelTests final : public QObject {
@@ -167,14 +168,14 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
 
     for (const skygate::ephemeris::EphemerisWarningCode code : warningCodes) {
         const skygate::ephemeris::EphemerisWarning warning(code);
-        QVERIFY(!warning.displayText.empty());
+        QVERIFY(!warning.displayText().empty());
         QVERIFY(!skygate::ephemeris::ephemerisWarningText(code).empty());
     }
 
     const skygate::ephemeris::EphemerisWarning fallbackTextWarning(
-        skygate::ephemeris::EphemerisWarningCode::DataOutOfRange, {}
+        skygate::ephemeris::EphemerisWarningCode::DataOutOfRange
     );
-    QVERIFY(!fallbackTextWarning.displayText.empty());
+    QVERIFY(!fallbackTextWarning.displayText().empty());
 
     skygate::ephemeris::EphemerisResultMetadata metadata;
     QVERIFY(metadata.isSuccessful());
@@ -182,19 +183,26 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
         static_cast<std::uint8_t>(metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
     );
-    QVERIFY(metadata.warnings.empty());
-    QVERIFY(!metadata.effectiveDataValidityRange.has_value());
+    QCOMPARE(metadata.warningCount(), std::size_t{0});
+    QVERIFY(!metadata.hasWarnings());
+    QVERIFY(metadata.effectiveDataValidityRange == nullptr);
     QVERIFY(!metadata.estimatedAngularUncertaintyArcsec.has_value());
 
+    skygate::ephemeris::EphemerisDateRange validityRange;
+    validityRange.id = "modern";
+    validityRange.displayName = "Modern kernel";
+
     metadata.status = skygate::ephemeris::EphemerisResultStatus::Failed;
-    metadata.warnings.emplace_back(skygate::ephemeris::EphemerisWarningCode::ComputationFailed);
-    metadata.dataSourceProvenance = "test source";
+    metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed);
+    metadata.dataSourceProvenance = std::string_view{"test source"};
+    metadata.effectiveDataValidityRange = &validityRange;
     metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
 
     QVERIFY(!metadata.isSuccessful());
-    QCOMPARE(metadata.warnings.size(), std::size_t{1});
-    QVERIFY(!metadata.warnings.front().displayText.empty());
-    QVERIFY(metadata.dataSourceProvenance == std::string("test source"));
+    QCOMPARE(metadata.warningCount(), std::size_t{1});
+    QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed));
+    QVERIFY(metadata.effectiveDataValidityRange == &validityRange);
+    QVERIFY(metadata.dataSourceProvenance == std::string_view{"test source"});
     QVERIFY(skygate::ephemeris::hasCorrectionFlag(
         metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
     ));
@@ -225,12 +233,13 @@ void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
         static_cast<std::uint8_t>(state.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
     );
-    QVERIFY(state.metadata.warnings.empty());
+    QCOMPARE(state.metadata.warningCount(), std::size_t{0});
 }
 
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisResultStatus>);
+static_assert(sizeof(skygate::ephemeris::EphemerisResultMetadata) <= 64);
 
 QTEST_MAIN(EphemerisApiModelTests)
 
