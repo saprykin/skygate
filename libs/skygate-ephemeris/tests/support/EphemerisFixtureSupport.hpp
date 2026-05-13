@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 
 namespace skygate::ephemeris::tests {
@@ -41,9 +42,18 @@ struct EphemerisRaDecFixture {
     return rightAscensionHours * 15.0;
 }
 
+[[nodiscard]] inline bool hasFiniteCoordinates(const EphemerisRaDecExpectation& expectation) noexcept
+{
+    return std::isfinite(expectation.rightAscensionHours) && std::isfinite(expectation.declinationDegrees);
+}
+
 [[nodiscard]] inline double
 angularSeparationDegrees(const EphemerisRaDecExpectation& lhs, const EphemerisRaDecExpectation& rhs) noexcept
 {
+    if (!hasFiniteCoordinates(lhs) || !hasFiniteCoordinates(rhs)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+
     constexpr double kDegreesToRadians = 3.141592653589793238462643383279502884 / 180.0;
     constexpr double kRadiansToDegrees = 180.0 / 3.141592653589793238462643383279502884;
 
@@ -62,6 +72,11 @@ angularSeparationDegrees(const EphemerisRaDecExpectation& lhs, const EphemerisRa
     const EphemerisRaDecExpectation& actual, const EphemerisRaDecExpectation& expected, const double toleranceDegrees
 ) noexcept
 {
+    if (!hasFiniteCoordinates(actual) || !hasFiniteCoordinates(expected) || !std::isfinite(toleranceDegrees)
+        || toleranceDegrees < 0.0) {
+        return false;
+    }
+
     return angularSeparationDegrees(actual, expected) <= toleranceDegrees;
 }
 

@@ -1,3 +1,3 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ddc95b96987fce766ee25cad0a509546d405e768b8b7f162038e7b4f9bbb2526
-size 373
+# source,target,center,epoch_jd_tdb,x_au,y_au,z_au,expected_ra_hours,expected_dec_deg,tolerance_deg
+# JPL Horizons vectors, COMMAND="499", CENTER="399", EPHEM_TYPE=VECTORS, REF_PLANE=FRAME, OUT_UNITS=AU-D, VEC_TABLE=2
+JPL Horizons,499,399,2460310.500000000,-1.274935030596002E-01,-2.211390407247969E+00,-9.840400192216817E-01,17.780024903465446,-23.953152259288466,1.0E-12
