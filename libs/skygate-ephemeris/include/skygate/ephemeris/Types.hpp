@@ -153,7 +153,11 @@ daysFromCivilDate(const int astronomicalYear, const int month, const int day) no
     if (dateTime.hour < 0 || dateTime.hour > 23 || dateTime.minute < 0 || dateTime.minute > 59) {
         return false;
     }
-    if (dateTime.second < 0 || dateTime.second > 59) {
+    if (dateTime.second < 0 || dateTime.second > 60) {
+        return false;
+    }
+    if (dateTime.second == 60
+        && (dateTime.timeScale != TimeScale::Utc || dateTime.hour != 23 || dateTime.minute != 59)) {
         return false;
     }
 
