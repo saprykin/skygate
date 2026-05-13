@@ -14,6 +14,7 @@ namespace {
 
 constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial and terrestrial frame transform";
 constexpr double kArcsecondsToRadians = 4.8481368110953599359e-6;
+constexpr double kSecondsPerDay = 86'400.0;
 
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
 {
@@ -94,6 +95,16 @@ multiplyTranspose(const Matrix3x3& matrix, const CelestialFrameVector& vector) n
         .y = matrix[0][1] * vector.x + matrix[1][1] * vector.y + matrix[2][1] * vector.z,
         .z = matrix[0][2] * vector.x + matrix[1][2] * vector.y + matrix[2][2] * vector.z,
     };
+}
+
+[[nodiscard]] AstronomicalEpoch
+addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
+{
+    return normalizedAstronomicalEpoch(AstronomicalEpoch{
+        .julianDatePart1 = epoch.julianDatePart1,
+        .julianDatePart2 = epoch.julianDatePart2 + seconds / kSecondsPerDay,
+        .timeScale = targetScale,
+    });
 }
 
 [[nodiscard]] Matrix3x3 earthRotationMatrix(const double earthRotationAngle) noexcept
@@ -227,6 +238,26 @@ struct FrameTransformContext {
         return earthOrientationSample;
     }
 
+    [[nodiscard]] std::optional<AstronomicalEpoch> ut1Epoch(EphemerisResultMetadata& metadata) const
+    {
+        if (!isFiniteEpoch(request.epoch)) {
+            metadata.status = EphemerisResultStatus::Failed;
+            metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+            return std::nullopt;
+        }
+
+        if (request.epoch.timeScale == TimeScale::Ut1 || earthOrientationProvider == nullptr) {
+            return epochInScale(TimeScale::Ut1, metadata);
+        }
+
+        const std::optional<EarthOrientationSample> sample = earthOrientation(metadata);
+        if (!sample.has_value()) {
+            return std::nullopt;
+        }
+
+        return addSeconds(sample->requestedUtcEpoch, sample->ut1MinusUtcSeconds, TimeScale::Ut1);
+    }
+
 private:
     [[nodiscard]] std::optional<TimeScaleConversionResult>* conversionCacheFor(const TimeScale targetScale) const
     {
@@ -270,7 +301,7 @@ celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisResul
 [[nodiscard]] std::optional<Matrix3x3>
 intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context, EphemerisResultMetadata& metadata)
 {
-    const std::optional<AstronomicalEpoch> ut1Epoch = context.epochInScale(TimeScale::Ut1, metadata);
+    const std::optional<AstronomicalEpoch> ut1Epoch = context.ut1Epoch(metadata);
     if (!ut1Epoch.has_value()) {
         return std::nullopt;
     }
@@ -405,8 +436,12 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
     CelestialFrameVector transformed = request.vector;
     if (sourceRank < targetRank) {
         for (std::uint8_t lowerRank = sourceRank; lowerRank < targetRank; ++lowerRank) {
-            CelestialFrameTransformStageMetadata stage =
-                makeStageMetadata(frameForRank(lowerRank), frameForRank(static_cast<std::uint8_t>(lowerRank + 1U)));
+            const CelestialReferenceFrame stageSourceFrame =
+                lowerRank == sourceRank ? request.sourceFrame : frameForRank(lowerRank);
+            const std::uint8_t upperRank = static_cast<std::uint8_t>(lowerRank + 1U);
+            const CelestialReferenceFrame stageTargetFrame =
+                upperRank == targetRank ? request.targetFrame : frameForRank(upperRank);
+            CelestialFrameTransformStageMetadata stage = makeStageMetadata(stageSourceFrame, stageTargetFrame);
             const std::optional<Matrix3x3> matrix = stageMatrix(context, lowerRank, stage.metadata);
             if (!matrix.has_value()) {
                 mergeStageMetadata(result.metadata, stage.metadata);
@@ -423,8 +458,11 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
     } else {
         for (std::uint8_t lowerRank = sourceRank; lowerRank > targetRank; --lowerRank) {
             const std::uint8_t stageLowerRank = static_cast<std::uint8_t>(lowerRank - 1U);
-            CelestialFrameTransformStageMetadata stage =
-                makeStageMetadata(frameForRank(lowerRank), frameForRank(stageLowerRank));
+            const CelestialReferenceFrame stageSourceFrame =
+                lowerRank == sourceRank ? request.sourceFrame : frameForRank(lowerRank);
+            const CelestialReferenceFrame stageTargetFrame =
+                stageLowerRank == targetRank ? request.targetFrame : frameForRank(stageLowerRank);
+            CelestialFrameTransformStageMetadata stage = makeStageMetadata(stageSourceFrame, stageTargetFrame);
             const std::optional<Matrix3x3> matrix = stageMatrix(context, stageLowerRank, stage.metadata);
             if (!matrix.has_value()) {
                 mergeStageMetadata(result.metadata, stage.metadata);
