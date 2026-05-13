@@ -31,6 +31,10 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
 )
 
 set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
+list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
+    src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
+    src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
+)
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
         src/engine/highprecision/ErfaAstrometry.hpp
