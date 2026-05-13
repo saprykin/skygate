@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "source": "JPL Horizons",
+    "sourceUrl": "https://ssd.jpl.nasa.gov/horizons/",
+    "apiParameters": "COMMAND=\"499\" CENTER=\"399\" EPHEM_TYPE=VECTORS REF_PLANE=FRAME OUT_UNITS=AU-D VEC_TABLE=2",
+    "generatedDate": "2026-05-13",
+    "sourceFrame": "ICRF",
+    "timeScale": "TDB",
+    "target": "Mars barycenter/body center (499)",
+    "observer": "Earth geocenter (399)"
+  },
+  "epoch": {
+    "julianDate": 2460310.5
+  },
+  "expected": {
+    "rightAscensionHours": 17.780024903465446,
+    "declinationDegrees": -23.953152259288466
+  },
+  "tolerance": {
+    "angularDegrees": 1.0e-12
+  }
+}
