@@ -34,6 +34,11 @@ include(SkyGateCoverage)
 option(SKYGATE_BUILD_UI "Build Qt UI application" ON)
 option(SKYGATE_BUILD_TESTS "Build tests" ON)
 option(SKYGATE_ENABLE_COVERAGE "Build tests with coverage instrumentation" OFF)
+option(
+    SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS
+    "Enable high-precision ephemeris dependency gates and tests"
+    OFF
+)
 
 set(SKYGATE_PACKAGE_ARCHITECTURE "" CACHE STRING "Architecture label used in package file names")
 if(SKYGATE_PACKAGE_ARCHITECTURE)

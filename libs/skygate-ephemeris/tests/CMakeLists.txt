@@ -60,6 +60,28 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     endif()
 endfunction()
 
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_executable(skygate-ephemeris-highprecision-dependency-smoke-tests
+        highprecision/HighPrecisionDependencySmokeTests.cpp
+    )
+    set_target_properties(skygate-ephemeris-highprecision-dependency-smoke-tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(skygate-ephemeris-highprecision-dependency-smoke-tests
+        PRIVATE
+            Qt6::Test
+            skygate::ephemeris-highprecision-dependencies
+    )
+    target_compile_features(skygate-ephemeris-highprecision-dependency-smoke-tests PRIVATE cxx_std_20)
+    add_test(
+        NAME skygate-ephemeris-highprecision-dependency-smoke-tests
+        COMMAND $<TARGET_FILE:skygate-ephemeris-highprecision-dependency-smoke-tests>
+    )
+    set_tests_properties(skygate-ephemeris-highprecision-dependency-smoke-tests
+        PROPERTIES
+            LABELS "unit;highprecision"
+            TIMEOUT 30
+    )
+endif()
+
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-payload-parser-tests
     catalog/CatalogPayloadParserTests.cpp
