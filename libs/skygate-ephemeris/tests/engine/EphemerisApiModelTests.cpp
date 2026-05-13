@@ -7,9 +7,43 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
+#include <vector>
+
+namespace {
+
+[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryTestBody()
+{
+    return {
+        .id = "vega",
+        .displayName = "Vega",
+        .type = skygate::ephemeris::CelestialBodyType::Star,
+        .fixedEquatorial =
+            skygate::core::EquatorialCoordinate{
+                .rightAscensionHours = 18.6156,
+                .declinationDeg = 38.7837,
+            },
+    };
+}
+
+class TestStarCatalog final : public skygate::ephemeris::IStarCatalog {
+public:
+    explicit TestStarCatalog(std::vector<skygate::ephemeris::CelestialBody> bodies) : m_bodies(std::move(bodies)) {}
+
+    [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> bodies() const override
+    {
+        return m_bodies;
+    }
+
+private:
+    std::vector<skygate::ephemeris::CelestialBody> m_bodies;
+};
+
+}  // namespace
 
 class EphemerisApiModelTests final : public QObject {
     Q_OBJECT
@@ -23,6 +57,7 @@ private slots:
     void constructsSimpleAndHighPrecisionFactoryRequests();
     void exposesFactoryFallbackPolicyHelpers();
     void constructsFactoryResultAndCreationDiagnostics();
+    void preservesSimpleFactoryCompatibilityOverloads();
     void constructsResultStatusAndWarningModels();
     void keepsLegacyBodyStateFieldsReadableWithMetadata();
     void simpleEngineExposesMetadataDefaults();
@@ -174,18 +209,7 @@ void EphemerisApiModelTests::constructsFactoryRequestDefaults()
 
 void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
 {
-    const std::array bodies{
-        skygate::ephemeris::CelestialBody{
-            .id = "vega",
-            .displayName = "Vega",
-            .type = skygate::ephemeris::CelestialBodyType::Star,
-            .fixedEquatorial =
-                skygate::core::EquatorialCoordinate{
-                    .rightAscensionHours = 18.6156,
-                    .declinationDeg = 38.7837,
-                },
-        },
-    };
+    const std::array bodies{makeFactoryTestBody()};
 
     skygate::ephemeris::EphemerisEngineFactoryRequest simpleRequest;
     simpleRequest.catalogBodies = bodies;
@@ -322,6 +346,61 @@ void EphemerisApiModelTests::constructsFactoryResultAndCreationDiagnostics()
     QVERIFY(strictFailureResult.hasDiagnostics());
     QVERIFY(strictFailureResult.hasErrors());
     QCOMPARE(strictFailureResult.diagnostics.size(), std::size_t{1});
+}
+
+void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
+{
+    skygate::core::SkyContext context;
+    context.observer = {
+        .latitudeDeg = 37.7749,
+        .longitudeDeg = -122.4194,
+        .elevationMeters = 10.0,
+    };
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    const auto emptyEngine = skygate::ephemeris::createEphemerisEngine();
+    QVERIFY(emptyEngine != nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(emptyEngine->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QVERIFY(emptyEngine->compute(context).states.empty());
+
+    const std::array bodies{makeFactoryTestBody()};
+    const auto spanEngine =
+        skygate::ephemeris::createEphemerisEngine(std::span<const skygate::ephemeris::CelestialBody>{
+            bodies.data(),
+            bodies.size(),
+        });
+    QVERIFY(spanEngine != nullptr);
+
+    const auto spanState = spanEngine->computeBodyState(context, "vega");
+    QVERIFY(spanState.has_value());
+    QCOMPARE(spanState->bodyIndex, 0U);
+    QCOMPARE(spanState->equatorial.rightAscensionHours, 18.6156);
+    QCOMPARE(spanState->equatorial.declinationDeg, 38.7837);
+
+    const TestStarCatalog catalog({makeFactoryTestBody()});
+    const auto catalogEngine = skygate::ephemeris::createEphemerisEngine(catalog);
+    QVERIFY(catalogEngine != nullptr);
+
+    const auto catalogState = catalogEngine->computeBodyState(context, std::uint32_t{0});
+    QVERIFY(catalogState.has_value());
+    QCOMPARE(catalogState->bodyIndex, 0U);
+    QCOMPARE(catalogState->equatorial.rightAscensionHours, spanState->equatorial.rightAscensionHours);
+    QCOMPARE(catalogState->equatorial.declinationDeg, spanState->equatorial.declinationDeg);
+
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.catalogBodies = bodies;
+    const auto requestResult = skygate::ephemeris::createEphemerisEngine(request);
+    QVERIFY(requestResult.isSuccess());
+    QVERIFY(requestResult.engine != nullptr);
+    QVERIFY(!requestResult.usedSimpleEngineFallback());
+    QVERIFY(!requestResult.hasDiagnostics());
+    QCOMPARE(
+        static_cast<std::uint8_t>(requestResult.engine->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
 }
 
 void EphemerisApiModelTests::constructsResultStatusAndWarningModels()

@@ -92,6 +92,18 @@ void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOp
     }
 }
 
+[[nodiscard]] EphemerisEngineFactoryResult makeUnsupportedRequestResult()
+{
+    return EphemerisEngineFactoryResult::failure(
+        EphemerisFactoryCreationStatus::FailedInvalidRequest,
+        {EphemerisFactoryCreationDiagnostic{
+            EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
+            EphemerisFactoryCreationDiagnosticSeverity::Error,
+            "Only simple ephemeris engine factory requests are supported before high-precision construction is wired.",
+        }}
+    );
+}
+
 }  // namespace
 
 class SimpleEphemerisEngine final : public IEphemerisEngine {
@@ -296,9 +308,20 @@ private:
     PlanetEquatorialCalculator m_planetCalculator;
 };
 
+EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryRequest& request)
+{
+    if (request.engineKind != EphemerisEngineKind::Simple) {
+        return makeUnsupportedRequestResult();
+    }
+
+    return EphemerisEngineFactoryResult::success(std::make_unique<SimpleEphemerisEngine>(request.catalogBodies));
+}
+
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine()
 {
-    return std::make_unique<SimpleEphemerisEngine>(std::span<const CelestialBody>{});
+    EphemerisEngineFactoryRequest request;
+    EphemerisEngineFactoryResult result = createEphemerisEngine(request);
+    return std::move(result.engine);
 }
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog)
@@ -308,7 +331,10 @@ std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& cata
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const CelestialBody> bodies)
 {
-    return std::make_unique<SimpleEphemerisEngine>(bodies);
+    EphemerisEngineFactoryRequest request;
+    request.catalogBodies = bodies;
+    EphemerisEngineFactoryResult result = createEphemerisEngine(request);
+    return std::move(result.engine);
 }
 
 }  // namespace skygate::ephemeris
