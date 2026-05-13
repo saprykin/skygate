@@ -274,7 +274,7 @@ private:
     mutable EphemerisCorrectionFlags m_lastFlags = EphemerisCorrectionFlags::NoCorrections;
 };
 
-class StubEarthOrientationProvider final : public IEarthOrientationProvider {};
+class StubEarthOrientationProvider final : public skygate::ephemeris::highprecision::IEarthOrientationProvider {};
 class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionCalculator {};
 
 [[nodiscard]] HighPrecisionEphemerisEngineDependencies makeDependencies(
