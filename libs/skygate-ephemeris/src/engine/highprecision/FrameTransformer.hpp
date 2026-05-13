@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace skygate::ephemeris::highprecision {
 
@@ -29,9 +30,17 @@ struct CelestialFrameTransformRequest {
     CelestialFrameVector vector;
 };
 
+struct CelestialFrameTransformStageMetadata {
+    CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
+    CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
+    bool applied = false;
+    EphemerisResultMetadata metadata;
+};
+
 struct CelestialFrameTransformResult {
     std::optional<CelestialFrameVector> vector;
     EphemerisResultMetadata metadata;
+    std::vector<CelestialFrameTransformStageMetadata> stages;
 };
 
 class IFrameTransformer {

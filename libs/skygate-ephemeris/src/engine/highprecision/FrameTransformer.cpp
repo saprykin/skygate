@@ -42,6 +42,22 @@ constexpr double kArcsecondsToRadians = 4.8481368110953599359e-6;
     return 0U;
 }
 
+[[nodiscard]] CelestialReferenceFrame frameForRank(const std::uint8_t rank) noexcept
+{
+    switch (rank) {
+    case 0U:
+        return CelestialReferenceFrame::Gcrs;
+    case 1U:
+        return CelestialReferenceFrame::Cirs;
+    case 2U:
+        return CelestialReferenceFrame::Tirs;
+    case 3U:
+        return CelestialReferenceFrame::Itrs;
+    default:
+        return CelestialReferenceFrame::Gcrs;
+    }
+}
+
 [[nodiscard]] CelestialFrameTransformResult makeFailedResult(const EphemerisWarningCode warningCode)
 {
     CelestialFrameTransformResult result;
@@ -132,83 +148,108 @@ void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const Eart
     }
 }
 
-[[nodiscard]] std::optional<AstronomicalEpoch> terrestrialTimeEpoch(
-    const AstronomicalEpoch& epoch,
-    const skygate::ephemeris::ITimeScaleService* timeScaleService,
-    EphemerisResultMetadata& metadata
-)
-{
-    if (!isFiniteEpoch(epoch)) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
-        return std::nullopt;
-    }
+struct FrameTransformContext {
+    const CelestialFrameTransformRequest& request;
+    const skygate::ephemeris::ITimeScaleService* timeScaleService = nullptr;
+    const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider = nullptr;
+    mutable std::optional<TimeScaleConversionResult> ttConversion;
+    mutable std::optional<TimeScaleConversionResult> utcConversion;
+    mutable std::optional<TimeScaleConversionResult> ut1Conversion;
+    mutable bool earthOrientationSampleComputed = false;
+    mutable EarthOrientationSample earthOrientationSample;
 
-    if (epoch.timeScale == TimeScale::Tt) {
-        return normalizedAstronomicalEpoch(epoch);
-    }
+    [[nodiscard]] std::optional<AstronomicalEpoch>
+    epochInScale(TimeScale targetScale, EphemerisResultMetadata& metadata) const
+    {
+        if (!isFiniteEpoch(request.epoch)) {
+            metadata.status = EphemerisResultStatus::Failed;
+            metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+            return std::nullopt;
+        }
 
-    if (timeScaleService == nullptr) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
+        if (request.epoch.timeScale == targetScale) {
+            return normalizedAstronomicalEpoch(request.epoch);
+        }
 
-    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, TimeScale::Tt);
-    if (!conversion.isSuccess()) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
+        if (timeScaleService == nullptr) {
+            metadata.status = EphemerisResultStatus::Failed;
+            metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            return std::nullopt;
+        }
 
-    if (conversion.status == TimeScaleConversionStatus::Degraded) {
+        std::optional<TimeScaleConversionResult>* cachedConversion = conversionCacheFor(targetScale);
+        if (cachedConversion == nullptr) {
+            metadata.status = EphemerisResultStatus::Failed;
+            metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            return std::nullopt;
+        }
+        if (!cachedConversion->has_value()) {
+            *cachedConversion = timeScaleService->convert(request.epoch, targetScale);
+        }
+
+        const TimeScaleConversionResult& conversion = **cachedConversion;
+        if (!conversion.isSuccess()) {
+            metadata.status = EphemerisResultStatus::Failed;
+            metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            return std::nullopt;
+        }
+
         mergeTimeScaleWarnings(metadata, conversion);
+        return conversion.epoch;
     }
 
-    return conversion.epoch;
-}
+    [[nodiscard]] std::optional<EarthOrientationSample> earthOrientation(EphemerisResultMetadata& metadata) const
+    {
+        const std::optional<AstronomicalEpoch> utcEpoch = epochInScale(TimeScale::Utc, metadata);
+        if (!utcEpoch.has_value()) {
+            return std::nullopt;
+        }
 
-[[nodiscard]] std::optional<AstronomicalEpoch> epochInScale(
-    const AstronomicalEpoch& epoch,
-    const TimeScale targetScale,
-    const skygate::ephemeris::ITimeScaleService* timeScaleService,
-    EphemerisResultMetadata& metadata
-)
+        if (!earthOrientationSampleComputed) {
+            earthOrientationSample = sampleEarthOrientation(
+                earthOrientationProvider,
+                *utcEpoch,
+                EarthOrientationSampleOptions{
+                    .allowOutOfRangeNearestSampleFallback = true,
+                    .allowMissingDataZeroFallback = true,
+                }
+            );
+            earthOrientationSampleComputed = true;
+        }
+
+        if (!earthOrientationSample.isSuccess()) {
+            metadata.status = EphemerisResultStatus::Failed;
+            metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            return std::nullopt;
+        }
+
+        mergeEarthOrientationWarnings(metadata, earthOrientationSample);
+        return earthOrientationSample;
+    }
+
+private:
+    [[nodiscard]] std::optional<TimeScaleConversionResult>* conversionCacheFor(const TimeScale targetScale) const
+    {
+        switch (targetScale) {
+        case TimeScale::Tt:
+            return &ttConversion;
+        case TimeScale::Utc:
+            return &utcConversion;
+        case TimeScale::Ut1:
+            return &ut1Conversion;
+        case TimeScale::Tai:
+        case TimeScale::Tdb:
+            return nullptr;
+        }
+
+        return nullptr;
+    }
+};
+
+[[nodiscard]] std::optional<Matrix3x3>
+celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisResultMetadata& metadata)
 {
-    if (!isFiniteEpoch(epoch)) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
-        return std::nullopt;
-    }
-
-    if (epoch.timeScale == targetScale) {
-        return normalizedAstronomicalEpoch(epoch);
-    }
-
-    if (timeScaleService == nullptr) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
-
-    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, targetScale);
-    if (!conversion.isSuccess()) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
-
-    mergeTimeScaleWarnings(metadata, conversion);
-    return conversion.epoch;
-}
-
-[[nodiscard]] std::optional<Matrix3x3> celestialIntermediateMatrix(
-    const CelestialFrameTransformRequest& request,
-    const skygate::ephemeris::ITimeScaleService* timeScaleService,
-    EphemerisResultMetadata& metadata
-)
-{
-    const std::optional<AstronomicalEpoch> ttEpoch = terrestrialTimeEpoch(request.epoch, timeScaleService, metadata);
+    const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, metadata);
     if (!ttEpoch.has_value()) {
         return std::nullopt;
     }
@@ -226,14 +267,10 @@ void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const Eart
     return celestialToIntermediate;
 }
 
-[[nodiscard]] std::optional<Matrix3x3> intermediateToTerrestrialIntermediateMatrix(
-    const CelestialFrameTransformRequest& request,
-    const skygate::ephemeris::ITimeScaleService* timeScaleService,
-    EphemerisResultMetadata& metadata
-)
+[[nodiscard]] std::optional<Matrix3x3>
+intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context, EphemerisResultMetadata& metadata)
 {
-    const std::optional<AstronomicalEpoch> ut1Epoch =
-        epochInScale(request.epoch, TimeScale::Ut1, timeScaleService, metadata);
+    const std::optional<AstronomicalEpoch> ut1Epoch = context.epochInScale(TimeScale::Ut1, metadata);
     if (!ut1Epoch.has_value()) {
         return std::nullopt;
     }
@@ -251,35 +288,14 @@ void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const Eart
     return earthRotationMatrix(*earthRotationAngle);
 }
 
-[[nodiscard]] std::optional<Matrix3x3> terrestrialIntermediateToTerrestrialMatrix(
-    const CelestialFrameTransformRequest& request,
-    const skygate::ephemeris::ITimeScaleService* timeScaleService,
-    const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider,
-    EphemerisResultMetadata& metadata
-)
+[[nodiscard]] std::optional<Matrix3x3>
+terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context, EphemerisResultMetadata& metadata)
 {
-    const std::optional<AstronomicalEpoch> ttEpoch =
-        epochInScale(request.epoch, TimeScale::Tt, timeScaleService, metadata);
-    const std::optional<AstronomicalEpoch> utcEpoch =
-        epochInScale(request.epoch, TimeScale::Utc, timeScaleService, metadata);
-    if (!ttEpoch.has_value() || !utcEpoch.has_value()) {
+    const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, metadata);
+    const std::optional<EarthOrientationSample> earthOrientationSample = context.earthOrientation(metadata);
+    if (!ttEpoch.has_value() || !earthOrientationSample.has_value()) {
         return std::nullopt;
     }
-
-    const EarthOrientationSample earthOrientationSample = sampleEarthOrientation(
-        earthOrientationProvider,
-        *utcEpoch,
-        EarthOrientationSampleOptions{
-            .allowOutOfRangeNearestSampleFallback = true,
-            .allowMissingDataZeroFallback = true,
-        }
-    );
-    if (!earthOrientationSample.isSuccess()) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return std::nullopt;
-    }
-    mergeEarthOrientationWarnings(metadata, earthOrientationSample);
 
     const std::optional<double> tioLocator = tioLocatorS00(JulianDateParts{
         .day1 = ttEpoch->julianDatePart1,
@@ -292,8 +308,8 @@ void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const Eart
     }
 
     const std::optional<Matrix3x3> polarMotionMatrix = polarMotionMatrix00(
-        earthOrientationSample.polarMotionXArcseconds * kArcsecondsToRadians,
-        earthOrientationSample.polarMotionYArcseconds * kArcsecondsToRadians,
+        earthOrientationSample->polarMotionXArcseconds * kArcsecondsToRadians,
+        earthOrientationSample->polarMotionYArcseconds * kArcsecondsToRadians,
         *tioLocator
     );
     if (!polarMotionMatrix.has_value()) {
@@ -305,28 +321,52 @@ void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const Eart
     return polarMotionMatrix;
 }
 
-[[nodiscard]] std::optional<Matrix3x3> stageMatrix(
-    const CelestialFrameTransformRequest& request,
-    const std::uint8_t lowerRank,
-    const skygate::ephemeris::ITimeScaleService* timeScaleService,
-    const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider,
-    EphemerisResultMetadata& metadata
-)
+[[nodiscard]] std::optional<Matrix3x3>
+stageMatrix(const FrameTransformContext& context, const std::uint8_t lowerRank, EphemerisResultMetadata& metadata)
 {
     switch (lowerRank) {
     case 0U:
-        return celestialIntermediateMatrix(request, timeScaleService, metadata);
+        return celestialIntermediateMatrix(context, metadata);
     case 1U:
-        return intermediateToTerrestrialIntermediateMatrix(request, timeScaleService, metadata);
+        return intermediateToTerrestrialIntermediateMatrix(context, metadata);
     case 2U:
-        return terrestrialIntermediateToTerrestrialMatrix(
-            request, timeScaleService, earthOrientationProvider, metadata
-        );
+        return terrestrialIntermediateToTerrestrialMatrix(context, metadata);
     default:
         metadata.status = EphemerisResultStatus::Failed;
         metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         return std::nullopt;
     }
+}
+
+void mergeStageMetadata(
+    EphemerisResultMetadata& aggregateMetadata, const EphemerisResultMetadata& stageMetadata
+) noexcept
+{
+    if (stageMetadata.status == EphemerisResultStatus::Failed) {
+        aggregateMetadata.status = EphemerisResultStatus::Failed;
+    } else if (stageMetadata.status == EphemerisResultStatus::Degraded
+               && aggregateMetadata.status == EphemerisResultStatus::Valid) {
+        aggregateMetadata.status = EphemerisResultStatus::Degraded;
+    }
+
+    aggregateMetadata.warningCodeMask |= stageMetadata.warningCodeMask;
+    aggregateMetadata.appliedCorrections |= stageMetadata.appliedCorrections;
+}
+
+[[nodiscard]] CelestialFrameTransformStageMetadata
+makeStageMetadata(const CelestialReferenceFrame sourceFrame, const CelestialReferenceFrame targetFrame)
+{
+    CelestialFrameTransformStageMetadata stage;
+    stage.sourceFrame = sourceFrame;
+    stage.targetFrame = targetFrame;
+    stage.metadata.status = EphemerisResultStatus::Valid;
+    stage.metadata.dataSourceProvenance = kFrameTransformProvenance;
+    return stage;
+}
+
+[[nodiscard]] constexpr EphemerisCorrectionFlags correctionForStage(const std::uint8_t lowerRank) noexcept
+{
+    return lowerRank == 0U ? EphemerisCorrectionFlags::PrecessionNutation : EphemerisCorrectionFlags::EarthOrientation;
 }
 
 }  // namespace
@@ -357,42 +397,46 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
     result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
 
+    const FrameTransformContext context{
+        .request = request,
+        .timeScaleService = m_timeScaleService.get(),
+        .earthOrientationProvider = m_earthOrientationProvider.get(),
+    };
     CelestialFrameVector transformed = request.vector;
     if (sourceRank < targetRank) {
         for (std::uint8_t lowerRank = sourceRank; lowerRank < targetRank; ++lowerRank) {
-            const std::optional<Matrix3x3> matrix = stageMatrix(
-                request, lowerRank, m_timeScaleService.get(), m_earthOrientationProvider.get(), result.metadata
-            );
+            CelestialFrameTransformStageMetadata stage =
+                makeStageMetadata(frameForRank(lowerRank), frameForRank(static_cast<std::uint8_t>(lowerRank + 1U)));
+            const std::optional<Matrix3x3> matrix = stageMatrix(context, lowerRank, stage.metadata);
             if (!matrix.has_value()) {
+                mergeStageMetadata(result.metadata, stage.metadata);
+                result.stages.push_back(std::move(stage));
                 return result;
             }
 
             transformed = multiply(*matrix, transformed);
-            if (lowerRank == 0U) {
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::PrecessionNutation;
-            } else {
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::EarthOrientation;
-            }
+            stage.applied = true;
+            stage.metadata.appliedCorrections = correctionForStage(lowerRank);
+            mergeStageMetadata(result.metadata, stage.metadata);
+            result.stages.push_back(std::move(stage));
         }
     } else {
         for (std::uint8_t lowerRank = sourceRank; lowerRank > targetRank; --lowerRank) {
-            const std::optional<Matrix3x3> matrix = stageMatrix(
-                request,
-                static_cast<std::uint8_t>(lowerRank - 1U),
-                m_timeScaleService.get(),
-                m_earthOrientationProvider.get(),
-                result.metadata
-            );
+            const std::uint8_t stageLowerRank = static_cast<std::uint8_t>(lowerRank - 1U);
+            CelestialFrameTransformStageMetadata stage =
+                makeStageMetadata(frameForRank(lowerRank), frameForRank(stageLowerRank));
+            const std::optional<Matrix3x3> matrix = stageMatrix(context, stageLowerRank, stage.metadata);
             if (!matrix.has_value()) {
+                mergeStageMetadata(result.metadata, stage.metadata);
+                result.stages.push_back(std::move(stage));
                 return result;
             }
 
             transformed = multiplyTranspose(*matrix, transformed);
-            if (lowerRank == 1U) {
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::PrecessionNutation;
-            } else {
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::EarthOrientation;
-            }
+            stage.applied = true;
+            stage.metadata.appliedCorrections = correctionForStage(stageLowerRank);
+            mergeStageMetadata(result.metadata, stage.metadata);
+            result.stages.push_back(std::move(stage));
         }
     }
 
