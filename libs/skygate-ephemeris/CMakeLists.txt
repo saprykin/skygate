@@ -32,6 +32,8 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
 
 set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
 list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
+    src/engine/highprecision/ApparentPlaceCalculator.hpp
+    src/engine/highprecision/ApparentPlaceCalculator.cpp
     src/engine/highprecision/CalcephKernelProvider.hpp
     src/engine/highprecision/CalcephKernelProvider.cpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
