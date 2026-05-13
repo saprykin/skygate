@@ -45,6 +45,90 @@ struct EarthOrientationTableEntry {
     bool predicted = false;
 };
 
+enum class EarthOrientationSampleStatus : std::uint8_t {
+    Valid,
+    Degraded,
+    Failed
+};
+
+[[nodiscard]] constexpr std::string_view displayName(const EarthOrientationSampleStatus status) noexcept
+{
+    switch (status) {
+    case EarthOrientationSampleStatus::Valid:
+        return "valid";
+    case EarthOrientationSampleStatus::Degraded:
+        return "degraded";
+    case EarthOrientationSampleStatus::Failed:
+        return "failed";
+    }
+
+    return {};
+}
+
+enum class EarthOrientationSampleWarningCode : std::uint8_t {
+    StaleData,
+    PredictedData,
+    MissingData,
+    EpochOutsideRange,
+    InvalidInput
+};
+
+[[nodiscard]] constexpr std::string_view earthOrientationSampleWarningText(const EarthOrientationSampleWarningCode code
+) noexcept
+{
+    switch (code) {
+    case EarthOrientationSampleWarningCode::StaleData:
+        return "Earth-orientation data is stale for the requested epoch.";
+    case EarthOrientationSampleWarningCode::PredictedData:
+        return "Earth-orientation data uses a prediction for the requested epoch.";
+    case EarthOrientationSampleWarningCode::MissingData:
+        return "Earth-orientation data is unavailable.";
+    case EarthOrientationSampleWarningCode::EpochOutsideRange:
+        return "The requested epoch is outside the Earth-orientation data range.";
+    case EarthOrientationSampleWarningCode::InvalidInput:
+        return "The requested Earth-orientation input is invalid.";
+    }
+
+    return "Earth-orientation warning.";
+}
+
+[[nodiscard]] constexpr std::uint32_t earthOrientationSampleWarningMask(const EarthOrientationSampleWarningCode code
+) noexcept
+{
+    return 1U << static_cast<std::uint8_t>(code);
+}
+
+struct EarthOrientationSampleOptions {
+    bool allowOutOfRangeNearestSampleFallback = true;
+    bool allowMissingDataZeroFallback = false;
+};
+
+struct EarthOrientationSample {
+    AstronomicalEpoch requestedUtcEpoch;
+    double ut1MinusUtcSeconds = 0.0;
+    double polarMotionXArcseconds = 0.0;
+    double polarMotionYArcseconds = 0.0;
+    bool predicted = false;
+    EarthOrientationSampleStatus status = EarthOrientationSampleStatus::Failed;
+    std::uint32_t warningCodeMask = 0U;
+    std::string diagnosticText;
+
+    [[nodiscard]] bool isSuccess() const noexcept
+    {
+        return status == EarthOrientationSampleStatus::Valid || status == EarthOrientationSampleStatus::Degraded;
+    }
+
+    void addWarning(const EarthOrientationSampleWarningCode code) noexcept
+    {
+        warningCodeMask |= earthOrientationSampleWarningMask(code);
+    }
+
+    [[nodiscard]] bool hasWarning(const EarthOrientationSampleWarningCode code) const noexcept
+    {
+        return (warningCodeMask & earthOrientationSampleWarningMask(code)) != 0U;
+    }
+};
+
 struct EarthOrientationDataInfo {
     std::string version;
     std::string provenance;
@@ -102,6 +186,18 @@ struct EarthOrientationDataLoadResult {
 
 [[nodiscard]] EarthOrientationDataLoadResult loadEarthOrientationDataFromTextAsset(
     const EphemerisTextDataAsset& asset, const EarthOrientationDataLoadOptions& options = {}
+);
+
+[[nodiscard]] EarthOrientationSample sampleEarthOrientation(
+    const IEarthOrientationProvider* provider,
+    const AstronomicalEpoch& utcEpoch,
+    const EarthOrientationSampleOptions& options = {}
+);
+
+[[nodiscard]] EarthOrientationSample sampleEarthOrientation(
+    const std::shared_ptr<const IEarthOrientationProvider>& provider,
+    const AstronomicalEpoch& utcEpoch,
+    const EarthOrientationSampleOptions& options = {}
 );
 
 }  // namespace skygate::ephemeris

@@ -2,6 +2,7 @@
 
 #include <QtTest/QtTest>
 
+#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -74,6 +75,13 @@ private slots:
     void exposesPredictionIntervalMetadata();
     void exposesValidityRangeMetadata();
     void reportsStaleData();
+    void samplesExactRows();
+    void interpolatesBetweenRows();
+    void samplesAtRangeBoundaries();
+    void reportsOutOfRangeFallback();
+    void reportsOutOfRangeFailureWhenFallbackDisallowed();
+    void reportsStaleAndPredictedSamplesAsDegraded();
+    void reportsMissingDataFallback();
 };
 
 void EarthOrientationProviderTests::loadsValidDataFromSnapshot()
@@ -217,6 +225,149 @@ void EarthOrientationProviderTests::reportsStaleData()
         static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationDataStatus::Stale)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::samplesExactRows()
+{
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset());
+    QVERIFY(loadResult.isSuccess());
+
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 4, 1));
+
+    QVERIFY(sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Valid)
+    );
+    QCOMPARE(sample.ut1MinusUtcSeconds, 0.03142);
+    QCOMPARE(sample.polarMotionXArcseconds, 0.1123);
+    QCOMPARE(sample.polarMotionYArcseconds, 0.2187);
+    QVERIFY(!sample.predicted);
+    QVERIFY(!sample.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::interpolatesBetweenRows()
+{
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset());
+    QVERIFY(loadResult.isSuccess());
+
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 4, 16));
+
+    QVERIFY(sample.isSuccess());
+    QVERIFY(std::abs(sample.ut1MinusUtcSeconds - 0.03296) < 1.0e-10);
+    QVERIFY(std::abs(sample.polarMotionXArcseconds - 0.11515) < 1.0e-10);
+    QVERIFY(std::abs(sample.polarMotionYArcseconds - 0.21985) < 1.0e-10);
+    QVERIFY(sample.predicted);
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Degraded)
+    );
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::PredictedData));
+}
+
+void EarthOrientationProviderTests::samplesAtRangeBoundaries()
+{
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset());
+    QVERIFY(loadResult.isSuccess());
+
+    const skygate::ephemeris::EarthOrientationSample first =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 4, 1));
+    const skygate::ephemeris::EarthOrientationSample last =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 6, 1));
+
+    QVERIFY(first.isSuccess());
+    QVERIFY(last.isSuccess());
+    QVERIFY(!first.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::EpochOutsideRange));
+    QVERIFY(!last.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::EpochOutsideRange));
+    QCOMPARE(last.ut1MinusUtcSeconds, 0.03725);
+    QVERIFY(last.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::PredictedData));
+}
+
+void EarthOrientationProviderTests::reportsOutOfRangeFallback()
+{
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset());
+    QVERIFY(loadResult.isSuccess());
+
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 7, 1));
+
+    QVERIFY(sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Degraded)
+    );
+    QCOMPARE(sample.ut1MinusUtcSeconds, 0.03725);
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::EpochOutsideRange));
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::PredictedData));
+    QVERIFY(!sample.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::reportsOutOfRangeFailureWhenFallbackDisallowed()
+{
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset());
+    QVERIFY(loadResult.isSuccess());
+
+    skygate::ephemeris::EarthOrientationSampleOptions options;
+    options.allowOutOfRangeNearestSampleFallback = false;
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 3, 1), options);
+
+    QVERIFY(!sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Failed)
+    );
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::EpochOutsideRange));
+    QVERIFY(!sample.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::reportsStaleAndPredictedSamplesAsDegraded()
+{
+    skygate::ephemeris::EarthOrientationDataLoadOptions loadOptions;
+    loadOptions.referenceEpoch = epochForDate(2027, 1, 1);
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset(), loadOptions);
+    QVERIFY(loadResult.isSuccess());
+
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 5, 1));
+
+    QVERIFY(sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Degraded)
+    );
+    QVERIFY(sample.predicted);
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::StaleData));
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::PredictedData));
+    QVERIFY(!sample.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::reportsMissingDataFallback()
+{
+    skygate::ephemeris::EarthOrientationSampleOptions options;
+    options.allowMissingDataZeroFallback = true;
+
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(nullptr, epochForDate(2026, 5, 1), options);
+
+    QVERIFY(sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Degraded)
+    );
+    QCOMPARE(sample.ut1MinusUtcSeconds, 0.0);
+    QCOMPARE(sample.polarMotionXArcseconds, 0.0);
+    QCOMPARE(sample.polarMotionYArcseconds, 0.0);
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::MissingData));
+    QVERIFY(!sample.diagnosticText.empty());
 }
 
 QTEST_MAIN(EarthOrientationProviderTests)
