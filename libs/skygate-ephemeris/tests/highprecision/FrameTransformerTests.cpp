@@ -170,6 +170,9 @@ private slots:
     void transformsCirsToTirsAgainstSofaReference();
     void transformsTirsToItrsAgainstSofaReference();
     void transformsGcrsToItrsAgainstSofaReference();
+    void recordsPerStageMetadataForComposedTransforms();
+    void reusesTimeScaleConversionsAcrossComposedStages();
+    void recordsUnavailableStageWhenTransformCannotBeComputed();
     void degradesItrsTransformForPredictedEarthOrientationData();
     void degradesItrsTransformForStaleEarthOrientationData();
     void degradesItrsTransformForMissingEarthOrientationData();
@@ -366,6 +369,103 @@ void FrameTransformerTests::transformsGcrsToItrsAgainstSofaReference()
         static_cast<std::uint32_t>(
             EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation
         )
+    );
+}
+
+void FrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Gcrs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(result.stages.size(), static_cast<std::size_t>(3U));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages[0].sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages[0].targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.stages[0].metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::PrecessionNutation)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages[1].sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages[1].targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Tirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages[2].sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Tirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages[2].targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Itrs)
+    );
+
+    for (const CelestialFrameTransformStageMetadata& stage : result.stages) {
+        QVERIFY(stage.applied);
+        QCOMPARE(
+            static_cast<std::uint8_t>(stage.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        );
+        QVERIFY(!stage.metadata.dataSourceProvenance.empty());
+    }
+}
+
+void FrameTransformerTests::reusesTimeScaleConversionsAcrossComposedStages()
+{
+    auto service = frameTimeScaleService();
+    const ErfaFrameTransformer transformer(service, earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Gcrs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch =
+            {
+                .julianDatePart1 = 2'400'000.5,
+                .julianDatePart2 = 53'736.0,
+                .timeScale = TimeScale::Tai,
+            },
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(service->convertCallCount, 3);
+}
+
+void FrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed()
+{
+    const ErfaFrameTransformer transformer(nullptr);
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Gcrs,
+        .targetFrame = CelestialReferenceFrame::Cirs,
+        .epoch = utcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(!result.vector.has_value());
+    QCOMPARE(result.stages.size(), static_cast<std::size_t>(1U));
+    QVERIFY(!result.stages.front().applied);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.front().metadata.status),
+        static_cast<std::uint8_t>(EphemerisResultStatus::Failed)
+    );
+    QVERIFY(result.stages.front().metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::NoCorrections)
     );
 }
 
