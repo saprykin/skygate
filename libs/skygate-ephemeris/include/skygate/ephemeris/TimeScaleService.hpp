@@ -45,7 +45,8 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
     EarthOrientationDataPredicted,
     EpochOutsideEarthOrientationData,
     DeltaTFallbackApplied,
-    DeltaTUnavailable
+    DeltaTUnavailable,
+    EarthOrientationDataEstimated
 };
 
 [[nodiscard]] constexpr std::string_view timeScaleConversionWarningText(const TimeScaleConversionWarningCode code
@@ -78,6 +79,8 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
         return "A degraded Delta T fallback was applied.";
     case TimeScaleConversionWarningCode::DeltaTUnavailable:
         return "Delta T data is unavailable for this conversion.";
+    case TimeScaleConversionWarningCode::EarthOrientationDataEstimated:
+        return "Earth-orientation data uses an estimate for this conversion.";
     }
 
     return "Time-scale conversion warning.";

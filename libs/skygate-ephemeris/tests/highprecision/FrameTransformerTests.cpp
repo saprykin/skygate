@@ -155,7 +155,9 @@ private:
 }
 
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider(
-    const bool predicted = false, const EarthOrientationDataStatus status = EarthOrientationDataStatus::Available
+    const bool predicted = false,
+    const EarthOrientationDataStatus status = EarthOrientationDataStatus::Available,
+    const bool estimated = false
 )
 {
     EarthOrientationDataInfo info;
@@ -170,6 +172,7 @@ private:
     entry.polarMotionXArcseconds = 0.05260995057240829;
     entry.polarMotionYArcseconds = 0.38372663963244913;
     entry.predicted = predicted;
+    entry.estimated = estimated;
 
     return std::make_shared<TableBackedEarthOrientationProvider>(
         std::move(info), std::vector<EarthOrientationTableEntry>{entry}
@@ -226,6 +229,7 @@ private slots:
     void recordsUnavailableStageWhenTransformCannotBeComputed();
     void degradesItrsTransformForPredictedEarthOrientationData();
     void degradesItrsTransformForStaleEarthOrientationData();
+    void degradesItrsTransformForEstimatedEarthOrientationData();
     void degradesItrsTransformForMissingEarthOrientationData();
 };
 
@@ -303,6 +307,25 @@ void FrameTransformerTests::treatsIcrsAndGcrsAsIdentityCelestialAxes()
         static_cast<std::uint32_t>(result.metadata.appliedCorrections),
         static_cast<std::uint32_t>(EphemerisCorrectionFlags::NoCorrections)
     );
+    QCOMPARE(result.stages.size(), static_cast<std::size_t>(1U));
+    QVERIFY(!result.stages.front().applied);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.front().sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Icrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.front().targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.front().metadata.status),
+        static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.stages.front().metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::NoCorrections)
+    );
+    QVERIFY(!result.stages.front().metadata.dataSourceProvenance.empty());
 }
 
 void FrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
@@ -623,6 +646,26 @@ void FrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(
         frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Stale)
+    );
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Tirs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+}
+
+void FrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationData()
+{
+    const ErfaFrameTransformer transformer(
+        frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Estimated)
     );
 
     const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{

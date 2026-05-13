@@ -4,6 +4,7 @@
 #include "engine/highprecision/ErfaAstrometry.hpp"
 #endif
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -349,6 +350,8 @@ timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampleWarningC
         return TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData;
     case EarthOrientationSampleWarningCode::InvalidInput:
         return TimeScaleConversionWarningCode::InvalidInput;
+    case EarthOrientationSampleWarningCode::EstimatedData:
+        return TimeScaleConversionWarningCode::EarthOrientationDataEstimated;
     }
 
     return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
@@ -356,10 +359,16 @@ timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampleWarningC
 
 void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const EarthOrientationSample& sample) noexcept
 {
-    for (std::uint8_t codeIndex = 0U;
-         codeIndex <= static_cast<std::uint8_t>(EarthOrientationSampleWarningCode::InvalidInput);
-         ++codeIndex) {
-        const auto sampleCode = static_cast<EarthOrientationSampleWarningCode>(codeIndex);
+    constexpr std::array kSampleWarningCodes{
+        EarthOrientationSampleWarningCode::StaleData,
+        EarthOrientationSampleWarningCode::PredictedData,
+        EarthOrientationSampleWarningCode::MissingData,
+        EarthOrientationSampleWarningCode::EpochOutsideRange,
+        EarthOrientationSampleWarningCode::InvalidInput,
+        EarthOrientationSampleWarningCode::EstimatedData,
+    };
+
+    for (const EarthOrientationSampleWarningCode sampleCode : kSampleWarningCodes) {
         if (sample.hasWarning(sampleCode)) {
             result.addWarning(timeScaleWarningFromEarthOrientationWarning(sampleCode));
         }

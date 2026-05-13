@@ -252,7 +252,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 [[nodiscard]] bool parseEntryLine(std::string_view line, EarthOrientationTableEntry& entry) noexcept
 {
     const std::vector<std::string_view> columns = splitCsvLine(line);
-    if (columns.size() != 4U && columns.size() != 5U) {
+    if (columns.size() < 4U || columns.size() > 6U) {
         return false;
     }
 
@@ -261,11 +261,15 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     double polarMotionXArcseconds = 0.0;
     double polarMotionYArcseconds = 0.0;
     bool predicted = false;
+    bool estimated = false;
     if (!effectiveDate.has_value() || !parseDouble(columns[1], ut1MinusUtcSeconds)
         || !parseDouble(columns[2], polarMotionXArcseconds) || !parseDouble(columns[3], polarMotionYArcseconds)) {
         return false;
     }
     if (columns.size() == 5U && !parseBool(columns[4], predicted)) {
+        return false;
+    }
+    if (columns.size() == 6U && (!parseBool(columns[4], predicted) || !parseBool(columns[5], estimated))) {
         return false;
     }
 
@@ -280,6 +284,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     entry.polarMotionXArcseconds = polarMotionXArcseconds;
     entry.polarMotionYArcseconds = polarMotionYArcseconds;
     entry.predicted = predicted;
+    entry.estimated = estimated;
     return true;
 }
 
@@ -364,6 +369,7 @@ sampleFromEntry(const AstronomicalEpoch& requestedEpoch, const EarthOrientationT
     sample.polarMotionXArcseconds = entry.polarMotionXArcseconds;
     sample.polarMotionYArcseconds = entry.polarMotionYArcseconds;
     sample.predicted = entry.predicted;
+    sample.estimated = entry.estimated;
     sample.status = EarthOrientationSampleStatus::Valid;
     sample.diagnosticText = "Earth-orientation sample resolved.";
     return sample;
@@ -394,6 +400,7 @@ sampleFromEntry(const AstronomicalEpoch& requestedEpoch, const EarthOrientationT
     sample.polarMotionYArcseconds =
         lower.polarMotionYArcseconds + (upper.polarMotionYArcseconds - lower.polarMotionYArcseconds) * ratio;
     sample.predicted = lower.predicted || upper.predicted;
+    sample.estimated = lower.estimated || upper.estimated;
     sample.status = EarthOrientationSampleStatus::Valid;
     sample.diagnosticText = "Earth-orientation sample interpolated.";
     return sample;
@@ -406,6 +413,11 @@ void applyDataWarnings(
     if (info.status == EarthOrientationDataStatus::Stale
         || (info.expiresAt.has_value() && epochAfter(utcEpoch, *info.expiresAt))) {
         addSampleWarning(sample, EarthOrientationSampleWarningCode::StaleData);
+    }
+
+    if (info.status == EarthOrientationDataStatus::Estimated || sample.estimated) {
+        sample.estimated = true;
+        addSampleWarning(sample, EarthOrientationSampleWarningCode::EstimatedData);
     }
 
     if (sample.predicted || (info.predictionRange.has_value() && epochInRange(utcEpoch, *info.predictionRange))) {
