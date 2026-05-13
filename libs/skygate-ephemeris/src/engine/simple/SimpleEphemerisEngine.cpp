@@ -41,6 +41,18 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
     return core::UtcTimePoint(std::chrono::seconds(static_cast<std::int64_t>(epochSeconds)));
 }
 
+[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
+{
+    const double julianDay =
+        static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay + kUnixEpochJulianDay;
+    const double julianDatePart1 = std::floor(julianDay);
+    return AstronomicalEpoch{
+        .julianDatePart1 = julianDatePart1,
+        .julianDatePart2 = julianDay - julianDatePart1,
+        .timeScale = TimeScale::Utc,
+    };
+}
+
 [[nodiscard]] core::SkyContext contextFromRequest(const EphemerisRequest& request) noexcept
 {
     core::SkyContext context = request.context;
@@ -138,7 +150,7 @@ public:
 
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override
     {
-        SkySnapshot snapshot = compute(contextFromRequest(request));
+        SkySnapshot snapshot = computeSnapshot(contextFromRequest(request));
         markUnsupportedSimpleOptions(snapshot, request.options);
         return snapshot;
     }
@@ -146,7 +158,7 @@ public:
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, const std::string_view bodyId) const override
     {
-        std::optional<CelestialBodyState> state = computeBodyState(contextFromRequest(request), bodyId);
+        std::optional<CelestialBodyState> state = computeBodyStateById(contextFromRequest(request), bodyId);
         if (state.has_value()) {
             markUnsupportedSimpleOptions(*state, request.options);
         }
@@ -167,6 +179,33 @@ public:
 
     [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override
     {
+        return compute(makeCompatibilityRequest(context));
+    }
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const core::SkyContext& context, const std::string_view bodyId) const override
+    {
+        return computeBodyState(makeCompatibilityRequest(context), bodyId);
+    }
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    {
+        return computeBodyState(makeCompatibilityRequest(context), static_cast<std::size_t>(bodyIndex));
+    }
+
+private:
+    [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept
+    {
+        EphemerisRequest request;
+        request.epoch = epochFromUtcTime(context.utcTime);
+        request.context = context;
+        request.options = options();
+        return request;
+    }
+
+    [[nodiscard]] SkySnapshot computeSnapshot(const core::SkyContext& context) const
+    {
         SkySnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = m_bodies;
@@ -181,7 +220,7 @@ public:
     }
 
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const core::SkyContext& context, const std::string_view bodyId) const override
+    computeBodyStateById(const core::SkyContext& context, const std::string_view bodyId) const
     {
         if (bodyId.empty()) {
             return std::nullopt;
@@ -196,18 +235,6 @@ public:
 
         return std::nullopt;
     }
-
-    [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const core::SkyContext& context, const std::uint32_t bodyIndex) const override
-    {
-        if (bodyIndex >= m_bodies->size()) {
-            return std::nullopt;
-        }
-
-        return computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, context);
-    }
-
-private:
     [[nodiscard]] CelestialBodyState
     computeStateForBody(const CelestialBody& body, const std::size_t bodyIndex, const core::SkyContext& context) const
     {
