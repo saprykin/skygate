@@ -371,17 +371,16 @@ SkySettingsStore::EphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisData
 {
     QSettings settings;
     EphemerisDataCacheSnapshot snapshot;
-    snapshot.installedKernelPath = readTrimmedStringSetting(settings, ephemerisDataCacheKey("installedKernelPath"));
-    snapshot.installedKernelVersion =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("installedKernelVersion"));
+    snapshot.installedKernelPath = settings.value(ephemerisDataCacheKey("installedKernelPath")).toString();
+    snapshot.installedKernelVersion = settings.value(ephemerisDataCacheKey("installedKernelVersion")).toString();
     snapshot.installedEarthOrientationPath =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("installedEarthOrientationPath"));
+        settings.value(ephemerisDataCacheKey("installedEarthOrientationPath")).toString();
     snapshot.installedEarthOrientationVersion =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("installedEarthOrientationVersion"));
+        settings.value(ephemerisDataCacheKey("installedEarthOrientationVersion")).toString();
     snapshot.installedLeapSecondTableVersion =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("installedLeapSecondTableVersion"));
+        settings.value(ephemerisDataCacheKey("installedLeapSecondTableVersion")).toString();
     snapshot.installedDeltaTDataVersion =
-        readTrimmedStringSetting(settings, ephemerisDataCacheKey("installedDeltaTDataVersion"));
+        settings.value(ephemerisDataCacheKey("installedDeltaTDataVersion")).toString();
     snapshot.dataRevisionToken =
         readTrimmedStringSetting(settings, ephemerisDataCacheKey("dataRevisionToken"), snapshot.dataRevisionToken);
     if (snapshot.dataRevisionToken.isEmpty()) {

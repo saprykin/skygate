@@ -35,6 +35,7 @@ private slots:
     void partialCatalogCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
     void savesLoadsAndClearsEphemerisDataCacheMetadata();
+    void ephemerisDataCachePathsRoundTripExactly();
     void partialAndMalformedEphemerisDataCacheMetadataFallsBack();
     void savesLoadsAndDefaultsLoggingPreferences();
     void malformedLoggingPreferencesFallBackToDefaults();
@@ -370,6 +371,25 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
     QVERIFY(stillLoadedCatalogSnapshot.has_value());
     QCOMPARE(stillLoadedCatalogSnapshot->catalogPayload, catalogSnapshot.catalogPayload);
     QCOMPARE(stillLoadedCatalogSnapshot->deepSkyCatalogPayload, catalogSnapshot.deepSkyCatalogPayload);
+}
+
+void SkySettingsStoreTests::ephemerisDataCachePathsRoundTripExactly()
+{
+    QSettings settings;
+    settings.clear();
+
+    SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot;
+    savedSnapshot.installedKernelPath =
+        QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced kernel.bsp")));
+    savedSnapshot.installedEarthOrientationPath =
+        QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced eop.csv")));
+
+    const SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(savedSnapshot));
+
+    const auto loadedSnapshot = store.loadEphemerisDataCache();
+    QCOMPARE(loadedSnapshot.installedKernelPath, savedSnapshot.installedKernelPath);
+    QCOMPARE(loadedSnapshot.installedEarthOrientationPath, savedSnapshot.installedEarthOrientationPath);
 }
 
 void SkySettingsStoreTests::partialAndMalformedEphemerisDataCacheMetadataFallsBack()
