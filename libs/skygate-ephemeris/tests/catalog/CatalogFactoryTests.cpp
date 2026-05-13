@@ -23,18 +23,15 @@ private slots:
 
 void CatalogFactoryTests::loadsBundledCatalogBySourceType()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(
-        skygate::ephemeris::CatalogSourceType::Bundled
-    );
+    auto result = skygate::ephemeris::loadStarCatalog(skygate::ephemeris::CatalogSourceType::Bundled);
     QVERIFY(result.isSuccess());
     const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 119U);
-    const auto messier31It = std::find_if(bodies.begin(), bodies.end(), [](const auto& body) {
-        return body.id == "messier_031";
-    });
+    const auto messier31It =
+        std::find_if(bodies.begin(), bodies.end(), [](const auto& body) { return body.id == "messier_031"; });
     QVERIFY(messier31It != bodies.end());
     QVERIFY(messier31It->displayName == "M31");
     QVERIFY(messier31It->type == skygate::ephemeris::CelestialBodyType::DeepSkyObject);
@@ -45,14 +42,11 @@ void CatalogFactoryTests::loadsBundledCatalogBySourceType()
 
 void CatalogFactoryTests::loadsHygCatalogBySourceRequest()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(
-        skygate::ephemeris::CatalogSourceRequest {
-            .type = skygate::ephemeris::CatalogSourceType::HygCsv,
-            .data =
-                "id,hip,proper,ra,dec,mag\n"
+    auto result = skygate::ephemeris::loadStarCatalog(skygate::ephemeris::CatalogSourceRequest{
+        .type = skygate::ephemeris::CatalogSourceType::HygCsv,
+        .data = "id,hip,proper,ra,dec,mag\n"
                 "1,11,Alpha,12.5,-30.0,4.0\n"
-        }
-    );
+    });
     QVERIFY(result.isSuccess());
     const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
@@ -71,9 +65,7 @@ void CatalogFactoryTests::loadsHygCatalogBySourceTypeWithProgress()
         "id,hip,proper,ra,dec,mag\n"
         "1,11,Alpha,1.0,2.0,3.0\n"
         "2,22,Beta,4.0,5.0,6.0\n",
-        [&callbackLastCount](const std::size_t parsedObjectCount) {
-            callbackLastCount = parsedObjectCount;
-        }
+        [&callbackLastCount](const std::size_t parsedObjectCount) { callbackLastCount = parsedObjectCount; }
     );
     QVERIFY(result.isSuccess());
     const auto& catalog = result.catalog;
@@ -90,9 +82,8 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
         "1,11,Alpha,1.0,2.0,3.0\n"
         "2,22,Beta,4.0,5.0,6.0\n",
         {},
-        skygate::ephemeris::CatalogSelectionOptions {
-            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude,
-            .maxBodyCount = 1U
+        skygate::ephemeris::CatalogSelectionOptions{
+            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude, .maxBodyCount = 1U
         }
     );
     QVERIFY(selectedCatalog.isSuccess());
@@ -101,8 +92,7 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
     QVERIFY(selectedCatalog.diagnostics.truncatedBodyCount == 1U);
 
     QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
+        QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
     );
     const auto invalidCatalog = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
@@ -110,9 +100,7 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
         "1,NoCoordinates\n"
     );
     QVERIFY(!invalidCatalog.isSuccess());
-    QVERIFY(
-        invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns
-    );
+    QVERIFY(invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns);
 }
 
 void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput()
@@ -123,9 +111,8 @@ void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLarge
         "1,11,Alpha,1.0,2.0,3.0\n"
         "2,22,Beta,4.0,5.0,6.0\n",
         {},
-        skygate::ephemeris::CatalogSelectionOptions {
-            .mode = skygate::ephemeris::CatalogSelectionMode::None,
-            .maxBodyCount = 1U
+        skygate::ephemeris::CatalogSelectionOptions{
+            .mode = skygate::ephemeris::CatalogSelectionMode::Disabled, .maxBodyCount = 1U
         }
     );
     QVERIFY(disabledSelection.isSuccess());
@@ -139,9 +126,8 @@ void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLarge
         "1,11,Alpha,1.0,2.0,3.0\n"
         "2,22,Beta,4.0,5.0,6.0\n",
         {},
-        skygate::ephemeris::CatalogSelectionOptions {
-            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude,
-            .maxBodyCount = 10U
+        skygate::ephemeris::CatalogSelectionOptions{
+            .mode = skygate::ephemeris::CatalogSelectionMode::BrightestByVisualMagnitude, .maxBodyCount = 10U
         }
     );
     QVERIFY(oversizedSelection.isSuccess());
@@ -155,14 +141,10 @@ void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes()
 {
     QVERIFY(skygate::ephemeris::createStarCatalogFromBodies({}) == nullptr);
 
-    const auto unsupported = skygate::ephemeris::loadStarCatalog(
-        static_cast<skygate::ephemeris::CatalogSourceType>(255U),
-        "unused"
-    );
+    const auto unsupported =
+        skygate::ephemeris::loadStarCatalog(static_cast<skygate::ephemeris::CatalogSourceType>(255U), "unused");
     QVERIFY(!unsupported.isSuccess());
-    QVERIFY(
-        unsupported.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat
-    );
+    QVERIFY(unsupported.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat);
     QVERIFY(!unsupported.errorDetail.empty());
     QVERIFY(unsupported.catalog == nullptr);
 }

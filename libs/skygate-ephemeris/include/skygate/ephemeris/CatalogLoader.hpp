@@ -12,17 +12,17 @@ namespace skygate::ephemeris {
 using HygParseProgressCallback = std::function<void(std::size_t parsedObjectCount)>;
 
 enum class CatalogSelectionMode : std::uint8_t {
-    None,
+    Disabled,
     BrightestByVisualMagnitude
 };
 
 struct CatalogSelectionOptions {
-    CatalogSelectionMode mode = CatalogSelectionMode::None;
+    CatalogSelectionMode mode = CatalogSelectionMode::Disabled;
     std::size_t maxBodyCount = 0;
 
     [[nodiscard]] bool isEnabled() const noexcept
     {
-        return mode != CatalogSelectionMode::None && maxBodyCount > 0;
+        return mode != CatalogSelectionMode::Disabled && maxBodyCount > 0;
     }
 };
 
