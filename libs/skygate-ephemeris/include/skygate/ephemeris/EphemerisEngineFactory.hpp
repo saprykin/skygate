@@ -211,6 +211,7 @@ struct EphemerisEngineFactoryResult {
     }
 };
 
+[[nodiscard]] EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryRequest& request);
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine();
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog);
 [[nodiscard]] std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const CelestialBody> bodies);
