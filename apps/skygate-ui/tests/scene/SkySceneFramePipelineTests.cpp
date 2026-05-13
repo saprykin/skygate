@@ -17,14 +17,27 @@ namespace {
 
 class CountingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit CountingEngine(std::string bodyId = "target")
-        : m_bodyId(std::move(bodyId))
+    explicit CountingEngine(std::string bodyId = "target") : m_bodyId(std::move(bodyId)) {}
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
     {
+        return compute(request.context);
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
-        const skygate::core::SkyContext& context
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {
         ++m_computeCount;
         skygate::ephemeris::CelestialBody body;
@@ -37,35 +50,22 @@ public:
         auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
         bodies->push_back(std::move(body));
         snapshot.catalogBodies = std::move(bodies);
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState {
-            .bodyIndex = 0U,
-            .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0}
+        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U, .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0}
         });
         return snapshot;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext& context,
-        const std::string_view bodyId
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
     {
-        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(
-            *this,
-            context,
-            bodyId
-        );
+        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(*this, context, bodyId);
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext& context,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
-        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(
-            *this,
-            context,
-            bodyIndex
-        );
+        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(*this, context, bodyIndex);
     }
 
     [[nodiscard]] int computeCount() const noexcept
@@ -82,11 +82,7 @@ SkySceneFramePipelineInput makeInput(const CountingEngine& engine)
 {
     SkySceneFramePipelineInput input;
     input.ephemerisEngine = &engine;
-    input.skyContext.observer = {
-        .latitudeDeg = 47.0,
-        .longitudeDeg = 8.0,
-        .elevationMeters = 400.0
-    };
+    input.skyContext.observer = {.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
     input.catalogRevision = 1U;
     input.projectionType = skygate::core::ProjectionType::Stereographic;
     input.viewCenterAltitudeDeg = 45.0;

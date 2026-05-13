@@ -121,6 +121,10 @@ add_skygate_ephemeris_qtest(
     skygate-ephemeris-api-model-tests
     engine/EphemerisApiModelTests.cpp
 )
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-interface-migration-tests
+    engine/EphemerisEngineInterfaceMigrationTests.cpp
+)
 add_executable(skygate-ephemeris-public-header-macro-compat-tests
     engine/PublicHeaderMacroCompatTests.cpp
     engine/PublicHeaderLegacyAliasTests.cpp

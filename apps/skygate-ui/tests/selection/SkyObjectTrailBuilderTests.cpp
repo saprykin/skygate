@@ -14,49 +14,55 @@ namespace {
 
 class TrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit TrailEngine(const std::uint32_t expectedBodyIndex = 7U)
-        : m_expectedBodyIndex(expectedBodyIndex)
-    {
-    }
+    explicit TrailEngine(const std::uint32_t expectedBodyIndex = 7U) : m_expectedBodyIndex(expectedBodyIndex) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
-        const skygate::core::SkyContext& context
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
     ) const override
     {
-        (void) context;
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        (void)context;
         return {};
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext&,
-        std::string_view
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext& context,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
         m_sawExpectedBodyIndex = m_sawExpectedBodyIndex || bodyIndex == m_expectedBodyIndex;
 
         const auto offsetMinutes = static_cast<int>(
-            std::chrono::duration_cast<std::chrono::minutes>(
-                context.utcTime.time_since_epoch()
-            ).count()
+            std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
         );
         if (m_gapAtPresent && offsetMinutes == 0) {
             return std::nullopt;
         }
 
-        return skygate::ephemeris::CelestialBodyState {
+        return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = bodyIndex,
-            .horizontal = {
-                .altitudeDeg = 45.0 + (static_cast<double>(offsetMinutes) / 6000.0),
-                .azimuthDeg = 180.0 + (static_cast<double>(offsetMinutes) / 6000.0)
-            }
+            .horizontal =
+                {.altitudeDeg = 45.0 + (static_cast<double>(offsetMinutes) / 6000.0),
+                 .azimuthDeg = 180.0 + (static_cast<double>(offsetMinutes) / 6000.0)}
         };
     }
 
@@ -78,42 +84,50 @@ private:
 
 class CrossingTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
-        const skygate::core::SkyContext& context
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
     ) const override
     {
-        (void) context;
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        (void)context;
         return {};
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext&,
-        std::string_view
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext& context,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
         const auto offsetMinutes = static_cast<int>(
-            std::chrono::duration_cast<std::chrono::minutes>(
-                context.utcTime.time_since_epoch()
-            ).count()
+            std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
         );
         if (offsetMinutes == -30) {
-            return skygate::ephemeris::CelestialBodyState {
-                .bodyIndex = bodyIndex,
-                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0}
+            return skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = bodyIndex, .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0}
             };
         }
         if (offsetMinutes == 0) {
-            return skygate::ephemeris::CelestialBodyState {
-                .bodyIndex = bodyIndex,
-                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0}
+            return skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = bodyIndex, .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0}
             };
         }
 
@@ -136,19 +150,13 @@ std::optional<skygate::core::PreparedProjection> makeProjection(const double fov
     );
 }
 
-SkyObjectTrailInput makeInput(
-    const skygate::ephemeris::IEphemerisEngine& engine,
-    const skygate::core::PreparedProjection& projection
-)
+SkyObjectTrailInput
+makeInput(const skygate::ephemeris::IEphemerisEngine& engine, const skygate::core::PreparedProjection& projection)
 {
     SkyObjectTrailInput input;
     input.ephemerisEngine = &engine;
     input.preparedProjection = &projection;
-    input.skyContext.observer = {
-        .latitudeDeg = 47.0,
-        .longitudeDeg = 8.0,
-        .elevationMeters = 400.0
-    };
+    input.skyContext.observer = {.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
     input.renderTheme = makeRenderTheme();
     input.targetBodyIndex = 7U;
     input.viewportWidth = 1000.0;
