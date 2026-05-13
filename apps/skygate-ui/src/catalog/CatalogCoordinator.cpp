@@ -19,7 +19,7 @@ Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCode errorCode)
 {
     switch (errorCode) {
-    case skygate::ephemeris::CatalogLoadErrorCode::None:
+    case skygate::ephemeris::CatalogLoadErrorCode::NoError:
         return "Unknown parse failure";
     case skygate::ephemeris::CatalogLoadErrorCode::EmptyInput:
         return "empty payload";
@@ -42,17 +42,11 @@ QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCo
     return "unknown parse failure";
 }
 
-QString catalogLoadErrorText(
-    const skygate::ephemeris::CatalogLoadResult& loadResult,
-    const QString& sourceUrl
-)
+QString catalogLoadErrorText(const skygate::ephemeris::CatalogLoadResult& loadResult, const QString& sourceUrl)
 {
     QString description = catalogLoadErrorDescription(loadResult.errorCode);
     if (!loadResult.errorDetail.empty()) {
-        description = QString("%1 (%2)").arg(
-            description,
-            QString::fromStdString(loadResult.errorDetail)
-        );
+        description = QString("%1 (%2)").arg(description, QString::fromStdString(loadResult.errorDetail));
     }
 
     return QString("Catalog: Source %1 parse failed: %2").arg(sourceUrl, description);
@@ -60,9 +54,8 @@ QString catalogLoadErrorText(
 }  // namespace
 
 CatalogCoordinator::CatalogCoordinator(QNetworkAccessManager* networkAccessManager)
-    : m_downloadService(std::make_unique<CatalogDownloadService>(networkAccessManager))
-    , m_parseService(std::make_unique<CatalogPayloadParseService>())
-    , m_networkAccessManager(networkAccessManager)
+    : m_downloadService(std::make_unique<CatalogDownloadService>(networkAccessManager)),
+      m_parseService(std::make_unique<CatalogPayloadParseService>()), m_networkAccessManager(networkAccessManager)
 {
 }
 
@@ -86,12 +79,12 @@ void CatalogCoordinator::downloadCatalogFromUrls(
         urlTexts,
         callbackContext,
         statusHandler,
-        [this, callbackContext, statusHandler, completionHandler](CatalogDownloadService::DownloadResult downloadResult) mutable {
+        [this, callbackContext, statusHandler, completionHandler](CatalogDownloadService::DownloadResult downloadResult
+        ) mutable {
             if (downloadResult.payload.isEmpty()) {
                 DownloadResult result;
-                result.errorText = downloadResult.errorText.isEmpty()
-                    ? QString("Catalog: Download failed")
-                    : downloadResult.errorText;
+                result.errorText =
+                    downloadResult.errorText.isEmpty() ? QString("Catalog: Download failed") : downloadResult.errorText;
                 completionHandler(std::move(result));
                 return;
             }
@@ -100,9 +93,8 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                 statusHandler("Catalog: Processing downloaded catalog...");
             }
 
-            QObject* const contextObject = callbackContext != nullptr
-                ? callbackContext
-                : static_cast<QObject*>(m_networkAccessManager);
+            QObject* const contextObject =
+                callbackContext != nullptr ? callbackContext : static_cast<QObject*>(m_networkAccessManager);
             if (contextObject == nullptr) {
                 DownloadResult result;
                 result.errorText = "Catalog: Callback context unavailable";
@@ -121,8 +113,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                         return;
                     }
 
-                    const QString countText =
-                        QLocale::system().toString(static_cast<qulonglong>(parsedObjectCount));
+                    const QString countText = QLocale::system().toString(static_cast<qulonglong>(parsedObjectCount));
                     statusHandler(QString("Catalog: Processing... %1 objects parsed").arg(countText));
                 },
                 [sourceUrl, payload, statusHandler, completionHandler = std::move(completionHandler)](

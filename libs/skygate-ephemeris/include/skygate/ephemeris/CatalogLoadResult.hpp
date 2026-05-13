@@ -18,7 +18,7 @@ enum class CatalogPayloadFormat : std::uint8_t {
 };
 
 enum class CatalogLoadErrorCode : std::uint8_t {
-    None,
+    NoError,
     EmptyInput,
     UnsupportedFormat,
     MissingRequiredColumns,
@@ -39,7 +39,7 @@ struct CatalogLoadDiagnostics {
 struct CatalogLoadResult {
     std::unique_ptr<IStarCatalog> catalog;
     CatalogPayloadFormat detectedFormat = CatalogPayloadFormat::Unknown;
-    CatalogLoadErrorCode errorCode = CatalogLoadErrorCode::None;
+    CatalogLoadErrorCode errorCode = CatalogLoadErrorCode::NoError;
     std::string errorDetail;
     CatalogLoadDiagnostics diagnostics;
 

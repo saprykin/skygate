@@ -10,13 +10,13 @@ namespace skygate::ephemeris {
 
 struct CatalogBodyParseResult {
     std::vector<CelestialBody> bodies;
-    CatalogLoadErrorCode errorCode = CatalogLoadErrorCode::None;
+    CatalogLoadErrorCode errorCode = CatalogLoadErrorCode::NoError;
     std::string errorDetail;
     CatalogLoadDiagnostics diagnostics;
 
     [[nodiscard]] bool isSuccess() const noexcept
     {
-        return errorCode == CatalogLoadErrorCode::None;
+        return errorCode == CatalogLoadErrorCode::NoError;
     }
 };
 
