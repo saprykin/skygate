@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <vector>
 
 class EphemerisDataManifestTests final : public QObject {
     Q_OBJECT
@@ -17,6 +18,9 @@ private slots:
     void parsesValidityRanges();
     void distinguishesModernAndOptionalDe441Profiles();
     void rejectsUnknownProfileAssetReferences();
+    void rejectsDuplicateIds();
+    void rejectsInvalidBooleanFields();
+    void rejectsUnsafeCompressionSizes();
 };
 
 namespace {
@@ -183,6 +187,23 @@ namespace {
     });
     Q_ASSERT(epoch.has_value());
     return *epoch;
+}
+
+[[nodiscard]] std::string manifestWithReplacement(const std::string_view from, const std::string_view to)
+{
+    std::string payload = validManifestPayload();
+    const std::size_t position = payload.find(from);
+    Q_ASSERT(position != std::string::npos);
+    payload.replace(position, from.size(), to);
+    return payload;
+}
+
+[[nodiscard]] bool
+hasDiagnosticContaining(const skygate::ephemeris::EphemerisDataManifestParseResult& result, const std::string_view text)
+{
+    return std::ranges::any_of(result.diagnostics, [text](const std::string& diagnostic) {
+        return diagnostic.find(text) != std::string::npos;
+    });
 }
 
 }  // namespace
@@ -357,6 +378,61 @@ void EphemerisDataManifestTests::rejectsUnknownProfileAssetReferences()
 
     QVERIFY(!result.isSuccess());
     QVERIFY(!result.diagnostics.empty());
+}
+
+void EphemerisDataManifestTests::rejectsDuplicateIds()
+{
+    const std::vector<std::string> payloads = {
+        manifestWithReplacement("\"id\": \"de441-long-range\"", "\"id\": \"modern\""),
+        manifestWithReplacement("\"id\": \"de441-kernel\"", "\"id\": \"de440s-kernel\""),
+        manifestWithReplacement(
+            R"("de440s-kernel",
+                    "leap-seconds")",
+            R"("de440s-kernel",
+                    "de440s-kernel")"
+        ),
+    };
+
+    for (const std::string& payload : payloads) {
+        const skygate::ephemeris::EphemerisDataManifestParseResult result =
+            skygate::ephemeris::parseEphemerisDataManifest(payload);
+
+        QVERIFY(!result.isSuccess());
+        QVERIFY(hasDiagnosticContaining(result, "duplicate"));
+    }
+}
+
+void EphemerisDataManifestTests::rejectsInvalidBooleanFields()
+{
+    const std::vector<std::string> payloads = {
+        manifestWithReplacement("\"bundled\": true", "\"bundled\": \"true\""),
+        manifestWithReplacement("\"longRange\": false", "\"longRange\": 0"),
+        manifestWithReplacement("\"optional\": true", "\"optional\": null"),
+    };
+
+    for (const std::string& payload : payloads) {
+        const skygate::ephemeris::EphemerisDataManifestParseResult result =
+            skygate::ephemeris::parseEphemerisDataManifest(payload);
+
+        QVERIFY(!result.isSuccess());
+        QVERIFY(hasDiagnosticContaining(result, "boolean"));
+    }
+}
+
+void EphemerisDataManifestTests::rejectsUnsafeCompressionSizes()
+{
+    const std::vector<std::string> payloads = {
+        manifestWithReplacement("\"compressedSizeBytes\": 4096", "\"compressedSizeBytes\": 9223372036854775808"),
+        manifestWithReplacement("\"uncompressedSizeBytes\": 8192", "\"uncompressedSizeBytes\": 9007199254740993"),
+    };
+
+    for (const std::string& payload : payloads) {
+        const skygate::ephemeris::EphemerisDataManifestParseResult result =
+            skygate::ephemeris::parseEphemerisDataManifest(payload);
+
+        QVERIFY(!result.isSuccess());
+        QVERIFY(hasDiagnosticContaining(result, "integer range"));
+    }
 }
 
 QTEST_APPLESS_MAIN(EphemerisDataManifestTests)
