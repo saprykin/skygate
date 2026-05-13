@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -140,6 +141,21 @@ public:
             m_cacheSnapshot.installedEarthOrientationVersion,
             QStringLiteral("Installed ephemeris data cache")
         );
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::EphemerisKernelDataAsset>
+    solarSystemKernelAsset(std::string_view assetId) const override
+    {
+        if (!m_installedDataActive || m_cacheSnapshot.installedKernelPath.isEmpty()) {
+            return std::nullopt;
+        }
+
+        skygate::ephemeris::EphemerisKernelDataAsset asset;
+        asset.id = std::string(assetId);
+        asset.version = m_cacheSnapshot.installedKernelVersion.toStdString();
+        asset.provenance = "Installed ephemeris data cache";
+        asset.activePath = m_cacheSnapshot.installedKernelPath.toStdString();
+        return asset;
     }
 
 private:
