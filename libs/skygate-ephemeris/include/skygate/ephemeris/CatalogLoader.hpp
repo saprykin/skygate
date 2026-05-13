@@ -13,6 +13,9 @@ using HygParseProgressCallback = std::function<void(std::size_t parsedObjectCoun
 
 enum class CatalogSelectionMode : std::uint8_t {
     Disabled,
+#ifndef None
+    None [[deprecated("Use CatalogSelectionMode::Disabled")]] = Disabled,
+#endif
     BrightestByVisualMagnitude
 };
 

@@ -6,6 +6,8 @@
 
 #include <cstdint>
 
+int verifyPublicHeaderLegacyAliases();
+
 int main()
 {
     static_assert(None == 0L);
@@ -14,5 +16,5 @@ int main()
     static_assert(static_cast<std::uint8_t>(skygate::ephemeris::CatalogLoadErrorCode::NoError) == 0U);
 
     skygate::ephemeris::EphemerisCapabilities capabilities;
-    return static_cast<int>(capabilities.supportedCorrections);
+    return static_cast<int>(capabilities.supportedCorrections) + verifyPublicHeaderLegacyAliases();
 }

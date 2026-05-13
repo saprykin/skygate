@@ -123,6 +123,7 @@ add_skygate_ephemeris_qtest(
 )
 add_executable(skygate-ephemeris-public-header-macro-compat-tests
     engine/PublicHeaderMacroCompatTests.cpp
+    engine/PublicHeaderLegacyAliasTests.cpp
 )
 target_link_libraries(skygate-ephemeris-public-header-macro-compat-tests
     PRIVATE
