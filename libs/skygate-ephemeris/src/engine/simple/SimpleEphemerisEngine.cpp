@@ -6,6 +6,9 @@
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
 #include "engine/simple/SunEquatorialCalculator.hpp"
 
+#include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -22,6 +25,31 @@ constexpr std::string_view kSimpleDataSourceProvenance = "Simple ephemeris engin
 constexpr std::string_view kSimpleEngineName = "Simple ephemeris engine";
 constexpr std::string_view kSimpleDataSetId = "simple";
 constexpr std::string_view kSimpleDataSetVersion = "built-in";
+constexpr double kSecondsPerDay = 86'400.0;
+constexpr double kUnixEpochJulianDay = 2'440'587.5;
+
+[[nodiscard]] bool hasExplicitEpoch(const AstronomicalEpoch& epoch) noexcept
+{
+    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2)
+           && (epoch.julianDatePart1 != 0.0 || epoch.julianDatePart2 != 0.0);
+}
+
+[[nodiscard]] core::UtcTimePoint utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept
+{
+    const double julianDay = epoch.julianDatePart1 + epoch.julianDatePart2;
+    const double epochSeconds = std::round((julianDay - kUnixEpochJulianDay) * kSecondsPerDay);
+    return core::UtcTimePoint(std::chrono::seconds(static_cast<std::int64_t>(epochSeconds)));
+}
+
+[[nodiscard]] core::SkyContext contextFromRequest(const EphemerisRequest& request) noexcept
+{
+    core::SkyContext context = request.context;
+    if (request.epoch.timeScale == TimeScale::Utc && hasExplicitEpoch(request.epoch)) {
+        context.utcTime = utcTimeFromEpoch(request.epoch);
+    }
+
+    return context;
+}
 
 }  // namespace
 
@@ -77,6 +105,11 @@ public:
         engineOptions.correctionFlags = EphemerisCorrectionFlags::NoCorrections;
         engineOptions.enableAtmosphericRefraction = false;
         return engineOptions;
+    }
+
+    [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override
+    {
+        return compute(contextFromRequest(request));
     }
 
     [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override

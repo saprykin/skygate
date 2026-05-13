@@ -49,6 +49,11 @@ public:
         return engineOptions;
     }
 
+    [[nodiscard]] virtual SkySnapshot compute(const EphemerisRequest& request) const
+    {
+        return compute(request.context);
+    }
+
     [[nodiscard]] virtual SkySnapshot compute(const core::SkyContext& context) const = 0;
     [[nodiscard]] virtual std::optional<CelestialBodyState>
     computeBodyState(const core::SkyContext& context, std::string_view bodyId) const = 0;
