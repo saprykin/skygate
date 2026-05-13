@@ -75,6 +75,16 @@ constexpr double kSecondsPerDay = 86'400.0;
     result.metadata.status = EphemerisResultStatus::Valid;
     result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
+    if (request.sourceFrame != request.targetFrame) {
+        CelestialFrameTransformStageMetadata stage;
+        stage.sourceFrame = request.sourceFrame;
+        stage.targetFrame = request.targetFrame;
+        stage.applied = false;
+        stage.metadata.status = EphemerisResultStatus::Valid;
+        stage.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+        stage.metadata.dataSourceProvenance = kFrameTransformProvenance;
+        result.stages.push_back(std::move(stage));
+    }
     return result;
 }
 

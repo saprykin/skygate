@@ -17,7 +17,8 @@ enum class EarthOrientationDataStatus : std::uint8_t {
     Available,
     Missing,
     Malformed,
-    Stale
+    Stale,
+    Estimated
 };
 
 [[nodiscard]] constexpr std::string_view displayName(const EarthOrientationDataStatus status) noexcept
@@ -31,6 +32,8 @@ enum class EarthOrientationDataStatus : std::uint8_t {
         return "malformed";
     case EarthOrientationDataStatus::Stale:
         return "stale";
+    case EarthOrientationDataStatus::Estimated:
+        return "estimated";
     }
 
     return {};
@@ -43,6 +46,7 @@ struct EarthOrientationTableEntry {
     double polarMotionXArcseconds = 0.0;
     double polarMotionYArcseconds = 0.0;
     bool predicted = false;
+    bool estimated = false;
 };
 
 enum class EarthOrientationSampleStatus : std::uint8_t {
@@ -70,7 +74,8 @@ enum class EarthOrientationSampleWarningCode : std::uint8_t {
     PredictedData,
     MissingData,
     EpochOutsideRange,
-    InvalidInput
+    InvalidInput,
+    EstimatedData
 };
 
 [[nodiscard]] constexpr std::string_view earthOrientationSampleWarningText(const EarthOrientationSampleWarningCode code
@@ -87,6 +92,8 @@ enum class EarthOrientationSampleWarningCode : std::uint8_t {
         return "The requested epoch is outside the Earth-orientation data range.";
     case EarthOrientationSampleWarningCode::InvalidInput:
         return "The requested Earth-orientation input is invalid.";
+    case EarthOrientationSampleWarningCode::EstimatedData:
+        return "Earth-orientation data uses an estimate for the requested epoch.";
     }
 
     return "Earth-orientation warning.";
@@ -109,6 +116,7 @@ struct EarthOrientationSample {
     double polarMotionXArcseconds = 0.0;
     double polarMotionYArcseconds = 0.0;
     bool predicted = false;
+    bool estimated = false;
     EarthOrientationSampleStatus status = EarthOrientationSampleStatus::Failed;
     std::uint32_t warningCodeMask = 0U;
     std::string diagnosticText;
@@ -140,7 +148,8 @@ struct EarthOrientationDataInfo {
 
     [[nodiscard]] bool isUsable() const noexcept
     {
-        return status == EarthOrientationDataStatus::Available || status == EarthOrientationDataStatus::Stale;
+        return status == EarthOrientationDataStatus::Available || status == EarthOrientationDataStatus::Stale
+               || status == EarthOrientationDataStatus::Estimated;
     }
 };
 

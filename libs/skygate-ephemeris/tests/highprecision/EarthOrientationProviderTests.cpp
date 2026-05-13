@@ -81,6 +81,7 @@ private slots:
     void reportsOutOfRangeFallback();
     void reportsOutOfRangeFailureWhenFallbackDisallowed();
     void reportsStaleAndPredictedSamplesAsDegraded();
+    void reportsEstimatedSamplesAsDegraded();
     void reportsMissingDataFallback();
 };
 
@@ -347,6 +348,33 @@ void EarthOrientationProviderTests::reportsStaleAndPredictedSamplesAsDegraded()
     QVERIFY(sample.predicted);
     QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::StaleData));
     QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::PredictedData));
+    QVERIFY(!sample.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::reportsEstimatedSamplesAsDegraded()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content =
+        "#@ version estimated\n"
+        "#@ source unit test\n"
+        "effective_utc_date,ut1_minus_utc_seconds,polar_motion_x_arcseconds,polar_motion_y_arcseconds,predicted,"
+        "estimated\n"
+        "2026-04-01,0.03142,0.1123,0.2187,false,true\n";
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(asset);
+    QVERIFY(loadResult.isSuccess());
+    QVERIFY(loadResult.provider->entries().front().estimated);
+
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 4, 1));
+
+    QVERIFY(sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Degraded)
+    );
+    QVERIFY(sample.estimated);
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::EstimatedData));
     QVERIFY(!sample.diagnosticText.empty());
 }
 
