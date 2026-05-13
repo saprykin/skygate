@@ -305,6 +305,115 @@ failureResult(EarthOrientationDataInfo info, const EarthOrientationDataStatus st
            && epochSortKey(range.start) <= epochSortKey(range.end);
 }
 
+[[nodiscard]] bool epochInRange(const AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
+{
+    const double key = epochSortKey(epoch);
+    return key >= epochSortKey(range.start) && key <= epochSortKey(range.end);
+}
+
+[[nodiscard]] bool epochAfter(const AstronomicalEpoch& epoch, const AstronomicalEpoch& boundary) noexcept
+{
+    return epochSortKey(epoch) > epochSortKey(boundary);
+}
+
+void addSampleWarning(EarthOrientationSample& sample, const EarthOrientationSampleWarningCode code) noexcept
+{
+    if (sample.status == EarthOrientationSampleStatus::Valid) {
+        sample.status = EarthOrientationSampleStatus::Degraded;
+    }
+    sample.addWarning(code);
+}
+
+[[nodiscard]] EarthOrientationSample failedSample(
+    const AstronomicalEpoch& utcEpoch, const EarthOrientationSampleWarningCode code, std::string diagnosticText
+)
+{
+    EarthOrientationSample sample;
+    sample.requestedUtcEpoch = utcEpoch;
+    sample.status = EarthOrientationSampleStatus::Failed;
+    sample.diagnosticText = std::move(diagnosticText);
+    sample.addWarning(code);
+    return sample;
+}
+
+[[nodiscard]] EarthOrientationSample
+missingDataSample(const AstronomicalEpoch& utcEpoch, const EarthOrientationSampleOptions& options)
+{
+    if (!options.allowMissingDataZeroFallback) {
+        return failedSample(
+            utcEpoch,
+            EarthOrientationSampleWarningCode::MissingData,
+            "Earth-orientation data is unavailable for the requested epoch."
+        );
+    }
+
+    EarthOrientationSample sample;
+    sample.requestedUtcEpoch = utcEpoch;
+    sample.status = EarthOrientationSampleStatus::Degraded;
+    sample.addWarning(EarthOrientationSampleWarningCode::MissingData);
+    sample.diagnosticText = "Earth-orientation data used a degraded zero-value fallback.";
+    return sample;
+}
+
+[[nodiscard]] EarthOrientationSample
+sampleFromEntry(const AstronomicalEpoch& requestedEpoch, const EarthOrientationTableEntry& entry)
+{
+    EarthOrientationSample sample;
+    sample.requestedUtcEpoch = requestedEpoch;
+    sample.ut1MinusUtcSeconds = entry.ut1MinusUtcSeconds;
+    sample.polarMotionXArcseconds = entry.polarMotionXArcseconds;
+    sample.polarMotionYArcseconds = entry.polarMotionYArcseconds;
+    sample.predicted = entry.predicted;
+    sample.status = EarthOrientationSampleStatus::Valid;
+    sample.diagnosticText = "Earth-orientation sample resolved.";
+    return sample;
+}
+
+[[nodiscard]] EarthOrientationSample interpolateSamples(
+    const AstronomicalEpoch& utcEpoch, const EarthOrientationTableEntry& lower, const EarthOrientationTableEntry& upper
+)
+{
+    const double lowerKey = epochSortKey(lower.effectiveUtcEpoch);
+    const double upperKey = epochSortKey(upper.effectiveUtcEpoch);
+    const double denominator = upperKey - lowerKey;
+    if (denominator <= 0.0) {
+        return failedSample(
+            utcEpoch,
+            EarthOrientationSampleWarningCode::InvalidInput,
+            "Earth-orientation rows do not form a valid interpolation interval."
+        );
+    }
+
+    const double ratio = (epochSortKey(utcEpoch) - lowerKey) / denominator;
+    EarthOrientationSample sample;
+    sample.requestedUtcEpoch = utcEpoch;
+    sample.ut1MinusUtcSeconds =
+        lower.ut1MinusUtcSeconds + (upper.ut1MinusUtcSeconds - lower.ut1MinusUtcSeconds) * ratio;
+    sample.polarMotionXArcseconds =
+        lower.polarMotionXArcseconds + (upper.polarMotionXArcseconds - lower.polarMotionXArcseconds) * ratio;
+    sample.polarMotionYArcseconds =
+        lower.polarMotionYArcseconds + (upper.polarMotionYArcseconds - lower.polarMotionYArcseconds) * ratio;
+    sample.predicted = lower.predicted || upper.predicted;
+    sample.status = EarthOrientationSampleStatus::Valid;
+    sample.diagnosticText = "Earth-orientation sample interpolated.";
+    return sample;
+}
+
+void applyDataWarnings(
+    EarthOrientationSample& sample, const EarthOrientationDataInfo& info, const AstronomicalEpoch& utcEpoch
+) noexcept
+{
+    if (info.status == EarthOrientationDataStatus::Stale
+        || (info.expiresAt.has_value() && epochAfter(utcEpoch, *info.expiresAt))) {
+        addSampleWarning(sample, EarthOrientationSampleWarningCode::StaleData);
+    }
+
+    if (sample.predicted || (info.predictionRange.has_value() && epochInRange(utcEpoch, *info.predictionRange))) {
+        sample.predicted = true;
+        addSampleWarning(sample, EarthOrientationSampleWarningCode::PredictedData);
+    }
+}
+
 }  // namespace
 
 TableBackedEarthOrientationProvider::TableBackedEarthOrientationProvider(
@@ -437,6 +546,80 @@ EarthOrientationDataLoadResult loadEarthOrientationDataFromTextAsset(
     result.dataInfo = info;
     result.provider = std::make_shared<TableBackedEarthOrientationProvider>(std::move(info), std::move(entries));
     return result;
+}
+
+EarthOrientationSample sampleEarthOrientation(
+    const IEarthOrientationProvider* provider,
+    const AstronomicalEpoch& utcEpoch,
+    const EarthOrientationSampleOptions& options
+)
+{
+    if (!isFiniteUtcEpoch(utcEpoch)) {
+        return failedSample(
+            utcEpoch,
+            EarthOrientationSampleWarningCode::InvalidInput,
+            "Earth-orientation sampling requires a finite UTC epoch."
+        );
+    }
+
+    if (provider == nullptr || !provider->dataInfo().isUsable() || provider->entries().empty()) {
+        return missingDataSample(utcEpoch, options);
+    }
+
+    const std::span<const EarthOrientationTableEntry> entries = provider->entries();
+    const double requestedKey = epochSortKey(utcEpoch);
+    const auto lowerBound = std::ranges::lower_bound(entries, requestedKey, {}, [](const auto& entry) {
+        return epochSortKey(entry.effectiveUtcEpoch);
+    });
+
+    EarthOrientationSample sample;
+    if (lowerBound != entries.end() && epochSortKey(lowerBound->effectiveUtcEpoch) == requestedKey) {
+        sample = sampleFromEntry(utcEpoch, *lowerBound);
+    } else if (lowerBound == entries.begin()) {
+        if (!options.allowOutOfRangeNearestSampleFallback) {
+            return failedSample(
+                utcEpoch,
+                EarthOrientationSampleWarningCode::EpochOutsideRange,
+                "Requested epoch is before the first Earth-orientation row."
+            );
+        }
+        sample = sampleFromEntry(utcEpoch, entries.front());
+        addSampleWarning(sample, EarthOrientationSampleWarningCode::EpochOutsideRange);
+        sample.diagnosticText = "Earth-orientation sample used the first available row as a degraded fallback.";
+    } else if (lowerBound == entries.end()) {
+        if (!options.allowOutOfRangeNearestSampleFallback) {
+            return failedSample(
+                utcEpoch,
+                EarthOrientationSampleWarningCode::EpochOutsideRange,
+                "Requested epoch is after the last Earth-orientation row."
+            );
+        }
+        sample = sampleFromEntry(utcEpoch, entries.back());
+        addSampleWarning(sample, EarthOrientationSampleWarningCode::EpochOutsideRange);
+        sample.diagnosticText = "Earth-orientation sample used the last available row as a degraded fallback.";
+    } else {
+        sample = interpolateSamples(utcEpoch, *(lowerBound - 1), *lowerBound);
+    }
+
+    applyDataWarnings(sample, provider->dataInfo(), utcEpoch);
+    if (sample.status == EarthOrientationSampleStatus::Degraded
+        && sample.diagnosticText == "Earth-orientation sample resolved.") {
+        sample.diagnosticText = "Earth-orientation sample resolved with degraded metadata.";
+    }
+    if (sample.status == EarthOrientationSampleStatus::Degraded
+        && sample.diagnosticText == "Earth-orientation sample interpolated.") {
+        sample.diagnosticText = "Earth-orientation sample interpolated with degraded metadata.";
+    }
+    return sample;
+}
+
+EarthOrientationSample sampleEarthOrientation(
+    const std::shared_ptr<const IEarthOrientationProvider>& provider,
+    const AstronomicalEpoch& utcEpoch,
+    const EarthOrientationSampleOptions& options
+)
+{
+    return sampleEarthOrientation(provider.get(), utcEpoch, options);
 }
 
 }  // namespace skygate::ephemeris
