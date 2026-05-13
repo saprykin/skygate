@@ -75,13 +75,20 @@ private:
         state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
         state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
         state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
+        state.metadata.dataSourceProvenance = "Simple ephemeris engine";
 
         if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
             state.equatorial = *equatorial;
             if (context.observer.isValid()) {
                 state.horizontal =
                     EquatorialToHorizontalCalculator::compute(*equatorial, context.observer, context.utcTime);
+            } else {
+                state.metadata.status = EphemerisResultStatus::Degraded;
+                state.metadata.warnings.emplace_back(EphemerisWarningCode::MissingObserver);
             }
+        } else {
+            state.metadata.status = EphemerisResultStatus::Unsupported;
+            state.metadata.warnings.emplace_back(EphemerisWarningCode::UnsupportedBody);
         }
 
         return state;
