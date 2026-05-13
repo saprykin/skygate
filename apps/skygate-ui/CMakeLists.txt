@@ -23,6 +23,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/selection/SkyHitTargetIndex.hpp
     src/diagnostics/SkyLogging.cpp
     src/diagnostics/SkyLogging.hpp
+    src/ephemeris/SkyEphemerisDataManager.cpp
+    src/ephemeris/SkyEphemerisDataManager.hpp
     src/selection/SkyObjectTrailBuilder.cpp
     src/selection/SkyObjectTrailBuilder.hpp
     src/catalog/SkyCatalogManager.cpp
@@ -119,6 +121,7 @@ target_include_directories(skygate-ui-lib
         ${CMAKE_CURRENT_SOURCE_DIR}/src/app
         ${CMAKE_CURRENT_SOURCE_DIR}/src/catalog
         ${CMAKE_CURRENT_SOURCE_DIR}/src/diagnostics
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ephemeris
         ${CMAKE_CURRENT_SOURCE_DIR}/src/location
         ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
         ${CMAKE_CURRENT_SOURCE_DIR}/src/render
