@@ -74,6 +74,9 @@ private slots:
     void rejectsMalformedRows();
     void exposesAncientFallbackMetadata();
     void exposesValidityRangeMetadata();
+    void returnsUnavailableBetweenLastTableRowAndExpiration();
+    void rejectsAncientFallbackWithoutRepresentativeEstimate();
+    void rejectsPartialAncientFallbackRanges();
     void reportsStaleData();
 };
 
@@ -148,9 +151,21 @@ void DeltaTProviderTests::exposesAncientFallbackMetadata()
     QVERIFY(fallback.validityRange.id == std::string{"delta-t-ancient-fallback"});
     QVERIFY(fallback.provenance == std::string{"Morrison-Stephenson model"});
     QVERIFY(fallback.hasRepresentativeEstimate());
+    QCOMPARE(*fallback.representativeDeltaTSeconds, 12000.5);
     QVERIFY(fallback.estimatedUncertaintySeconds.has_value());
+    QCOMPARE(*fallback.estimatedUncertaintySeconds, 7200.0);
     QCOMPARE(fallback.validityRange.start.julianDatePart1, epochForDate(-13200, 1, 1).julianDatePart1);
+    QCOMPARE(fallback.validityRange.start.julianDatePart2, epochForDate(-13200, 1, 1).julianDatePart2);
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallback.validityRange.start.timeScale),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+    );
     QCOMPARE(fallback.validityRange.end.julianDatePart1, epochForDate(1600, 1, 1).julianDatePart1);
+    QCOMPARE(fallback.validityRange.end.julianDatePart2, epochForDate(1600, 1, 1).julianDatePart2);
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallback.validityRange.end.timeScale),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+    );
 
     const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(-5000, 1, 1));
     QCOMPARE(
@@ -171,7 +186,90 @@ void DeltaTProviderTests::exposesValidityRangeMetadata()
     QVERIFY(result.dataInfo.expiresAt.has_value());
     QVERIFY(result.dataInfo.validityRange->id == std::string{"delta-t"});
     QCOMPARE(result.dataInfo.validityRange->start.julianDatePart1, epochForDate(1900, 1, 1).julianDatePart1);
-    QCOMPARE(result.dataInfo.validityRange->end.julianDatePart1, epochForDate(2027, 1, 1).julianDatePart1);
+    QCOMPARE(result.dataInfo.validityRange->start.julianDatePart2, epochForDate(1900, 1, 1).julianDatePart2);
+    QCOMPARE(result.dataInfo.validityRange->end.julianDatePart1, epochForDate(2026, 1, 1).julianDatePart1);
+    QCOMPARE(result.dataInfo.validityRange->end.julianDatePart2, epochForDate(2026, 1, 1).julianDatePart2);
+    QCOMPARE(result.dataInfo.expiresAt->julianDatePart1, epochForDate(2027, 1, 1).julianDatePart1);
+    QCOMPARE(result.dataInfo.expiresAt->julianDatePart2, epochForDate(2027, 1, 1).julianDatePart2);
+}
+
+void DeltaTProviderTests::returnsUnavailableBetweenLastTableRowAndExpiration()
+{
+    const skygate::ephemeris::DeltaTDataLoadResult result =
+        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeValidAsset());
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+
+    const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(2026, 6, 1));
+    QVERIFY(!estimate.isUsable());
+    QCOMPARE(
+        static_cast<std::uint8_t>(estimate.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTEstimateStatus::Unavailable)
+    );
+    QVERIFY(!estimate.deltaTSeconds.has_value());
+    QVERIFY(!estimate.diagnosticText.empty());
+}
+
+void DeltaTProviderTests::rejectsAncientFallbackWithoutRepresentativeEstimate()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "#@ version bad-fallback\n"
+                    "#@ ancient_fallback_start -13200-01-01\n"
+                    "#@ ancient_fallback_end 1600-01-01\n"
+                    "#@ ancient_fallback_source Historical model\n"
+                    "effective_utc_date,delta_t_seconds\n"
+                    "1900-01-01,-2.72\n"
+                    "2000-01-01,63.83\n";
+
+    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromTextAsset(asset);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.provider == nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.dataInfo.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+    );
+    QVERIFY(!result.dataInfo.diagnosticText.empty());
+}
+
+void DeltaTProviderTests::rejectsPartialAncientFallbackRanges()
+{
+    skygate::ephemeris::EphemerisTextDataAsset startOnlyAsset = makeValidAsset();
+    startOnlyAsset.content = "#@ version start-only-fallback\n"
+                             "#@ ancient_fallback_start -13200-01-01\n"
+                             "#@ ancient_fallback_delta_t_seconds 12000.5\n"
+                             "effective_utc_date,delta_t_seconds\n"
+                             "1900-01-01,-2.72\n"
+                             "2000-01-01,63.83\n";
+
+    const skygate::ephemeris::DeltaTDataLoadResult startOnlyResult =
+        skygate::ephemeris::loadDeltaTDataFromTextAsset(startOnlyAsset);
+
+    QVERIFY(!startOnlyResult.isSuccess());
+    QVERIFY(startOnlyResult.provider == nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(startOnlyResult.dataInfo.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+    );
+
+    skygate::ephemeris::EphemerisTextDataAsset endOnlyAsset = makeValidAsset();
+    endOnlyAsset.content = "#@ version end-only-fallback\n"
+                           "#@ ancient_fallback_end 1600-01-01\n"
+                           "#@ ancient_fallback_delta_t_seconds 12000.5\n"
+                           "effective_utc_date,delta_t_seconds\n"
+                           "1900-01-01,-2.72\n"
+                           "2000-01-01,63.83\n";
+
+    const skygate::ephemeris::DeltaTDataLoadResult endOnlyResult =
+        skygate::ephemeris::loadDeltaTDataFromTextAsset(endOnlyAsset);
+
+    QVERIFY(!endOnlyResult.isSuccess());
+    QVERIFY(endOnlyResult.provider == nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(endOnlyResult.dataInfo.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+    );
 }
 
 void DeltaTProviderTests::reportsStaleData()
