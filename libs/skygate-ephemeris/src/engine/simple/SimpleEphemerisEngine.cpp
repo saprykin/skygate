@@ -1,5 +1,6 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
+#include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "StringUtilities.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
@@ -197,6 +198,19 @@ void appendKernelDateRangeIfMissing(
     }
 
     dataSetInfo.dateRanges.push_back(kernelInfo->validityRange);
+}
+
+void publishDiagnostics(
+    IEphemerisDiagnosticsSink* diagnosticsSink, const std::vector<EphemerisFactoryCreationDiagnostic>& diagnostics
+)
+{
+    if (diagnosticsSink == nullptr) {
+        return;
+    }
+
+    for (const EphemerisFactoryCreationDiagnostic& diagnostic : diagnostics) {
+        diagnosticsSink->recordFactoryCreationDiagnostic(diagnostic);
+    }
 }
 
 }  // namespace
@@ -456,6 +470,9 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
             dependencies.frameTransformer = std::make_shared<highprecision::ErfaFrameTransformer>(
                 request.timeScaleService, request.earthOrientationProvider
             );
+            dependencies.apparentPlaceCalculator = std::make_shared<highprecision::ApparentPlaceCalculator>(
+                dependencies.frameTransformer, request.timeScaleService, request.earthOrientationProvider
+            );
             dependencies.dataSetInfo = request.dataManifest->dataSetInfo;
             if (request.dataSetManifest != nullptr) {
                 dependencies.dataSetInfo = *request.dataSetManifest;
@@ -481,16 +498,23 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
 
 EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryRequest& request)
 {
+    EphemerisEngineFactoryResult result;
     switch (request.engineKind) {
     case EphemerisEngineKind::Simple:
-        return EphemerisEngineFactoryResult::success(
+        result = EphemerisEngineFactoryResult::success(
             std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options)
         );
+        break;
     case EphemerisEngineKind::HighPrecision:
-        return createHighPrecisionEphemerisEngine(request);
+        result = createHighPrecisionEphemerisEngine(request);
+        break;
+    default:
+        result = makeInvalidFactoryRequestResult();
+        break;
     }
 
-    return makeInvalidFactoryRequestResult();
+    publishDiagnostics(request.diagnosticsSink, result.diagnostics);
+    return result;
 }
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine()

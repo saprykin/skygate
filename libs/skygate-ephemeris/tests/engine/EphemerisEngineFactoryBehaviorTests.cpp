@@ -114,9 +114,14 @@ public:
         const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::TimeScale targetScale
     ) const override
     {
+        static_cast<void>(epoch);
+        ++m_convertCallCount;
         skygate::ephemeris::TimeScaleConversionResult result;
-        result.epoch = epoch;
-        result.epoch.timeScale = targetScale;
+        result.epoch = {
+            .julianDatePart1 = 2'400'000.5,
+            .julianDatePart2 = 53'736.0,
+            .timeScale = targetScale,
+        };
         result.status = skygate::ephemeris::TimeScaleConversionStatus::Valid;
         return result;
     }
@@ -135,22 +140,89 @@ public:
         result.addWarning(skygate::ephemeris::TimeScaleConversionWarningCode::InvalidInput);
         return result;
     }
+
+    [[nodiscard]] std::size_t convertCallCount() const noexcept
+    {
+        return m_convertCallCount;
+    }
+
+private:
+    mutable std::size_t m_convertCallCount = 0U;
 };
 
 class TestEarthOrientationProvider final : public skygate::ephemeris::IEarthOrientationProvider {
 public:
+    explicit TestEarthOrientationProvider(
+        const skygate::ephemeris::AstronomicalEpoch& effectiveUtcEpoch =
+            skygate::ephemeris::AstronomicalEpoch{
+                .julianDatePart1 = 2'400'000.5,
+                .julianDatePart2 = 53'736.0,
+                .timeScale = skygate::ephemeris::TimeScale::Utc,
+            }
+    )
+    {
+        m_dataInfo.status = skygate::ephemeris::EarthOrientationDataStatus::Available;
+        m_dataInfo.provenance = "factory behavior EOP";
+        m_entries.push_back(skygate::ephemeris::EarthOrientationTableEntry{
+            .effectiveUtcDate =
+                skygate::ephemeris::CivilDateTime{
+                    .astronomicalYear = 2023,
+                    .month = 2,
+                    .day = 25,
+                    .timeScale = skygate::ephemeris::TimeScale::Utc,
+                },
+            .effectiveUtcEpoch = effectiveUtcEpoch,
+            .ut1MinusUtcSeconds = 0.0,
+            .polarMotionXArcseconds = 0.0,
+            .polarMotionYArcseconds = 0.0,
+        });
+    }
+
     [[nodiscard]] const skygate::ephemeris::EarthOrientationDataInfo& dataInfo() const noexcept override
     {
+        ++m_dataInfoCallCount;
         return m_dataInfo;
     }
 
     [[nodiscard]] std::span<const skygate::ephemeris::EarthOrientationTableEntry> entries() const noexcept override
     {
-        return {};
+        ++m_entriesCallCount;
+        return m_entries;
+    }
+
+    [[nodiscard]] std::size_t dataInfoCallCount() const noexcept
+    {
+        return m_dataInfoCallCount;
+    }
+
+    [[nodiscard]] std::size_t entriesCallCount() const noexcept
+    {
+        return m_entriesCallCount;
     }
 
 private:
     skygate::ephemeris::EarthOrientationDataInfo m_dataInfo;
+    std::vector<skygate::ephemeris::EarthOrientationTableEntry> m_entries;
+    mutable std::size_t m_dataInfoCallCount = 0U;
+    mutable std::size_t m_entriesCallCount = 0U;
+};
+
+class RecordingEphemerisDiagnosticsSink final : public skygate::ephemeris::IEphemerisDiagnosticsSink {
+public:
+    void recordFactoryCreationDiagnostic(const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic
+    ) override
+    {
+        m_diagnostics.push_back(diagnostic);
+    }
+
+    [[nodiscard]] const std::vector<skygate::ephemeris::EphemerisFactoryCreationDiagnostic>&
+    diagnostics() const noexcept
+    {
+        return m_diagnostics;
+    }
+
+private:
+    std::vector<skygate::ephemeris::EphemerisFactoryCreationDiagnostic> m_diagnostics;
 };
 
 class TestCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
@@ -259,6 +331,7 @@ private slots:
     void compatibilityOverloadsCreateSimpleEngines();
     void simpleRequestCreatesRequestedEngineWithOptions();
     void highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable();
+    void highPrecisionRequestWiresApparentTopocentricCorrectionPath();
     void highPrecisionRequestFallsBackOnlyWhenAllowed();
     void invalidEngineKindReturnsStructuredInvalidRequest();
 };
@@ -480,9 +553,64 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"snapshot provenance"});
 }
 
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopocentricCorrectionPath()
+{
+    const QByteArray kernelPayload("fake kernel payload");
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const std::string kernelPath = writeKernelFixture(directory, kernelPayload);
+    QVERIFY(!kernelPath.empty());
+
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.catalogBodies = bodies;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric;
+    request.options.enableAtmosphericRefraction = false;
+    const skygate::ephemeris::EphemerisDataManifest manifest =
+        makeFactoryManifest(kernelPayload, static_cast<std::uint64_t>(kernelPayload.size()));
+    request.dataManifest = &manifest;
+    request.activeDataSnapshot =
+        std::make_shared<TestEphemerisDataSnapshot>(skygate::ephemeris::EphemerisKernelDataAsset{
+            .id = "kernel",
+            .profileId = "modern",
+            .version = "snapshot-version",
+            .provenance = "snapshot provenance",
+            .activePath = kernelPath,
+        });
+    auto timeScaleService = std::make_shared<TestTimeScaleService>();
+    auto earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+    request.timeScaleService = timeScaleService;
+    request.earthOrientationProvider = earthOrientationProvider;
+    request.calcephKernelRuntime = std::make_shared<TestCalcephKernelRuntime>();
+
+    auto result = skygate::ephemeris::createEphemerisEngine(request);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.engine != nullptr);
+
+    skygate::ephemeris::EphemerisRequest computeRequest;
+    computeRequest.context = makeContext();
+    computeRequest.epoch = {
+        .julianDatePart1 = 2'460'000.5,
+        .julianDatePart2 = 0.0,
+        .timeScale = skygate::ephemeris::TimeScale::Tdb,
+    };
+    computeRequest.options = request.options;
+
+    const auto state = result.engine->computeBodyState(computeRequest, "sun");
+
+    QVERIFY(state.has_value());
+    QVERIFY(timeScaleService->convertCallCount() > std::size_t{0});
+    QVERIFY(earthOrientationProvider->dataInfoCallCount() > std::size_t{0});
+    QVERIFY(earthOrientationProvider->entriesCallCount() > std::size_t{0});
+}
+
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenAllowed()
 {
     const std::array bodies{makeFactoryBehaviorBody()};
+    RecordingEphemerisDiagnosticsSink fallbackDiagnosticsSink;
 
     skygate::ephemeris::EphemerisEngineFactoryRequest fallbackRequest;
     fallbackRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
@@ -490,6 +618,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     fallbackRequest.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
     fallbackRequest.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
     fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    fallbackRequest.diagnosticsSink = &fallbackDiagnosticsSink;
 
     auto fallback = skygate::ephemeris::createEphemerisEngine(fallbackRequest);
 
@@ -502,9 +631,16 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
         static_cast<std::uint8_t>(fallback.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback)
     );
+    QCOMPARE(fallbackDiagnosticsSink.diagnostics().size(), fallback.diagnostics.size());
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallbackDiagnosticsSink.diagnostics().front().severity),
+        static_cast<std::uint8_t>(fallback.diagnostics.front().severity)
+    );
 
+    RecordingEphemerisDiagnosticsSink strictDiagnosticsSink;
     skygate::ephemeris::EphemerisEngineFactoryRequest strictRequest = fallbackRequest;
     strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    strictRequest.diagnosticsSink = &strictDiagnosticsSink;
 
     const auto strict = skygate::ephemeris::createEphemerisEngine(strictRequest);
 
@@ -520,6 +656,12 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
             skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
         )
     );
+    QCOMPARE(strictDiagnosticsSink.diagnostics().size(), strict.diagnostics.size());
+    QCOMPARE(
+        static_cast<std::uint8_t>(strictDiagnosticsSink.diagnostics().front().severity),
+        static_cast<std::uint8_t>(strict.diagnostics.front().severity)
+    );
+    QVERIFY(strictDiagnosticsSink.diagnostics().front().isError());
 }
 
 void EphemerisEngineFactoryBehaviorTests::invalidEngineKindReturnsStructuredInvalidRequest()
