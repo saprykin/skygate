@@ -90,6 +90,26 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
     return key < epochSortKey(range.start) || key > epochSortKey(range.end);
 }
 
+[[nodiscard]] bool taiEpochOutsideUtcRange(
+    const AstronomicalEpoch& taiEpoch,
+    const EphemerisDateRange& utcRange,
+    const std::shared_ptr<const ILeapSecondProvider>& provider
+) noexcept
+{
+    const std::optional<int> startOffsetSeconds = provider->taiMinusUtcSeconds(utcRange.start);
+    const std::optional<int> endOffsetSeconds = provider->taiMinusUtcSeconds(utcRange.end);
+    if (!startOffsetSeconds.has_value() || !endOffsetSeconds.has_value()) {
+        return true;
+    }
+
+    const double key = epochSortKey(taiEpoch);
+    const AstronomicalEpoch startTaiEpoch =
+        addSeconds(utcRange.start, static_cast<double>(*startOffsetSeconds), TimeScale::Tai);
+    const AstronomicalEpoch endTaiEpoch =
+        addSeconds(utcRange.end, static_cast<double>(*endOffsetSeconds), TimeScale::Tai);
+    return key < epochSortKey(startTaiEpoch) || key > epochSortKey(endTaiEpoch);
+}
+
 [[nodiscard]] OffsetLookupResult fallbackOffset(
     const TimeScaleServiceOptions& options, TimeScaleConversionWarningCode warningCode, std::string diagnosticText
 )
@@ -192,6 +212,22 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
             break;
         }
         offset = entry.taiMinusUtcSeconds;
+    }
+
+    if (tableInfo.validityRange.has_value() && taiEpochOutsideUtcRange(taiEpoch, *tableInfo.validityRange, provider)) {
+        if (!options.allowDegradedLeapSecondFallback) {
+            result.status = TimeScaleConversionStatus::Failed;
+            result.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
+            result.diagnosticText = "TAI epoch is outside the leap-second table validity range.";
+            return result;
+        }
+
+        result.offsetSeconds = offset.value_or(options.fallbackTaiMinusUtcSeconds);
+        result.status = TimeScaleConversionStatus::Degraded;
+        result.addWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable);
+        result.addWarning(TimeScaleConversionWarningCode::LeapSecondFallbackApplied);
+        result.diagnosticText = "TAI epoch used a degraded leap-second range fallback.";
+        return result;
     }
 
     if (!offset.has_value()) {
@@ -312,7 +348,18 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
         return result;
     }
 
-    const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(dateTime);
+    std::optional<AstronomicalEpoch> epoch;
+    if (!isUtcLeapSecondLabel(dateTime)) {
+        epoch = astronomicalEpochFromCivilDateTime(dateTime);
+    } else {
+        CivilDateTime precedingSecond = dateTime;
+        precedingSecond.second = 59;
+        const std::optional<AstronomicalEpoch> precedingEpoch = astronomicalEpochFromCivilDateTime(precedingSecond);
+        if (precedingEpoch.has_value()) {
+            epoch = addSeconds(*precedingEpoch, 1.0, TimeScale::Utc);
+        }
+    }
+
     if (!epoch.has_value()) {
         AstronomicalEpoch failedEpoch;
         failedEpoch.timeScale = targetScale;

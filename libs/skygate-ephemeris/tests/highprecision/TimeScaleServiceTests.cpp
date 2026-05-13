@@ -80,6 +80,7 @@ private slots:
     void convertsPositiveLeapSecondCivilLabel();
     void convertsAtTableRangeBoundaries();
     void reportsOutOfRangeWithoutFallback();
+    void reportsReverseOutOfRangeWithoutFallback();
     void usesDegradedFallbackForMissingTableWhenAllowed();
 };
 
@@ -162,6 +163,7 @@ void TimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     };
     QVERIFY(skygate::ephemeris::isValidCivilDateTime(leapSecond));
+    QVERIFY(!skygate::ephemeris::astronomicalEpochFromCivilDateTime(leapSecond).has_value());
 
     const skygate::ephemeris::TimeScaleConversionResult tai =
         service.convertCivilDateTime(leapSecond, skygate::ephemeris::TimeScale::Tai);
@@ -206,6 +208,37 @@ void TimeScaleServiceTests::reportsOutOfRangeWithoutFallback()
     );
     QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable));
     QVERIFY(!result.diagnosticText.empty());
+}
+
+void TimeScaleServiceTests::reportsReverseOutOfRangeWithoutFallback()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+
+    skygate::ephemeris::AstronomicalEpoch tai = makeUtcEpoch(2030, 1, 1);
+    tai.timeScale = skygate::ephemeris::TimeScale::Tai;
+    const skygate::ephemeris::TimeScaleConversionResult utcFromTai =
+        service.convert(tai, skygate::ephemeris::TimeScale::Utc);
+
+    QVERIFY(!utcFromTai.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(utcFromTai.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Failed)
+    );
+    QVERIFY(utcFromTai.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable));
+    QVERIFY(!utcFromTai.diagnosticText.empty());
+
+    skygate::ephemeris::AstronomicalEpoch tt = makeUtcEpoch(2030, 1, 1);
+    tt.timeScale = skygate::ephemeris::TimeScale::Tt;
+    const skygate::ephemeris::TimeScaleConversionResult utcFromTt =
+        service.convert(tt, skygate::ephemeris::TimeScale::Utc);
+
+    QVERIFY(!utcFromTt.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(utcFromTt.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Failed)
+    );
+    QVERIFY(utcFromTt.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable));
+    QVERIFY(!utcFromTt.diagnosticText.empty());
 }
 
 void TimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAllowed()

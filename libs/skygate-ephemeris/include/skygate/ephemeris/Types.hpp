@@ -185,6 +185,9 @@ daysFromCivilDate(const int astronomicalYear, const int month, const int day) no
     if (!isValidCivilDateTime(dateTime)) {
         return std::nullopt;
     }
+    if (dateTime.second == 60) {
+        return std::nullopt;
+    }
 
     const std::int64_t daysSinceUnixEpoch =
         detail::daysFromCivilDate(dateTime.astronomicalYear, dateTime.month, dateTime.day);

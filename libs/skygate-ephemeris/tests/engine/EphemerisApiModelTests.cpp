@@ -289,6 +289,18 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
         .day = 29,
     };
     QVERIFY(!skygate::ephemeris::astronomicalEpochFromCivilDateTime(invalidLeapDay).has_value());
+
+    const skygate::ephemeris::CivilDateTime leapSecondLabel{
+        .astronomicalYear = 2016,
+        .month = 12,
+        .day = 31,
+        .hour = 23,
+        .minute = 59,
+        .second = 60,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    };
+    QVERIFY(skygate::ephemeris::isValidCivilDateTime(leapSecondLabel));
+    QVERIFY(!skygate::ephemeris::astronomicalEpochFromCivilDateTime(leapSecondLabel).has_value());
 }
 
 void EphemerisApiModelTests::constructsFactoryRequestDefaults()
