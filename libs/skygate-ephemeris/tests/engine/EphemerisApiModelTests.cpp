@@ -19,6 +19,9 @@ private slots:
     void constructsHighPrecisionModelDefaults();
     void combinesCorrectionFlags();
     void constructsRequestAndDataSetModels();
+    void constructsFactoryRequestDefaults();
+    void constructsSimpleAndHighPrecisionFactoryRequests();
+    void exposesFactoryFallbackPolicyHelpers();
     void constructsResultStatusAndWarningModels();
     void keepsLegacyBodyStateFieldsReadableWithMetadata();
     void simpleEngineExposesMetadataDefaults();
@@ -141,6 +144,95 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
         static_cast<std::uint8_t>(dataSet.dateRanges.front().start.timeScale),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
     );
+}
+
+void EphemerisApiModelTests::constructsFactoryRequestDefaults()
+{
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(request.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QCOMPARE(request.catalogBodies.size(), std::size_t{0});
+    QCOMPARE(
+        static_cast<std::uint8_t>(request.options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(request.fallbackPolicy),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback)
+    );
+    QVERIFY(skygate::ephemeris::allowsSimpleEngineFallback(request.fallbackPolicy));
+    QVERIFY(request.dataSetManifest == nullptr);
+    QVERIFY(request.activeDataSnapshot == nullptr);
+    QVERIFY(request.timeScaleService == nullptr);
+    QVERIFY(request.earthOrientationProvider == nullptr);
+    QVERIFY(request.diagnosticsSink == nullptr);
+}
+
+void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
+{
+    const std::array bodies{
+        skygate::ephemeris::CelestialBody{
+            .id = "vega",
+            .displayName = "Vega",
+            .type = skygate::ephemeris::CelestialBodyType::Star,
+            .fixedEquatorial =
+                skygate::core::EquatorialCoordinate{
+                    .rightAscensionHours = 18.6156,
+                    .declinationDeg = 38.7837,
+                },
+        },
+    };
+
+    skygate::ephemeris::EphemerisEngineFactoryRequest simpleRequest;
+    simpleRequest.catalogBodies = bodies;
+
+    QCOMPARE(simpleRequest.catalogBodies.size(), std::size_t{1});
+    QVERIFY(simpleRequest.catalogBodies.front().id == std::string{"vega"});
+    QCOMPARE(
+        static_cast<std::uint8_t>(simpleRequest.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+
+    skygate::ephemeris::EphemerisDataSetInfo manifest;
+    manifest.id = "de440s";
+    manifest.displayName = "DE440s";
+
+    skygate::ephemeris::EphemerisEngineFactoryRequest highPrecisionRequest;
+    highPrecisionRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    highPrecisionRequest.catalogBodies = bodies;
+    highPrecisionRequest.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    highPrecisionRequest.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+    highPrecisionRequest.dataSetManifest = &manifest;
+    highPrecisionRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(highPrecisionRequest.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(highPrecisionRequest.options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(highPrecisionRequest.options.correctionFlags),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Apparent)
+    );
+    QVERIFY(highPrecisionRequest.dataSetManifest == &manifest);
+    QVERIFY(!skygate::ephemeris::allowsSimpleEngineFallback(highPrecisionRequest.fallbackPolicy));
+}
+
+void EphemerisApiModelTests::exposesFactoryFallbackPolicyHelpers()
+{
+    constexpr auto strictPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    constexpr auto fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+
+    QVERIFY(!skygate::ephemeris::allowsSimpleEngineFallback(strictPolicy));
+    QVERIFY(skygate::ephemeris::allowsSimpleEngineFallback(fallbackPolicy));
+    QVERIFY(skygate::ephemeris::displayName(strictPolicy) == std::string_view{"strict high precision"});
+    QVERIFY(skygate::ephemeris::displayName(fallbackPolicy) == std::string_view{"allow simple engine fallback"});
 }
 
 void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
