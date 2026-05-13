@@ -171,6 +171,7 @@ private slots:
     void transformsTirsToItrsAgainstSofaReference();
     void transformsGcrsToItrsAgainstSofaReference();
     void degradesItrsTransformForPredictedEarthOrientationData();
+    void degradesItrsTransformForStaleEarthOrientationData();
     void degradesItrsTransformForMissingEarthOrientationData();
 };
 
@@ -371,6 +372,26 @@ void FrameTransformerTests::transformsGcrsToItrsAgainstSofaReference()
 void FrameTransformerTests::degradesItrsTransformForPredictedEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider(true));
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Tirs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+}
+
+void FrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
+{
+    const ErfaFrameTransformer transformer(
+        frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Stale)
+    );
 
     const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
         .sourceFrame = CelestialReferenceFrame::Tirs,
