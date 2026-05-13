@@ -179,7 +179,7 @@ private slots:
     void routesGeometricRequestsToGcrs();
     void routesRequestsWithoutPrecessionNutationToGcrs();
     void routesAstrometricRequestsWithUnsupportedRefractionToGcrs();
-    void routesApparentRequestsToCirs();
+    void routesApparentRequestsToTrueEquatorAndEquinox();
     void appliesPrecessionNutationWhenRequested();
     void propagatesDegradedTransformMetadataForPrecessionNutation();
     void propagatesDegradedRealFrameTransformMetadataForPrecessionNutation();
@@ -264,7 +264,7 @@ void ApparentPlaceCalculatorTests::routesAstrometricRequestsWithUnsupportedRefra
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 }
 
-void ApparentPlaceCalculatorTests::routesApparentRequestsToCirs()
+void ApparentPlaceCalculatorTests::routesApparentRequestsToTrueEquatorAndEquinox()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
     const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
@@ -279,7 +279,7 @@ void ApparentPlaceCalculatorTests::routesApparentRequestsToCirs()
     );
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(
@@ -309,7 +309,7 @@ void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 6.0);
@@ -338,7 +338,7 @@ void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecess
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)

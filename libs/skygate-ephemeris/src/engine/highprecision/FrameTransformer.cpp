@@ -32,6 +32,7 @@ constexpr double kSecondsPerDay = 86'400.0;
     case CelestialReferenceFrame::Icrs:
     case CelestialReferenceFrame::Gcrs:
         return 0U;
+    case CelestialReferenceFrame::TrueEquatorAndEquinox:
     case CelestialReferenceFrame::Cirs:
         return 1U;
     case CelestialReferenceFrame::Tirs:
@@ -410,6 +411,65 @@ makeStageMetadata(const CelestialReferenceFrame sourceFrame, const CelestialRefe
     return lowerRank == 0U ? EphemerisCorrectionFlags::PrecessionNutation : EphemerisCorrectionFlags::EarthOrientation;
 }
 
+[[nodiscard]] bool isGcrsLike(const CelestialReferenceFrame frame) noexcept
+{
+    return frame == CelestialReferenceFrame::Icrs || frame == CelestialReferenceFrame::Gcrs;
+}
+
+[[nodiscard]] std::optional<Matrix3x3>
+apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisResultMetadata& metadata)
+{
+    const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, metadata);
+    if (!ttEpoch.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<Matrix3x3> matrix = precessionNutationMatrix06A(JulianDateParts{
+        .day1 = ttEpoch->julianDatePart1,
+        .day2 = ttEpoch->julianDatePart2,
+    });
+    if (!matrix.has_value()) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        return std::nullopt;
+    }
+
+    return matrix;
+}
+
+[[nodiscard]] std::optional<CelestialFrameTransformResult> tryTransformApparentEquatorAndEquinox(
+    const CelestialFrameTransformRequest& request, const FrameTransformContext& context
+)
+{
+    const bool forward =
+        isGcrsLike(request.sourceFrame) && request.targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox;
+    const bool reverse =
+        request.sourceFrame == CelestialReferenceFrame::TrueEquatorAndEquinox && isGcrsLike(request.targetFrame);
+    if (!forward && !reverse) {
+        return std::nullopt;
+    }
+
+    CelestialFrameTransformResult result;
+    result.metadata.status = EphemerisResultStatus::Valid;
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    result.metadata.dataSourceProvenance = kFrameTransformProvenance;
+
+    CelestialFrameTransformStageMetadata stage = makeStageMetadata(request.sourceFrame, request.targetFrame);
+    const std::optional<Matrix3x3> matrix = apparentEquatorAndEquinoxMatrix(context, stage.metadata);
+    if (!matrix.has_value()) {
+        mergeStageMetadata(result.metadata, stage.metadata);
+        result.stages.push_back(std::move(stage));
+        return result;
+    }
+
+    result.vector = forward ? multiply(*matrix, request.vector) : multiplyTranspose(*matrix, request.vector);
+    stage.applied = true;
+    stage.metadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+    mergeStageMetadata(result.metadata, stage.metadata);
+    result.stages.push_back(std::move(stage));
+    return result;
+}
+
 }  // namespace
 
 ErfaFrameTransformer::ErfaFrameTransformer(
@@ -429,7 +489,9 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
 
     const std::uint8_t sourceRank = frameRank(request.sourceFrame);
     const std::uint8_t targetRank = frameRank(request.targetFrame);
-    if (sourceRank == targetRank) {
+    if (sourceRank == targetRank
+        && (request.sourceFrame == request.targetFrame
+            || (isGcrsLike(request.sourceFrame) && isGcrsLike(request.targetFrame)))) {
         return makeIdentityResult(request);
     }
 
@@ -443,6 +505,15 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
         .timeScaleService = m_timeScaleService.get(),
         .earthOrientationProvider = m_earthOrientationProvider.get(),
     };
+    if (std::optional<CelestialFrameTransformResult> apparentResult =
+            tryTransformApparentEquatorAndEquinox(request, context);
+        apparentResult.has_value()) {
+        return *apparentResult;
+    }
+    if (sourceRank == targetRank) {
+        return makeFailedResult(EphemerisWarningCode::CorrectionUnavailable);
+    }
+
     CelestialFrameVector transformed = request.vector;
     if (sourceRank < targetRank) {
         for (std::uint8_t lowerRank = sourceRank; lowerRank < targetRank; ++lowerRank) {

@@ -12,6 +12,7 @@ namespace skygate::ephemeris::highprecision {
 enum class CelestialReferenceFrame : std::uint8_t {
     Icrs,
     Gcrs,
+    TrueEquatorAndEquinox,
     Cirs,
     Tirs,
     Itrs

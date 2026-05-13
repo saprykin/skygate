@@ -14,6 +14,7 @@ struct JulianDateParts {
 
 [[nodiscard]] std::optional<JulianDateParts> calendarDateToJulianDate(int year, int month, int day) noexcept;
 [[nodiscard]] std::optional<Matrix3x3> celestialToIntermediateMatrix06A(JulianDateParts terrestrialTime) noexcept;
+[[nodiscard]] std::optional<Matrix3x3> precessionNutationMatrix06A(JulianDateParts terrestrialTime) noexcept;
 [[nodiscard]] std::optional<double> earthRotationAngle00(JulianDateParts universalTime1) noexcept;
 [[nodiscard]] std::optional<double> tioLocatorS00(JulianDateParts terrestrialTime) noexcept;
 [[nodiscard]] std::optional<Matrix3x3>

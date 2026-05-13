@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "source": "JPL Horizons",
+    "sourceUrl": "https://ssd.jpl.nasa.gov/api/horizons.api",
+    "apiParameters": "COMMAND='499'; CENTER='500@399'; EPHEM_TYPE=OBSERVER; QUANTITIES='2'; REF_SYSTEM=ICRF; APPARENT=AIRLESS; COMMAND='499','399','10'; EPHEM_TYPE=VECTORS; CENTER='@399'/'@0'; REF_PLANE=FRAME; OUT_UNITS=AU-D",
+    "generatedDate": "2026-05-13",
+    "sourceFrame": "IAU true equator and equinox of date apparent RA/Dec",
+    "timeScale": "UTC output with TDB vector inputs",
+    "target": "Mars body center (499)",
+    "observer": "Earth geocenter (399)"
+  },
+  "request": {
+    "julianDateTdb": 2460310.500000000
+  },
+  "kernelStates": [
+    {
+      "role": "geometric",
+      "targetNaifId": 499,
+      "centerNaifId": 399,
+      "julianDateTdb": 2460310.500000000,
+      "positionAu": [-1.274935030596002E-01, -2.211390407247969E+00, -9.840400192216817E-01]
+    },
+    {
+      "role": "earth-receive",
+      "targetNaifId": 399,
+      "centerNaifId": 0,
+      "julianDateTdb": 2460310.500000000,
+      "positionAu": [-1.738192017257054E-01, 8.865236347050142E-01, 3.845244009122337E-01],
+      "velocityAuPerDay": [-1.723001232538228E-02, -2.723084963441052E-03, -1.179906206709686E-03]
+    },
+    {
+      "role": "target-retarded",
+      "targetNaifId": 499,
+      "centerNaifId": 0,
+      "julianDateTdb": 2460310.4860012624,
+      "positionAu": [-3.015256951614944E-01, -1.324876675087526E+00, -5.994729051594873E-01]
+    },
+    {
+      "role": "target-retarded",
+      "targetNaifId": 499,
+      "centerNaifId": 0,
+      "julianDateTdb": 2460310.4860012457,
+      "positionAu": [-3.015256954088563E-01, -1.324876675064982E+00, -5.994729051424773E-01]
+    },
+    {
+      "role": "target-retarded",
+      "targetNaifId": 499,
+      "centerNaifId": 0,
+      "julianDateTdb": 2460310.4860012457,
+      "positionAu": [-3.015256954088563E-01, -1.324876675064982E+00, -5.994729051424773E-01]
+    },
+    {
+      "role": "sun-geocentric",
+      "targetNaifId": 10,
+      "centerNaifId": 399,
+      "julianDateTdb": 2460310.500000000,
+      "positionAu": [1.658512460341716E-01, -8.892737009468347E-01, -3.854874803387113E-01]
+    }
+  ],
+  "expected": {
+    "rightAscensionHours": 17.8036279136,
+    "declinationDegrees": -23.961388660
+  },
+  "tolerance": {
+    "angularDegrees": 0.02
+  }
+}

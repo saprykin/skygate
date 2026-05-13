@@ -51,7 +51,7 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     case ApparentPlaceRequestMode::Astrometric:
         return CelestialReferenceFrame::Gcrs;
     case ApparentPlaceRequestMode::Apparent:
-        return CelestialReferenceFrame::Cirs;
+        return CelestialReferenceFrame::TrueEquatorAndEquinox;
     case ApparentPlaceRequestMode::Topocentric:
         return CelestialReferenceFrame::Itrs;
     }

@@ -52,6 +52,26 @@ std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const JulianDateParts 
 #endif
 }
 
+std::optional<Matrix3x3> precessionNutationMatrix06A(const JulianDateParts terrestrialTime) noexcept
+{
+    if (!std::isfinite(terrestrialTime.day1) || !std::isfinite(terrestrialTime.day2)) {
+        return std::nullopt;
+    }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    double matrix[3][3] = {};
+    eraPnm06a(terrestrialTime.day1, terrestrialTime.day2, matrix);
+
+    return Matrix3x3{
+        std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
+        std::array<double, 3>{matrix[1][0], matrix[1][1], matrix[1][2]},
+        std::array<double, 3>{matrix[2][0], matrix[2][1], matrix[2][2]},
+    };
+#else
+    return std::nullopt;
+#endif
+}
+
 std::optional<double> earthRotationAngle00(const JulianDateParts universalTime1) noexcept
 {
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
