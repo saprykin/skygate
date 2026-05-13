@@ -51,6 +51,26 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
     return context;
 }
 
+[[nodiscard]] bool requestsUnsupportedSimpleOptions(const EphemerisEngineOptions& options) noexcept
+{
+    return options.correctionFlags != EphemerisCorrectionFlags::NoCorrections || options.enableAtmosphericRefraction;
+}
+
+void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
+{
+    if (!requestsUnsupportedSimpleOptions(options)) {
+        return;
+    }
+
+    for (CelestialBodyState& state : snapshot.states) {
+        if (state.metadata.status == EphemerisResultStatus::Valid) {
+            state.metadata.status = EphemerisResultStatus::Degraded;
+        }
+        state.metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+        state.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    }
+}
+
 }  // namespace
 
 class SimpleEphemerisEngine final : public IEphemerisEngine {
@@ -109,7 +129,9 @@ public:
 
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override
     {
-        return compute(contextFromRequest(request));
+        SkySnapshot snapshot = compute(contextFromRequest(request));
+        markUnsupportedSimpleOptions(snapshot, request.options);
+        return snapshot;
     }
 
     [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override
