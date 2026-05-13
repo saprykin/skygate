@@ -32,6 +32,23 @@ struct OffsetLookupResult {
     }
 };
 
+struct Ut1OffsetLookupResult {
+    std::optional<double> ut1MinusUtcSeconds;
+    TimeScaleConversionStatus status = TimeScaleConversionStatus::Valid;
+    std::uint32_t warningCodeMask = 0U;
+    std::string diagnosticText;
+
+    void addWarning(const TimeScaleConversionWarningCode code) noexcept
+    {
+        warningCodeMask |= timeScaleConversionWarningMask(code);
+    }
+
+    [[nodiscard]] bool isSuccess() const noexcept
+    {
+        return status == TimeScaleConversionStatus::Valid || status == TimeScaleConversionStatus::Degraded;
+    }
+};
+
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
 {
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
@@ -296,6 +313,14 @@ void mergeOffsetWarnings(TimeScaleConversionResult& result, const OffsetLookupRe
     }
 }
 
+void mergeUt1OffsetWarnings(TimeScaleConversionResult& result, const Ut1OffsetLookupResult& lookup) noexcept
+{
+    result.warningCodeMask |= lookup.warningCodeMask;
+    if (lookup.status == TimeScaleConversionStatus::Degraded && result.status == TimeScaleConversionStatus::Valid) {
+        result.status = TimeScaleConversionStatus::Degraded;
+    }
+}
+
 void mergeConversionWarnings(TimeScaleConversionResult& result, const TimeScaleConversionResult& source) noexcept
 {
     result.warningCodeMask |= source.warningCodeMask;
@@ -310,12 +335,219 @@ void addTdbApproximationWarning(TimeScaleConversionResult& result) noexcept
     result.addWarning(TimeScaleConversionWarningCode::TdbApproximationApplied);
 }
 
+[[nodiscard]] TimeScaleConversionWarningCode
+timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampleWarningCode code) noexcept
+{
+    switch (code) {
+    case EarthOrientationSampleWarningCode::StaleData:
+        return TimeScaleConversionWarningCode::EarthOrientationDataStale;
+    case EarthOrientationSampleWarningCode::PredictedData:
+        return TimeScaleConversionWarningCode::EarthOrientationDataPredicted;
+    case EarthOrientationSampleWarningCode::MissingData:
+        return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
+    case EarthOrientationSampleWarningCode::EpochOutsideRange:
+        return TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData;
+    case EarthOrientationSampleWarningCode::InvalidInput:
+        return TimeScaleConversionWarningCode::InvalidInput;
+    }
+
+    return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
+}
+
+void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const EarthOrientationSample& sample) noexcept
+{
+    for (std::uint8_t codeIndex = 0U;
+         codeIndex <= static_cast<std::uint8_t>(EarthOrientationSampleWarningCode::InvalidInput);
+         ++codeIndex) {
+        const auto sampleCode = static_cast<EarthOrientationSampleWarningCode>(codeIndex);
+        if (sample.hasWarning(sampleCode)) {
+            result.addWarning(timeScaleWarningFromEarthOrientationWarning(sampleCode));
+        }
+    }
+}
+
+[[nodiscard]] Ut1OffsetLookupResult eopUt1Offset(
+    const std::shared_ptr<const IEarthOrientationProvider>& earthOrientationProvider,
+    const TimeScaleServiceOptions& options,
+    const AstronomicalEpoch& utcEpoch
+)
+{
+    const EarthOrientationSample sample =
+        sampleEarthOrientation(earthOrientationProvider, utcEpoch, options.earthOrientationSampleOptions);
+
+    Ut1OffsetLookupResult result;
+    result.diagnosticText = sample.diagnosticText;
+    mergeEarthOrientationSampleWarnings(result, sample);
+    if (!sample.isSuccess()) {
+        result.status = TimeScaleConversionStatus::Failed;
+        return result;
+    }
+
+    result.ut1MinusUtcSeconds = sample.ut1MinusUtcSeconds;
+    result.status = sample.status == EarthOrientationSampleStatus::Degraded ? TimeScaleConversionStatus::Degraded
+                                                                            : TimeScaleConversionStatus::Valid;
+    return result;
+}
+
+[[nodiscard]] Ut1OffsetLookupResult deltaTUt1Offset(
+    const std::shared_ptr<const ILeapSecondProvider>& leapSecondProvider,
+    const std::shared_ptr<const IDeltaTProvider>& deltaTProvider,
+    const TimeScaleServiceOptions& options,
+    const AstronomicalEpoch& utcEpoch,
+    Ut1OffsetLookupResult sourceFailure = {}
+)
+{
+    Ut1OffsetLookupResult result = std::move(sourceFailure);
+    if (!options.allowUt1DeltaTFallback) {
+        if (result.diagnosticText.empty()) {
+            result.diagnosticText = "UT1 conversion requires usable Earth-orientation data.";
+        }
+        result.status = TimeScaleConversionStatus::Failed;
+        return result;
+    }
+
+    if (deltaTProvider == nullptr) {
+        result.status = TimeScaleConversionStatus::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        result.diagnosticText = "UT1 conversion could not use Delta T fallback because data is unavailable.";
+        return result;
+    }
+
+    const DeltaTEstimate estimate = deltaTProvider->deltaTSeconds(utcEpoch);
+    if (!estimate.isUsable() || !estimate.deltaTSeconds.has_value()) {
+        result.status = TimeScaleConversionStatus::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        result.diagnosticText = estimate.diagnosticText.empty()
+                                    ? "UT1 conversion could not use Delta T fallback for the requested epoch."
+                                    : estimate.diagnosticText;
+        return result;
+    }
+
+    const OffsetLookupResult utcOffset = lookupUtcOffset(leapSecondProvider, options, utcEpoch);
+    if (!utcOffset.offsetSeconds.has_value()) {
+        result.status = TimeScaleConversionStatus::Failed;
+        result.warningCodeMask |= utcOffset.warningCodeMask;
+        result.diagnosticText = utcOffset.diagnosticText;
+        return result;
+    }
+
+    result.ut1MinusUtcSeconds =
+        static_cast<double>(*utcOffset.offsetSeconds) + kTtMinusTaiSeconds - *estimate.deltaTSeconds;
+    result.status = TimeScaleConversionStatus::Degraded;
+    result.warningCodeMask |= utcOffset.warningCodeMask;
+    result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    if (estimate.status == DeltaTEstimateStatus::Degraded) {
+        result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    }
+    result.diagnosticText =
+        estimate.diagnosticText.empty() ? "UT1 conversion used Delta T fallback metadata." : estimate.diagnosticText;
+    return result;
+}
+
+[[nodiscard]] Ut1OffsetLookupResult lookupUtcToUt1Offset(
+    const std::shared_ptr<const ILeapSecondProvider>& leapSecondProvider,
+    const std::shared_ptr<const IEarthOrientationProvider>& earthOrientationProvider,
+    const std::shared_ptr<const IDeltaTProvider>& deltaTProvider,
+    const TimeScaleServiceOptions& options,
+    const AstronomicalEpoch& utcEpoch
+)
+{
+    Ut1OffsetLookupResult result = eopUt1Offset(earthOrientationProvider, options, utcEpoch);
+    if (result.isSuccess()) {
+        return result;
+    }
+
+    return deltaTUt1Offset(leapSecondProvider, deltaTProvider, options, utcEpoch, std::move(result));
+}
+
+[[nodiscard]] TimeScaleConversionResult utcFromUt1WithDeltaT(
+    const std::shared_ptr<const ILeapSecondProvider>& leapSecondProvider,
+    const std::shared_ptr<const IDeltaTProvider>& deltaTProvider,
+    const TimeScaleServiceOptions& options,
+    const AstronomicalEpoch& ut1Epoch,
+    Ut1OffsetLookupResult sourceFailure
+)
+{
+    if (!options.allowUt1DeltaTFallback || deltaTProvider == nullptr) {
+        TimeScaleConversionResult result =
+            failureResult(ut1Epoch, TimeScale::Utc, std::move(sourceFailure.diagnosticText));
+        result.warningCodeMask = sourceFailure.warningCodeMask;
+        if (deltaTProvider == nullptr) {
+            result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        }
+        return result;
+    }
+
+    AstronomicalEpoch estimateEpoch = ut1Epoch;
+    estimateEpoch.timeScale = TimeScale::Utc;
+    const DeltaTEstimate estimate = deltaTProvider->deltaTSeconds(estimateEpoch);
+    if (!estimate.isUsable() || !estimate.deltaTSeconds.has_value()) {
+        TimeScaleConversionResult result = failureResult(
+            ut1Epoch,
+            TimeScale::Utc,
+            estimate.diagnosticText.empty() ? "UT1 conversion could not use Delta T fallback for the requested epoch."
+                                            : estimate.diagnosticText
+        );
+        result.warningCodeMask = sourceFailure.warningCodeMask;
+        result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
+        return result;
+    }
+
+    const AstronomicalEpoch ttEpoch = addSeconds(ut1Epoch, *estimate.deltaTSeconds, TimeScale::Tt);
+    const AstronomicalEpoch taiEpoch = addSeconds(ttEpoch, -kTtMinusTaiSeconds, TimeScale::Tai);
+    const OffsetLookupResult taiOffset = lookupTaiOffset(leapSecondProvider, options, taiEpoch);
+    if (!taiOffset.offsetSeconds.has_value()) {
+        TimeScaleConversionResult result = failureResult(taiEpoch, TimeScale::Utc, taiOffset.diagnosticText);
+        result.warningCodeMask = sourceFailure.warningCodeMask | taiOffset.warningCodeMask;
+        return result;
+    }
+
+    TimeScaleConversionResult result = successResult(
+        addSeconds(taiEpoch, -static_cast<double>(*taiOffset.offsetSeconds), TimeScale::Utc),
+        TimeScaleConversionStatus::Degraded,
+        sourceFailure.warningCodeMask | taiOffset.warningCodeMask,
+        estimate.diagnosticText.empty() ? "UT1 conversion used Delta T fallback metadata." : estimate.diagnosticText
+    );
+    result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+    return result;
+}
+
+[[nodiscard]] TimeScaleConversionResult lookupUtcFromUt1(
+    const std::shared_ptr<const ILeapSecondProvider>& leapSecondProvider,
+    const std::shared_ptr<const IEarthOrientationProvider>& earthOrientationProvider,
+    const std::shared_ptr<const IDeltaTProvider>& deltaTProvider,
+    const TimeScaleServiceOptions& options,
+    const AstronomicalEpoch& ut1Epoch
+)
+{
+    AstronomicalEpoch utcEpoch = ut1Epoch;
+    utcEpoch.timeScale = TimeScale::Utc;
+    Ut1OffsetLookupResult lookup;
+    for (int iteration = 0; iteration < 4; ++iteration) {
+        lookup = eopUt1Offset(earthOrientationProvider, options, utcEpoch);
+        if (!lookup.ut1MinusUtcSeconds.has_value()) {
+            return utcFromUt1WithDeltaT(leapSecondProvider, deltaTProvider, options, ut1Epoch, std::move(lookup));
+        }
+        utcEpoch = addSeconds(ut1Epoch, -*lookup.ut1MinusUtcSeconds, TimeScale::Utc);
+    }
+
+    TimeScaleConversionResult result =
+        successResult(utcEpoch, lookup.status, lookup.warningCodeMask, lookup.diagnosticText);
+    mergeUt1OffsetWarnings(result, lookup);
+    return result;
+}
+
 }  // namespace
 
 LeapSecondTimeScaleService::LeapSecondTimeScaleService(
-    std::shared_ptr<const ILeapSecondProvider> leapSecondProvider, TimeScaleServiceOptions options
+    std::shared_ptr<const ILeapSecondProvider> leapSecondProvider,
+    TimeScaleServiceOptions options,
+    std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider,
+    std::shared_ptr<const IDeltaTProvider> deltaTProvider
 )
-    : m_leapSecondProvider(std::move(leapSecondProvider)), m_options(options)
+    : m_leapSecondProvider(std::move(leapSecondProvider)),
+      m_earthOrientationProvider(std::move(earthOrientationProvider)), m_deltaTProvider(std::move(deltaTProvider)),
+      m_options(options)
 {
 }
 
@@ -334,6 +566,25 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
 
     switch (epoch.timeScale) {
     case TimeScale::Utc: {
+        if (targetScale == TimeScale::Ut1) {
+            const Ut1OffsetLookupResult lookup = lookupUtcToUt1Offset(
+                m_leapSecondProvider, m_earthOrientationProvider, m_deltaTProvider, m_options, epoch
+            );
+            if (!lookup.ut1MinusUtcSeconds.has_value()) {
+                TimeScaleConversionResult result = failureResult(epoch, targetScale, lookup.diagnosticText);
+                result.warningCodeMask = lookup.warningCodeMask;
+                return result;
+            }
+
+            TimeScaleConversionResult result =
+                successResult(addSeconds(epoch, *lookup.ut1MinusUtcSeconds, TimeScale::Ut1));
+            mergeUt1OffsetWarnings(result, lookup);
+            if (!lookup.diagnosticText.empty()) {
+                result.diagnosticText = lookup.diagnosticText;
+            }
+            return result;
+        }
+
         if (targetScale == TimeScale::Tdb) {
             const TimeScaleConversionResult tt = convert(epoch, TimeScale::Tt);
             if (!tt.isSuccess()) {
@@ -402,8 +653,30 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             }
             return result;
         }
+        if (targetScale == TimeScale::Ut1) {
+            TimeScaleConversionResult utc = convert(epoch, TimeScale::Utc);
+            if (!utc.isSuccess()) {
+                utc.epoch.timeScale = targetScale;
+                return utc;
+            }
+
+            TimeScaleConversionResult ut1 = convert(utc.epoch, TimeScale::Ut1);
+            mergeConversionWarnings(ut1, utc);
+            return ut1;
+        }
         break;
     case TimeScale::Tt:
+        if (targetScale == TimeScale::Ut1) {
+            TimeScaleConversionResult utc = convert(epoch, TimeScale::Utc);
+            if (!utc.isSuccess()) {
+                utc.epoch.timeScale = targetScale;
+                return utc;
+            }
+
+            TimeScaleConversionResult ut1 = convert(utc.epoch, TimeScale::Ut1);
+            mergeConversionWarnings(ut1, utc);
+            return ut1;
+        }
         if (targetScale == TimeScale::Tdb) {
             const std::optional<double> tdbMinusTt = tdbMinusTtSeconds(epoch);
             if (!tdbMinusTt.has_value()) {
@@ -458,8 +731,21 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
         mergeConversionWarnings(converted, result);
         return converted;
     }
-    case TimeScale::Ut1:
-        break;
+    case TimeScale::Ut1: {
+        TimeScaleConversionResult utc =
+            lookupUtcFromUt1(m_leapSecondProvider, m_earthOrientationProvider, m_deltaTProvider, m_options, epoch);
+        if (targetScale == TimeScale::Utc) {
+            return utc;
+        }
+        if (!utc.isSuccess()) {
+            utc.epoch.timeScale = targetScale;
+            return utc;
+        }
+
+        TimeScaleConversionResult converted = convert(utc.epoch, targetScale);
+        mergeConversionWarnings(converted, utc);
+        return converted;
+    }
     }
 
     TimeScaleConversionResult result =
