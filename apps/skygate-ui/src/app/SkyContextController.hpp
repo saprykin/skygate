@@ -23,11 +23,16 @@
 #include <utility>
 #include <vector>
 
+namespace skygate::ephemeris {
+class IEphemerisDataSnapshot;
+}
+
 class QDateTime;
 class QGeoPositionInfo;
 class QGeoPositionInfoSource;
 class LocationCatalogModel;
 class SkyCatalogManager;
+class SkyEphemerisDataManager;
 class SkyObjectSearchModel;
 class SkyOverlayLayerSettings;
 class SkySettingsStore;
@@ -80,6 +85,11 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(QString logFilePath READ logFilePath WRITE setLogFilePath NOTIFY loggingChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
+    Q_PROPERTY(
+        QString ephemerisDataStatusText
+        READ ephemerisDataStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
     Q_PROPERTY(
         QString catalogDatasetInfoText
         READ catalogDatasetInfoText
@@ -181,6 +191,7 @@ public:
     [[nodiscard]] QString logFilePath() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
+    [[nodiscard]] QString ephemerisDataStatusText() const;
     [[nodiscard]] QString catalogDatasetInfoText() const;
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
@@ -201,6 +212,9 @@ public:
     [[nodiscard]] const skygate::ui::internal::SkyThemeRenderPalette& renderTheme() const noexcept;
     [[nodiscard]] const SkyOverlayLayerVisibility& overlayLayerVisibility() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
+    [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
+    activeEphemerisDataSnapshot() const noexcept;
+    [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
     [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
     [[nodiscard]] QStringList catalogSourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
@@ -222,10 +236,7 @@ public:
     Q_INVOKABLE void resetViewDirection();
     Q_INVOKABLE void stepForward();
     Q_INVOKABLE void stepBackward();
-    [[nodiscard]] QString validateUtcDateTimeText(
-        const QString& utcDateText,
-        const QString& utcTimeText
-    ) const;
+    [[nodiscard]] QString validateUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText) const;
     [[nodiscard]] bool setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText);
     Q_INVOKABLE void setLatitudeText(const QString& latitudeText);
     Q_INVOKABLE void setLongitudeText(const QString& longitudeText);
@@ -282,6 +293,8 @@ signals:
     void loggingChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
+    void ephemerisDataStatusTextChanged();
+    void ephemerisDataChanged();
     void catalogDatasetInfoTextChanged();
     void deepSkyCatalogInfoTextChanged();
     void downloadingCatalogChanged();
@@ -311,11 +324,7 @@ private:
     void refreshObjectSearchModel();
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
-    void setTrackedTarget(
-        const QString& targetKind,
-        const QString& targetId,
-        const QString& displayText
-    );
+    void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
 
 private:
     skygate::core::SystemTimeSource m_systemTimeSource;
@@ -331,6 +340,7 @@ private:
     std::unique_ptr<SkyTimeController> m_timeController;
     std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
+    std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     QVariantList m_themeOptions;

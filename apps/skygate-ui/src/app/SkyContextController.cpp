@@ -2,6 +2,7 @@
 
 #include "LocationCatalogModel.hpp"
 #include "SkyCatalogManager.hpp"
+#include "SkyEphemerisDataManager.hpp"
 #include "SkyLogging.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
@@ -23,10 +24,7 @@ SkyContextController::SkyContextController(
     : SkyContextController(
           std::move(starCatalog),
           std::move(ephemerisEngine),
-          InitializationOptions {
-              .loadSettings = true,
-              .initializeLocation = true
-          },
+          InitializationOptions{.loadSettings = true, .initializeLocation = true},
           parent
       )
 {
@@ -38,25 +36,21 @@ SkyContextController::SkyContextController(
     InitializationOptions initializationOptions,
     QObject* parent
 )
-    : QObject(parent)
-    , m_timeSource(
-          initializationOptions.timeSource != nullptr
-              ? initializationOptions.timeSource
-              : &m_systemTimeSource
-      )
-    , m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this))
-    , m_themePalette(std::make_unique<SkyThemePalette>(this))
-    , m_themeRepository(std::make_unique<SkyThemeRepository>())
-    , m_timeController(std::make_unique<SkyTimeController>(*m_timeSource, this))
-    , m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this))
-    , m_settingsStore(std::make_unique<SkySettingsStore>())
-    , m_catalogManager(std::make_unique<SkyCatalogManager>(
-          m_settingsStore.get(),
-          std::move(starCatalog),
-          std::move(ephemerisEngine),
-          this
-      ))
-    , m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
+    : QObject(parent),
+      m_timeSource(
+          initializationOptions.timeSource != nullptr ? initializationOptions.timeSource : &m_systemTimeSource
+      ),
+      m_locationCatalogModel(std::make_unique<LocationCatalogModel>(this)),
+      m_themePalette(std::make_unique<SkyThemePalette>(this)),
+      m_themeRepository(std::make_unique<SkyThemeRepository>()),
+      m_timeController(std::make_unique<SkyTimeController>(*m_timeSource, this)),
+      m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this)),
+      m_settingsStore(std::make_unique<SkySettingsStore>()),
+      m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
+      m_catalogManager(std::make_unique<SkyCatalogManager>(
+          m_settingsStore.get(), std::move(starCatalog), std::move(ephemerisEngine), this
+      )),
+      m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
     m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
     m_location.setPositionSource(initializationOptions.positionSource);
@@ -79,18 +73,20 @@ SkyContextController::SkyContextController(
             setLive(false);
         }
     );
+    connect(m_timeController.get(), &SkyTimeController::goLiveNowRequested, this, &SkyContextController::goLiveNow);
     connect(
-        m_timeController.get(),
-        &SkyTimeController::goLiveNowRequested,
-        this,
-        &SkyContextController::goLiveNow
+        m_timeController.get(), &SkyTimeController::timeZoneChanged, this, &SkyContextController::refreshNightConditions
     );
     connect(
-        m_timeController.get(),
-        &SkyTimeController::timeZoneChanged,
+        m_ephemerisDataManager.get(),
+        &SkyEphemerisDataManager::statusTextChanged,
         this,
-        &SkyContextController::refreshNightConditions
+        &SkyContextController::ephemerisDataStatusTextChanged
     );
+    connect(m_ephemerisDataManager.get(), &SkyEphemerisDataManager::activeDataChanged, this, [this] {
+        emit ephemerisDataChanged();
+        emit skyContextChanged();
+    });
 
     connect(
         m_catalogManager.get(),
@@ -122,18 +118,13 @@ SkyContextController::SkyContextController(
         this,
         &SkyContextController::catalogProcessingChanged
     );
-    connect(
-        m_catalogManager.get(),
-        &SkyCatalogManager::catalogChanged,
-        this,
-        [this] {
-            refreshObjectSearchModel();
-            emit nightConditionsChanged();
-            if (!recenterTrackedTarget(true)) {
-                emit skyContextChanged();
-            }
+    connect(m_catalogManager.get(), &SkyCatalogManager::catalogChanged, this, [this] {
+        refreshObjectSearchModel();
+        emit nightConditionsChanged();
+        if (!recenterTrackedTarget(true)) {
+            emit skyContextChanged();
         }
-    );
+    });
     refreshObjectSearchModel();
 
     m_location.setUtcTime(m_timeSource->nowUtc());
@@ -148,10 +139,7 @@ SkyContextController::SkyContextController(
     connect(&m_timer, &QTimer::timeout, this, &SkyContextController::tickUtcTime);
     m_timer.start();
 
-    if (
-        initializationOptions.initializeLocation
-        && m_location.source() == SkyContextLocationSource::CurrentDevice
-    ) {
+    if (initializationOptions.initializeLocation && m_location.source() == SkyContextLocationSource::CurrentDevice) {
         initializeCurrentLocation();
     }
 }
@@ -245,9 +233,7 @@ QString SkyContextController::utcTimeText() const
 
 QString SkyContextController::utcDateText() const
 {
-    return SkyContextUtcDateTimeTextCodec::formatDate(
-        SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime())
-    );
+    return SkyContextUtcDateTimeTextCodec::formatDate(SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()));
 }
 
 QString SkyContextController::latitudeText() const
@@ -338,9 +324,7 @@ QString SkyContextController::logFilePath() const
 const SkyOverlayLayerVisibility& SkyContextController::overlayLayerVisibility() const noexcept
 {
     static const SkyOverlayLayerVisibility kDefaultVisibility;
-    return m_overlayLayerSettings != nullptr
-        ? m_overlayLayerSettings->visibility()
-        : kDefaultVisibility;
+    return m_overlayLayerSettings != nullptr ? m_overlayLayerSettings->visibility() : kDefaultVisibility;
 }
 
 QString SkyContextController::locationStatusText() const
@@ -363,9 +347,7 @@ void SkyContextController::updateLocationStatusText()
         return;
     case SkyContextLocationSource::City:
         if (!m_location.selectedCityDisplayText().isEmpty()) {
-            setLocationStatusText(
-                QString("Location: City - %1").arg(m_location.selectedCityDisplayText())
-            );
+            setLocationStatusText(QString("Location: City - %1").arg(m_location.selectedCityDisplayText()));
             return;
         }
 
@@ -377,10 +359,7 @@ void SkyContextController::updateLocationStatusText()
     }
 }
 
-void SkyContextController::setSelectedSearchTarget(
-    const QString& targetKind,
-    const QString& targetId
-)
+void SkyContextController::setSelectedSearchTarget(const QString& targetKind, const QString& targetId)
 {
     if (m_search.setSelectedTarget(targetKind, targetId)) {
         emit selectedSearchTargetChanged();
@@ -393,9 +372,7 @@ void SkyContextController::clearSelectedSearchTarget()
 }
 
 void SkyContextController::setTrackedTarget(
-    const QString& targetKind,
-    const QString& targetId,
-    const QString& displayText
+    const QString& targetKind, const QString& targetId, const QString& displayText
 )
 {
     if (m_search.setTrackedTarget(targetKind, targetId, displayText)) {
@@ -408,6 +385,11 @@ QString SkyContextController::catalogStatusText() const
     return m_catalogManager != nullptr ? m_catalogManager->statusText() : QString();
 }
 
+QString SkyContextController::ephemerisDataStatusText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->statusText() : QString();
+}
+
 QString SkyContextController::catalogDatasetInfoText() const
 {
     return m_catalogManager != nullptr ? m_catalogManager->datasetInfoText() : QString();
@@ -415,9 +397,7 @@ QString SkyContextController::catalogDatasetInfoText() const
 
 QString SkyContextController::deepSkyCatalogInfoText() const
 {
-    return m_catalogManager != nullptr
-        ? m_catalogManager->deepSkyCatalogInfoText()
-        : QString();
+    return m_catalogManager != nullptr ? m_catalogManager->deepSkyCatalogInfoText() : QString();
 }
 
 QAbstractItemModel* SkyContextController::objectSearchModel() const noexcept
@@ -450,43 +430,44 @@ const skygate::ephemeris::IEphemerisEngine* SkyContextController::ephemerisEngin
     return m_catalogManager != nullptr ? m_catalogManager->ephemerisEngine() : nullptr;
 }
 
-std::span<const skygate::ephemeris::CelestialBody>
-SkyContextController::catalogBodies() const noexcept
+std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
+SkyContextController::activeEphemerisDataSnapshot() const noexcept
 {
-    const auto* starCatalog = m_catalogManager != nullptr
-        ? m_catalogManager->starCatalog()
-        : nullptr;
-    return starCatalog != nullptr
-        ? starCatalog->bodies()
-        : std::span<const skygate::ephemeris::CelestialBody> {};
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->activeDataSnapshot() : nullptr;
+}
+
+std::uint64_t SkyContextController::ephemerisDataRevision() const noexcept
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->dataRevision() : 0U;
+}
+
+std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalogBodies() const noexcept
+{
+    const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
+    return starCatalog != nullptr ? starCatalog->bodies() : std::span<const skygate::ephemeris::CelestialBody>{};
 }
 
 QStringList SkyContextController::catalogSourceLabels() const
 {
-    return m_catalogManager != nullptr ? m_catalogManager->sourceLabels() : QStringList {};
+    return m_catalogManager != nullptr ? m_catalogManager->sourceLabels() : QStringList{};
 }
 
 std::span<const std::uint8_t> SkyContextController::catalogSourceIds() const noexcept
 {
-    return m_catalogManager != nullptr
-        ? m_catalogManager->sourceIds()
-        : std::span<const std::uint8_t> {};
+    return m_catalogManager != nullptr ? m_catalogManager->sourceIds() : std::span<const std::uint8_t>{};
 }
 
-std::span<const SkyContextController::ConstellationLineRef>
-SkyContextController::constellationLineRefs() const noexcept
+std::span<const SkyContextController::ConstellationLineRef> SkyContextController::constellationLineRefs() const noexcept
 {
-    return m_catalogManager != nullptr
-        ? m_catalogManager->constellationLineRefs()
-        : std::span<const ConstellationLineRef> {};
+    return m_catalogManager != nullptr ? m_catalogManager->constellationLineRefs()
+                                       : std::span<const ConstellationLineRef>{};
 }
 
 std::span<const SkyContextController::ConstellationLabelRef>
 SkyContextController::constellationLabelRefs() const noexcept
 {
-    return m_catalogManager != nullptr
-        ? m_catalogManager->constellationLabelRefs()
-        : std::span<const ConstellationLabelRef> {};
+    return m_catalogManager != nullptr ? m_catalogManager->constellationLabelRefs()
+                                       : std::span<const ConstellationLabelRef>{};
 }
 
 int SkyContextController::catalogPresetIndex() const noexcept
@@ -540,13 +521,11 @@ void SkyContextController::setThemeId(const QString& themeId)
 
 void SkyContextController::applyLoggingConfiguration()
 {
-    skygate::ui::SkyLoggingConfiguration configuration =
-        skygate::ui::SkyLogging::configuration();
+    skygate::ui::SkyLoggingConfiguration configuration = skygate::ui::SkyLogging::configuration();
     configuration.logToTerminal = m_logToTerminal;
     configuration.logToFile = m_logToFile;
-    configuration.logFilePath = m_logFilePath.trimmed().isEmpty()
-        ? skygate::ui::SkyLogging::defaultLogFilePath()
-        : m_logFilePath.trimmed();
+    configuration.logFilePath =
+        m_logFilePath.trimmed().isEmpty() ? skygate::ui::SkyLogging::defaultLogFilePath() : m_logFilePath.trimmed();
     skygate::ui::SkyLogging::configure(configuration);
 }
 
@@ -574,9 +553,8 @@ void SkyContextController::setLogToFile(const bool logToFile)
 
 void SkyContextController::setLogFilePath(const QString& logFilePath)
 {
-    const QString normalizedPath = logFilePath.trimmed().isEmpty()
-        ? skygate::ui::SkyLogging::defaultLogFilePath()
-        : logFilePath.trimmed();
+    const QString normalizedPath =
+        logFilePath.trimmed().isEmpty() ? skygate::ui::SkyLogging::defaultLogFilePath() : logFilePath.trimmed();
     if (m_logFilePath == normalizedPath) {
         return;
     }
@@ -653,8 +631,8 @@ void SkyContextController::setLocationSourceText(const QString& locationSourceTe
 {
     const auto parsedLocationSource = SkyContextLocationSourceCodec::fromString(locationSourceText);
     const SkyContextLocationSource nextLocationSource = parsedLocationSource.has_value()
-        ? parsedLocationSource.value()
-        : SkyContextLocationSourceCodec::defaultSource();
+                                                            ? parsedLocationSource.value()
+                                                            : SkyContextLocationSourceCodec::defaultSource();
     setLocationSource(nextLocationSource);
 }
 
@@ -670,10 +648,7 @@ bool SkyContextController::applySelectedCityId(const QString& cityId)
     }
 
     const QString displayText = cityEntry->displayText();
-    const SkySelectedCityChange cityChange = m_location.setSelectedCity(
-        cityEntry->id,
-        displayText
-    );
+    const SkySelectedCityChange cityChange = m_location.setSelectedCity(cityEntry->id, displayText);
 
     if (cityChange.idChanged) {
         emit selectedCityIdChanged();

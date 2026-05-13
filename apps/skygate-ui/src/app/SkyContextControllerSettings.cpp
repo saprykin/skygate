@@ -2,6 +2,7 @@
 
 #include "SkyCatalogManager.hpp"
 #include "SkyContextControllerSupport.hpp"
+#include "SkyEphemerisDataManager.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
@@ -27,8 +28,7 @@ bool SkyContextController::saveSettings() const
     snapshot.viewCenterAltitudeDeg = m_view.centerAltitudeDeg();
     snapshot.viewCenterAzimuthDeg = m_view.centerAzimuthDeg();
     snapshot.viewFieldOfViewDeg = m_view.fieldOfViewDeg();
-    snapshot.utcEpochSeconds =
-        SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).toSecsSinceEpoch();
+    snapshot.utcEpochSeconds = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).toSecsSinceEpoch();
     snapshot.latitudeDeg = m_location.observer().latitudeDeg;
     snapshot.longitudeDeg = m_location.observer().longitudeDeg;
     snapshot.elevationMeters = m_location.observer().elevationMeters;
@@ -50,28 +50,21 @@ bool SkyContextController::saveSettings() const
 
 bool SkyContextController::loadSettings()
 {
-    const auto stateSnapshot = m_settingsStore != nullptr
-        ? m_settingsStore->loadState()
-        : std::optional<SkySettingsStore::StateSnapshot> {};
+    const auto stateSnapshot =
+        m_settingsStore != nullptr ? m_settingsStore->loadState() : std::optional<SkySettingsStore::StateSnapshot>{};
     if (stateSnapshot.has_value()) {
         setTimelineToolbarCollapsed(stateSnapshot->timelineToolbarCollapsed);
         setSearchToolbarCollapsed(stateSnapshot->searchToolbarCollapsed);
         setSpeedMultiplier(stateSnapshot->speedMultiplier);
         setStepSeconds(stateSnapshot->stepSeconds);
         setMagnitudeCutoff(stateSnapshot->magnitudeCutoff);
-        setViewCenter(
-            stateSnapshot->viewCenterAltitudeDeg,
-            stateSnapshot->viewCenterAzimuthDeg
-        );
+        setViewCenter(stateSnapshot->viewCenterAltitudeDeg, stateSnapshot->viewCenterAzimuthDeg);
         setViewFieldOfViewDeg(stateSnapshot->viewFieldOfViewDeg);
         if (stateSnapshot->live) {
             goLiveNow();
         } else {
             setLive(false);
-            setCurrentUtc(QDateTime::fromSecsSinceEpoch(
-                stateSnapshot->utcEpochSeconds,
-                QTimeZone::UTC
-            ));
+            setCurrentUtc(QDateTime::fromSecsSinceEpoch(stateSnapshot->utcEpochSeconds, QTimeZone::UTC));
         }
 
         skygate::core::GeoLocation observer = m_location.observer();
@@ -82,20 +75,15 @@ bool SkyContextController::loadSettings()
             applyObserverLocation(observer);
         }
 
-        const auto parsedLocationSource = SkyContextLocationSourceCodec::fromString(
-            stateSnapshot->locationSourceText
-        );
+        const auto parsedLocationSource = SkyContextLocationSourceCodec::fromString(stateSnapshot->locationSourceText);
         SkyContextLocationSource locationSource = parsedLocationSource.has_value()
-            ? parsedLocationSource.value()
-            : SkyContextLocationSourceCodec::defaultSource();
+                                                      ? parsedLocationSource.value()
+                                                      : SkyContextLocationSourceCodec::defaultSource();
         if (!SkyContextLocationSourceCodec::isAvailable(locationSource)) {
             locationSource = SkyContextLocationSource::Custom;
         }
 
-        if (
-            locationSource == SkyContextLocationSource::City
-            && !applySelectedCityId(stateSnapshot->selectedCityId)
-        ) {
+        if (locationSource == SkyContextLocationSource::City && !applySelectedCityId(stateSnapshot->selectedCityId)) {
             setLocationSource(SkyContextLocationSource::Custom);
         } else {
             setLocationSource(locationSource);
@@ -118,6 +106,9 @@ bool SkyContextController::loadSettings()
 
     if (m_catalogManager != nullptr) {
         m_catalogManager->restoreCatalogCache();
+    }
+    if (m_ephemerisDataManager != nullptr) {
+        static_cast<void>(m_ephemerisDataManager->restoreFromSettings());
     }
     return stateSnapshot.has_value();
 }

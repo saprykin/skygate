@@ -28,6 +28,7 @@ function(add_skygate_ui_qtest target_name source_file)
             ${CMAKE_CURRENT_SOURCE_DIR}/app
             ${CMAKE_CURRENT_SOURCE_DIR}/catalog
             ${CMAKE_CURRENT_SOURCE_DIR}/diagnostics
+            ${CMAKE_CURRENT_SOURCE_DIR}/ephemeris
             ${CMAKE_CURRENT_SOURCE_DIR}/location
             ${CMAKE_CURRENT_SOURCE_DIR}/qml
             ${CMAKE_CURRENT_SOURCE_DIR}/render
@@ -212,6 +213,7 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 60
 )
+add_skygate_ui_qtest(skygate-ui-sky-ephemeris-data-manager-tests ephemeris/SkyEphemerisDataManagerTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-catalog-runtime-tests catalog/SkyCatalogRuntimeTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests selection/SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests selection/SkyObjectTrailBuilderTests.cpp)
