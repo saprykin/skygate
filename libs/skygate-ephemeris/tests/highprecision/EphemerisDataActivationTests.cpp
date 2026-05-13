@@ -1,7 +1,9 @@
 #include "skygate/ephemeris/EphemerisDataActivation.hpp"
 
-#include <QFile>
 #include <QDir>
+#include <QDirIterator>
+#include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
@@ -25,11 +27,31 @@ constexpr std::array<unsigned char, 50> kCompressedPayload{
     return std::filesystem::path(path.toStdString());
 }
 
+[[nodiscard]] QString pathToQString(const std::filesystem::path& path)
+{
+    return QString::fromStdString(path.generic_string());
+}
+
 void writeFile(const QString& path, const QByteArray& payload)
 {
     QFile file(path);
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
     QCOMPARE(file.write(payload), static_cast<qint64>(payload.size()));
+}
+
+[[nodiscard]] QByteArray readFile(const QString& path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return file.readAll();
+}
+
+[[nodiscard]] bool containsFiles(const QString& rootPath)
+{
+    QDirIterator iterator(rootPath, QDir::Files, QDirIterator::Subdirectories);
+    return iterator.hasNext();
 }
 
 [[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset makeZstdAsset()
@@ -44,6 +66,16 @@ void writeFile(const QString& path, const QByteArray& payload)
     asset.checksum.value = std::string{kPayloadSha256};
     asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::Zstd;
     asset.compression.compressedSizeBytes = kCompressedPayload.size();
+    asset.compression.uncompressedSizeBytes = kPayload.size();
+    return asset;
+}
+
+[[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset makeUncompressedAsset()
+{
+    skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    asset.relativePath = "kernels/de440s.bsp";
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None;
+    asset.compression.compressedSizeBytes.reset();
     asset.compression.uncompressedSizeBytes = kPayload.size();
     return asset;
 }
@@ -73,6 +105,11 @@ void writeFile(const QString& path, const QByteArray& payload)
     return root.path() + QStringLiteral("/kernels/de440s.bsp.zst");
 }
 
+[[nodiscard]] QString uncompressedSourcePath(const QTemporaryDir& root)
+{
+    return root.path() + QStringLiteral("/kernels/de440s.bsp");
+}
+
 }  // namespace
 
 class EphemerisDataActivationTests final : public QObject {
@@ -82,6 +119,8 @@ private slots:
     void activatesValidZstdArchive();
     void rejectsCorruptZstdArchive();
     void rejectsChecksumMismatch();
+    void rejectsExpectedSizeMismatch();
+    void preservesExistingCacheFileWhenReplacementCannotBeWritten();
     void treatsExistingValidCacheFileAsAlreadyActive();
     void rejectsLargeKernelQtResourcePaths();
 };
@@ -136,6 +175,8 @@ void EphemerisDataActivationTests::rejectsCorruptZstdArchive()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::CorruptArchive)
     );
     QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!QFileInfo::exists(pathToQString(result.activePath)));
+    QVERIFY(!containsFiles(cacheRoot.path()));
 }
 
 void EphemerisDataActivationTests::rejectsChecksumMismatch()
@@ -160,6 +201,69 @@ void EphemerisDataActivationTests::rejectsChecksumMismatch()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::ChecksumMismatch)
     );
     QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!QFileInfo::exists(pathToQString(result.activePath)));
+    QVERIFY(!containsFiles(cacheRoot.path()));
+}
+
+void EphemerisDataActivationTests::rejectsExpectedSizeMismatch()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    asset.compression.uncompressedSizeBytes = kPayload.size() + 1U;
+    writeFile(
+        uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+
+    const skygate::ephemeris::EphemerisDataActivationResult result =
+        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::ChecksumMismatch)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!QFileInfo::exists(pathToQString(result.activePath)));
+    QVERIFY(!containsFiles(cacheRoot.path()));
+}
+
+void EphemerisDataActivationTests::preservesExistingCacheFileWhenReplacementCannotBeWritten()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    writeFile(
+        uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+
+    const QString activePath = cacheRoot.path() + QStringLiteral("/modern/kernels/de440s.bsp");
+    QVERIFY(QDir(cacheRoot.path()).mkpath(QStringLiteral("modern/kernels")));
+    const QByteArray previousActivePayload("previous active cache");
+    writeFile(activePath, previousActivePayload);
+
+    const QString activeDirectoryPath = QFileInfo(activePath).absolutePath();
+    const QFileDevice::Permissions originalPermissions = QFileInfo(activeDirectoryPath).permissions();
+    const QFileDevice::Permissions readOnlyPermissions =
+        originalPermissions
+        & ~(QFileDevice::WriteOwner | QFileDevice::WriteUser | QFileDevice::WriteGroup | QFileDevice::WriteOther);
+    QVERIFY(QFile::setPermissions(activeDirectoryPath, readOnlyPermissions));
+
+    const skygate::ephemeris::EphemerisDataActivationResult result =
+        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+
+    QVERIFY(QFile::setPermissions(activeDirectoryPath, originalPermissions));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::IoError)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QCOMPARE(readFile(activePath), previousActivePayload);
 }
 
 void EphemerisDataActivationTests::treatsExistingValidCacheFileAsAlreadyActive()
