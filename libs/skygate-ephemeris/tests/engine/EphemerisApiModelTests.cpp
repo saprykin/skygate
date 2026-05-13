@@ -326,6 +326,8 @@ void EphemerisApiModelTests::constructsFactoryRequestDefaults()
     QVERIFY(request.timeScaleService == nullptr);
     QVERIFY(request.earthOrientationProvider == nullptr);
     QVERIFY(request.diagnosticsSink == nullptr);
+    QVERIFY(request.dataManifest == nullptr);
+    QVERIFY(request.calcephKernelRuntime == nullptr);
 }
 
 void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()

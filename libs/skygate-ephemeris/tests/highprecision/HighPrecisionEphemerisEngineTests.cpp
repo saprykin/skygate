@@ -1,5 +1,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
+#include "skygate/ephemeris/EarthOrientationProvider.hpp"
+
 #include <QtTest/QtTest>
 
 #include <array>
@@ -274,7 +276,22 @@ private:
     mutable EphemerisCorrectionFlags m_lastFlags = EphemerisCorrectionFlags::NoCorrections;
 };
 
-class StubEarthOrientationProvider final : public skygate::ephemeris::highprecision::IEarthOrientationProvider {};
+class StubEarthOrientationProvider final : public skygate::ephemeris::IEarthOrientationProvider {
+public:
+    [[nodiscard]] const EarthOrientationDataInfo& dataInfo() const noexcept override
+    {
+        return m_dataInfo;
+    }
+
+    [[nodiscard]] std::span<const EarthOrientationTableEntry> entries() const noexcept override
+    {
+        return {};
+    }
+
+private:
+    EarthOrientationDataInfo m_dataInfo;
+};
+
 class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionCalculator {};
 
 [[nodiscard]] HighPrecisionEphemerisEngineDependencies makeDependencies(
