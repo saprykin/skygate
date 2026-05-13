@@ -33,7 +33,7 @@ struct AstronomicalEpoch {
 };
 
 enum class EphemerisCorrectionFlags : std::uint32_t {
-    None = 0U,
+    NoCorrections = 0U,
     Geometric = 0U,
     LightTime = 1U << 0U,
     StellarAberration = 1U << 1U,
@@ -81,7 +81,7 @@ operator|=(EphemerisCorrectionFlags& lhs, const EphemerisCorrectionFlags rhs) no
 [[nodiscard]] constexpr bool
 hasCorrectionFlag(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags flag) noexcept
 {
-    return (flags & flag) != EphemerisCorrectionFlags::None;
+    return (flags & flag) != EphemerisCorrectionFlags::NoCorrections;
 }
 
 struct EphemerisEngineOptions {
@@ -97,7 +97,7 @@ struct EphemerisEngineOptions {
 
 struct EphemerisCapabilities {
     EphemerisEngineKind engineKind = EphemerisEngineKind::Simple;
-    EphemerisCorrectionFlags supportedCorrections = EphemerisCorrectionFlags::None;
+    EphemerisCorrectionFlags supportedCorrections = EphemerisCorrectionFlags::NoCorrections;
     bool supportsSolarSystemBodies = false;
     bool supportsCatalogStars = false;
     bool supportsTopocentricPositions = false;
