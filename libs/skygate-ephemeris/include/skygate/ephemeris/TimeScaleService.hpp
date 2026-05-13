@@ -36,7 +36,8 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
     EpochOutsideLeapSecondTable,
     LeapSecondFallbackApplied,
     UnsupportedConversion,
-    InvalidInput
+    InvalidInput,
+    TdbApproximationApplied
 };
 
 [[nodiscard]] constexpr std::string_view timeScaleConversionWarningText(const TimeScaleConversionWarningCode code
@@ -55,6 +56,8 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
         return "The requested time-scale conversion is not supported.";
     case TimeScaleConversionWarningCode::InvalidInput:
         return "The requested time-scale conversion input is invalid.";
+    case TimeScaleConversionWarningCode::TdbApproximationApplied:
+        return "The TT/TDB conversion used a documented approximation.";
     }
 
     return "Time-scale conversion warning.";

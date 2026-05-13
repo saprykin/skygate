@@ -171,5 +171,9 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 endif()
 
 target_compile_features(skygate-ephemeris PUBLIC cxx_std_20)
+target_compile_definitions(skygate-ephemeris
+    PRIVATE
+        $<$<BOOL:${SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS}>:SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=1>
+)
 
 add_library(skygate::ephemeris ALIAS skygate-ephemeris)

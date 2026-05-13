@@ -34,8 +34,15 @@ namespace {
     return result.provider;
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch makeUtcEpoch(
-    const int year, const int month, const int day, const int hour = 0, const int minute = 0, const int second = 0
+[[nodiscard]] skygate::ephemeris::AstronomicalEpoch makeEpoch(
+    const skygate::ephemeris::TimeScale timeScale,
+    const int year,
+    const int month,
+    const int day,
+    const int hour = 0,
+    const int minute = 0,
+    const int second = 0,
+    const std::uint32_t nanosecond = 0U
 )
 {
     const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
@@ -45,10 +52,18 @@ namespace {
         .hour = hour,
         .minute = minute,
         .second = second,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .nanosecond = nanosecond,
+        .timeScale = timeScale,
     });
     Q_ASSERT(epoch.has_value());
     return *epoch;
+}
+
+[[nodiscard]] skygate::ephemeris::AstronomicalEpoch makeUtcEpoch(
+    const int year, const int month, const int day, const int hour = 0, const int minute = 0, const int second = 0
+)
+{
+    return makeEpoch(skygate::ephemeris::TimeScale::Utc, year, month, day, hour, minute, second);
 }
 
 [[nodiscard]] double secondsBetween(
@@ -82,6 +97,9 @@ private slots:
     void reportsOutOfRangeWithoutFallback();
     void reportsReverseOutOfRangeWithoutFallback();
     void usesDegradedFallbackForMissingTableWhenAllowed();
+    void convertsTtToTdbWithDocumentedApproximation();
+    void roundTripsTtAndTdbPreservingPrecision();
+    void convertsUtcToTdbThroughTt();
 };
 
 void TimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
@@ -260,6 +278,70 @@ void TimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAllowed()
     QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::LeapSecondTableMissing));
     QVERIFY(result.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::LeapSecondFallbackApplied));
     compareSecondsBetween(result.epoch, utc, 42.0);
+}
+
+void TimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+    const skygate::ephemeris::AstronomicalEpoch tt = makeEpoch(skygate::ephemeris::TimeScale::Tt, 2000, 1, 1, 12, 0, 0);
+
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::ephemeris::TimeScale::Tdb);
+
+    QVERIFY(tdb.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(tdb.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
+    );
+    QVERIFY(tdb.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
+    QVERIFY(!skygate::ephemeris::timeScaleConversionWarningText(
+                 skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied
+    )
+                 .empty());
+    QVERIFY(std::abs(secondsBetween(tdb.epoch, tt) - -0.00007260319547380129) < 2.0e-3);
+}
+
+void TimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+    const skygate::ephemeris::AstronomicalEpoch tt =
+        makeEpoch(skygate::ephemeris::TimeScale::Tt, 2024, 2, 1, 6, 7, 8, 123'456'789U);
+
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::ephemeris::TimeScale::Tdb);
+    QVERIFY(tdb.isSuccess());
+
+    const skygate::ephemeris::TimeScaleConversionResult ttAgain =
+        service.convert(tdb.epoch, skygate::ephemeris::TimeScale::Tt);
+    QVERIFY(ttAgain.isSuccess());
+    QVERIFY(ttAgain.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
+    compareSecondsBetween(ttAgain.epoch, tt, 0.0);
+}
+
+void TimeScaleServiceTests::convertsUtcToTdbThroughTt()
+{
+    const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
+    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
+
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(utc, skygate::ephemeris::TimeScale::Tdb);
+
+    QVERIFY(tdb.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(tdb.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
+    );
+    QVERIFY(tdb.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
+    QVERIFY(std::abs(secondsBetween(tdb.epoch, utc) - 69.1839224023) < 2.0e-3);
+
+    const skygate::ephemeris::TimeScaleConversionResult utcAgain =
+        service.convert(tdb.epoch, skygate::ephemeris::TimeScale::Utc);
+    QVERIFY(utcAgain.isSuccess());
+    QVERIFY(utcAgain.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
+    compareSecondsBetween(utcAgain.epoch, utc, 0.0);
 }
 
 QTEST_MAIN(TimeScaleServiceTests)
