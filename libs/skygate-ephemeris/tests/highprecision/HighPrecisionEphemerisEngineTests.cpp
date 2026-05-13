@@ -390,8 +390,11 @@ void HighPrecisionEphemerisEngineTests::forwardsOptionsThroughCollaboratorsAndRe
     EphemerisRequest request = makeRequest();
     request.options.correctionFlags = EphemerisCorrectionFlags::LightTime | EphemerisCorrectionFlags::EarthOrientation;
 
+    EphemerisEngineOptions engineOptions = request.options;
+    engineOptions.correctionFlags = EphemerisCorrectionFlags::AtmosphericRefraction;
+
     const HighPrecisionEphemerisEngine engine(
-        bodies, request.options, makeDependencies(solarSystemCalculator, {}, apparentPlaceCalculator, resultBuilder)
+        bodies, engineOptions, makeDependencies(solarSystemCalculator, {}, apparentPlaceCalculator, resultBuilder)
     );
 
     const auto state = engine.computeBodyState(request, std::size_t{0});

@@ -136,6 +136,7 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-highprecision-engine-tests
     highprecision/HighPrecisionEphemerisEngineTests.cpp
+    LABELS "unit;highprecision"
 )
 add_executable(skygate-ephemeris-public-header-macro-compat-tests
     engine/PublicHeaderMacroCompatTests.cpp
