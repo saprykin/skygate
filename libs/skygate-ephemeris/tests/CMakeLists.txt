@@ -139,6 +139,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;highprecision"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-delta-t-provider-tests
+    highprecision/DeltaTProviderTests.cpp
+    LABELS "unit;highprecision"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-leap-second-provider-tests
     highprecision/LeapSecondProviderTests.cpp
     LABELS "unit;highprecision"
