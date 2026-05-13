@@ -58,6 +58,8 @@ private slots:
     void computesSingleBodyStateByCaseInsensitiveIdAndIndex();
     void requestBasedSnapshotComputeMatchesSkyContextPath();
     void requestBasedSnapshotReportsUnsupportedSimpleOptions();
+    void requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex();
+    void requestBasedSingleBodyStateReturnsNulloptForMissingIdAndIndex();
 };
 
 void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
@@ -377,6 +379,101 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     QVERIFY(
         skygate::ephemeris::tests::isNear(requestState.horizontal.azimuthDeg, contextState.horizontal.azimuthDeg, 1e-12)
     );
+}
+
+void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex()
+{
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            4.0,
+            skygate::core::EquatorialCoordinate{
+                .rightAscensionHours = 12.5,
+                .declinationDeg = -30.0,
+            }
+        ),
+    });
+    QVERIFY(catalog != nullptr);
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = context;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
+    request.epoch = epochFromUtc(context.utcTime);
+    request.options = engine->options();
+
+    const auto contextState = engine->computeBodyState(context, "demo_star");
+    QVERIFY(contextState.has_value());
+
+    const auto byId = engine->computeBodyState(request, "DEMO_STAR");
+    QVERIFY(byId.has_value());
+    QCOMPARE(byId->bodyIndex, 0U);
+    QCOMPARE(byId->metadata.status, contextState->metadata.status);
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        byId->equatorial.rightAscensionHours, contextState->equatorial.rightAscensionHours, 1e-12
+    ));
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        byId->equatorial.declinationDeg, contextState->equatorial.declinationDeg, 1e-12
+    ));
+    QVERIFY(skygate::ephemeris::tests::isNear(byId->horizontal.altitudeDeg, contextState->horizontal.altitudeDeg, 1e-12)
+    );
+    QVERIFY(skygate::ephemeris::tests::isNear(byId->horizontal.azimuthDeg, contextState->horizontal.azimuthDeg, 1e-12));
+
+    const auto byIndex = engine->computeBodyState(request, std::size_t{0});
+    QVERIFY(byIndex.has_value());
+    QCOMPARE(byIndex->bodyIndex, 0U);
+    QCOMPARE(byIndex->metadata.status, byId->metadata.status);
+    QVERIFY(skygate::ephemeris::tests::isNear(
+        byIndex->equatorial.rightAscensionHours, byId->equatorial.rightAscensionHours, 1e-12
+    ));
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(byIndex->equatorial.declinationDeg, byId->equatorial.declinationDeg, 1e-12)
+    );
+    QVERIFY(skygate::ephemeris::tests::isNear(byIndex->horizontal.altitudeDeg, byId->horizontal.altitudeDeg, 1e-12));
+    QVERIFY(skygate::ephemeris::tests::isNear(byIndex->horizontal.azimuthDeg, byId->horizontal.azimuthDeg, 1e-12));
+}
+
+void EphemerisEngineBaselineTests::requestBasedSingleBodyStateReturnsNulloptForMissingIdAndIndex()
+{
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            4.0,
+            skygate::core::EquatorialCoordinate{
+                .rightAscensionHours = 12.5,
+                .declinationDeg = -30.0,
+            }
+        ),
+    });
+    QVERIFY(catalog != nullptr);
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = context;
+    request.epoch = epochFromUtc(context.utcTime);
+    request.options = engine->options();
+
+    QVERIFY(!engine->computeBodyState(request, "missing").has_value());
+    QVERIFY(!engine->computeBodyState(request, "").has_value());
+    QVERIFY(!engine->computeBodyState(request, std::size_t{1}).has_value());
 }
 
 QTEST_APPLESS_MAIN(EphemerisEngineBaselineTests)

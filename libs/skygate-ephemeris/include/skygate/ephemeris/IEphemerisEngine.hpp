@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -52,6 +53,22 @@ public:
     [[nodiscard]] virtual SkySnapshot compute(const EphemerisRequest& request) const
     {
         return compute(request.context);
+    }
+
+    [[nodiscard]] virtual std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, std::string_view bodyId) const
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] virtual std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const
+    {
+        if (bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
+            return std::nullopt;
+        }
+
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
     [[nodiscard]] virtual SkySnapshot compute(const core::SkyContext& context) const = 0;
