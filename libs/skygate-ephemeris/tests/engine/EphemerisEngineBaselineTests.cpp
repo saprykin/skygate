@@ -58,6 +58,7 @@ private slots:
     void computesSingleBodyStateByCaseInsensitiveIdAndIndex();
     void requestBasedSnapshotComputeMatchesSkyContextPath();
     void requestBasedSnapshotReportsUnsupportedSimpleOptions();
+    void skyContextCompatibilityPathAppliesEngineDefaultOptions();
     void requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex();
     void requestBasedSingleBodyStateReturnsNulloptForMissingIdAndIndex();
 };
@@ -379,6 +380,58 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     QVERIFY(
         skygate::ephemeris::tests::isNear(requestState.horizontal.azimuthDeg, contextState.horizontal.azimuthDeg, 1e-12)
     );
+}
+
+void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefaultOptions()
+{
+    skygate::core::SkyContext context;
+    context.observer.latitudeDeg = 37.7749;
+    context.observer.longitudeDeg = -122.4194;
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+        makeBody(
+            "demo_star",
+            "Demo Star",
+            skygate::ephemeris::CelestialBodyType::Star,
+            4.0,
+            skygate::core::EquatorialCoordinate{
+                .rightAscensionHours = 12.5,
+                .declinationDeg = -30.0,
+            }
+        ),
+    });
+    QVERIFY(catalog != nullptr);
+
+    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    QVERIFY(engine != nullptr);
+
+    skygate::ephemeris::EphemerisRequest defaultRequest;
+    defaultRequest.context = context;
+    defaultRequest.epoch = epochFromUtc(context.utcTime);
+
+    const auto contextSnapshot = engine->compute(context);
+    const auto requestSnapshot = engine->compute(defaultRequest);
+    QCOMPARE(contextSnapshot.states.size(), 1U);
+    QCOMPARE(requestSnapshot.states.size(), 1U);
+
+    const auto& contextState = contextSnapshot.states.front();
+    const auto& requestState = requestSnapshot.states.front();
+    QCOMPARE(contextState.metadata.status, skygate::ephemeris::EphemerisResultStatus::Valid);
+    QVERIFY(!contextState.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QCOMPARE(contextState.metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections);
+    QCOMPARE(requestState.metadata.status, skygate::ephemeris::EphemerisResultStatus::Degraded);
+    QVERIFY(requestState.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+
+    const auto contextBodyState = engine->computeBodyState(context, "demo_star");
+    QVERIFY(contextBodyState.has_value());
+    QCOMPARE(contextBodyState->metadata.status, skygate::ephemeris::EphemerisResultStatus::Valid);
+    QVERIFY(!contextBodyState->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+
+    const auto requestBodyState = engine->computeBodyState(defaultRequest, "demo_star");
+    QVERIFY(requestBodyState.has_value());
+    QCOMPARE(requestBodyState->metadata.status, skygate::ephemeris::EphemerisResultStatus::Degraded);
+    QVERIFY(requestBodyState->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
 }
 
 void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex()
