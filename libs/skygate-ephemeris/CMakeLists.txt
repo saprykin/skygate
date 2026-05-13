@@ -34,6 +34,7 @@ set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
 list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
+    src/engine/highprecision/LeapSecondProvider.cpp
 )
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
@@ -69,9 +70,11 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/ConstellationData.hpp
     include/skygate/ephemeris/ConstellationDataCodec.hpp
     include/skygate/ephemeris/ConstellationReferenceCalculator.hpp
+    include/skygate/ephemeris/EphemerisDataSnapshot.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/EphemerisEngineQueries.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
+    include/skygate/ephemeris/LeapSecondProvider.hpp
     include/skygate/ephemeris/NightConditionsCalculator.hpp
     include/skygate/ephemeris/IStarCatalog.hpp
     include/skygate/ephemeris/ObservationEventCalculator.hpp
