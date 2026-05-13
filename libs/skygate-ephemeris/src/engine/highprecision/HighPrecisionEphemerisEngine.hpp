@@ -20,6 +20,7 @@ struct SolarSystemKernelVector {
 
 struct SolarSystemKernelStateResult {
     std::optional<SolarSystemKernelVector> positionAu;
+    std::optional<SolarSystemKernelVector> velocityAuPerDay;
     EphemerisResultMetadata metadata;
 };
 
