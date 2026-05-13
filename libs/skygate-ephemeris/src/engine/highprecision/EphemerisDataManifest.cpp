@@ -13,14 +13,17 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace skygate::ephemeris {
 namespace {
 
 constexpr int kSupportedSchemaVersion = 1;
+constexpr double kMaxExactJsonInteger = 9007199254740991.0;
 
 [[nodiscard]] std::string_view trimAsciiWhitespace(std::string_view text) noexcept
 {
@@ -139,6 +142,45 @@ constexpr int kSupportedSchemaVersion = 1;
     return !value.empty();
 }
 
+[[nodiscard]] bool readRequiredBool(
+    const QJsonObject& object,
+    const QString& key,
+    const std::string_view context,
+    std::vector<std::string>& diagnostics,
+    bool& value
+)
+{
+    const QJsonValue jsonValue = object.value(key);
+    if (!jsonValue.isBool()) {
+        diagnostics.push_back(std::string(context) + " field '" + key.toStdString() + "' must be a boolean.");
+        return false;
+    }
+
+    value = jsonValue.toBool();
+    return true;
+}
+
+[[nodiscard]] bool readOptionalBool(
+    const QJsonObject& object,
+    const QString& key,
+    const std::string_view context,
+    std::vector<std::string>& diagnostics,
+    bool& value
+)
+{
+    const QJsonValue jsonValue = object.value(key);
+    if (jsonValue.isUndefined()) {
+        return true;
+    }
+    if (!jsonValue.isBool()) {
+        diagnostics.push_back(std::string(context) + " field '" + key.toStdString() + "' must be a boolean.");
+        return false;
+    }
+
+    value = jsonValue.toBool();
+    return true;
+}
+
 [[nodiscard]] bool parseAssetKind(const std::string_view text, EphemerisDataManifestAssetKind& kind) noexcept
 {
     if (text == "solar-system-kernel") {
@@ -197,6 +239,16 @@ parseCompressionKind(const std::string_view text, EphemerisDataManifestCompressi
     if (!std::isfinite(number) || number < 0.0 || std::floor(number) != number) {
         diagnostics.push_back(
             std::string(context) + " field '" + key.toStdString() + "' must be a non-negative integer."
+        );
+        return false;
+    }
+    if (number > static_cast<double>(std::numeric_limits<std::uint64_t>::max())) {
+        diagnostics.push_back(std::string(context) + " field '" + key.toStdString() + "' exceeds the uint64 range.");
+        return false;
+    }
+    if (number > kMaxExactJsonInteger) {
+        diagnostics.push_back(
+            std::string(context) + " field '" + key.toStdString() + "' exceeds the exact JSON integer range."
         );
         return false;
     }
@@ -306,21 +358,28 @@ parseProfile(const QJsonValue& value, std::vector<std::string>& diagnostics, Eph
     bool valid = true;
     valid &= readRequiredString(object, "id", context, diagnostics, profile.id);
     valid &= readRequiredString(object, "displayName", context, diagnostics, profile.displayName);
-    profile.bundled = object.value("bundled").toBool(false);
-    profile.longRange = object.value("longRange").toBool(false);
+    valid &= readRequiredBool(object, "bundled", context, diagnostics, profile.bundled);
+    valid &= readRequiredBool(object, "longRange", context, diagnostics, profile.longRange);
 
     const QJsonValue assetIdsValue = object.value("assetIds");
     if (!assetIdsValue.isArray() || assetIdsValue.toArray().isEmpty()) {
         diagnostics.push_back("Profile requires a non-empty assetIds array.");
         valid = false;
     } else {
+        std::unordered_set<std::string> seenAssetIds;
         for (const QJsonValue& assetIdValue : assetIdsValue.toArray()) {
             if (!assetIdValue.isString() || assetIdValue.toString().trimmed().isEmpty()) {
                 diagnostics.push_back("Profile assetIds entries must be non-empty strings.");
                 valid = false;
                 continue;
             }
-            profile.assetIds.push_back(assetIdValue.toString().trimmed().toStdString());
+            std::string assetId = assetIdValue.toString().trimmed().toStdString();
+            if (!seenAssetIds.insert(assetId).second) {
+                diagnostics.push_back("Profile '" + profile.id + "' contains duplicate asset id '" + assetId + "'.");
+                valid = false;
+                continue;
+            }
+            profile.assetIds.push_back(std::move(assetId));
         }
     }
 
@@ -354,7 +413,7 @@ parseAsset(const QJsonValue& value, std::vector<std::string>& diagnostics, Ephem
     valid &= readRequiredString(object, "version", context, diagnostics, asset.version);
     valid &= readRequiredString(object, "sourceUrl", context, diagnostics, asset.sourceUrl);
     (void)readOptionalString(object, "relativePath", asset.relativePath);
-    asset.optional = object.value("optional").toBool(false);
+    valid &= readOptionalBool(object, "optional", context, diagnostics, asset.optional);
 
     valid &= parseChecksum(object.value("checksum"), context, diagnostics, asset.checksum);
     valid &= parseCompression(object.value("compression"), context, diagnostics, asset.compression);
@@ -370,7 +429,18 @@ parseAsset(const QJsonValue& value, std::vector<std::string>& diagnostics, Ephem
 
 void validateProfileAssetReferences(const EphemerisDataManifest& manifest, std::vector<std::string>& diagnostics)
 {
+    std::unordered_set<std::string> profileIds;
+    for (const EphemerisDataManifestProfile& profile : manifest.profiles) {
+        if (!profileIds.insert(profile.id).second) {
+            diagnostics.push_back("Manifest contains duplicate profile id '" + profile.id + "'.");
+        }
+    }
+
+    std::unordered_set<std::string> assetIds;
     for (const EphemerisDataManifestAsset& asset : manifest.assets) {
+        if (!assetIds.insert(asset.id).second) {
+            diagnostics.push_back("Manifest contains duplicate asset id '" + asset.id + "'.");
+        }
         if (manifest.profile(asset.profileId) == nullptr) {
             diagnostics.push_back("Asset '" + asset.id + "' references unknown profile '" + asset.profileId + "'.");
         }
