@@ -93,14 +93,49 @@ void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOp
     }
 }
 
-[[nodiscard]] EphemerisEngineFactoryResult makeUnsupportedRequestResult()
+[[nodiscard]] EphemerisEngineOptions simpleEngineDefaultOptions() noexcept
+{
+    EphemerisEngineOptions engineOptions;
+    engineOptions.engineKind = EphemerisEngineKind::Simple;
+    engineOptions.correctionFlags = EphemerisCorrectionFlags::NoCorrections;
+    engineOptions.enableAtmosphericRefraction = false;
+    return engineOptions;
+}
+
+[[nodiscard]] EphemerisEngineOptions simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions
+) noexcept
+{
+    EphemerisEngineOptions engineOptions = requestOptions;
+    engineOptions.engineKind = EphemerisEngineKind::Simple;
+    return engineOptions;
+}
+
+[[nodiscard]] EphemerisFactoryCreationDiagnostic
+makeHighPrecisionUnavailableDiagnostic(const EphemerisFactoryCreationDiagnosticSeverity severity)
+{
+    return {
+        EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable,
+        severity,
+        "High-precision ephemeris construction is not wired yet.",
+    };
+}
+
+[[nodiscard]] EphemerisEngineFactoryResult makeStrictHighPrecisionUnavailableResult()
+{
+    return EphemerisEngineFactoryResult::failure(
+        EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable,
+        {makeHighPrecisionUnavailableDiagnostic(EphemerisFactoryCreationDiagnosticSeverity::Error)}
+    );
+}
+
+[[nodiscard]] EphemerisEngineFactoryResult makeInvalidFactoryRequestResult()
 {
     return EphemerisEngineFactoryResult::failure(
         EphemerisFactoryCreationStatus::FailedInvalidRequest,
         {EphemerisFactoryCreationDiagnostic{
             EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
-            "Only simple ephemeris engine factory requests are supported before high-precision construction is wired.",
+            "The requested ephemeris engine kind is not supported.",
         }}
     );
 }
@@ -109,8 +144,11 @@ void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOp
 
 class SimpleEphemerisEngine final : public IEphemerisEngine {
 public:
-    explicit SimpleEphemerisEngine(std::span<const CelestialBody> bodies)
-        : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end()))
+    explicit SimpleEphemerisEngine(
+        std::span<const CelestialBody> bodies, EphemerisEngineOptions engineOptions = simpleEngineDefaultOptions()
+    )
+        : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end())),
+          m_options(simpleEngineOptionsFromRequest(engineOptions))
     {
     }
 
@@ -154,11 +192,7 @@ public:
 
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override
     {
-        EphemerisEngineOptions engineOptions;
-        engineOptions.engineKind = EphemerisEngineKind::Simple;
-        engineOptions.correctionFlags = EphemerisCorrectionFlags::NoCorrections;
-        engineOptions.enableAtmosphericRefraction = false;
-        return engineOptions;
+        return m_options;
     }
 
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override
@@ -304,6 +338,7 @@ private:
     }
 
     std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
+    EphemerisEngineOptions m_options;
     SunEquatorialCalculator m_sunCalculator;
     MoonEquatorialCalculator m_moonCalculator;
     PlanetEquatorialCalculator m_planetCalculator;
@@ -311,16 +346,30 @@ private:
 
 EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryRequest& request)
 {
-    if (request.engineKind != EphemerisEngineKind::Simple) {
-        return makeUnsupportedRequestResult();
+    switch (request.engineKind) {
+    case EphemerisEngineKind::Simple:
+        return EphemerisEngineFactoryResult::success(
+            std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options)
+        );
+    case EphemerisEngineKind::HighPrecision:
+        if (allowsSimpleEngineFallback(request.fallbackPolicy)) {
+            return EphemerisEngineFactoryResult::success(
+                std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options),
+                EphemerisFactoryCreationStatus::CreatedSimpleFallback,
+                {makeHighPrecisionUnavailableDiagnostic(EphemerisFactoryCreationDiagnosticSeverity::Warning)}
+            );
+        }
+
+        return makeStrictHighPrecisionUnavailableResult();
     }
 
-    return EphemerisEngineFactoryResult::success(std::make_unique<SimpleEphemerisEngine>(request.catalogBodies));
+    return makeInvalidFactoryRequestResult();
 }
 
 std::unique_ptr<IEphemerisEngine> createEphemerisEngine()
 {
     EphemerisEngineFactoryRequest request;
+    request.options = simpleEngineDefaultOptions();
     EphemerisEngineFactoryResult result = createEphemerisEngine(request);
     return std::move(result.engine);
 }
@@ -339,6 +388,7 @@ std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const Celestia
 {
     EphemerisEngineFactoryRequest request;
     request.catalogBodies = bodies;
+    request.options = simpleEngineDefaultOptions();
     EphemerisEngineFactoryResult result = createEphemerisEngine(request);
     return std::move(result.engine);
 }
