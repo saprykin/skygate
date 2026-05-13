@@ -9,6 +9,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
@@ -120,6 +121,106 @@ struct EphemerisDataSetInfo {
     std::vector<EphemerisDateRange> dateRanges;
 };
 
+enum class EphemerisResultStatus : std::uint8_t {
+    Valid,
+    Degraded,
+    Unsupported,
+    OutOfRange,
+    Failed
+};
+
+[[nodiscard]] constexpr std::size_t ephemerisResultStatusCount() noexcept
+{
+    return 5U;
+}
+
+[[nodiscard]] constexpr std::string_view displayName(const EphemerisResultStatus status) noexcept
+{
+    switch (status) {
+    case EphemerisResultStatus::Valid:
+        return "valid";
+    case EphemerisResultStatus::Degraded:
+        return "degraded";
+    case EphemerisResultStatus::Unsupported:
+        return "unsupported";
+    case EphemerisResultStatus::OutOfRange:
+        return "out of range";
+    case EphemerisResultStatus::Failed:
+        return "failed";
+    }
+
+    return {};
+}
+
+enum class EphemerisWarningCode : std::uint8_t {
+    AccuracyDegraded,
+    UnsupportedBody,
+    DataOutOfRange,
+    MissingEphemerisData,
+    MissingObserver,
+    TimeScaleDataUnavailable,
+    CorrectionUnavailable,
+    ComputationFailed
+};
+
+[[nodiscard]] constexpr std::string_view ephemerisWarningText(const EphemerisWarningCode code) noexcept
+{
+    switch (code) {
+    case EphemerisWarningCode::AccuracyDegraded:
+        return "Result accuracy is degraded for this request.";
+    case EphemerisWarningCode::UnsupportedBody:
+        return "This body is not supported by the selected ephemeris engine.";
+    case EphemerisWarningCode::DataOutOfRange:
+        return "The request is outside the effective date range of the available ephemeris data.";
+    case EphemerisWarningCode::MissingEphemerisData:
+        return "Required ephemeris data is unavailable.";
+    case EphemerisWarningCode::MissingObserver:
+        return "Observer information is missing or invalid, so topocentric coordinates are unavailable.";
+    case EphemerisWarningCode::TimeScaleDataUnavailable:
+        return "Required time-scale data is unavailable.";
+    case EphemerisWarningCode::CorrectionUnavailable:
+        return "One or more requested correction terms could not be applied.";
+    case EphemerisWarningCode::ComputationFailed:
+        return "The ephemeris computation failed.";
+    }
+
+    return "Ephemeris warning.";
+}
+
+struct EphemerisWarning {
+    EphemerisWarningCode code = EphemerisWarningCode::AccuracyDegraded;
+    std::string displayText;
+
+    EphemerisWarning() : displayText(ephemerisWarningText(code)) {}
+
+    explicit EphemerisWarning(const EphemerisWarningCode warningCode)
+        : code(warningCode), displayText(ephemerisWarningText(warningCode))
+    {
+    }
+
+    EphemerisWarning(const EphemerisWarningCode warningCode, std::string warningText)
+        : code(warningCode), displayText(std::move(warningText))
+    {
+        if (displayText.empty()) {
+            displayText = std::string(ephemerisWarningText(code));
+        }
+    }
+};
+
+struct EphemerisResultMetadata {
+    EphemerisResultStatus status = EphemerisResultStatus::Valid;
+    std::vector<EphemerisWarning> warnings;
+    std::string dataSourceProvenance;
+    std::optional<EphemerisDateRange> effectiveDataValidityRange;
+    std::optional<double> estimatedAngularUncertaintyArcsec;
+    EphemerisCorrectionFlags appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+
+    [[nodiscard]] bool isSuccessful() const noexcept
+    {
+        return status == EphemerisResultStatus::Valid || status == EphemerisResultStatus::Degraded;
+    }
+};
+
 struct EphemerisRequest {
     AstronomicalEpoch epoch;
     core::SkyContext context;
@@ -194,6 +295,7 @@ struct CelestialBodyState {
     std::uint32_t bodyIndex = 0;
     core::EquatorialCoordinate equatorial;
     core::HorizontalCoordinate horizontal;
+    EphemerisResultMetadata metadata;
 };
 
 struct SkySnapshot {

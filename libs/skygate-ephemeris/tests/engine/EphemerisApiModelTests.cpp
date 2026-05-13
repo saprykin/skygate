@@ -17,6 +17,8 @@ private slots:
     void constructsHighPrecisionModelDefaults();
     void combinesCorrectionFlags();
     void constructsRequestAndDataSetModels();
+    void constructsResultStatusAndWarningModels();
+    void keepsLegacyBodyStateFieldsReadableWithMetadata();
 };
 
 void EphemerisApiModelTests::exposesExactlyTwoEngineKinds()
@@ -138,8 +140,97 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
     );
 }
 
+void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
+{
+    constexpr std::array<skygate::ephemeris::EphemerisResultStatus, skygate::ephemeris::ephemerisResultStatusCount()>
+        statuses{
+            skygate::ephemeris::EphemerisResultStatus::Valid,
+            skygate::ephemeris::EphemerisResultStatus::Degraded,
+            skygate::ephemeris::EphemerisResultStatus::Unsupported,
+            skygate::ephemeris::EphemerisResultStatus::OutOfRange,
+            skygate::ephemeris::EphemerisResultStatus::Failed,
+        };
+
+    QCOMPARE(statuses.size(), 5U);
+    QVERIFY(skygate::ephemeris::displayName(statuses[0]) == "valid");
+    QVERIFY(skygate::ephemeris::displayName(statuses[1]) == "degraded");
+    QVERIFY(skygate::ephemeris::displayName(statuses[2]) == "unsupported");
+    QVERIFY(skygate::ephemeris::displayName(statuses[3]) == "out of range");
+    QVERIFY(skygate::ephemeris::displayName(statuses[4]) == "failed");
+
+    const std::array warningCodes{
+        skygate::ephemeris::EphemerisWarningCode::AccuracyDegraded,
+        skygate::ephemeris::EphemerisWarningCode::UnsupportedBody,
+        skygate::ephemeris::EphemerisWarningCode::DataOutOfRange,
+        skygate::ephemeris::EphemerisWarningCode::ComputationFailed,
+    };
+
+    for (const skygate::ephemeris::EphemerisWarningCode code : warningCodes) {
+        const skygate::ephemeris::EphemerisWarning warning(code);
+        QVERIFY(!warning.displayText.empty());
+        QVERIFY(!skygate::ephemeris::ephemerisWarningText(code).empty());
+    }
+
+    const skygate::ephemeris::EphemerisWarning fallbackTextWarning(
+        skygate::ephemeris::EphemerisWarningCode::DataOutOfRange, {}
+    );
+    QVERIFY(!fallbackTextWarning.displayText.empty());
+
+    skygate::ephemeris::EphemerisResultMetadata metadata;
+    QVERIFY(metadata.isSuccessful());
+    QCOMPARE(
+        static_cast<std::uint8_t>(metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
+    );
+    QVERIFY(metadata.warnings.empty());
+    QVERIFY(!metadata.effectiveDataValidityRange.has_value());
+    QVERIFY(!metadata.estimatedAngularUncertaintyArcsec.has_value());
+
+    metadata.status = skygate::ephemeris::EphemerisResultStatus::Failed;
+    metadata.warnings.emplace_back(skygate::ephemeris::EphemerisWarningCode::ComputationFailed);
+    metadata.dataSourceProvenance = "test source";
+    metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+
+    QVERIFY(!metadata.isSuccessful());
+    QCOMPARE(metadata.warnings.size(), std::size_t{1});
+    QVERIFY(!metadata.warnings.front().displayText.empty());
+    QVERIFY(metadata.dataSourceProvenance == std::string("test source"));
+    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
+        metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+    ));
+}
+
+void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
+{
+    skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = 42U,
+        .equatorial =
+            {
+                .rightAscensionHours = 12.5,
+                .declinationDeg = -4.0,
+            },
+        .horizontal =
+            {
+                .altitudeDeg = 30.0,
+                .azimuthDeg = 180.0,
+            },
+    };
+
+    QCOMPARE(state.bodyIndex, 42U);
+    QCOMPARE(state.equatorial.rightAscensionHours, 12.5);
+    QCOMPARE(state.equatorial.declinationDeg, -4.0);
+    QCOMPARE(state.horizontal.altitudeDeg, 30.0);
+    QCOMPARE(state.horizontal.azimuthDeg, 180.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(state.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
+    );
+    QVERIFY(state.metadata.warnings.empty());
+}
+
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags>);
+static_assert(std::is_enum_v<skygate::ephemeris::EphemerisResultStatus>);
 
 QTEST_MAIN(EphemerisApiModelTests)
 
