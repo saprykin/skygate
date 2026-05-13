@@ -56,6 +56,19 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
     return options.correctionFlags != EphemerisCorrectionFlags::NoCorrections || options.enableAtmosphericRefraction;
 }
 
+void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngineOptions& options) noexcept
+{
+    if (!requestsUnsupportedSimpleOptions(options)) {
+        return;
+    }
+
+    if (state.metadata.status == EphemerisResultStatus::Valid) {
+        state.metadata.status = EphemerisResultStatus::Degraded;
+    }
+    state.metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+    state.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+}
+
 void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
 {
     if (!requestsUnsupportedSimpleOptions(options)) {
@@ -63,11 +76,7 @@ void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOp
     }
 
     for (CelestialBodyState& state : snapshot.states) {
-        if (state.metadata.status == EphemerisResultStatus::Valid) {
-            state.metadata.status = EphemerisResultStatus::Degraded;
-        }
-        state.metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
-        state.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+        markUnsupportedSimpleOptions(state, options);
     }
 }
 
@@ -132,6 +141,28 @@ public:
         SkySnapshot snapshot = compute(contextFromRequest(request));
         markUnsupportedSimpleOptions(snapshot, request.options);
         return snapshot;
+    }
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        std::optional<CelestialBodyState> state = computeBodyState(contextFromRequest(request), bodyId);
+        if (state.has_value()) {
+            markUnsupportedSimpleOptions(*state, request.options);
+        }
+        return state;
+    }
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex >= m_bodies->size()) {
+            return std::nullopt;
+        }
+
+        CelestialBodyState state = computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, contextFromRequest(request));
+        markUnsupportedSimpleOptions(state, request.options);
+        return state;
     }
 
     [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override
