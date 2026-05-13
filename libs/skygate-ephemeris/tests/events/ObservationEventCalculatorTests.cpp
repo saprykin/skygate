@@ -69,6 +69,24 @@ void verifyCrossingAltitude(
 
 class MovingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
+
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {
         skygate::ephemeris::SkySnapshot snapshot;
@@ -109,6 +127,24 @@ public:
 class ConstantAltitudeEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit ConstantAltitudeEngine(const double altitudeDeg) : m_altitudeDeg(altitudeDeg) {}
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
 
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {

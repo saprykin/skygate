@@ -34,6 +34,24 @@ skygate::ephemeris::CelestialBody makeBody(
 
 class SnapshotOnlyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
+
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {
         auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(

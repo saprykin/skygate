@@ -47,39 +47,23 @@ constexpr qint64 kManyTrailsBudgetMs = 12000;
 
 bool isStrictPerformanceGuardMode()
 {
-    const QString mode = QString::fromUtf8(
-        qgetenv("SKYGATE_PERFORMANCE_GUARD_MODE")
-    ).trimmed().toLower();
-    const QString legacyStrict = QString::fromUtf8(
-        qgetenv("SKYGATE_STRICT_PERFORMANCE_GUARDS")
-    ).trimmed().toLower();
+    const QString mode = QString::fromUtf8(qgetenv("SKYGATE_PERFORMANCE_GUARD_MODE")).trimmed().toLower();
+    const QString legacyStrict = QString::fromUtf8(qgetenv("SKYGATE_STRICT_PERFORMANCE_GUARDS")).trimmed().toLower();
     return mode == QStringLiteral("strict")
-        || (
-            !legacyStrict.isEmpty()
-            && legacyStrict != QStringLiteral("0")
-            && legacyStrict != QStringLiteral("false")
-            && legacyStrict != QStringLiteral("no")
-            && legacyStrict != QStringLiteral("off")
-        );
+           || (!legacyStrict.isEmpty() && legacyStrict != QStringLiteral("0") && legacyStrict != QStringLiteral("false")
+               && legacyStrict != QStringLiteral("no") && legacyStrict != QStringLiteral("off"));
 }
 
 QString performanceMetricMessage(
-    const qint64 elapsedMs,
-    const qint64 budgetMs,
-    const char* operationName,
-    const bool strictMode
+    const qint64 elapsedMs, const qint64 budgetMs, const char* operationName, const bool strictMode
 )
 {
     const qint64 deltaMs = budgetMs - elapsedMs;
-    const double budgetPercent = budgetMs > 0
-        ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs))
-        : 0.0;
-    return QStringLiteral(
-        "perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
-        "strict=%7"
-    )
-        .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget")
-                                  : QStringLiteral("over-budget"))
+    const double budgetPercent =
+        budgetMs > 0 ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs)) : 0.0;
+    return QStringLiteral("perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
+                          "strict=%7")
+        .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget") : QStringLiteral("over-budget"))
         .arg(QString::fromUtf8(operationName))
         .arg(elapsedMs)
         .arg(budgetMs)
@@ -90,66 +74,65 @@ QString performanceMetricMessage(
 
 class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(
-        const skygate::core::SkyContext& context
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
     ) const override
     {
-        (void) context;
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        (void)context;
         return {};
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext&,
-        std::string_view
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState> computeBodyState(
-        const skygate::core::SkyContext& context,
-        const std::uint32_t bodyIndex
-    ) const override
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
         const double offsetMinutes = static_cast<double>(
-            std::chrono::duration_cast<std::chrono::minutes>(
-                context.utcTime.time_since_epoch()
-            ).count()
+            std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
         );
         const double bodyOffset = static_cast<double>(bodyIndex % 40U) * 0.015;
-        return skygate::ephemeris::CelestialBodyState {
+        return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = bodyIndex,
-            .horizontal = {
-                .altitudeDeg = 45.0 + bodyOffset + (offsetMinutes / 8000.0),
-                .azimuthDeg = 180.0 + bodyOffset + (offsetMinutes / 8000.0)
-            }
+            .horizontal =
+                {.altitudeDeg = 45.0 + bodyOffset + (offsetMinutes / 8000.0),
+                 .azimuthDeg = 180.0 + bodyOffset + (offsetMinutes / 8000.0)}
         };
     }
 };
 
-void verifyElapsedBelow(
-    const qint64 elapsedMs,
-    const qint64 budgetMs,
-    const char* operationName
-)
+void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const char* operationName)
 {
     const bool strictMode = isStrictPerformanceGuardMode();
-    const QString message = performanceMetricMessage(
-        elapsedMs,
-        budgetMs,
-        operationName,
-        strictMode
-    );
+    const QString message = performanceMetricMessage(elapsedMs, budgetMs, operationName, strictMode);
 
     if (elapsedMs < budgetMs) {
         qInfo().noquote() << message;
         return;
     }
 
-    const QString strictHint = QStringLiteral(
-        "%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
-        "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail"
-    ).arg(message);
+    const QString strictHint = QStringLiteral("%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
+                                              "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail")
+                                   .arg(message);
     if (!strictMode) {
         qWarning().noquote() << strictHint;
         return;
@@ -172,19 +155,16 @@ skygate::ephemeris::CelestialBody makeBody(
     body.displayName = std::move(displayName);
     body.type = type;
     body.visualMagnitude = visualMagnitude;
-    body.fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = declinationDeg
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+        .rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg
     };
     if (type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
-        body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+        body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
             .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-            .aliases = {
-                "Guard Alias " + body.id,
-                "Shared Collision Alias " + std::to_string(
-                    static_cast<int>(std::fmod(rightAscensionHours * 1000.0, 25.0))
-                )
-            },
+            .aliases =
+                {"Guard Alias " + body.id,
+                 "Shared Collision Alias "
+                     + std::to_string(static_cast<int>(std::fmod(rightAscensionHours * 1000.0, 25.0)))},
             .majorAxisArcmin = 5.0,
             .minorAxisArcmin = 3.0,
             .positionAngleDeg = 0.0
@@ -229,10 +209,7 @@ std::vector<skygate::ephemeris::CelestialBody> makeLargeMixedCatalog()
 
 SkyContextController::InitializationOptions testInitializationOptions()
 {
-    return SkyContextController::InitializationOptions {
-        .loadSettings = false,
-        .initializeLocation = false
-    };
+    return SkyContextController::InitializationOptions{.loadSettings = false, .initializeLocation = false};
 }
 
 skygate::ephemeris::SkySnapshot makeHitTestSnapshot(const int bodyCount)
@@ -270,18 +247,10 @@ void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
     auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     QVERIFY(engine != nullptr);
 
-    SkyContextController controller(
-        std::move(catalog),
-        std::move(engine),
-        testInitializationOptions(),
-        nullptr
-    );
+    SkyContextController controller(std::move(catalog), std::move(engine), testInitializationOptions(), nullptr);
     controller.setLatitudeText(QStringLiteral("47.4"));
     controller.setLongitudeText(QStringLiteral("8.5"));
-    QVERIFY(controller.setUtcDateTimeText(
-        QStringLiteral("2026-05-03"),
-        QStringLiteral("21:00:00")
-    ));
+    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
     controller.setMagnitudeCutoff(12.0);
     controller.setViewCenter(45.0, 180.0);
 
@@ -295,8 +264,7 @@ void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
 
     QVERIFY(sceneModel.snapshotGeneration() > 0U);
     QVERIFY(
-        !sceneModel.renderPointSpan().empty()
-        || !sceneModel.renderGlyphSpan().empty()
+        !sceneModel.renderPointSpan().empty() || !sceneModel.renderGlyphSpan().empty()
         || !sceneModel.renderLineSpan().empty()
     );
     verifyElapsedBelow(elapsedMs, kLargeSceneBuildBudgetMs, "large scene build");
@@ -306,16 +274,11 @@ void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
 {
     std::vector<skygate::ephemeris::CelestialBody> bodies = makeLargeMixedCatalog();
     bodies.push_back(makeBody(
-        "guard_exact_target",
-        "Guard Exact Target",
-        skygate::ephemeris::CelestialBodyType::Star,
-        -1.0,
-        6.0,
-        -16.0
+        "guard_exact_target", "Guard Exact Target", skygate::ephemeris::CelestialBodyType::Star, -1.0, 6.0, -16.0
     ));
 
     SkyObjectSearchModel model;
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs {
+    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{
         {"Guard Constellation", {"guard_star_1", "guard_star_2"}}
     };
     QElapsedTimer timer;
@@ -329,8 +292,7 @@ void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
     const qint64 exactQueryElapsedMs = timer.elapsed();
     QCOMPARE(model.rowCount(), 1);
     QCOMPARE(
-        model.index(0, 0).data(SkyObjectSearchModel::TargetIdRole).toString(),
-        QStringLiteral("guard_exact_target")
+        model.index(0, 0).data(SkyObjectSearchModel::TargetIdRole).toString(), QStringLiteral("guard_exact_target")
     );
     verifyElapsedBelow(exactQueryElapsedMs, kLargeSearchQueryBudgetMs, "large exact search");
 
@@ -348,7 +310,7 @@ void PerformanceGuardTests::hitTestsDenseRenderFrameWithinGuardrail()
     SkyRenderFrame frame;
     frame.points.reserve(kTargetCount);
     for (int index = 0; index < kTargetCount; ++index) {
-        frame.points.push_back(SkyRenderPoint {
+        frame.points.push_back(SkyRenderPoint{
             .x = 10.0 + static_cast<double>((index * 37) % 1180),
             .y = 10.0 + static_cast<double>((index * 53) % 780),
             .sizePx = 3.0,
@@ -393,11 +355,7 @@ void PerformanceGuardTests::buildsManyObjectTrailsWithinGuardrail()
     SkyObjectTrailInput input;
     input.ephemerisEngine = &engine;
     input.preparedProjection = &projection.value();
-    input.skyContext.observer = {
-        .latitudeDeg = 47.0,
-        .longitudeDeg = 8.0,
-        .elevationMeters = 400.0
-    };
+    input.skyContext.observer = {.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
     input.renderTheme = makeTrailRenderTheme();
     input.viewportWidth = 1000.0;
     input.viewportHeight = 800.0;
