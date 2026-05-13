@@ -94,32 +94,51 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
            && std::isfinite(epoch.julianDatePart2);
 }
 
-[[nodiscard]] std::string copyMetadataValue(const std::string_view line, const std::string_view key)
+[[nodiscard]] std::optional<std::string> metadataValue(const std::string_view line, const std::string_view key)
 {
     const std::string prefix = "#@ " + std::string(key);
     if (!startsWith(line, prefix)) {
-        return {};
+        return std::nullopt;
+    }
+    if (line.size() > prefix.size() && std::isspace(static_cast<unsigned char>(line[prefix.size()])) == 0) {
+        return std::nullopt;
     }
 
     return std::string(trimAsciiWhitespace(line.substr(prefix.size())));
 }
 
-void applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line)
+[[nodiscard]] std::optional<std::string>
+applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const std::size_t lineNumber)
 {
-    if (std::string value = copyMetadataValue(line, "version"); !value.empty()) {
-        info.version = std::move(value);
-        return;
-    }
-    if (std::string value = copyMetadataValue(line, "source"); !value.empty()) {
-        info.provenance = std::move(value);
-        return;
-    }
-    if (std::string value = copyMetadataValue(line, "expires"); !value.empty()) {
-        const std::optional<CivilDateTime> expiresDate = parseUtcDate(value);
-        if (expiresDate.has_value()) {
-            info.expiresAt = epochFromUtcDate(*expiresDate);
+    if (std::optional<std::string> value = metadataValue(line, "version"); value.has_value()) {
+        if (!value->empty()) {
+            info.version = std::move(*value);
         }
+        return std::nullopt;
     }
+    if (std::optional<std::string> value = metadataValue(line, "source"); value.has_value()) {
+        if (!value->empty()) {
+            info.provenance = std::move(*value);
+        }
+        return std::nullopt;
+    }
+    if (std::optional<std::string> value = metadataValue(line, "expires"); value.has_value()) {
+        const std::optional<CivilDateTime> expiresDate = parseUtcDate(*value);
+        if (!expiresDate.has_value()) {
+            return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
+                   + ".";
+        }
+
+        const std::optional<AstronomicalEpoch> expiresEpoch = epochFromUtcDate(*expiresDate);
+        if (!expiresEpoch.has_value()) {
+            return "Leap-second table contains unusable expiration metadata at line " + std::to_string(lineNumber)
+                   + ".";
+        }
+
+        info.expiresAt = *expiresEpoch;
+    }
+
+    return std::nullopt;
 }
 
 [[nodiscard]] bool parseEntryLine(std::string_view line, LeapSecondTableEntry& entry) noexcept
@@ -253,7 +272,10 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
             continue;
         }
         if (startsWith(line, "#@ ")) {
-            applyMetadataLine(info, line);
+            if (std::optional<std::string> diagnosticText = applyMetadataLine(info, line, lineNumber);
+                diagnosticText.has_value()) {
+                return failureResult(std::move(info), LeapSecondTableStatus::Malformed, std::move(*diagnosticText));
+            }
             continue;
         }
         if (startsWith(line, "#")) {
