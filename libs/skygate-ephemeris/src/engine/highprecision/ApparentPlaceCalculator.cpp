@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <utility>
@@ -16,20 +17,62 @@ namespace {
 constexpr double kRadiansPerHour = 3.141592653589793238462643383279502884 / 12.0;
 constexpr double kHoursPerRadian = 12.0 / 3.141592653589793238462643383279502884;
 
+enum class ApparentPlaceRequestMode : std::uint8_t {
+    Geometric,
+    Astrometric,
+    Apparent,
+    Topocentric
+};
+
+[[nodiscard]] constexpr std::uint32_t correctionMask(const EphemerisCorrectionFlags flags) noexcept
+{
+    return static_cast<std::uint32_t>(flags);
+}
+
+[[nodiscard]] constexpr bool
+hasAnyCorrectionFlag(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags requestedFlags) noexcept
+{
+    return (correctionMask(flags) & correctionMask(requestedFlags)) != 0U;
+}
+
 [[nodiscard]] bool isFiniteEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
     return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg);
 }
 
-[[nodiscard]] bool requestsTopocentricOutput(const EphemerisCorrectionFlags flags) noexcept
+[[nodiscard]] ApparentPlaceRequestMode requestModeForCorrections(const EphemerisCorrectionFlags flags) noexcept
 {
-    return hasCorrectionFlag(flags, EphemerisCorrectionFlags::DiurnalParallax)
-           || hasCorrectionFlag(flags, EphemerisCorrectionFlags::EarthOrientation);
+    if (flags == EphemerisCorrectionFlags::NoCorrections) {
+        return ApparentPlaceRequestMode::Geometric;
+    }
+    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::DiurnalParallax)) {
+        return ApparentPlaceRequestMode::Topocentric;
+    }
+    if (flags == EphemerisCorrectionFlags::Astrometric
+        || !hasAnyCorrectionFlag(
+            flags,
+            EphemerisCorrectionFlags::StellarAberration | EphemerisCorrectionFlags::GravitationalLightDeflection
+                | EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation
+        )) {
+        return ApparentPlaceRequestMode::Astrometric;
+    }
+
+    return ApparentPlaceRequestMode::Apparent;
 }
 
-[[nodiscard]] CelestialReferenceFrame targetFrameForRequest(const EphemerisCorrectionFlags flags) noexcept
+[[nodiscard]] CelestialReferenceFrame targetFrameForRequest(const ApparentPlaceRequestMode mode) noexcept
 {
-    return requestsTopocentricOutput(flags) ? CelestialReferenceFrame::Itrs : CelestialReferenceFrame::Cirs;
+    switch (mode) {
+    case ApparentPlaceRequestMode::Geometric:
+    case ApparentPlaceRequestMode::Astrometric:
+        return CelestialReferenceFrame::Gcrs;
+    case ApparentPlaceRequestMode::Apparent:
+        return CelestialReferenceFrame::Cirs;
+    case ApparentPlaceRequestMode::Topocentric:
+        return CelestialReferenceFrame::Itrs;
+    }
+
+    return CelestialReferenceFrame::Gcrs;
 }
 
 [[nodiscard]] CelestialFrameVector vectorFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
@@ -176,7 +219,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     }
 
     const EphemerisCorrectionFlags requestedCorrections = input.request.options.correctionFlags;
-    const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestedCorrections);
+    const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
+    const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
     if (targetFrame == CelestialReferenceFrame::Itrs) {
         if (m_timeScaleService == nullptr) {
             result.metadata.status = EphemerisResultStatus::Failed;

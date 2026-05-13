@@ -303,7 +303,9 @@ HighPrecisionEphemerisEngine::computeStateForBody(const EphemerisRequest& reques
     if (isCatalogStarBody(body) && starAstrometryCalculator != nullptr) {
         HighPrecisionCalculatorResult calculatorResult = starAstrometryCalculator->calculate(input);
         HighPrecisionCalculatorResult apparentResult =
-            apparentPlaceCalculator(m_dependencies).apply(input, calculatorResult);
+            requestsApparentPlaceProcessing(request)
+                ? apparentPlaceCalculator(m_dependencies).apply(input, calculatorResult)
+                : calculatorResult;
         return builder.buildState(input, apparentResult);
     }
 
