@@ -5,6 +5,7 @@
 
 #include <QtTest/QtTest>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -218,6 +219,7 @@ private slots:
     void treatsIcrsAndGcrsAsIdentityCelestialAxes();
     void usesTimeScaleServiceForNonTtEpochs();
     void reportsMissingTimeScaleServiceForNonTtCirsTransforms();
+    void rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms();
     void transformsCirsToTirsAgainstSofaReference();
     void transformsTirsToItrsAgainstSofaReference();
     void transformsGcrsToItrsAgainstSofaReference();
@@ -365,6 +367,38 @@ void FrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Failed)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+}
+
+void FrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+    const std::array<std::pair<CelestialReferenceFrame, CelestialReferenceFrame>, 4U> cases{{
+        {CelestialReferenceFrame::TrueEquatorAndEquinox, CelestialReferenceFrame::Tirs},
+        {CelestialReferenceFrame::Tirs, CelestialReferenceFrame::TrueEquatorAndEquinox},
+        {CelestialReferenceFrame::TrueEquatorAndEquinox, CelestialReferenceFrame::Itrs},
+        {CelestialReferenceFrame::Itrs, CelestialReferenceFrame::TrueEquatorAndEquinox},
+    }};
+
+    for (const auto& [sourceFrame, targetFrame] : cases) {
+        const CelestialFrameTransformResult result =
+            transformer.transformCelestialVector(CelestialFrameTransformRequest{
+                .sourceFrame = sourceFrame,
+                .targetFrame = targetFrame,
+                .epoch = sofaReferenceUtcEpoch(),
+                .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+            });
+
+        QVERIFY(!result.vector.has_value());
+        QCOMPARE(
+            static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Failed)
+        );
+        QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+        QCOMPARE(
+            static_cast<std::uint32_t>(result.metadata.appliedCorrections),
+            static_cast<std::uint32_t>(EphemerisCorrectionFlags::NoCorrections)
+        );
+        QCOMPARE(result.stages.size(), static_cast<std::size_t>(0U));
+    }
 }
 
 void FrameTransformerTests::transformsCirsToTirsAgainstSofaReference()

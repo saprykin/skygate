@@ -416,6 +416,11 @@ makeStageMetadata(const CelestialReferenceFrame sourceFrame, const CelestialRefe
     return frame == CelestialReferenceFrame::Icrs || frame == CelestialReferenceFrame::Gcrs;
 }
 
+[[nodiscard]] bool isTrueEquatorAndEquinox(const CelestialReferenceFrame frame) noexcept
+{
+    return frame == CelestialReferenceFrame::TrueEquatorAndEquinox;
+}
+
 [[nodiscard]] std::optional<Matrix3x3>
 apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisResultMetadata& metadata)
 {
@@ -509,6 +514,9 @@ ErfaFrameTransformer::transformCelestialVector(const CelestialFrameTransformRequ
             tryTransformApparentEquatorAndEquinox(request, context);
         apparentResult.has_value()) {
         return *apparentResult;
+    }
+    if (isTrueEquatorAndEquinox(request.sourceFrame) || isTrueEquatorAndEquinox(request.targetFrame)) {
+        return makeFailedResult(EphemerisWarningCode::CorrectionUnavailable);
     }
     if (sourceRank == targetRank) {
         return makeFailedResult(EphemerisWarningCode::CorrectionUnavailable);
