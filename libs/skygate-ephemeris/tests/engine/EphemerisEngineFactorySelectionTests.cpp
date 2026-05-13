@@ -44,6 +44,7 @@ class EphemerisEngineFactorySelectionTests final : public QObject {
 private slots:
     void createsRequestedSimpleEngineWithCatalogAndOptions();
     void fallsBackToSimpleWhenHighPrecisionIsUnavailableAndFallbackIsAllowed();
+    void failsDefaultHighPrecisionRequestWhenHighPrecisionIsUnavailable();
     void failsStrictHighPrecisionRequestWhenHighPrecisionIsUnavailable();
 };
 
@@ -131,6 +132,38 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
     QVERIFY(state.has_value());
     QCOMPARE(state->equatorial.rightAscensionHours, 11.25);
     QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+}
+
+void EphemerisEngineFactorySelectionTests::failsDefaultHighPrecisionRequestWhenHighPrecisionIsUnavailable()
+{
+    const std::array bodies{makeFactoryBody()};
+
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.catalogBodies = bodies;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+
+    const auto result = skygate::ephemeris::createEphemerisEngine(request);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.isFailure());
+    QVERIFY(result.engine == nullptr);
+    QVERIFY(!result.usedSimpleEngineFallback());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(
+            skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
+        )
+    );
+    QVERIFY(result.hasDiagnostics());
+    QVERIFY(result.hasErrors());
+    QCOMPARE(result.diagnostics.size(), std::size_t{1});
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable)
+    );
+    QVERIFY(result.diagnostics.front().isError());
+    QVERIFY(!result.diagnostics.front().displayText().empty());
 }
 
 void EphemerisEngineFactorySelectionTests::failsStrictHighPrecisionRequestWhenHighPrecisionIsUnavailable()

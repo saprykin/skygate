@@ -197,9 +197,9 @@ void EphemerisApiModelTests::constructsFactoryRequestDefaults()
     );
     QCOMPARE(
         static_cast<std::uint8_t>(request.fallbackPolicy),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision)
     );
-    QVERIFY(skygate::ephemeris::allowsSimpleEngineFallback(request.fallbackPolicy));
+    QVERIFY(!skygate::ephemeris::allowsSimpleEngineFallback(request.fallbackPolicy));
     QVERIFY(request.dataSetManifest == nullptr);
     QVERIFY(request.activeDataSnapshot == nullptr);
     QVERIFY(request.timeScaleService == nullptr);
