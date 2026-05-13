@@ -19,6 +19,9 @@ namespace skygate::ephemeris {
 namespace {
 
 constexpr std::string_view kSimpleDataSourceProvenance = "Simple ephemeris engine";
+constexpr std::string_view kSimpleEngineName = "Simple ephemeris engine";
+constexpr std::string_view kSimpleDataSetId = "simple";
+constexpr std::string_view kSimpleDataSetVersion = "built-in";
 
 }  // namespace
 
@@ -27,6 +30,53 @@ public:
     explicit SimpleEphemerisEngine(std::span<const CelestialBody> bodies)
         : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end()))
     {
+    }
+
+    [[nodiscard]] EphemerisEngineKind kind() const noexcept override
+    {
+        return EphemerisEngineKind::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return kSimpleEngineName;
+    }
+
+    [[nodiscard]] EphemerisCapabilities capabilities() const noexcept override
+    {
+        EphemerisCapabilities engineCapabilities;
+        engineCapabilities.engineKind = EphemerisEngineKind::Simple;
+        engineCapabilities.supportedCorrections = EphemerisCorrectionFlags::NoCorrections;
+        engineCapabilities.supportsSolarSystemBodies = true;
+        engineCapabilities.supportsCatalogStars = true;
+        engineCapabilities.supportsTopocentricPositions = true;
+        engineCapabilities.supportsAtmosphericRefraction = false;
+        engineCapabilities.supportsExtendedHistoricalRange = false;
+        return engineCapabilities;
+    }
+
+    [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept override
+    {
+        return {};
+    }
+
+    [[nodiscard]] EphemerisDataSetInfo dataSetInfo() const override
+    {
+        EphemerisDataSetInfo info;
+        info.id = kSimpleDataSetId;
+        info.displayName = kSimpleEngineName;
+        info.version = kSimpleDataSetVersion;
+        info.provenance = kSimpleDataSourceProvenance;
+        return info;
+    }
+
+    [[nodiscard]] EphemerisEngineOptions options() const noexcept override
+    {
+        EphemerisEngineOptions engineOptions;
+        engineOptions.engineKind = EphemerisEngineKind::Simple;
+        engineOptions.correctionFlags = EphemerisCorrectionFlags::NoCorrections;
+        engineOptions.enableAtmosphericRefraction = false;
+        return engineOptions;
     }
 
     [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override
