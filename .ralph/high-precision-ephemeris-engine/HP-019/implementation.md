@@ -24,3 +24,20 @@ READY
 
 ## Important notes
 - Verification used `build-ralph`; `ctest --test-dir build-ralph --output-on-failure` passed 56/56 tests.
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Cache promotion can delete an existing active asset on failure
+  - Action: Fixed
+  - Notes: Replaced delete-then-rename promotion with `QSaveFile` commit semantics so the active cache path is only replaced after activation output has passed size and SHA-256 validation. Added regression coverage for failed writes preserving an existing cache file, expected-size mismatch cleanup, and failed zstd activation cleanup.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/src/engine/highprecision/EphemerisDataActivation.cpp`
+  - `libs/skygate-ephemeris/tests/highprecision/EphemerisDataActivationTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-019/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-019/fix.md`
+- Tests run after fix:
+  - `cmake --build build-ralph --target skygate-ephemeris-data-activation-tests` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R skygate-ephemeris-data-activation-tests` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure` - PASS
+- Remaining concerns: None.

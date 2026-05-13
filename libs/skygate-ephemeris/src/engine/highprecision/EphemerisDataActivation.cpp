@@ -1,12 +1,12 @@
 #include "skygate/ephemeris/EphemerisDataActivation.hpp"
 
-#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QByteArrayView>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLibrary>
+#include <QSaveFile>
 
 #include <array>
 #include <cstddef>
@@ -271,22 +271,9 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     return true;
 }
 
-[[nodiscard]] QString temporaryTargetPath(const QString& targetPath)
-{
-    return targetPath + QStringLiteral(".tmp.%1").arg(QCoreApplication::applicationPid());
-}
-
-void removeFileIfPresent(const QString& path)
-{
-    QFile file(path);
-    if (file.exists()) {
-        (void)file.remove();
-    }
-}
-
 [[nodiscard]] bool copyUncompressedAsset(
     QFile& sourceFile,
-    QFile& targetFile,
+    QIODevice& targetFile,
     QCryptographicHash& hash,
     std::uint64_t& outputBytes,
     EphemerisDataActivationResult& result
@@ -315,7 +302,7 @@ void removeFileIfPresent(const QString& path)
 
 [[nodiscard]] bool decompressZstdAsset(
     QFile& sourceFile,
-    QFile& targetFile,
+    QIODevice& targetFile,
     QCryptographicHash& hash,
     std::uint64_t& outputBytes,
     EphemerisDataActivationResult& result
@@ -456,11 +443,8 @@ EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActi
         return result;
     }
 
-    const QString temporaryPath = temporaryTargetPath(targetPathString);
-    removeFileIfPresent(temporaryPath);
-
     QFile sourceFile(sourcePath);
-    QFile targetFile(temporaryPath);
+    QSaveFile targetFile(targetPathString);
     if (!sourceFile.open(QIODevice::ReadOnly)) {
         result.status = EphemerisDataActivationStatus::MissingSource;
         addDiagnostic(result, "Unable to open bundled ephemeris data asset source file.");
@@ -488,38 +472,33 @@ EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActi
         if (result.status == EphemerisDataActivationStatus::InvalidRequest) {
             result.status = EphemerisDataActivationStatus::IoError;
         }
-        targetFile.close();
-        removeFileIfPresent(temporaryPath);
+        targetFile.cancelWriting();
         return result;
     }
     if (!targetFile.flush()) {
         result.status = EphemerisDataActivationStatus::IoError;
         addDiagnostic(result, "Unable to flush activated ephemeris data cache file.");
-        targetFile.close();
-        removeFileIfPresent(temporaryPath);
+        targetFile.cancelWriting();
         return result;
     }
-    targetFile.close();
 
     if (request.asset->compression.uncompressedSizeBytes.has_value()
         && outputBytes != *request.asset->compression.uncompressedSizeBytes) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Activated ephemeris data asset size does not match manifest metadata.");
-        removeFileIfPresent(temporaryPath);
+        targetFile.cancelWriting();
         return result;
     }
     if (hash.result().toHex().toStdString() != request.asset->checksum.value) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Activated ephemeris data asset checksum does not match manifest metadata.");
-        removeFileIfPresent(temporaryPath);
+        targetFile.cancelWriting();
         return result;
     }
 
-    removeFileIfPresent(targetPathString);
-    if (!QFile::rename(temporaryPath, targetPathString)) {
+    if (!targetFile.commit()) {
         result.status = EphemerisDataActivationStatus::IoError;
         addDiagnostic(result, "Unable to atomically promote activated ephemeris data cache file.");
-        removeFileIfPresent(temporaryPath);
         return result;
     }
 
