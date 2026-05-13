@@ -11,7 +11,9 @@ namespace skygate::ephemeris::highprecision {
 enum class CelestialReferenceFrame : std::uint8_t {
     Icrs,
     Gcrs,
-    Cirs
+    Cirs,
+    Tirs,
+    Itrs
 };
 
 struct CelestialFrameVector {
@@ -42,13 +44,17 @@ public:
 
 class ErfaFrameTransformer final : public IFrameTransformer {
 public:
-    explicit ErfaFrameTransformer(std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService);
+    explicit ErfaFrameTransformer(
+        std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService,
+        std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider = nullptr
+    );
 
     [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
     ) const override;
 
 private:
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_earthOrientationProvider;
 };
 
 }  // namespace skygate::ephemeris::highprecision
