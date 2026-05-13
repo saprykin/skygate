@@ -1,3 +1,4 @@
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <QtTest/QtTest>
@@ -20,6 +21,7 @@ private slots:
     void constructsRequestAndDataSetModels();
     void constructsResultStatusAndWarningModels();
     void keepsLegacyBodyStateFieldsReadableWithMetadata();
+    void simpleEngineExposesMetadataDefaults();
 };
 
 void EphemerisApiModelTests::exposesExactlyTwoEngineKinds()
@@ -234,6 +236,53 @@ void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
     );
     QCOMPARE(state.metadata.warningCount(), std::size_t{0});
+}
+
+void EphemerisApiModelTests::simpleEngineExposesMetadataDefaults()
+{
+    const auto engine = skygate::ephemeris::createEphemerisEngine();
+    QVERIFY(engine != nullptr);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(engine->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QVERIFY(engine->name() == std::string_view{"Simple ephemeris engine"});
+
+    const auto capabilities = engine->capabilities();
+    QCOMPARE(
+        static_cast<std::uint8_t>(capabilities.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(capabilities.supportedCorrections),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+    );
+    QVERIFY(capabilities.supportsSolarSystemBodies);
+    QVERIFY(capabilities.supportsCatalogStars);
+    QVERIFY(capabilities.supportsTopocentricPositions);
+    QVERIFY(!capabilities.supportsAtmosphericRefraction);
+    QVERIFY(!capabilities.supportsExtendedHistoricalRange);
+
+    const auto options = engine->options();
+    QCOMPARE(
+        static_cast<std::uint8_t>(options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(options.correctionFlags),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+    );
+    QVERIFY(options.fallbackToSimpleEngine);
+    QVERIFY(!options.enableAtmosphericRefraction);
+
+    const auto dataSetInfo = engine->dataSetInfo();
+    QVERIFY(dataSetInfo.id == std::string{"simple"});
+    QVERIFY(dataSetInfo.displayName == std::string{"Simple ephemeris engine"});
+    QVERIFY(dataSetInfo.version == std::string{"built-in"});
+    QVERIFY(!dataSetInfo.provenance.empty());
+    QVERIFY(dataSetInfo.dateRanges.empty());
+    QVERIFY(engine->supportedDateRanges().empty());
 }
 
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind>);
