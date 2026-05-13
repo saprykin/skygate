@@ -11,6 +11,7 @@ endif()
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     find_package(calceph CONFIG REQUIRED GLOBAL)
     find_package(zstd CONFIG REQUIRED GLOBAL)
+    find_package(ERFA REQUIRED)
 endif()
 
 set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
@@ -30,6 +31,12 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
 )
 
 set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
+        src/engine/highprecision/ErfaAstrometry.hpp
+        src/engine/highprecision/ErfaAstrometry.cpp
+    )
+endif()
 
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_library(skygate-ephemeris-highprecision-dependencies INTERFACE)
@@ -37,6 +44,7 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         INTERFACE
             calceph
             zstd::libzstd
+            ERFA::ERFA
     )
     add_library(
         skygate::ephemeris-highprecision-dependencies
@@ -141,6 +149,13 @@ target_link_libraries(skygate-ephemeris
         Qt6::Core
         ZLIB::ZLIB
 )
+
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    target_link_libraries(skygate-ephemeris
+        PRIVATE
+            skygate::ephemeris-highprecision-dependencies
+    )
+endif()
 
 target_compile_features(skygate-ephemeris PUBLIC cxx_std_20)
 

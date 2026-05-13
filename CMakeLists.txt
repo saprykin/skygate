@@ -39,6 +39,9 @@ option(
     "Enable high-precision ephemeris dependency gates and tests"
     OFF
 )
+# High-precision builds use ERFA through the repo-local vcpkg overlay port when
+# configured with a vcpkg preset, or through a system ERFA package found by
+# cmake/FindERFA.cmake for non-vcpkg builds.
 
 set(SKYGATE_PACKAGE_ARCHITECTURE "" CACHE STRING "Architecture label used in package file names")
 if(SKYGATE_PACKAGE_ARCHITECTURE)

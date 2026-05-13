@@ -1,0 +1,21 @@
+{
+    "name": "erfa",
+    "version": "2.0.1",
+    "description": "Essential Routines for Fundamental Astronomy.",
+    "homepage": "https://github.com/liberfa/erfa",
+    "license": "BSD-3-Clause",
+    "dependencies": [
+        {
+            "name": "vcpkg-pkgconfig-get-modules",
+            "host": true
+        },
+        {
+            "name": "vcpkg-tool-meson",
+            "host": true
+        },
+        {
+            "name": "vcpkg-tool-ninja",
+            "host": true
+        }
+    ]
+}
