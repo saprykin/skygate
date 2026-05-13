@@ -15,12 +15,7 @@ namespace {
 void ignoreSkySettingsFallbackWarnings(const int count)
 {
     for (int index = 0; index < count; ++index) {
-        QTest::ignoreMessage(
-            QtWarningMsg,
-            QRegularExpression(
-                "Invalid .*setting skyContext/.* - using fallback .*"
-            )
-        );
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid .*setting skyContext/.* - using fallback .*"));
     }
 }
 
@@ -39,6 +34,8 @@ private slots:
     void savesLoadsAndClearsCatalogCachesIndependently();
     void partialCatalogCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
+    void savesLoadsAndClearsEphemerisDataCacheMetadata();
+    void partialAndMalformedEphemerisDataCacheMetadataFallsBack();
     void savesLoadsAndDefaultsLoggingPreferences();
     void malformedLoggingPreferencesFallBackToDefaults();
 
@@ -111,10 +108,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QVERIFY(loadedSnapshot->overlayLayers.equals(savedSnapshot.overlayLayers));
     QCOMPARE(loadedSnapshot->catalogPresetIndex, savedSnapshot.catalogPresetIndex);
     QCOMPARE(loadedSnapshot->catalogUrlText, savedSnapshot.catalogUrlText);
-    QCOMPARE(
-        loadedSnapshot->deepSkyCatalogPresetIndex,
-        savedSnapshot.deepSkyCatalogPresetIndex
-    );
+    QCOMPARE(loadedSnapshot->deepSkyCatalogPresetIndex, savedSnapshot.deepSkyCatalogPresetIndex);
     QCOMPARE(loadedSnapshot->deepSkyCatalogUrlText, savedSnapshot.deepSkyCatalogUrlText);
     QCOMPARE(loadedSnapshot->logToTerminal, savedSnapshot.logToTerminal);
     QCOMPARE(loadedSnapshot->logToFile, savedSnapshot.logToFile);
@@ -237,17 +231,13 @@ void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
 void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 {
     m_settings.resetSettingsWithCatalogCachePaths(
-        QStringLiteral("catalog-cache-test.txt"),
-        QStringLiteral("deep-sky-catalog-cache-test.txt")
+        QStringLiteral("catalog-cache-test.txt"), QStringLiteral("deep-sky-catalog-cache-test.txt")
     );
 
     SkySettingsStore store;
-    const SkySettingsStore::CatalogCacheSnapshot savedSnapshot =
-        skygate::ui::tests::sampleCatalogCacheSnapshot({
-            .constellationLineRows = "a|b\n",
-            .constellationLabelRows = "Orion|hip1,hip2\n",
-            .constellationCount = 42
-        });
+    const SkySettingsStore::CatalogCacheSnapshot savedSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
+        {.constellationLineRows = "a|b\n", .constellationLabelRows = "Orion|hip1,hip2\n", .constellationCount = 42}
+    );
 
     QVERIFY(store.saveCatalogCache(savedSnapshot));
     const auto loadedSnapshot = store.loadCatalogCache();
@@ -257,10 +247,7 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
     QCOMPARE(loadedSnapshot->catalogPayload, savedSnapshot.catalogPayload);
     QCOMPARE(loadedSnapshot->deepSkyCatalogPayload, savedSnapshot.deepSkyCatalogPayload);
     QCOMPARE(loadedSnapshot->constellationLineRows, savedSnapshot.constellationLineRows);
-    QCOMPARE(
-        loadedSnapshot->constellationLineSchemaVersion,
-        savedSnapshot.constellationLineSchemaVersion
-    );
+    QCOMPARE(loadedSnapshot->constellationLineSchemaVersion, savedSnapshot.constellationLineSchemaVersion);
     QCOMPARE(loadedSnapshot->constellationCount, savedSnapshot.constellationCount);
 
     QVERIFY(store.clearCatalogCache());
@@ -272,14 +259,8 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
     QVERIFY(starClearedSnapshot->constellationLabelRows.isEmpty());
     QCOMPARE(starClearedSnapshot->constellationLineSchemaVersion, 0);
     QCOMPARE(starClearedSnapshot->constellationCount, 0U);
-    QCOMPARE(
-        starClearedSnapshot->deepSkySourceLabel,
-        savedSnapshot.deepSkySourceLabel
-    );
-    QCOMPARE(
-        starClearedSnapshot->deepSkyCatalogPayload,
-        savedSnapshot.deepSkyCatalogPayload
-    );
+    QCOMPARE(starClearedSnapshot->deepSkySourceLabel, savedSnapshot.deepSkySourceLabel);
+    QCOMPARE(starClearedSnapshot->deepSkyCatalogPayload, savedSnapshot.deepSkyCatalogPayload);
 
     QVERIFY(store.clearDeepSkyCatalogCache());
     QVERIFY(!store.loadCatalogCache().has_value());
@@ -288,8 +269,7 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
 {
     const QString starCachePath = m_settings.filePath(QStringLiteral("partial-star-cache.txt"));
-    const QString deepSkyCachePath =
-        m_settings.filePath(QStringLiteral("partial-deep-sky-cache.txt"));
+    const QString deepSkyCachePath = m_settings.filePath(QStringLiteral("partial-deep-sky-cache.txt"));
     m_settings.clearSettings();
     m_settings.setCatalogCachePaths(starCachePath, deepSkyCachePath);
     QSettings settings;
@@ -304,8 +284,7 @@ void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()
 
     SkySettingsStore::CatalogCacheSnapshot deepSkySnapshot;
     deepSkySnapshot.deepSkySourceLabel = "Saved OpenNGC";
-    deepSkySnapshot.deepSkyCatalogPayload =
-        skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
+    deepSkySnapshot.deepSkyCatalogPayload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
     QVERIFY(store.saveCatalogCache(deepSkySnapshot));
     QCOMPARE(settings.value("skyContext/catalogCachePath").toString(), starCachePath);
     QCOMPARE(settings.value("skyContext/deepSkyCatalogCachePath").toString(), deepSkyCachePath);
@@ -345,6 +324,74 @@ void SkySettingsStoreTests::missingCacheFilesAndMalformedCacheMetadataAreTolerat
     QVERIFY(loadedSnapshot->deepSkyCatalogPayload.isEmpty());
 }
 
+void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
+{
+    m_settings.resetSettingsWithCatalogCachePaths(
+        QStringLiteral("ephemeris-clear-star-cache.csv"), QStringLiteral("ephemeris-clear-deep-sky-cache.csv")
+    );
+
+    SkySettingsStore store;
+    const SkySettingsStore::CatalogCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
+    QVERIFY(store.saveCatalogCache(catalogSnapshot));
+
+    SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot;
+    savedSnapshot.installedKernelPath = m_settings.filePath(QStringLiteral("de440s.bsp"));
+    savedSnapshot.installedKernelVersion = QStringLiteral("DE440s-2026a");
+    savedSnapshot.installedEarthOrientationPath = m_settings.filePath(QStringLiteral("eop.csv"));
+    savedSnapshot.installedEarthOrientationVersion = QStringLiteral("IERS-2026-05");
+    savedSnapshot.installedLeapSecondTableVersion = QStringLiteral("leap-seconds-2025");
+    savedSnapshot.installedDeltaTDataVersion = QStringLiteral("delta-t-2026");
+    savedSnapshot.dataRevisionToken = QStringLiteral("ephemeris-rev-42");
+    savedSnapshot.lastUpdateResult = QStringLiteral("Updated");
+
+    QVERIFY(store.saveEphemerisDataCache(savedSnapshot));
+    const auto loadedSnapshot = store.loadEphemerisDataCache();
+    QCOMPARE(loadedSnapshot.installedKernelPath, savedSnapshot.installedKernelPath);
+    QCOMPARE(loadedSnapshot.installedKernelVersion, savedSnapshot.installedKernelVersion);
+    QCOMPARE(loadedSnapshot.installedEarthOrientationPath, savedSnapshot.installedEarthOrientationPath);
+    QCOMPARE(loadedSnapshot.installedEarthOrientationVersion, savedSnapshot.installedEarthOrientationVersion);
+    QCOMPARE(loadedSnapshot.installedLeapSecondTableVersion, savedSnapshot.installedLeapSecondTableVersion);
+    QCOMPARE(loadedSnapshot.installedDeltaTDataVersion, savedSnapshot.installedDeltaTDataVersion);
+    QCOMPARE(loadedSnapshot.dataRevisionToken, savedSnapshot.dataRevisionToken);
+    QCOMPARE(loadedSnapshot.lastUpdateResult, savedSnapshot.lastUpdateResult);
+
+    QVERIFY(store.clearEphemerisDataCache());
+    const auto clearedSnapshot = store.loadEphemerisDataCache();
+    QVERIFY(clearedSnapshot.installedKernelPath.isEmpty());
+    QVERIFY(clearedSnapshot.installedKernelVersion.isEmpty());
+    QVERIFY(clearedSnapshot.installedEarthOrientationPath.isEmpty());
+    QVERIFY(clearedSnapshot.installedEarthOrientationVersion.isEmpty());
+    QVERIFY(clearedSnapshot.installedLeapSecondTableVersion.isEmpty());
+    QVERIFY(clearedSnapshot.installedDeltaTDataVersion.isEmpty());
+    QCOMPARE(clearedSnapshot.dataRevisionToken, QString("bundled"));
+    QCOMPARE(clearedSnapshot.lastUpdateResult, QString("Bundled fallback"));
+
+    const auto stillLoadedCatalogSnapshot = store.loadCatalogCache();
+    QVERIFY(stillLoadedCatalogSnapshot.has_value());
+    QCOMPARE(stillLoadedCatalogSnapshot->catalogPayload, catalogSnapshot.catalogPayload);
+    QCOMPARE(stillLoadedCatalogSnapshot->deepSkyCatalogPayload, catalogSnapshot.deepSkyCatalogPayload);
+}
+
+void SkySettingsStoreTests::partialAndMalformedEphemerisDataCacheMetadataFallsBack()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/ephemerisData/installedKernelVersion", "DE440s-2026a");
+    settings.setValue("skyContext/ephemerisData/dataRevisionToken", "   ");
+    settings.setValue("skyContext/ephemerisData/lastUpdateResult", "");
+
+    const SkySettingsStore store;
+    const auto loadedSnapshot = store.loadEphemerisDataCache();
+    QVERIFY(loadedSnapshot.installedKernelPath.isEmpty());
+    QCOMPARE(loadedSnapshot.installedKernelVersion, QString("DE440s-2026a"));
+    QVERIFY(loadedSnapshot.installedEarthOrientationPath.isEmpty());
+    QVERIFY(loadedSnapshot.installedEarthOrientationVersion.isEmpty());
+    QVERIFY(loadedSnapshot.installedLeapSecondTableVersion.isEmpty());
+    QVERIFY(loadedSnapshot.installedDeltaTDataVersion.isEmpty());
+    QCOMPARE(loadedSnapshot.dataRevisionToken, QString("bundled"));
+    QCOMPARE(loadedSnapshot.lastUpdateResult, QString("Bundled fallback"));
+}
+
 void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
 {
     QSettings settings;
@@ -367,10 +414,7 @@ void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()
     ignoreSkySettingsFallbackWarnings(1);
     const auto loadedWithBlankPath = store.loadState();
     QVERIFY(loadedWithBlankPath.has_value());
-    QCOMPARE(
-        loadedWithBlankPath->logFilePath,
-        skygate::ui::SkyLogging::defaultLogFilePath()
-    );
+    QCOMPARE(loadedWithBlankPath->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
 }
 
 void SkySettingsStoreTests::malformedLoggingPreferencesFallBackToDefaults()
