@@ -61,6 +61,7 @@ private slots:
     void loadsValidTableFromSnapshot();
     void reportsMissingTable();
     void rejectsMalformedRows();
+    void rejectsMalformedExpirationMetadata();
     void reportsStaleTable();
     void exposesValidityRangeMetadata();
 };
@@ -119,6 +120,28 @@ void LeapSecondProviderTests::rejectsMalformedRows()
         static_cast<std::uint8_t>(result.tableInfo.status),
         static_cast<std::uint8_t>(skygate::ephemeris::LeapSecondTableStatus::Malformed)
     );
+    QVERIFY(!result.tableInfo.diagnosticText.empty());
+}
+
+void LeapSecondProviderTests::rejectsMalformedExpirationMetadata()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "#@ version bad-expiration\n"
+                    "#@ expires not-a-date\n"
+                    "effective_utc_date,tai_minus_utc\n"
+                    "1972-01-01,10\n";
+
+    const skygate::ephemeris::LeapSecondTableLoadResult result =
+        skygate::ephemeris::loadLeapSecondTableFromTextAsset(asset);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.provider == nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.tableInfo.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::LeapSecondTableStatus::Malformed)
+    );
+    QVERIFY(!result.tableInfo.expiresAt.has_value());
+    QVERIFY(!result.tableInfo.validityRange.has_value());
     QVERIFY(!result.tableInfo.diagnosticText.empty());
 }
 
