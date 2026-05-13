@@ -366,6 +366,14 @@ void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
     );
     QVERIFY(emptyEngine->compute(context).states.empty());
 
+    const auto emptyBraceEngine = skygate::ephemeris::createEphemerisEngine({});
+    QVERIFY(emptyBraceEngine != nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(emptyBraceEngine->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QVERIFY(emptyBraceEngine->compute(context).states.empty());
+
     const std::array bodies{makeFactoryTestBody()};
     const auto spanEngine =
         skygate::ephemeris::createEphemerisEngine(std::span<const skygate::ephemeris::CelestialBody>{
