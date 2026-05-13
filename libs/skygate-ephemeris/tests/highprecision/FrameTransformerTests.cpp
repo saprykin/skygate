@@ -1,5 +1,8 @@
 #include "engine/highprecision/FrameTransformer.hpp"
 
+#include "skygate/ephemeris/LeapSecondProvider.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
+
 #include <QtTest/QtTest>
 
 #include <cmath>
@@ -98,6 +101,32 @@ public:
     std::optional<TimeScaleConversionResult> ut1Result;
 };
 
+class RecordingEarthOrientationProvider final : public IEarthOrientationProvider {
+public:
+    explicit RecordingEarthOrientationProvider(std::shared_ptr<const IEarthOrientationProvider> provider)
+        : m_provider(std::move(provider))
+    {
+    }
+
+    [[nodiscard]] const EarthOrientationDataInfo& dataInfo() const noexcept override
+    {
+        ++dataInfoCallCount;
+        return m_provider->dataInfo();
+    }
+
+    [[nodiscard]] std::span<const EarthOrientationTableEntry> entries() const noexcept override
+    {
+        ++entriesCallCount;
+        return m_provider->entries();
+    }
+
+    mutable int dataInfoCallCount = 0;
+    mutable int entriesCallCount = 0;
+
+private:
+    std::shared_ptr<const IEarthOrientationProvider> m_provider;
+};
+
 [[nodiscard]] TimeScaleConversionResult validTtConversionResult()
 {
     return {
@@ -147,6 +176,25 @@ public:
     );
 }
 
+[[nodiscard]] std::shared_ptr<const ILeapSecondProvider> leapSecondProvider()
+{
+    const LeapSecondTableLoadResult result = loadLeapSecondTableFromTextAsset(EphemerisTextDataAsset{
+        .id = "leap-seconds",
+        .version = "unit-test-leap-seconds",
+        .provenance = "unit test leap-second data",
+        .content = "#@ version unit-test-leap-seconds\n"
+                   "#@ source unit test\n"
+                   "#@ expires 2027-01-01\n"
+                   "effective_utc_date,tai_minus_utc\n"
+                   "1972-01-01,10\n"
+                   "1972-07-01,11\n"
+                   "2015-07-01,36\n"
+                   "2017-01-01,37\n",
+    });
+    Q_ASSERT(result.isSuccess());
+    return result.provider;
+}
+
 [[nodiscard]] std::shared_ptr<RecordingTimeScaleService> frameTimeScaleService()
 {
     auto service = std::make_shared<RecordingTimeScaleService>();
@@ -172,6 +220,9 @@ private slots:
     void transformsGcrsToItrsAgainstSofaReference();
     void recordsPerStageMetadataForComposedTransforms();
     void reusesTimeScaleConversionsAcrossComposedStages();
+    void reusesEarthOrientationSampleAcrossComposedTerrestrialStages();
+    void preservesIcrsSourceFrameInComposedStageMetadata();
+    void preservesIcrsTargetFrameInComposedStageMetadata();
     void recordsUnavailableStageWhenTransformCannotBeComputed();
     void degradesItrsTransformForPredictedEarthOrientationData();
     void degradesItrsTransformForStaleEarthOrientationData();
@@ -406,12 +457,20 @@ void FrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
         static_cast<std::uint8_t>(CelestialReferenceFrame::Tirs)
     );
     QCOMPARE(
+        static_cast<std::uint32_t>(result.stages[1].metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::EarthOrientation)
+    );
+    QCOMPARE(
         static_cast<std::uint8_t>(result.stages[2].sourceFrame),
         static_cast<std::uint8_t>(CelestialReferenceFrame::Tirs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[2].targetFrame),
         static_cast<std::uint8_t>(CelestialReferenceFrame::Itrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.stages[2].metadata.appliedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::EarthOrientation)
     );
 
     for (const CelestialFrameTransformStageMetadata& stage : result.stages) {
@@ -441,7 +500,80 @@ void FrameTransformerTests::reusesTimeScaleConversionsAcrossComposedStages()
     });
 
     QVERIFY(result.vector.has_value());
-    QCOMPARE(service->convertCallCount, 3);
+    QCOMPARE(service->convertCallCount, 2);
+}
+
+void FrameTransformerTests::reusesEarthOrientationSampleAcrossComposedTerrestrialStages()
+{
+    auto eopProvider = std::make_shared<RecordingEarthOrientationProvider>(earthOrientationProvider());
+    const TimeScaleServiceOptions options{
+        .allowDegradedLeapSecondFallback = false,
+        .fallbackTaiMinusUtcSeconds = 0,
+        .earthOrientationSampleOptions =
+            {
+                .allowOutOfRangeNearestSampleFallback = true,
+                .allowMissingDataZeroFallback = false,
+            },
+        .allowUt1DeltaTFallback = false,
+    };
+    const auto service = std::make_shared<LeapSecondTimeScaleService>(leapSecondProvider(), options, eopProvider);
+    const ErfaFrameTransformer transformer(service, eopProvider);
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Gcrs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(eopProvider->entriesCallCount, 2);
+}
+
+void FrameTransformerTests::preservesIcrsSourceFrameInComposedStageMetadata()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Icrs,
+        .targetFrame = CelestialReferenceFrame::Itrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(result.stages.size(), static_cast<std::size_t>(3U));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.front().sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Icrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.front().targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+    );
+}
+
+void FrameTransformerTests::preservesIcrsTargetFrameInComposedStageMetadata()
+{
+    const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
+
+    const CelestialFrameTransformResult result = transformer.transformCelestialVector(CelestialFrameTransformRequest{
+        .sourceFrame = CelestialReferenceFrame::Itrs,
+        .targetFrame = CelestialReferenceFrame::Icrs,
+        .epoch = sofaReferenceUtcEpoch(),
+        .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+    });
+
+    QVERIFY(result.vector.has_value());
+    QCOMPARE(result.stages.size(), static_cast<std::size_t>(3U));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.back().sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.stages.back().targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Icrs)
+    );
 }
 
 void FrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed()
