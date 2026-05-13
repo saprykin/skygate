@@ -114,10 +114,37 @@ class ApparentPlaceCalculatorTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void routesGeometricRequestsToGcrs();
     void routesAstrometricRequestsToGcrs();
+    void routesAstrometricRequestsWithUnsupportedRefractionToGcrs();
     void routesApparentRequestsToCirs();
     void reportsUnavailableRefractionMode();
 };
+
+void ApparentPlaceCalculatorTests::routesGeometricRequestsToGcrs()
+{
+    auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
+    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Geometric);
+
+    const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
+
+    QCOMPARE(frameTransformer->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastSourceFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+    );
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+}
 
 void ApparentPlaceCalculatorTests::routesAstrometricRequestsToGcrs()
 {
@@ -142,6 +169,34 @@ void ApparentPlaceCalculatorTests::routesAstrometricRequestsToGcrs()
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
     );
+}
+
+void ApparentPlaceCalculatorTests::routesAstrometricRequestsWithUnsupportedRefractionToGcrs()
+{
+    auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
+    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
+    EphemerisRequest request =
+        makeRequest(EphemerisCorrectionFlags::Astrometric | EphemerisCorrectionFlags::AtmosphericRefraction);
+    request.options.enableAtmosphericRefraction = true;
+
+    const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
+
+    QCOMPARE(frameTransformer->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastSourceFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+    );
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 }
 
 void ApparentPlaceCalculatorTests::routesApparentRequestsToCirs()

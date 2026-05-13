@@ -22,3 +22,20 @@ READY
 ## Important notes
 - Verification run: `cmake --build build-ralph`
 - Verification run: `ctest --test-dir build-ralph --output-on-failure`
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Astrometric requests with extra unsupported flags route as apparent
+  - Action: Fixed
+  - Notes: `ApparentPlaceCalculator` now keeps geocentric requests without `EarthOrientation` in the astrometric/GCRS path even when unsupported extras such as `AtmosphericRefraction` are present. Refraction is still reported as unavailable degraded metadata.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/src/engine/highprecision/ApparentPlaceCalculator.cpp`
+  - `libs/skygate-ephemeris/tests/highprecision/ApparentPlaceCalculatorTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-027A/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-027A/fix.md`
+- Tests run after fix:
+  - `cmake --build build-ralph --target skygate-ephemeris-apparent-place-calculator-tests skygate-ephemeris-highprecision-engine-tests` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R "skygate-ephemeris-(highprecision-engine|apparent-place-calculator)-tests"` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure` - PASS
+- Remaining concerns: None.

@@ -24,17 +24,6 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     Topocentric
 };
 
-[[nodiscard]] constexpr std::uint32_t correctionMask(const EphemerisCorrectionFlags flags) noexcept
-{
-    return static_cast<std::uint32_t>(flags);
-}
-
-[[nodiscard]] constexpr bool
-hasAnyCorrectionFlag(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags requestedFlags) noexcept
-{
-    return (correctionMask(flags) & correctionMask(requestedFlags)) != 0U;
-}
-
 [[nodiscard]] bool isFiniteEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
     return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg);
@@ -48,16 +37,11 @@ hasAnyCorrectionFlag(const EphemerisCorrectionFlags flags, const EphemerisCorrec
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::DiurnalParallax)) {
         return ApparentPlaceRequestMode::Topocentric;
     }
-    if (flags == EphemerisCorrectionFlags::Astrometric
-        || !hasAnyCorrectionFlag(
-            flags,
-            EphemerisCorrectionFlags::StellarAberration | EphemerisCorrectionFlags::GravitationalLightDeflection
-                | EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation
-        )) {
-        return ApparentPlaceRequestMode::Astrometric;
+    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::EarthOrientation)) {
+        return ApparentPlaceRequestMode::Apparent;
     }
 
-    return ApparentPlaceRequestMode::Apparent;
+    return ApparentPlaceRequestMode::Astrometric;
 }
 
 [[nodiscard]] CelestialReferenceFrame targetFrameForRequest(const ApparentPlaceRequestMode mode) noexcept
