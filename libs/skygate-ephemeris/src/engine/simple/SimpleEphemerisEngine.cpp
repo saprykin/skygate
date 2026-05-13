@@ -16,6 +16,12 @@
 
 namespace skygate::ephemeris {
 
+namespace {
+
+constexpr std::string_view kSimpleDataSourceProvenance = "Simple ephemeris engine";
+
+}  // namespace
+
 class SimpleEphemerisEngine final : public IEphemerisEngine {
 public:
     explicit SimpleEphemerisEngine(std::span<const CelestialBody> bodies)
@@ -75,7 +81,7 @@ private:
         state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
         state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
         state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
-        state.metadata.dataSourceProvenance = "Simple ephemeris engine";
+        state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
 
         if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
             state.equatorial = *equatorial;
@@ -84,11 +90,11 @@ private:
                     EquatorialToHorizontalCalculator::compute(*equatorial, context.observer, context.utcTime);
             } else {
                 state.metadata.status = EphemerisResultStatus::Degraded;
-                state.metadata.warnings.emplace_back(EphemerisWarningCode::MissingObserver);
+                state.metadata.addWarning(EphemerisWarningCode::MissingObserver);
             }
         } else {
             state.metadata.status = EphemerisResultStatus::Unsupported;
-            state.metadata.warnings.emplace_back(EphemerisWarningCode::UnsupportedBody);
+            state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
         }
 
         return state;

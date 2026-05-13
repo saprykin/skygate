@@ -138,8 +138,8 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(std::isfinite(sunById->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(sunById->equatorial.declinationDeg));
     QVERIFY(sunById->metadata.status == skygate::ephemeris::EphemerisResultStatus::Valid);
-    QVERIFY(sunById->metadata.warnings.empty());
-    QVERIFY(sunById->metadata.dataSourceProvenance == std::string("Simple ephemeris engine"));
+    QCOMPARE(sunById->metadata.warningCount(), std::size_t{0});
+    QVERIFY(sunById->metadata.dataSourceProvenance == std::string_view{"Simple ephemeris engine"});
 
     QVERIFY(moonById != nullptr);
     QVERIFY(std::isfinite(moonById->equatorial.rightAscensionHours));
@@ -157,9 +157,11 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(std::isnan(unknownStar->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(unknownStar->equatorial.declinationDeg));
     QVERIFY(unknownStar->metadata.status == skygate::ephemeris::EphemerisResultStatus::Unsupported);
-    QCOMPARE(unknownStar->metadata.warnings.size(), std::size_t{1});
-    QVERIFY(unknownStar->metadata.warnings.front().code == skygate::ephemeris::EphemerisWarningCode::UnsupportedBody);
-    QVERIFY(!unknownStar->metadata.warnings.front().displayText.empty());
+    QCOMPARE(unknownStar->metadata.warningCount(), std::size_t{1});
+    QVERIFY(unknownStar->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::UnsupportedBody));
+    const auto unsupportedWarningText =
+        skygate::ephemeris::ephemerisWarningText(skygate::ephemeris::EphemerisWarningCode::UnsupportedBody);
+    QVERIFY(!unsupportedWarningText.empty());
 
     QVERIFY(planetX != nullptr);
     QVERIFY(std::isnan(planetX->equatorial.rightAscensionHours));
@@ -253,9 +255,11 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
     QVERIFY(std::isnan(sun->horizontal.altitudeDeg));
     QVERIFY(std::isnan(sun->horizontal.azimuthDeg));
     QVERIFY(sun->metadata.status == skygate::ephemeris::EphemerisResultStatus::Degraded);
-    QCOMPARE(sun->metadata.warnings.size(), std::size_t{1});
-    QVERIFY(sun->metadata.warnings.front().code == skygate::ephemeris::EphemerisWarningCode::MissingObserver);
-    QVERIFY(!sun->metadata.warnings.front().displayText.empty());
+    QCOMPARE(sun->metadata.warningCount(), std::size_t{1});
+    QVERIFY(sun->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::MissingObserver));
+    const auto missingObserverWarningText =
+        skygate::ephemeris::ephemerisWarningText(skygate::ephemeris::EphemerisWarningCode::MissingObserver);
+    QVERIFY(!missingObserverWarningText.empty());
 }
 
 void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatch()
