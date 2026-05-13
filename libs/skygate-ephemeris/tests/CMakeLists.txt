@@ -159,6 +159,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;highprecision"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-fixture-support-tests
+    highprecision/EphemerisFixtureSupportTests.cpp
+    LABELS "unit;highprecision"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-data-manifest-tests
     highprecision/EphemerisDataManifestTests.cpp
     LABELS "unit;highprecision"
