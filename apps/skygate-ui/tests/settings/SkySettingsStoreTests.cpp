@@ -336,6 +336,8 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
     QVERIFY(store.saveCatalogCache(catalogSnapshot));
 
     SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot;
+    savedSnapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
+    savedSnapshot.installedKernelProfileId = QStringLiteral("modern");
     savedSnapshot.installedKernelPath = m_settings.filePath(QStringLiteral("de440s.bsp"));
     savedSnapshot.installedKernelVersion = QStringLiteral("DE440s-2026a");
     savedSnapshot.installedEarthOrientationPath = m_settings.filePath(QStringLiteral("eop.csv"));
@@ -347,6 +349,8 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
 
     QVERIFY(store.saveEphemerisDataCache(savedSnapshot));
     const auto loadedSnapshot = store.loadEphemerisDataCache();
+    QCOMPARE(loadedSnapshot.installedKernelAssetId, savedSnapshot.installedKernelAssetId);
+    QCOMPARE(loadedSnapshot.installedKernelProfileId, savedSnapshot.installedKernelProfileId);
     QCOMPARE(loadedSnapshot.installedKernelPath, savedSnapshot.installedKernelPath);
     QCOMPARE(loadedSnapshot.installedKernelVersion, savedSnapshot.installedKernelVersion);
     QCOMPARE(loadedSnapshot.installedEarthOrientationPath, savedSnapshot.installedEarthOrientationPath);
@@ -358,6 +362,8 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
 
     QVERIFY(store.clearEphemerisDataCache());
     const auto clearedSnapshot = store.loadEphemerisDataCache();
+    QVERIFY(clearedSnapshot.installedKernelAssetId.isEmpty());
+    QVERIFY(clearedSnapshot.installedKernelProfileId.isEmpty());
     QVERIFY(clearedSnapshot.installedKernelPath.isEmpty());
     QVERIFY(clearedSnapshot.installedKernelVersion.isEmpty());
     QVERIFY(clearedSnapshot.installedEarthOrientationPath.isEmpty());

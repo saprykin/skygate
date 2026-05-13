@@ -15,6 +15,7 @@ namespace {
 using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
 using skygate::ephemeris::EphemerisTextDataAsset;
 using skygate::ephemeris::IEphemerisDataSnapshot;
+using KernelDataAsset = skygate::ephemeris::EphemerisKernelDataAsset;
 
 QString trimmed(const QString& value)
 {
@@ -23,6 +24,8 @@ QString trimmed(const QString& value)
 
 EphemerisDataCacheSnapshot normalizedSnapshot(EphemerisDataCacheSnapshot snapshot)
 {
+    snapshot.installedKernelAssetId = trimmed(snapshot.installedKernelAssetId);
+    snapshot.installedKernelProfileId = trimmed(snapshot.installedKernelProfileId);
     snapshot.installedKernelPath = trimmed(snapshot.installedKernelPath);
     snapshot.installedKernelVersion = trimmed(snapshot.installedKernelVersion);
     snapshot.installedEarthOrientationPath = trimmed(snapshot.installedEarthOrientationPath);
@@ -42,7 +45,8 @@ EphemerisDataCacheSnapshot normalizedSnapshot(EphemerisDataCacheSnapshot snapsho
 
 bool hasInstalledMetadata(const EphemerisDataCacheSnapshot& snapshot)
 {
-    return !snapshot.installedKernelPath.isEmpty() || !snapshot.installedKernelVersion.isEmpty()
+    return !snapshot.installedKernelAssetId.isEmpty() || !snapshot.installedKernelProfileId.isEmpty()
+           || !snapshot.installedKernelPath.isEmpty() || !snapshot.installedKernelVersion.isEmpty()
            || !snapshot.installedEarthOrientationPath.isEmpty() || !snapshot.installedEarthOrientationVersion.isEmpty()
            || !snapshot.installedLeapSecondTableVersion.isEmpty() || !snapshot.installedDeltaTDataVersion.isEmpty()
            || snapshot.dataRevisionToken != EphemerisDataCacheSnapshot{}.dataRevisionToken;
@@ -62,7 +66,9 @@ QStringList missingInstalledPaths(const EphemerisDataCacheSnapshot& snapshot)
 
 bool cacheSnapshotsEqual(const EphemerisDataCacheSnapshot& lhs, const EphemerisDataCacheSnapshot& rhs)
 {
-    return lhs.installedKernelPath == rhs.installedKernelPath
+    return lhs.installedKernelAssetId == rhs.installedKernelAssetId
+           && lhs.installedKernelProfileId == rhs.installedKernelProfileId
+           && lhs.installedKernelPath == rhs.installedKernelPath
            && lhs.installedKernelVersion == rhs.installedKernelVersion
            && lhs.installedEarthOrientationPath == rhs.installedEarthOrientationPath
            && lhs.installedEarthOrientationVersion == rhs.installedEarthOrientationVersion
@@ -143,15 +149,20 @@ public:
         );
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::EphemerisKernelDataAsset>
-    solarSystemKernelAsset(std::string_view assetId) const override
+    [[nodiscard]] std::optional<KernelDataAsset> solarSystemKernelAsset(std::string_view assetId) const override
     {
         if (!m_installedDataActive || m_cacheSnapshot.installedKernelPath.isEmpty()) {
             return std::nullopt;
         }
+        const QString requestedAssetId = QString::fromUtf8(assetId.data(), static_cast<qsizetype>(assetId.size()));
+        if (m_cacheSnapshot.installedKernelAssetId.isEmpty()
+            || m_cacheSnapshot.installedKernelAssetId != requestedAssetId) {
+            return std::nullopt;
+        }
 
-        skygate::ephemeris::EphemerisKernelDataAsset asset;
-        asset.id = std::string(assetId);
+        KernelDataAsset asset;
+        asset.id = m_cacheSnapshot.installedKernelAssetId.toStdString();
+        asset.profileId = m_cacheSnapshot.installedKernelProfileId.toStdString();
         asset.version = m_cacheSnapshot.installedKernelVersion.toStdString();
         asset.provenance = "Installed ephemeris data cache";
         asset.activePath = m_cacheSnapshot.installedKernelPath.toStdString();

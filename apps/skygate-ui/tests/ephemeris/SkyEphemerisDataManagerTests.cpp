@@ -25,6 +25,8 @@ SkySettingsStore::EphemerisDataCacheSnapshot
 installedSnapshot(const QString& kernelPath, const QString& earthOrientationPath)
 {
     SkySettingsStore::EphemerisDataCacheSnapshot snapshot;
+    snapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
+    snapshot.installedKernelProfileId = QStringLiteral("modern");
     snapshot.installedKernelPath = kernelPath;
     snapshot.installedKernelVersion = QStringLiteral("DE-test");
     snapshot.installedEarthOrientationPath = earthOrientationPath;
@@ -97,6 +99,13 @@ void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
 
     const auto snapshot = manager.activeDataSnapshot();
     QVERIFY(snapshot != nullptr);
+    const auto kernelAsset = snapshot->solarSystemKernelAsset("de440s-kernel");
+    QVERIFY(kernelAsset.has_value());
+    QCOMPARE(QString::fromStdString(kernelAsset->id), QString("de440s-kernel"));
+    QCOMPARE(QString::fromStdString(kernelAsset->profileId), QString("modern"));
+    QCOMPARE(QString::fromStdString(kernelAsset->activePath), kernelPath);
+    QVERIFY(!snapshot->solarSystemKernelAsset("de441-kernel").has_value());
+
     const auto eopAsset = snapshot->earthOrientationDataAsset();
     QVERIFY(eopAsset.has_value());
     QCOMPARE(QString::fromStdString(eopAsset->content), QString("eop payload"));
