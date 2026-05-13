@@ -86,6 +86,11 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         highprecision/HighPrecisionErfaSmokeTests.cpp
         LABELS "unit;highprecision"
     )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-frame-transformer-tests
+        highprecision/FrameTransformerTests.cpp
+        LABELS "unit;highprecision"
+    )
 endif()
 
 add_skygate_ephemeris_qtest(

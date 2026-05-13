@@ -1,6 +1,7 @@
 #pragma once
 
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -40,20 +41,12 @@ public:
     }
 };
 
-class ITimeScaleService {
-public:
-    virtual ~ITimeScaleService() = default;
-};
-
 class IEarthOrientationProvider {
 public:
     virtual ~IEarthOrientationProvider() = default;
 };
 
-class IFrameTransformer {
-public:
-    virtual ~IFrameTransformer() = default;
-};
+class IFrameTransformer;
 
 class IAtmosphericRefractionCalculator {
 public:
@@ -116,7 +109,7 @@ struct HighPrecisionEphemerisEngineDependencies {
     std::shared_ptr<const ICalcephKernelProvider> calcephKernelProvider;
     std::shared_ptr<const ISolarSystemStateCalculator> solarSystemStateCalculator;
     std::shared_ptr<const IStarAstrometryCalculator> starAstrometryCalculator;
-    std::shared_ptr<const ITimeScaleService> timeScaleService;
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
     std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider;
     std::shared_ptr<const IFrameTransformer> frameTransformer;
     std::shared_ptr<const IApparentPlaceCalculator> apparentPlaceCalculator;
