@@ -176,22 +176,22 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-delta-t-provider-tests
     highprecision/DeltaTProviderTests.cpp
-    LABELS "unit;highprecision"
+    LABELS "unit;highprecision;validation;time-eop"
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-earth-orientation-provider-tests
     highprecision/EarthOrientationProviderTests.cpp
-    LABELS "unit;highprecision"
+    LABELS "unit;highprecision;validation;time-eop"
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-leap-second-provider-tests
     highprecision/LeapSecondProviderTests.cpp
-    LABELS "unit;highprecision"
+    LABELS "unit;highprecision;validation;time-eop"
 )
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-time-scale-service-tests
     highprecision/TimeScaleServiceTests.cpp
-    LABELS "unit;highprecision"
+    LABELS "unit;highprecision;validation;time-eop"
 )
 add_executable(skygate-ephemeris-public-header-macro-compat-tests
     engine/PublicHeaderMacroCompatTests.cpp

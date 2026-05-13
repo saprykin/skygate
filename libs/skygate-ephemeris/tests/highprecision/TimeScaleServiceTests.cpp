@@ -150,6 +150,7 @@ class TimeScaleServiceTests final : public QObject {
     Q_OBJECT
 
 private slots:
+    void roundTripsBceCivilDatesWithHistoricalYearHelpers();
     void convertsNormalUtcToTaiAndTt();
     void roundTripsTaiAndTtHelpers();
     void handlesLeapSecondBoundaryOffsets();
@@ -168,6 +169,38 @@ private slots:
     void usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange();
     void reportsMissingEopWhenUt1FallbackIsDisallowed();
 };
+
+void TimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
+{
+    const std::optional<int> oneBceAstronomicalYear = skygate::ephemeris::astronomicalYearFromHistoricalYear(-1);
+    QVERIFY(oneBceAstronomicalYear.has_value());
+    QCOMPARE(*oneBceAstronomicalYear, 0);
+    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
+    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(-1), -2);
+    QVERIFY(!skygate::ephemeris::astronomicalYearFromHistoricalYear(0).has_value());
+
+    const skygate::ephemeris::AstronomicalEpoch oneBce =
+        makeEpoch(skygate::ephemeris::TimeScale::Tt, *oneBceAstronomicalYear, 12, 31, 12, 0, 0);
+    const std::optional<skygate::ephemeris::CivilDateTime> roundTrip =
+        skygate::ephemeris::civilDateTimeFromAstronomicalEpoch(oneBce);
+
+    QVERIFY(roundTrip.has_value());
+    QCOMPARE(roundTrip->astronomicalYear, 0);
+    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
+    QCOMPARE(roundTrip->month, 12);
+    QCOMPARE(roundTrip->day, 31);
+    QCOMPARE(roundTrip->hour, 12);
+    QCOMPARE(roundTrip->minute, 0);
+    QCOMPARE(roundTrip->second, 0);
+    QCOMPARE(roundTrip->nanosecond, 0U);
+    QCOMPARE(
+        static_cast<std::uint8_t>(roundTrip->timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
+    );
+
+    const skygate::ephemeris::AstronomicalEpoch firstCeDay =
+        makeEpoch(skygate::ephemeris::TimeScale::Tt, 1, 1, 1, 12, 0, 0);
+    compareSecondsBetween(firstCeDay, oneBce, 86'400.0);
+}
 
 void TimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
 {
