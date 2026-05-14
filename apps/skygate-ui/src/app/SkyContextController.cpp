@@ -13,8 +13,9 @@
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
-#include <optional>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 
 using namespace skygate::ui::internal;
@@ -42,6 +43,43 @@ astronomicalEpochFromUtcDateTime(const QDateTime& utcDateTime) noexcept
         .nanosecond = static_cast<std::uint32_t>(time.msec()) * 1'000'000U,
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     });
+}
+
+void appendRevisionComponent(std::uint64_t& revision, const std::string_view value) noexcept
+{
+    constexpr std::uint64_t kFnvPrime = 1'099'511'628'211ULL;
+    for (const char character : value) {
+        revision ^= static_cast<unsigned char>(character);
+        revision *= kFnvPrime;
+    }
+    revision ^= 0xffU;
+    revision *= kFnvPrime;
+}
+
+[[nodiscard]] std::uint64_t textDataAssetRevision(
+    const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& snapshot,
+    const std::uint64_t dataRevision,
+    const bool earthOrientation
+) noexcept
+{
+    if (snapshot == nullptr) {
+        return 0U;
+    }
+
+    const std::optional<skygate::ephemeris::EphemerisTextDataAsset> asset =
+        earthOrientation ? snapshot->earthOrientationDataAsset() : snapshot->leapSecondTableAsset();
+    if (!asset.has_value()) {
+        return dataRevision;
+    }
+
+    constexpr std::uint64_t kFnvOffsetBasis = 14'695'981'039'346'656'037ULL;
+    std::uint64_t revision = kFnvOffsetBasis;
+    revision ^= dataRevision;
+    revision *= 1'099'511'628'211ULL;
+    appendRevisionComponent(revision, asset->id);
+    appendRevisionComponent(revision, asset->version);
+    appendRevisionComponent(revision, asset->provenance);
+    return revision;
 }
 
 }  // namespace
@@ -508,7 +546,12 @@ SkyContextController::ephemerisRequestContextFor(const skygate::core::SkyContext
     context.request.options = m_ephemerisEngineOptions;
     context.request.options.engineKind = m_ephemerisEngineKind;
     context.activeDataSnapshot = activeEphemerisDataSnapshot();
+    context.engineOptionsRevision = m_ephemerisOptionsRevision;
     context.ephemerisDataRevision = ephemerisDataRevision();
+    context.earthOrientationDataRevision =
+        textDataAssetRevision(context.activeDataSnapshot, context.ephemerisDataRevision, true);
+    context.leapSecondDataRevision =
+        textDataAssetRevision(context.activeDataSnapshot, context.ephemerisDataRevision, false);
     context.catalogRevision = catalogRevision();
 
     if (const auto epoch = astronomicalEpochFromUtcDateTime(SkyContextTimeCodec::toQDateTimeUtc(skyContext.utcTime));

@@ -54,8 +54,12 @@ epochsEqual(const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::eph
 
 bool SkySceneFramePipeline::SnapshotCacheKey::equals(const SnapshotCacheKey& other) const noexcept
 {
-    return catalogRevision == other.catalogRevision && observer.latitudeDeg == other.observer.latitudeDeg
-           && observer.longitudeDeg == other.observer.longitudeDeg
+    return catalogRevision == other.catalogRevision && engineKind == other.engineKind
+           && engineOptionsRevision == other.engineOptionsRevision
+           && ephemerisDataRevision == other.ephemerisDataRevision
+           && earthOrientationDataRevision == other.earthOrientationDataRevision
+           && leapSecondDataRevision == other.leapSecondDataRevision
+           && observer.latitudeDeg == other.observer.latitudeDeg && observer.longitudeDeg == other.observer.longitudeDeg
            && observer.elevationMeters == other.observer.elevationMeters && utcTime == other.utcTime
            && optionalEpochsEqual(requestEpoch, other.requestEpoch)
            && optionalOptionsEqual(requestOptions, other.requestOptions);
@@ -91,6 +95,11 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     const SnapshotCacheKey snapshotKey{
         .catalogRevision = input.catalogRevision,
+        .engineKind = input.engineKind,
+        .engineOptionsRevision = input.engineOptionsRevision,
+        .ephemerisDataRevision = input.ephemerisDataRevision,
+        .earthOrientationDataRevision = input.earthOrientationDataRevision,
+        .leapSecondDataRevision = input.leapSecondDataRevision,
         .observer = snapshotContext.observer,
         .utcTime = snapshotContext.utcTime,
         .requestEpoch = input.ephemerisRequest.has_value() ? std::make_optional(input.ephemerisRequest->epoch)

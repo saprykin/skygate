@@ -133,6 +133,8 @@ private slots:
     void repeatedKeysReportNoUpdate();
     void requestBasedSnapshotsUseSelectedEngineOptions();
     void requestOptionChangesOnSameEngineRecomputeSnapshot();
+    void highPrecisionRevisionChangesRecomputeSnapshot();
+    void astronomicalEpochSubsecondChangesRecomputeSnapshot();
     void renderOnlyChangesAvoidSnapshotRecompute();
     void snapshotKeyChangesRecomputeSnapshot();
     void clearReportsWhetherStateWasPresent();
@@ -247,6 +249,86 @@ void SkySceneFramePipelineTests::requestOptionChangesOnSameEngineRecomputeSnapsh
     QCOMPARE(second->snapshot->states.front().horizontal.azimuthDeg, 181.5);
     QVERIFY(!second->frame->points.empty());
     QVERIFY(second->frame->points.front().x != firstX || second->frame->points.front().y != firstY);
+}
+
+void SkySceneFramePipelineTests::highPrecisionRevisionChangesRecomputeSnapshot()
+{
+    CountingEngine engine;
+    SkySceneFramePipeline pipeline;
+    auto input = makeInput(engine);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    input.ephemerisRequest = request;
+    input.engineKind = request.options.engineKind;
+    input.engineOptionsRevision = 1U;
+    input.ephemerisDataRevision = 1U;
+    input.earthOrientationDataRevision = 1U;
+    input.leapSecondDataRevision = 1U;
+
+    auto result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 1U);
+    QCOMPARE(engine.requestComputeCount(), 1);
+
+    input.engineOptionsRevision = 2U;
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 2U);
+    QCOMPARE(engine.requestComputeCount(), 2);
+
+    input.ephemerisDataRevision = 2U;
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 3U);
+    QCOMPARE(engine.requestComputeCount(), 3);
+
+    input.earthOrientationDataRevision = 2U;
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 4U);
+    QCOMPARE(engine.requestComputeCount(), 4);
+
+    input.leapSecondDataRevision = 2U;
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 5U);
+    QCOMPARE(engine.requestComputeCount(), 5);
+
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    input.ephemerisRequest = request;
+    input.engineKind = request.options.engineKind;
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 6U);
+    QCOMPARE(engine.requestComputeCount(), 6);
+}
+
+void SkySceneFramePipelineTests::astronomicalEpochSubsecondChangesRecomputeSnapshot()
+{
+    CountingEngine engine;
+    SkySceneFramePipeline pipeline;
+    auto input = makeInput(engine);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.epoch = {.julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25};
+    input.ephemerisRequest = request;
+    input.engineKind = request.options.engineKind;
+
+    auto result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 1U);
+    QCOMPARE(engine.requestComputeCount(), 1);
+
+    request.epoch.julianDatePart2 += 1.0 / 86'400'000.0;
+    input.ephemerisRequest = request;
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(result->snapshotGeneration, 2U);
+    QCOMPARE(engine.requestComputeCount(), 2);
 }
 
 void SkySceneFramePipelineTests::renderOnlyChangesAvoidSnapshotRecompute()
