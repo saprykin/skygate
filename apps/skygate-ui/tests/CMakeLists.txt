@@ -133,6 +133,12 @@ add_skygate_ui_qtest(
     TIMEOUT 60
 )
 add_skygate_ui_qtest(
+    skygate-ui-context-controller-ephemeris-settings-tests
+    app/SkyContextControllerEphemerisSettingsTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
     skygate-ui-context-controller-timeline-tests
     app/SkyContextControllerTimelineTests.cpp
     LABELS integration

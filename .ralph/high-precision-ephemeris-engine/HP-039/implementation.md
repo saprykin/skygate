@@ -31,3 +31,34 @@ READY
 - Verification: `cmake --build build-ralph -j2` passed.
 - Verification: `ctest --test-dir build-ralph --output-on-failure` passed
   123/123 tests, with the two configured CALCEPH-dependent tests skipped.
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Controller Drops Profile And Update Settings
+    - Action: Fixed
+    - Notes: The controller now owns the full ephemeris user settings snapshot,
+      preserves non-engine fields during load/save, and has controller
+      round-trip coverage for profile/update fields.
+  - Ephemeris Reload Does Not Notify Scene Consumers
+    - Action: Fixed
+    - Notes: Loading persisted ephemeris settings now emits
+      `skyContextChanged()` after rebuilding the ephemeris engine, with
+      controller-level signal coverage.
+- Files changed during fix pass:
+  - `apps/skygate-ui/src/app/SkyContextController.hpp`
+  - `apps/skygate-ui/src/app/SkyContextController.cpp`
+  - `apps/skygate-ui/src/app/SkyContextControllerSettings.cpp`
+  - `apps/skygate-ui/tests/app/SkyContextControllerEphemerisSettingsTests.cpp`
+  - `apps/skygate-ui/tests/CMakeLists.txt`
+- Tests run after fix:
+  - `cmake -S . -B build-ralph`: PASS
+  - `cmake --build build-ralph --target
+    skygate-ui-context-controller-ephemeris-settings-tests
+    skygate-ui-settings-store-tests skygate-ui-sky-settings-codecs-tests -j2`:
+    PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R`
+    `'ephemeris-settings|settings-store|sky-settings-codecs'`: PASS
+  - `ctest --test-dir build-ralph --output-on-failure`: PASS, 124/124 tests
+    passed, with the two CALCEPH-dependent tests skipped.
+- Remaining concerns: None.
