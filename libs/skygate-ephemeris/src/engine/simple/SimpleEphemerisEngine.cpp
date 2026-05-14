@@ -79,6 +79,7 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
 
 void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngineOptions& options) noexcept
 {
+    state.metadata.finalizeCorrectionTracking(options.correctionFlags);
     if (!requestsUnsupportedSimpleOptions(options)) {
         return;
     }
@@ -86,8 +87,9 @@ void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngi
     if (state.metadata.status == EphemerisResultStatus::Valid) {
         state.metadata.status = EphemerisResultStatus::Degraded;
     }
-    state.metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
     state.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    state.metadata.addUnavailableCorrection(options.correctionFlags);
+    state.metadata.finalizeCorrectionTracking(options.correctionFlags);
 }
 
 void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOptions& options) noexcept

@@ -196,20 +196,14 @@ void mergeKernelMetadata(EphemerisResultMetadata& target, const EphemerisResultM
     }
 }
 
-void markLightTimeUnavailable(EphemerisResultMetadata& metadata) noexcept
+void markCorrectionUnavailable(
+    EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags unavailableCorrection
+) noexcept
 {
     if (metadata.status == EphemerisResultStatus::Valid) {
         metadata.status = EphemerisResultStatus::Degraded;
     }
-    metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
-}
-
-void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
-{
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-    }
-    metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+    metadata.addUnavailableCorrection(unavailableCorrection);
 }
 
 [[nodiscard]] std::optional<SolarSystemKernelVector>
@@ -302,7 +296,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
         const SolarSystemKernelStateResult& earthState = observerState();
         if (!earthState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
-            markLightTimeUnavailable(result.metadata);
+            markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::LightTime);
         } else {
             mergeKernelMetadata(result.metadata, earthState.metadata);
             double lightTimeDays = vectorDistanceAu(outputVector) / kSpeedOfLightAuPerDay;
@@ -327,7 +321,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                 outputVector = *correctedVector;
                 result.metadata.appliedCorrections |= EphemerisCorrectionFlags::LightTime;
             } else {
-                markLightTimeUnavailable(result.metadata);
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::LightTime);
             }
         }
     }
@@ -338,7 +332,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             m_kernelProvider->computeGeometricState(input.request.epoch, kNaifSun, kNaifEarth);
         if (!sunState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= sunState.metadata.warningCodeMask;
-            markCorrectionUnavailable(result.metadata);
+            markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::GravitationalLightDeflection);
         } else {
             mergeKernelMetadata(result.metadata, sunState.metadata);
             if (const std::optional<SolarSystemKernelVector> deflectedVector =
@@ -347,7 +341,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                 outputVector = *deflectedVector;
                 result.metadata.appliedCorrections |= EphemerisCorrectionFlags::GravitationalLightDeflection;
             } else {
-                markCorrectionUnavailable(result.metadata);
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::GravitationalLightDeflection);
             }
         }
     }
@@ -356,7 +350,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
         const SolarSystemKernelStateResult& earthState = observerState();
         if (!earthState.positionAu.has_value() || !earthState.velocityAuPerDay.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
-            markCorrectionUnavailable(result.metadata);
+            markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::StellarAberration);
         } else {
             mergeKernelMetadata(result.metadata, earthState.metadata);
             if (const std::optional<SolarSystemKernelVector> aberratedVector =
@@ -365,7 +359,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                 outputVector = *aberratedVector;
                 result.metadata.appliedCorrections |= EphemerisCorrectionFlags::StellarAberration;
             } else {
-                markCorrectionUnavailable(result.metadata);
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::StellarAberration);
             }
         }
     }

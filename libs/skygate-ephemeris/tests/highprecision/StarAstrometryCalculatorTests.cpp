@@ -330,6 +330,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMi
     QVERIFY(!result.observerRelativePositionAu.has_value());
     QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AnnualParallax));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
 }
 
@@ -348,6 +349,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
     QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AnnualParallax));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
     QCOMPARE(kernelProvider->callCount(), 0);
 }
@@ -367,6 +369,7 @@ void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsD
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
     QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::RadialVelocity));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::RadialVelocity));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarParallax));
 }

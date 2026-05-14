@@ -612,6 +612,7 @@ void ApparentPlaceCalculatorTests::routesAstrometricRequestsWithUnsupportedRefra
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
 }
 
 void ApparentPlaceCalculatorTests::routesApparentRequestsToTrueEquatorAndEquinox()

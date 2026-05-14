@@ -48,7 +48,7 @@ void markUnavailable(EphemerisResultMetadata& metadata) noexcept
     if (metadata.status == EphemerisResultStatus::Valid) {
         metadata.status = EphemerisResultStatus::Degraded;
     }
-    metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+    metadata.addUnavailableCorrection(EphemerisCorrectionFlags::AtmosphericRefraction);
 }
 
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept

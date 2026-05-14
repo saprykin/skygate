@@ -616,15 +616,28 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
     metadata.dataSourceProvenance = "test source";
     metadata.effectiveDataValidityRange = validityRange;
     metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    metadata.addUnavailableCorrection(skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration);
+    metadata.finalizeCorrectionTracking(
+        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        | skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration
+        | skygate::ephemeris::EphemerisCorrectionFlags::GravitationalLightDeflection
+    );
 
     QVERIFY(!metadata.isSuccessful());
-    QCOMPARE(metadata.warningCount(), std::size_t{1});
+    QCOMPARE(metadata.warningCount(), std::size_t{2});
     QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed));
+    QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
     QVERIFY(metadata.effectiveDataValidityRange.has_value());
     QVERIFY(metadata.effectiveDataValidityRange->id == std::string{"modern"});
     QVERIFY(metadata.dataSourceProvenance == std::string{"test source"});
     QVERIFY(skygate::ephemeris::hasCorrectionFlag(
         metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+    ));
+    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
+        metadata.unavailableCorrections, skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration
+    ));
+    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
+        metadata.skippedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::GravitationalLightDeflection
     ));
 }
 

@@ -65,6 +65,7 @@ CelestialBodyState EphemerisResultBuilder::buildState(
     CelestialBodyState state = makeEmptyState(input.bodyIndex);
     state.metadata = calculatorResult.metadata;
     applyDefaultProvenance(state.metadata);
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags);
 
     if (calculatorResult.equatorial.has_value()) {
         state.equatorial = *calculatorResult.equatorial;
@@ -86,6 +87,7 @@ CelestialBodyState EphemerisResultBuilder::buildUnsupportedState(const HighPreci
     state.metadata.status = EphemerisResultStatus::Unsupported;
     state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
     state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags);
     return state;
 }
 
@@ -95,6 +97,7 @@ CelestialBodyState EphemerisResultBuilder::buildFailedState(const HighPrecisionC
     state.metadata.status = EphemerisResultStatus::Failed;
     state.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
     state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags);
     return state;
 }
 
