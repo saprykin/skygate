@@ -9,6 +9,7 @@
 #include <QStringView>
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -19,8 +20,47 @@ constexpr std::size_t kHygProgressCallbackInterval = 512;
 constexpr std::size_t kHygRowCountLimitFloor = 2000000;
 constexpr std::size_t kHygMinExpectedBytesPerDataRow = 6;
 constexpr std::size_t kMaxInvalidRowSamples = 5;
+constexpr double kMasPerArcsecond = 1'000.0;
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
+
+[[nodiscard]] AstronomicalEpoch j2000CatalogEpoch() noexcept
+{
+    return {
+        .julianDatePart1 = 2'451'545.0,
+        .julianDatePart2 = 0.0,
+        .timeScale = TimeScale::Tt,
+    };
+}
+
+[[nodiscard]] std::optional<double>
+optionalFiniteDoubleColumn(const DelimitedCatalogReader::Row& row, const QString& name)
+{
+    const QString text = row.decodeColumn(name);
+    if (text.trimmed().isEmpty()) {
+        return std::nullopt;
+    }
+
+    return catalog_parsing::parseFiniteDouble(QStringView{text});
+}
+
+[[nodiscard]] std::optional<double> parallaxMasFromHygRow(const DelimitedCatalogReader::Row& row)
+{
+    if (const std::optional<double> parallaxMas = optionalFiniteDoubleColumn(row, QStringLiteral("parallax"));
+        parallaxMas.has_value()) {
+        return parallaxMas;
+    }
+    if (const std::optional<double> parallaxMas = optionalFiniteDoubleColumn(row, QStringLiteral("plx"));
+        parallaxMas.has_value()) {
+        return parallaxMas;
+    }
+    if (const std::optional<double> distanceParsecs = optionalFiniteDoubleColumn(row, QStringLiteral("dist"));
+        distanceParsecs.has_value() && *distanceParsecs > 0.0) {
+        return kMasPerArcsecond / *distanceParsecs;
+    }
+
+    return std::nullopt;
+}
 
 }  // namespace
 
@@ -84,6 +124,19 @@ HygCatalogParser::parse(const std::string_view csvData, const HygParseProgressCa
             body.visualMagnitude = *magnitude;
             body.fixedEquatorial =
                 core::EquatorialCoordinate{.rightAscensionHours = *raHours, .declinationDeg = *decDeg};
+
+            CatalogStarAstrometry astrometry;
+            astrometry.referenceEquatorial = *body.fixedEquatorial;
+            astrometry.referenceEpoch = j2000CatalogEpoch();
+            astrometry.properMotionRightAscensionMasPerYear = optionalFiniteDoubleColumn(row, QStringLiteral("pmra"));
+            astrometry.properMotionDeclinationMasPerYear = optionalFiniteDoubleColumn(row, QStringLiteral("pmdec"));
+            astrometry.stellarParallaxMas = parallaxMasFromHygRow(row);
+            astrometry.radialVelocityKmPerSecond = optionalFiniteDoubleColumn(row, QStringLiteral("rv"));
+            if (astrometry.properMotionRightAscensionMasPerYear.has_value()
+                || astrometry.properMotionDeclinationMasPerYear.has_value() || astrometry.stellarParallaxMas.has_value()
+                || astrometry.radialVelocityKmPerSecond.has_value()) {
+                body.starAstrometry = astrometry;
+            }
 
             if (!hip.isEmpty()) {
                 body.id = "hip_" + catalog_parsing::toUtf8String(hip);
