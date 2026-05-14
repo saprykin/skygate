@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace skygate::ephemeris::highprecision {
@@ -31,6 +32,13 @@ struct CelestialFrameTransformRequest {
     CelestialFrameVector vector;
 };
 
+struct CelestialFrameBatchTransformRequest {
+    CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
+    CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
+    AstronomicalEpoch epoch;
+    std::span<const CelestialFrameVector> vectors;
+};
+
 struct CelestialFrameTransformStageMetadata {
     CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
     CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
@@ -50,6 +58,21 @@ public:
 
     [[nodiscard]] virtual CelestialFrameTransformResult
     transformCelestialVector(const CelestialFrameTransformRequest& request) const = 0;
+    [[nodiscard]] virtual std::vector<CelestialFrameTransformResult>
+    transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const
+    {
+        std::vector<CelestialFrameTransformResult> results;
+        results.reserve(request.vectors.size());
+        for (const CelestialFrameVector& vector : request.vectors) {
+            results.push_back(transformCelestialVector(CelestialFrameTransformRequest{
+                .sourceFrame = request.sourceFrame,
+                .targetFrame = request.targetFrame,
+                .epoch = request.epoch,
+                .vector = vector,
+            }));
+        }
+        return results;
+    }
 };
 
 class ErfaFrameTransformer final : public IFrameTransformer {
@@ -61,6 +84,8 @@ public:
 
     [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
     ) const override;
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const override;
 
 private:
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;

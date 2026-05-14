@@ -18,6 +18,11 @@ public:
     [[nodiscard]] HighPrecisionCalculatorResult apply(
         const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
     ) const override;
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
+        const EphemerisRequest& request,
+        std::span<const CelestialBody> bodies,
+        std::span<const StarAstrometryBatchResult> calculatorResults
+    ) const override;
 
 private:
     std::shared_ptr<const IFrameTransformer> m_frameTransformer;

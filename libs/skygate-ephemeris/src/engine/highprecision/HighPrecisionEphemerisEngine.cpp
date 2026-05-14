@@ -103,6 +103,20 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
     return apparentPlaceCalculator(dependencies).apply(input, calculatorResult);
 }
 
+[[nodiscard]] std::vector<StarAstrometryBatchResult> applyApparentPlaceBatchIfRequested(
+    const HighPrecisionEphemerisEngineDependencies& dependencies,
+    const EphemerisRequest& request,
+    const std::span<const CelestialBody> bodies,
+    const std::span<const StarAstrometryBatchResult> calculatorResults
+)
+{
+    if (!requestsApparentPlaceProcessing(request)) {
+        return {calculatorResults.begin(), calculatorResults.end()};
+    }
+
+    return apparentPlaceCalculator(dependencies).applyBatch(request, bodies, calculatorResults);
+}
+
 }  // namespace
 
 HighPrecisionEphemerisEngine::HighPrecisionEphemerisEngine(
@@ -179,7 +193,9 @@ SkySnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& reques
     if (starAstrometryCalculator != nullptr && !m_catalogStarAstrometryArrays.empty()) {
         const std::vector<StarAstrometryBatchResult> batchResults =
             starAstrometryCalculator->calculateBatch(request, m_catalogStarAstrometryArrays);
-        for (const StarAstrometryBatchResult& batchResult : batchResults) {
+        const std::vector<StarAstrometryBatchResult> apparentBatchResults =
+            applyApparentPlaceBatchIfRequested(m_dependencies, request, *m_bodies, batchResults);
+        for (const StarAstrometryBatchResult& batchResult : apparentBatchResults) {
             if (batchResult.bodyIndex >= m_bodies->size()
                 || batchResult.bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
                 continue;
@@ -190,9 +206,7 @@ SkySnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& reques
                 .body = (*m_bodies)[batchResult.bodyIndex],
                 .bodyIndex = batchResult.bodyIndex,
             };
-            const HighPrecisionCalculatorResult apparentResult =
-                applyApparentPlaceIfRequested(m_dependencies, request, input, batchResult.result);
-            snapshot.states[batchResult.bodyIndex] = builder.buildState(input, apparentResult);
+            snapshot.states[batchResult.bodyIndex] = builder.buildState(input, batchResult.result);
             batchFilledStates[batchResult.bodyIndex] = 1U;
         }
     }

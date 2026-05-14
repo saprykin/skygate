@@ -27,6 +27,15 @@ struct CartesianVector {
     double z = 0.0;
 };
 
+struct AnnualParallaxRequestCache {
+    bool kernelEpochComputed = false;
+    std::optional<AstronomicalEpoch> kernelEpoch;
+    EphemerisResultMetadata kernelEpochMetadata;
+
+    bool earthStateComputed = false;
+    SolarSystemKernelStateResult earthState;
+};
+
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
 {
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
@@ -318,6 +327,42 @@ void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleCo
     return conversion.epoch;
 }
 
+[[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
+    EphemerisResultMetadata& metadata,
+    const AstronomicalEpoch& epoch,
+    const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
+    AnnualParallaxRequestCache* cache
+) noexcept
+{
+    if (cache == nullptr) {
+        return tdbEpochForKernel(metadata, epoch, timeScaleService);
+    }
+
+    if (!cache->kernelEpochComputed) {
+        cache->kernelEpoch = tdbEpochForKernel(cache->kernelEpochMetadata, epoch, timeScaleService);
+        cache->kernelEpochComputed = true;
+    }
+    mergeKernelMetadata(metadata, cache->kernelEpochMetadata);
+    return cache->kernelEpoch;
+}
+
+[[nodiscard]] SolarSystemKernelStateResult earthStateForAnnualParallax(
+    const AstronomicalEpoch& kernelEpoch,
+    const std::shared_ptr<const ICalcephKernelProvider>& kernelProvider,
+    AnnualParallaxRequestCache* cache
+)
+{
+    if (cache == nullptr) {
+        return kernelProvider->computeGeometricState(kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+    }
+
+    if (!cache->earthStateComputed) {
+        cache->earthState = kernelProvider->computeGeometricState(kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+        cache->earthStateComputed = true;
+    }
+    return cache->earthState;
+}
+
 void recordUnavailableRequestedFields(
     EphemerisResultMetadata& metadata, const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags
 ) noexcept
@@ -364,7 +409,8 @@ void recordAppliedCorrections(
     const std::optional<CatalogStarAstrometry>& astrometry,
     const std::optional<core::EquatorialCoordinate>& fixedEquatorial,
     const std::shared_ptr<const ICalcephKernelProvider>& kernelProvider,
-    const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService
+    const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
+    AnnualParallaxRequestCache* annualParallaxCache = nullptr
 )
 {
     const EphemerisCorrectionFlags flags = request.options.correctionFlags;
@@ -418,13 +464,13 @@ void recordAppliedCorrections(
             result.equatorial = equatorialFromVector(*propagatedVector);
         } else {
             const std::optional<AstronomicalEpoch> kernelEpoch =
-                tdbEpochForKernel(result.metadata, request.epoch, timeScaleService);
+                tdbEpochForKernel(result.metadata, request.epoch, timeScaleService, annualParallaxCache);
             if (!kernelEpoch.has_value()) {
                 markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
                 result.equatorial = equatorialFromVector(*propagatedVector);
             } else {
                 const SolarSystemKernelStateResult earthState =
-                    kernelProvider->computeGeometricState(*kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+                    earthStateForAnnualParallax(*kernelEpoch, kernelProvider, annualParallaxCache);
                 mergeKernelMetadata(result.metadata, earthState.metadata);
                 if (earthState.positionAu.has_value()) {
                     const CartesianVector geocentricVector =
@@ -491,14 +537,16 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
 {
     std::vector<StarAstrometryBatchResult> results;
     results.reserve(arrays.size());
+    AnnualParallaxRequestCache annualParallaxCache;
 
     for (std::size_t arrayIndex = 0U; arrayIndex < arrays.size(); ++arrayIndex) {
         const std::optional<CatalogStarAstrometry> astrometry = astrometryFromArrays(arrays, arrayIndex);
         const std::optional<core::EquatorialCoordinate> fixedEquatorial = arrays.fixedEquatorialFallback(arrayIndex);
         results.push_back(StarAstrometryBatchResult{
             .bodyIndex = arrays.bodyIndices()[arrayIndex],
-            .result =
-                calculateStarAstrometry(request, astrometry, fixedEquatorial, m_kernelProvider, m_timeScaleService),
+            .result = calculateStarAstrometry(
+                request, astrometry, fixedEquatorial, m_kernelProvider, m_timeScaleService, &annualParallaxCache
+            ),
         });
     }
 

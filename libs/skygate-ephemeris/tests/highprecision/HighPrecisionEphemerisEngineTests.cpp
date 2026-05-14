@@ -3,6 +3,7 @@
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "skygate/ephemeris/DeltaTProvider.hpp"
 #include "skygate/ephemeris/EarthOrientationProvider.hpp"
 #include "skygate/ephemeris/LeapSecondProvider.hpp"
@@ -468,6 +469,94 @@ private:
     mutable EphemerisCorrectionFlags m_lastFlags = EphemerisCorrectionFlags::NoCorrections;
 };
 
+class BatchRecordingFrameTransformer final : public IFrameTransformer {
+public:
+    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
+    ) const override
+    {
+        ++m_singleCallCount;
+        return transform(request.vector);
+    }
+
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const override
+    {
+        ++m_batchCallCount;
+        m_lastBatchSize = request.vectors.size();
+
+        std::vector<CelestialFrameTransformResult> results;
+        results.reserve(request.vectors.size());
+        for (const CelestialFrameVector& vector : request.vectors) {
+            results.push_back(transform(vector));
+        }
+        return results;
+    }
+
+    [[nodiscard]] int singleCallCount() const noexcept
+    {
+        return m_singleCallCount;
+    }
+
+    [[nodiscard]] int batchCallCount() const noexcept
+    {
+        return m_batchCallCount;
+    }
+
+    [[nodiscard]] std::size_t lastBatchSize() const noexcept
+    {
+        return m_lastBatchSize;
+    }
+
+private:
+    [[nodiscard]] static CelestialFrameTransformResult transform(const CelestialFrameVector& vector)
+    {
+        CelestialFrameTransformResult result;
+        result.vector = vector;
+        result.metadata.status = EphemerisResultStatus::Valid;
+        result.metadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+        result.metadata.dataSourceProvenance = "batch frame transformer fake";
+        return result;
+    }
+
+    mutable int m_singleCallCount = 0;
+    mutable int m_batchCallCount = 0;
+    mutable std::size_t m_lastBatchSize = 0U;
+};
+
+class BatchValidTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    {
+        ++m_callCount;
+        TimeScaleConversionResult result;
+        result.epoch = epoch;
+        result.epoch.timeScale = targetScale;
+        result.status = TimeScaleConversionStatus::Valid;
+        return result;
+    }
+
+    [[nodiscard]] TimeScaleConversionResult
+    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    {
+        static_cast<void>(dateTime);
+
+        TimeScaleConversionResult result;
+        result.epoch.timeScale = targetScale;
+        result.status = TimeScaleConversionStatus::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+        return result;
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+private:
+    mutable int m_callCount = 0;
+};
+
 class RecordingResultBuilder final : public IEphemerisResultBuilder {
 public:
     [[nodiscard]] CelestialBodyState buildState(
@@ -704,6 +793,8 @@ private slots:
     void dispatchesSolarSystemAndStarBodies();
     void usesBatchStarPathForFullFrameSnapshot();
     void batchesRepresentativeLargeCatalogWithoutSingleStarDispatch();
+    void batchesRepresentativeLargeCatalogApparentPlaceTransformsOnce();
+    void batchesTopocentricApparentPlaceRequestWideState();
     void fallsBackToSingleStarPathWhenBatchReturnsNoResults();
     void forwardsOptionsThroughCollaboratorsAndResultBuilder();
     void bypassesApparentPlaceForGeometricSolarSystemRequests();
@@ -856,6 +947,69 @@ void HighPrecisionEphemerisEngineTests::batchesRepresentativeLargeCatalogWithout
     QCOMPARE(starAstrometryCalculator->batchCallCount(), 1);
     QCOMPARE(starAstrometryCalculator->lastBatchSize(), kRepresentativeCatalogSize);
     QCOMPARE(starAstrometryCalculator->singleCallCount(), 0);
+    QCOMPARE(snapshot.states.front().bodyIndex, std::uint32_t{0});
+    QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
+}
+
+void HighPrecisionEphemerisEngineTests::batchesRepresentativeLargeCatalogApparentPlaceTransformsOnce()
+{
+    constexpr std::size_t kRepresentativeCatalogSize = 4'096U;
+    std::vector<CelestialBody> bodies;
+    bodies.reserve(kRepresentativeCatalogSize);
+    for (std::size_t index = 0; index < kRepresentativeCatalogSize; ++index) {
+        bodies.push_back(
+            makeFixedStarBody("star-" + std::to_string(index), 1.0 + static_cast<double>(index) * 0.001, 5.0)
+        );
+    }
+
+    auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>();
+    auto frameTransformer = std::make_shared<BatchRecordingFrameTransformer>();
+    auto apparentPlaceCalculator = std::make_shared<ApparentPlaceCalculator>(frameTransformer, nullptr, nullptr);
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies({}, starAstrometryCalculator, apparentPlaceCalculator)
+    );
+
+    const SkySnapshot snapshot = engine.compute(makeRequest());
+
+    QCOMPARE(snapshot.states.size(), kRepresentativeCatalogSize);
+    QCOMPARE(frameTransformer->batchCallCount(), 1);
+    QCOMPARE(frameTransformer->lastBatchSize(), kRepresentativeCatalogSize);
+    QCOMPARE(frameTransformer->singleCallCount(), 0);
+    QCOMPARE(snapshot.states.front().bodyIndex, std::uint32_t{0});
+    QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
+}
+
+void HighPrecisionEphemerisEngineTests::batchesTopocentricApparentPlaceRequestWideState()
+{
+    constexpr std::size_t kRepresentativeCatalogSize = 4'096U;
+    std::vector<CelestialBody> bodies;
+    bodies.reserve(kRepresentativeCatalogSize);
+    for (std::size_t index = 0; index < kRepresentativeCatalogSize; ++index) {
+        bodies.push_back(
+            makeFixedStarBody("star-" + std::to_string(index), 1.0 + static_cast<double>(index) * 0.001, 5.0)
+        );
+    }
+
+    auto timeScaleService = std::make_shared<BatchValidTimeScaleService>();
+    auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>();
+    auto frameTransformer = std::make_shared<BatchRecordingFrameTransformer>();
+    auto apparentPlaceCalculator =
+        std::make_shared<ApparentPlaceCalculator>(frameTransformer, timeScaleService, makeEarthOrientationProvider());
+
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::Topocentric;
+    const HighPrecisionEphemerisEngine engine(
+        bodies, request.options, makeDependencies({}, starAstrometryCalculator, apparentPlaceCalculator)
+    );
+
+    const SkySnapshot snapshot = engine.compute(request);
+
+    QCOMPARE(snapshot.states.size(), kRepresentativeCatalogSize);
+    QCOMPARE(timeScaleService->callCount(), 1);
+    QCOMPARE(frameTransformer->batchCallCount(), 3);
+    QCOMPARE(frameTransformer->lastBatchSize(), kRepresentativeCatalogSize);
+    QCOMPARE(frameTransformer->singleCallCount(), 0);
     QCOMPARE(snapshot.states.front().bodyIndex, std::uint32_t{0});
     QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
 }
