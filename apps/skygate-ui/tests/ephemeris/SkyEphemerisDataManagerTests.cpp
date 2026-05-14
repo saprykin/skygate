@@ -27,6 +27,7 @@ namespace {
 
 constexpr std::string_view kPayload = "SkyGate ephemeris staged asset\n";
 constexpr std::string_view kPayloadSha256 = "782092fd09110da30d95c1b5bc87cd827174ae5346bb3ea80cd5384fd8cf0d13";
+constexpr std::string_view kEmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 bool writeFile(const QString& path, const QByteArray& contents)
 {
@@ -131,6 +132,30 @@ skygate::ephemeris::EphemerisDataManifest stagedManifest()
     manifest.assets.push_back(
         stagedAsset("delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData, "time/delta-t.csv")
     );
+    return manifest;
+}
+
+skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
+{
+    skygate::ephemeris::EphemerisDataManifest manifest;
+    manifest.dataSetInfo.id = "test-data";
+    manifest.dataSetInfo.displayName = "Test data";
+    manifest.dataSetInfo.version = "2026a";
+    manifest.dataSetInfo.provenance = "test";
+    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
+        .id = "modern",
+        .displayName = "Modern",
+        .bundled = false,
+        .longRange = false,
+        .assetIds = {"de440s-kernel"},
+    });
+
+    skygate::ephemeris::EphemerisDataManifestAsset asset = stagedAsset(
+        "de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    asset.checksum.value = std::string{kEmptySha256};
+    asset.compression.uncompressedSizeBytes = 0U;
+    manifest.assets.push_back(std::move(asset));
     return manifest;
 }
 
@@ -696,10 +721,8 @@ void SkyEphemerisDataManagerTests::cancellationBeforeActivationPreservesVerified
 
     QTemporaryDir stagedRoot;
     QVERIFY(stagedRoot.isValid());
-    skygate::ephemeris::EphemerisDataManifest manifest = stagedManifest();
-    manifest.profiles[0].assetIds = {"de440s-kernel"};
-    manifest.assets.resize(1);
-    writeStagedAssets(stagedRoot, manifest);
+    const skygate::ephemeris::EphemerisDataManifest manifest = emptySingleAssetStagedManifest();
+    QVERIFY(writeFile(stagedRoot.path() + QStringLiteral("/kernels/de440s.bsp"), QByteArray{}));
 
     int cancellationChecks = 0;
     SkyEphemerisDataManager::StagedUpdateActivationRequest request =
@@ -708,7 +731,7 @@ void SkyEphemerisDataManagerTests::cancellationBeforeActivationPreservesVerified
     request.expectedComponents.clear();
     request.cancellationRequested = [&cancellationChecks] {
         ++cancellationChecks;
-        return cancellationChecks >= 7;
+        return cancellationChecks >= 6;
     };
 
     const SkyEphemerisDataManager::StagedUpdateActivationResult result =
@@ -720,7 +743,7 @@ void SkyEphemerisDataManagerTests::cancellationBeforeActivationPreservesVerified
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.verificationStatus),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Canceled)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.activationStatus),

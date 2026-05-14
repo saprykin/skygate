@@ -5,45 +5,29 @@
 
 ## Review input
   - Review verdict: NEEDS_FIX
-  - Review report: .ralph/high-precision-ephemeris-engine/HP-022E/review.md
+  - Review report: .ralph/high-precision-ephemeris-engine/HP-022E/verify.md
   - Implementation handoff: .ralph/high-precision-ephemeris-engine/HP-022E/implementation.md
 
 ## Summary
-  Fixed the missing download/staging cancellation surface, closed the activation post-copy commit window, and added coverage for the manager's post-verification/pre-install cancellation branch.
+  Fixed the verifier's remaining pre-activation cancellation coverage gap by preserving successful verification status on post-verification cancellation and updating the manager test to cancel after verification succeeds, before install begins.
 
 ## Findings addressed
-  - Finding title: Download cancellation requirement is not implemented or tested
-  - Severity: MAJOR
-  - Action: Fixed
-  - File(s): apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.hpp, apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.cpp, apps/skygate-ui/tests/ephemeris/SkyEphemerisDataManagerTests.cpp
-  - What changed: Added `stageEphemerisUpdateAsset()` with manager-level and request-level cancellation checks, safe relative-path staging, partial staging retention/cleanup policy, and a cancellation-during-transfer test.
-  - Why this resolves the finding: Active transfer cancellation is now represented in the ephemeris data manager and covered by a deterministic test that verifies unchanged active snapshot, revision, and persisted settings.
-
-  - Finding title: Activation can commit after cancellation is requested
-  - Severity: MAJOR
-  - Action: Fixed
-  - File(s): libs/skygate-ephemeris/src/engine/highprecision/EphemerisDataActivation.cpp, libs/skygate-ephemeris/tests/highprecision/EphemerisDataActivationTests.cpp
-  - What changed: Added cancellation checks after payload copy, after flush, and before atomic commit; canceled paths call `QSaveFile::cancelWriting()`. Added coverage for cancellation after payload copy and before commit.
-  - Why this resolves the finding: A late cancellation request now prevents promotion of the staged file and returns `EphemerisDataActivationStatus::Canceled`.
-
-  - Finding title: Required pre-activation cancellation path lacks coverage
+  - Finding title: Pre-activation cancellation branch is still not covered
   - Severity: MINOR
   - Action: Fixed
-  - File(s): apps/skygate-ui/tests/ephemeris/SkyEphemerisDataManagerTests.cpp
-  - What changed: Added a manager-level test that cancels after successful verification and before the first activation write.
-  - Why this resolves the finding: The distinct post-verification/pre-install branch is now exercised and asserts unchanged active data, unchanged settings, no activation output, and retained verified staging.
+  - File(s): apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.cpp, apps/skygate-ui/tests/ephemeris/SkyEphemerisDataManagerTests.cpp
+  - What changed: The post-verification/pre-install cancellation branch now returns canceled activation without overwriting `EphemerisStagedUpdateVerificationStatus::Verified`. The manager test uses a deterministic single empty staged asset and asserts verified verification status, canceled activation status, unchanged active data/settings, no activation output, and retained staging.
+  - Why this resolves the finding: The test now exercises the distinct manager cancellation branch after staged verification has succeeded and before any activation request writes cache output.
 
 ## Tests run
-  - `cmake --build build-ralph --target skygate-ephemeris-data-activation-tests skygate-ui-sky-ephemeris-data-manager-tests`: PASS
+  - `cmake --build build-ralph --target skygate-ui-sky-ephemeris-data-manager-tests`: PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R skygate-ui-sky-ephemeris-data-manager-tests`: PASS
   - `ctest --test-dir build-ralph --output-on-failure -R 'skygate-ephemeris-data-activation-tests|skygate-ui-sky-ephemeris-data-manager-tests'`: PASS
   - `ctest --test-dir build-ralph --output-on-failure`: PASS
 
 ## Files changed
-  - apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.hpp
   - apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.cpp
   - apps/skygate-ui/tests/ephemeris/SkyEphemerisDataManagerTests.cpp
-  - libs/skygate-ephemeris/src/engine/highprecision/EphemerisDataActivation.cpp
-  - libs/skygate-ephemeris/tests/highprecision/EphemerisDataActivationTests.cpp
   - .ralph/high-precision-ephemeris-engine/HP-022E/implementation.md
   - .ralph/high-precision-ephemeris-engine/HP-022E/fix.md
 

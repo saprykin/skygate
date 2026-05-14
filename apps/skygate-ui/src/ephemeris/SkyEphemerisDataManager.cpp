@@ -749,7 +749,8 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
         return result;
     }
     if (isCanceled()) {
-        markCanceled(result, QStringLiteral("Ephemeris staged update activation was canceled before install."));
+        result.status = StagedUpdateActivationStatus::Canceled;
+        addDiagnostic(result, QStringLiteral("Ephemeris staged update activation was canceled before install."));
         cleanupCanceledStagingRoot(request, m_activeCacheSnapshot, result);
         return result;
     }
