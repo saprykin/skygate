@@ -23,3 +23,22 @@ READY
 ## Important notes
 - Verified with `cmake --build build-ralph -j2`.
 - Verified with `ctest --test-dir build-ralph --output-on-failure`.
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Required data-condition coverage is only synthetic
+    - Action: Fixed
+    - Notes: Added concrete high-precision engine result-assembly coverage that drives missing long-range kernel fallback through `SolarSystemStateCalculator`, stale Earth-orientation data through table-backed EOP sampling and apparent/topocentric assembly, stale leap-second data through `LeapSecondTimeScaleService`, and ancient Delta T fallback through the time-scale service with Delta T provider metadata.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/tests/highprecision/HighPrecisionEphemerisEngineTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-030/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-030/fix.md`
+- Tests run after fix:
+  - `cmake --build build-ralph --target skygate-ephemeris-highprecision-engine-tests -j2` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R skygate-ephemeris-highprecision-engine-tests` - PASS
+  - `cmake --build build-ralph --target skygate-ephemeris-highprecision-engine-tests skygate-ephemeris-solar-system-state-calculator-tests skygate-ephemeris-apparent-place-calculator-tests skygate-ephemeris-time-scale-service-tests skygate-ephemeris-earth-orientation-provider-tests skygate-ephemeris-leap-second-provider-tests skygate-ephemeris-delta-t-provider-tests -j2` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R '^(skygate-ephemeris-(highprecision-engine|solar-system-state-calculator|apparent-place-calculator|time-scale-service|earth-orientation-provider|leap-second-provider|delta-t-provider)-tests)$'` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure` - PASS
+- Remaining concerns:
+  - None.
