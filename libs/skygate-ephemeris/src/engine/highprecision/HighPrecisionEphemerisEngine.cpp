@@ -1,11 +1,10 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
 #include "StringUtilities.hpp"
+#include "engine/highprecision/EphemerisResultBuilder.hpp"
 
 #include <chrono>
 #include <cmath>
-#include <cstdint>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -18,7 +17,6 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
-constexpr std::string_view kHighPrecisionDataSourceProvenance = "High-precision ephemeris facade";
 constexpr double kSecondsPerDay = 86'400.0;
 constexpr double kUnixEpochJulianDay = 2'440'587.5;
 
@@ -59,79 +57,12 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
     return request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections;
 }
 
-void applyDefaultMetadata(EphemerisResultMetadata& metadata) noexcept
-{
-    if (metadata.dataSourceProvenance.empty()) {
-        metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
-    }
-}
-
 class DefaultApparentPlaceCalculator final : public IApparentPlaceCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult
     apply(const HighPrecisionComputationInput&, const HighPrecisionCalculatorResult& calculatorResult) const override
     {
         return calculatorResult;
-    }
-};
-
-class DefaultEphemerisResultBuilder final : public IEphemerisResultBuilder {
-public:
-    [[nodiscard]] CelestialBodyState buildState(
-        const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
-    ) const override
-    {
-        CelestialBodyState state;
-        state.bodyIndex = static_cast<std::uint32_t>(input.bodyIndex);
-        state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
-        state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
-        state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
-        state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
-        state.metadata = calculatorResult.metadata;
-        applyDefaultMetadata(state.metadata);
-
-        if (calculatorResult.equatorial.has_value()) {
-            state.equatorial = *calculatorResult.equatorial;
-        } else if (state.metadata.status == EphemerisResultStatus::Valid) {
-            state.metadata.status = EphemerisResultStatus::Failed;
-            state.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
-        }
-
-        if (calculatorResult.horizontal.has_value()) {
-            state.horizontal = *calculatorResult.horizontal;
-        }
-
-        return state;
-    }
-
-    [[nodiscard]] CelestialBodyState buildUnsupportedState(const HighPrecisionComputationInput& input) const override
-    {
-        CelestialBodyState state = makeEmptyState(input.bodyIndex);
-        state.metadata.status = EphemerisResultStatus::Unsupported;
-        state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
-        state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
-        return state;
-    }
-
-    [[nodiscard]] CelestialBodyState buildFailedState(const HighPrecisionComputationInput& input) const override
-    {
-        CelestialBodyState state = makeEmptyState(input.bodyIndex);
-        state.metadata.status = EphemerisResultStatus::Failed;
-        state.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
-        state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
-        return state;
-    }
-
-private:
-    [[nodiscard]] static CelestialBodyState makeEmptyState(const std::size_t bodyIndex) noexcept
-    {
-        CelestialBodyState state;
-        state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
-        state.equatorial.rightAscensionHours = std::numeric_limits<double>::quiet_NaN();
-        state.equatorial.declinationDeg = std::numeric_limits<double>::quiet_NaN();
-        state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
-        state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
-        return state;
     }
 };
 
@@ -148,7 +79,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
 
 [[nodiscard]] const IEphemerisResultBuilder& resultBuilder(const HighPrecisionEphemerisEngineDependencies& dependencies)
 {
-    static const DefaultEphemerisResultBuilder kDefaultBuilder;
+    static const EphemerisResultBuilder kDefaultBuilder;
     if (dependencies.resultBuilder != nullptr) {
         return *dependencies.resultBuilder;
     }
