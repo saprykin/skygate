@@ -50,6 +50,14 @@ SkyContextController::SkyContextController(
       m_settingsStore(std::make_unique<SkySettingsStore>()),
       m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
       m_ephemerisEngine(std::move(ephemerisEngine)),
+      m_ephemerisDataSetManifest(initializationOptions.ephemerisFactoryInputs.dataSetManifest),
+      m_ephemerisDataManifest(initializationOptions.ephemerisFactoryInputs.dataManifest),
+      m_ephemerisTimeScaleService(std::move(initializationOptions.ephemerisFactoryInputs.timeScaleService)),
+      m_ephemerisEarthOrientationProvider(
+          std::move(initializationOptions.ephemerisFactoryInputs.earthOrientationProvider)
+      ),
+      m_ephemerisCalcephKernelRuntime(std::move(initializationOptions.ephemerisFactoryInputs.calcephKernelRuntime)),
+      m_ephemerisDiagnosticsSink(initializationOptions.ephemerisFactoryInputs.diagnosticsSink),
       m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
       m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
@@ -462,10 +470,25 @@ void SkyContextController::rebuildEphemerisEngine()
     request.catalogBodies = catalogBodies();
     request.options = m_ephemerisEngineOptions;
     request.options.engineKind = m_ephemerisEngineKind;
+    request.dataSetManifest = m_ephemerisDataSetManifest;
+    request.dataManifest = m_ephemerisDataManifest;
     request.activeDataSnapshot = activeEphemerisDataSnapshot();
-    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    request.timeScaleService = m_ephemerisTimeScaleService;
+    request.earthOrientationProvider = m_ephemerisEarthOrientationProvider;
+    request.calcephKernelRuntime = m_ephemerisCalcephKernelRuntime;
+    request.diagnosticsSink = m_ephemerisDiagnosticsSink;
+    request.fallbackPolicy = m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+                                     && !m_ephemerisEngineOptions.fallbackToSimpleEngine
+                                 ? skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision
+                                 : skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
     auto result = skygate::ephemeris::createEphemerisEngine(request);
+    if (result.usedSimpleEngineFallback()
+        && m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+        && m_ephemerisEngine != nullptr
+        && m_ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
+        return;
+    }
     if (result.engine != nullptr) {
         m_ephemerisEngine = std::move(result.engine);
     }
