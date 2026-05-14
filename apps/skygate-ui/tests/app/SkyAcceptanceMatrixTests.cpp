@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace {
 
@@ -58,6 +59,28 @@ skygate::ephemeris::EphemerisDateRange acceptanceRange()
     };
 }
 
+skygate::ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
+    std::string id, std::string profileId, std::string version, std::string relativePath, const bool optional
+)
+{
+    return skygate::ephemeris::EphemerisDataManifestAsset{
+        .id = std::move(id),
+        .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+        .profileId = std::move(profileId),
+        .version = std::move(version),
+        .sourceUrl = "https://example.invalid/ephemeris.bsp",
+        .relativePath = std::move(relativePath),
+        .checksum = {.algorithm = "sha256", .value = std::string{kPayloadSha256}},
+        .compression =
+            {
+                .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
+                .uncompressedSizeBytes = kPayload.size(),
+            },
+        .validityRange = acceptanceRange(),
+        .optional = optional,
+    };
+}
+
 skygate::ephemeris::EphemerisDataManifest acceptanceManifest()
 {
     skygate::ephemeris::EphemerisDataManifest manifest;
@@ -69,26 +92,23 @@ skygate::ephemeris::EphemerisDataManifest acceptanceManifest()
     manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
         .id = "modern",
         .displayName = "Modern",
-        .bundled = false,
+        .bundled = true,
         .longRange = false,
         .assetIds = {"de440s-kernel"},
     });
-    manifest.assets.push_back(skygate::ephemeris::EphemerisDataManifestAsset{
-        .id = "de440s-kernel",
-        .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
-        .profileId = "modern",
-        .version = "acceptance-kernel",
-        .sourceUrl = "https://example.invalid/de440s.bsp",
-        .relativePath = "kernels/de440s.bsp",
-        .checksum = {.algorithm = "sha256", .value = std::string{kPayloadSha256}},
-        .compression =
-            {
-                .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
-                .uncompressedSizeBytes = kPayload.size(),
-            },
-        .validityRange = acceptanceRange(),
-        .optional = false,
+    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
+        .id = "de441-long-range",
+        .displayName = "DE441 long range",
+        .bundled = false,
+        .longRange = true,
+        .assetIds = {"de441-kernel"},
     });
+    manifest.assets.push_back(
+        acceptanceKernelAsset("de440s-kernel", "modern", "acceptance-modern-kernel", "kernels/de440s.bsp", false)
+    );
+    manifest.assets.push_back(
+        acceptanceKernelAsset("de441-kernel", "de441-long-range", "acceptance-de441-kernel", "kernels/de441.bsp", true)
+    );
     return manifest;
 }
 
@@ -103,21 +123,26 @@ void writeStagedAssets(const QTemporaryDir& root, const skygate::ephemeris::Ephe
 SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
     const skygate::ephemeris::EphemerisDataManifest& manifest,
     const QTemporaryDir& stagedRoot,
-    const QString& writableCacheRoot
+    const QString& writableCacheRoot,
+    const QString& profileId = QStringLiteral("modern")
 )
 {
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
     request.manifest = &manifest;
-    request.profileId = QStringLiteral("modern");
+    request.profileId = profileId;
     request.stagedResourceRoot = stagedRoot.path();
     request.writableCacheRoot = writableCacheRoot;
-    request.revisionToken = QStringLiteral("acceptance-rev");
-    request.requiredKinds = {skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel};
-    request.expectedComponents = {
-        {"de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel},
-    };
-    request.expectedComponents.front().expectedVersion = "acceptance-kernel";
-    request.expectedComponents.front().requiredValidityRange = acceptanceRange();
+    request.revisionToken = QStringLiteral("acceptance-%1-rev").arg(profileId);
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId.toStdString());
+    Q_ASSERT(profile != nullptr);
+    for (const std::string& assetId : profile->assetIds) {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        Q_ASSERT(asset != nullptr);
+        request.requiredKinds.push_back(asset->kind);
+        auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
+        component.expectedVersion = asset->version;
+        component.requiredValidityRange = asset->validityRange;
+    }
     return request;
 }
 
@@ -144,6 +169,8 @@ private slots:
     void initTestCase();
     void init();
     void engineSelectionPersistsAcrossRestart();
+    void cleanInstallOfflineModernDataActivatesAndClearReturnsToBundled();
+    void optionalLongRangeProfileActivationSelectsDe441Kernel();
     void ephemerisDataUpdateLeavesCatalogStateUnchanged();
 
 private:
@@ -188,6 +215,70 @@ void SkyAcceptanceMatrixTests::engineSelectionPersistsAcrossRestart()
     QCOMPARE(restoredSnapshot->ephemeris.preferredDataProfileId, QString("de441-long-range"));
 }
 
+void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearReturnsToBundled()
+{
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+    QCOMPARE(manager.statusText(), QString("Ephemeris data: Bundled fallback"));
+    QVERIFY(!manager.usingInstalledData());
+
+    const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
+    QTemporaryDir bundledResourceRoot;
+    QVERIFY(bundledResourceRoot.isValid());
+    writeStagedAssets(bundledResourceRoot, manifest);
+
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result =
+        manager.activateVerifiedStagedUpdateSet(activationRequest(manifest, bundledResourceRoot, m_settings.path()));
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: acceptance-modern-kernel"));
+    QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
+
+    const auto installedSnapshot = manager.activeDataSnapshot();
+    QVERIFY(installedSnapshot != nullptr);
+    QVERIFY(installedSnapshot->solarSystemKernelAsset("de440s-kernel").has_value());
+    QVERIFY(!installedSnapshot->solarSystemKernelAsset("de441-kernel").has_value());
+
+    QVERIFY(manager.clearInstalledDataCache());
+    QVERIFY(!manager.usingInstalledData());
+    QCOMPARE(manager.statusText(), QString("Ephemeris data: Bundled fallback"));
+    QCOMPARE(manager.dataRevisionToken(), QString("bundled"));
+    const auto bundledFallbackSnapshot = manager.activeDataSnapshot();
+    QVERIFY(bundledFallbackSnapshot != nullptr);
+    QVERIFY(!bundledFallbackSnapshot->solarSystemKernelAsset("de440s-kernel").has_value());
+}
+
+void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Kernel()
+{
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+
+    const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
+    QTemporaryDir bundledResourceRoot;
+    QVERIFY(bundledResourceRoot.isValid());
+    writeStagedAssets(bundledResourceRoot, manifest);
+
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result = manager.activateVerifiedStagedUpdateSet(
+        activationRequest(manifest, bundledResourceRoot, m_settings.path(), QStringLiteral("de441-long-range"))
+    );
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
+    QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
+
+    const auto snapshot = manager.activeDataSnapshot();
+    QVERIFY(snapshot != nullptr);
+    QVERIFY(!snapshot->solarSystemKernelAsset("de440s-kernel").has_value());
+    const auto de441Kernel = snapshot->solarSystemKernelAsset("de441-kernel");
+    QVERIFY(de441Kernel.has_value());
+    QCOMPARE(QString::fromStdString(de441Kernel->profileId), QString("de441-long-range"));
+    QCOMPARE(QString::fromStdString(de441Kernel->version), QString("acceptance-de441-kernel"));
+}
+
 void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
 {
     SkySettingsStore store;
@@ -205,7 +296,7 @@ void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
-    QCOMPARE(manager.dataRevisionToken(), QString("acceptance-rev"));
+    QCOMPARE(manager.dataRevisionToken(), QString("acceptance-modern-rev"));
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{1});
 
     const auto loadedCatalogSnapshot = store.loadCatalogCache();
