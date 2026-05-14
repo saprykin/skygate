@@ -231,6 +231,9 @@ SkyContextController::SkyContextController(
     m_ephemerisUserSettings.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC;
     m_ephemerisUserSettings.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity;
     m_ephemerisUserSettings.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers;
+    if (m_ephemerisDataManager != nullptr) {
+        m_ephemerisDataManager->setBundledFallbackData(m_ephemerisDataManifest, m_ephemerisUpdateResourceRoot);
+    }
     if (initializationOptions.rebuildEphemerisEngineOnStartup) {
         rebuildEphemerisEngine();
     }

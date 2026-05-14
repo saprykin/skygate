@@ -282,6 +282,29 @@ bool installedKernelLooksLongRange(const EphemerisDataCacheSnapshot& snapshot)
     return haystack.contains(QStringLiteral("de441")) || haystack.contains(QStringLiteral("long"));
 }
 
+const EphemerisDataManifestProfile*
+bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& profileId)
+{
+    if (manifest == nullptr) {
+        return nullptr;
+    }
+
+    const std::string normalizedProfileId = profileId.trimmed().toStdString();
+    if (!normalizedProfileId.empty()) {
+        return manifest->profile(normalizedProfileId);
+    }
+
+    const auto bundledModern =
+        std::ranges::find_if(manifest->profiles, [](const EphemerisDataManifestProfile& profile) {
+            return profile.bundled && !profile.longRange;
+        });
+    if (bundledModern != manifest->profiles.end()) {
+        return &*bundledModern;
+    }
+
+    return manifest->profiles.empty() ? nullptr : &manifest->profiles.front();
+}
+
 std::optional<EphemerisTextDataAsset>
 loadTextAsset(const QString& path, const QString& id, const QString& version, const QString& provenance)
 {
@@ -424,8 +447,16 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
 
 class SkyActiveEphemerisDataSnapshot final : public IEphemerisDataSnapshot {
 public:
-    SkyActiveEphemerisDataSnapshot(EphemerisDataCacheSnapshot cacheSnapshot, const bool installedDataActive)
-        : m_cacheSnapshot(std::move(cacheSnapshot)), m_installedDataActive(installedDataActive)
+    SkyActiveEphemerisDataSnapshot(
+        EphemerisDataCacheSnapshot cacheSnapshot,
+        const bool installedDataActive,
+        const EphemerisDataManifest* bundledFallbackManifest,
+        QString bundledFallbackResourceRoot,
+        QString bundledFallbackProfileId
+    )
+        : m_cacheSnapshot(std::move(cacheSnapshot)), m_bundledFallbackManifest(bundledFallbackManifest),
+          m_bundledFallbackResourceRoot(std::move(bundledFallbackResourceRoot)),
+          m_bundledFallbackProfileId(std::move(bundledFallbackProfileId)), m_installedDataActive(installedDataActive)
     {
     }
 
@@ -473,26 +504,64 @@ public:
 
     [[nodiscard]] std::optional<KernelDataAsset> solarSystemKernelAsset(std::string_view assetId) const override
     {
-        if (!m_installedDataActive || m_cacheSnapshot.installedKernelPath.isEmpty()) {
-            return std::nullopt;
-        }
         const QString requestedAssetId = QString::fromUtf8(assetId.data(), static_cast<qsizetype>(assetId.size()));
-        if (m_cacheSnapshot.installedKernelAssetId.isEmpty()
-            || m_cacheSnapshot.installedKernelAssetId != requestedAssetId) {
+        if (m_installedDataActive && !m_cacheSnapshot.installedKernelPath.isEmpty()) {
+            if (m_cacheSnapshot.installedKernelAssetId.isEmpty()
+                || m_cacheSnapshot.installedKernelAssetId != requestedAssetId) {
+                return std::nullopt;
+            }
+
+            KernelDataAsset asset;
+            asset.id = m_cacheSnapshot.installedKernelAssetId.toStdString();
+            asset.profileId = m_cacheSnapshot.installedKernelProfileId.toStdString();
+            asset.version = m_cacheSnapshot.installedKernelVersion.toStdString();
+            asset.provenance = "Installed ephemeris data cache";
+            asset.activePath = m_cacheSnapshot.installedKernelPath.toStdString();
+            return asset;
+        }
+
+        const EphemerisDataManifestProfile* profile =
+            bundledFallbackProfile(m_bundledFallbackManifest, m_bundledFallbackProfileId);
+        if (profile == nullptr || m_bundledFallbackResourceRoot.trimmed().isEmpty()) {
             return std::nullopt;
         }
 
-        KernelDataAsset asset;
-        asset.id = m_cacheSnapshot.installedKernelAssetId.toStdString();
-        asset.profileId = m_cacheSnapshot.installedKernelProfileId.toStdString();
-        asset.version = m_cacheSnapshot.installedKernelVersion.toStdString();
-        asset.provenance = "Installed ephemeris data cache";
-        asset.activePath = m_cacheSnapshot.installedKernelPath.toStdString();
-        return asset;
+        for (const std::string& profileAssetId : profile->assetIds) {
+            if (profileAssetId != assetId) {
+                continue;
+            }
+            const EphemerisDataManifestAsset* manifestAsset = m_bundledFallbackManifest->asset(profileAssetId);
+            if (manifestAsset == nullptr || manifestAsset->kind != EphemerisDataManifestAssetKind::SolarSystemKernel
+                || manifestAsset->relativePath.empty()) {
+                return std::nullopt;
+            }
+
+            const std::filesystem::path activePath =
+                pathFromQString(m_bundledFallbackResourceRoot) / std::filesystem::path(manifestAsset->relativePath);
+            const QFileInfo activeFileInfo(pathToQString(activePath));
+            if (!activeFileInfo.exists() || !activeFileInfo.isFile()) {
+                return std::nullopt;
+            }
+
+            return KernelDataAsset{
+                .id = manifestAsset->id,
+                .profileId = profile->id,
+                .version = manifestAsset->version,
+                .provenance = m_bundledFallbackManifest->dataSetInfo.provenance.empty()
+                                  ? "Bundled ephemeris fallback"
+                                  : m_bundledFallbackManifest->dataSetInfo.provenance,
+                .activePath = pathToQString(activePath).toStdString(),
+            };
+        }
+
+        return std::nullopt;
     }
 
 private:
     EphemerisDataCacheSnapshot m_cacheSnapshot;
+    const EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
+    QString m_bundledFallbackResourceRoot;
+    QString m_bundledFallbackProfileId;
     bool m_installedDataActive = false;
 };
 
@@ -518,7 +587,8 @@ QString SkyEphemerisDataManager::datasetInfoText() const
 
 QString SkyEphemerisDataManager::modernKernelStatusText() const
 {
-    if (usingInstalledData() && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
+    if (usingInstalledData() && !installedKernelLooksLongRange(m_activeCacheSnapshot)
+        && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
         return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedKernelVersion);
     }
     if (m_activeSource == ActiveSource::MissingInstalledFallback) {
@@ -600,6 +670,20 @@ std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
 SkyEphemerisDataManager::activeDataSnapshot() const noexcept
 {
     return m_activeDataSnapshot;
+}
+
+void SkyEphemerisDataManager::setBundledFallbackData(
+    const skygate::ephemeris::EphemerisDataManifest* manifest, QString resourceRoot, QString profileId
+)
+{
+    m_bundledFallbackManifest = manifest;
+    m_bundledFallbackResourceRoot = std::move(resourceRoot).trimmed();
+    m_bundledFallbackProfileId = std::move(profileId).trimmed();
+
+    if (m_activeSource != ActiveSource::Installed) {
+        m_activeDataSnapshot.reset();
+        applyCacheSnapshot(m_activeCacheSnapshot, m_activeSource, m_statusText, true);
+    }
 }
 
 bool SkyEphemerisDataManager::restoreFromSettings()
@@ -949,7 +1033,11 @@ void SkyEphemerisDataManager::applyCacheSnapshot(
     m_datasetInfoText = std::move(datasetInfoText);
     if (activeDataDidChange) {
         m_activeDataSnapshot = std::make_shared<SkyActiveEphemerisDataSnapshot>(
-            m_activeCacheSnapshot, m_activeSource == ActiveSource::Installed
+            m_activeCacheSnapshot,
+            m_activeSource == ActiveSource::Installed,
+            m_bundledFallbackManifest,
+            m_bundledFallbackResourceRoot,
+            m_bundledFallbackProfileId
         );
         ++m_dataRevision;
     }
