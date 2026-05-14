@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <utility>
 
 namespace skygate::ephemeris::highprecision {
 namespace {
@@ -17,6 +18,8 @@ constexpr double kJulianDaysPerYear = 365.25;
 constexpr double kAuPerParsec = 206'264.80624709636;
 constexpr double kAuKilometers = 149'597'870.7;
 constexpr double kSecondsPerJulianYear = 31'557'600.0;
+constexpr int kNaifEarth = 399;
+constexpr int kNaifSolarSystemBarycenter = 0;
 
 struct CartesianVector {
     double x = 0.0;
@@ -58,11 +61,18 @@ hasEnabledPositiveParallax(const CatalogStarAstrometry& astrometry, const Epheme
     return hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax) && hasPositiveParallax(astrometry);
 }
 
+[[nodiscard]] bool
+hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags) noexcept
+{
+    return hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax) && hasPositiveParallax(astrometry);
+}
+
 [[nodiscard]] bool requestsAnyAstrometryCorrection(const EphemerisCorrectionFlags flags) noexcept
 {
     return hasCorrectionFlag(flags, EphemerisCorrectionFlags::ProperMotion)
            || hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
-           || hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax);
+           || hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax)
+           || hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax);
 }
 
 void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
@@ -88,6 +98,15 @@ void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
         .x = lhs.x + rhs.x,
         .y = lhs.y + rhs.y,
         .z = lhs.z + rhs.z,
+    };
+}
+
+[[nodiscard]] CartesianVector subtractVectors(const CartesianVector& lhs, const CartesianVector& rhs) noexcept
+{
+    return {
+        .x = lhs.x - rhs.x,
+        .y = lhs.y - rhs.y,
+        .z = lhs.z - rhs.z,
     };
 }
 
@@ -168,7 +187,7 @@ void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
     return *value;
 }
 
-[[nodiscard]] std::optional<core::EquatorialCoordinate> propagatedEquatorial(
+[[nodiscard]] std::optional<CartesianVector> propagatedAstrometricVector(
     const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags, const double years
 ) noexcept
 {
@@ -195,20 +214,23 @@ void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
     const CartesianVector north = northBasisFromEquatorial(reference);
     const double tangentialRaRadiansPerYear = *properMotionRaMasPerYear * kMasToRadians;
     const double tangentialDecRadiansPerYear = *properMotionDecMasPerYear * kMasToRadians;
+    const bool needsDistance =
+        hasEnabledPositiveParallax(astrometry, flags) || hasAnnualParallaxInput(astrometry, flags);
 
-    if (!hasEnabledPositiveParallax(astrometry, flags)) {
-        const CartesianVector direction = addVectors(
+    if (!needsDistance) {
+        return addVectors(
             referenceUnit,
             addVectors(
                 scaleVector(east, tangentialRaRadiansPerYear * years),
                 scaleVector(north, tangentialDecRadiansPerYear * years)
             )
         );
-        return equatorialFromVector(direction);
     }
 
     const double distanceAu = kAuPerParsec * (1'000.0 / *astrometry.stellarParallaxMas);
-    const double radialVelocityAuPerYear = *radialVelocityKmPerSecond * kSecondsPerJulianYear / kAuKilometers;
+    const double radialVelocityAuPerYear = hasEnabledPositiveParallax(astrometry, flags)
+                                               ? *radialVelocityKmPerSecond * kSecondsPerJulianYear / kAuKilometers
+                                               : 0.0;
     const CartesianVector referencePosition = scaleVector(referenceUnit, distanceAu);
     const CartesianVector velocity = addVectors(
         scaleVector(referenceUnit, radialVelocityAuPerYear),
@@ -217,7 +239,49 @@ void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
             scaleVector(north, tangentialDecRadiansPerYear * distanceAu)
         )
     );
-    return equatorialFromVector(addVectors(referencePosition, scaleVector(velocity, years)));
+    return addVectors(referencePosition, scaleVector(velocity, years));
+}
+
+[[nodiscard]] CartesianVector cartesianFromSolarSystemVector(const SolarSystemKernelVector& vector) noexcept
+{
+    return {
+        .x = vector.xAu,
+        .y = vector.yAu,
+        .z = vector.zAu,
+    };
+}
+
+[[nodiscard]] SolarSystemKernelVector solarSystemVectorFromCartesian(const CartesianVector& vector) noexcept
+{
+    return {
+        .xAu = vector.x,
+        .yAu = vector.y,
+        .zAu = vector.z,
+    };
+}
+
+void mergeKernelMetadata(EphemerisResultMetadata& target, const EphemerisResultMetadata& source) noexcept
+{
+    if (source.status == EphemerisResultStatus::Failed) {
+        target.status = EphemerisResultStatus::Failed;
+    } else if (source.status == EphemerisResultStatus::OutOfRange) {
+        target.status = EphemerisResultStatus::OutOfRange;
+    } else if (source.status == EphemerisResultStatus::Unsupported) {
+        target.status = EphemerisResultStatus::Unsupported;
+    } else if (source.status == EphemerisResultStatus::Degraded && target.status == EphemerisResultStatus::Valid) {
+        target.status = EphemerisResultStatus::Degraded;
+    }
+
+    target.warningCodeMask |= source.warningCodeMask;
+    if (target.dataSourceProvenance.empty()) {
+        target.dataSourceProvenance = source.dataSourceProvenance;
+    }
+    if (!target.effectiveDataValidityRange.has_value()) {
+        target.effectiveDataValidityRange = source.effectiveDataValidityRange;
+    }
+    if (!target.estimatedAngularUncertaintyArcsec.has_value()) {
+        target.estimatedAngularUncertaintyArcsec = source.estimatedAngularUncertaintyArcsec;
+    }
 }
 
 void recordUnavailableRequestedFields(
@@ -230,6 +294,9 @@ void recordUnavailableRequestedFields(
         markCorrectionUnavailable(metadata);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax) && !hasPositiveParallax(astrometry)) {
+        markCorrectionUnavailable(metadata);
+    }
+    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax) && !hasPositiveParallax(astrometry)) {
         markCorrectionUnavailable(metadata);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
@@ -257,6 +324,11 @@ void recordAppliedCorrections(
 }
 
 }  // namespace
+
+StarAstrometryCalculator::StarAstrometryCalculator(std::shared_ptr<const ICalcephKernelProvider> kernelProvider)
+    : m_kernelProvider(std::move(kernelProvider))
+{
+}
 
 HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrecisionComputationInput& input) const
 {
@@ -295,12 +367,38 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
     }
 
     const double elapsedYears = yearsBetween(astrometry->referenceEpoch, input.request.epoch);
-    const std::optional<core::EquatorialCoordinate> propagated = propagatedEquatorial(*astrometry, flags, elapsedYears);
-    if (!propagated.has_value()) {
+    const std::optional<CartesianVector> propagatedVector =
+        propagatedAstrometricVector(*astrometry, flags, elapsedYears);
+    if (!propagatedVector.has_value()) {
         return makeFailedResult();
     }
 
-    result.equatorial = *propagated;
+    if (hasAnnualParallaxInput(*astrometry, flags)) {
+        if (m_kernelProvider == nullptr) {
+            markCorrectionUnavailable(result.metadata);
+            result.equatorial = equatorialFromVector(*propagatedVector);
+        } else {
+            const SolarSystemKernelStateResult earthState =
+                m_kernelProvider->computeGeometricState(input.request.epoch, kNaifEarth, kNaifSolarSystemBarycenter);
+            mergeKernelMetadata(result.metadata, earthState.metadata);
+            if (earthState.positionAu.has_value()) {
+                const CartesianVector geocentricVector =
+                    subtractVectors(*propagatedVector, cartesianFromSolarSystemVector(*earthState.positionAu));
+                result.observerRelativePositionAu = solarSystemVectorFromCartesian(geocentricVector);
+                result.equatorial = equatorialFromVector(geocentricVector);
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::AnnualParallax;
+            } else {
+                result.metadata.status = EphemerisResultStatus::Degraded;
+                markCorrectionUnavailable(result.metadata);
+                result.equatorial = equatorialFromVector(*propagatedVector);
+            }
+        }
+    } else {
+        result.equatorial = equatorialFromVector(*propagatedVector);
+    }
+    if (!result.equatorial.has_value()) {
+        return makeFailedResult();
+    }
     recordUnavailableRequestedFields(result.metadata, *astrometry, flags);
     recordAppliedCorrections(result.metadata, *astrometry, flags);
     return result;
