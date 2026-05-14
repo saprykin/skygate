@@ -35,6 +35,12 @@ public:
         std::uint32_t sunBodyIndex,
         std::uint32_t moonBodyIndex
     ) const;
+    [[nodiscard]] NightConditions compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t sunBodyIndex,
+        std::uint32_t moonBodyIndex
+    ) const;
 };
 
 }  // namespace skygate::ephemeris

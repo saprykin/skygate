@@ -14,10 +14,8 @@
 
 namespace {
 
-[[nodiscard]] std::optional<std::uint32_t> bodyIndexById(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies,
-    const std::string_view bodyId
-)
+[[nodiscard]] std::optional<std::uint32_t>
+bodyIndexById(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string_view bodyId)
 {
     for (std::size_t index = 0; index < bodies.size(); ++index) {
         if (bodies[index].id == bodyId) {
@@ -29,18 +27,14 @@ namespace {
 
 class NightConditionsDataBuilder final {
 public:
-    NightConditionsDataBuilder(
-        const skygate::core::SkyContext& context,
-        const SkyTimeController* timeController
-    )
-        : m_context(context)
-        , m_timeController(timeController)
+    NightConditionsDataBuilder(const skygate::core::SkyContext& context, const SkyTimeController* timeController)
+        : m_context(context), m_timeController(timeController)
     {
     }
 
     [[nodiscard]] SkyNightConditionsData placeholderData() const
     {
-        return SkyNightConditionsData {
+        return SkyNightConditionsData{
             .valid = false,
             .locationText = locationText(),
             .sunRows = {},
@@ -50,37 +44,32 @@ public:
         };
     }
 
-    [[nodiscard]] SkyNightConditionsData conditionsData(
-        const skygate::ephemeris::NightConditions& conditions
-    ) const
+    [[nodiscard]] SkyNightConditionsData conditionsData(const skygate::ephemeris::NightConditions& conditions) const
     {
         if (!conditions.valid) {
             return placeholderData();
         }
 
-        return SkyNightConditionsData {
+        return SkyNightConditionsData{
             .valid = true,
             .locationText = locationText(),
-            .sunRows = {
-                eventRow(QStringLiteral("Sunset"), conditions.sunset),
-                eventRow(QStringLiteral("Civil dusk"), conditions.civilDusk),
-                eventRow(QStringLiteral("Nautical dusk"), conditions.nauticalDusk),
-                eventRow(QStringLiteral("Astro dusk"), conditions.astronomicalDusk),
-                eventRow(QStringLiteral("Astro dawn"), conditions.astronomicalDawn),
-                eventRow(QStringLiteral("Sunrise"), conditions.sunrise)
-            },
+            .sunRows =
+                {eventRow(QStringLiteral("Sunset"), conditions.sunset),
+                 eventRow(QStringLiteral("Civil dusk"), conditions.civilDusk),
+                 eventRow(QStringLiteral("Nautical dusk"), conditions.nauticalDusk),
+                 eventRow(QStringLiteral("Astro dusk"), conditions.astronomicalDusk),
+                 eventRow(QStringLiteral("Astro dawn"), conditions.astronomicalDawn),
+                 eventRow(QStringLiteral("Sunrise"), conditions.sunrise)},
             .moonPhaseText = QString("%1 | %2%")
-                .arg(QString::fromStdString(conditions.moonPhaseName))
-                .arg(qRound(conditions.moonIlluminationPercent)),
+                                 .arg(QString::fromStdString(conditions.moonPhaseName))
+                                 .arg(qRound(conditions.moonIlluminationPercent)),
             .moonRiseText = formatEventValue(conditions.moonrise),
             .moonSetText = formatEventValue(conditions.moonset)
         };
     }
 
 private:
-    [[nodiscard]] QString formatEventValue(
-        const skygate::ephemeris::ObservationEvent& event
-    ) const
+    [[nodiscard]] QString formatEventValue(const skygate::ephemeris::ObservationEvent& event) const
     {
         using skygate::ephemeris::ObservationEventStatus;
 
@@ -88,10 +77,9 @@ private:
         case ObservationEventStatus::Available:
             if (event.utcTime.has_value()) {
                 return m_timeController != nullptr
-                    ? m_timeController->formatUtcTime(*event.utcTime, false)
-                    : skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(
-                        *event.utcTime
-                    ).toString("HH:mm");
+                           ? m_timeController->formatUtcTime(*event.utcTime, false)
+                           : skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(*event.utcTime)
+                                 .toString("HH:mm");
             }
             return "--";
         case ObservationEventStatus::AlwaysAbove:
@@ -108,29 +96,18 @@ private:
         return "--";
     }
 
-    [[nodiscard]] SkyNightConditionSunRow eventRow(
-        const QString& label,
-        const skygate::ephemeris::ObservationEvent& event
-    ) const
+    [[nodiscard]] SkyNightConditionSunRow
+    eventRow(const QString& label, const skygate::ephemeris::ObservationEvent& event) const
     {
-        return SkyNightConditionSunRow {
-            .label = label,
-            .value = formatEventValue(event)
-        };
+        return SkyNightConditionSunRow{.label = label, .value = formatEventValue(event)};
     }
 
     [[nodiscard]] QString locationText() const
     {
         return QString("%1 | Lat %2 Lon %3")
-            .arg(m_timeController != nullptr
-                ? m_timeController->timeZoneLabel()
-                : QStringLiteral("UTC"))
-            .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
-                m_context.observer.latitudeDeg
-            ))
-            .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(
-                m_context.observer.longitudeDeg
-            ));
+            .arg(m_timeController != nullptr ? m_timeController->timeZoneLabel() : QStringLiteral("UTC"))
+            .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(m_context.observer.latitudeDeg))
+            .arg(skygate::ui::internal::SkyContextTextFormatter::formatCoordinate(m_context.observer.longitudeDeg));
     }
 
 private:
@@ -147,7 +124,8 @@ QString SkyContextController::nightConditionsIconKind() const
         return QStringLiteral("unknown");
     }
 
-    const auto sunState = engine->computeBodyState(m_location.context(), std::string_view("sun"));
+    const auto requestContext = ephemerisRequestContext();
+    const auto sunState = engine->computeBodyState(requestContext.request, std::string_view("sun"));
     if (!sunState.has_value() || !sunState->horizontal.isFinite()) {
         return QStringLiteral("unknown");
     }
@@ -173,9 +151,9 @@ void SkyContextController::refreshNightConditions()
     SkyNightConditionsData nextData = dataBuilder.placeholderData();
     if (engine != nullptr && sunIndex.has_value() && moonIndex.has_value()) {
         const skygate::ephemeris::NightConditionsCalculator calculator;
-        nextData = dataBuilder.conditionsData(
-            calculator.compute(*engine, m_location.context(), *sunIndex, *moonIndex)
-        );
+        const auto requestContext = ephemerisRequestContext();
+        nextData =
+            dataBuilder.conditionsData(calculator.compute(*engine, requestContext.request, *sunIndex, *moonIndex));
     }
     const QVariantMap nextConditions = adapter.nightConditions(nextData);
 
