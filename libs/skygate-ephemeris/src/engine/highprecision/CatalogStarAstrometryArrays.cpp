@@ -1,6 +1,7 @@
 #include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace skygate::ephemeris::highprecision {
@@ -8,8 +9,7 @@ namespace {
 
 [[nodiscard]] bool isCatalogStarBody(const CelestialBody& body) noexcept
 {
-    return body.type == CelestialBodyType::Star || body.ephemerisSource == CelestialBodyEphemerisSource::Star
-           || body.ephemerisSource == CelestialBodyEphemerisSource::FixedEquatorial;
+    return body.type == CelestialBodyType::Star || body.ephemerisSource == CelestialBodyEphemerisSource::Star;
 }
 
 [[nodiscard]] double optionalOrQuietNaN(const std::optional<double> value) noexcept
@@ -17,9 +17,14 @@ namespace {
     return value.value_or(std::numeric_limits<double>::quiet_NaN());
 }
 
-[[nodiscard]] std::uint8_t maskForOptional(const std::optional<double> value) noexcept
+[[nodiscard]] std::uint8_t finiteMaskForOptional(const std::optional<double> value) noexcept
 {
-    return value.has_value() ? 1U : 0U;
+    return value.has_value() && std::isfinite(*value) ? 1U : 0U;
+}
+
+[[nodiscard]] std::uint8_t positiveFiniteMaskForOptional(const std::optional<double> value) noexcept
+{
+    return value.has_value() && std::isfinite(*value) && *value > 0.0 ? 1U : 0U;
 }
 
 }  // namespace
@@ -86,13 +91,13 @@ CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const C
         const std::optional<double> radialVelocity =
             astrometry != nullptr ? astrometry->radialVelocityKmPerSecond : std::nullopt;
 
-        m_hasProperMotionRightAscension.push_back(maskForOptional(properMotionRightAscension));
+        m_hasProperMotionRightAscension.push_back(finiteMaskForOptional(properMotionRightAscension));
         m_properMotionRightAscensionMasPerYear.push_back(optionalOrQuietNaN(properMotionRightAscension));
-        m_hasProperMotionDeclination.push_back(maskForOptional(properMotionDeclination));
+        m_hasProperMotionDeclination.push_back(finiteMaskForOptional(properMotionDeclination));
         m_properMotionDeclinationMasPerYear.push_back(optionalOrQuietNaN(properMotionDeclination));
-        m_hasStellarParallax.push_back(maskForOptional(stellarParallax));
+        m_hasStellarParallax.push_back(positiveFiniteMaskForOptional(stellarParallax));
         m_stellarParallaxMas.push_back(optionalOrQuietNaN(stellarParallax));
-        m_hasRadialVelocity.push_back(maskForOptional(radialVelocity));
+        m_hasRadialVelocity.push_back(finiteMaskForOptional(radialVelocity));
         m_radialVelocityKmPerSecond.push_back(optionalOrQuietNaN(radialVelocity));
 
         const std::optional<EphemerisDateRange> validityRange =
@@ -223,6 +228,76 @@ std::span<const double> CatalogStarAstrometryArrays::referenceEpochJulianDatePar
 std::span<const TimeScale> CatalogStarAstrometryArrays::referenceEpochTimeScales() const noexcept
 {
     return m_referenceEpochTimeScales;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasCatalogAstrometryMask() const noexcept
+{
+    return m_hasCatalogAstrometry;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasFixedEquatorialFallbackMask() const noexcept
+{
+    return m_hasFixedEquatorialFallback;
+}
+
+std::span<const double> CatalogStarAstrometryArrays::fixedRightAscensionHours() const noexcept
+{
+    return m_fixedRightAscensionHours;
+}
+
+std::span<const double> CatalogStarAstrometryArrays::fixedDeclinationDegrees() const noexcept
+{
+    return m_fixedDeclinationDegrees;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasProperMotionRightAscensionMask() const noexcept
+{
+    return m_hasProperMotionRightAscension;
+}
+
+std::span<const double> CatalogStarAstrometryArrays::properMotionRightAscensionMasPerYearValues() const noexcept
+{
+    return m_properMotionRightAscensionMasPerYear;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasProperMotionDeclinationMask() const noexcept
+{
+    return m_hasProperMotionDeclination;
+}
+
+std::span<const double> CatalogStarAstrometryArrays::properMotionDeclinationMasPerYearValues() const noexcept
+{
+    return m_properMotionDeclinationMasPerYear;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasStellarParallaxMask() const noexcept
+{
+    return m_hasStellarParallax;
+}
+
+std::span<const double> CatalogStarAstrometryArrays::stellarParallaxMasValues() const noexcept
+{
+    return m_stellarParallaxMas;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasRadialVelocityMask() const noexcept
+{
+    return m_hasRadialVelocity;
+}
+
+std::span<const double> CatalogStarAstrometryArrays::radialVelocityKmPerSecondValues() const noexcept
+{
+    return m_radialVelocityKmPerSecond;
+}
+
+std::span<const std::uint8_t> CatalogStarAstrometryArrays::hasValidityRangeMask() const noexcept
+{
+    return m_hasValidityRange;
+}
+
+std::span<const EphemerisDateRange> CatalogStarAstrometryArrays::validityRanges() const noexcept
+{
+    return m_validityRanges;
 }
 
 bool CatalogStarAstrometryArrays::hasValueAt(const std::vector<std::uint8_t>& mask, const std::size_t arrayIndex)

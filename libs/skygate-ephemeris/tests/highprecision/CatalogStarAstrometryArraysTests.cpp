@@ -2,6 +2,9 @@
 
 #include <QtTest/QtTest>
 
+#include <cmath>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -93,6 +96,34 @@ namespace core = skygate::core;
     return body;
 }
 
+[[nodiscard]] CelestialBody makeFixedDeepSkyObject()
+{
+    CelestialBody body;
+    body.id = "messier-31";
+    body.displayName = "M31";
+    body.type = CelestialBodyType::DeepSkyObject;
+    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.fixedEquatorial = core::EquatorialCoordinate{
+        .rightAscensionHours = 0.7,
+        .declinationDeg = 41.3,
+    };
+    body.deepSkyObject = DeepSkyObjectInfo{
+        .kind = DeepSkyObjectKind::Galaxy,
+    };
+    return body;
+}
+
+[[nodiscard]] CelestialBody makeStarWithInvalidNumericAstrometry()
+{
+    CelestialBody body = makeAstrometricStar();
+    body.id = "invalid-astrometry-star";
+    body.starAstrometry->properMotionRightAscensionMasPerYear = std::numeric_limits<double>::quiet_NaN();
+    body.starAstrometry->properMotionDeclinationMasPerYear = std::numeric_limits<double>::infinity();
+    body.starAstrometry->stellarParallaxMas = 0.0;
+    body.starAstrometry->radialVelocityKmPerSecond = -std::numeric_limits<double>::infinity();
+    return body;
+}
+
 }  // namespace
 
 class CatalogStarAstrometryArraysTests final : public QObject {
@@ -100,6 +131,8 @@ class CatalogStarAstrometryArraysTests final : public QObject {
 
 private slots:
     void buildsCacheFriendlyArraysFromFullPartialAndFixedStars();
+    void excludesFixedCoordinateNonStarBodies();
+    void masksOnlyUsableNumericAstrometryValues();
     void copiesCatalogDataAndSurvivesSourceLifetimeChanges();
 };
 
@@ -153,6 +186,64 @@ void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialA
     QCOMPARE(arrays.referenceEpochJulianDatePart1().size(), arrays.size());
     QCOMPARE(arrays.referenceEpochJulianDatePart2().size(), arrays.size());
     QCOMPARE(arrays.referenceEpochTimeScales().size(), arrays.size());
+    QCOMPARE(arrays.hasCatalogAstrometryMask().size(), arrays.size());
+    QCOMPARE(arrays.hasCatalogAstrometryMask()[0], std::uint8_t{1});
+    QCOMPARE(arrays.hasCatalogAstrometryMask()[2], std::uint8_t{0});
+    QCOMPARE(arrays.hasFixedEquatorialFallbackMask().size(), arrays.size());
+    QCOMPARE(arrays.fixedRightAscensionHours().size(), arrays.size());
+    QCOMPARE(arrays.fixedDeclinationDegrees().size(), arrays.size());
+    QCOMPARE(arrays.fixedRightAscensionHours()[2], 4.0);
+    QCOMPARE(arrays.fixedDeclinationDegrees()[2], -15.0);
+    QCOMPARE(arrays.hasProperMotionRightAscensionMask().size(), arrays.size());
+    QCOMPARE(arrays.properMotionRightAscensionMasPerYearValues().size(), arrays.size());
+    QCOMPARE(arrays.hasProperMotionRightAscensionMask()[0], std::uint8_t{1});
+    QCOMPARE(arrays.properMotionRightAscensionMasPerYearValues()[0], 125.0);
+    QCOMPARE(arrays.hasProperMotionDeclinationMask().size(), arrays.size());
+    QCOMPARE(arrays.properMotionDeclinationMasPerYearValues().size(), arrays.size());
+    QCOMPARE(arrays.hasStellarParallaxMask().size(), arrays.size());
+    QCOMPARE(arrays.stellarParallaxMasValues().size(), arrays.size());
+    QCOMPARE(arrays.hasRadialVelocityMask().size(), arrays.size());
+    QCOMPARE(arrays.radialVelocityKmPerSecondValues().size(), arrays.size());
+    QCOMPARE(arrays.hasValidityRangeMask().size(), arrays.size());
+    QCOMPARE(arrays.validityRanges().size(), arrays.size());
+}
+
+void CatalogStarAstrometryArraysTests::excludesFixedCoordinateNonStarBodies()
+{
+    const std::vector<CelestialBody> bodies{
+        makeFixedDeepSkyObject(),
+        makeFixedOnlyStar(),
+    };
+
+    const CatalogStarAstrometryArrays arrays(bodies);
+
+    QCOMPARE(arrays.size(), 1U);
+    QCOMPARE(arrays.bodyIndices()[0], 1U);
+    QVERIFY(!arrays.arrayIndexForBodyIndex(0).has_value());
+    QCOMPARE(*arrays.arrayIndexForBodyIndex(1), 0U);
+}
+
+void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
+{
+    const std::vector<CelestialBody> bodies{
+        makeStarWithInvalidNumericAstrometry(),
+    };
+
+    const CatalogStarAstrometryArrays arrays(bodies);
+
+    QCOMPARE(arrays.size(), 1U);
+    QCOMPARE(arrays.hasProperMotionRightAscensionMask()[0], std::uint8_t{0});
+    QCOMPARE(arrays.hasProperMotionDeclinationMask()[0], std::uint8_t{0});
+    QCOMPARE(arrays.hasStellarParallaxMask()[0], std::uint8_t{0});
+    QCOMPARE(arrays.hasRadialVelocityMask()[0], std::uint8_t{0});
+    QVERIFY(!arrays.properMotionRightAscensionMasPerYear(0).has_value());
+    QVERIFY(!arrays.properMotionDeclinationMasPerYear(0).has_value());
+    QVERIFY(!arrays.stellarParallaxMas(0).has_value());
+    QVERIFY(!arrays.radialVelocityKmPerSecond(0).has_value());
+    QVERIFY(std::isnan(arrays.properMotionRightAscensionMasPerYearValues()[0]));
+    QVERIFY(std::isinf(arrays.properMotionDeclinationMasPerYearValues()[0]));
+    QCOMPARE(arrays.stellarParallaxMasValues()[0], 0.0);
+    QVERIFY(std::isinf(arrays.radialVelocityKmPerSecondValues()[0]));
 }
 
 void CatalogStarAstrometryArraysTests::copiesCatalogDataAndSurvivesSourceLifetimeChanges()
