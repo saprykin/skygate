@@ -89,6 +89,11 @@ selectProfile(const EphemerisDataManifest& manifest, const CalcephKernelSelectio
     return manifest.profiles.empty() ? nullptr : &manifest.profiles.front();
 }
 
+[[nodiscard]] bool hasExplicitKernelSelection(const CalcephKernelSelectionOptions& options) noexcept
+{
+    return !options.preferredProfileId.empty() || options.preferLongRange;
+}
+
 [[nodiscard]] const EphemerisDataManifestAsset*
 selectKernelAsset(const EphemerisDataManifest& manifest, const EphemerisDataManifestProfile& profile) noexcept
 {
@@ -245,7 +250,7 @@ CalcephKernelProvider::CalcephKernelProvider(
 
     std::optional<EphemerisKernelDataAsset> snapshotAsset =
         snapshotKernelForProfile(snapshot, *manifestAsset, *profile);
-    if (!snapshotAsset.has_value()) {
+    if (!snapshotAsset.has_value() && !hasExplicitKernelSelection(options)) {
         for (const EphemerisDataManifestProfile& candidateProfile : manifest.profiles) {
             const EphemerisDataManifestAsset* candidateAsset = selectKernelAsset(manifest, candidateProfile);
             if (candidateAsset == nullptr) {

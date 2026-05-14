@@ -222,8 +222,9 @@ private slots:
     void reportsMissingKernelAsset();
     void reportsMissingKernelFile();
     void reportsMissingKernelWhenSnapshotDoesNotContainSelectedAsset();
-    void rejectsSnapshotKernelAssetIdMismatch();
-    void rejectsSnapshotKernelProfileIdMismatch();
+    void reportsMissingKernelWhenPreferredProfileAssetIsAbsent();
+    void usesActiveSnapshotKernelWhenDefaultProfileAssetIsAbsent();
+    void reportsMissingKernelWhenExplicitProfileSnapshotMismatches();
     void rejectsChecksumMismatchBeforeOpening();
     void reportsOpenFailureForWrongKernelFile();
     void reportsOutOfRangeEpochs();
@@ -360,7 +361,28 @@ void CalcephKernelProviderTests::reportsMissingKernelWhenSnapshotDoesNotContainS
     QVERIFY(!provider.diagnostics().empty());
 }
 
-void CalcephKernelProviderTests::rejectsSnapshotKernelAssetIdMismatch()
+void CalcephKernelProviderTests::reportsMissingKernelWhenPreferredProfileAssetIsAbsent()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    const QString kernelPath = writeKernel(root);
+    const auto runtime = std::make_shared<FakeCalcephKernelRuntime>();
+    skygate::ephemeris::highprecision::CalcephKernelSelectionOptions options;
+    options.preferredProfileId = "long-range";
+
+    const skygate::ephemeris::highprecision::CalcephKernelProvider provider(
+        makeSnapshot(kernelPath), makeManifest(), options, runtime
+    );
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(provider.status()),
+        static_cast<std::uint8_t>(skygate::ephemeris::highprecision::CalcephKernelProviderStatus::MissingKernelFile)
+    );
+    QCOMPARE(runtime->openCount, 0);
+    QVERIFY(!provider.diagnostics().empty());
+}
+
+void CalcephKernelProviderTests::usesActiveSnapshotKernelWhenDefaultProfileAssetIsAbsent()
 {
     QTemporaryDir root;
     QVERIFY(root.isValid());
@@ -378,13 +400,16 @@ void CalcephKernelProviderTests::rejectsSnapshotKernelAssetIdMismatch()
 
     QCOMPARE(
         static_cast<std::uint8_t>(provider.status()),
-        static_cast<std::uint8_t>(skygate::ephemeris::highprecision::CalcephKernelProviderStatus::InvalidKernelAsset)
+        static_cast<std::uint8_t>(skygate::ephemeris::highprecision::CalcephKernelProviderStatus::Ready)
     );
-    QCOMPARE(runtime->openCount, 0);
-    QVERIFY(!provider.diagnostics().empty());
+    QCOMPARE(runtime->openCount, 1);
+    QVERIFY(provider.kernelInfo().has_value());
+    QVERIFY(provider.kernelInfo()->id == std::string{"de441-kernel"});
+    QVERIFY(provider.kernelInfo()->profileId == std::string{"long-range"});
+    QVERIFY(provider.kernelInfo()->longRange);
 }
 
-void CalcephKernelProviderTests::rejectsSnapshotKernelProfileIdMismatch()
+void CalcephKernelProviderTests::reportsMissingKernelWhenExplicitProfileSnapshotMismatches()
 {
     QTemporaryDir root;
     QVERIFY(root.isValid());
@@ -397,12 +422,14 @@ void CalcephKernelProviderTests::rejectsSnapshotKernelProfileIdMismatch()
     asset.activePath = kernelPath.toStdString();
     const TestEphemerisDataSnapshot snapshot(std::move(asset), false);
     const auto runtime = std::make_shared<FakeCalcephKernelRuntime>();
+    skygate::ephemeris::highprecision::CalcephKernelSelectionOptions options;
+    options.preferredProfileId = "modern";
 
-    const skygate::ephemeris::highprecision::CalcephKernelProvider provider(snapshot, makeManifest(), {}, runtime);
+    const skygate::ephemeris::highprecision::CalcephKernelProvider provider(snapshot, makeManifest(), options, runtime);
 
     QCOMPARE(
         static_cast<std::uint8_t>(provider.status()),
-        static_cast<std::uint8_t>(skygate::ephemeris::highprecision::CalcephKernelProviderStatus::InvalidKernelAsset)
+        static_cast<std::uint8_t>(skygate::ephemeris::highprecision::CalcephKernelProviderStatus::MissingKernelFile)
     );
     QCOMPARE(runtime->openCount, 0);
     QVERIFY(!provider.diagnostics().empty());

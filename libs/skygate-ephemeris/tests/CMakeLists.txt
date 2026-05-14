@@ -191,22 +191,18 @@ add_skygate_ephemeris_qtest(
     highprecision/CatalogStarAstrometryArraysTests.cpp
     LABELS "unit;highprecision;stellar-astrometry;performance"
 )
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-calceph-kernel-provider-tests
+    highprecision/CalcephKernelProviderTests.cpp
+    LABELS "unit;highprecision;validation;kernel"
+)
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    add_skygate_ephemeris_qtest(
-        skygate-ephemeris-calceph-kernel-provider-tests
-        highprecision/CalcephKernelProviderTests.cpp
-        LABELS "unit;highprecision;validation;kernel"
-    )
     add_skygate_ephemeris_qtest(
         skygate-ephemeris-solar-system-state-calculator-tests
         highprecision/SolarSystemStateCalculatorTests.cpp
         LABELS "unit;highprecision;validation;geometric"
     )
 else()
-    add_skygate_disabled_highprecision_test(
-        skygate-ephemeris-calceph-kernel-provider-tests
-        "CALCEPH kernel validation requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON"
-    )
     add_skygate_disabled_highprecision_test(
         skygate-ephemeris-solar-system-state-calculator-tests
         "geometric solar-system validation requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON"
