@@ -45,6 +45,7 @@ bool SkyContextController::saveSettings() const
     snapshot.logToTerminal = logToTerminal();
     snapshot.logToFile = logToFile();
     snapshot.logFilePath = logFilePath();
+    snapshot.ephemeris = m_ephemerisUserSettings;
     snapshot.ephemeris.engineKind = m_ephemerisEngineKind;
     snapshot.ephemeris.correctionFlags = m_ephemerisEngineOptions.correctionFlags;
     snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine;
@@ -113,6 +114,7 @@ bool SkyContextController::loadSettings()
         setLogFilePath(stateSnapshot->logFilePath);
 
         if (stateSnapshot->ephemerisSettingsPresent) {
+            m_ephemerisUserSettings = stateSnapshot->ephemeris;
             m_ephemerisEngineKind = stateSnapshot->ephemeris.engineKind;
             m_ephemerisEngineOptions.engineKind = stateSnapshot->ephemeris.engineKind;
             m_ephemerisEngineOptions.correctionFlags = stateSnapshot->ephemeris.correctionFlags;
@@ -124,6 +126,7 @@ bool SkyContextController::loadSettings()
             m_ephemerisEngineOptions.observingWavelengthMicrometers =
                 stateSnapshot->ephemeris.observingWavelengthMicrometers;
             rebuildEphemerisEngine();
+            emit skyContextChanged();
         }
     }
 

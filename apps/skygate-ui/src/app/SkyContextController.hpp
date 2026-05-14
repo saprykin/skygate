@@ -16,6 +16,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
+#include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
 #include <cstdint>
@@ -44,7 +45,6 @@ class SkyCatalogManager;
 class SkyEphemerisDataManager;
 class SkyObjectSearchModel;
 class SkyOverlayLayerSettings;
-class SkySettingsStore;
 
 class SkyContextController final : public QObject {
     Q_OBJECT
@@ -364,6 +364,7 @@ private:
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
     skygate::ephemeris::EphemerisEngineKind m_ephemerisEngineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
     skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
+    SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
     const skygate::ephemeris::EphemerisDataSetInfo* m_ephemerisDataSetManifest = nullptr;
     const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;

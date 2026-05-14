@@ -68,6 +68,14 @@ SkyContextController::SkyContextController(
         m_ephemerisEngineKind = m_ephemerisEngine->kind();
         m_ephemerisEngineOptions = m_ephemerisEngine->options();
     }
+    m_ephemerisUserSettings.engineKind = m_ephemerisEngineKind;
+    m_ephemerisUserSettings.correctionFlags = m_ephemerisEngineOptions.correctionFlags;
+    m_ephemerisUserSettings.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine;
+    m_ephemerisUserSettings.refractionEnabled = m_ephemerisEngineOptions.enableAtmosphericRefraction;
+    m_ephemerisUserSettings.atmosphericPressureHpa = m_ephemerisEngineOptions.atmosphericPressureHpa;
+    m_ephemerisUserSettings.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC;
+    m_ephemerisUserSettings.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity;
+    m_ephemerisUserSettings.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers;
     rebuildEphemerisEngine();
 
     m_themeOptions = m_themeRepository->themeOptions();
