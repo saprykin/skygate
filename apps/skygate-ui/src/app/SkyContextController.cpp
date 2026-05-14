@@ -11,6 +11,8 @@
 
 #include <QDateTime>
 
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+
 #include <memory>
 #include <utility>
 
@@ -47,14 +49,18 @@ SkyContextController::SkyContextController(
       m_overlayLayerSettings(std::make_unique<SkyOverlayLayerSettings>(this)),
       m_settingsStore(std::make_unique<SkySettingsStore>()),
       m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
-      m_catalogManager(std::make_unique<SkyCatalogManager>(
-          m_settingsStore.get(), std::move(starCatalog), std::move(ephemerisEngine), this
-      )),
+      m_ephemerisEngine(std::move(ephemerisEngine)),
+      m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
       m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
 {
     m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
     m_location.setPositionSource(initializationOptions.positionSource);
     m_location.setRequestLocationPermission(initializationOptions.requestLocationPermission);
+    if (m_ephemerisEngine != nullptr) {
+        m_ephemerisEngineKind = m_ephemerisEngine->kind();
+        m_ephemerisEngineOptions = m_ephemerisEngine->options();
+    }
+    rebuildEphemerisEngine();
 
     m_themeOptions = m_themeRepository->themeOptions();
     m_themePalette->setDefinition(m_themeRepository->defaultTheme());
@@ -84,6 +90,7 @@ SkyContextController::SkyContextController(
         &SkyContextController::ephemerisDataStatusTextChanged
     );
     connect(m_ephemerisDataManager.get(), &SkyEphemerisDataManager::activeDataChanged, this, [this] {
+        rebuildEphemerisEngine();
         emit ephemerisDataChanged();
         emit skyContextChanged();
     });
@@ -119,6 +126,7 @@ SkyContextController::SkyContextController(
         &SkyContextController::catalogProcessingChanged
     );
     connect(m_catalogManager.get(), &SkyCatalogManager::catalogChanged, this, [this] {
+        rebuildEphemerisEngine();
         refreshObjectSearchModel();
         emit nightConditionsChanged();
         if (!recenterTrackedTarget(true)) {
@@ -427,7 +435,7 @@ std::uint64_t SkyContextController::catalogRevision() const noexcept
 
 const skygate::ephemeris::IEphemerisEngine* SkyContextController::ephemerisEngine() const noexcept
 {
-    return m_catalogManager != nullptr ? m_catalogManager->ephemerisEngine() : nullptr;
+    return m_ephemerisEngine.get();
 }
 
 std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
@@ -445,6 +453,22 @@ std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalog
 {
     const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
     return starCatalog != nullptr ? starCatalog->bodies() : std::span<const skygate::ephemeris::CelestialBody>{};
+}
+
+void SkyContextController::rebuildEphemerisEngine()
+{
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = m_ephemerisEngineKind;
+    request.catalogBodies = catalogBodies();
+    request.options = m_ephemerisEngineOptions;
+    request.options.engineKind = m_ephemerisEngineKind;
+    request.activeDataSnapshot = activeEphemerisDataSnapshot();
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+
+    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    if (result.engine != nullptr) {
+        m_ephemerisEngine = std::move(result.engine);
+    }
 }
 
 QStringList SkyContextController::catalogSourceLabels() const

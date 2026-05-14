@@ -1,7 +1,6 @@
 #include "SkyActiveCatalogBuilder.hpp"
 
 #include "skygate/ephemeris/CatalogComposer.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
 #include <cstdint>
 #include <utility>
@@ -19,21 +18,19 @@ QString normalizedSourceLabel(const QString& sourceLabel, const QString& fallbac
 
 bool SkyActiveCatalogBuildResult::isSuccess() const noexcept
 {
-    return catalog != nullptr && ephemerisEngine != nullptr;
+    return catalog != nullptr;
 }
 
-SkyActiveCatalogBuildResult SkyActiveCatalogBuilder::build(
-    const SkyActiveCatalogBuildRequest& request
-)
+SkyActiveCatalogBuildResult SkyActiveCatalogBuilder::build(const SkyActiveCatalogBuildRequest& request)
 {
     SkyActiveCatalogBuildResult result;
-    auto activeCatalog = skygate::ephemeris::composeActiveCatalog({
-        .sourceCatalog = request.sourceCatalog,
-        .deepSkyCatalog = request.deepSkyCatalog,
-        .useBundledDeepSkyCatalog = request.useBundledDeepSkyCatalog,
-        .currentConstellationCount = request.currentConstellationCount,
-        .knownDeepSkyObjectCount = request.knownDeepSkyObjectCount
-    });
+    auto activeCatalog = skygate::ephemeris::composeActiveCatalog(
+        {.sourceCatalog = request.sourceCatalog,
+         .deepSkyCatalog = request.deepSkyCatalog,
+         .useBundledDeepSkyCatalog = request.useBundledDeepSkyCatalog,
+         .currentConstellationCount = request.currentConstellationCount,
+         .knownDeepSkyObjectCount = request.knownDeepSkyObjectCount}
+    );
     if (!activeCatalog.isSuccess()) {
         result.errorText = "Catalog: Failed to load";
         return result;
@@ -48,12 +45,9 @@ SkyActiveCatalogBuildResult SkyActiveCatalogBuilder::build(
         result.sourceLabels.push_back(label);
         return static_cast<std::uint8_t>(result.sourceLabels.size() - 1);
     };
-    const std::uint8_t primarySourceId = sourceIdForLabel(
-        normalizedSourceLabel(request.sourceLabel, "Catalog")
-    );
-    const std::uint8_t deepSkySourceId = sourceIdForLabel(
-        normalizedSourceLabel(request.deepSkySourceLabel, "Deep sky catalog")
-    );
+    const std::uint8_t primarySourceId = sourceIdForLabel(normalizedSourceLabel(request.sourceLabel, "Catalog"));
+    const std::uint8_t deepSkySourceId =
+        sourceIdForLabel(normalizedSourceLabel(request.deepSkySourceLabel, "Deep sky catalog"));
     const std::uint8_t builtInSourceId = sourceIdForLabel("Built-in ephemeris");
 
     result.sourceIds.reserve(activeCatalog.sourceKinds.size());
@@ -75,20 +69,14 @@ SkyActiveCatalogBuildResult SkyActiveCatalogBuilder::build(
     result.constellationCount = activeCatalog.constellationCount;
     result.deepSkyObjectCount = activeCatalog.deepSkyObjectCount;
     result.foundDeepSkyObjectCount = activeCatalog.foundDeepSkyObjectCount;
-    result.ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*activeCatalog.catalog);
-    if (result.ephemerisEngine == nullptr) {
-        result.errorText = "Catalog: Failed to load";
-        return result;
-    }
-
-    result.statusText =
-        QString("Catalog: %1 + %2 (%3 objects, %4 deep sky, %5 constellations)").arg(
-            request.sourceLabel,
-            request.deepSkySourceLabel,
-            QString::number(static_cast<qulonglong>(result.bodyCount)),
-            QString::number(static_cast<qulonglong>(result.deepSkyObjectCount)),
-            QString::number(static_cast<qulonglong>(result.constellationCount))
-        );
+    result.statusText = QString("Catalog: %1 + %2 (%3 objects, %4 deep sky, %5 constellations)")
+                            .arg(
+                                request.sourceLabel,
+                                request.deepSkySourceLabel,
+                                QString::number(static_cast<qulonglong>(result.bodyCount)),
+                                QString::number(static_cast<qulonglong>(result.deepSkyObjectCount)),
+                                QString::number(static_cast<qulonglong>(result.constellationCount))
+                            );
     result.catalog = std::move(activeCatalog.catalog);
     return result;
 }

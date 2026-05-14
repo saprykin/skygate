@@ -7,7 +7,6 @@
 #include <QString>
 #include <QStringList>
 
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 
@@ -27,7 +26,7 @@ struct SkyCatalogRuntimeResult;
 struct SkyCatalogImportResult;
 struct SkyDeepSkyCatalogImportResult;
 struct SkyConstellationLineImportResult;
-}
+}  // namespace skygate::ui::internal
 
 class SkyCatalogManager final : public QObject {
     Q_OBJECT
@@ -39,7 +38,6 @@ public:
     explicit SkyCatalogManager(
         SkySettingsStore* settingsStore,
         std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
-        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine = nullptr,
         QObject* parent = nullptr
     );
     ~SkyCatalogManager() override;
@@ -58,7 +56,6 @@ public:
     [[nodiscard]] std::size_t constellationCount() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IStarCatalog* starCatalog() const noexcept;
-    [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
     [[nodiscard]] QStringList sourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
@@ -97,37 +94,24 @@ private:
         bool persistCatalog = true
     );
     void downloadCatalogFromUrls(
-        const QStringList& urlTexts,
-        const QString& sourceLabel,
-        const QStringList& constellationLineUrlTexts = {}
+        const QStringList& urlTexts, const QString& sourceLabel, const QStringList& constellationLineUrlTexts = {}
     );
-    void downloadDeepSkyCatalogFromUrls(
-        const QStringList& urlTexts,
-        const QString& sourceLabel
-    );
+    void downloadDeepSkyCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel);
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
     void setCatalogProcessing(bool catalogProcessing);
     void handleCatalogImportStatus(const QString& statusText);
     void handleCatalogImportFinished(
-        skygate::ui::internal::SkyCatalogImportResult result,
-        const QStringList& constellationLineUrlTexts
+        skygate::ui::internal::SkyCatalogImportResult result, const QStringList& constellationLineUrlTexts
     );
     void downloadConstellationLinesAfterCatalog(
-        const QStringList& constellationLineUrlTexts,
-        const QString& catalogSummaryText
+        const QStringList& constellationLineUrlTexts, const QString& catalogSummaryText
     );
-    void handleConstellationLineImportStatus(
-        const QString& catalogSummaryText,
-        const QString& statusText
-    );
+    void handleConstellationLineImportStatus(const QString& catalogSummaryText, const QString& statusText);
     void handleConstellationLineImportFinished(
-        const QString& catalogSummaryText,
-        skygate::ui::internal::SkyConstellationLineImportResult lineResult
+        const QString& catalogSummaryText, skygate::ui::internal::SkyConstellationLineImportResult lineResult
     );
-    void handleDeepSkyImportFinished(
-        skygate::ui::internal::SkyDeepSkyCatalogImportResult result
-    );
+    void handleDeepSkyImportFinished(skygate::ui::internal::SkyDeepSkyCatalogImportResult result);
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
     void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
     void resetConstellationLineRefs();

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <QString>
@@ -25,7 +24,6 @@ struct SkyActiveCatalogBuildRequest final {
 
 struct SkyActiveCatalogBuildResult final {
     std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine;
     QString statusText;
     QString errorText;
     std::size_t bodyCount = 0;
@@ -40,9 +38,7 @@ struct SkyActiveCatalogBuildResult final {
 
 class SkyActiveCatalogBuilder final {
 public:
-    [[nodiscard]] static SkyActiveCatalogBuildResult build(
-        const SkyActiveCatalogBuildRequest& request
-    );
+    [[nodiscard]] static SkyActiveCatalogBuildResult build(const SkyActiveCatalogBuildRequest& request);
 };
 
 }  // namespace skygate::ui::internal

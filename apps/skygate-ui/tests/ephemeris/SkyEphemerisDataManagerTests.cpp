@@ -51,6 +51,7 @@ private slots:
     void missingInstalledDataFallsBackToBundled();
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
     void controllerOwnsManagerAndExposesSnapshot();
+    void controllerCatalogChangePreservesEphemerisDataSelection();
     void managerDoesNotTouchCatalogState();
 
 private:
@@ -158,6 +159,42 @@ void SkyEphemerisDataManagerTests::controllerOwnsManagerAndExposesSnapshot()
     QCOMPARE(controller.ephemerisDataStatusText(), QString("Ephemeris data: Bundled fallback"));
     QVERIFY(controller.ephemerisDataRevision() > 0U);
     QVERIFY(controller.activeEphemerisDataSnapshot() != nullptr);
+}
+
+void SkyEphemerisDataManagerTests::controllerCatalogChangePreservesEphemerisDataSelection()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("controller-catalog-kernel.bsp"));
+    const QString earthOrientationPath = m_settings.filePath(QStringLiteral("controller-catalog-eop.txt"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+    QVERIFY(writeFile(earthOrientationPath, QByteArrayLiteral("eop")));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(installedSnapshot(kernelPath, earthOrientationPath)));
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = false;
+    options.initializeLocation = false;
+    SkyContextController controller(nullptr, nullptr, options, nullptr);
+
+    QCOMPARE(controller.ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
+    const std::uint64_t originalDataRevision = controller.ephemerisDataRevision();
+    const std::uint64_t originalCatalogRevision = controller.catalogRevision();
+    auto originalSnapshot = controller.activeEphemerisDataSnapshot();
+    QVERIFY(originalSnapshot != nullptr);
+    const auto originalKernel = originalSnapshot->solarSystemKernelAsset("de440s-kernel");
+    QVERIFY(originalKernel.has_value());
+    QCOMPARE(QString::fromStdString(originalKernel->activePath), kernelPath);
+
+    controller.loadDeepSkyCatalogPreset(QStringLiteral("bundled_messier"));
+
+    QVERIFY(controller.catalogRevision() > originalCatalogRevision);
+    QCOMPARE(controller.ephemerisDataRevision(), originalDataRevision);
+    auto currentSnapshot = controller.activeEphemerisDataSnapshot();
+    QVERIFY(currentSnapshot != nullptr);
+    const auto currentKernel = currentSnapshot->solarSystemKernelAsset("de440s-kernel");
+    QVERIFY(currentKernel.has_value());
+    QCOMPARE(QString::fromStdString(currentKernel->activePath), kernelPath);
+    QVERIFY(controller.ephemerisEngine() != nullptr);
 }
 
 void SkyEphemerisDataManagerTests::managerDoesNotTouchCatalogState()

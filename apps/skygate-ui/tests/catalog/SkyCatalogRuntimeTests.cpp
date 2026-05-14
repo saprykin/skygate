@@ -9,11 +9,7 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeFixedBody(
-    std::string id,
-    std::string displayName,
-    const double magnitude = 1.0
-)
+skygate::ephemeris::CelestialBody makeFixedBody(std::string id, std::string displayName, const double magnitude = 1.0)
 {
     skygate::ephemeris::CelestialBody body;
     body.id = std::move(id);
@@ -21,19 +17,15 @@ skygate::ephemeris::CelestialBody makeFixedBody(
     body.type = skygate::ephemeris::CelestialBodyType::Star;
     body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial;
     body.visualMagnitude = magnitude;
-    body.fixedEquatorial = skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 1.0,
-        .declinationDeg = 2.0
-    };
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     return body;
 }
 
 std::unique_ptr<skygate::ephemeris::IStarCatalog> makeCatalog()
 {
-    return skygate::ephemeris::createStarCatalogFromBodies({
-        makeFixedBody("hip_1", "HIP 1"),
-        makeFixedBody("hip_2", "HIP 2", 2.0)
-    });
+    return skygate::ephemeris::createStarCatalogFromBodies(
+        {makeFixedBody("hip_1", "HIP 1"), makeFixedBody("hip_2", "HIP 2", 2.0)}
+    );
 }
 
 }  // namespace
@@ -49,16 +41,13 @@ private slots:
 
 void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndCacheRequest()
 {
-    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog(), nullptr);
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
 
-    const auto result = runtime.initialize({
-        .useBundledDeepSkyCatalog = false
-    });
+    const auto result = runtime.initialize({.useBundledDeepSkyCatalog = false});
 
     QVERIFY(result.catalogChanged);
     QVERIFY(result.datasetInfoChanged);
     QVERIFY(runtime.starCatalog() != nullptr);
-    QVERIFY(runtime.ephemerisEngine() != nullptr);
     QCOMPARE(runtime.sourceLabel(), QString("Bundled"));
     QVERIFY(runtime.bodyCount() >= 2U);
     QCOMPARE(runtime.sourceIds().size(), runtime.bodyCount());
@@ -71,17 +60,11 @@ void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndCacheRequest()
 
 void SkyCatalogRuntimeTests::restoreConstellationRefsUpdatesRevisionAndCount()
 {
-    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog(), nullptr);
-    static_cast<void>(runtime.initialize({
-        .useBundledDeepSkyCatalog = false
-    }));
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
     const auto originalRevision = runtime.catalogRevision();
 
-    const auto result = runtime.restoreConstellationRefs(
-        {{"orion", "hip_1"}},
-        {{"orion", {"hip_1", "hip_2"}}},
-        1U
-    );
+    const auto result = runtime.restoreConstellationRefs({{"orion", "hip_1"}}, {{"orion", {"hip_1", "hip_2"}}}, 1U);
 
     QVERIFY(result.catalogChanged);
     QVERIFY(result.datasetInfoChanged);
@@ -93,13 +76,9 @@ void SkyCatalogRuntimeTests::restoreConstellationRefsUpdatesRevisionAndCount()
 
 void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()
 {
-    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog(), nullptr);
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
 
-    const auto result = runtime.applyCatalog(
-        nullptr,
-        QStringLiteral("Broken"),
-        {.useBundledDeepSkyCatalog = false}
-    );
+    const auto result = runtime.applyCatalog(nullptr, QStringLiteral("Broken"), {.useBundledDeepSkyCatalog = false});
 
     QVERIFY(result.statusTextChanged);
     QVERIFY(result.datasetInfoChanged);

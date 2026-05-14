@@ -11,6 +11,7 @@
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
+#include "skygate/ephemeris/Types.hpp"
 
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"
@@ -325,6 +326,7 @@ private:
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
+    void rebuildEphemerisEngine();
 
 private:
     skygate::core::SystemTimeSource m_systemTimeSource;
@@ -341,6 +343,9 @@ private:
     std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    skygate::ephemeris::EphemerisEngineKind m_ephemerisEngineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     QVariantList m_themeOptions;
