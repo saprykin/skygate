@@ -105,6 +105,9 @@ public:
     [[nodiscard]] SkySettingsStore::EphemerisDataCacheSnapshot activeCacheSnapshot() const;
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot() const noexcept;
 
+    void setBundledFallbackData(
+        const skygate::ephemeris::EphemerisDataManifest* manifest, QString resourceRoot, QString profileId = {}
+    );
     [[nodiscard]] bool restoreFromSettings();
     [[nodiscard]] bool clearInstalledDataCache();
     void requestUpdateCancellation() noexcept;
@@ -137,6 +140,9 @@ private:
     SkySettingsStore* m_settingsStore = nullptr;
     SkySettingsStore::EphemerisDataCacheSnapshot m_activeCacheSnapshot;
     std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> m_activeDataSnapshot;
+    const skygate::ephemeris::EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
+    QString m_bundledFallbackResourceRoot;
+    QString m_bundledFallbackProfileId;
     QString m_statusText;
     QString m_datasetInfoText;
     ActiveSource m_activeSource = ActiveSource::BundledFallback;

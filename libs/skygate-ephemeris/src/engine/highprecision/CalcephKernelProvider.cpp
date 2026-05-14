@@ -102,6 +102,24 @@ selectKernelAsset(const EphemerisDataManifest& manifest, const EphemerisDataMani
     return nullptr;
 }
 
+[[nodiscard]] std::optional<EphemerisKernelDataAsset> snapshotKernelForProfile(
+    const IEphemerisDataSnapshot& snapshot,
+    const EphemerisDataManifestAsset& asset,
+    const EphemerisDataManifestProfile& profile
+)
+{
+    std::optional<EphemerisKernelDataAsset> snapshotAsset = snapshot.solarSystemKernelAsset(asset.id);
+    if (!snapshotAsset.has_value() || snapshotAsset->activePath.empty()) {
+        return std::nullopt;
+    }
+    if (snapshotAsset->id != asset.id
+        || (!snapshotAsset->profileId.empty() && snapshotAsset->profileId != profile.id)) {
+        return std::nullopt;
+    }
+
+    return snapshotAsset;
+}
+
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 class CalcephRuntimeKernelHandle final : public ICalcephKernelHandle {
 public:
@@ -225,7 +243,23 @@ CalcephKernelProvider::CalcephKernelProvider(
         return;
     }
 
-    const std::optional<EphemerisKernelDataAsset> snapshotAsset = snapshot.solarSystemKernelAsset(manifestAsset->id);
+    std::optional<EphemerisKernelDataAsset> snapshotAsset =
+        snapshotKernelForProfile(snapshot, *manifestAsset, *profile);
+    if (!snapshotAsset.has_value()) {
+        for (const EphemerisDataManifestProfile& candidateProfile : manifest.profiles) {
+            const EphemerisDataManifestAsset* candidateAsset = selectKernelAsset(manifest, candidateProfile);
+            if (candidateAsset == nullptr) {
+                continue;
+            }
+
+            snapshotAsset = snapshotKernelForProfile(snapshot, *candidateAsset, candidateProfile);
+            if (snapshotAsset.has_value()) {
+                profile = &candidateProfile;
+                manifestAsset = candidateAsset;
+                break;
+            }
+        }
+    }
     if (!snapshotAsset.has_value() || snapshotAsset->activePath.empty()) {
         m_status = CalcephKernelProviderStatus::MissingKernelFile;
         addDiagnostic(m_diagnostics, "The active ephemeris data snapshot does not expose the selected kernel file.");

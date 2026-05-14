@@ -456,7 +456,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowInstalledStateAndClear
     QVERIFY(updateButton != nullptr);
     QVERIFY(clearButton != nullptr);
 
-    QCOMPARE(modernStatus->property("text").toString(), QString("Installed: DE441-test"));
+    QCOMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
     QCOMPARE(longRangeStatus->property("text").toString(), QString("Installed: DE441-test"));
     QCOMPARE(eopStatus->property("text").toString(), QString("Installed: EOP-test"));
     QCOMPARE(leapSecondStatus->property("text").toString(), QString("Installed: LS-test"));

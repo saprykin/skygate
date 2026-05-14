@@ -162,6 +162,10 @@ add_skygate_ui_qtest(
     LABELS "integration;acceptance"
     TIMEOUT 60
 )
+target_include_directories(skygate-ui-acceptance-matrix-tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src
+)
 add_skygate_ui_qtest(
     skygate-ui-context-controller-night-catalog-tests
     app/SkyContextControllerNightCatalogTests.cpp
