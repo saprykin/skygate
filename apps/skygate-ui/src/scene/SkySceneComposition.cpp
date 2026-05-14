@@ -158,7 +158,7 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
             );
         }
 
-        sceneFrame.overlayItems = buildOverlayItems(sceneFrame, input);
+        sceneFrame.overlayItems = buildOverlayItems(sceneFrame, input, frameResult);
     }
 
     sceneFrame.selectionMarker = m_selectionOverlayBuilder.buildSelectionMarkerData(selectionInput);
@@ -167,8 +167,11 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     return SkySceneCompositionResult{.changed = true, .frameContentChanged = frameContentChanged};
 }
 
-std::vector<SkyOverlayItem>
-SkySceneComposer::buildOverlayItems(const SkySceneFrameData& sceneFrame, const SkySceneCompositionInput& input) const
+std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
+    const SkySceneFrameData& sceneFrame,
+    const SkySceneCompositionInput& input,
+    const SkySceneFramePipelineResult& frameResult
+) const
 {
     std::vector<SkyOverlayItem> overlayItems = renderLabelsToOverlayItems(sceneFrame.frame.labels);
 
@@ -178,7 +181,8 @@ SkySceneComposer::buildOverlayItems(const SkySceneFrameData& sceneFrame, const S
 
     const auto& overlayLayers = input.frameInput.overlayLayers;
     const auto& renderTheme = input.frameInput.renderTheme;
-    const auto& skyContext = input.frameInput.skyContext;
+    const auto* snapshot = frameResult.snapshot != nullptr ? frameResult.snapshot : sceneFrame.snapshot;
+    const auto& skyContext = snapshot != nullptr ? snapshot->context : input.frameInput.skyContext;
 
     if (overlayLayers.ecliptic) {
         appendReferenceLayerLabel(
