@@ -5,75 +5,50 @@
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
-bool SkySceneFramePipeline::SnapshotCacheKey::equals(
-    const SnapshotCacheKey& other
-) const noexcept
+bool SkySceneFramePipeline::SnapshotCacheKey::equals(const SnapshotCacheKey& other) const noexcept
 {
-    return catalogRevision == other.catalogRevision
-        && observer.latitudeDeg == other.observer.latitudeDeg
-        && observer.longitudeDeg == other.observer.longitudeDeg
-        && observer.elevationMeters == other.observer.elevationMeters
-        && utcTime == other.utcTime;
+    return catalogRevision == other.catalogRevision && observer.latitudeDeg == other.observer.latitudeDeg
+           && observer.longitudeDeg == other.observer.longitudeDeg
+           && observer.elevationMeters == other.observer.elevationMeters && utcTime == other.utcTime;
 }
 
-bool SkySceneFramePipeline::RenderFrameKey::equals(
-    const RenderFrameKey& other
-) const noexcept
+bool SkySceneFramePipeline::RenderFrameKey::equals(const RenderFrameKey& other) const noexcept
 {
-    return snapshotGeneration == other.snapshotGeneration
-        && projectionType == other.projectionType
-        && viewportWidth == other.viewportWidth
-        && viewportHeight == other.viewportHeight
-        && viewCenterAltitudeDeg == other.viewCenterAltitudeDeg
-        && viewCenterAzimuthDeg == other.viewCenterAzimuthDeg
-        && viewFieldOfViewDeg == other.viewFieldOfViewDeg
-        && magnitudeCutoff == other.magnitudeCutoff
-        && themeId == other.themeId
-        && overlayLayers.equals(other.overlayLayers);
+    return snapshotGeneration == other.snapshotGeneration && projectionType == other.projectionType
+           && viewportWidth == other.viewportWidth && viewportHeight == other.viewportHeight
+           && viewCenterAltitudeDeg == other.viewCenterAltitudeDeg && viewCenterAzimuthDeg == other.viewCenterAzimuthDeg
+           && viewFieldOfViewDeg == other.viewFieldOfViewDeg && magnitudeCutoff == other.magnitudeCutoff
+           && themeId == other.themeId && overlayLayers.equals(other.overlayLayers);
 }
 
 std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
-    const SkySceneFramePipelineInput& input,
-    const double viewportWidth,
-    const double viewportHeight
+    const SkySceneFramePipelineInput& input, const double viewportWidth, const double viewportHeight
 )
 {
-    if (
-        input.ephemerisEngine == nullptr
-        || viewportWidth <= 0.0
-        || viewportHeight <= 0.0
-    ) {
+    if (input.ephemerisEngine == nullptr || viewportWidth <= 0.0 || viewportHeight <= 0.0) {
         return std::nullopt;
     }
 
     bool updated = false;
-    const skygate::core::ProjectionParams projectionParams =
-        skygate::core::ViewportMath::buildProjectionParams(
-            viewportWidth,
-            viewportHeight,
-            input.viewCenterAltitudeDeg,
-            input.viewCenterAzimuthDeg,
-            input.viewFieldOfViewDeg
-        );
-    auto preparedProjection = skygate::core::PreparedProjection::create(
-        input.projectionType,
-        projectionParams
+    const skygate::core::ProjectionParams projectionParams = skygate::core::ViewportMath::buildProjectionParams(
+        viewportWidth, viewportHeight, input.viewCenterAltitudeDeg, input.viewCenterAzimuthDeg, input.viewFieldOfViewDeg
     );
+    auto preparedProjection = skygate::core::PreparedProjection::create(input.projectionType, projectionParams);
     if (!preparedProjection.has_value()) {
         return std::nullopt;
     }
 
-    const SnapshotCacheKey snapshotKey {
+    const skygate::core::SkyContext& snapshotContext =
+        input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
+    const SnapshotCacheKey snapshotKey{
         .catalogRevision = input.catalogRevision,
-        .observer = input.skyContext.observer,
-        .utcTime = input.skyContext.utcTime
+        .observer = snapshotContext.observer,
+        .utcTime = snapshotContext.utcTime
     };
-    if (
-        m_cachedEphemerisEngine != input.ephemerisEngine
-        || !m_snapshotCacheKey.has_value()
-        || !m_snapshotCacheKey.value().equals(snapshotKey)
-    ) {
-        m_snapshot = input.ephemerisEngine->compute(input.skyContext);
+    if (m_cachedEphemerisEngine != input.ephemerisEngine || !m_snapshotCacheKey.has_value()
+        || !m_snapshotCacheKey.value().equals(snapshotKey)) {
+        m_snapshot = input.ephemerisRequest.has_value() ? input.ephemerisEngine->compute(*input.ephemerisRequest)
+                                                        : input.ephemerisEngine->compute(input.skyContext);
         m_stateIndexByBodyId.clear();
         m_stateIndexByBodyId.reserve(static_cast<qsizetype>(m_snapshot.states.size()));
         for (std::size_t stateIndex = 0; stateIndex < m_snapshot.states.size(); ++stateIndex) {
@@ -90,7 +65,7 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
 
     m_preparedProjection = std::move(preparedProjection);
 
-    const RenderFrameKey renderFrameKey {
+    const RenderFrameKey renderFrameKey{
         .snapshotGeneration = m_snapshotGeneration,
         .projectionType = input.projectionType,
         .viewportWidth = viewportWidth,
@@ -120,7 +95,7 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
         updated = true;
     }
 
-    return SkySceneFramePipelineResult {
+    return SkySceneFramePipelineResult{
         .updated = updated,
         .snapshotGeneration = m_snapshotGeneration,
         .renderFrameGeneration = m_renderFrameGeneration,
@@ -133,12 +108,9 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
 
 bool SkySceneFramePipeline::clear()
 {
-    const bool hadScene = m_preparedProjection.has_value()
-        || m_snapshot.catalogBodies != nullptr
-        || !m_frame.points.empty()
-        || !m_frame.lines.empty()
-        || !m_frame.glyphs.empty()
-        || !m_frame.labels.empty();
+    const bool hadScene = m_preparedProjection.has_value() || m_snapshot.catalogBodies != nullptr
+                          || !m_frame.points.empty() || !m_frame.lines.empty() || !m_frame.glyphs.empty()
+                          || !m_frame.labels.empty();
     m_cachedEphemerisEngine = nullptr;
     m_snapshotCacheKey.reset();
     m_renderFrameKey.reset();
