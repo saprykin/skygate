@@ -113,6 +113,20 @@ jobs:
             ninja-build \
             zlib1g-dev
 
+      - name: Configure vcpkg
+        run: |
+          vcpkg_root="${VCPKG_INSTALLATION_ROOT:-}"
+          if [[ -z "${vcpkg_root}" && -d /usr/local/share/vcpkg ]]; then
+            vcpkg_root="/usr/local/share/vcpkg"
+          fi
+          if [[ -z "${vcpkg_root}" ]]; then
+            vcpkg_root="${RUNNER_TEMP}/vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "${vcpkg_root}"
+            "${vcpkg_root}/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+          echo "VCPKG_ROOT=${vcpkg_root}" >> "${GITHUB_ENV}"
+
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:

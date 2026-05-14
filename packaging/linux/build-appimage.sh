@@ -75,10 +75,17 @@ cmakeArgs=(
     -DCMAKE_INSTALL_PREFIX=/usr
     -DSKYGATE_BUILD_UI=ON
     -DSKYGATE_BUILD_TESTS=OFF
+    -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS="${SKYGATE_APPIMAGE_ENABLE_HIGH_PRECISION:-ON}"
 )
 
 if [[ -n "${prefixPath}" ]]; then
     cmakeArgs+=("-DCMAKE_PREFIX_PATH=${prefixPath}")
+fi
+if [[ -n "${VCPKG_ROOT:-}" ]]; then
+    cmakeArgs+=(
+        "-DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        "-DVCPKG_MANIFEST_FEATURES=high-precision-ephemeris"
+    )
 fi
 
 cmake "${cmakeArgs[@]}"
