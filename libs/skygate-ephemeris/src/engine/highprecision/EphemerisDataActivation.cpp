@@ -5,15 +5,19 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QIODevice>
 #include <QLibrary>
 #include <QSaveFile>
 
 #include <array>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 namespace skygate::ephemeris {
 namespace {
@@ -136,6 +140,27 @@ private:
     ZstdDStream* m_stream = nullptr;
 };
 
+class HashingWriteDevice final : public QIODevice {
+public:
+    explicit HashingWriteDevice(QObject* parent = nullptr) : QIODevice(parent) {}
+
+    [[nodiscard]] bool openForWrite()
+    {
+        return open(QIODevice::WriteOnly);
+    }
+
+protected:
+    [[nodiscard]] qint64 readData(char*, qint64) override
+    {
+        return -1;
+    }
+
+    [[nodiscard]] qint64 writeData(const char*, const qint64 maxSize) override
+    {
+        return maxSize;
+    }
+};
+
 [[nodiscard]] QString pathToQString(const std::filesystem::path& path)
 {
     return QString::fromStdString(path.generic_string());
@@ -210,6 +235,11 @@ private:
 }
 
 void addDiagnostic(EphemerisDataActivationResult& result, const std::string_view diagnostic)
+{
+    result.diagnostics.emplace_back(diagnostic);
+}
+
+void addDiagnostic(EphemerisStagedUpdateVerificationResult& result, const std::string_view diagnostic)
 {
     result.diagnostics.emplace_back(diagnostic);
 }
@@ -384,6 +414,150 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     return pathToQString(request.bundledResourceRoot / sourceRelativePath);
 }
 
+[[nodiscard]] QString
+stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const EphemerisDataManifestAsset& asset)
+{
+    return pathToQString(stagedResourceRoot / std::filesystem::path(asset.relativePath));
+}
+
+[[nodiscard]] bool isValidDateRange(const EphemerisDateRange& range) noexcept
+{
+    return std::isfinite(range.start.julianDatePart1) && std::isfinite(range.start.julianDatePart2)
+           && std::isfinite(range.end.julianDatePart1) && std::isfinite(range.end.julianDatePart2)
+           && range.start.julianDatePart1 + range.start.julianDatePart2
+                  <= range.end.julianDatePart1 + range.end.julianDatePart2;
+}
+
+[[nodiscard]] bool
+hasKind(const std::vector<EphemerisDataManifestAssetKind>& kinds, const EphemerisDataManifestAssetKind kind) noexcept
+{
+    return std::find(kinds.begin(), kinds.end(), kind) != kinds.end();
+}
+
+[[nodiscard]] bool hasAssetId(const std::vector<std::string>& assetIds, const std::string_view assetId) noexcept
+{
+    return std::find(assetIds.begin(), assetIds.end(), assetId) != assetIds.end();
+}
+
+[[nodiscard]] bool
+validateAssetMetadata(const EphemerisDataManifestAsset& asset, EphemerisStagedUpdateVerificationResult& result)
+{
+    bool valid = true;
+    if (asset.id.empty() || asset.profileId.empty() || asset.version.empty() || asset.relativePath.empty()) {
+        addDiagnostic(result, "Staged ephemeris asset metadata requires id, profile, version, and relative path.");
+        valid = false;
+    }
+    if (asset.checksum.algorithm != "sha256" || asset.checksum.value.empty()) {
+        addDiagnostic(result, "Staged ephemeris asset metadata requires a sha256 checksum.");
+        valid = false;
+    }
+    const std::filesystem::path relativePath(asset.relativePath);
+    if (hasUnsafePathComponent(relativePath)) {
+        addDiagnostic(result, "Staged ephemeris asset metadata contains an unsafe relative path.");
+        valid = false;
+    }
+    if (asset.compression.kind == EphemerisDataManifestCompressionKind::Zstd
+        && (!asset.compression.compressedSizeBytes.has_value() || !asset.compression.uncompressedSizeBytes.has_value()
+            || *asset.compression.compressedSizeBytes == 0U || *asset.compression.uncompressedSizeBytes == 0U)) {
+        addDiagnostic(result, "zstd staged ephemeris assets require positive compressed and uncompressed sizes.");
+        valid = false;
+    }
+    if (!isValidDateRange(asset.validityRange)) {
+        addDiagnostic(result, "Staged ephemeris asset metadata requires an ordered finite validity range.");
+        valid = false;
+    }
+
+    return valid;
+}
+
+[[nodiscard]] EphemerisStagedUpdateVerificationStatus
+mappedVerificationStatus(const EphemerisDataActivationStatus status) noexcept
+{
+    switch (status) {
+    case EphemerisDataActivationStatus::UnsupportedCompression:
+        return EphemerisStagedUpdateVerificationStatus::UnsupportedCompression;
+    case EphemerisDataActivationStatus::CorruptArchive:
+        return EphemerisStagedUpdateVerificationStatus::CorruptArchive;
+    case EphemerisDataActivationStatus::ChecksumMismatch:
+        return EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
+    case EphemerisDataActivationStatus::IoError:
+    case EphemerisDataActivationStatus::MissingSource:
+        return EphemerisStagedUpdateVerificationStatus::IoError;
+    case EphemerisDataActivationStatus::Activated:
+    case EphemerisDataActivationStatus::AlreadyActive:
+    case EphemerisDataActivationStatus::InvalidRequest:
+    case EphemerisDataActivationStatus::LargeKernelInQtResource:
+        break;
+    }
+
+    return EphemerisStagedUpdateVerificationStatus::IoError;
+}
+
+[[nodiscard]] bool verifyAssetPayload(
+    const EphemerisDataManifestAsset& asset, const QString& sourcePath, EphemerisStagedUpdateVerificationResult& result
+)
+{
+    QFileInfo sourceInfo(sourcePath);
+    if (!sourceInfo.exists() || !sourceInfo.isFile()) {
+        result.status = EphemerisStagedUpdateVerificationStatus::MissingAsset;
+        addDiagnostic(result, "Staged ephemeris asset file is missing.");
+        return false;
+    }
+    if (!sourceSizeMatchesMetadata(sourceInfo, asset)) {
+        result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
+        addDiagnostic(result, "Staged ephemeris asset size does not match manifest metadata.");
+        return false;
+    }
+
+    QFile sourceFile(sourcePath);
+    if (!sourceFile.open(QIODevice::ReadOnly)) {
+        result.status = EphemerisStagedUpdateVerificationStatus::IoError;
+        addDiagnostic(result, "Unable to open staged ephemeris asset for verification.");
+        return false;
+    }
+
+    HashingWriteDevice sink;
+    if (!sink.openForWrite()) {
+        result.status = EphemerisStagedUpdateVerificationStatus::IoError;
+        addDiagnostic(result, "Unable to initialize staged ephemeris verification sink.");
+        return false;
+    }
+
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    std::uint64_t outputBytes = 0U;
+    bool payloadValid = false;
+    EphemerisDataActivationResult activationResult;
+    switch (asset.compression.kind) {
+    case EphemerisDataManifestCompressionKind::None:
+        payloadValid = copyUncompressedAsset(sourceFile, sink, hash, outputBytes, activationResult);
+        break;
+    case EphemerisDataManifestCompressionKind::Zstd:
+        payloadValid = decompressZstdAsset(sourceFile, sink, hash, outputBytes, activationResult);
+        break;
+    }
+
+    if (!payloadValid) {
+        result.status = mappedVerificationStatus(activationResult.status);
+        result.diagnostics.insert(
+            result.diagnostics.end(), activationResult.diagnostics.begin(), activationResult.diagnostics.end()
+        );
+        return false;
+    }
+    if (asset.compression.uncompressedSizeBytes.has_value()
+        && outputBytes != *asset.compression.uncompressedSizeBytes) {
+        result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
+        addDiagnostic(result, "Staged ephemeris asset uncompressed size does not match manifest metadata.");
+        return false;
+    }
+    if (hash.result().toHex().toStdString() != asset.checksum.value) {
+        result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
+        addDiagnostic(result, "Staged ephemeris asset checksum does not match manifest metadata.");
+        return false;
+    }
+
+    return true;
+}
+
 }  // namespace
 
 EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActivationRequest& request)
@@ -503,6 +677,97 @@ EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActi
     }
 
     result.status = EphemerisDataActivationStatus::Activated;
+    return result;
+}
+
+EphemerisStagedUpdateVerificationResult
+verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& request)
+{
+    EphemerisStagedUpdateVerificationResult result;
+    if (request.manifest == nullptr) {
+        addDiagnostic(result, "Staged ephemeris update verification requires a manifest.");
+        return result;
+    }
+    if (request.profileId.empty()) {
+        addDiagnostic(result, "Staged ephemeris update verification requires a profile id.");
+        return result;
+    }
+    if (request.stagedResourceRoot.empty()) {
+        addDiagnostic(result, "Staged ephemeris update verification requires a staging root.");
+        return result;
+    }
+
+    const EphemerisDataManifestProfile* profile = request.manifest->profile(request.profileId);
+    if (profile == nullptr || profile->assetIds.empty()) {
+        result.status = EphemerisStagedUpdateVerificationStatus::UnsupportedProfile;
+        addDiagnostic(result, "Requested ephemeris update profile is not present in the manifest.");
+        return result;
+    }
+
+    std::unordered_set<std::string> seenAssetIds;
+    std::vector<EphemerisDataManifestAssetKind> presentKinds;
+    for (const std::string& assetId : profile->assetIds) {
+        const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
+        if (asset == nullptr) {
+            result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
+            addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
+            return result;
+        }
+        if (!seenAssetIds.insert(asset->id).second) {
+            result.status = EphemerisStagedUpdateVerificationStatus::MalformedMetadata;
+            addDiagnostic(result, "Selected ephemeris update profile contains duplicate asset ids.");
+            return result;
+        }
+        if (asset->profileId != request.profileId) {
+            result.status = EphemerisStagedUpdateVerificationStatus::MalformedMetadata;
+            addDiagnostic(result, "Selected ephemeris update asset belongs to a different profile.");
+            return result;
+        }
+        if (!validateAssetMetadata(*asset, result)) {
+            result.status = EphemerisStagedUpdateVerificationStatus::MalformedMetadata;
+            return result;
+        }
+
+        presentKinds.push_back(asset->kind);
+    }
+
+    for (const EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component : request.expectedComponents) {
+        const EphemerisDataManifestAsset* asset = request.manifest->asset(component.assetId);
+        if (asset == nullptr || !hasAssetId(profile->assetIds, component.assetId)) {
+            result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
+            addDiagnostic(result, "Selected ephemeris update profile is missing an expected component.");
+            return result;
+        }
+        if (asset->kind != component.kind) {
+            result.status = EphemerisStagedUpdateVerificationStatus::WrongComponentKind;
+            addDiagnostic(result, "Selected ephemeris update component kind does not match the expected kind.");
+            return result;
+        }
+    }
+
+    for (const EphemerisDataManifestAssetKind kind : request.requiredKinds) {
+        if (!hasKind(presentKinds, kind)) {
+            result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
+            addDiagnostic(result, "Selected ephemeris update profile is missing a required component kind.");
+            return result;
+        }
+    }
+
+    for (const std::string& assetId : profile->assetIds) {
+        const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
+        if (asset == nullptr) {
+            result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
+            addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
+            return result;
+        }
+        if (!verifyAssetPayload(*asset, stagedSourcePath(request.stagedResourceRoot, *asset), result)) {
+            return result;
+        }
+
+        result.verifiedAssetIds.push_back(asset->id);
+    }
+
+    result.status = EphemerisStagedUpdateVerificationStatus::Verified;
     return result;
 }
 
