@@ -3,6 +3,7 @@
 #include "SkyContextController.hpp"
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkyObjectSearchModel.hpp"
+#include "SkyOverlayLayerSettings.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySceneModelTestSupport.hpp"
 
@@ -84,6 +85,77 @@ public:
 {
     return QString("%1 / %2 deg")
         .arg(QString::number(horizontal.altitudeDeg, 'f', 1), QString::number(horizontal.azimuthDeg, 'f', 1));
+}
+
+[[nodiscard]] bool pointsDiffer(const QPointF& lhs, const QPointF& rhs) noexcept
+{
+    constexpr double kPointTolerance = 1.0e-3;
+    return !nearlyEqual(lhs.x(), rhs.x(), kPointTolerance) || !nearlyEqual(lhs.y(), rhs.y(), kPointTolerance);
+}
+
+[[nodiscard]] bool lineFingerprintsDiffer(const QVector<double>& lhs, const QVector<double>& rhs) noexcept
+{
+    constexpr double kLineTolerance = 1.0e-3;
+    if (lhs.size() != rhs.size()) {
+        return true;
+    }
+
+    for (qsizetype index = 0; index < lhs.size(); ++index) {
+        if (!nearlyEqual(lhs.at(index), rhs.at(index), kLineTolerance)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] const SkyRenderPoint*
+renderPointForBodyIndex(const SkySceneModel& sceneModel, const std::uint32_t bodyIndex) noexcept
+{
+    for (const SkyRenderPoint& point : sceneModel.renderPointSpan()) {
+        if (point.bodyIndex == bodyIndex) {
+            return &point;
+        }
+    }
+    return nullptr;
+}
+
+[[nodiscard]] QVariantMap referenceOverlayItem(const QVariantList& overlayItems, const QString& text)
+{
+    for (const QVariant& itemValue : overlayItems) {
+        const QVariantMap item = itemValue.toMap();
+        if (item.value(QStringLiteral("kind")).toString() == QStringLiteral("referenceLine")
+            && item.value(QStringLiteral("text")).toString() == text) {
+            return item;
+        }
+    }
+    return {};
+}
+
+[[nodiscard]] QVector<double> trailLineFingerprint(const SkySceneModel& sceneModel)
+{
+    QVector<double> fingerprint;
+    for (const SkyRenderLine& line : sceneModel.renderLineSpan()) {
+        const bool isTrailLine = (nearlyEqual(line.widthPx, 1.4) && line.color.alpha() == 105)
+                                 || (nearlyEqual(line.widthPx, 2.0) && line.color.alpha() == 175);
+        if (!isTrailLine) {
+            continue;
+        }
+
+        fingerprint.push_back(line.x1);
+        fingerprint.push_back(line.y1);
+        fingerprint.push_back(line.x2);
+        fingerprint.push_back(line.y2);
+    }
+    return fingerprint;
+}
+
+[[nodiscard]] QString firstSunRowValue(const QVariantMap& nightConditions)
+{
+    const QVariantList sunRows = nightConditions.value(QStringLiteral("sunRows")).toList();
+    if (sunRows.isEmpty()) {
+        return {};
+    }
+    return sunRows.front().toMap().value(QStringLiteral("value")).toString();
 }
 
 class MatrixEphemerisEngine final : public skygate::ephemeris::IEphemerisEngine {
@@ -255,8 +327,9 @@ private:
         const double wave = std::sin(2.0 * kPi * fraction);
 
         if (bodyIndex == 0U) {
+            const double sunPhase = fraction - 0.25 + static_cast<double>(tier) * 0.04;
             return {
-                .altitudeDeg = 48.0 * std::sin(2.0 * kPi * (fraction - 0.25)) + static_cast<double>(tier),
+                .altitudeDeg = 48.0 * std::sin(2.0 * kPi * sunPhase),
                 .azimuthDeg = 180.0 + 20.0 * wave,
             };
         }
@@ -267,11 +340,11 @@ private:
             };
         }
 
-        const double baseAltitude = 28.0 + static_cast<double>(tier) * 18.0;
-        const double baseAzimuth = 116.0 + static_cast<double>(tier) * 43.0;
+        const double targetPhase = fraction - 0.5 + static_cast<double>(tier) * 0.05;
+        const double targetAzimuthPhase = fraction + static_cast<double>(tier) * 0.03;
         return {
-            .altitudeDeg = baseAltitude + 4.0 * wave,
-            .azimuthDeg = baseAzimuth + 7.0 * std::cos(2.0 * kPi * fraction),
+            .altitudeDeg = 8.0 + static_cast<double>(tier) * 5.0 + 32.0 * std::sin(2.0 * kPi * targetPhase),
+            .azimuthDeg = 120.0 + static_cast<double>(tier) * 30.0 + 12.0 * std::cos(2.0 * kPi * targetAzimuthPhase),
         };
     }
 
@@ -313,6 +386,12 @@ struct MatrixHarness final {
         std::make_unique<SkyContextController>(std::move(starCatalog), std::move(ephemerisEngine), options, nullptr);
     Q_ASSERT(skygate::ui::tests::configureTestSkyContext(*controller));
 
+    auto* overlayLayers = qobject_cast<SkyOverlayLayerSettings*>(controller->overlayLayers());
+    Q_ASSERT(overlayLayers != nullptr);
+    overlayLayers->setEcliptic(true);
+    overlayLayers->setCelestialEquator(true);
+    overlayLayers->setCircumpolarBoundary(true);
+
     auto sceneModel = std::make_unique<SkySceneModel>();
     sceneModel->setViewportSize(1100.0, 760.0);
     sceneModel->setSkyContextController(controller.get());
@@ -334,7 +413,26 @@ void verifyRequestOptions(
     QCOMPARE(static_cast<std::uint32_t>(actual.correctionFlags), static_cast<std::uint32_t>(correctionFlags));
 }
 
+struct MatrixConsumerObservations final {
+    QPointF targetRenderPoint;
+    double referenceLongitudeDeg = 0.0;
+    QPointF eclipticLabelPoint;
+    QPointF celestialEquatorLabelPoint;
+    QPointF circumpolarLabelPoint;
+    QString altAzText;
+    QString raDecText;
+    QString riseText;
+    QString setText;
+    QString culminationText;
+    QVector<double> trailLineFingerprint;
+    QString nightIconKind;
+    QString sunsetText;
+    QString moonRiseText;
+    QString moonSetText;
+};
+
 void verifyConsumerMatrix(
+    MatrixConsumerObservations& observations,
     const skygate::ephemeris::EphemerisEngineKind kind,
     const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
 )
@@ -349,13 +447,40 @@ void verifyConsumerMatrix(
     verifyRequestOptions(initialRequestContext.request.options, kind, correctionFlags);
     const auto expectedFocusHorizontal = engine.expectedTargetHorizontal(initialRequestContext.request);
 
-    QVERIFY(!sceneModel.renderPointSpan().empty());
+    const auto* targetPoint = renderPointForBodyIndex(sceneModel, static_cast<std::uint32_t>(kTargetIndex));
+    QVERIFY(targetPoint != nullptr);
+    const auto projection = sceneModel.preparedProjection();
+    QVERIFY(projection.has_value());
+    const auto expectedTargetPoint = projection->project(expectedFocusHorizontal);
+    QVERIFY(expectedTargetPoint.isVisible);
+    QVERIFY(nearlyEqual(targetPoint->x, expectedTargetPoint.x));
+    QVERIFY(nearlyEqual(targetPoint->y, expectedTargetPoint.y));
+    observations.targetRenderPoint = QPointF(targetPoint->x, targetPoint->y);
+
     const auto referenceContext = sceneModel.referenceOverlayContext();
     QVERIFY(referenceContext.has_value());
     QVERIFY(nearlyEqual(
         referenceContext->observer.longitudeDeg,
         controller.skyContext().observer.longitudeDeg + expectedLongitudeOffset(initialRequestContext.request.options)
     ));
+    observations.referenceLongitudeDeg = referenceContext->observer.longitudeDeg;
+
+    const QVariantMap eclipticItem = referenceOverlayItem(sceneModel.overlayItems(), QStringLiteral("Ecliptic"));
+    const QVariantMap celestialEquatorItem =
+        referenceOverlayItem(sceneModel.overlayItems(), QStringLiteral("Celestial equator"));
+    const QVariantMap circumpolarItem = referenceOverlayItem(sceneModel.overlayItems(), QStringLiteral("Circumpolar"));
+    QVERIFY(!eclipticItem.isEmpty());
+    QVERIFY(!celestialEquatorItem.isEmpty());
+    QVERIFY(!circumpolarItem.isEmpty());
+    observations.eclipticLabelPoint =
+        QPointF(eclipticItem.value(QStringLiteral("x")).toDouble(), eclipticItem.value(QStringLiteral("y")).toDouble());
+    observations.celestialEquatorLabelPoint = QPointF(
+        celestialEquatorItem.value(QStringLiteral("x")).toDouble(),
+        celestialEquatorItem.value(QStringLiteral("y")).toDouble()
+    );
+    observations.circumpolarLabelPoint = QPointF(
+        circumpolarItem.value(QStringLiteral("x")).toDouble(), circumpolarItem.value(QStringLiteral("y")).toDouble()
+    );
 
     engine.resetCounters();
     QVERIFY(controller.focusSearchTarget(QStringLiteral("body"), QString::fromUtf8(kTargetId.data())));
@@ -368,14 +493,18 @@ void verifyConsumerMatrix(
 
     const QVariantMap inspector = sceneModel.selectedObjectInspector();
     QCOMPARE(inspector.value("title").toString(), QString("Matrix Target"));
-    QCOMPARE(
-        skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Alt / Az")),
-        formattedHorizontal(expectedFocusHorizontal)
-    );
-    QVERIFY(!skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Rise")).isEmpty());
-    QVERIFY(!skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Set")).isEmpty());
-    QVERIFY(!skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Culmination")).isEmpty());
-    QVERIFY(!sceneModel.renderLineSpan().empty());
+    observations.altAzText = skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Alt / Az"));
+    observations.raDecText = skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("RA / Dec"));
+    observations.riseText = skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Rise"));
+    observations.setText = skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Set"));
+    observations.culminationText = skygate::ui::tests::inspectorFieldValue(inspector, QStringLiteral("Culmination"));
+    QCOMPARE(observations.altAzText, formattedHorizontal(expectedFocusHorizontal));
+    QVERIFY(!observations.raDecText.isEmpty());
+    QVERIFY(!observations.riseText.isEmpty());
+    QVERIFY(!observations.setText.isEmpty());
+    QVERIFY(!observations.culminationText.isEmpty());
+    observations.trailLineFingerprint = trailLineFingerprint(sceneModel);
+    QVERIFY(!observations.trailLineFingerprint.isEmpty());
     QVERIFY(engine.requestSnapshotCount() > 0);
     QVERIFY(engine.requestBodyStateCount() > 0);
     QCOMPARE(engine.contextSnapshotCount(), 0);
@@ -395,10 +524,17 @@ void verifyConsumerMatrix(
     QCOMPARE(engine.contextSnapshotCount(), 0);
 
     engine.resetCounters();
-    const QString iconKind = controller.nightConditionsIconKind();
-    QVERIFY(QStringList({"sun", "twilight", "moon"}).contains(iconKind));
+    observations.nightIconKind = controller.nightConditionsIconKind();
+    QVERIFY(QStringList({"sun", "twilight", "moon"}).contains(observations.nightIconKind));
     controller.refreshNightConditions();
-    QVERIFY(controller.nightConditions().value("valid").toBool());
+    const QVariantMap nightConditions = controller.nightConditions();
+    QVERIFY(nightConditions.value("valid").toBool());
+    observations.sunsetText = firstSunRowValue(nightConditions);
+    observations.moonRiseText = nightConditions.value(QStringLiteral("moonRiseText")).toString();
+    observations.moonSetText = nightConditions.value(QStringLiteral("moonSetText")).toString();
+    QVERIFY(!observations.sunsetText.isEmpty());
+    QVERIFY(!observations.moonRiseText.isEmpty());
+    QVERIFY(!observations.moonSetText.isEmpty());
     QVERIFY(engine.requestBodyStateCount() > 0);
     QCOMPARE(engine.contextBodyStateCount(), 0);
     QVERIFY(engine.lastRequestOptions().has_value());
@@ -417,11 +553,41 @@ private slots:
 
 void SkyContextControllerSelectedEngineMatrixTests::consumersSwitchTogetherForSimpleAndHighPrecisionEngines()
 {
+    MatrixConsumerObservations simpleObservations;
     verifyConsumerMatrix(
-        skygate::ephemeris::EphemerisEngineKind::Simple, skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections
+        simpleObservations,
+        skygate::ephemeris::EphemerisEngineKind::Simple,
+        skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections
     );
+    MatrixConsumerObservations highPrecisionObservations;
     verifyConsumerMatrix(
-        skygate::ephemeris::EphemerisEngineKind::HighPrecision, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        highPrecisionObservations,
+        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+    );
+
+    QVERIFY(pointsDiffer(simpleObservations.targetRenderPoint, highPrecisionObservations.targetRenderPoint));
+    QVERIFY(!nearlyEqual(simpleObservations.referenceLongitudeDeg, highPrecisionObservations.referenceLongitudeDeg));
+    QVERIFY(pointsDiffer(simpleObservations.eclipticLabelPoint, highPrecisionObservations.eclipticLabelPoint));
+    QVERIFY(pointsDiffer(
+        simpleObservations.celestialEquatorLabelPoint, highPrecisionObservations.celestialEquatorLabelPoint
+    ));
+    QVERIFY(pointsDiffer(simpleObservations.circumpolarLabelPoint, highPrecisionObservations.circumpolarLabelPoint));
+    QVERIFY(simpleObservations.altAzText != highPrecisionObservations.altAzText);
+    QVERIFY(simpleObservations.raDecText != highPrecisionObservations.raDecText);
+    QVERIFY(
+        simpleObservations.riseText != highPrecisionObservations.riseText
+        || simpleObservations.setText != highPrecisionObservations.setText
+        || simpleObservations.culminationText != highPrecisionObservations.culminationText
+    );
+    QVERIFY(
+        lineFingerprintsDiffer(simpleObservations.trailLineFingerprint, highPrecisionObservations.trailLineFingerprint)
+    );
+    QVERIFY(
+        simpleObservations.nightIconKind != highPrecisionObservations.nightIconKind
+        || simpleObservations.sunsetText != highPrecisionObservations.sunsetText
+        || simpleObservations.moonRiseText != highPrecisionObservations.moonRiseText
+        || simpleObservations.moonSetText != highPrecisionObservations.moonSetText
     );
 }
 
@@ -457,6 +623,43 @@ void SkyContextControllerSelectedEngineMatrixTests::optionChangesAffectPositions
         astrometricHarness.controller->viewCenterAzimuthDeg(), apparentHarness.controller->viewCenterAzimuthDeg()
     ));
     QCOMPARE(astrometricHarness.controller->catalogRevision(), apparentHarness.controller->catalogRevision());
+
+    MatrixConsumerObservations astrometricObservations;
+    verifyConsumerMatrix(
+        astrometricObservations,
+        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections
+    );
+    MatrixConsumerObservations apparentObservations;
+    verifyConsumerMatrix(
+        apparentObservations,
+        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+    );
+
+    QVERIFY(pointsDiffer(astrometricObservations.targetRenderPoint, apparentObservations.targetRenderPoint));
+    QVERIFY(!nearlyEqual(astrometricObservations.referenceLongitudeDeg, apparentObservations.referenceLongitudeDeg));
+    QVERIFY(pointsDiffer(astrometricObservations.eclipticLabelPoint, apparentObservations.eclipticLabelPoint));
+    QVERIFY(pointsDiffer(
+        astrometricObservations.celestialEquatorLabelPoint, apparentObservations.celestialEquatorLabelPoint
+    ));
+    QVERIFY(pointsDiffer(astrometricObservations.circumpolarLabelPoint, apparentObservations.circumpolarLabelPoint));
+    QVERIFY(astrometricObservations.altAzText != apparentObservations.altAzText);
+    QVERIFY(astrometricObservations.raDecText != apparentObservations.raDecText);
+    QVERIFY(
+        astrometricObservations.riseText != apparentObservations.riseText
+        || astrometricObservations.setText != apparentObservations.setText
+        || astrometricObservations.culminationText != apparentObservations.culminationText
+    );
+    QVERIFY(
+        lineFingerprintsDiffer(astrometricObservations.trailLineFingerprint, apparentObservations.trailLineFingerprint)
+    );
+    QVERIFY(
+        astrometricObservations.nightIconKind != apparentObservations.nightIconKind
+        || astrometricObservations.sunsetText != apparentObservations.sunsetText
+        || astrometricObservations.moonRiseText != apparentObservations.moonRiseText
+        || astrometricObservations.moonSetText != apparentObservations.moonSetText
+    );
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerSelectedEngineMatrixTests)
