@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -77,6 +78,18 @@ constexpr double kPi = 3.141592653589793238462643383279502884;
         .rightAscensionHours = 4.0,
         .declinationDeg = -15.0,
     };
+    return body;
+}
+
+[[nodiscard]] CelestialBody makeStarWithInvalidOptionalAstrometry()
+{
+    CelestialBody body = makeAstrometricStar();
+    body.id = "invalid-optional-star";
+    body.displayName = "Invalid Optional Star";
+    body.starAstrometry->properMotionRightAscensionMasPerYear = std::numeric_limits<double>::quiet_NaN();
+    body.starAstrometry->properMotionDeclinationMasPerYear = std::numeric_limits<double>::infinity();
+    body.starAstrometry->stellarParallaxMas = std::numeric_limits<double>::quiet_NaN();
+    body.starAstrometry->radialVelocityKmPerSecond = -std::numeric_limits<double>::infinity();
     return body;
 }
 
@@ -267,6 +280,8 @@ private slots:
     void treatsRightAscensionProperMotionAsTangentPlaneComponent();
     void appliesAnnualParallaxWithEarthBarycentricState();
     void batchMatchesSingleStarPropagationForFullPartialAndFixedStars();
+    void batchMatchesSingleStarWhenCorrectionsAreDisabled();
+    void batchMatchesSingleStarForInvalidOptionalAstrometry();
     void batchMatchesSingleStarAnnualParallaxCorrections();
     void degradesAnnualParallaxWhenKernelProviderIsMissing();
     void degradesAnnualParallaxWhenSourceParallaxIsMissing();
@@ -403,6 +418,53 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPart
             calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));
         compareCalculatorResults(batchResult.result, singleResult);
     }
+}
+
+void StarAstrometryCalculatorTests::batchMatchesSingleStarWhenCorrectionsAreDisabled()
+{
+    const std::vector<CelestialBody> bodies{
+        makeAstrometricStar(),
+        makePartialAstrometricStar(),
+        makeFixedOnlyStar(),
+    };
+    const CatalogStarAstrometryArrays arrays(bodies);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::NoCorrections, 10.0);
+
+    const StarAstrometryCalculator calculator;
+    const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
+
+    QCOMPARE(batchResults.size(), 3U);
+    for (const StarAstrometryBatchResult& batchResult : batchResults) {
+        const HighPrecisionCalculatorResult singleResult =
+            calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));
+        compareCalculatorResults(batchResult.result, singleResult);
+    }
+}
+
+void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstrometry()
+{
+    const std::vector<CelestialBody> bodies{
+        makeStarWithInvalidOptionalAstrometry(),
+    };
+    const CatalogStarAstrometryArrays arrays(bodies);
+    const EphemerisRequest request = makeRequest(
+        EphemerisCorrectionFlags::ProperMotion | EphemerisCorrectionFlags::StellarParallax
+            | EphemerisCorrectionFlags::RadialVelocity,
+        10.0
+    );
+
+    const StarAstrometryCalculator calculator;
+    const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
+    const HighPrecisionCalculatorResult singleResult = calculator.calculate(makeInput(bodies[0], request));
+
+    QCOMPARE(batchResults.size(), 1U);
+    QCOMPARE(batchResults[0].bodyIndex, 0U);
+    compareCalculatorResults(batchResults[0].result, singleResult);
+    QCOMPARE(singleResult.metadata.status, EphemerisResultStatus::Degraded);
+    QVERIFY(singleResult.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::ProperMotion));
+    QVERIFY(hasCorrectionFlag(singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::StellarParallax));
+    QVERIFY(hasCorrectionFlag(singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::RadialVelocity));
 }
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrections()
