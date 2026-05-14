@@ -166,6 +166,11 @@ add_skygate_ephemeris_qtest(
     highprecision/ApparentRaDecValidationTests.cpp
     LABELS "unit;highprecision;validation;apparent"
 )
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-fallback-validation-tests
+    highprecision/EphemerisFallbackValidationTests.cpp
+    LABELS "unit;highprecision;validation;fallback"
+)
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_skygate_ephemeris_qtest(
         skygate-ephemeris-calceph-kernel-provider-tests
