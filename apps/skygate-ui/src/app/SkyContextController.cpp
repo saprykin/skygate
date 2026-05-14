@@ -13,10 +13,38 @@
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
+#include <optional>
 #include <memory>
 #include <utility>
 
 using namespace skygate::ui::internal;
+
+namespace {
+
+[[nodiscard]] std::optional<skygate::ephemeris::AstronomicalEpoch>
+astronomicalEpochFromUtcDateTime(const QDateTime& utcDateTime) noexcept
+{
+    const QDateTime normalizedUtcDateTime = utcDateTime.toUTC();
+    const QDate date = normalizedUtcDateTime.date();
+    const QTime time = normalizedUtcDateTime.time();
+    const auto astronomicalYear = skygate::ephemeris::astronomicalYearFromHistoricalYear(date.year());
+    if (!astronomicalYear.has_value()) {
+        return std::nullopt;
+    }
+
+    return skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+        .astronomicalYear = *astronomicalYear,
+        .month = date.month(),
+        .day = date.day(),
+        .hour = time.hour(),
+        .minute = time.minute(),
+        .second = time.second(),
+        .nanosecond = static_cast<std::uint32_t>(time.msec()) * 1'000'000U,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    });
+}
+
+}  // namespace
 
 SkyContextController::SkyContextController(
     std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
@@ -463,6 +491,24 @@ SkyContextController::activeEphemerisDataSnapshot() const noexcept
 std::uint64_t SkyContextController::ephemerisDataRevision() const noexcept
 {
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->dataRevision() : 0U;
+}
+
+SkyContextController::EphemerisRequestContext SkyContextController::ephemerisRequestContext() const
+{
+    EphemerisRequestContext context;
+    context.request.context = skyContext();
+    context.request.options = m_ephemerisEngineOptions;
+    context.request.options.engineKind = m_ephemerisEngineKind;
+    context.activeDataSnapshot = activeEphemerisDataSnapshot();
+    context.ephemerisDataRevision = ephemerisDataRevision();
+    context.catalogRevision = catalogRevision();
+
+    if (const auto epoch = astronomicalEpochFromUtcDateTime(SkyContextTimeCodec::toQDateTimeUtc(skyContext().utcTime));
+        epoch.has_value()) {
+        context.request.epoch = *epoch;
+    }
+
+    return context;
 }
 
 std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalogBodies() const noexcept

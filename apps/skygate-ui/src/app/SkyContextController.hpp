@@ -150,6 +150,13 @@ public:
     using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
 
 public:
+    struct EphemerisRequestContext final {
+        skygate::ephemeris::EphemerisRequest request;
+        std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot;
+        std::uint64_t ephemerisDataRevision = 0U;
+        std::uint64_t catalogRevision = 0U;
+    };
+
     struct InitializationOptions final {
         struct EphemerisFactoryInputs final {
             const skygate::ephemeris::EphemerisDataSetInfo* dataSetManifest = nullptr;
@@ -234,6 +241,7 @@ public:
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
     activeEphemerisDataSnapshot() const noexcept;
     [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
+    [[nodiscard]] EphemerisRequestContext ephemerisRequestContext() const;
     [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
     [[nodiscard]] QStringList catalogSourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
