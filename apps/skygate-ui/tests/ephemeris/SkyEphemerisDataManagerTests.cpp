@@ -325,7 +325,10 @@ public:
         Q_ASSERT(asset != nullptr);
         const QString sourcePath =
             m_sourceRoot.path() + QStringLiteral("/") + QString::fromStdString(asset->relativePath);
-        Q_ASSERT(writeFile(sourcePath, payload));
+        if (!writeFile(sourcePath, payload)) {
+            QTest::qFail("Unable to write source ephemeris update payload.", __FILE__, __LINE__);
+            return {};
+        }
 
         SkyEphemerisDataManager::StagedUpdateDownloadRequest request;
         request.asset = asset;
@@ -378,6 +381,7 @@ private slots:
     void updateFlowHarnessActivatesSuccessfullyAndSignalsRevision();
     void updateFlowHarnessRestartsAfterPartialDownload();
     void updateFlowHarnessInjectsVerificationFailureAndPreservesActiveData();
+    void updateFlowHarnessInjectsActivationFailureAndPreservesActiveData();
     void updateFlowHarnessInjectsActivationCancellationAndPreservesActiveData();
     void controllerOwnsManagerAndExposesSnapshot();
     void controllerCatalogChangePreservesEphemerisDataSelection();
@@ -959,6 +963,39 @@ void SkyEphemerisDataManagerTests::updateFlowHarnessInjectsVerificationFailureAn
     QVERIFY(QFileInfo::exists(stagedKernelPath));
 }
 
+void SkyEphemerisDataManagerTests::updateFlowHarnessInjectsActivationFailureAndPreservesActiveData()
+{
+    EphemerisUpdateFlowHarness harness(m_settings);
+    harness.initializeInstalledManager(QStringLiteral("harness-activation-failure"));
+    harness.writeCompleteStagingSet();
+
+    const QString failedActivationRoot = m_settings.filePath(QStringLiteral("updates/installed-rev-failure"));
+    const QString blockingTimePath = failedActivationRoot + QStringLiteral("/modern/time");
+    QVERIFY(writeFile(blockingTimePath, QByteArrayLiteral("not a directory")));
+
+    SkyEphemerisDataManager::StagedUpdateActivationRequest request = harness.activationRequest();
+    request.revisionToken = QStringLiteral("installed-rev-failure");
+
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result =
+        harness.manager().activateVerifiedStagedUpdateSet(request);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(SkyEphemerisDataManager::StagedUpdateActivationStatus::ActivationFailed)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.verificationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.activationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::IoError)
+    );
+    harness.verifyActiveDataPreserved();
+    QVERIFY(!QFileInfo::exists(failedActivationRoot));
+    QVERIFY(QFileInfo::exists(harness.stagedRoot().path() + QStringLiteral("/kernels/de440s.bsp")));
+}
+
 void SkyEphemerisDataManagerTests::updateFlowHarnessInjectsActivationCancellationAndPreservesActiveData()
 {
     EphemerisUpdateFlowHarness harness(m_settings);
@@ -978,6 +1015,15 @@ void SkyEphemerisDataManagerTests::updateFlowHarnessInjectsActivationCancellatio
         static_cast<std::uint8_t>(result.status),
         static_cast<std::uint8_t>(SkyEphemerisDataManager::StagedUpdateActivationStatus::Canceled)
     );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.verificationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.activationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Activated)
+    );
+    QCOMPARE(result.activatedAssetIds.size(), std::size_t{1});
     harness.verifyActiveDataPreserved();
     QVERIFY(!QFileInfo::exists(partialActivationRoot));
     QVERIFY(QFileInfo::exists(harness.stagedRoot().path() + QStringLiteral("/kernels/de440s.bsp")));
