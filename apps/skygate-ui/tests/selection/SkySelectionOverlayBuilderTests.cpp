@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+using skygate::ui::tests::overlayInspectorFieldTooltip;
 using skygate::ui::tests::overlayInspectorFieldValue;
 
 namespace {
@@ -196,6 +197,7 @@ private slots:
     void markerPriorityPrefersSelectedThenTrackedThenSearch();
     void constellationLabelMarkerUsesLabelReferences();
     void inspectorFormatsSourceAliasesAndFallbacks();
+    void inspectorSurfacesEphemerisMetadataAndWarnings();
     void inspectorIncludesObservationEventsAndFallbacks();
     void inspectorObservationEventsUseRequestOptions();
     void pinnedInspectorRendersForUnprojectableBody();
@@ -262,6 +264,63 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
     QCOMPARE(overlayInspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"), QString("Catalog"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarnings()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto& metadata = fixture.snapshot.states[0].metadata;
+    metadata.status = skygate::ephemeris::EphemerisResultStatus::Degraded;
+    metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::MissingEphemerisData);
+    metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::DataOutOfRange);
+    metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
+    metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
+        .displayName = "Modern kernel",
+        .start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 1849,
+            .month = 12,
+            .day = 26,
+        }),
+        .end = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 2150,
+            .month = 1,
+            .day = 22,
+        })
+    };
+    metadata.estimatedAngularUncertaintyArcsec = 0.42;
+    metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    metadata.addUnavailableCorrection(skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction);
+    metadata.finalizeCorrectionTracking(
+        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        | skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
+        | skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation
+    );
+
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "selected";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
+        .context = fixture.skyContext,
+        .options =
+            skygate::ephemeris::EphemerisEngineOptions{
+                .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+            },
+    };
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(inspector.ephemerisStatus, QString("Degraded"));
+    QVERIFY(inspector.ephemerisWarningText.contains("Required ephemeris data is unavailable."));
+    QVERIFY(inspector.ephemerisWarningText.contains("outside the effective date range"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Ephemeris"), QString("Degraded"));
+    QCOMPARE(overlayInspectorFieldTooltip(inspector, "Ephemeris"), inspector.ephemerisWarningText);
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("JPL DE440s smoke fixture"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Data range").contains("Modern kernel"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Uncertainty"), QString("0.42 arcsec"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Unavailable: atmospheric refraction"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Skipped: precession/nutation"));
 }
 
 void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallbacks()

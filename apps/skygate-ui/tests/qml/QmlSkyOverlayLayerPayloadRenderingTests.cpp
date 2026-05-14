@@ -11,9 +11,7 @@ private slots:
 
 void QmlSkyOverlayLayerPayloadRenderingTests::initTestCase()
 {
-    QVERIFY(initializeOverlayRenderingSettings(
-        QStringLiteral("QmlSkyOverlayLayerPayloadRenderingTests")
-    ));
+    QVERIFY(initializeOverlayRenderingSettings(QStringLiteral("QmlSkyOverlayLayerPayloadRenderingTests")));
 }
 
 void QmlSkyOverlayLayerPayloadRenderingTests::init()
@@ -30,7 +28,9 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             width: 900
@@ -59,8 +59,15 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
                         { "label": "Rise", "value": "2024-06-02 23:58:00 UTC" },
                         { "label": "Set", "value": "2024-06-03 04:12:00 UTC" },
                         { "label": "Culmination", "value": "2024-06-02 11:47:00 UTC at 72.4 deg" },
+                        {
+                            "label": "Ephemeris",
+                            "value": "Degraded",
+                            "tooltip": "Required ephemeris data is unavailable."
+                        },
                         { "label": "Source", "value": "OpenNGC" }
                     ],
+                    "ephemerisStatus": "Degraded",
+                    "ephemerisWarningText": "Required ephemeris data is unavailable.",
                     "aliases": "Andromeda Galaxy"
                 })
                 function moveSelectedObjectInspector(x, y) {
@@ -88,7 +95,9 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
                 avoidItems: []
             }
         }
-    )"), QStringLiteral("SkyOverlayLayerBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SkyOverlayLayerBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -100,27 +109,21 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Galaxy")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Rise")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Set")) != nullptr);
-    auto* riseValue = firstVisibleItemWithText(
-        root,
-        QStringLiteral("2024-06-02 23:58:00 UTC")
-    );
+    auto* riseValue = firstVisibleItemWithText(root, QStringLiteral("2024-06-02 23:58:00 UTC"));
     QVERIFY(riseValue != nullptr);
     QCOMPARE(riseValue->property("text").toString().count(QStringLiteral("UTC")), 1);
     QVERIFY(!riseValue->property("truncated").toBool());
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Culmination")) != nullptr);
-    QVERIFY(firstVisibleItemWithText(
-        root,
-        QStringLiteral("2024-06-02 11:47:00 UTC at 72.4 deg")
-    ) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("2024-06-02 11:47:00 UTC at 72.4 deg")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Ephemeris")) != nullptr);
+    QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Degraded")) != nullptr);
+    QVERIFY(firstQuickItemWithObjectName(root, QStringLiteral("objectInspectorField_Ephemeris")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Andromeda Galaxy")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Vega")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("N")) != nullptr);
     QVERIFY(firstVisibleItemWithText(root, QStringLiteral("Sirius")) != nullptr);
 
-    auto* selectionMarker = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("searchSelectionMarker")
-    );
+    auto* selectionMarker = firstQuickItemWithObjectName(root, QStringLiteral("searchSelectionMarker"));
     QVERIFY(selectionMarker != nullptr);
     QVERIFY(selectionMarker->isVisible());
     QCOMPARE(selectionMarker->width(), 34.0);
@@ -132,10 +135,7 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
     QVERIFY(hoverLabel != nullptr);
     auto* vegaLabel = firstQuickItemWithObjectName(root, QStringLiteral("skyOverlayLabel_Vega"));
     QVERIFY(vegaLabel != nullptr);
-    auto* cardinalLabel = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("cardinalOverlayLabel_N")
-    );
+    auto* cardinalLabel = firstQuickItemWithObjectName(root, QStringLiteral("cardinalOverlayLabel_N"));
     QVERIFY(cardinalLabel != nullptr);
 
     const QImage overlayImage = exposed.window()->grabWindow();
@@ -146,10 +146,7 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
         renderingScenePointIsColorNear(
             *exposed.window(),
             overlayImage,
-            selectionMarker->mapToScene(QPointF(
-                selectionMarker->width() * 0.5,
-                selectionMarker->height() * 0.5
-            )),
+            selectionMarker->mapToScene(QPointF(selectionMarker->width() * 0.5, selectionMarker->height() * 0.5)),
             theme->property("selectionMarkerCenter").value<QColor>(),
             12
         ),
@@ -177,31 +174,19 @@ void QmlSkyOverlayLayerPayloadRenderingTests::skyOverlayLayerRendersPayloads()
     );
     QVERIFY2(
         renderingItemRegionContainsColorNear(
-            *exposed.window(),
-            overlayImage,
-            *hoverLabel,
-            theme->property("overlayTooltipBorder").value<QColor>(),
-            24
+            *exposed.window(), overlayImage, *hoverLabel, theme->property("overlayTooltipBorder").value<QColor>(), 24
         ),
         "Hover tooltip region did not paint its border"
     );
     QVERIFY2(
         renderingItemRegionContainsColorNear(
-            *exposed.window(),
-            overlayImage,
-            *vegaLabel,
-            theme->property("overlayLabelText").value<QColor>(),
-            24
+            *exposed.window(), overlayImage, *vegaLabel, theme->property("overlayLabelText").value<QColor>(), 24
         ),
         "Sky overlay label region did not paint its label/border color"
     );
     QVERIFY2(
         renderingItemRegionContainsColorNear(
-            *exposed.window(),
-            overlayImage,
-            *cardinalLabel,
-            theme->property("overlayLabelText").value<QColor>(),
-            24
+            *exposed.window(), overlayImage, *cardinalLabel, theme->property("overlayLabelText").value<QColor>(), 24
         ),
         "Cardinal overlay label region did not paint its label/border color"
     );
