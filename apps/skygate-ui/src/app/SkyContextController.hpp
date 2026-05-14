@@ -153,7 +153,10 @@ public:
     struct EphemerisRequestContext final {
         skygate::ephemeris::EphemerisRequest request;
         std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot;
+        std::uint64_t engineOptionsRevision = 0U;
         std::uint64_t ephemerisDataRevision = 0U;
+        std::uint64_t earthOrientationDataRevision = 0U;
+        std::uint64_t leapSecondDataRevision = 0U;
         std::uint64_t catalogRevision = 0U;
     };
 
@@ -374,6 +377,7 @@ private:
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
     skygate::ephemeris::EphemerisEngineKind m_ephemerisEngineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
     skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
+    std::uint64_t m_ephemerisOptionsRevision = 1U;
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
     const skygate::ephemeris::EphemerisDataSetInfo* m_ephemerisDataSetManifest = nullptr;
     const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;

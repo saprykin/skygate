@@ -24,6 +24,11 @@ struct SkySceneFramePipelineInput final {
     skygate::core::SkyContext skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::uint64_t catalogRevision = 0;
+    skygate::ephemeris::EphemerisEngineKind engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    std::uint64_t engineOptionsRevision = 0;
+    std::uint64_t ephemerisDataRevision = 0;
+    std::uint64_t earthOrientationDataRevision = 0;
+    std::uint64_t leapSecondDataRevision = 0;
     skygate::core::ProjectionType projectionType = skygate::core::ProjectionType::Stereographic;
     double viewCenterAltitudeDeg = 0.0;
     double viewCenterAzimuthDeg = 0.0;
@@ -56,6 +61,11 @@ public:
 private:
     struct SnapshotCacheKey final {
         std::uint64_t catalogRevision = 0;
+        skygate::ephemeris::EphemerisEngineKind engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+        std::uint64_t engineOptionsRevision = 0;
+        std::uint64_t ephemerisDataRevision = 0;
+        std::uint64_t earthOrientationDataRevision = 0;
+        std::uint64_t leapSecondDataRevision = 0;
         skygate::core::GeoLocation observer;
         skygate::core::UtcTimePoint utcTime{};
         std::optional<skygate::ephemeris::AstronomicalEpoch> requestEpoch;
