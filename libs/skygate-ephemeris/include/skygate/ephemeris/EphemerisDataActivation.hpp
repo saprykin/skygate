@@ -22,6 +22,20 @@ enum class EphemerisDataActivationStatus : std::uint8_t {
     LargeKernelInQtResource
 };
 
+enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
+    Verified,
+    InvalidRequest,
+    UnsupportedProfile,
+    IncompleteUpdateSet,
+    WrongComponentKind,
+    MissingAsset,
+    MalformedMetadata,
+    UnsupportedCompression,
+    CorruptArchive,
+    ChecksumMismatch,
+    IoError
+};
+
 [[nodiscard]] constexpr std::string_view displayName(const EphemerisDataActivationStatus status) noexcept
 {
     switch (status) {
@@ -48,6 +62,36 @@ enum class EphemerisDataActivationStatus : std::uint8_t {
     return {};
 }
 
+[[nodiscard]] constexpr std::string_view displayName(const EphemerisStagedUpdateVerificationStatus status) noexcept
+{
+    switch (status) {
+    case EphemerisStagedUpdateVerificationStatus::Verified:
+        return "verified";
+    case EphemerisStagedUpdateVerificationStatus::InvalidRequest:
+        return "invalid-request";
+    case EphemerisStagedUpdateVerificationStatus::UnsupportedProfile:
+        return "unsupported-profile";
+    case EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet:
+        return "incomplete-update-set";
+    case EphemerisStagedUpdateVerificationStatus::WrongComponentKind:
+        return "wrong-component-kind";
+    case EphemerisStagedUpdateVerificationStatus::MissingAsset:
+        return "missing-asset";
+    case EphemerisStagedUpdateVerificationStatus::MalformedMetadata:
+        return "malformed-metadata";
+    case EphemerisStagedUpdateVerificationStatus::UnsupportedCompression:
+        return "unsupported-compression";
+    case EphemerisStagedUpdateVerificationStatus::CorruptArchive:
+        return "corrupt-archive";
+    case EphemerisStagedUpdateVerificationStatus::ChecksumMismatch:
+        return "checksum-mismatch";
+    case EphemerisStagedUpdateVerificationStatus::IoError:
+        return "io-error";
+    }
+
+    return {};
+}
+
 struct EphemerisDataActivationRequest {
     const EphemerisDataManifestAsset* asset = nullptr;
     std::filesystem::path bundledResourceRoot;
@@ -68,6 +112,32 @@ struct EphemerisDataActivationResult {
     }
 };
 
+struct EphemerisStagedUpdateVerificationRequest {
+    struct ExpectedComponent {
+        std::string assetId;
+        EphemerisDataManifestAssetKind kind = EphemerisDataManifestAssetKind::SolarSystemKernel;
+    };
+
+    const EphemerisDataManifest* manifest = nullptr;
+    std::string profileId;
+    std::filesystem::path stagedResourceRoot;
+    std::vector<EphemerisDataManifestAssetKind> requiredKinds;
+    std::vector<ExpectedComponent> expectedComponents;
+};
+
+struct EphemerisStagedUpdateVerificationResult {
+    EphemerisStagedUpdateVerificationStatus status = EphemerisStagedUpdateVerificationStatus::InvalidRequest;
+    std::vector<std::string> verifiedAssetIds;
+    std::vector<std::string> diagnostics;
+
+    [[nodiscard]] bool isSuccess() const noexcept
+    {
+        return status == EphemerisStagedUpdateVerificationStatus::Verified;
+    }
+};
+
 [[nodiscard]] EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActivationRequest& request);
+[[nodiscard]] EphemerisStagedUpdateVerificationResult
+verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& request);
 
 }  // namespace skygate::ephemeris
