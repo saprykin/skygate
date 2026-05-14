@@ -12,17 +12,12 @@ namespace {
 
 SkyInspectorField inspectorField(const QString& label, const QString& value)
 {
-    return SkyInspectorField {
-        .label = label,
-        .value = value
-    };
+    return SkyInspectorField{.label = label, .value = value};
 }
 
 bool hasSelectionInputs(const SkySelectionOverlayInput& input)
 {
-    return input.snapshot != nullptr
-        && input.preparedProjection != nullptr
-        && input.stateIndexByBodyId != nullptr;
+    return input.snapshot != nullptr && input.preparedProjection != nullptr && input.stateIndexByBodyId != nullptr;
 }
 
 void appendObservationEventFields(
@@ -37,51 +32,38 @@ void appendObservationEventFields(
     }
 
     const skygate::ephemeris::ObservationEventCalculator calculator;
-    const auto events = calculator.compute(
-        *input.ephemerisEngine,
-        *input.skyContext,
-        bodyIndex,
-        body
+    const auto events = input.ephemerisRequest.has_value()
+                            ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body)
+                            : calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex, body);
+    fields.push_back(
+        inspectorField("Rise", skygate::ui::internal::formatObservationEvent(events.nextRise, input.timeController))
+    );
+    fields.push_back(
+        inspectorField("Set", skygate::ui::internal::formatObservationEvent(events.nextSet, input.timeController))
     );
     fields.push_back(inspectorField(
-        "Rise",
-        skygate::ui::internal::formatObservationEvent(events.nextRise, input.timeController)
-    ));
-    fields.push_back(inspectorField(
-        "Set",
-        skygate::ui::internal::formatObservationEvent(events.nextSet, input.timeController)
-    ));
-    fields.push_back(inspectorField(
-        "Culmination",
-        skygate::ui::internal::formatObservationCulmination(
-            events.culmination,
-            input.timeController
-        )
+        "Culmination", skygate::ui::internal::formatObservationCulmination(events.culmination, input.timeController)
     ));
 }
 
 }  // namespace
 
-SkySelectedObjectInspector SkyObjectInspectorBuilder::build(
-    const SkySelectionOverlayInput& input
-) const
+SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOverlayInput& input) const
 {
     if (!hasSelectionInputs(input)) {
         return {};
     }
 
-    const QString targetId = !input.selectedObjectTargetId.isEmpty()
-        ? input.selectedObjectTargetId
-        : (normalizedSceneLookupKey(input.selectedSearchTargetKind) == "body"
-            ? input.selectedSearchTargetId
-            : QString());
+    const QString targetId =
+        !input.selectedObjectTargetId.isEmpty()
+            ? input.selectedObjectTargetId
+            : (normalizedSceneLookupKey(input.selectedSearchTargetKind) == "body" ? input.selectedSearchTargetId
+                                                                                  : QString());
     if (targetId.trimmed().isEmpty()) {
         return {};
     }
 
-    const auto stateIndexIt = input.stateIndexByBodyId->constFind(
-        normalizedSceneLookupKey(targetId)
-    );
+    const auto stateIndexIt = input.stateIndexByBodyId->constFind(normalizedSceneLookupKey(targetId));
     if (stateIndexIt == input.stateIndexByBodyId->cend()) {
         return {};
     }
@@ -109,22 +91,10 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(
     }
 
     std::vector<SkyInspectorField> fields;
-    fields.push_back(inspectorField(
-        "Type",
-        skygate::ui::internal::celestialBodyTypeText(body)
-    ));
-    fields.push_back(inspectorField(
-        "Magnitude",
-        skygate::ui::internal::formatMagnitude(body.visualMagnitude)
-    ));
-    fields.push_back(inspectorField(
-        "Alt / Az",
-        skygate::ui::internal::formatHorizontalCoordinate(state.horizontal)
-    ));
-    fields.push_back(inspectorField(
-        "RA / Dec",
-        skygate::ui::internal::formatEquatorialCoordinate(state.equatorial)
-    ));
+    fields.push_back(inspectorField("Type", skygate::ui::internal::celestialBodyTypeText(body)));
+    fields.push_back(inspectorField("Magnitude", skygate::ui::internal::formatMagnitude(body.visualMagnitude)));
+    fields.push_back(inspectorField("Alt / Az", skygate::ui::internal::formatHorizontalCoordinate(state.horizontal)));
+    fields.push_back(inspectorField("RA / Dec", skygate::ui::internal::formatEquatorialCoordinate(state.equatorial)));
     appendObservationEventFields(fields, input, body, state.bodyIndex);
 
     if (body.deepSkyObject.has_value()) {
@@ -137,13 +107,11 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(
     fields.push_back(inspectorField(
         "Source",
         skygate::ui::internal::sourceLabelForBodyIndex(
-            input.catalogSourceIds,
-            input.catalogSourceLabels,
-            state.bodyIndex
+            input.catalogSourceIds, input.catalogSourceLabels, state.bodyIndex
         )
     ));
 
-    return SkySelectedObjectInspector {
+    return SkySelectedObjectInspector{
         .visible = true,
         .x = inspectorX,
         .y = inspectorY,

@@ -16,66 +16,89 @@ constexpr int kSampleStepSeconds = 10 * 60;
 constexpr int kSearchHorizonSeconds = 72 * 60 * 60;
 constexpr int kRefinementToleranceSeconds = 1;
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;
+constexpr double kUnixEpochJulianDay = 2'440'587.5;
+constexpr double kSecondsPerDay = 86'400.0;
 
 struct AltitudeSample final {
     core::UtcTimePoint utcTime;
     double altitudeDeg = std::numeric_limits<double>::quiet_NaN();
 };
 
-[[nodiscard]] core::UtcTimePoint addSeconds(
-    const core::UtcTimePoint& utcTime,
-    const int seconds
-) noexcept
+[[nodiscard]] core::UtcTimePoint addSeconds(const core::UtcTimePoint& utcTime, const int seconds) noexcept
 {
     return utcTime + std::chrono::seconds(seconds);
 }
 
+[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
+{
+    const double julianDay =
+        kUnixEpochJulianDay + static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay;
+    const double julianDatePart1 = std::floor(julianDay);
+    return AstronomicalEpoch{
+        .julianDatePart1 = julianDatePart1,
+        .julianDatePart2 = julianDay - julianDatePart1,
+        .timeScale = TimeScale::Utc,
+    };
+}
+
+[[nodiscard]] EphemerisRequest requestFromContext(const core::SkyContext& context) noexcept
+{
+    EphemerisRequest request;
+    request.context = context;
+    request.epoch = epochFromUtcTime(context.utcTime);
+    return request;
+}
+
+[[nodiscard]] EphemerisRequest
+requestAtUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& utcTime) noexcept
+{
+    EphemerisRequest request = baseRequest;
+    const double offsetSeconds = std::chrono::duration<double>(utcTime - baseRequest.context.utcTime).count();
+    request.context.utcTime = utcTime;
+    request.epoch = normalizedAstronomicalEpoch(AstronomicalEpoch{
+        .julianDatePart1 = baseRequest.epoch.julianDatePart1,
+        .julianDatePart2 = baseRequest.epoch.julianDatePart2 + offsetSeconds / kSecondsPerDay,
+        .timeScale = baseRequest.epoch.timeScale,
+    });
+    return request;
+}
+
 [[nodiscard]] std::optional<double> altitudeAt(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& baseContext,
+    const EphemerisRequest& baseRequest,
     const std::uint32_t bodyIndex,
     const core::UtcTimePoint& utcTime
 )
 {
-    core::SkyContext context = baseContext;
-    context.utcTime = utcTime;
-    const auto state = ephemerisEngine.computeBodyState(context, bodyIndex);
+    const auto request = requestAtUtcTime(baseRequest, utcTime);
+    const auto state = ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(bodyIndex));
     if (!state.has_value() || !state->horizontal.isFinite()) {
         return std::nullopt;
     }
     return state->horizontal.altitudeDeg;
 }
 
-[[nodiscard]] std::vector<AltitudeSample> sampleAltitudes(
-    const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
-    const std::uint32_t bodyIndex
-)
+[[nodiscard]] std::vector<AltitudeSample>
+sampleAltitudes(const IEphemerisEngine& ephemerisEngine, const EphemerisRequest& request, const std::uint32_t bodyIndex)
 {
     std::vector<AltitudeSample> samples;
     samples.reserve((kSearchHorizonSeconds / kSampleStepSeconds) + 1);
 
-    for (int offsetSeconds = 0; offsetSeconds <= kSearchHorizonSeconds;
-         offsetSeconds += kSampleStepSeconds) {
-        const core::UtcTimePoint utcTime = addSeconds(context.utcTime, offsetSeconds);
-        const auto altitude = altitudeAt(ephemerisEngine, context, bodyIndex, utcTime);
+    for (int offsetSeconds = 0; offsetSeconds <= kSearchHorizonSeconds; offsetSeconds += kSampleStepSeconds) {
+        const core::UtcTimePoint utcTime = addSeconds(request.context.utcTime, offsetSeconds);
+        const auto altitude = altitudeAt(ephemerisEngine, request, bodyIndex, utcTime);
         if (!altitude.has_value()) {
             continue;
         }
 
-        samples.push_back(AltitudeSample {
-            .utcTime = utcTime,
-            .altitudeDeg = *altitude
-        });
+        samples.push_back(AltitudeSample{.utcTime = utcTime, .altitudeDeg = *altitude});
     }
 
     return samples;
 }
 
 [[nodiscard]] std::optional<ObservationEventStatus> fixedHorizonStatus(
-    const CelestialBody* body,
-    const core::GeoLocation& observer,
-    const double crossingAltitudeDeg
+    const CelestialBody* body, const core::GeoLocation& observer, const double crossingAltitudeDeg
 ) noexcept
 {
     if (body == nullptr || !body->fixedEquatorial.has_value()) {
@@ -87,10 +110,8 @@ struct AltitudeSample final {
         return std::nullopt;
     }
 
-    const double maxAltitudeDeg =
-        90.0 - std::abs(observer.latitudeDeg - equatorial.declinationDeg);
-    const double minAltitudeDeg =
-        std::abs(observer.latitudeDeg + equatorial.declinationDeg) - 90.0;
+    const double maxAltitudeDeg = 90.0 - std::abs(observer.latitudeDeg - equatorial.declinationDeg);
+    const double minAltitudeDeg = std::abs(observer.latitudeDeg + equatorial.declinationDeg) - 90.0;
 
     if (minAltitudeDeg >= crossingAltitudeDeg - kAltitudeClassificationToleranceDeg) {
         return ObservationEventStatus::AlwaysAbove;
@@ -103,8 +124,7 @@ struct AltitudeSample final {
 }
 
 [[nodiscard]] ObservationEventStatus unavailableCrossingStatus(
-    const std::vector<AltitudeSample>& samples,
-    const std::optional<ObservationEventStatus> provenFixedStatus
+    const std::vector<AltitudeSample>& samples, const std::optional<ObservationEventStatus> provenFixedStatus
 ) noexcept
 {
     if (samples.empty()) {
@@ -117,29 +137,21 @@ struct AltitudeSample final {
     return ObservationEventStatus::NoEventInSearchWindow;
 }
 
-[[nodiscard]] bool isRiseBracket(
-    const AltitudeSample& previous,
-    const AltitudeSample& next,
-    const double crossingAltitudeDeg
-) noexcept
+[[nodiscard]] bool
+isRiseBracket(const AltitudeSample& previous, const AltitudeSample& next, const double crossingAltitudeDeg) noexcept
 {
-    return previous.altitudeDeg < crossingAltitudeDeg
-        && next.altitudeDeg >= crossingAltitudeDeg;
+    return previous.altitudeDeg < crossingAltitudeDeg && next.altitudeDeg >= crossingAltitudeDeg;
 }
 
-[[nodiscard]] bool isSetBracket(
-    const AltitudeSample& previous,
-    const AltitudeSample& next,
-    const double crossingAltitudeDeg
-) noexcept
+[[nodiscard]] bool
+isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, const double crossingAltitudeDeg) noexcept
 {
-    return previous.altitudeDeg > crossingAltitudeDeg
-        && next.altitudeDeg <= crossingAltitudeDeg;
+    return previous.altitudeDeg > crossingAltitudeDeg && next.altitudeDeg <= crossingAltitudeDeg;
 }
 
 [[nodiscard]] core::UtcTimePoint refinedCrossingTime(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
+    const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const AltitudeSample& previous,
     const AltitudeSample& next,
@@ -153,7 +165,7 @@ struct AltitudeSample final {
     while ((high - low).count() > kRefinementToleranceSeconds) {
         const auto midpointOffset = (high - low) / 2;
         const core::UtcTimePoint midpoint = low + midpointOffset;
-        const auto midpointAltitude = altitudeAt(ephemerisEngine, context, bodyIndex, midpoint);
+        const auto midpointAltitude = altitudeAt(ephemerisEngine, request, bodyIndex, midpoint);
         if (!midpointAltitude.has_value()) {
             break;
         }
@@ -178,7 +190,7 @@ struct AltitudeSample final {
 
 [[nodiscard]] ObservationEvent findCrossing(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
+    const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const std::vector<AltitudeSample>& samples,
     const bool rising,
@@ -189,36 +201,25 @@ struct AltitudeSample final {
     for (std::size_t index = 1; index < samples.size(); ++index) {
         const AltitudeSample& previous = samples[index - 1U];
         const AltitudeSample& next = samples[index];
-        const bool bracketed = rising
-            ? isRiseBracket(previous, next, crossingAltitudeDeg)
-            : isSetBracket(previous, next, crossingAltitudeDeg);
+        const bool bracketed = rising ? isRiseBracket(previous, next, crossingAltitudeDeg)
+                                      : isSetBracket(previous, next, crossingAltitudeDeg);
         if (!bracketed) {
             continue;
         }
 
-        return ObservationEvent {
+        return ObservationEvent{
             .status = ObservationEventStatus::Available,
-            .utcTime = refinedCrossingTime(
-                ephemerisEngine,
-                context,
-                bodyIndex,
-                previous,
-                next,
-                rising,
-                crossingAltitudeDeg
-            )
+            .utcTime =
+                refinedCrossingTime(ephemerisEngine, request, bodyIndex, previous, next, rising, crossingAltitudeDeg)
         };
     }
 
-    return ObservationEvent {
-        .status = unavailableCrossingStatus(samples, provenFixedStatus),
-        .utcTime = std::nullopt
-    };
+    return ObservationEvent{.status = unavailableCrossingStatus(samples, provenFixedStatus), .utcTime = std::nullopt};
 }
 
 [[nodiscard]] AltitudeSample refinedMaximum(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
+    const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const core::UtcTimePoint& startUtc,
     const core::UtcTimePoint& endUtc
@@ -231,10 +232,10 @@ struct AltitudeSample final {
         const auto spanSeconds = highSeconds - lowSeconds;
         const auto firstSeconds = lowSeconds + spanSeconds / 3;
         const auto secondSeconds = highSeconds - spanSeconds / 3;
-        const core::UtcTimePoint firstUtc {std::chrono::seconds(firstSeconds)};
-        const core::UtcTimePoint secondUtc {std::chrono::seconds(secondSeconds)};
-        const auto firstAltitude = altitudeAt(ephemerisEngine, context, bodyIndex, firstUtc);
-        const auto secondAltitude = altitudeAt(ephemerisEngine, context, bodyIndex, secondUtc);
+        const core::UtcTimePoint firstUtc{std::chrono::seconds(firstSeconds)};
+        const core::UtcTimePoint secondUtc{std::chrono::seconds(secondSeconds)};
+        const auto firstAltitude = altitudeAt(ephemerisEngine, request, bodyIndex, firstUtc);
+        const auto secondAltitude = altitudeAt(ephemerisEngine, request, bodyIndex, secondUtc);
         if (!firstAltitude.has_value() || !secondAltitude.has_value()) {
             break;
         }
@@ -246,13 +247,10 @@ struct AltitudeSample final {
         }
     }
 
-    AltitudeSample best {
-        .utcTime = startUtc,
-        .altitudeDeg = -std::numeric_limits<double>::infinity()
-    };
+    AltitudeSample best{.utcTime = startUtc, .altitudeDeg = -std::numeric_limits<double>::infinity()};
     for (auto seconds = lowSeconds; seconds <= highSeconds; ++seconds) {
-        const core::UtcTimePoint utcTime {std::chrono::seconds(seconds)};
-        const auto altitude = altitudeAt(ephemerisEngine, context, bodyIndex, utcTime);
+        const core::UtcTimePoint utcTime{std::chrono::seconds(seconds)};
+        const auto altitude = altitudeAt(ephemerisEngine, request, bodyIndex, utcTime);
         if (altitude.has_value() && *altitude > best.altitudeDeg) {
             best.utcTime = utcTime;
             best.altitudeDeg = *altitude;
@@ -264,7 +262,7 @@ struct AltitudeSample final {
 
 [[nodiscard]] ObservationCulmination findCulmination(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
+    const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const std::vector<AltitudeSample>& samples
 )
@@ -274,35 +272,23 @@ struct AltitudeSample final {
         const AltitudeSample& current = samples[index];
         const AltitudeSample& next = samples[index + 1U];
 
-        if (
-            current.altitudeDeg < previous.altitudeDeg
-            || current.altitudeDeg < next.altitudeDeg
-        ) {
+        if (current.altitudeDeg < previous.altitudeDeg || current.altitudeDeg < next.altitudeDeg) {
             continue;
         }
 
-        const AltitudeSample maximum = refinedMaximum(
-            ephemerisEngine,
-            context,
-            bodyIndex,
-            previous.utcTime,
-            next.utcTime
-        );
+        const AltitudeSample maximum =
+            refinedMaximum(ephemerisEngine, request, bodyIndex, previous.utcTime, next.utcTime);
         if (!std::isfinite(maximum.altitudeDeg)) {
             break;
         }
 
-        return ObservationCulmination {
-            .status = ObservationEventStatus::Available,
-            .utcTime = maximum.utcTime,
-            .altitudeDeg = maximum.altitudeDeg
+        return ObservationCulmination{
+            .status = ObservationEventStatus::Available, .utcTime = maximum.utcTime, .altitudeDeg = maximum.altitudeDeg
         };
     }
 
-    return ObservationCulmination {
-        .status = samples.empty()
-            ? ObservationEventStatus::Unresolved
-            : ObservationEventStatus::NoEventInSearchWindow,
+    return ObservationCulmination{
+        .status = samples.empty() ? ObservationEventStatus::Unresolved : ObservationEventStatus::NoEventInSearchWindow,
         .utcTime = std::nullopt,
         .altitudeDeg = std::nullopt
     };
@@ -310,7 +296,7 @@ struct AltitudeSample final {
 
 [[nodiscard]] ObservationEventSummary invalidSummary() noexcept
 {
-    return ObservationEventSummary {
+    return ObservationEventSummary{
         .nextRise = {.status = ObservationEventStatus::InvalidInput},
         .nextSet = {.status = ObservationEventStatus::InvalidInput},
         .culmination = {.status = ObservationEventStatus::InvalidInput}
@@ -319,54 +305,39 @@ struct AltitudeSample final {
 
 [[nodiscard]] ObservationEventSummary computeObservationEvents(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
+    const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const CelestialBody* body,
     const double crossingAltitudeDeg
 )
 {
+    const core::SkyContext& context = request.context;
     if (!context.observer.isValid() || !std::isfinite(crossingAltitudeDeg)) {
         return invalidSummary();
     }
 
-    const auto samples = sampleAltitudes(ephemerisEngine, context, bodyIndex);
+    const auto samples = sampleAltitudes(ephemerisEngine, request, bodyIndex);
     if (samples.empty()) {
-        return ObservationEventSummary {};
+        return ObservationEventSummary{};
     }
 
     const auto provenFixedStatus = fixedHorizonStatus(body, context.observer, crossingAltitudeDeg);
-    return ObservationEventSummary {
-        .nextRise = findCrossing(
-            ephemerisEngine,
-            context,
-            bodyIndex,
-            samples,
-            true,
-            provenFixedStatus,
-            crossingAltitudeDeg
-        ),
-        .nextSet = findCrossing(
-            ephemerisEngine,
-            context,
-            bodyIndex,
-            samples,
-            false,
-            provenFixedStatus,
-            crossingAltitudeDeg
-        ),
-        .culmination = findCulmination(ephemerisEngine, context, bodyIndex, samples)
+    return ObservationEventSummary{
+        .nextRise =
+            findCrossing(ephemerisEngine, request, bodyIndex, samples, true, provenFixedStatus, crossingAltitudeDeg),
+        .nextSet =
+            findCrossing(ephemerisEngine, request, bodyIndex, samples, false, provenFixedStatus, crossingAltitudeDeg),
+        .culmination = findCulmination(ephemerisEngine, request, bodyIndex, samples)
     };
 }
 
 }  // namespace
 
 ObservationEventSummary ObservationEventCalculator::compute(
-    const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
-    const std::uint32_t bodyIndex
+    const IEphemerisEngine& ephemerisEngine, const core::SkyContext& context, const std::uint32_t bodyIndex
 ) const
 {
-    return compute(ephemerisEngine, context, bodyIndex, 0.0);
+    return compute(ephemerisEngine, requestFromContext(context), bodyIndex, 0.0);
 }
 
 ObservationEventSummary ObservationEventCalculator::compute(
@@ -376,7 +347,9 @@ ObservationEventSummary ObservationEventCalculator::compute(
     const double crossingAltitudeDeg
 ) const
 {
-    return computeObservationEvents(ephemerisEngine, context, bodyIndex, nullptr, crossingAltitudeDeg);
+    return computeObservationEvents(
+        ephemerisEngine, requestFromContext(context), bodyIndex, nullptr, crossingAltitudeDeg
+    );
 }
 
 ObservationEventSummary ObservationEventCalculator::compute(
@@ -386,7 +359,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     const CelestialBody& body
 ) const
 {
-    return compute(ephemerisEngine, context, bodyIndex, body, 0.0);
+    return compute(ephemerisEngine, requestFromContext(context), bodyIndex, body, 0.0);
 }
 
 ObservationEventSummary ObservationEventCalculator::compute(
@@ -398,12 +371,46 @@ ObservationEventSummary ObservationEventCalculator::compute(
 ) const
 {
     return computeObservationEvents(
-        ephemerisEngine,
-        context,
-        bodyIndex,
-        &body,
-        crossingAltitudeDeg
+        ephemerisEngine, requestFromContext(context), bodyIndex, &body, crossingAltitudeDeg
     );
+}
+
+ObservationEventSummary ObservationEventCalculator::compute(
+    const IEphemerisEngine& ephemerisEngine, const EphemerisRequest& request, const std::uint32_t bodyIndex
+) const
+{
+    return compute(ephemerisEngine, request, bodyIndex, 0.0);
+}
+
+ObservationEventSummary ObservationEventCalculator::compute(
+    const IEphemerisEngine& ephemerisEngine,
+    const EphemerisRequest& request,
+    const std::uint32_t bodyIndex,
+    const double crossingAltitudeDeg
+) const
+{
+    return computeObservationEvents(ephemerisEngine, request, bodyIndex, nullptr, crossingAltitudeDeg);
+}
+
+ObservationEventSummary ObservationEventCalculator::compute(
+    const IEphemerisEngine& ephemerisEngine,
+    const EphemerisRequest& request,
+    const std::uint32_t bodyIndex,
+    const CelestialBody& body
+) const
+{
+    return compute(ephemerisEngine, request, bodyIndex, body, 0.0);
+}
+
+ObservationEventSummary ObservationEventCalculator::compute(
+    const IEphemerisEngine& ephemerisEngine,
+    const EphemerisRequest& request,
+    const std::uint32_t bodyIndex,
+    const CelestialBody& body,
+    const double crossingAltitudeDeg
+) const
+{
+    return computeObservationEvents(ephemerisEngine, request, bodyIndex, &body, crossingAltitudeDeg);
 }
 
 }  // namespace skygate::ephemeris
