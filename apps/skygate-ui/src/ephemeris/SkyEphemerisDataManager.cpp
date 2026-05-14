@@ -3,7 +3,13 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
+#include <QEventLoop>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QStringList>
+#include <QTimer>
+#include <QUrl>
 
 #include <algorithm>
 #include <array>
@@ -193,6 +199,212 @@ void markCanceled(SkyEphemerisDataManager::StagedUpdateDownloadResult& result, Q
 {
     result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::Canceled;
     addDiagnostic(result, std::move(diagnostic));
+}
+
+[[nodiscard]] QString sourceUrlForRequest(const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request)
+{
+    if (!request.sourceUrl.trimmed().isEmpty()) {
+        return request.sourceUrl.trimmed();
+    }
+    if (request.asset == nullptr || request.asset->sourceUrl.empty()) {
+        return {};
+    }
+    return stringToQString(request.asset->sourceUrl);
+}
+
+[[nodiscard]] bool
+prepareStagedFileDirectory(const QString& stagedPath, SkyEphemerisDataManager::StagedUpdateDownloadResult& result)
+{
+    const QFileInfo stagedFileInfo(stagedPath);
+    if (QDir().mkpath(stagedFileInfo.absolutePath())) {
+        return true;
+    }
+
+    result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+    addDiagnostic(result, QStringLiteral("Unable to create ephemeris update staging directory."));
+    return false;
+}
+
+void cleanupCanceledDownload(
+    const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request,
+    const SkyEphemerisDataManager::StagedUpdateDownloadResult& result
+)
+{
+    if (request.retainPartialStagingOnCancellation || result.stagedPath.trimmed().isEmpty()) {
+        return;
+    }
+    if (!QFile::remove(result.stagedPath) && QFileInfo::exists(result.stagedPath)) {
+        // The caller already has a cancellation result; preserve that primary
+        // status and avoid adding a misleading hard failure.
+    }
+}
+
+[[nodiscard]] bool copyFileToStaging(
+    QFile& sourceFile,
+    QFile& stagedFile,
+    const std::function<bool()>& isCanceled,
+    const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request,
+    SkyEphemerisDataManager::StagedUpdateDownloadResult& result
+)
+{
+    std::array<char, kDownloadBufferBytes> buffer{};
+    while (!sourceFile.atEnd()) {
+        if (isCanceled()) {
+            stagedFile.close();
+            markCanceled(result, QStringLiteral("Ephemeris update download was canceled during transfer."));
+            cleanupCanceledDownload(request, result);
+            return false;
+        }
+
+        const qint64 bytesRead = sourceFile.read(buffer.data(), static_cast<qint64>(buffer.size()));
+        if (bytesRead < 0) {
+            result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+            addDiagnostic(result, QStringLiteral("Unable to read ephemeris update source file."));
+            return false;
+        }
+        if (bytesRead == 0) {
+            continue;
+        }
+        if (stagedFile.write(buffer.data(), bytesRead) != bytesRead) {
+            result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+            addDiagnostic(result, QStringLiteral("Unable to write ephemeris update staging file."));
+            return false;
+        }
+        result.stagedBytes += static_cast<std::uint64_t>(bytesRead);
+    }
+    return true;
+}
+
+[[nodiscard]] bool stageLocalFile(
+    const QString& sourcePath,
+    const std::function<bool()>& isCanceled,
+    const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request,
+    SkyEphemerisDataManager::StagedUpdateDownloadResult& result
+)
+{
+    QFile sourceFile(sourcePath);
+    if (!sourceFile.open(QIODevice::ReadOnly)) {
+        result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::MissingSource;
+        addDiagnostic(result, QStringLiteral("Ephemeris update download source file is missing."));
+        return false;
+    }
+
+    if (!prepareStagedFileDirectory(result.stagedPath, result)) {
+        return false;
+    }
+
+    QFile stagedFile(result.stagedPath);
+    if (!stagedFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(result, QStringLiteral("Unable to create ephemeris update staging file."));
+        return false;
+    }
+
+    if (!copyFileToStaging(sourceFile, stagedFile, isCanceled, request, result)) {
+        return false;
+    }
+    if (isCanceled()) {
+        stagedFile.close();
+        markCanceled(result, QStringLiteral("Ephemeris update download was canceled after transfer."));
+        cleanupCanceledDownload(request, result);
+        return false;
+    }
+    if (!stagedFile.flush()) {
+        result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(result, QStringLiteral("Unable to flush ephemeris update staging file."));
+        return false;
+    }
+
+    result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::Downloaded;
+    return true;
+}
+
+[[nodiscard]] bool stageNetworkUrl(
+    const QUrl& sourceUrl,
+    const std::function<bool()>& isCanceled,
+    const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request,
+    SkyEphemerisDataManager::StagedUpdateDownloadResult& result
+)
+{
+    if (!prepareStagedFileDirectory(result.stagedPath, result)) {
+        return false;
+    }
+
+    QFile stagedFile(result.stagedPath);
+    if (!stagedFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(result, QStringLiteral("Unable to create ephemeris update staging file."));
+        return false;
+    }
+
+    QNetworkAccessManager networkAccessManager;
+    QNetworkRequest networkRequest(sourceUrl);
+    networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply* reply = networkAccessManager.get(networkRequest);
+    QEventLoop eventLoop;
+    QTimer cancellationTimer;
+    cancellationTimer.setInterval(50);
+
+    QObject::connect(reply, &QNetworkReply::readyRead, &eventLoop, [&] {
+        const QByteArray payload = reply->readAll();
+        if (payload.isEmpty()) {
+            return;
+        }
+        if (stagedFile.write(payload) != payload.size()) {
+            result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+            addDiagnostic(result, QStringLiteral("Unable to write ephemeris update staging file."));
+            reply->abort();
+            return;
+        }
+        result.stagedBytes += static_cast<std::uint64_t>(payload.size());
+    });
+    QObject::connect(&cancellationTimer, &QTimer::timeout, &eventLoop, [&] {
+        if (isCanceled()) {
+            reply->abort();
+        }
+    });
+    QObject::connect(reply, &QNetworkReply::finished, &eventLoop, &QEventLoop::quit);
+
+    cancellationTimer.start();
+    eventLoop.exec();
+    cancellationTimer.stop();
+
+    const QByteArray remainingPayload = reply->readAll();
+    if (!remainingPayload.isEmpty() && result.status != SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError) {
+        if (stagedFile.write(remainingPayload) != remainingPayload.size()) {
+            result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+            addDiagnostic(result, QStringLiteral("Unable to write ephemeris update staging file."));
+        } else {
+            result.stagedBytes += static_cast<std::uint64_t>(remainingPayload.size());
+        }
+    }
+
+    const QNetworkReply::NetworkError networkError = reply->error();
+    const QString networkErrorText = reply->errorString();
+    reply->deleteLater();
+
+    if (isCanceled()) {
+        stagedFile.close();
+        markCanceled(result, QStringLiteral("Ephemeris update download was canceled during transfer."));
+        cleanupCanceledDownload(request, result);
+        return false;
+    }
+    if (result.status == SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError) {
+        return false;
+    }
+    if (networkError != QNetworkReply::NoError) {
+        result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(result, QStringLiteral("Ephemeris update download failed: %1").arg(networkErrorText));
+        return false;
+    }
+    if (!stagedFile.flush()) {
+        result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::IoError;
+        addDiagnostic(result, QStringLiteral("Unable to flush ephemeris update staging file."));
+        return false;
+    }
+
+    result.status = SkyEphemerisDataManager::StagedUpdateDownloadStatus::Downloaded;
+    return true;
 }
 
 [[nodiscard]] bool
@@ -750,14 +962,6 @@ SkyEphemerisDataManager::stageEphemerisUpdateAsset(const StagedUpdateDownloadReq
     const auto isCanceled = [this, &request] {
         return m_updateCancellationRequested.load() || cancellationRequested(request.cancellationRequested);
     };
-    const auto cleanupPartialStaging = [&request, &result] {
-        if (request.retainPartialStagingOnCancellation || result.stagedPath.trimmed().isEmpty()) {
-            return;
-        }
-        if (!QFile::remove(result.stagedPath) && QFileInfo::exists(result.stagedPath)) {
-            addDiagnostic(result, QStringLiteral("Unable to clean canceled ephemeris staged download file."));
-        }
-    };
 
     if (isCanceled()) {
         markCanceled(result, QStringLiteral("Ephemeris update download was canceled before transfer."));
@@ -765,10 +969,6 @@ SkyEphemerisDataManager::stageEphemerisUpdateAsset(const StagedUpdateDownloadReq
     }
     if (request.asset == nullptr) {
         addDiagnostic(result, QStringLiteral("Ephemeris update download requires an asset."));
-        return result;
-    }
-    if (request.sourceResourceRoot.trimmed().isEmpty()) {
-        addDiagnostic(result, QStringLiteral("Ephemeris update download requires a source root."));
         return result;
     }
     if (request.stagedResourceRoot.trimmed().isEmpty()) {
@@ -786,66 +986,34 @@ SkyEphemerisDataManager::stageEphemerisUpdateAsset(const StagedUpdateDownloadReq
     const std::filesystem::path stagedPath = pathFromQString(request.stagedResourceRoot) / relativePath;
     result.stagedPath = pathToQString(stagedPath);
 
-    QFile sourceFile(pathToQString(sourcePath));
-    if (!sourceFile.open(QIODevice::ReadOnly)) {
+    if (!request.sourceResourceRoot.trimmed().isEmpty()) {
+        static_cast<void>(stageLocalFile(pathToQString(sourcePath), isCanceled, request, result));
+        return result;
+    }
+
+    const QString sourceUrlText = sourceUrlForRequest(request);
+    if (sourceUrlText.isEmpty()) {
         result.status = StagedUpdateDownloadStatus::MissingSource;
-        addDiagnostic(result, QStringLiteral("Ephemeris update download source file is missing."));
+        addDiagnostic(result, QStringLiteral("Ephemeris update download source URL is missing."));
         return result;
     }
 
-    const QFileInfo stagedFileInfo(result.stagedPath);
-    if (!QDir().mkpath(stagedFileInfo.absolutePath())) {
-        result.status = StagedUpdateDownloadStatus::IoError;
-        addDiagnostic(result, QStringLiteral("Unable to create ephemeris update staging directory."));
+    const QUrl sourceUrl(sourceUrlText);
+    if (sourceUrl.isLocalFile()) {
+        static_cast<void>(stageLocalFile(sourceUrl.toLocalFile(), isCanceled, request, result));
+        return result;
+    }
+    if (sourceUrl.scheme().isEmpty()) {
+        static_cast<void>(stageLocalFile(sourceUrlText, isCanceled, request, result));
+        return result;
+    }
+    if (sourceUrl.scheme() != QStringLiteral("http") && sourceUrl.scheme() != QStringLiteral("https")) {
+        result.status = StagedUpdateDownloadStatus::MissingSource;
+        addDiagnostic(result, QStringLiteral("Ephemeris update download source URL scheme is unsupported."));
         return result;
     }
 
-    QFile stagedFile(result.stagedPath);
-    if (!stagedFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        result.status = StagedUpdateDownloadStatus::IoError;
-        addDiagnostic(result, QStringLiteral("Unable to create ephemeris update staging file."));
-        return result;
-    }
-
-    std::array<char, kDownloadBufferBytes> buffer{};
-    while (!sourceFile.atEnd()) {
-        if (isCanceled()) {
-            stagedFile.close();
-            markCanceled(result, QStringLiteral("Ephemeris update download was canceled during transfer."));
-            cleanupPartialStaging();
-            return result;
-        }
-
-        const qint64 bytesRead = sourceFile.read(buffer.data(), static_cast<qint64>(buffer.size()));
-        if (bytesRead < 0) {
-            result.status = StagedUpdateDownloadStatus::IoError;
-            addDiagnostic(result, QStringLiteral("Unable to read ephemeris update source file."));
-            return result;
-        }
-        if (bytesRead == 0) {
-            continue;
-        }
-        if (stagedFile.write(buffer.data(), bytesRead) != bytesRead) {
-            result.status = StagedUpdateDownloadStatus::IoError;
-            addDiagnostic(result, QStringLiteral("Unable to write ephemeris update staging file."));
-            return result;
-        }
-        result.stagedBytes += static_cast<std::uint64_t>(bytesRead);
-    }
-
-    if (isCanceled()) {
-        stagedFile.close();
-        markCanceled(result, QStringLiteral("Ephemeris update download was canceled after transfer."));
-        cleanupPartialStaging();
-        return result;
-    }
-    if (!stagedFile.flush()) {
-        result.status = StagedUpdateDownloadStatus::IoError;
-        addDiagnostic(result, QStringLiteral("Unable to flush ephemeris update staging file."));
-        return result;
-    }
-
-    result.status = StagedUpdateDownloadStatus::Downloaded;
+    static_cast<void>(stageNetworkUrl(sourceUrl, isCanceled, request, result));
     return result;
 }
 

@@ -148,6 +148,11 @@ class SkyContextController final : public QObject {
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
+        bool ephemerisDataUpdateInProgress
+        READ ephemerisDataUpdateInProgress
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
         QString catalogDatasetInfoText
         READ catalogDatasetInfoText
         NOTIFY catalogDatasetInfoTextChanged
@@ -287,6 +292,7 @@ public:
     [[nodiscard]] QString ephemerisDataLastUpdateResultText() const;
     [[nodiscard]] bool ephemerisDataOnlineUpdatesEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateEnabled() const noexcept;
+    [[nodiscard]] bool ephemerisDataUpdateInProgress() const noexcept;
     [[nodiscard]] QString catalogDatasetInfoText() const;
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
@@ -435,6 +441,7 @@ private:
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
+    void setEphemerisDataOperationStatusText(QString statusText);
     void rebuildEphemerisEngine();
 
 private:
@@ -461,6 +468,7 @@ private:
     const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
     QString m_ephemerisUpdateResourceRoot;
     QString m_ephemerisWritableCacheRoot;
+    QString m_ephemerisDataOperationStatusText;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;
     std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_ephemerisEarthOrientationProvider;
     std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> m_ephemerisCalcephKernelRuntime;
@@ -472,4 +480,5 @@ private:
     bool m_logToFile = false;
     QString m_logFilePath;
     QVariantMap m_nightConditions;
+    bool m_ephemerisDataUpdateInProgress = false;
 };

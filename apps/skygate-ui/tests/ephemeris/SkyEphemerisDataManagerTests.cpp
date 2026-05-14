@@ -14,6 +14,7 @@
 #include <QFileInfo>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QUrl>
 
 #include <cstdint>
 #include <memory>
@@ -373,6 +374,7 @@ private slots:
     void activationFailurePreservesActiveDataAndSettings();
     void sameRevisionActivationFailurePreservesActiveFilesAndSettings();
     void metadataPersistenceFailurePreservesActiveData();
+    void stagesAssetFromSourceUrl();
     void cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData();
     void cancellationBeforeVerificationPreservesActiveDataAndRetainsStaging();
     void cancellationDuringVerificationCanCleanStagingAndPreservesActiveData();
@@ -671,6 +673,40 @@ void SkyEphemerisDataManagerTests::metadataPersistenceFailurePreservesActiveData
     QVERIFY(!manager.usingInstalledData());
     QCOMPARE(manager.dataRevisionToken(), QString("bundled"));
     QVERIFY(!QFileInfo::exists(m_settings.filePath(QStringLiteral("updates/installed-rev-2"))));
+}
+
+void SkyEphemerisDataManagerTests::stagesAssetFromSourceUrl()
+{
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+
+    QTemporaryDir sourceRoot;
+    QTemporaryDir stagedRoot;
+    QVERIFY(sourceRoot.isValid());
+    QVERIFY(stagedRoot.isValid());
+    const QString sourcePath = sourceRoot.path() + QStringLiteral("/source-kernel.bsp");
+    const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
+    QVERIFY(writeFile(sourcePath, payload));
+
+    skygate::ephemeris::EphemerisDataManifestAsset asset = stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    asset.sourceUrl = QUrl::fromLocalFile(sourcePath).toString().toStdString();
+
+    SkyEphemerisDataManager::StagedUpdateDownloadRequest request;
+    request.asset = &asset;
+    request.stagedResourceRoot = stagedRoot.path();
+
+    const SkyEphemerisDataManager::StagedUpdateDownloadResult result = manager.stageEphemerisUpdateAsset(request);
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QCOMPARE(result.stagedPath, stagedRoot.path() + QStringLiteral("/kernels/de440s.bsp"));
+    QCOMPARE(result.stagedBytes, static_cast<std::uint64_t>(payload.size()));
+
+    QFile stagedFile(result.stagedPath);
+    QVERIFY(stagedFile.open(QIODevice::ReadOnly));
+    QCOMPARE(stagedFile.readAll(), payload);
 }
 
 void SkyEphemerisDataManagerTests::cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData()

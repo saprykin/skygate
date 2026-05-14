@@ -6,6 +6,8 @@
 #include "MacDockIcon.hpp"
 
 #include <QFont>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
@@ -14,17 +16,20 @@
 #include <QQmlApplicationEngine>
 #include <QSettings>
 #include <QSize>
+#include <QStandardPaths>
 #include <QSysInfo>
 #include <QWindow>
 #include <QVariantMap>
 #include <qqml.h>
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/EphemerisDataManifest.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -68,8 +73,7 @@ bool hasArgument(const int argc, char* argv[], const char* expectedArgument) noe
 void writeVersionOutput(const char* appVersion, const char* gitHash, const char* qtVersion)
 {
 #if defined(_WIN32)
-    const std::string output = std::string("SkyGate ") + appVersion + " (git "
-        + gitHash + ", Qt " + qtVersion + ")\n";
+    const std::string output = std::string("SkyGate ") + appVersion + " (git " + gitHash + ", Qt " + qtVersion + ")\n";
     const auto writeToStdout = [&output]() noexcept {
         const HANDLE stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
         if (stdoutHandle == nullptr || stdoutHandle == INVALID_HANDLE_VALUE) {
@@ -77,13 +81,7 @@ void writeVersionOutput(const char* appVersion, const char* gitHash, const char*
         }
 
         DWORD bytesWritten = 0;
-        return WriteFile(
-            stdoutHandle,
-            output.data(),
-            static_cast<DWORD>(output.size()),
-            &bytesWritten,
-            nullptr
-        ) != 0;
+        return WriteFile(stdoutHandle, output.data(), static_cast<DWORD>(output.size()), &bytesWritten, nullptr) != 0;
     };
 
     if (writeToStdout()) {
@@ -104,10 +102,14 @@ struct StartupLoggingConfiguration final {
     QStringList ignoredLogLevelTexts;
 };
 
-bool applyOutputText(
-    skygate::ui::SkyLoggingConfiguration& configuration,
-    const QString& outputText
-)
+struct StartupEphemerisDataConfiguration final {
+    std::optional<skygate::ephemeris::EphemerisDataManifest> manifest;
+    QString resourceRoot;
+    QString manifestPath;
+    QString errorText;
+};
+
+bool applyOutputText(skygate::ui::SkyLoggingConfiguration& configuration, const QString& outputText)
 {
     const QString normalizedOutput = outputText.trimmed().toLower();
     if (normalizedOutput == QStringLiteral("terminal")) {
@@ -128,10 +130,7 @@ bool applyOutputText(
     return true;
 }
 
-bool applyLevelText(
-    skygate::ui::SkyLoggingConfiguration& configuration,
-    const QString& levelText
-)
+bool applyLevelText(skygate::ui::SkyLoggingConfiguration& configuration, const QString& levelText)
 {
     const auto minimumType = skygate::ui::SkyLogging::messageTypeFromLevelText(levelText);
     if (!minimumType.has_value()) {
@@ -145,28 +144,22 @@ bool applyLevelText(
 
 StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& arguments)
 {
-    StartupLoggingConfiguration startupConfiguration {
-        .configuration = skygate::ui::SkyLogging::defaultConfiguration()
-    };
+    StartupLoggingConfiguration startupConfiguration{.configuration = skygate::ui::SkyLogging::defaultConfiguration()};
 
     QSettings settings;
-    startupConfiguration.configuration.logToTerminal = settings.value(
-        QStringLiteral("skyContext/logging/logToTerminal"),
-        startupConfiguration.configuration.logToTerminal
-    ).toBool();
-    startupConfiguration.configuration.logToFile = settings.value(
-        QStringLiteral("skyContext/logging/logToFile"),
-        startupConfiguration.configuration.logToFile
-    ).toBool();
-    startupConfiguration.configuration.logFilePath = settings.value(
-        QStringLiteral("skyContext/logging/logFilePath"),
-        startupConfiguration.configuration.logFilePath
-    ).toString();
+    startupConfiguration.configuration.logToTerminal =
+        settings
+            .value(QStringLiteral("skyContext/logging/logToTerminal"), startupConfiguration.configuration.logToTerminal)
+            .toBool();
+    startupConfiguration.configuration.logToFile =
+        settings.value(QStringLiteral("skyContext/logging/logToFile"), startupConfiguration.configuration.logToFile)
+            .toBool();
+    startupConfiguration.configuration.logFilePath =
+        settings.value(QStringLiteral("skyContext/logging/logFilePath"), startupConfiguration.configuration.logFilePath)
+            .toString();
 
-    startupConfiguration.overrideApplied = applyOutputText(
-        startupConfiguration.configuration,
-        qEnvironmentVariable("SKYGATE_LOG_OUTPUT")
-    );
+    startupConfiguration.overrideApplied =
+        applyOutputText(startupConfiguration.configuration, qEnvironmentVariable("SKYGATE_LOG_OUTPUT"));
     const QString envLogFilePath = qEnvironmentVariable("SKYGATE_LOG_FILE");
     if (!envLogFilePath.trimmed().isEmpty()) {
         startupConfiguration.configuration.logFilePath = envLogFilePath.trimmed();
@@ -218,6 +211,64 @@ StartupLoggingConfiguration startupLoggingConfiguration(const QStringList& argum
     return startupConfiguration;
 }
 
+QStringList ephemerisDataRootCandidates()
+{
+    QStringList candidates;
+    const QString overrideRoot = qEnvironmentVariable("SKYGATE_EPHEMERIS_DATA_ROOT").trimmed();
+    if (!overrideRoot.isEmpty()) {
+        candidates.push_back(overrideRoot);
+    }
+
+    const QString appDir = QCoreApplication::applicationDirPath();
+#if defined(Q_OS_MACOS)
+    candidates.push_back(QDir::cleanPath(appDir + QStringLiteral("/../Resources/ephemeris")));
+#endif
+    candidates.push_back(QDir::cleanPath(appDir + QStringLiteral("/ephemeris")));
+    candidates.push_back(QStringLiteral(":/ephemeris"));
+    return candidates;
+}
+
+StartupEphemerisDataConfiguration startupEphemerisDataConfiguration()
+{
+    StartupEphemerisDataConfiguration configuration;
+    for (const QString& root : ephemerisDataRootCandidates()) {
+        const QString manifestPath = root + QStringLiteral("/manifest.json");
+        QFile manifestFile(manifestPath);
+        if (!manifestFile.exists()) {
+            continue;
+        }
+        if (!manifestFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            configuration.errorText = QStringLiteral("Unable to open ephemeris manifest: %1").arg(manifestPath);
+            continue;
+        }
+
+        const QByteArray payload = manifestFile.readAll();
+        skygate::ephemeris::EphemerisDataManifestParseResult parseResult =
+            skygate::ephemeris::parseEphemerisDataManifest(
+                std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
+            );
+        if (!parseResult.isSuccess()) {
+            const QString diagnostic = parseResult.diagnostics.empty()
+                                           ? QStringLiteral("unknown parse error")
+                                           : QString::fromStdString(parseResult.diagnostics.front());
+            configuration.errorText =
+                QStringLiteral("Unable to parse ephemeris manifest %1: %2").arg(manifestPath, diagnostic);
+            continue;
+        }
+
+        configuration.manifest = std::move(parseResult.manifest);
+        configuration.resourceRoot = root;
+        configuration.manifestPath = manifestPath;
+        configuration.errorText.clear();
+        return configuration;
+    }
+
+    if (configuration.errorText.isEmpty()) {
+        configuration.errorText = QStringLiteral("No ephemeris data manifest was found.");
+    }
+    return configuration;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[])
@@ -241,10 +292,8 @@ int main(int argc, char* argv[])
     QCoreApplication::setOrganizationDomain("skygate.app");
     QCoreApplication::setApplicationName("SkyGate");
     QCoreApplication::setApplicationVersion(QStringLiteral(SKYGATE_APP_VERSION));
-    const StartupLoggingConfiguration startupLogging =
-        startupLoggingConfiguration(app.arguments());
-    const skygate::ui::SkyLoggingConfiguration loggingConfiguration =
-        startupLogging.configuration;
+    const StartupLoggingConfiguration startupLogging = startupLoggingConfiguration(app.arguments());
+    const skygate::ui::SkyLoggingConfiguration loggingConfiguration = startupLogging.configuration;
     skygate::ui::SkyLogging::install(loggingConfiguration);
 
     QIcon appIcon;
@@ -256,8 +305,8 @@ int main(int argc, char* argv[])
     appIcon.addFile(QStringLiteral(":/icons/app-icon-512.png"), QSize(512, 512));
     appIcon.addFile(QStringLiteral(":/icons/app-icon-1024.png"), QSize(1024, 1024));
 #if defined(Q_OS_MACOS)
-    const QString bundleIconPath = QCoreApplication::applicationDirPath()
-        + QStringLiteral("/../Resources/Skygate.icns");
+    const QString bundleIconPath =
+        QCoreApplication::applicationDirPath() + QStringLiteral("/../Resources/Skygate.icns");
     if (QFileInfo::exists(bundleIconPath)) {
         appIcon.addFile(bundleIconPath);
     }
@@ -269,54 +318,61 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog =
-        skygate::ephemeris::createBundledStarCatalog();
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = skygate::ephemeris::createBundledStarCatalog();
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
         skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));
+    StartupEphemerisDataConfiguration ephemerisDataConfiguration = startupEphemerisDataConfiguration();
+    if (ephemerisDataConfiguration.manifest.has_value()) {
+        qCInfo(skygateAppLog).noquote() << "Loaded ephemeris data manifest" << ephemerisDataConfiguration.manifestPath;
+    } else {
+        qCWarning(skygateAppLog).noquote() << ephemerisDataConfiguration.errorText;
+    }
+
+    SkyContextController::InitializationOptions controllerOptions;
+    if (ephemerisDataConfiguration.manifest.has_value()) {
+        controllerOptions.ephemerisFactoryInputs.dataSetManifest = &ephemerisDataConfiguration.manifest->dataSetInfo;
+        controllerOptions.ephemerisFactoryInputs.dataManifest = &*ephemerisDataConfiguration.manifest;
+        controllerOptions.ephemerisFactoryInputs.updateResourceRoot = ephemerisDataConfiguration.resourceRoot;
+        controllerOptions.ephemerisFactoryInputs.writableCacheRoot =
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/ephemeris-data");
+    }
+    SkyContextController skyContextController(
+        std::move(starCatalog), std::move(ephemerisEngine), controllerOptions, nullptr
+    );
     skyContextController.setLogToTerminal(loggingConfiguration.logToTerminal);
     skyContextController.setLogToFile(loggingConfiguration.logToFile);
     skyContextController.setLogFilePath(loggingConfiguration.logFilePath);
-    qCInfo(skygateAppLog).noquote() << QStringLiteral(
-        "SkyGate started: version=%1 qt=%2 os=%3 %4 overrides=%5"
-    ).arg(
-        QCoreApplication::applicationVersion(),
-        QString::fromLatin1(qVersion()),
-        QSysInfo::prettyProductName(),
-        skygate::ui::SkyLogging::configurationSummary(skygate::ui::SkyLogging::configuration()),
-        startupLogging.overrideApplied ? QStringLiteral("yes") : QStringLiteral("no")
-    );
+    qCInfo(skygateAppLog).noquote()
+        << QStringLiteral("SkyGate started: version=%1 qt=%2 os=%3 %4 overrides=%5")
+               .arg(
+                   QCoreApplication::applicationVersion(),
+                   QString::fromLatin1(qVersion()),
+                   QSysInfo::prettyProductName(),
+                   skygate::ui::SkyLogging::configurationSummary(skygate::ui::SkyLogging::configuration()),
+                   startupLogging.overrideApplied ? QStringLiteral("yes") : QStringLiteral("no")
+               );
     for (const QString& ignoredLogLevelText : startupLogging.ignoredLogLevelTexts) {
-        qCWarning(skygateAppLog).noquote()
-            << "Ignoring invalid log level" << ignoredLogLevelText;
+        qCWarning(skygateAppLog).noquote() << "Ignoring invalid log level" << ignoredLogLevelText;
     }
     SkySceneModel skySceneModel;
     skySceneModel.setSkyContextController(&skyContextController);
     SkySettingsStore settingsStore;
-    QObject::connect(
-        &app,
-        &QCoreApplication::aboutToQuit,
-        &app,
-        [&skyContextController] {
-            qCInfo(skygateAppLog) << "SkyGate shutting down";
-            skyContextController.saveSettings();
-        }
-    );
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &app, [&skyContextController] {
+        qCInfo(skygateAppLog) << "SkyGate shutting down";
+        skyContextController.saveSettings();
+    });
 
     qmlRegisterType<SkyViewportItem>("com.skygate.app", 1, 0, "SkyViewportItem");
 
     QQmlApplicationEngine engine;
     const QSize initialMainWindowSize = settingsStore.loadMainWindowSize();
-    engine.setInitialProperties(QVariantMap {
+    engine.setInitialProperties(QVariantMap{
         {QStringLiteral("width"), initialMainWindowSize.width()},
         {QStringLiteral("height"), initialMainWindowSize.height()}
     });
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);
     engine.rootContext()->setContextProperty("skyScene", &skySceneModel);
-    engine.rootContext()->setContextProperty(
-        "skygateBuildDateTime",
-        QStringLiteral(SKYGATE_BUILD_DATE_TIME)
-    );
+    engine.rootContext()->setContextProperty("skygateBuildDateTime", QStringLiteral(SKYGATE_BUILD_DATE_TIME));
     engine.rootContext()->setContextProperty("skygateGitHash", QStringLiteral(SKYGATE_GIT_HASH));
     QObject::connect(
         &engine,
@@ -330,14 +386,9 @@ int main(int argc, char* argv[])
     for (QObject* rootObject : engine.rootObjects()) {
         if (QWindow* rootWindow = qobject_cast<QWindow*>(rootObject)) {
             rootWindow->setIcon(appIcon);
-            QObject::connect(
-                &app,
-                &QGuiApplication::lastWindowClosed,
-                rootWindow,
-                [rootWindow, &settingsStore] {
-                    (void)settingsStore.saveMainWindowSize(rootWindow->size());
-                }
-            );
+            QObject::connect(&app, &QGuiApplication::lastWindowClosed, rootWindow, [rootWindow, &settingsStore] {
+                (void)settingsStore.saveMainWindowSize(rootWindow->size());
+            });
         }
     }
     return app.exec();
