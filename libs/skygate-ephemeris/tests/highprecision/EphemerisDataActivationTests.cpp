@@ -71,16 +71,18 @@ void writeFile(const QString& path, const QByteArray& payload)
     return asset;
 }
 
-[[nodiscard]] skygate::ephemeris::EphemerisDateRange testValidityRange()
+[[nodiscard]] skygate::ephemeris::EphemerisDateRange makeValidityRange(
+    const int startYear, const int endYear, std::string id = "test-range", std::string displayName = "Test range"
+)
 {
     const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = 2000,
+        .astronomicalYear = startYear,
         .month = 1,
         .day = 1,
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     });
     const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = 2100,
+        .astronomicalYear = endYear,
         .month = 1,
         .day = 1,
         .timeScale = skygate::ephemeris::TimeScale::Utc,
@@ -88,11 +90,16 @@ void writeFile(const QString& path, const QByteArray& payload)
     Q_ASSERT(start.has_value());
     Q_ASSERT(end.has_value());
     return skygate::ephemeris::EphemerisDateRange{
-        .id = "test-range",
-        .displayName = "Test range",
+        .id = std::move(id),
+        .displayName = std::move(displayName),
         .start = *start,
         .end = *end,
     };
+}
+
+[[nodiscard]] skygate::ephemeris::EphemerisDateRange testValidityRange()
+{
+    return makeValidityRange(2000, 2100);
 }
 
 [[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset makeUncompressedAsset()
@@ -183,7 +190,7 @@ void writeAllStagedAssets(const QTemporaryDir& root, const skygate::ephemeris::E
 [[nodiscard]] skygate::ephemeris::EphemerisStagedUpdateVerificationRequest
 verificationRequest(const skygate::ephemeris::EphemerisDataManifest& manifest, const QTemporaryDir& stagedRoot)
 {
-    return skygate::ephemeris::EphemerisStagedUpdateVerificationRequest{
+    skygate::ephemeris::EphemerisStagedUpdateVerificationRequest request{
         .manifest = &manifest,
         .profileId = "modern",
         .stagedResourceRoot = pathFromQString(stagedRoot.path()),
@@ -202,6 +209,14 @@ verificationRequest(const skygate::ephemeris::EphemerisDataManifest& manifest, c
                 {"delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData},
             },
     };
+
+    for (skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component :
+         request.expectedComponents) {
+        component.expectedVersion = "test";
+        component.requiredValidityRange = testValidityRange();
+    }
+
+    return request;
 }
 
 [[nodiscard]] QString sourcePath(const QTemporaryDir& root)
@@ -230,8 +245,11 @@ private slots:
     void verifiesCompleteStagedUpdateSet();
     void rejectsStagedUpdateChecksumFailure();
     void rejectsStagedUpdateWrongComponentKind();
+    void rejectsStagedUpdateVersionMismatch();
+    void rejectsStagedUpdateValidityRangeMismatch();
     void rejectsIncompleteStagedUpdateSet();
     void rejectsMalformedStagedMetadata();
+    void rejectsMalformedStagedValidityRangeLabels();
     void rejectsCorruptCompressedStagedAsset();
     void rejectsUnsupportedStagedProfile();
 };
@@ -486,6 +504,45 @@ void EphemerisDataActivationTests::rejectsStagedUpdateWrongComponentKind()
     QVERIFY(!result.diagnostics.empty());
 }
 
+void EphemerisDataActivationTests::rejectsStagedUpdateVersionMismatch()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    manifest.assets[1].version = "stale";
+    writeAllStagedAssets(stagedRoot, manifest);
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::MismatchedMetadata)
+    );
+    QVERIFY(!result.diagnostics.empty());
+}
+
+void EphemerisDataActivationTests::rejectsStagedUpdateValidityRangeMismatch()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    writeAllStagedAssets(stagedRoot, manifest);
+    skygate::ephemeris::EphemerisStagedUpdateVerificationRequest request = verificationRequest(manifest, stagedRoot);
+    request.expectedComponents[0].requiredValidityRange = makeValidityRange(1990, 2100);
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::verifyEphemerisStagedUpdateSet(request);
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::MismatchedMetadata)
+    );
+    QVERIFY(!result.diagnostics.empty());
+}
+
 void EphemerisDataActivationTests::rejectsIncompleteStagedUpdateSet()
 {
     QTemporaryDir stagedRoot;
@@ -511,6 +568,24 @@ void EphemerisDataActivationTests::rejectsMalformedStagedMetadata()
     QVERIFY(stagedRoot.isValid());
     skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
     manifest.assets[0].relativePath = "../kernel.bsp";
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::MalformedMetadata)
+    );
+    QVERIFY(!result.diagnostics.empty());
+}
+
+void EphemerisDataActivationTests::rejectsMalformedStagedValidityRangeLabels()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    manifest.assets[0].validityRange.displayName.clear();
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
         skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));

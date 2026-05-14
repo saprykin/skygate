@@ -422,10 +422,19 @@ stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const Ephemeri
 
 [[nodiscard]] bool isValidDateRange(const EphemerisDateRange& range) noexcept
 {
-    return std::isfinite(range.start.julianDatePart1) && std::isfinite(range.start.julianDatePart2)
-           && std::isfinite(range.end.julianDatePart1) && std::isfinite(range.end.julianDatePart2)
-           && range.start.julianDatePart1 + range.start.julianDatePart2
-                  <= range.end.julianDatePart1 + range.end.julianDatePart2;
+    const double rangeStart = range.start.julianDatePart1 + range.start.julianDatePart2;
+    const double rangeEnd = range.end.julianDatePart1 + range.end.julianDatePart2;
+    return std::isfinite(rangeStart) && std::isfinite(rangeEnd) && rangeStart <= rangeEnd;
+}
+
+[[nodiscard]] bool
+validityRangeCovers(const EphemerisDateRange& availableRange, const EphemerisDateRange& requiredRange) noexcept
+{
+    const double availableStart = availableRange.start.julianDatePart1 + availableRange.start.julianDatePart2;
+    const double availableEnd = availableRange.end.julianDatePart1 + availableRange.end.julianDatePart2;
+    const double requiredStart = requiredRange.start.julianDatePart1 + requiredRange.start.julianDatePart2;
+    const double requiredEnd = requiredRange.end.julianDatePart1 + requiredRange.end.julianDatePart2;
+    return availableStart <= requiredStart && requiredEnd <= availableEnd;
 }
 
 [[nodiscard]] bool
@@ -464,6 +473,10 @@ validateAssetMetadata(const EphemerisDataManifestAsset& asset, EphemerisStagedUp
     }
     if (!isValidDateRange(asset.validityRange)) {
         addDiagnostic(result, "Staged ephemeris asset metadata requires an ordered finite validity range.");
+        valid = false;
+    }
+    if (asset.validityRange.id.empty() || asset.validityRange.displayName.empty()) {
+        addDiagnostic(result, "Staged ephemeris asset metadata requires validity range id and display name.");
         valid = false;
     }
 
@@ -741,6 +754,29 @@ verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& r
         if (asset->kind != component.kind) {
             result.status = EphemerisStagedUpdateVerificationStatus::WrongComponentKind;
             addDiagnostic(result, "Selected ephemeris update component kind does not match the expected kind.");
+            return result;
+        }
+        if (component.expectedVersion.has_value() && component.expectedVersion->empty()) {
+            result.status = EphemerisStagedUpdateVerificationStatus::InvalidRequest;
+            addDiagnostic(result, "Expected staged ephemeris component versions must be non-empty.");
+            return result;
+        }
+        if (component.expectedVersion.has_value() && asset->version != *component.expectedVersion) {
+            result.status = EphemerisStagedUpdateVerificationStatus::MismatchedMetadata;
+            addDiagnostic(result, "Selected ephemeris update component version does not match the expected version.");
+            return result;
+        }
+        if (component.requiredValidityRange.has_value() && !isValidDateRange(*component.requiredValidityRange)) {
+            result.status = EphemerisStagedUpdateVerificationStatus::InvalidRequest;
+            addDiagnostic(result, "Required staged ephemeris component validity ranges must be ordered and finite.");
+            return result;
+        }
+        if (component.requiredValidityRange.has_value()
+            && !validityRangeCovers(asset->validityRange, *component.requiredValidityRange)) {
+            result.status = EphemerisStagedUpdateVerificationStatus::MismatchedMetadata;
+            addDiagnostic(
+                result, "Selected ephemeris update component validity range does not cover the required range."
+            );
             return result;
         }
     }
