@@ -6,6 +6,7 @@
 #include "SkySettingsStore.hpp"
 
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "skygate/ephemeris/EphemerisDataManifest.hpp"
 
 #include <QtTest/QtTest>
 
@@ -25,6 +26,10 @@
 #include <vector>
 
 namespace {
+
+#ifndef SKYGATE_UI_SOURCE_DIR
+#define SKYGATE_UI_SOURCE_DIR ""
+#endif
 
 constexpr std::string_view kPayload = "SkyGate ephemeris staged asset\n";
 constexpr std::string_view kPayloadSha256 = "782092fd09110da30d95c1b5bc87cd827174ae5346bb3ea80cd5384fd8cf0d13";
@@ -90,13 +95,17 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
     };
 }
 
-skygate::ephemeris::EphemerisDataManifestAsset
-stagedAsset(std::string id, const skygate::ephemeris::EphemerisDataManifestAssetKind kind, std::string relativePath)
+skygate::ephemeris::EphemerisDataManifestAsset stagedAsset(
+    std::string id,
+    const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
+    std::string relativePath,
+    std::string profileId = "modern"
+)
 {
     skygate::ephemeris::EphemerisDataManifestAsset asset;
     asset.id = std::move(id);
     asset.kind = kind;
-    asset.profileId = "modern";
+    asset.profileId = std::move(profileId);
     asset.version = "test";
     asset.relativePath = std::move(relativePath);
     asset.checksum.algorithm = "sha256";
@@ -136,6 +145,47 @@ skygate::ephemeris::EphemerisDataManifest stagedManifest()
     return manifest;
 }
 
+skygate::ephemeris::EphemerisDataManifest longRangeStagedManifest()
+{
+    skygate::ephemeris::EphemerisDataManifest manifest;
+    manifest.dataSetInfo.id = "test-data";
+    manifest.dataSetInfo.displayName = "Test data";
+    manifest.dataSetInfo.version = "2026a";
+    manifest.dataSetInfo.provenance = "test";
+    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
+        .id = "de441-long-range",
+        .displayName = "DE441 long range",
+        .bundled = false,
+        .longRange = true,
+        .assetIds = {"de441-kernel", "de441-leap-seconds", "de441-earth-orientation", "de441-delta-t"},
+    });
+    manifest.assets.push_back(stagedAsset(
+        "de441-kernel",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+        "kernels/de441.bsp",
+        "de441-long-range"
+    ));
+    manifest.assets.push_back(stagedAsset(
+        "de441-leap-seconds",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+        "time/leap-seconds.list",
+        "de441-long-range"
+    ));
+    manifest.assets.push_back(stagedAsset(
+        "de441-earth-orientation",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+        "time/eop.csv",
+        "de441-long-range"
+    ));
+    manifest.assets.push_back(stagedAsset(
+        "de441-delta-t",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+        "time/delta-t.csv",
+        "de441-long-range"
+    ));
+    return manifest;
+}
+
 skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
 {
     skygate::ephemeris::EphemerisDataManifest manifest;
@@ -171,33 +221,65 @@ void writeStagedAssets(const QTemporaryDir& root, const skygate::ephemeris::Ephe
 SkyEphemerisDataManager::StagedUpdateActivationRequest stagedActivationRequest(
     const skygate::ephemeris::EphemerisDataManifest& manifest,
     const QTemporaryDir& stagedRoot,
-    const QString& writableCacheRoot
+    const QString& writableCacheRoot,
+    const QString& profileId = QStringLiteral("modern")
 )
 {
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
     request.manifest = &manifest;
-    request.profileId = QStringLiteral("modern");
+    request.profileId = profileId;
     request.stagedResourceRoot = stagedRoot.path();
     request.writableCacheRoot = writableCacheRoot;
     request.revisionToken = QStringLiteral("installed-rev-2");
-    request.requiredKinds = {
-        skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
-        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
-        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
-        skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
-    };
-    request.expectedComponents = {
-        {"de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel},
-        {"leap-seconds", skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable},
-        {"earth-orientation", skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData},
-        {"delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData},
-    };
-    for (skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component :
-         request.expectedComponents) {
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId.toStdString());
+    Q_ASSERT(profile != nullptr);
+    for (const std::string& assetId : profile->assetIds) {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        Q_ASSERT(asset != nullptr);
+        request.requiredKinds.push_back(asset->kind);
+        auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
         component.expectedVersion = "test";
         component.requiredValidityRange = testValidityRange();
     }
     return request;
+}
+
+bool isSha256Hex(const std::string& value)
+{
+    if (value.size() != 64U) {
+        return false;
+    }
+    return std::all_of(value.begin(), value.end(), [](const char character) {
+        return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f');
+    });
+}
+
+skygate::ephemeris::EphemerisDataManifest loadProductionManifest()
+{
+    const QString manifestPath =
+        QStringLiteral(SKYGATE_UI_SOURCE_DIR) + QStringLiteral("/resources/ephemeris/manifest.json");
+    QFile manifestFile(manifestPath);
+    if (!manifestFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QTest::qFail(
+            qPrintable(QStringLiteral("Unable to open production manifest: %1").arg(manifestPath)), __FILE__, __LINE__
+        );
+        return {};
+    }
+
+    const QByteArray payload = manifestFile.readAll();
+    skygate::ephemeris::EphemerisDataManifestParseResult result = skygate::ephemeris::parseEphemerisDataManifest(
+        std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
+    );
+    if (!result.isSuccess()) {
+        const QString diagnostic =
+            result.diagnostics.empty() ? QStringLiteral("unknown") : QString::fromStdString(result.diagnostics.front());
+        QTest::qFail(
+            qPrintable(QStringLiteral("Production manifest did not parse: %1").arg(diagnostic)), __FILE__, __LINE__
+        );
+        return {};
+    }
+
+    return std::move(result.manifest);
 }
 
 skygate::ephemeris::EphemerisEngineOptions highPrecisionOptions()
@@ -367,10 +449,13 @@ private slots:
     void initTestCase();
     void init();
     void initialBundledStatus();
+    void productionManifestMetadataIsVerifiable();
     void installedDataStatusAndSnapshot();
     void missingInstalledDataFallsBackToBundled();
+    void unbundledProductionManifestDoesNotExposeMissingFallbackFiles();
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
     void activatesVerifiedStagedUpdateSetAtomically();
+    void activatesFullLongRangeProfileUpdateSet();
     void activationFailurePreservesActiveDataAndSettings();
     void sameRevisionActivationFailurePreservesActiveFilesAndSettings();
     void metadataPersistenceFailurePreservesActiveData();
@@ -416,6 +501,29 @@ void SkyEphemerisDataManagerTests::initialBundledStatus()
     QCOMPARE(manager.datasetInfoText(), QString("Bundled fallback"));
     QVERIFY(manager.activeDataSnapshot() != nullptr);
     QVERIFY(!manager.activeDataSnapshot()->earthOrientationDataAsset().has_value());
+}
+
+void SkyEphemerisDataManagerTests::productionManifestMetadataIsVerifiable()
+{
+    const skygate::ephemeris::EphemerisDataManifest manifest = loadProductionManifest();
+    QVERIFY(!manifest.profiles.empty());
+    QVERIFY(!manifest.assets.empty());
+
+    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+        QCOMPARE(QString::fromStdString(asset.checksum.algorithm), QString("sha256"));
+        QVERIFY2(isSha256Hex(asset.checksum.value), asset.id.c_str());
+        QVERIFY2(asset.compression.uncompressedSizeBytes.has_value(), asset.id.c_str());
+        QVERIFY2(*asset.compression.uncompressedSizeBytes > 0U, asset.id.c_str());
+        QVERIFY2(!asset.sourceUrl.empty(), asset.id.c_str());
+    }
+
+    for (const skygate::ephemeris::EphemerisDataManifestProfile& profile : manifest.profiles) {
+        for (const std::string& assetId : profile.assetIds) {
+            const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+            QVERIFY2(asset != nullptr, assetId.c_str());
+            QCOMPARE(QString::fromStdString(asset->profileId), QString::fromStdString(profile.id));
+        }
+    }
 }
 
 void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
@@ -474,6 +582,20 @@ void SkyEphemerisDataManagerTests::missingInstalledDataFallsBackToBundled()
     QVERIFY(manager.statusText().contains(QStringLiteral("Installed data missing")));
     QVERIFY(manager.datasetInfoText().contains(QStringLiteral("Bundled fallback")));
     QVERIFY(manager.activeDataSnapshot() != nullptr);
+}
+
+void SkyEphemerisDataManagerTests::unbundledProductionManifestDoesNotExposeMissingFallbackFiles()
+{
+    const skygate::ephemeris::EphemerisDataManifest manifest = loadProductionManifest();
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+
+    manager.setBundledFallbackData(&manifest, QStringLiteral(":/ephemeris"), QStringLiteral("modern"));
+
+    const auto snapshot = manager.activeDataSnapshot();
+    QVERIFY(snapshot != nullptr);
+    QVERIFY(!snapshot->solarSystemKernelAsset("de440s-kernel").has_value());
+    QVERIFY(!snapshot->solarSystemKernelAsset("de441-kernel").has_value());
 }
 
 void SkyEphemerisDataManagerTests::revisionSignalEmitsOnlyWhenActiveDataChanges()
@@ -570,6 +692,41 @@ void SkyEphemerisDataManagerTests::activatesVerifiedStagedUpdateSetAtomically()
         QString::fromStdString(deltaT->content),
         QString::fromUtf8(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
     );
+}
+
+void SkyEphemerisDataManagerTests::activatesFullLongRangeProfileUpdateSet()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifest manifest = longRangeStagedManifest();
+    writeStagedAssets(stagedRoot, manifest);
+
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result = manager.activateVerifiedStagedUpdateSet(
+        stagedActivationRequest(manifest, stagedRoot, m_settings.path(), QStringLiteral("de441-long-range"))
+    );
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.verificationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
+    );
+    QCOMPARE(result.activatedAssetIds.size(), std::size_t{4});
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.modernKernelStatusText(), QString("Bundled fallback"));
+    QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: test"));
+
+    const auto snapshot = manager.activeDataSnapshot();
+    QVERIFY(snapshot != nullptr);
+    QVERIFY(!snapshot->solarSystemKernelAsset("de440s-kernel").has_value());
+    const auto kernel = snapshot->solarSystemKernelAsset("de441-kernel");
+    QVERIFY(kernel.has_value());
+    QCOMPARE(QString::fromStdString(kernel->profileId), QString("de441-long-range"));
+    QVERIFY(snapshot->leapSecondTableAsset().has_value());
+    QVERIFY(snapshot->earthOrientationDataAsset().has_value());
+    QVERIFY(snapshot->deltaTDataAsset().has_value());
 }
 
 void SkyEphemerisDataManagerTests::activationFailurePreservesActiveDataAndSettings()
