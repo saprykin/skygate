@@ -29,6 +29,34 @@ public:
         Canceled
     };
 
+    enum class StagedUpdateDownloadStatus : std::uint8_t {
+        Downloaded,
+        InvalidRequest,
+        MissingSource,
+        IoError,
+        Canceled
+    };
+
+    struct StagedUpdateDownloadRequest final {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = nullptr;
+        QString sourceResourceRoot;
+        QString stagedResourceRoot;
+        std::function<bool()> cancellationRequested;
+        bool retainPartialStagingOnCancellation = true;
+    };
+
+    struct StagedUpdateDownloadResult final {
+        StagedUpdateDownloadStatus status = StagedUpdateDownloadStatus::InvalidRequest;
+        QString stagedPath;
+        std::uint64_t stagedBytes = 0U;
+        std::vector<QString> diagnostics;
+
+        [[nodiscard]] bool isSuccess() const noexcept
+        {
+            return status == StagedUpdateDownloadStatus::Downloaded;
+        }
+    };
+
     struct StagedUpdateActivationRequest final {
         const skygate::ephemeris::EphemerisDataManifest* manifest = nullptr;
         QString profileId;
@@ -76,6 +104,7 @@ public:
     void requestUpdateCancellation() noexcept;
     void clearUpdateCancellation() noexcept;
     [[nodiscard]] bool updateCancellationRequested() const noexcept;
+    [[nodiscard]] StagedUpdateDownloadResult stageEphemerisUpdateAsset(const StagedUpdateDownloadRequest& request);
     [[nodiscard]] StagedUpdateActivationResult
     activateVerifiedStagedUpdateSet(const StagedUpdateActivationRequest& request);
 

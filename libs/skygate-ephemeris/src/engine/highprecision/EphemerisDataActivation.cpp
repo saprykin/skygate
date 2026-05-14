@@ -713,9 +713,19 @@ EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActi
         targetFile.cancelWriting();
         return result;
     }
+    if (cancellationRequested(request.cancellationRequested)) {
+        markCanceled(result);
+        targetFile.cancelWriting();
+        return result;
+    }
     if (!targetFile.flush()) {
         result.status = EphemerisDataActivationStatus::IoError;
         addDiagnostic(result, "Unable to flush activated ephemeris data cache file.");
+        targetFile.cancelWriting();
+        return result;
+    }
+    if (cancellationRequested(request.cancellationRequested)) {
+        markCanceled(result);
         targetFile.cancelWriting();
         return result;
     }
@@ -734,6 +744,11 @@ EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActi
         return result;
     }
 
+    if (cancellationRequested(request.cancellationRequested)) {
+        markCanceled(result);
+        targetFile.cancelWriting();
+        return result;
+    }
     if (!targetFile.commit()) {
         result.status = EphemerisDataActivationStatus::IoError;
         addDiagnostic(result, "Unable to atomically promote activated ephemeris data cache file.");

@@ -264,8 +264,10 @@ private slots:
     void activationFailurePreservesActiveDataAndSettings();
     void sameRevisionActivationFailurePreservesActiveFilesAndSettings();
     void metadataPersistenceFailurePreservesActiveData();
+    void cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData();
     void cancellationBeforeVerificationPreservesActiveDataAndRetainsStaging();
     void cancellationDuringVerificationCanCleanStagingAndPreservesActiveData();
+    void cancellationBeforeActivationPreservesVerifiedStagingAndActiveData();
     void cancellationDuringActivationCleansPartialCacheAndPreservesActiveData();
     void controllerOwnsManagerAndExposesSnapshot();
     void controllerCatalogChangePreservesEphemerisDataSelection();
@@ -557,6 +559,53 @@ void SkyEphemerisDataManagerTests::metadataPersistenceFailurePreservesActiveData
     QVERIFY(!QFileInfo::exists(m_settings.filePath(QStringLiteral("updates/installed-rev-2"))));
 }
 
+void SkyEphemerisDataManagerTests::cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData()
+{
+    const QString oldKernelPath = m_settings.filePath(QStringLiteral("download-cancel-old-kernel.bsp"));
+    QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
+
+    SkySettingsStore store;
+    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot = installedSnapshot(oldKernelPath, QString());
+    QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
+    SkyEphemerisDataManager manager(&store);
+    const std::uint64_t originalRevision = manager.dataRevision();
+
+    QTemporaryDir sourceRoot;
+    QTemporaryDir stagedRoot;
+    QVERIFY(sourceRoot.isValid());
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifestAsset asset = stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    const QByteArray payload(200000, 'x');
+    const QString sourcePath = sourceRoot.path() + QStringLiteral("/kernels/de440s.bsp");
+    QVERIFY(writeFile(sourcePath, payload));
+
+    int cancellationChecks = 0;
+    SkyEphemerisDataManager::StagedUpdateDownloadRequest request;
+    request.asset = &asset;
+    request.sourceResourceRoot = sourceRoot.path();
+    request.stagedResourceRoot = stagedRoot.path();
+    request.cancellationRequested = [&cancellationChecks] {
+        ++cancellationChecks;
+        return cancellationChecks >= 3;
+    };
+
+    const SkyEphemerisDataManager::StagedUpdateDownloadResult result = manager.stageEphemerisUpdateAsset(request);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(SkyEphemerisDataManager::StagedUpdateDownloadStatus::Canceled)
+    );
+    QCOMPARE(manager.dataRevision(), originalRevision);
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelPath, oldKernelPath);
+    QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
+    QVERIFY(QFileInfo::exists(result.stagedPath));
+    const qint64 stagedSize = QFileInfo(result.stagedPath).size();
+    QVERIFY(stagedSize > 0);
+    QVERIFY(stagedSize < payload.size());
+}
+
 void SkyEphemerisDataManagerTests::cancellationBeforeVerificationPreservesActiveDataAndRetainsStaging()
 {
     const QString oldKernelPath = m_settings.filePath(QStringLiteral("cancel-old-kernel.bsp"));
@@ -632,6 +681,56 @@ void SkyEphemerisDataManagerTests::cancellationDuringVerificationCanCleanStaging
     QCOMPARE(manager.activeCacheSnapshot().installedKernelPath, oldKernelPath);
     QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
     QVERIFY(!QFileInfo::exists(stagedPath));
+}
+
+void SkyEphemerisDataManagerTests::cancellationBeforeActivationPreservesVerifiedStagingAndActiveData()
+{
+    const QString oldKernelPath = m_settings.filePath(QStringLiteral("pre-activate-cancel-old-kernel.bsp"));
+    QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
+
+    SkySettingsStore store;
+    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot = installedSnapshot(oldKernelPath, QString());
+    QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
+    SkyEphemerisDataManager manager(&store);
+    const std::uint64_t originalRevision = manager.dataRevision();
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = stagedManifest();
+    manifest.profiles[0].assetIds = {"de440s-kernel"};
+    manifest.assets.resize(1);
+    writeStagedAssets(stagedRoot, manifest);
+
+    int cancellationChecks = 0;
+    SkyEphemerisDataManager::StagedUpdateActivationRequest request =
+        stagedActivationRequest(manifest, stagedRoot, m_settings.path());
+    request.requiredKinds.clear();
+    request.expectedComponents.clear();
+    request.cancellationRequested = [&cancellationChecks] {
+        ++cancellationChecks;
+        return cancellationChecks >= 7;
+    };
+
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result =
+        manager.activateVerifiedStagedUpdateSet(request);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(SkyEphemerisDataManager::StagedUpdateActivationStatus::Canceled)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.verificationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Canceled)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.activationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::InvalidRequest)
+    );
+    QCOMPARE(manager.dataRevision(), originalRevision);
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelPath, oldKernelPath);
+    QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
+    QVERIFY(QFileInfo::exists(stagedRoot.path() + QStringLiteral("/kernels/de440s.bsp")));
+    QVERIFY(!QFileInfo::exists(m_settings.filePath(QStringLiteral("updates/installed-rev-2"))));
 }
 
 void SkyEphemerisDataManagerTests::cancellationDuringActivationCleansPartialCacheAndPreservesActiveData()
