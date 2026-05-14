@@ -43,14 +43,7 @@ void appendTrailLine(
     const QColor& color
 )
 {
-    frame.lines.push_back(SkyRenderLine {
-        .x1 = x1,
-        .y1 = y1,
-        .x2 = x2,
-        .y2 = y2,
-        .widthPx = widthPx,
-        .color = color
-    });
+    frame.lines.push_back(SkyRenderLine{.x1 = x1, .y1 = y1, .x2 = x2, .y2 = y2, .widthPx = widthPx, .color = color});
 }
 
 void appendDashedTrailLine(
@@ -65,32 +58,16 @@ void appendDashedTrailLine(
 {
     const skygate::core::DashedLineBuilder dashBuilder;
     for (const auto& dash : dashBuilder.build(
-             skygate::core::LineSegment2d {
-                 .x1 = x1,
-                 .y1 = y1,
-                 .x2 = x2,
-                 .y2 = y2
-             },
+             skygate::core::LineSegment2d{.x1 = x1, .y1 = y1, .x2 = x2, .y2 = y2},
              kObjectTrailPastDashLengthPx,
              kObjectTrailPastDashGapPx
          )) {
-        appendTrailLine(
-            frame,
-            dash.x1,
-            dash.y1,
-            dash.x2,
-            dash.y2,
-            widthPx,
-            color
-        );
+        appendTrailLine(frame, dash.x1, dash.y1, dash.x2, dash.y2, widthPx, color);
     }
 }
 
 void appendFutureTrailTick(
-    SkyRenderFrame& frame,
-    const skygate::core::ScreenPoint& point,
-    const int offsetMinutes,
-    const QColor& color
+    SkyRenderFrame& frame, const skygate::core::ScreenPoint& point, const int offsetMinutes, const QColor& color
 )
 {
     appendTrailLine(
@@ -113,27 +90,17 @@ void appendFutureTrailTick(
     );
 
     skygate::ui::internal::appendSkyRenderLabel(
-        frame.labels,
-        "trailTick",
-        point.x,
-        point.y,
-        QString("+%1h").arg(offsetMinutes / 60),
-        color
+        frame.labels, "trailTick", point.x, point.y, QString("+%1h").arg(offsetMinutes / 60), color
     );
 }
 
 }  // namespace
 
-void SkyObjectTrailBuilder::appendTrail(
-    SkyRenderFrame& frame,
-    const SkyObjectTrailInput& input
-) const
+void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTrailInput& input) const
 {
-    if (
-        input.ephemerisEngine == nullptr
-        || input.preparedProjection == nullptr
-        || !input.skyContext.observer.isValid()
-    ) {
+    const skygate::core::SkyContext& context =
+        input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
+    if (input.ephemerisEngine == nullptr || input.preparedProjection == nullptr || !context.observer.isValid()) {
         return;
     }
 
@@ -148,16 +115,17 @@ void SkyObjectTrailBuilder::appendTrail(
     int previousOffsetMinutes = 0;
 
     const skygate::ephemeris::BodyTrailCalculator trailCalculator;
-    const auto samples = trailCalculator.sample(
-        *input.ephemerisEngine,
-        input.skyContext,
-        input.targetBodyIndex,
-        skygate::ephemeris::BodyTrailOptions {
-            .pastHours = kObjectTrailPastHours,
-            .futureHours = kObjectTrailFutureHours,
-            .sampleStepMinutes = kObjectTrailSampleStepMinutes
-        }
-    );
+    const skygate::ephemeris::BodyTrailOptions trailOptions{
+        .pastHours = kObjectTrailPastHours,
+        .futureHours = kObjectTrailFutureHours,
+        .sampleStepMinutes = kObjectTrailSampleStepMinutes
+    };
+    const auto samples =
+        input.ephemerisRequest.has_value()
+            ? trailCalculator.sample(
+                  *input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, trailOptions
+              )
+            : trailCalculator.sample(*input.ephemerisEngine, input.skyContext, input.targetBodyIndex, trailOptions);
 
     for (const auto& sample : samples) {
         if (!sample.horizontal.has_value() || !sample.horizontal->isValid()) {
@@ -166,47 +134,27 @@ void SkyObjectTrailBuilder::appendTrail(
         }
 
         if (hasPreviousCoordinate) {
-            const std::array<skygate::core::HorizontalCoordinate, 2> coordinates {
-                previousCoordinate,
-                *sample.horizontal
+            const std::array<skygate::core::HorizontalCoordinate, 2> coordinates{
+                previousCoordinate, *sample.horizontal
             };
             const bool isPastSegment = previousOffsetMinutes < 0 && sample.offsetMinutes <= 0;
-            for (const auto& segment : polylineBuilder.build(
-                     *input.preparedProjection,
-                     coordinates,
-                     maxSegmentLengthSquared
-                 )) {
+            for (const auto& segment :
+                 polylineBuilder.build(*input.preparedProjection, coordinates, maxSegmentLengthSquared)) {
                 if (isPastSegment) {
                     appendDashedTrailLine(
-                        frame,
-                        segment.x1,
-                        segment.y1,
-                        segment.x2,
-                        segment.y2,
-                        kObjectTrailPastWidthPx,
-                        pastColor
+                        frame, segment.x1, segment.y1, segment.x2, segment.y2, kObjectTrailPastWidthPx, pastColor
                     );
                 } else {
                     appendTrailLine(
-                        frame,
-                        segment.x1,
-                        segment.y1,
-                        segment.x2,
-                        segment.y2,
-                        kObjectTrailFutureWidthPx,
-                        futureColor
+                        frame, segment.x1, segment.y1, segment.x2, segment.y2, kObjectTrailFutureWidthPx, futureColor
                     );
                 }
             }
         }
 
         const auto projected = input.preparedProjection->project(*sample.horizontal);
-        if (
-            projected.isVisible
-            && projected.isFinite()
-            && sample.offsetMinutes > 0
-            && sample.offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0
-        ) {
+        if (projected.isVisible && projected.isFinite() && sample.offsetMinutes > 0
+            && sample.offsetMinutes % (kObjectTrailFutureTickStepHours * 60) == 0) {
             appendFutureTrailTick(frame, projected, sample.offsetMinutes, futureColor);
         }
 

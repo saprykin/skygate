@@ -7,6 +7,7 @@
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstdint>
+#include <optional>
 
 namespace skygate::ephemeris {
 class IEphemerisEngine;
@@ -16,6 +17,7 @@ struct SkyObjectTrailInput final {
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
     skygate::core::SkyContext skyContext;
+    std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
     std::uint32_t targetBodyIndex = 0;
     double viewportWidth = 0.0;

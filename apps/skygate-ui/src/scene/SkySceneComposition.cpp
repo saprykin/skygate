@@ -149,6 +149,7 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
                     .ephemerisEngine = input.frameInput.ephemerisEngine,
                     .preparedProjection = frameResult.preparedProjection,
                     .skyContext = input.frameInput.skyContext,
+                    .ephemerisRequest = input.frameInput.ephemerisRequest,
                     .renderTheme = input.frameInput.renderTheme,
                     .targetBodyIndex = *trailTargetBodyIndex,
                     .viewportWidth = input.viewportWidth,
