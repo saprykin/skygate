@@ -41,11 +41,13 @@ struct AltitudeSample final {
     };
 }
 
-[[nodiscard]] EphemerisRequest requestFromContext(const core::SkyContext& context) noexcept
+[[nodiscard]] EphemerisRequest
+requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephemerisEngine) noexcept
 {
     EphemerisRequest request;
     request.context = context;
     request.epoch = epochFromUtcTime(context.utcTime);
+    request.options = ephemerisEngine.options();
     return request;
 }
 
@@ -337,7 +339,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     const IEphemerisEngine& ephemerisEngine, const core::SkyContext& context, const std::uint32_t bodyIndex
 ) const
 {
-    return compute(ephemerisEngine, requestFromContext(context), bodyIndex, 0.0);
+    return compute(ephemerisEngine, requestFromContext(context, ephemerisEngine), bodyIndex, 0.0);
 }
 
 ObservationEventSummary ObservationEventCalculator::compute(
@@ -348,7 +350,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
 ) const
 {
     return computeObservationEvents(
-        ephemerisEngine, requestFromContext(context), bodyIndex, nullptr, crossingAltitudeDeg
+        ephemerisEngine, requestFromContext(context, ephemerisEngine), bodyIndex, nullptr, crossingAltitudeDeg
     );
 }
 
@@ -359,7 +361,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     const CelestialBody& body
 ) const
 {
-    return compute(ephemerisEngine, requestFromContext(context), bodyIndex, body, 0.0);
+    return compute(ephemerisEngine, requestFromContext(context, ephemerisEngine), bodyIndex, body, 0.0);
 }
 
 ObservationEventSummary ObservationEventCalculator::compute(
@@ -371,7 +373,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
 ) const
 {
     return computeObservationEvents(
-        ephemerisEngine, requestFromContext(context), bodyIndex, &body, crossingAltitudeDeg
+        ephemerisEngine, requestFromContext(context, ephemerisEngine), bodyIndex, &body, crossingAltitudeDeg
     );
 }
 

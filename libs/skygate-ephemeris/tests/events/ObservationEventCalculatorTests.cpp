@@ -214,6 +214,9 @@ public:
             || hasCorrectionFlag(
                 request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
             );
+        sawNoCorrectionsRequest =
+            sawNoCorrectionsRequest
+            || request.options.correctionFlags == skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
         if (request.context.utcTime != baseUtcTime
             && (request.epoch.julianDatePart1 != baseEpoch.julianDatePart1
                 || request.epoch.julianDatePart2 != baseEpoch.julianDatePart2)) {
@@ -252,6 +255,11 @@ public:
         return std::nullopt;
     }
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        return engineOptions;
+    }
+
     static double movingAltitudeDeg(const skygate::core::UtcTimePoint& utcTime) noexcept
     {
         const double seconds = static_cast<double>(utcTime.time_since_epoch().count());
@@ -259,11 +267,13 @@ public:
         return 35.0 * std::sin(2.0 * kPi * (phase - 0.25));
     }
 
+    skygate::ephemeris::EphemerisEngineOptions engineOptions;
     skygate::core::UtcTimePoint baseUtcTime{};
     skygate::ephemeris::AstronomicalEpoch baseEpoch;
     mutable int requestSampleCount = 0;
     mutable int contextSampleCount = 0;
     mutable bool sawLightTimeRequest = false;
+    mutable bool sawNoCorrectionsRequest = false;
     mutable bool sawSampleEpochUpdate = false;
 };
 
@@ -282,6 +292,7 @@ private slots:
     void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
     void movingBodySamplesThroughEphemerisEngine();
     void requestOverloadPropagatesOptionsAndSampleEpochs();
+    void contextOverloadSeedsRequestOptionsFromEngine();
 };
 
 void ObservationEventCalculatorTests::normalObjectFindsOrderedEventsAndRefinedHorizonCrossings()
@@ -482,6 +493,25 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+}
+
+void ObservationEventCalculatorTests::contextOverloadSeedsRequestOptionsFromEngine()
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    RequestSensitiveMovingEngine engine;
+    engine.engineOptions.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    engine.engineOptions.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    auto context = makeContext(0.0, 0.0);
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
+
+    const auto summary = calculator.compute(engine, context, 0U);
+
+    QCOMPARE(engine.contextSampleCount, 0);
+    QVERIFY(engine.requestSampleCount > 0);
+    QVERIFY(engine.sawNoCorrectionsRequest);
+    QVERIFY(!engine.sawLightTimeRequest);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
 }
 
 QTEST_APPLESS_MAIN(ObservationEventCalculatorTests)

@@ -26,3 +26,28 @@ READY
 ## Important notes
 - Full `ctest --test-dir build-ralph --output-on-failure` passed: 122 passed,
   2 skipped high-precision dependency tests.
+
+## Review fixes
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Context event overloads drop engine options
+  - Action: Fixed
+  - Notes: Context-based observation event overloads now seed synthesized
+    requests from `ephemerisEngine.options()`, preserving selected correction
+    and atmosphere options for compatibility callers.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/src/ObservationEventCalculator.cpp`
+  - `libs/skygate-ephemeris/tests/events/ObservationEventCalculatorTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-041D/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-041D/fix.md`
+- Tests run after fix:
+  - `cmake --build build-ralph --target
+    skygate-ephemeris-observation-event-calculator-tests`: PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R
+    skygate-ephemeris-observation-event-calculator-tests`: PASS
+  - `cmake --build build-ralph --target
+    skygate-ui-sky-selection-overlay-builder-tests`: PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R
+    skygate-ui-sky-selection-overlay-builder-tests`: PASS
+  - `ctest --test-dir build-ralph --output-on-failure`: PASS
+- Remaining concerns: None.
