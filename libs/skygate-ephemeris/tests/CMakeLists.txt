@@ -181,6 +181,11 @@ add_skygate_ephemeris_qtest(
     highprecision/StarAstrometryCalculatorTests.cpp
     LABELS "unit;highprecision;validation;stellar-astrometry"
 )
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-star-astrometry-arrays-tests
+    highprecision/CatalogStarAstrometryArraysTests.cpp
+    LABELS "unit;highprecision;stellar-astrometry;performance"
+)
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_skygate_ephemeris_qtest(
         skygate-ephemeris-calceph-kernel-provider-tests
