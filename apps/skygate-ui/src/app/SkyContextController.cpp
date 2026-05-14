@@ -1029,11 +1029,21 @@ bool SkyContextController::clearEphemerisDataCache()
 
 bool SkyContextController::updateEphemerisData()
 {
+    return updateEphemerisDataProfile(m_ephemerisUserSettings.preferredDataProfileId);
+}
+
+bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdText)
+{
     if (!ephemerisDataUpdateEnabled() || m_ephemerisDataManager == nullptr) {
         return false;
     }
 
-    const std::string profileId = m_ephemerisUserSettings.preferredDataProfileId.trimmed().toStdString();
+    const QString normalizedProfileId = profileIdText.trimmed();
+    if (normalizedProfileId.isEmpty()) {
+        return false;
+    }
+
+    const std::string profileId = normalizedProfileId.toStdString();
     const skygate::ephemeris::EphemerisDataManifestProfile* profile = m_ephemerisDataManifest->profile(profileId);
     if (profile == nullptr) {
         return false;
@@ -1041,7 +1051,7 @@ bool SkyContextController::updateEphemerisData()
 
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
     request.manifest = m_ephemerisDataManifest;
-    request.profileId = m_ephemerisUserSettings.preferredDataProfileId;
+    request.profileId = normalizedProfileId;
     request.stagedResourceRoot = m_ephemerisUpdateResourceRoot;
     request.writableCacheRoot = m_ephemerisWritableCacheRoot;
     request.revisionToken = QString::fromStdString(profile->id);
@@ -1056,7 +1066,11 @@ bool SkyContextController::updateEphemerisData()
         component.requiredValidityRange = asset->validityRange;
     }
 
-    return m_ephemerisDataManager->activateVerifiedStagedUpdateSet(request).isSuccess();
+    const bool activated = m_ephemerisDataManager->activateVerifiedStagedUpdateSet(request).isSuccess();
+    if (activated) {
+        m_ephemerisUserSettings.preferredDataProfileId = normalizedProfileId;
+    }
+    return activated;
 }
 
 QString SkyContextController::catalogUrlText() const

@@ -358,6 +358,7 @@ public:
     Q_INVOKABLE bool clearDeepSkyCatalogCache();
     Q_INVOKABLE bool clearEphemerisDataCache();
     Q_INVOKABLE bool updateEphemerisData();
+    Q_INVOKABLE bool updateEphemerisDataProfile(const QString& profileId);
     Q_INVOKABLE void setEphemerisDataOnlineUpdatesEnabled(bool enabled);
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);

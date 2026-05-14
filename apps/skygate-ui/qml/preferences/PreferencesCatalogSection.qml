@@ -345,19 +345,40 @@ Item {
                     }
                 }
 
-                PreferencesActionButton {
-                    objectName: "ephemerisDataUpdateButton"
-                    Layout.preferredWidth: 150
-                    text: "Update Data"
-                    enabled: skyContextController.ephemerisDataUpdateEnabled
-                    onClicked: skyContextController.updateEphemerisData()
+                Label {
+                    text: "Actions"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
                 }
 
-                PreferencesActionButton {
-                    objectName: "ephemerisDataClearCacheButton"
+                RowLayout {
                     Layout.fillWidth: true
-                    text: "Clear Ephemeris Data Cache"
-                    onClicked: skyContextController.clearEphemerisDataCache()
+                    spacing: 7
+
+                    PreferencesActionButton {
+                        objectName: "ephemerisDataUpdateButton"
+                        Layout.preferredWidth: 130
+                        text: "Update Modern"
+                        enabled: skyContextController.ephemerisDataUpdateEnabled
+                        onClicked: skyContextController.updateEphemerisDataProfile("modern")
+                    }
+
+                    PreferencesActionButton {
+                        objectName: "ephemerisLongRangeUpdateButton"
+                        Layout.preferredWidth: 130
+                        text: "Install DE441"
+                        enabled: skyContextController.ephemerisDataUpdateEnabled
+                        onClicked: skyContextController.updateEphemerisDataProfile("de441-long-range")
+                    }
+
+                    PreferencesActionButton {
+                        objectName: "ephemerisDataClearCacheButton"
+                        Layout.fillWidth: true
+                        text: "Clear Cache"
+                        onClicked: skyContextController.clearEphemerisDataCache()
+                    }
                 }
 
                 PreferencesGroupTitle {
