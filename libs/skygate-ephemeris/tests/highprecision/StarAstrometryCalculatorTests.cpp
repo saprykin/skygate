@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <vector>
 
 namespace {
 
@@ -54,6 +55,41 @@ constexpr double kPi = 3.141592653589793238462643383279502884;
     return body;
 }
 
+[[nodiscard]] CelestialBody makePartialAstrometricStar()
+{
+    CelestialBody body = makeAstrometricStar();
+    body.id = "partial-star";
+    body.displayName = "Partial Star";
+    body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
+    body.starAstrometry->stellarParallaxMas = std::nullopt;
+    body.starAstrometry->radialVelocityKmPerSecond = std::nullopt;
+    return body;
+}
+
+[[nodiscard]] CelestialBody makeFixedOnlyStar()
+{
+    CelestialBody body;
+    body.id = "fixed-star";
+    body.displayName = "Fixed Star";
+    body.type = CelestialBodyType::Star;
+    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.fixedEquatorial = core::EquatorialCoordinate{
+        .rightAscensionHours = 4.0,
+        .declinationDeg = -15.0,
+    };
+    return body;
+}
+
+[[nodiscard]] CelestialBody makePlanet()
+{
+    CelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.type = CelestialBodyType::Planet;
+    body.ephemerisSource = CelestialBodyEphemerisSource::Planet;
+    return body;
+}
+
 [[nodiscard]] HighPrecisionComputationInput makeInput(const CelestialBody& body, const EphemerisRequest& request)
 {
     return {
@@ -93,6 +129,26 @@ angularSeparationDegrees(const core::EquatorialCoordinate& lhs, const core::Equa
     const double cosine = std::sin(lhsDecRad) * std::sin(rhsDecRad)
                           + std::cos(lhsDecRad) * std::cos(rhsDecRad) * std::cos(lhsRaRad - rhsRaRad);
     return std::acos(std::clamp(cosine, -1.0, 1.0)) * 180.0 / kPi;
+}
+
+void compareCalculatorResults(
+    const HighPrecisionCalculatorResult& actual, const HighPrecisionCalculatorResult& expected
+)
+{
+    QCOMPARE(actual.equatorial.has_value(), expected.equatorial.has_value());
+    if (actual.equatorial.has_value() && expected.equatorial.has_value()) {
+        compareCoordinates(*actual.equatorial, *expected.equatorial, 0.0000001);
+    }
+    QCOMPARE(actual.observerRelativePositionAu.has_value(), expected.observerRelativePositionAu.has_value());
+    if (actual.observerRelativePositionAu.has_value() && expected.observerRelativePositionAu.has_value()) {
+        QCOMPARE(actual.observerRelativePositionAu->xAu, expected.observerRelativePositionAu->xAu);
+        QCOMPARE(actual.observerRelativePositionAu->yAu, expected.observerRelativePositionAu->yAu);
+        QCOMPARE(actual.observerRelativePositionAu->zAu, expected.observerRelativePositionAu->zAu);
+    }
+    QCOMPARE(actual.metadata.status, expected.metadata.status);
+    QCOMPARE(actual.metadata.appliedCorrections, expected.metadata.appliedCorrections);
+    QCOMPARE(actual.metadata.unavailableCorrections, expected.metadata.unavailableCorrections);
+    QCOMPARE(actual.metadata.warningCodeMask, expected.metadata.warningCodeMask);
 }
 
 class FixedEarthKernelProvider final : public ICalcephKernelProvider {
@@ -210,6 +266,8 @@ private slots:
     void leavesReferenceCoordinateWhenCorrectionsAreDisabled();
     void treatsRightAscensionProperMotionAsTangentPlaneComponent();
     void appliesAnnualParallaxWithEarthBarycentricState();
+    void batchMatchesSingleStarPropagationForFullPartialAndFixedStars();
+    void batchMatchesSingleStarAnnualParallaxCorrections();
     void degradesAnnualParallaxWhenKernelProviderIsMissing();
     void degradesAnnualParallaxWhenSourceParallaxIsMissing();
     void degradesRadialVelocityWhenStellarParallaxIsDisabled();
@@ -316,6 +374,61 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     );
     QCOMPARE(timeScaleService->callCount(), 1);
     QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Tdb));
+}
+
+void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPartialAndFixedStars()
+{
+    const std::vector<CelestialBody> bodies{
+        makePlanet(),
+        makeAstrometricStar(),
+        makePartialAstrometricStar(),
+        makeFixedOnlyStar(),
+    };
+    const CatalogStarAstrometryArrays arrays(bodies);
+    const EphemerisRequest request = makeRequest(
+        EphemerisCorrectionFlags::ProperMotion | EphemerisCorrectionFlags::StellarParallax
+            | EphemerisCorrectionFlags::RadialVelocity,
+        10.0
+    );
+
+    const StarAstrometryCalculator calculator;
+    const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
+
+    QCOMPARE(batchResults.size(), 3U);
+    QCOMPARE(batchResults[0].bodyIndex, 1U);
+    QCOMPARE(batchResults[1].bodyIndex, 2U);
+    QCOMPARE(batchResults[2].bodyIndex, 3U);
+    for (const StarAstrometryBatchResult& batchResult : batchResults) {
+        const HighPrecisionCalculatorResult singleResult =
+            calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));
+        compareCalculatorResults(batchResult.result, singleResult);
+    }
+}
+
+void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrections()
+{
+    const std::vector<CelestialBody> bodies{
+        makeAstrometricStar(),
+        makePartialAstrometricStar(),
+        makeFixedOnlyStar(),
+    };
+    const CatalogStarAstrometryArrays arrays(bodies);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    auto kernelProvider =
+        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
+    auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
+
+    const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
+    const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
+
+    QCOMPARE(batchResults.size(), 3U);
+    for (const StarAstrometryBatchResult& batchResult : batchResults) {
+        const HighPrecisionCalculatorResult singleResult =
+            calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));
+        compareCalculatorResults(batchResult.result, singleResult);
+    }
+    QCOMPARE(kernelProvider->lastTargetNaifId(), 399);
+    QCOMPARE(kernelProvider->lastCenterNaifId(), 0);
 }
 
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()

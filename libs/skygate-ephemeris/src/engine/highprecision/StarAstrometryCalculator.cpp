@@ -366,22 +366,15 @@ void recordAppliedCorrections(
     }
 }
 
-}  // namespace
-
-StarAstrometryCalculator::StarAstrometryCalculator(
-    std::shared_ptr<const ICalcephKernelProvider> kernelProvider,
-    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+[[nodiscard]] HighPrecisionCalculatorResult calculateStarAstrometry(
+    const EphemerisRequest& request,
+    const std::optional<CatalogStarAstrometry>& astrometry,
+    const std::optional<core::EquatorialCoordinate>& fixedEquatorial,
+    const std::shared_ptr<const ICalcephKernelProvider>& kernelProvider,
+    const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService
 )
-    : m_kernelProvider(std::move(kernelProvider)), m_timeScaleService(std::move(timeScaleService))
 {
-}
-
-HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrecisionComputationInput& input) const
-{
-    const EphemerisCorrectionFlags flags = input.request.options.correctionFlags;
-    const std::optional<CatalogStarAstrometry>& astrometry = input.body.starAstrometry;
-    const std::optional<core::EquatorialCoordinate>& fixedEquatorial = input.body.fixedEquatorial;
-
+    const EphemerisCorrectionFlags flags = request.options.correctionFlags;
     const core::EquatorialCoordinate* referenceEquatorial = nullptr;
     if (astrometry.has_value()) {
         referenceEquatorial = &astrometry->referenceEquatorial;
@@ -415,11 +408,11 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
         return result;
     }
 
-    if (!isFiniteEpoch(input.request.epoch) || !isFiniteEpoch(astrometry->referenceEpoch)) {
+    if (!isFiniteEpoch(request.epoch) || !isFiniteEpoch(astrometry->referenceEpoch)) {
         return makeFailedResult();
     }
 
-    const double elapsedYears = yearsBetween(astrometry->referenceEpoch, input.request.epoch);
+    const double elapsedYears = yearsBetween(astrometry->referenceEpoch, request.epoch);
     const std::optional<CartesianVector> propagatedVector =
         propagatedAstrometricVector(*astrometry, flags, elapsedYears);
     if (!propagatedVector.has_value()) {
@@ -427,18 +420,18 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
     }
 
     if (hasAnnualParallaxInput(*astrometry, flags)) {
-        if (m_kernelProvider == nullptr) {
+        if (kernelProvider == nullptr) {
             markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
             result.equatorial = equatorialFromVector(*propagatedVector);
         } else {
             const std::optional<AstronomicalEpoch> kernelEpoch =
-                tdbEpochForKernel(result.metadata, input.request.epoch, m_timeScaleService);
+                tdbEpochForKernel(result.metadata, request.epoch, timeScaleService);
             if (!kernelEpoch.has_value()) {
                 markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
                 result.equatorial = equatorialFromVector(*propagatedVector);
             } else {
                 const SolarSystemKernelStateResult earthState =
-                    m_kernelProvider->computeGeometricState(*kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+                    kernelProvider->computeGeometricState(*kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
                 mergeKernelMetadata(result.metadata, earthState.metadata);
                 if (earthState.positionAu.has_value()) {
                     const CartesianVector geocentricVector =
@@ -462,6 +455,61 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
     recordUnavailableRequestedFields(result.metadata, *astrometry, flags);
     recordAppliedCorrections(result.metadata, *astrometry, flags);
     return result;
+}
+
+[[nodiscard]] std::optional<CatalogStarAstrometry>
+astrometryFromArrays(const CatalogStarAstrometryArrays& arrays, const std::size_t arrayIndex)
+{
+    if (!arrays.hasCatalogAstrometry(arrayIndex)) {
+        return std::nullopt;
+    }
+
+    return CatalogStarAstrometry{
+        .referenceEquatorial = arrays.referenceEquatorial(arrayIndex),
+        .referenceEpoch = arrays.referenceEpoch(arrayIndex),
+        .properMotionRightAscensionMasPerYear = arrays.properMotionRightAscensionMasPerYear(arrayIndex),
+        .properMotionDeclinationMasPerYear = arrays.properMotionDeclinationMasPerYear(arrayIndex),
+        .stellarParallaxMas = arrays.stellarParallaxMas(arrayIndex),
+        .radialVelocityKmPerSecond = arrays.radialVelocityKmPerSecond(arrayIndex),
+        .validityRange = arrays.validityRange(arrayIndex),
+    };
+}
+
+}  // namespace
+
+StarAstrometryCalculator::StarAstrometryCalculator(
+    std::shared_ptr<const ICalcephKernelProvider> kernelProvider,
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+)
+    : m_kernelProvider(std::move(kernelProvider)), m_timeScaleService(std::move(timeScaleService))
+{
+}
+
+HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrecisionComputationInput& input) const
+{
+    return calculateStarAstrometry(
+        input.request, input.body.starAstrometry, input.body.fixedEquatorial, m_kernelProvider, m_timeScaleService
+    );
+}
+
+std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
+    const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays
+) const
+{
+    std::vector<StarAstrometryBatchResult> results;
+    results.reserve(arrays.size());
+
+    for (std::size_t arrayIndex = 0U; arrayIndex < arrays.size(); ++arrayIndex) {
+        const std::optional<CatalogStarAstrometry> astrometry = astrometryFromArrays(arrays, arrayIndex);
+        const std::optional<core::EquatorialCoordinate> fixedEquatorial = arrays.fixedEquatorialFallback(arrayIndex);
+        results.push_back(StarAstrometryBatchResult{
+            .bodyIndex = arrays.bodyIndices()[arrayIndex],
+            .result =
+                calculateStarAstrometry(request, astrometry, fixedEquatorial, m_kernelProvider, m_timeScaleService),
+        });
+    }
+
+    return results;
 }
 
 }  // namespace skygate::ephemeris::highprecision
