@@ -88,6 +88,15 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     };
 }
 
+[[nodiscard]] std::optional<CelestialFrameVector>
+celestialVectorFromSolarSystemVector(const std::optional<SolarSystemKernelVector>& vector) noexcept
+{
+    if (!vector.has_value()) {
+        return std::nullopt;
+    }
+    return celestialVectorFromSolarSystemVector(*vector);
+}
+
 [[nodiscard]] std::optional<CelestialFrameVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept
 {
     if (!observer.isValid()) {
@@ -277,7 +286,12 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
     const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
     if (targetFrame == CelestialReferenceFrame::Itrs) {
-        if (m_timeScaleService == nullptr) {
+        if (input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared) {
+            mergeMetadata(result.metadata, input.preparedRequestState->topocentricMetadata);
+            if (!input.preparedRequestState->topocentricStateAvailable) {
+                return result;
+            }
+        } else if (m_timeScaleService == nullptr) {
             result.metadata.status = EphemerisResultStatus::Failed;
             result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::EarthOrientation);
@@ -333,7 +347,9 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     }
     if (targetFrame == CelestialReferenceFrame::Itrs) {
         const std::optional<CelestialFrameVector> observerPosition =
-            observerItrsPositionAu(input.request.context.observer);
+            input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared
+                ? celestialVectorFromSolarSystemVector(input.preparedRequestState->observerItrsPositionAu)
+                : observerItrsPositionAu(input.request.context.observer);
         if (!observerPosition.has_value()) {
             if (result.metadata.status == EphemerisResultStatus::Valid) {
                 result.metadata.status = EphemerisResultStatus::Degraded;
@@ -418,7 +434,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
     const EphemerisRequest& request,
     const std::span<const CelestialBody> bodies,
-    const std::span<const StarAstrometryBatchResult> calculatorResults
+    const std::span<const StarAstrometryBatchResult> calculatorResults,
+    std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState
 ) const
 {
     const EphemerisCorrectionFlags requestedCorrections = request.options.correctionFlags;
@@ -432,7 +449,10 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
     EphemerisResultMetadata topocentricMetadata;
     bool topocentricRequestWideStateAvailable = true;
     if (isTopocentric) {
-        if (m_timeScaleService == nullptr) {
+        if (preparedRequestState != nullptr && preparedRequestState->topocentricStatePrepared) {
+            topocentricMetadata = preparedRequestState->topocentricMetadata;
+            topocentricRequestWideStateAvailable = preparedRequestState->topocentricStateAvailable;
+        } else if (m_timeScaleService == nullptr) {
             topocentricMetadata.status = EphemerisResultStatus::Failed;
             topocentricMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             topocentricMetadata.addUnavailableCorrection(EphemerisCorrectionFlags::EarthOrientation);
@@ -556,7 +576,10 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
     std::vector<std::optional<CelestialFrameVector>> equatorialVectors = outputVectors;
     if (isTopocentric) {
-        const std::optional<CelestialFrameVector> observerPosition = observerItrsPositionAu(request.context.observer);
+        const std::optional<CelestialFrameVector> observerPosition =
+            preparedRequestState != nullptr && preparedRequestState->topocentricStatePrepared
+                ? celestialVectorFromSolarSystemVector(preparedRequestState->observerItrsPositionAu)
+                : observerItrsPositionAu(request.context.observer);
         for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
             if (!outputVectors[resultIndex].has_value()) {
                 continue;
@@ -681,6 +704,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                 const HighPrecisionComputationInput input{
                     .request = request,
                     .body = bodies[results[resultIndex].bodyIndex],
+                    .preparedRequestState = preparedRequestState,
                     .bodyIndex = results[resultIndex].bodyIndex,
                 };
                 result = m_atmosphericRefractionCalculator->apply(input, result);

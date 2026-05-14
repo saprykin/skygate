@@ -21,6 +21,11 @@ namespace {
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
 constexpr double kSecondsPerDay = 86'400.0;
 constexpr double kUnixEpochJulianDay = 2'440'587.5;
+constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
+constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
+constexpr double kWgs84Flattening = 1.0 / 298.257223563;
+constexpr int kNaifEarth = 399;
+constexpr int kNaifSolarSystemBarycenter = 0;
 
 [[nodiscard]] bool hasValidEpoch(const AstronomicalEpoch& epoch) noexcept
 {
@@ -57,6 +62,85 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
 [[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
 {
     return request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections;
+}
+
+[[nodiscard]] bool requestsAnnualParallaxState(const EphemerisRequest& request) noexcept
+{
+    return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::AnnualParallax);
+}
+
+[[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
+{
+    return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax);
+}
+
+[[nodiscard]] std::optional<SolarSystemKernelVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept
+{
+    if (!observer.isValid()) {
+        return std::nullopt;
+    }
+
+    const double latitudeRad = observer.latitudeDeg * 3.141592653589793238462643383279502884 / 180.0;
+    const double longitudeRad = observer.longitudeDeg * 3.141592653589793238462643383279502884 / 180.0;
+    const double sinLatitude = std::sin(latitudeRad);
+    const double cosLatitude = std::cos(latitudeRad);
+    const double sinLongitude = std::sin(longitudeRad);
+    const double cosLongitude = std::cos(longitudeRad);
+    const double firstEccentricitySquared = kWgs84Flattening * (2.0 - kWgs84Flattening);
+    const double primeVerticalRadius =
+        kWgs84EquatorialRadiusMeters / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
+
+    const double xMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * cosLongitude;
+    const double yMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * sinLongitude;
+    const double zMeters =
+        (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
+    return SolarSystemKernelVector{
+        .xAu = xMeters / kAstronomicalUnitMeters,
+        .yAu = yMeters / kAstronomicalUnitMeters,
+        .zAu = zMeters / kAstronomicalUnitMeters,
+    };
+}
+
+void addUnavailableCorrection(EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags correction) noexcept
+{
+    if (metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+    }
+    metadata.addUnavailableCorrection(correction);
+}
+
+void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
+{
+    if (conversion.status == TimeScaleConversionStatus::Failed) {
+        if (metadata.status == EphemerisResultStatus::Valid) {
+            metadata.status = EphemerisResultStatus::Degraded;
+        }
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return;
+    }
+    if (conversion.status == TimeScaleConversionStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
+    }
+}
+
+void mergeEarthOrientationMetadata(EphemerisResultMetadata& metadata, const EarthOrientationSample& sample) noexcept
+{
+    if (sample.status == EarthOrientationSampleStatus::Failed) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return;
+    }
+    if (sample.status == EarthOrientationSampleStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
+    }
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    }
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
+        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    }
 }
 
 class DefaultApparentPlaceCalculator final : public IApparentPlaceCalculator {
@@ -107,14 +191,16 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
     const HighPrecisionEphemerisEngineDependencies& dependencies,
     const EphemerisRequest& request,
     const std::span<const CelestialBody> bodies,
-    const std::span<const StarAstrometryBatchResult> calculatorResults
+    const std::span<const StarAstrometryBatchResult> calculatorResults,
+    std::shared_ptr<const PreparedEphemerisRequestState> preparedState
 )
 {
     if (!requestsApparentPlaceProcessing(request)) {
         return {calculatorResults.begin(), calculatorResults.end()};
     }
 
-    return apparentPlaceCalculator(dependencies).applyBatch(request, bodies, calculatorResults);
+    return apparentPlaceCalculator(dependencies)
+        .applyBatch(request, bodies, calculatorResults, std::move(preparedState));
 }
 
 }  // namespace
@@ -178,14 +264,17 @@ SkySnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& reques
         }
     }
 
-    SkySnapshot snapshot = computeUncached(request);
+    const std::shared_ptr<const PreparedEphemerisRequestState> preparedState = preparedRequestState(request);
+    SkySnapshot snapshot = computeUncached(request, preparedState);
     if (m_dependencies.computationCache != nullptr) {
         m_dependencies.computationCache->storeSnapshot(request, *m_bodies, m_dependencies.dataSetInfo, snapshot);
     }
     return snapshot;
 }
 
-SkySnapshot HighPrecisionEphemerisEngine::computeUncached(const EphemerisRequest& request) const
+SkySnapshot HighPrecisionEphemerisEngine::computeUncached(
+    const EphemerisRequest& request, std::shared_ptr<const PreparedEphemerisRequestState> preparedState
+) const
 {
     SkySnapshot snapshot;
     snapshot.context = request.context;
@@ -198,6 +287,7 @@ SkySnapshot HighPrecisionEphemerisEngine::computeUncached(const EphemerisRequest
             const HighPrecisionComputationInput input{
                 .request = request,
                 .body = (*m_bodies)[bodyIndex],
+                .preparedRequestState = preparedState,
                 .bodyIndex = bodyIndex,
             };
             snapshot.states[bodyIndex] = builder.buildFailedState(input);
@@ -209,9 +299,9 @@ SkySnapshot HighPrecisionEphemerisEngine::computeUncached(const EphemerisRequest
     const IStarAstrometryCalculator* starAstrometryCalculator = m_dependencies.starAstrometryCalculator.get();
     if (starAstrometryCalculator != nullptr && !m_catalogStarAstrometryArrays.empty()) {
         const std::vector<StarAstrometryBatchResult> batchResults =
-            starAstrometryCalculator->calculateBatch(request, m_catalogStarAstrometryArrays);
+            starAstrometryCalculator->calculateBatch(request, m_catalogStarAstrometryArrays, preparedState);
         const std::vector<StarAstrometryBatchResult> apparentBatchResults =
-            applyApparentPlaceBatchIfRequested(m_dependencies, request, *m_bodies, batchResults);
+            applyApparentPlaceBatchIfRequested(m_dependencies, request, *m_bodies, batchResults, preparedState);
         for (const StarAstrometryBatchResult& batchResult : apparentBatchResults) {
             if (batchResult.bodyIndex >= m_bodies->size()
                 || batchResult.bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
@@ -221,6 +311,7 @@ SkySnapshot HighPrecisionEphemerisEngine::computeUncached(const EphemerisRequest
             const HighPrecisionComputationInput input{
                 .request = request,
                 .body = (*m_bodies)[batchResult.bodyIndex],
+                .preparedRequestState = preparedState,
                 .bodyIndex = batchResult.bodyIndex,
             };
             snapshot.states[batchResult.bodyIndex] = builder.buildState(input, batchResult.result);
@@ -232,7 +323,7 @@ SkySnapshot HighPrecisionEphemerisEngine::computeUncached(const EphemerisRequest
         if (batchFilledStates[bodyIndex] != 0U) {
             continue;
         }
-        snapshot.states[bodyIndex] = computeStateForBody(request, bodyIndex);
+        snapshot.states[bodyIndex] = computeStateForBody(request, bodyIndex, preparedState);
     }
 
     return snapshot;
@@ -248,7 +339,14 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
     for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
         const CelestialBody& body = (*m_bodies)[bodyIndex];
         if (strings::equalsIgnoreAsciiCase(body.id, bodyId)) {
-            return computeStateForBody(request, bodyIndex);
+            if (m_dependencies.computationCache != nullptr) {
+                if (std::optional<SkySnapshot> cachedSnapshot =
+                        m_dependencies.computationCache->findSnapshot(request, *m_bodies, m_dependencies.dataSetInfo);
+                    cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
+                    return cachedSnapshot->states[bodyIndex];
+                }
+            }
+            return computeStateForBody(request, bodyIndex, preparedRequestState(request));
         }
     }
 
@@ -270,7 +368,7 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
         }
     }
 
-    return computeStateForBody(request, bodyIndex);
+    return computeStateForBody(request, bodyIndex, preparedRequestState(request));
 }
 
 SkySnapshot HighPrecisionEphemerisEngine::compute(const core::SkyContext& context) const
@@ -299,13 +397,96 @@ EphemerisRequest HighPrecisionEphemerisEngine::makeCompatibilityRequest(const co
     return request;
 }
 
-CelestialBodyState
-HighPrecisionEphemerisEngine::computeStateForBody(const EphemerisRequest& request, const std::size_t bodyIndex) const
+std::shared_ptr<const PreparedEphemerisRequestState>
+HighPrecisionEphemerisEngine::preparedRequestState(const EphemerisRequest& request) const
+{
+    if (m_dependencies.computationCache != nullptr) {
+        if (std::shared_ptr<const PreparedEphemerisRequestState> cachedState =
+                m_dependencies.computationCache->findPreparedRequestState(
+                    request, *m_bodies, m_dependencies.dataSetInfo
+                );
+            cachedState != nullptr) {
+            return cachedState;
+        }
+    }
+
+    std::shared_ptr<const PreparedEphemerisRequestState> preparedState = buildPreparedRequestState(request);
+    if (m_dependencies.computationCache != nullptr) {
+        m_dependencies.computationCache->storePreparedRequestState(
+            request, *m_bodies, m_dependencies.dataSetInfo, preparedState
+        );
+    }
+    return preparedState;
+}
+
+std::shared_ptr<const PreparedEphemerisRequestState>
+HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& request) const
+{
+    auto preparedState = std::make_shared<PreparedEphemerisRequestState>();
+    if (requestsAnnualParallaxState(request)) {
+        if (request.epoch.timeScale == TimeScale::Tdb) {
+            preparedState->tdbKernelEpoch = normalizedAstronomicalEpoch(request.epoch);
+        } else if (m_dependencies.timeScaleService == nullptr) {
+            preparedState->tdbKernelEpochMetadata.status = EphemerisResultStatus::Degraded;
+            preparedState->tdbKernelEpochMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        } else {
+            const TimeScaleConversionResult conversion =
+                m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Tdb);
+            mergeTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
+            if (conversion.isSuccess()) {
+                preparedState->tdbKernelEpoch = conversion.epoch;
+            }
+        }
+
+        if (preparedState->tdbKernelEpoch.has_value() && m_dependencies.calcephKernelProvider != nullptr) {
+            preparedState->annualParallaxEarthState = m_dependencies.calcephKernelProvider->computeGeometricState(
+                *preparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter
+            );
+        }
+    }
+
+    if (requestsTopocentricState(request) && m_dependencies.timeScaleService != nullptr) {
+        preparedState->topocentricStatePrepared = true;
+        preparedState->observerItrsPositionAu = observerItrsPositionAu(request.context.observer);
+        const TimeScaleConversionResult utcConversion =
+            m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Utc);
+        mergeTimeScaleMetadata(preparedState->topocentricMetadata, utcConversion);
+        if (!utcConversion.isSuccess()) {
+            preparedState->topocentricStateAvailable = false;
+            addUnavailableCorrection(preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation);
+        } else {
+            preparedState->earthOrientationSample = sampleEarthOrientation(
+                m_dependencies.earthOrientationProvider,
+                utcConversion.epoch,
+                EarthOrientationSampleOptions{
+                    .allowOutOfRangeNearestSampleFallback = true,
+                    .allowMissingDataZeroFallback = true,
+                }
+            );
+            mergeEarthOrientationMetadata(preparedState->topocentricMetadata, *preparedState->earthOrientationSample);
+            if (!preparedState->earthOrientationSample->isSuccess()) {
+                preparedState->topocentricStateAvailable = false;
+                addUnavailableCorrection(
+                    preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
+                );
+            }
+        }
+    }
+
+    return preparedState;
+}
+
+CelestialBodyState HighPrecisionEphemerisEngine::computeStateForBody(
+    const EphemerisRequest& request,
+    const std::size_t bodyIndex,
+    std::shared_ptr<const PreparedEphemerisRequestState> preparedState
+) const
 {
     const CelestialBody& body = (*m_bodies)[bodyIndex];
     const HighPrecisionComputationInput input{
         .request = request,
         .body = body,
+        .preparedRequestState = std::move(preparedState),
         .bodyIndex = bodyIndex,
     };
     const IEphemerisResultBuilder& builder = resultBuilder(m_dependencies);

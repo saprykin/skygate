@@ -16,8 +16,11 @@ public:
     );
 
     [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const override;
-    [[nodiscard]] std::vector<StarAstrometryBatchResult>
-    calculateBatch(const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays) const override;
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> calculateBatch(
+        const EphemerisRequest& request,
+        const CatalogStarAstrometryArrays& arrays,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
+    ) const override;
 
 private:
     std::shared_ptr<const ICalcephKernelProvider> m_kernelProvider;
