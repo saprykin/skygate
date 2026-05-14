@@ -162,6 +162,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;highprecision"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-atmospheric-refraction-calculator-tests
+    highprecision/AtmosphericRefractionCalculatorTests.cpp
+    LABELS "unit;highprecision;validation;apparent"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-apparent-radec-validation-tests
     highprecision/ApparentRaDecValidationTests.cpp
     LABELS "unit;highprecision;validation;apparent"

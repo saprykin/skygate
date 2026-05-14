@@ -44,11 +44,6 @@ public:
 
 class IFrameTransformer;
 
-class IAtmosphericRefractionCalculator {
-public:
-    virtual ~IAtmosphericRefractionCalculator() = default;
-};
-
 class IEphemerisComputationCache {
 public:
     virtual ~IEphemerisComputationCache() = default;
@@ -65,6 +60,14 @@ struct HighPrecisionCalculatorResult {
     std::optional<core::HorizontalCoordinate> horizontal;
     std::optional<SolarSystemKernelVector> observerRelativePositionAu;
     EphemerisResultMetadata metadata;
+};
+
+class IAtmosphericRefractionCalculator {
+public:
+    virtual ~IAtmosphericRefractionCalculator() = default;
+
+    [[nodiscard]] virtual HighPrecisionCalculatorResult
+    apply(const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult) const;
 };
 
 class ISolarSystemStateCalculator {

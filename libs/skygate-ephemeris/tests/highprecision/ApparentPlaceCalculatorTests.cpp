@@ -1,5 +1,6 @@
 #include "EphemerisFixtureSupport.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
+#include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 
 #include <QFile>
@@ -522,6 +523,7 @@ private slots:
     void reportsUnavailableParallaxWhenDistanceVectorIsMissing();
     void leavesApparentRequestGeocentricWhenParallaxIsDisabled();
     void changesTopocentricPositionWhenObserverElevationChanges();
+    void appliesAtmosphericRefractionToTopocentricHorizontalCoordinates();
     void reportsUnavailableRefractionMode();
 };
 
@@ -975,6 +977,38 @@ void ApparentPlaceCalculatorTests::changesTopocentricPositionWhenObserverElevati
         || elevatedResult.horizontal->altitudeDeg != seaLevelResult.horizontal->altitudeDeg
     );
     QVERIFY(hasCorrectionFlag(elevatedResult.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
+}
+
+void ApparentPlaceCalculatorTests::appliesAtmosphericRefractionToTopocentricHorizontalCoordinates()
+{
+    auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
+    const auto refractionCalculator = std::make_shared<AtmosphericRefractionCalculator>();
+    const ApparentPlaceCalculator calculator(frameTransformer, timeScaleService, nullptr, refractionCalculator);
+    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::ApparentTopocentric);
+    request.options.enableAtmosphericRefraction = true;
+    request.context.observer = {
+        .latitudeDeg = 45.0,
+        .longitudeDeg = 0.0,
+        .elevationMeters = 0.0,
+    };
+
+    const HighPrecisionCalculatorResult result = calculator.apply(
+        makeInput(request),
+        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
+            .xAu = 1.0,
+            .yAu = 0.0,
+            .zAu = 1.0,
+        })
+    );
+
+    QVERIFY(result.horizontal.has_value());
+    QVERIFY(result.horizontal->altitudeDeg > 0.0);
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
 }
 
 void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()

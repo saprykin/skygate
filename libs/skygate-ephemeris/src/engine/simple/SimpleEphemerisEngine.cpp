@@ -2,6 +2,7 @@
 
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "StringUtilities.hpp"
+#include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
@@ -470,8 +471,13 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
             dependencies.frameTransformer = std::make_shared<highprecision::ErfaFrameTransformer>(
                 request.timeScaleService, request.earthOrientationProvider
             );
+            dependencies.atmosphericRefractionCalculator =
+                std::make_shared<highprecision::AtmosphericRefractionCalculator>();
             dependencies.apparentPlaceCalculator = std::make_shared<highprecision::ApparentPlaceCalculator>(
-                dependencies.frameTransformer, request.timeScaleService, request.earthOrientationProvider
+                dependencies.frameTransformer,
+                request.timeScaleService,
+                request.earthOrientationProvider,
+                dependencies.atmosphericRefractionCalculator
             );
             dependencies.dataSetInfo = request.dataManifest->dataSetInfo;
             if (request.dataSetManifest != nullptr) {

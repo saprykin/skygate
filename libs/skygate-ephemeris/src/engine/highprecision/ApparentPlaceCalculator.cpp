@@ -253,10 +253,12 @@ computationVectorFromCalculatorResult(const HighPrecisionCalculatorResult& calcu
 ApparentPlaceCalculator::ApparentPlaceCalculator(
     std::shared_ptr<const IFrameTransformer> frameTransformer,
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService,
-    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider,
+    std::shared_ptr<const IAtmosphericRefractionCalculator> atmosphericRefractionCalculator
 )
     : m_frameTransformer(std::move(frameTransformer)), m_timeScaleService(std::move(timeScaleService)),
-      m_earthOrientationProvider(std::move(earthOrientationProvider))
+      m_earthOrientationProvider(std::move(earthOrientationProvider)),
+      m_atmosphericRefractionCalculator(std::move(atmosphericRefractionCalculator))
 {
 }
 
@@ -393,7 +395,11 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 
     if (input.request.options.enableAtmosphericRefraction
         && hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction)) {
-        markCorrectionUnavailable(result.metadata);
+        if (m_atmosphericRefractionCalculator == nullptr) {
+            markCorrectionUnavailable(result.metadata);
+        } else {
+            result = m_atmosphericRefractionCalculator->apply(input, result);
+        }
     }
 
     return result;
