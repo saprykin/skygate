@@ -97,8 +97,10 @@ angularSeparationDegrees(const core::EquatorialCoordinate& lhs, const core::Equa
 
 class FixedEarthKernelProvider final : public ICalcephKernelProvider {
 public:
-    explicit FixedEarthKernelProvider(std::optional<SolarSystemKernelVector> earthPositionAu)
-        : m_earthPositionAu(earthPositionAu)
+    explicit FixedEarthKernelProvider(
+        std::optional<SolarSystemKernelVector> earthPositionAu, const bool requireTdbEpoch = false
+    )
+        : m_earthPositionAu(earthPositionAu), m_requireTdbEpoch(requireTdbEpoch)
     {
     }
 
@@ -111,6 +113,12 @@ public:
         m_lastCenterNaifId = centerNaifId;
 
         SolarSystemKernelStateResult result;
+        if (m_requireTdbEpoch && epoch.timeScale != TimeScale::Tdb) {
+            result.metadata.status = EphemerisResultStatus::Failed;
+            result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            return result;
+        }
+
         result.positionAu = m_earthPositionAu;
         result.metadata.status =
             m_earthPositionAu.has_value() ? EphemerisResultStatus::Valid : EphemerisResultStatus::Failed;
@@ -143,10 +151,53 @@ public:
 
 private:
     std::optional<SolarSystemKernelVector> m_earthPositionAu;
+    bool m_requireTdbEpoch = false;
     mutable int m_callCount = 0;
     mutable int m_lastTargetNaifId = 0;
     mutable int m_lastCenterNaifId = 0;
     mutable AstronomicalEpoch m_lastEpoch;
+};
+
+class FixedTdbTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    {
+        ++m_callCount;
+        m_lastTargetScale = targetScale;
+
+        TimeScaleConversionResult result;
+        result.epoch = epoch;
+        result.epoch.timeScale = targetScale;
+        result.status = TimeScaleConversionStatus::Valid;
+        return result;
+    }
+
+    [[nodiscard]] TimeScaleConversionResult
+    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    {
+        static_cast<void>(dateTime);
+
+        TimeScaleConversionResult result;
+        result.epoch.timeScale = targetScale;
+        result.status = TimeScaleConversionStatus::Failed;
+        result.addWarning(TimeScaleConversionWarningCode::UnsupportedConversion);
+        return result;
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+    [[nodiscard]] TimeScale lastTargetScale() const noexcept
+    {
+        return m_lastTargetScale;
+    }
+
+private:
+    mutable int m_callCount = 0;
+    mutable TimeScale m_lastTargetScale = TimeScale::Utc;
 };
 
 }  // namespace
@@ -244,9 +295,10 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::StellarParallax, 0.0);
     const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
     auto kernelProvider =
-        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
+    auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
 
-    const StarAstrometryCalculator calculator(kernelProvider);
+    const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
     const HighPrecisionCalculatorResult referenceResult = calculator.calculate(makeInput(body, referenceRequest));
     const HighPrecisionCalculatorResult parallaxResult = calculator.calculate(makeInput(body, parallaxRequest));
 
@@ -259,6 +311,11 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     QCOMPARE(kernelProvider->callCount(), 1);
     QCOMPARE(kernelProvider->lastTargetNaifId(), 399);
     QCOMPARE(kernelProvider->lastCenterNaifId(), 0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(kernelProvider->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb)
+    );
+    QCOMPARE(timeScaleService->callCount(), 1);
+    QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Tdb));
 }
 
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()

@@ -284,6 +284,47 @@ void mergeKernelMetadata(EphemerisResultMetadata& target, const EphemerisResultM
     }
 }
 
+void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
+{
+    if (conversion.status == TimeScaleConversionStatus::Failed) {
+        if (metadata.status == EphemerisResultStatus::Valid) {
+            metadata.status = EphemerisResultStatus::Degraded;
+        }
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return;
+    }
+    if (conversion.status == TimeScaleConversionStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
+    }
+}
+
+[[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
+    EphemerisResultMetadata& metadata,
+    const AstronomicalEpoch& epoch,
+    const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService
+) noexcept
+{
+    if (epoch.timeScale == TimeScale::Tdb) {
+        return epoch;
+    }
+    if (timeScaleService == nullptr) {
+        if (metadata.status == EphemerisResultStatus::Valid) {
+            metadata.status = EphemerisResultStatus::Degraded;
+        }
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return std::nullopt;
+    }
+
+    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, TimeScale::Tdb);
+    mergeTimeScaleMetadata(metadata, conversion);
+    if (!conversion.isSuccess()) {
+        return std::nullopt;
+    }
+
+    return conversion.epoch;
+}
+
 void recordUnavailableRequestedFields(
     EphemerisResultMetadata& metadata, const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags
 ) noexcept
@@ -325,8 +366,11 @@ void recordAppliedCorrections(
 
 }  // namespace
 
-StarAstrometryCalculator::StarAstrometryCalculator(std::shared_ptr<const ICalcephKernelProvider> kernelProvider)
-    : m_kernelProvider(std::move(kernelProvider))
+StarAstrometryCalculator::StarAstrometryCalculator(
+    std::shared_ptr<const ICalcephKernelProvider> kernelProvider,
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
+)
+    : m_kernelProvider(std::move(kernelProvider)), m_timeScaleService(std::move(timeScaleService))
 {
 }
 
@@ -378,19 +422,26 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
             markCorrectionUnavailable(result.metadata);
             result.equatorial = equatorialFromVector(*propagatedVector);
         } else {
-            const SolarSystemKernelStateResult earthState =
-                m_kernelProvider->computeGeometricState(input.request.epoch, kNaifEarth, kNaifSolarSystemBarycenter);
-            mergeKernelMetadata(result.metadata, earthState.metadata);
-            if (earthState.positionAu.has_value()) {
-                const CartesianVector geocentricVector =
-                    subtractVectors(*propagatedVector, cartesianFromSolarSystemVector(*earthState.positionAu));
-                result.observerRelativePositionAu = solarSystemVectorFromCartesian(geocentricVector);
-                result.equatorial = equatorialFromVector(geocentricVector);
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::AnnualParallax;
-            } else {
-                result.metadata.status = EphemerisResultStatus::Degraded;
+            const std::optional<AstronomicalEpoch> kernelEpoch =
+                tdbEpochForKernel(result.metadata, input.request.epoch, m_timeScaleService);
+            if (!kernelEpoch.has_value()) {
                 markCorrectionUnavailable(result.metadata);
                 result.equatorial = equatorialFromVector(*propagatedVector);
+            } else {
+                const SolarSystemKernelStateResult earthState =
+                    m_kernelProvider->computeGeometricState(*kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+                mergeKernelMetadata(result.metadata, earthState.metadata);
+                if (earthState.positionAu.has_value()) {
+                    const CartesianVector geocentricVector =
+                        subtractVectors(*propagatedVector, cartesianFromSolarSystemVector(*earthState.positionAu));
+                    result.observerRelativePositionAu = solarSystemVectorFromCartesian(geocentricVector);
+                    result.equatorial = equatorialFromVector(geocentricVector);
+                    result.metadata.appliedCorrections |= EphemerisCorrectionFlags::AnnualParallax;
+                } else {
+                    result.metadata.status = EphemerisResultStatus::Degraded;
+                    markCorrectionUnavailable(result.metadata);
+                    result.equatorial = equatorialFromVector(*propagatedVector);
+                }
             }
         }
     } else {
