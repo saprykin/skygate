@@ -92,6 +92,13 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(bool logToTerminal READ logToTerminal WRITE setLogToTerminal NOTIFY loggingChanged)
     Q_PROPERTY(bool logToFile READ logToFile WRITE setLogToFile NOTIFY loggingChanged)
     Q_PROPERTY(QString logFilePath READ logFilePath WRITE setLogFilePath NOTIFY loggingChanged)
+    Q_PROPERTY(int ephemerisEngineKindIndex READ ephemerisEngineKindIndex WRITE setEphemerisEngineKindIndex NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(int ephemerisCorrectionPresetIndex READ ephemerisCorrectionPresetIndex WRITE setEphemerisCorrectionPresetIndex NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(bool ephemerisRefractionEnabled READ ephemerisRefractionEnabled WRITE setEphemerisRefractionEnabled NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisAtmosphericPressureText READ ephemerisAtmosphericPressureText WRITE setEphemerisAtmosphericPressureText NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisAtmosphericTemperatureText READ ephemerisAtmosphericTemperatureText WRITE setEphemerisAtmosphericTemperatureText NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisRelativeHumidityText READ ephemerisRelativeHumidityText WRITE setEphemerisRelativeHumidityText NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QString ephemerisWavelengthText READ ephemerisWavelengthText WRITE setEphemerisWavelengthText NOTIFY ephemerisSettingsChanged)
     Q_PROPERTY(QString locationStatusText READ locationStatusText NOTIFY locationStatusTextChanged)
     Q_PROPERTY(QString catalogStatusText READ catalogStatusText NOTIFY catalogStatusTextChanged)
     Q_PROPERTY(
@@ -219,6 +226,13 @@ public:
     [[nodiscard]] bool logToTerminal() const noexcept;
     [[nodiscard]] bool logToFile() const noexcept;
     [[nodiscard]] QString logFilePath() const;
+    [[nodiscard]] int ephemerisEngineKindIndex() const noexcept;
+    [[nodiscard]] int ephemerisCorrectionPresetIndex() const noexcept;
+    [[nodiscard]] bool ephemerisRefractionEnabled() const noexcept;
+    [[nodiscard]] QString ephemerisAtmosphericPressureText() const;
+    [[nodiscard]] QString ephemerisAtmosphericTemperatureText() const;
+    [[nodiscard]] QString ephemerisRelativeHumidityText() const;
+    [[nodiscard]] QString ephemerisWavelengthText() const;
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString ephemerisDataStatusText() const;
@@ -280,6 +294,13 @@ public:
     Q_INVOKABLE void setLogToTerminal(bool logToTerminal);
     Q_INVOKABLE void setLogToFile(bool logToFile);
     Q_INVOKABLE void setLogFilePath(const QString& logFilePath);
+    Q_INVOKABLE void setEphemerisEngineKindIndex(int engineKindIndex);
+    Q_INVOKABLE void setEphemerisCorrectionPresetIndex(int correctionPresetIndex);
+    Q_INVOKABLE void setEphemerisRefractionEnabled(bool enabled);
+    Q_INVOKABLE void setEphemerisAtmosphericPressureText(const QString& pressureText);
+    Q_INVOKABLE void setEphemerisAtmosphericTemperatureText(const QString& temperatureText);
+    Q_INVOKABLE void setEphemerisRelativeHumidityText(const QString& humidityText);
+    Q_INVOKABLE void setEphemerisWavelengthText(const QString& wavelengthText);
     Q_INVOKABLE bool saveSettings() const;
     Q_INVOKABLE bool loadSettings();
     Q_INVOKABLE bool clearCatalogCache();
@@ -322,6 +343,7 @@ signals:
     void themeChanged();
     void themeOptionsChanged();
     void loggingChanged();
+    void ephemerisSettingsChanged();
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
     void ephemerisDataStatusTextChanged();
@@ -357,6 +379,7 @@ private:
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
+    void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
     void rebuildEphemerisEngine();
 
 private:
