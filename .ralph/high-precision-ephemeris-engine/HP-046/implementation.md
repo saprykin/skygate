@@ -40,3 +40,29 @@ READY
 - `ctest --test-dir build-ralph --output-on-failure` passed: 125 tests run,
   123 passed, 2 skipped high-precision CALCEPH kernel tests in simple-only
   mode.
+
+## Review fixes
+
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Simple-only developer builds are not explicit
+  - Action: Fixed
+  - Notes: Added explicit
+    `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF` cache variables to the
+    simple-only developer configure presets. Updated plain README configure
+    examples, including coverage, to pass the same flag. Clarified that the
+    AppImage simple-only opt-out forwards to the CMake flag.
+- Files changed during fix pass:
+  - `CMakePresets.json`
+  - `README.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-046/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-046/fix.md`
+- Tests run after fix:
+  - `cmake --list-presets=all`: PASS
+  - `cmake -S . -B build-ralph -DCMAKE_BUILD_TYPE=Debug
+    -DSKYGATE_BUILD_UI=ON -DSKYGATE_BUILD_TESTS=ON
+    -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF`: PASS
+  - `cmake --build build-ralph --parallel 2`: PASS
+  - `ctest --test-dir build-ralph -R <factory/simple ephemeris tests>
+    --output-on-failure`: PASS
+- Remaining concerns: None.
