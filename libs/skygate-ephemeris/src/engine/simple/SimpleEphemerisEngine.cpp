@@ -74,7 +74,7 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
 
 [[nodiscard]] bool requestsUnsupportedSimpleOptions(const EphemerisEngineOptions& options) noexcept
 {
-    return options.correctionFlags != EphemerisCorrectionFlags::NoCorrections || options.enableAtmosphericRefraction;
+    return options.correctionFlags != EphemerisCorrectionFlags::NoCorrections;
 }
 
 void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngineOptions& options) noexcept

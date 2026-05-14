@@ -213,7 +213,7 @@ private slots:
     void degradesAnnualParallaxWhenKernelProviderIsMissing();
     void degradesAnnualParallaxWhenSourceParallaxIsMissing();
     void degradesRadialVelocityWhenStellarParallaxIsDisabled();
-    void degradesPartialAstrometryButAppliesAvailableProperMotion();
+    void degradesPartialAstrometryAndReportsProperMotionUnavailable();
     void degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested();
     void failsWhenNoCoordinateFallbackExists();
 };
@@ -374,7 +374,7 @@ void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsD
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarParallax));
 }
 
-void StarAstrometryCalculatorTests::degradesPartialAstrometryButAppliesAvailableProperMotion()
+void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMotionUnavailable()
 {
     CelestialBody body = makeAstrometricStar();
     body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
@@ -388,7 +388,8 @@ void StarAstrometryCalculatorTests::degradesPartialAstrometryButAppliesAvailable
     QVERIFY(std::abs(result.equatorial->declinationDeg - body.fixedEquatorial->declinationDeg) < 0.00001);
     QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::ProperMotion));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
 }
 
 void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested()

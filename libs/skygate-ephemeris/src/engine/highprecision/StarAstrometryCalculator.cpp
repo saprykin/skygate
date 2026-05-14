@@ -353,8 +353,8 @@ void recordAppliedCorrections(
 ) noexcept
 {
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::ProperMotion)
-        && (astrometry.properMotionRightAscensionMasPerYear.has_value()
-            || astrometry.properMotionDeclinationMasPerYear.has_value())) {
+        && astrometry.properMotionRightAscensionMasPerYear.has_value()
+        && astrometry.properMotionDeclinationMasPerYear.has_value()) {
         metadata.appliedCorrections |= EphemerisCorrectionFlags::ProperMotion;
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax) && hasPositiveParallax(astrometry)) {
