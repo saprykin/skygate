@@ -7,6 +7,7 @@
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
@@ -466,6 +467,7 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
             dependencies.calcephKernelProvider = kernelProvider;
             dependencies.solarSystemStateCalculator =
                 std::make_shared<highprecision::SolarSystemStateCalculator>(kernelProvider);
+            dependencies.starAstrometryCalculator = std::make_shared<highprecision::StarAstrometryCalculator>();
             dependencies.timeScaleService = request.timeScaleService;
             dependencies.earthOrientationProvider = request.earthOrientationProvider;
             dependencies.frameTransformer = std::make_shared<highprecision::ErfaFrameTransformer>(

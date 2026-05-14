@@ -176,6 +176,11 @@ add_skygate_ephemeris_qtest(
     highprecision/EphemerisFallbackValidationTests.cpp
     LABELS "unit;highprecision;validation;fallback"
 )
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-star-astrometry-calculator-tests
+    highprecision/StarAstrometryCalculatorTests.cpp
+    LABELS "unit;highprecision;validation;stellar-astrometry"
+)
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_skygate_ephemeris_qtest(
         skygate-ephemeris-calceph-kernel-provider-tests

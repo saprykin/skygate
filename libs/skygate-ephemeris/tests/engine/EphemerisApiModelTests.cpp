@@ -53,6 +53,7 @@ private slots:
     void constructsHighPrecisionModelDefaults();
     void combinesCorrectionFlags();
     void constructsRequestAndDataSetModels();
+    void constructsCatalogStarAstrometryModel();
     void constructsAndNormalizesAstronomicalTimePrimitives();
     void convertsCivilDatesAndDefinesNoYearZeroPolicy();
     void constructsFactoryRequestDefaults();
@@ -182,6 +183,31 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
         static_cast<std::uint8_t>(dataSet.dateRanges.front().start.timeScale),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
     );
+}
+
+void EphemerisApiModelTests::constructsCatalogStarAstrometryModel()
+{
+    skygate::ephemeris::CelestialBody body = makeFactoryTestBody();
+    body.starAstrometry = skygate::ephemeris::CatalogStarAstrometry{
+        .referenceEquatorial = *body.fixedEquatorial,
+        .referenceEpoch =
+            {
+                .julianDatePart1 = 2'451'545.0,
+                .julianDatePart2 = 0.0,
+                .timeScale = skygate::ephemeris::TimeScale::Tt,
+            },
+        .properMotionRightAscensionMasPerYear = 200.0,
+        .properMotionDeclinationMasPerYear = -300.0,
+        .stellarParallaxMas = 130.0,
+        .radialVelocityKmPerSecond = -13.9,
+    };
+
+    QVERIFY(body.starAstrometry.has_value());
+    QCOMPARE(body.starAstrometry->referenceEquatorial.rightAscensionHours, 18.6156);
+    QCOMPARE(body.starAstrometry->properMotionRightAscensionMasPerYear.value_or(0.0), 200.0);
+    QCOMPARE(body.starAstrometry->properMotionDeclinationMasPerYear.value_or(0.0), -300.0);
+    QCOMPARE(body.starAstrometry->stellarParallaxMas.value_or(0.0), 130.0);
+    QCOMPARE(body.starAstrometry->radialVelocityKmPerSecond.value_or(0.0), -13.9);
 }
 
 void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()

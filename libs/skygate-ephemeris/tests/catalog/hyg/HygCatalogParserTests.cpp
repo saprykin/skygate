@@ -3,6 +3,7 @@
 
 #include <QtTest/QtTest>
 
+#include <cmath>
 #include <string>
 
 class HygCatalogParserTests final : public QObject {
@@ -10,6 +11,7 @@ class HygCatalogParserTests final : public QObject {
 
 private slots:
     void parsesBasicRows();
+    void parsesAstrometryColumns();
     void supportsFallbackIdsAndQuotedFields();
     void keepsWholeCatalogByDefault();
     void rejectsMalformedInput();
@@ -31,17 +33,37 @@ void HygCatalogParserTests::parsesBasicRows()
     QVERIFY(bodies.size() == 2U);
     QVERIFY(bodies[0].id == "hip_32349");
     QVERIFY(bodies[0].fixedEquatorial.has_value());
-    QCOMPARE(
-        bodies[0].ephemerisSource,
-        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+    QCOMPARE(bodies[0].ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
+}
+
+void HygCatalogParserTests::parsesAstrometryColumns()
+{
+    auto result = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag,pmra,pmdec,rv,dist\n"
+        "1,32349,Sirius,6.7525,-16.7161,-1.46,-546.01,-1223.07,-5.5,2.637\n"
     );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 1U);
+    QVERIFY(bodies[0].starAstrometry.has_value());
+    const auto& astrometry = *bodies[0].starAstrometry;
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 6.7525);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, -16.7161);
+    QCOMPARE(astrometry.properMotionRightAscensionMasPerYear.value_or(0.0), -546.01);
+    QCOMPARE(astrometry.properMotionDeclinationMasPerYear.value_or(0.0), -1223.07);
+    QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), -5.5);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QVERIFY(std::abs(*astrometry.stellarParallaxMas - 379.219) < 0.001);
 }
 
 void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
 {
     QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV skipped 1 rows with invalid numeric values; samples: row 7 ra='1.0' dec='2.0' mag=''"
+        QtWarningMsg, "HYG CSV skipped 1 rows with invalid numeric values; samples: row 7 ra='1.0' dec='2.0' mag=''"
     );
     auto result = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
@@ -107,9 +129,7 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
     auto loadResult = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         csv,
-        [&lastProgress](const std::size_t parsedObjectCount) {
-            lastProgress = parsedObjectCount;
-        }
+        [&lastProgress](const std::size_t parsedObjectCount) { lastProgress = parsedObjectCount; }
     );
     QVERIFY(loadResult.isSuccess());
     QVERIFY(lastProgress == 30000U);
@@ -129,19 +149,14 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
 
 void HygCatalogParserTests::rejectsMalformedInput()
 {
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows."
-    );
+    QTest::ignoreMessage(QtWarningMsg, "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows.");
     const auto headerOnlyResult = skygate::ephemeris::loadStarCatalog(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        "hip,id,proper,ra,dec,mag\n"
+        skygate::ephemeris::CatalogSourceType::HygCsv, "hip,id,proper,ra,dec,mag\n"
     );
     QVERIFY(!headerOnlyResult.isSuccess());
 
     QTest::ignoreMessage(
-        QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
+        QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
     );
     const auto malformedResult = skygate::ephemeris::loadStarCatalog(
         skygate::ephemeris::CatalogSourceType::HygCsv,

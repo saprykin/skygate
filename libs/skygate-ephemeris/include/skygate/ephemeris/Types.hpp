@@ -512,6 +512,16 @@ struct DeepSkyObjectInfo {
     std::optional<double> positionAngleDeg;
 };
 
+struct CatalogStarAstrometry {
+    core::EquatorialCoordinate referenceEquatorial;
+    AstronomicalEpoch referenceEpoch;
+    std::optional<double> properMotionRightAscensionMasPerYear;
+    std::optional<double> properMotionDeclinationMasPerYear;
+    std::optional<double> stellarParallaxMas;
+    std::optional<double> radialVelocityKmPerSecond;
+    std::optional<EphemerisDateRange> validityRange;
+};
+
 struct CelestialBody {
     std::string id;
     std::string displayName;
@@ -519,6 +529,7 @@ struct CelestialBody {
     CelestialBodyEphemerisSource ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
     double visualMagnitude = 0.0;
     std::optional<core::EquatorialCoordinate> fixedEquatorial;
+    std::optional<CatalogStarAstrometry> starAstrometry;
     std::optional<DeepSkyObjectInfo> deepSkyObject;
 };
 
