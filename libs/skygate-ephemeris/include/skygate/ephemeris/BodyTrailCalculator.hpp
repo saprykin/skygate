@@ -28,6 +28,12 @@ public:
         std::uint32_t bodyIndex,
         const BodyTrailOptions& options = {}
     ) const;
+    [[nodiscard]] std::vector<BodyTrailSample> sample(
+        const IEphemerisEngine& engine,
+        const EphemerisRequest& request,
+        std::uint32_t bodyIndex,
+        const BodyTrailOptions& options = {}
+    ) const;
 };
 
 }  // namespace skygate::ephemeris

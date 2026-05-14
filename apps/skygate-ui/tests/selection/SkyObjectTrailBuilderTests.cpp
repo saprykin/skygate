@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <optional>
 #include <string_view>
 
@@ -25,13 +27,16 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::string_view bodyId) const override
     {
-        return computeBodyState(request.context, bodyId);
+        (void)bodyId;
+        return computeBodyState(request, std::size_t{m_expectedBodyIndex});
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        ++m_requestBodyStateCalls;
+        m_lastRequest = request;
+        return stateForContext(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
@@ -48,6 +53,13 @@ public:
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    {
+        ++m_contextBodyStateCalls;
+        return stateForContext(context, bodyIndex);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    stateForContext(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const
     {
         m_sawExpectedBodyIndex = m_sawExpectedBodyIndex || bodyIndex == m_expectedBodyIndex;
 
@@ -76,10 +88,28 @@ public:
         return m_sawExpectedBodyIndex;
     }
 
+    [[nodiscard]] int requestBodyStateCalls() const noexcept
+    {
+        return m_requestBodyStateCalls;
+    }
+
+    [[nodiscard]] int contextBodyStateCalls() const noexcept
+    {
+        return m_contextBodyStateCalls;
+    }
+
+    [[nodiscard]] const std::optional<skygate::ephemeris::EphemerisRequest>& lastRequest() const noexcept
+    {
+        return m_lastRequest;
+    }
+
 private:
     std::uint32_t m_expectedBodyIndex = 0;
     bool m_gapAtPresent = false;
     mutable bool m_sawExpectedBodyIndex = false;
+    mutable int m_requestBodyStateCalls = 0;
+    mutable int m_contextBodyStateCalls = 0;
+    mutable std::optional<skygate::ephemeris::EphemerisRequest> m_lastRequest;
 };
 
 class CrossingTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
@@ -184,6 +214,7 @@ private slots:
     void invalidInputsAppendNoLines();
     void appendsPastDashesFutureSegmentsAndTickLabels();
     void invalidSamplesBreakContinuity();
+    void requestTrailSamplingUsesSelectedEngineOptions();
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
 };
@@ -249,6 +280,46 @@ void SkyObjectTrailBuilderTests::invalidSamplesBreakContinuity()
 
     QVERIFY(!continuousFrame.lines.empty());
     QVERIFY(gappedFrame.lines.size() < continuousFrame.lines.size());
+}
+
+void SkyObjectTrailBuilderTests::requestTrailSamplingUsesSelectedEngineOptions()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::ephemeris::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
+    };
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Astrometric;
+    request.options.enableAtmosphericRefraction = false;
+    input.ephemerisRequest = request;
+
+    builder.appendTrail(frame, input);
+
+    QVERIFY(engine.sawExpectedBodyIndex());
+    QVERIFY(frame.lines.size() > 40U);
+    QVERIFY(engine.requestBodyStateCalls() > 0);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+    QVERIFY(engine.lastRequest().has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(engine.lastRequest()->options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(engine.lastRequest()->options.correctionFlags),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Astrometric)
+    );
+    QVERIFY(!engine.lastRequest()->options.enableAtmosphericRefraction);
+    QCOMPARE(engine.lastRequest()->context.utcTime.time_since_epoch().count(), std::int64_t{65400});
+    QCOMPARE(engine.lastRequest()->epoch.julianDatePart1, 2'451'546.0);
+    QVERIFY(std::abs(engine.lastRequest()->epoch.julianDatePart2) < 1e-12);
 }
 
 void SkyObjectTrailBuilderTests::longProjectedJumpsAreDropped()
