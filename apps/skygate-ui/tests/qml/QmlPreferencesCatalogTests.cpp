@@ -7,6 +7,7 @@ private slots:
     void initTestCase();
     void init();
     void catalogSectionBindsDraftAndControls();
+    void ephemerisEngineControlsBindDraftAndVisibility();
     void catalogSectionDownloadsAppliesClearsAndRestoresCatalogs();
 
 private:
@@ -32,7 +33,9 @@ void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -50,7 +53,9 @@ void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
                 preferencesDraft: draft
             }
         }
-    )"), QStringLiteral("PreferencesCatalogSectionBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesCatalogSectionBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -59,10 +64,7 @@ void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    QObject* catalogCombo = firstObjectWithObjectName(
-        root,
-        QStringLiteral("starCatalogPresetCombo")
-    );
+    QObject* catalogCombo = firstObjectWithObjectName(root, QStringLiteral("starCatalogPresetCombo"));
     QVERIFY(catalogCombo != nullptr);
     QCOMPARE(catalogCombo->property("currentIndex").toInt(), 0);
 
@@ -75,10 +77,7 @@ void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
     QTRY_COMPARE(catalogCombo->property("currentIndex").toInt(), 2);
     QVERIFY(!useButton->property("enabled").toBool());
 
-    auto* catalogUrlInput = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("starCatalogUrlInput")
-    );
+    auto* catalogUrlInput = firstQuickItemWithObjectName(root, QStringLiteral("starCatalogUrlInput"));
     QVERIFY(catalogUrlInput != nullptr);
     QTRY_VERIFY(catalogUrlInput->isVisible());
 
@@ -88,12 +87,84 @@ void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
     commitText(exposed.window(), QString::fromUtf8(kCatalogUrl));
     QTRY_COMPARE(draft->property("catalogUrlText").toString(), QString(kCatalogUrl));
 
-    QObject* downloadButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("starCatalogDownloadButton")
-    );
+    QObject* downloadButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogDownloadButton"));
     QVERIFY(downloadButton != nullptr);
     QVERIFY(downloadButton->property("enabled").toBool());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferencesCatalogTests::ephemerisEngineControlsBindDraftAndVisibility()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 620
+            property alias draft: draft
+            PreferencesDraft {
+                id: draft
+                skyContextController: skyContext
+                Component.onCompleted: resetFromContext()
+            }
+            PreferencesCatalogSection {
+                anchors.fill: parent
+                skyContextController: skyContext
+                preferencesDraft: draft
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesEphemerisEngineSectionTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
+    QVERIFY(draft != nullptr);
+
+    QObject* engineCombo = firstObjectWithObjectName(root, QStringLiteral("ephemerisEngineSelectorCombo"));
+    QVERIFY(engineCombo != nullptr);
+    QCOMPARE(engineCombo->property("count").toInt(), 2);
+    QCOMPARE(engineCombo->property("currentIndex").toInt(), 0);
+
+    QObject* correctionCombo = firstObjectWithObjectName(root, QStringLiteral("ephemerisCorrectionPresetCombo"));
+    QVERIFY(correctionCombo != nullptr);
+    QVERIFY(!correctionCombo->property("visible").toBool());
+
+    QObject* refractionCheckBox = firstObjectWithObjectName(root, QStringLiteral("ephemerisRefractionCheckBox"));
+    QVERIFY(refractionCheckBox != nullptr);
+    QVERIFY(!refractionCheckBox->property("visible").toBool());
+
+    draft->setProperty("ephemerisEngineKindIndex", 1);
+    draft->setProperty("ephemerisCorrectionPresetIndex", 3);
+    draft->setProperty("ephemerisRefractionEnabled", true);
+    QCoreApplication::processEvents();
+    QTRY_COMPARE(engineCombo->property("currentIndex").toInt(), 1);
+    QTRY_VERIFY(correctionCombo->property("visible").toBool());
+    QCOMPARE(correctionCombo->property("count").toInt(), 4);
+    QCOMPARE(correctionCombo->property("currentIndex").toInt(), 3);
+    QVERIFY(refractionCheckBox->property("visible").toBool());
+    QVERIFY(refractionCheckBox->property("checked").toBool());
+
+    draft->setProperty("ephemerisCorrectionPresetIndex", 1);
+    draft->setProperty("ephemerisRefractionEnabled", false);
+    QCoreApplication::processEvents();
+    QTRY_COMPARE(correctionCombo->property("currentIndex").toInt(), 1);
+    QTRY_VERIFY(!refractionCheckBox->property("checked").toBool());
+
+    auto* pressureInput = firstQuickItemWithObjectName(root, QStringLiteral("ephemerisPressureInput"));
+    QVERIFY(pressureInput != nullptr);
+    QVERIFY(!pressureInput->isVisible());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -101,9 +172,8 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
 {
     const QString starCatalogPath = m_settings.cachePath(QStringLiteral("download-stars.csv"));
     const QString deepSkyCatalogPath = m_settings.cachePath(QStringLiteral("download-dso.csv"));
-    const QByteArray starCatalogPayload = sampleHygCsvPayload(
-        {1, 900001, "Downloaded Star", "6.7525", "-16.7161", "1.0"}
-    );
+    const QByteArray starCatalogPayload =
+        sampleHygCsvPayload({1, 900001, "Downloaded Star", "6.7525", "-16.7161", "1.0"});
     const QByteArray deepSkyCatalogPayload = sampleOpenNgcCsvPayload(
         {"NGC0999", "G", "00:42:44.35", "+41:16:08.6", "And", "", "0999", "PGC 9999", "Custom Galaxy"}
     );
@@ -118,7 +188,9 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -136,7 +208,9 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
                 preferencesDraft: draft
             }
         }
-    )"), QStringLiteral("PreferencesCatalogDownloadTest.qml"));
+    )"),
+        QStringLiteral("PreferencesCatalogDownloadTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -148,26 +222,17 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     draft->setProperty("catalogPresetIndex", 2);
     draft->setProperty("catalogUrlText", starCatalogUrl);
     QCoreApplication::processEvents();
-    QObject* starDownloadButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("starCatalogDownloadButton")
-    );
+    QObject* starDownloadButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogDownloadButton"));
     QVERIFY(starDownloadButton != nullptr);
     QVERIFY(activateControl(starDownloadButton));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
-    QTRY_VERIFY(catalogContainsDisplayName(
-        controller->catalogBodies(),
-        QStringLiteral("Downloaded Star")
-    ));
+    QTRY_VERIFY(catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Downloaded Star")));
     QVERIFY(QFileInfo::exists(m_settings.cachePath(QStringLiteral("star-cache.csv"))));
 
     draft->setProperty("deepSkyCatalogPresetIndex", 2);
     draft->setProperty("deepSkyCatalogUrlText", deepSkyCatalogUrl);
     QCoreApplication::processEvents();
-    QObject* deepSkyDownloadButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("deepSkyCatalogDownloadButton")
-    );
+    QObject* deepSkyDownloadButton = firstObjectWithObjectName(root, QStringLiteral("deepSkyCatalogDownloadButton"));
     QVERIFY(deepSkyDownloadButton != nullptr);
     QVERIFY(activateControl(deepSkyDownloadButton));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
@@ -177,58 +242,34 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     QVERIFY(controller->saveSettings());
     auto restoredController = makeController();
     QVERIFY(restoredController != nullptr);
-    QTRY_VERIFY(catalogContainsDisplayName(
-        restoredController->catalogBodies(),
-        QStringLiteral("Downloaded Star")
-    ));
+    QTRY_VERIFY(catalogContainsDisplayName(restoredController->catalogBodies(), QStringLiteral("Downloaded Star")));
     QCOMPARE(restoredController->catalogPresetIndex(), 2);
     QCOMPARE(restoredController->catalogUrlText(), starCatalogUrl);
     QCOMPARE(restoredController->deepSkyCatalogPresetIndex(), 2);
     QCOMPARE(restoredController->deepSkyCatalogUrlText(), deepSkyCatalogUrl);
-    QTRY_VERIFY(catalogContainsAlias(
-        restoredController->catalogBodies(),
-        QStringLiteral("Custom Galaxy")
-    ));
+    QTRY_VERIFY(catalogContainsAlias(restoredController->catalogBodies(), QStringLiteral("Custom Galaxy")));
 
     draft->setProperty("catalogPresetIndex", 0);
     draft->setProperty("deepSkyCatalogPresetIndex", 0);
     QCoreApplication::processEvents();
-    QObject* starUseButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("starCatalogUseButton")
-    );
+    QObject* starUseButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogUseButton"));
     QVERIFY(starUseButton != nullptr);
     QVERIFY(activateControl(starUseButton));
-    QTRY_VERIFY(!catalogContainsDisplayName(
-        controller->catalogBodies(),
-        QStringLiteral("Downloaded Star")
-    ));
+    QTRY_VERIFY(!catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Downloaded Star")));
     QVERIFY(controller->catalogStatusText().contains("Bundled"));
 
-    QObject* deepSkyUseButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("deepSkyCatalogUseButton")
-    );
+    QObject* deepSkyUseButton = firstObjectWithObjectName(root, QStringLiteral("deepSkyCatalogUseButton"));
     QVERIFY(deepSkyUseButton != nullptr);
     QVERIFY(activateControl(deepSkyUseButton));
-    QTRY_VERIFY(!catalogContainsAlias(
-        controller->catalogBodies(),
-        QStringLiteral("Custom Galaxy")
-    ));
+    QTRY_VERIFY(!catalogContainsAlias(controller->catalogBodies(), QStringLiteral("Custom Galaxy")));
 
-    QObject* starClearButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("starCatalogClearCacheButton")
-    );
+    QObject* starClearButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogClearCacheButton"));
     QVERIFY(starClearButton != nullptr);
     QVERIFY(activateControl(starClearButton));
     QTRY_VERIFY(!QFileInfo::exists(m_settings.cachePath(QStringLiteral("star-cache.csv"))));
     QVERIFY(controller->catalogStatusText().contains("Star catalog cache cleared"));
 
-    QObject* deepSkyClearButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("deepSkyCatalogClearCacheButton")
-    );
+    QObject* deepSkyClearButton = firstObjectWithObjectName(root, QStringLiteral("deepSkyCatalogClearCacheButton"));
     QVERIFY(deepSkyClearButton != nullptr);
     QVERIFY(activateControl(deepSkyClearButton));
     QVERIFY(controller->catalogStatusText().contains("Deep-sky catalog cache cleared"));

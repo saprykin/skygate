@@ -28,117 +28,136 @@ QtObject {
     property string catalogUrlText: ""
     property int deepSkyCatalogPresetIndex: 0
     property string deepSkyCatalogUrlText: ""
+    property int ephemerisEngineKindIndex: 0
+    property int ephemerisCorrectionPresetIndex: 3
+    property bool ephemerisRefractionEnabled: true
+    property string ephemerisAtmosphericPressureText: ""
+    property string ephemerisAtmosphericTemperatureText: ""
+    property string ephemerisRelativeHumidityText: ""
+    property string ephemerisWavelengthText: ""
     property bool logToTerminal: true
     property bool logToFile: false
     property string logFilePath: ""
 
     function setLocationSource(nextLocationSourceText) {
-        locationSourceText = nextLocationSourceText
+        locationSourceText = nextLocationSourceText;
         if (locationSourceText !== "City") {
-            selectedCityId = ""
-            selectedCityDisplayText = ""
+            selectedCityId = "";
+            selectedCityDisplayText = "";
         }
     }
 
     function selectCity(cityId, displayText, latitudeDeg, longitudeDeg) {
-        locationSourceText = "City"
-        selectedCityId = cityId
-        selectedCityDisplayText = displayText
-        latitudeText = Number(latitudeDeg).toFixed(6)
-        longitudeText = Number(longitudeDeg).toFixed(6)
+        locationSourceText = "City";
+        selectedCityId = cityId;
+        selectedCityDisplayText = displayText;
+        latitudeText = Number(latitudeDeg).toFixed(6);
+        longitudeText = Number(longitudeDeg).toFixed(6);
     }
 
     function selectTimeZone(nextTimeZoneId, displayText) {
-        timeZoneId = nextTimeZoneId
-        timeZoneDisplayText = displayText
+        timeZoneId = nextTimeZoneId;
+        timeZoneDisplayText = displayText;
     }
 
     function useCustomCoordinates() {
         if (locationSourceText !== "Custom") {
-            locationSourceText = "Custom"
+            locationSourceText = "Custom";
         }
-        selectedCityId = ""
-        selectedCityDisplayText = ""
+        selectedCityId = "";
+        selectedCityDisplayText = "";
     }
 
     function resetFromContext() {
-        latitudeText = skyContextController.latitudeText
-        longitudeText = skyContextController.longitudeText
-        elevationText = skyContextController.elevationText
-        locationSourceText = skyContextController.locationSourceText
-        selectedCityId = skyContextController.selectedCityId
-        selectedCityDisplayText = skyContextController.selectedCityDisplayText
-        timeZoneId = skyContextController.time.timeZoneId
-        timeZoneDisplayText = skyContextController.time.timeZoneId
-            + " - "
-            + skyContextController.time.timeZoneDetailText
-        projectionTypeText = skyContextController.projectionTypeText
-        themeId = skyContextController.themeId
-        overlayHorizon = skyContextController.overlayLayers.horizon
-        overlayAltAzGrid = skyContextController.overlayLayers.altAzGrid
-        overlayConstellationLines = skyContextController.overlayLayers.constellationLines
-        overlayConstellationLabels = skyContextController.overlayLayers.constellationLabels
-        overlayEcliptic = skyContextController.overlayLayers.ecliptic
-        overlayCelestialEquator = skyContextController.overlayLayers.celestialEquator
-        overlayCircumpolarBoundary = skyContextController.overlayLayers.circumpolarBoundary
-        overlaySolarSystemLabels = skyContextController.overlayLayers.solarSystemLabels
-        overlayDeepSkyObjects = skyContextController.overlayLayers.deepSkyObjects
-        overlayDeepSkyLabels = skyContextController.overlayLayers.deepSkyLabels
-        catalogPresetIndex = skyContextController.catalogPresetIndex()
-        catalogUrlText = skyContextController.catalogUrlText()
-        deepSkyCatalogPresetIndex = skyContextController.deepSkyCatalogPresetIndex()
-        deepSkyCatalogUrlText = skyContextController.deepSkyCatalogUrlText()
-        logToTerminal = skyContextController.logToTerminal
-        logToFile = skyContextController.logToFile
-        logFilePath = skyContextController.logFilePath
+        latitudeText = skyContextController.latitudeText;
+        longitudeText = skyContextController.longitudeText;
+        elevationText = skyContextController.elevationText;
+        locationSourceText = skyContextController.locationSourceText;
+        selectedCityId = skyContextController.selectedCityId;
+        selectedCityDisplayText = skyContextController.selectedCityDisplayText;
+        timeZoneId = skyContextController.time.timeZoneId;
+        timeZoneDisplayText = skyContextController.time.timeZoneId + " - " + skyContextController.time.timeZoneDetailText;
+        projectionTypeText = skyContextController.projectionTypeText;
+        themeId = skyContextController.themeId;
+        overlayHorizon = skyContextController.overlayLayers.horizon;
+        overlayAltAzGrid = skyContextController.overlayLayers.altAzGrid;
+        overlayConstellationLines = skyContextController.overlayLayers.constellationLines;
+        overlayConstellationLabels = skyContextController.overlayLayers.constellationLabels;
+        overlayEcliptic = skyContextController.overlayLayers.ecliptic;
+        overlayCelestialEquator = skyContextController.overlayLayers.celestialEquator;
+        overlayCircumpolarBoundary = skyContextController.overlayLayers.circumpolarBoundary;
+        overlaySolarSystemLabels = skyContextController.overlayLayers.solarSystemLabels;
+        overlayDeepSkyObjects = skyContextController.overlayLayers.deepSkyObjects;
+        overlayDeepSkyLabels = skyContextController.overlayLayers.deepSkyLabels;
+        catalogPresetIndex = skyContextController.catalogPresetIndex();
+        catalogUrlText = skyContextController.catalogUrlText();
+        deepSkyCatalogPresetIndex = skyContextController.deepSkyCatalogPresetIndex();
+        deepSkyCatalogUrlText = skyContextController.deepSkyCatalogUrlText();
+        ephemerisEngineKindIndex = skyContextController.ephemerisEngineKindIndex;
+        ephemerisCorrectionPresetIndex = skyContextController.ephemerisCorrectionPresetIndex;
+        ephemerisRefractionEnabled = skyContextController.ephemerisRefractionEnabled;
+        ephemerisAtmosphericPressureText = skyContextController.ephemerisAtmosphericPressureText;
+        ephemerisAtmosphericTemperatureText = skyContextController.ephemerisAtmosphericTemperatureText;
+        ephemerisRelativeHumidityText = skyContextController.ephemerisRelativeHumidityText;
+        ephemerisWavelengthText = skyContextController.ephemerisWavelengthText;
+        logToTerminal = skyContextController.logToTerminal;
+        logToFile = skyContextController.logToFile;
+        logFilePath = skyContextController.logFilePath;
     }
 
     function syncDeviceLocationFromContext() {
         if (locationSourceText !== "Current Device") {
-            return
+            return;
         }
 
-        latitudeText = skyContextController.latitudeText
-        longitudeText = skyContextController.longitudeText
-        elevationText = skyContextController.elevationText
+        latitudeText = skyContextController.latitudeText;
+        longitudeText = skyContextController.longitudeText;
+        elevationText = skyContextController.elevationText;
     }
 
     function applyToContext() {
         if (locationSourceText === "City" && selectedCityId !== "") {
-            skyContextController.setLocationSourceText(locationSourceText)
-            skyContextController.setSelectedCityId(selectedCityId)
-            skyContextController.setElevationText(elevationText)
+            skyContextController.setLocationSourceText(locationSourceText);
+            skyContextController.setSelectedCityId(selectedCityId);
+            skyContextController.setElevationText(elevationText);
         } else if (locationSourceText === "Current Device") {
-            skyContextController.setLocationSourceText(locationSourceText)
-            skyContextController.setElevationText(elevationText)
-            skyContextController.refreshCurrentLocation()
+            skyContextController.setLocationSourceText(locationSourceText);
+            skyContextController.setElevationText(elevationText);
+            skyContextController.refreshCurrentLocation();
         } else {
-            skyContextController.setLocationSourceText("Custom")
-            skyContextController.setLatitudeText(latitudeText)
-            skyContextController.setLongitudeText(longitudeText)
-            skyContextController.setElevationText(elevationText)
+            skyContextController.setLocationSourceText("Custom");
+            skyContextController.setLatitudeText(latitudeText);
+            skyContextController.setLongitudeText(longitudeText);
+            skyContextController.setElevationText(elevationText);
         }
 
-        skyContextController.setProjectionTypeText(projectionTypeText)
-        skyContextController.time.setTimeZoneId(timeZoneId)
-        skyContextController.setThemeId(themeId)
-        skyContextController.overlayLayers.horizon = overlayHorizon
-        skyContextController.overlayLayers.altAzGrid = overlayAltAzGrid
-        skyContextController.overlayLayers.constellationLines = overlayConstellationLines
-        skyContextController.overlayLayers.constellationLabels = overlayConstellationLabels
-        skyContextController.overlayLayers.ecliptic = overlayEcliptic
-        skyContextController.overlayLayers.celestialEquator = overlayCelestialEquator
-        skyContextController.overlayLayers.circumpolarBoundary = overlayCircumpolarBoundary
-        skyContextController.overlayLayers.solarSystemLabels = overlaySolarSystemLabels
-        skyContextController.overlayLayers.deepSkyObjects = overlayDeepSkyObjects
-        skyContextController.overlayLayers.deepSkyLabels = overlayDeepSkyLabels
-        skyContextController.setCatalogPresetIndex(catalogPresetIndex)
-        skyContextController.setCatalogUrlText(catalogUrlText)
-        skyContextController.setDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex)
-        skyContextController.setDeepSkyCatalogUrlText(deepSkyCatalogUrlText)
-        skyContextController.setLogToTerminal(logToTerminal)
-        skyContextController.setLogToFile(logToFile)
-        skyContextController.setLogFilePath(logFilePath)
-        resetFromContext()
+        skyContextController.setProjectionTypeText(projectionTypeText);
+        skyContextController.time.setTimeZoneId(timeZoneId);
+        skyContextController.setThemeId(themeId);
+        skyContextController.overlayLayers.horizon = overlayHorizon;
+        skyContextController.overlayLayers.altAzGrid = overlayAltAzGrid;
+        skyContextController.overlayLayers.constellationLines = overlayConstellationLines;
+        skyContextController.overlayLayers.constellationLabels = overlayConstellationLabels;
+        skyContextController.overlayLayers.ecliptic = overlayEcliptic;
+        skyContextController.overlayLayers.celestialEquator = overlayCelestialEquator;
+        skyContextController.overlayLayers.circumpolarBoundary = overlayCircumpolarBoundary;
+        skyContextController.overlayLayers.solarSystemLabels = overlaySolarSystemLabels;
+        skyContextController.overlayLayers.deepSkyObjects = overlayDeepSkyObjects;
+        skyContextController.overlayLayers.deepSkyLabels = overlayDeepSkyLabels;
+        skyContextController.setCatalogPresetIndex(catalogPresetIndex);
+        skyContextController.setCatalogUrlText(catalogUrlText);
+        skyContextController.setDeepSkyCatalogPresetIndex(deepSkyCatalogPresetIndex);
+        skyContextController.setDeepSkyCatalogUrlText(deepSkyCatalogUrlText);
+        skyContextController.setEphemerisEngineKindIndex(ephemerisEngineKindIndex);
+        skyContextController.setEphemerisCorrectionPresetIndex(ephemerisCorrectionPresetIndex);
+        skyContextController.setEphemerisRefractionEnabled(ephemerisRefractionEnabled);
+        skyContextController.setEphemerisAtmosphericPressureText(ephemerisAtmosphericPressureText);
+        skyContextController.setEphemerisAtmosphericTemperatureText(ephemerisAtmosphericTemperatureText);
+        skyContextController.setEphemerisRelativeHumidityText(ephemerisRelativeHumidityText);
+        skyContextController.setEphemerisWavelengthText(ephemerisWavelengthText);
+        skyContextController.setLogToTerminal(logToTerminal);
+        skyContextController.setLogToFile(logToFile);
+        skyContextController.setLogFilePath(logFilePath);
+        resetFromContext();
     }
 }
