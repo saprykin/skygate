@@ -50,6 +50,21 @@ namespace core = skygate::core;
     };
 }
 
+[[nodiscard]] CelestialBody
+makeFixedStarBody(std::string id, const double rightAscensionHours, const double declinationDeg)
+{
+    CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = body.id;
+    body.type = CelestialBodyType::Star;
+    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.fixedEquatorial = core::EquatorialCoordinate{
+        .rightAscensionHours = rightAscensionHours,
+        .declinationDeg = declinationDeg,
+    };
+    return body;
+}
+
 [[nodiscard]] CelestialBody makeUnsupportedBody()
 {
     return {
@@ -278,6 +293,67 @@ private:
     mutable int m_callCount = 0;
     mutable std::string m_lastBodyId;
     mutable EphemerisCorrectionFlags m_lastFlags = EphemerisCorrectionFlags::NoCorrections;
+};
+
+class BatchRecordingStarAstrometryCalculator final : public IStarAstrometryCalculator {
+public:
+    [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const override
+    {
+        ++m_singleCallCount;
+        return makeCalculatorResult(input, 21.0, -21.0, "single-star fallback");
+    }
+
+    [[nodiscard]] std::vector<StarAstrometryBatchResult>
+    calculateBatch(const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays) const override
+    {
+        ++m_batchCallCount;
+        m_lastBatchSize = arrays.size();
+        m_lastRequestPart2 = request.epoch.julianDatePart2;
+
+        std::vector<StarAstrometryBatchResult> results;
+        results.reserve(arrays.size());
+        for (std::size_t arrayIndex = 0; arrayIndex < arrays.size(); ++arrayIndex) {
+            HighPrecisionCalculatorResult result;
+            result.equatorial = core::EquatorialCoordinate{
+                .rightAscensionHours =
+                    arrays.referenceRightAscensionHours()[arrayIndex] + request.epoch.julianDatePart2,
+                .declinationDeg = arrays.referenceDeclinationDegrees()[arrayIndex],
+            };
+            result.metadata.status = EphemerisResultStatus::Valid;
+            result.metadata.dataSourceProvenance = "batch star astrometry";
+            results.push_back(StarAstrometryBatchResult{
+                .bodyIndex = arrays.bodyIndices()[arrayIndex],
+                .result = result,
+            });
+        }
+        return results;
+    }
+
+    [[nodiscard]] int singleCallCount() const noexcept
+    {
+        return m_singleCallCount;
+    }
+
+    [[nodiscard]] int batchCallCount() const noexcept
+    {
+        return m_batchCallCount;
+    }
+
+    [[nodiscard]] std::size_t lastBatchSize() const noexcept
+    {
+        return m_lastBatchSize;
+    }
+
+    [[nodiscard]] double lastRequestPart2() const noexcept
+    {
+        return m_lastRequestPart2;
+    }
+
+private:
+    mutable int m_singleCallCount = 0;
+    mutable int m_batchCallCount = 0;
+    mutable std::size_t m_lastBatchSize = 0U;
+    mutable double m_lastRequestPart2 = 0.0;
 };
 
 class StaticSolarSystemCalculator final : public ISolarSystemStateCalculator {
@@ -626,6 +702,9 @@ class HighPrecisionEphemerisEngineTests final : public QObject {
 private slots:
     void exposesMetadataAndCapabilities();
     void dispatchesSolarSystemAndStarBodies();
+    void usesBatchStarPathForFullFrameSnapshot();
+    void batchesRepresentativeLargeCatalogWithoutSingleStarDispatch();
+    void fallsBackToSingleStarPathWhenBatchReturnsNoResults();
     void forwardsOptionsThroughCollaboratorsAndResultBuilder();
     void bypassesApparentPlaceForGeometricSolarSystemRequests();
     void bypassesApparentPlaceForGeometricStarRequests();
@@ -706,6 +785,99 @@ void HighPrecisionEphemerisEngineTests::dispatchesSolarSystemAndStarBodies()
     QCOMPARE(snapshot.states[0].equatorial.declinationDeg, -2.5);
     QCOMPARE(snapshot.states[1].equatorial.rightAscensionHours, 13.5);
     QCOMPARE(snapshot.states[1].equatorial.declinationDeg, 42.0);
+}
+
+void HighPrecisionEphemerisEngineTests::usesBatchStarPathForFullFrameSnapshot()
+{
+    const std::array bodies{
+        makeSunBody(),
+        makeFixedStarBody("star-a", 2.0, 10.0),
+        makeFixedStarBody("star-b", 5.0, -20.0),
+        makeUnsupportedBody(),
+    };
+    auto solarSystemCalculator = std::make_shared<RecordingSolarSystemCalculator>();
+    auto starAstrometryCalculator = std::make_shared<BatchRecordingStarAstrometryCalculator>();
+    auto apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies,
+        makeRequest().options,
+        makeDependencies(solarSystemCalculator, starAstrometryCalculator, apparentPlaceCalculator)
+    );
+
+    EphemerisRequest firstRequest = makeRequest();
+    firstRequest.epoch.julianDatePart2 = 0.25;
+    const SkySnapshot firstSnapshot = engine.compute(firstRequest);
+
+    QCOMPARE(firstSnapshot.states.size(), std::size_t{4});
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 1);
+    QCOMPARE(starAstrometryCalculator->singleCallCount(), 0);
+    QCOMPARE(starAstrometryCalculator->lastBatchSize(), std::size_t{2});
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(apparentPlaceCalculator->callCount(), 3);
+    QCOMPARE(firstSnapshot.states[1].bodyIndex, std::uint32_t{1});
+    QCOMPARE(firstSnapshot.states[2].bodyIndex, std::uint32_t{2});
+    QCOMPARE(firstSnapshot.states[1].equatorial.rightAscensionHours, 12.25);
+    QCOMPARE(firstSnapshot.states[1].equatorial.declinationDeg, 10.0);
+    QCOMPARE(firstSnapshot.states[2].equatorial.rightAscensionHours, 15.25);
+    QCOMPARE(firstSnapshot.states[2].equatorial.declinationDeg, -20.0);
+    QCOMPARE(firstSnapshot.states[3].metadata.status, EphemerisResultStatus::Unsupported);
+
+    EphemerisRequest secondRequest = firstRequest;
+    secondRequest.epoch.julianDatePart2 = 0.75;
+    const SkySnapshot secondSnapshot = engine.compute(secondRequest);
+
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 2);
+    QCOMPARE(starAstrometryCalculator->singleCallCount(), 0);
+    QCOMPARE(starAstrometryCalculator->lastRequestPart2(), 0.75);
+    QCOMPARE(secondSnapshot.states[1].equatorial.rightAscensionHours, 12.75);
+    QCOMPARE(secondSnapshot.states[2].equatorial.rightAscensionHours, 15.75);
+}
+
+void HighPrecisionEphemerisEngineTests::batchesRepresentativeLargeCatalogWithoutSingleStarDispatch()
+{
+    constexpr std::size_t kRepresentativeCatalogSize = 4'096U;
+    std::vector<CelestialBody> bodies;
+    bodies.reserve(kRepresentativeCatalogSize);
+    for (std::size_t index = 0; index < kRepresentativeCatalogSize; ++index) {
+        bodies.push_back(
+            makeFixedStarBody("star-" + std::to_string(index), 1.0 + static_cast<double>(index) * 0.001, 5.0)
+        );
+    }
+    auto starAstrometryCalculator = std::make_shared<BatchRecordingStarAstrometryCalculator>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies({}, starAstrometryCalculator)
+    );
+
+    const SkySnapshot snapshot = engine.compute(makeRequest());
+
+    QCOMPARE(snapshot.states.size(), kRepresentativeCatalogSize);
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 1);
+    QCOMPARE(starAstrometryCalculator->lastBatchSize(), kRepresentativeCatalogSize);
+    QCOMPARE(starAstrometryCalculator->singleCallCount(), 0);
+    QCOMPARE(snapshot.states.front().bodyIndex, std::uint32_t{0});
+    QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
+}
+
+void HighPrecisionEphemerisEngineTests::fallsBackToSingleStarPathWhenBatchReturnsNoResults()
+{
+    const std::array bodies{
+        makeFixedStarBody("star-a", 2.0, 10.0),
+        makeFixedStarBody("star-b", 5.0, -20.0),
+    };
+    auto starAstrometryCalculator = std::make_shared<RecordingStarAstrometryCalculator>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies({}, starAstrometryCalculator)
+    );
+
+    const SkySnapshot snapshot = engine.compute(makeRequest());
+
+    QCOMPARE(snapshot.states.size(), std::size_t{2});
+    QCOMPARE(starAstrometryCalculator->callCount(), 2);
+    QCOMPARE(snapshot.states[0].equatorial.rightAscensionHours, 3.5);
+    QCOMPARE(snapshot.states[1].equatorial.rightAscensionHours, 3.5);
 }
 
 void HighPrecisionEphemerisEngineTests::forwardsOptionsThroughCollaboratorsAndResultBuilder()

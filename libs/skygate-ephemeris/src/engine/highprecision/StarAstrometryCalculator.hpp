@@ -8,11 +8,6 @@
 
 namespace skygate::ephemeris::highprecision {
 
-struct StarAstrometryBatchResult {
-    std::size_t bodyIndex = 0U;
-    HighPrecisionCalculatorResult result;
-};
-
 class StarAstrometryCalculator final : public IStarAstrometryCalculator {
 public:
     explicit StarAstrometryCalculator(
@@ -22,7 +17,7 @@ public:
 
     [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const override;
     [[nodiscard]] std::vector<StarAstrometryBatchResult>
-    calculateBatch(const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays) const;
+    calculateBatch(const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays) const override;
 
 private:
     std::shared_ptr<const ICalcephKernelProvider> m_kernelProvider;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/TimeScaleService.hpp"
 
@@ -62,6 +63,11 @@ struct HighPrecisionCalculatorResult {
     EphemerisResultMetadata metadata;
 };
 
+struct StarAstrometryBatchResult {
+    std::size_t bodyIndex = 0U;
+    HighPrecisionCalculatorResult result;
+};
+
 class IAtmosphericRefractionCalculator {
 public:
     virtual ~IAtmosphericRefractionCalculator() = default;
@@ -82,6 +88,13 @@ public:
     virtual ~IStarAstrometryCalculator() = default;
 
     [[nodiscard]] virtual HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const = 0;
+    [[nodiscard]] virtual std::vector<StarAstrometryBatchResult>
+    calculateBatch(const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(arrays);
+        return {};
+    }
 };
 
 class IApparentPlaceCalculator {
@@ -151,6 +164,7 @@ private:
     [[nodiscard]] CelestialBodyState computeStateForBody(const EphemerisRequest& request, std::size_t bodyIndex) const;
 
     std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
+    CatalogStarAstrometryArrays m_catalogStarAstrometryArrays;
     EphemerisEngineOptions m_options;
     HighPrecisionEphemerisEngineDependencies m_dependencies;
 };

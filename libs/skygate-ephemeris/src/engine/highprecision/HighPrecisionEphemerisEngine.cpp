@@ -5,6 +5,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -87,6 +89,20 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
     return kDefaultBuilder;
 }
 
+[[nodiscard]] HighPrecisionCalculatorResult applyApparentPlaceIfRequested(
+    const HighPrecisionEphemerisEngineDependencies& dependencies,
+    const EphemerisRequest& request,
+    const HighPrecisionComputationInput& input,
+    const HighPrecisionCalculatorResult& calculatorResult
+)
+{
+    if (!requestsApparentPlaceProcessing(request)) {
+        return calculatorResult;
+    }
+
+    return apparentPlaceCalculator(dependencies).apply(input, calculatorResult);
+}
+
 }  // namespace
 
 HighPrecisionEphemerisEngine::HighPrecisionEphemerisEngine(
@@ -95,7 +111,7 @@ HighPrecisionEphemerisEngine::HighPrecisionEphemerisEngine(
     HighPrecisionEphemerisEngineDependencies dependencies
 )
     : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end())),
-      m_options(engineOptions), m_dependencies(std::move(dependencies))
+      m_catalogStarAstrometryArrays(*m_bodies), m_options(engineOptions), m_dependencies(std::move(dependencies))
 {
     m_options.engineKind = EphemerisEngineKind::HighPrecision;
 }
@@ -143,10 +159,49 @@ SkySnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& reques
     SkySnapshot snapshot;
     snapshot.context = request.context;
     snapshot.catalogBodies = m_bodies;
-    snapshot.states.reserve(m_bodies->size());
+    snapshot.states.resize(m_bodies->size());
+
+    const IEphemerisResultBuilder& builder = resultBuilder(m_dependencies);
+    if (!hasValidEpoch(request.epoch)) {
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            const HighPrecisionComputationInput input{
+                .request = request,
+                .body = (*m_bodies)[bodyIndex],
+                .bodyIndex = bodyIndex,
+            };
+            snapshot.states[bodyIndex] = builder.buildFailedState(input);
+        }
+        return snapshot;
+    }
+
+    std::vector<std::uint8_t> batchFilledStates(m_bodies->size(), 0U);
+    const IStarAstrometryCalculator* starAstrometryCalculator = m_dependencies.starAstrometryCalculator.get();
+    if (starAstrometryCalculator != nullptr && !m_catalogStarAstrometryArrays.empty()) {
+        const std::vector<StarAstrometryBatchResult> batchResults =
+            starAstrometryCalculator->calculateBatch(request, m_catalogStarAstrometryArrays);
+        for (const StarAstrometryBatchResult& batchResult : batchResults) {
+            if (batchResult.bodyIndex >= m_bodies->size()
+                || batchResult.bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
+                continue;
+            }
+
+            const HighPrecisionComputationInput input{
+                .request = request,
+                .body = (*m_bodies)[batchResult.bodyIndex],
+                .bodyIndex = batchResult.bodyIndex,
+            };
+            const HighPrecisionCalculatorResult apparentResult =
+                applyApparentPlaceIfRequested(m_dependencies, request, input, batchResult.result);
+            snapshot.states[batchResult.bodyIndex] = builder.buildState(input, apparentResult);
+            batchFilledStates[batchResult.bodyIndex] = 1U;
+        }
+    }
 
     for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-        snapshot.states.push_back(computeStateForBody(request, bodyIndex));
+        if (batchFilledStates[bodyIndex] != 0U) {
+            continue;
+        }
+        snapshot.states[bodyIndex] = computeStateForBody(request, bodyIndex);
     }
 
     return snapshot;
@@ -224,9 +279,7 @@ HighPrecisionEphemerisEngine::computeStateForBody(const EphemerisRequest& reques
     if (isSolarSystemBody(body) && solarSystemCalculator != nullptr) {
         HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(input);
         HighPrecisionCalculatorResult apparentResult =
-            requestsApparentPlaceProcessing(request)
-                ? apparentPlaceCalculator(m_dependencies).apply(input, calculatorResult)
-                : calculatorResult;
+            applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);
         return builder.buildState(input, apparentResult);
     }
 
@@ -234,9 +287,7 @@ HighPrecisionEphemerisEngine::computeStateForBody(const EphemerisRequest& reques
     if (isCatalogStarBody(body) && starAstrometryCalculator != nullptr) {
         HighPrecisionCalculatorResult calculatorResult = starAstrometryCalculator->calculate(input);
         HighPrecisionCalculatorResult apparentResult =
-            requestsApparentPlaceProcessing(request)
-                ? apparentPlaceCalculator(m_dependencies).apply(input, calculatorResult)
-                : calculatorResult;
+            applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);
         return builder.buildState(input, apparentResult);
     }
 
