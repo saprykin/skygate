@@ -104,7 +104,9 @@ SkyContextController::SkyContextController(
     m_ephemerisUserSettings.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC;
     m_ephemerisUserSettings.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity;
     m_ephemerisUserSettings.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers;
-    rebuildEphemerisEngine();
+    if (initializationOptions.rebuildEphemerisEngineOnStartup) {
+        rebuildEphemerisEngine();
+    }
 
     m_themeOptions = m_themeRepository->themeOptions();
     m_themePalette->setDefinition(m_themeRepository->defaultTheme());
@@ -495,15 +497,21 @@ std::uint64_t SkyContextController::ephemerisDataRevision() const noexcept
 
 SkyContextController::EphemerisRequestContext SkyContextController::ephemerisRequestContext() const
 {
+    return ephemerisRequestContextFor(skyContext());
+}
+
+SkyContextController::EphemerisRequestContext
+SkyContextController::ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const
+{
     EphemerisRequestContext context;
-    context.request.context = skyContext();
+    context.request.context = skyContext;
     context.request.options = m_ephemerisEngineOptions;
     context.request.options.engineKind = m_ephemerisEngineKind;
     context.activeDataSnapshot = activeEphemerisDataSnapshot();
     context.ephemerisDataRevision = ephemerisDataRevision();
     context.catalogRevision = catalogRevision();
 
-    if (const auto epoch = astronomicalEpochFromUtcDateTime(SkyContextTimeCodec::toQDateTimeUtc(skyContext().utcTime));
+    if (const auto epoch = astronomicalEpochFromUtcDateTime(SkyContextTimeCodec::toQDateTimeUtc(skyContext.utcTime));
         epoch.has_value()) {
         context.request.epoch = *epoch;
     }

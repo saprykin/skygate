@@ -1,5 +1,188 @@
 #include "ConstellationTestSupport.hpp"
 #include "SkyContextControllerTestSupport.hpp"
+#include "SkyObjectSearchModel.hpp"
+
+#include <memory>
+#include <string_view>
+#include <vector>
+
+namespace {
+
+class RequestSensitiveEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit RequestSensitiveEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
+        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+    {
+        m_options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        m_options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Request-sensitive test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisCapabilities capabilities() const noexcept override
+    {
+        skygate::ephemeris::EphemerisCapabilities capabilities;
+        capabilities.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        capabilities.supportedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        capabilities.supportsCatalogStars = true;
+        capabilities.supportsTopocentricPositions = true;
+        return capabilities;
+    }
+
+    [[nodiscard]] std::span<const skygate::ephemeris::EphemerisDateRange> supportedDateRanges() const noexcept override
+    {
+        return {};
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisDataSetInfo dataSetInfo() const override
+    {
+        skygate::ephemeris::EphemerisDataSetInfo info;
+        info.id = "request-sensitive-test";
+        return info;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        return m_options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
+    {
+        ++m_requestComputeCount;
+        const bool highPrecisionRequest =
+            request.options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        const bool lightTimeRequest = skygate::ephemeris::hasCorrectionFlag(
+            request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        );
+        return makeSnapshot(request.context, highPrecisionRequest && lightTimeRequest ? 64.0 : 41.0, 222.0);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        return findState(compute(request), bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        const auto snapshot = compute(request);
+        if (bodyIndex >= snapshot.states.size()) {
+            return std::nullopt;
+        }
+        return snapshot.states[bodyIndex];
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        ++m_contextComputeCount;
+        return makeSnapshot(context, 12.0, 34.0);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    {
+        return findState(compute(context), bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    {
+        const auto snapshot = compute(context);
+        if (bodyIndex >= snapshot.states.size()) {
+            return std::nullopt;
+        }
+        return snapshot.states[bodyIndex];
+    }
+
+    [[nodiscard]] int requestComputeCount() const noexcept
+    {
+        return m_requestComputeCount;
+    }
+
+    [[nodiscard]] int contextComputeCount() const noexcept
+    {
+        return m_contextComputeCount;
+    }
+
+private:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    makeSnapshot(const skygate::core::SkyContext& context, const double altitudeDeg, const double azimuthDeg) const
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.catalogBodies = m_bodies;
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+                .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg}
+            });
+        }
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    findState(const skygate::ephemeris::SkySnapshot& snapshot, const std::string_view bodyId) const
+    {
+        for (const auto& state : snapshot.states) {
+            if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
+                return state;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    skygate::ephemeris::EphemerisEngineOptions m_options;
+    mutable int m_requestComputeCount = 0;
+    mutable int m_contextComputeCount = 0;
+};
+
+std::unique_ptr<SkyContextController> createRequestSensitiveController(
+    RequestSensitiveEngine*& engine, const skygate::core::ITimeSource* timeSource = nullptr
+)
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies{makeBody(
+        "demo_target",
+        "Demo Target",
+        skygate::ephemeris::CelestialBodyType::Star,
+        1.0,
+        skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
+    )};
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    Q_ASSERT(starCatalog != nullptr);
+
+    auto ephemerisEngine = std::make_unique<RequestSensitiveEngine>(std::move(bodies));
+    engine = ephemerisEngine.get();
+
+    auto initializationOptions = controllerInitializationOptions(false, timeSource);
+    initializationOptions.rebuildEphemerisEngineOnStartup = false;
+    auto controller = std::make_unique<SkyContextController>(
+        std::move(starCatalog), std::move(ephemerisEngine), initializationOptions, nullptr
+    );
+    configureFocusTestContext(*controller);
+    return controller;
+}
+
+QStringList searchTargetIds(const SkyObjectSearchModel& model)
+{
+    QStringList targetIds;
+    for (int row = 0; row < model.rowCount(); ++row) {
+        targetIds.push_back(model.index(row, 0).data(SkyObjectSearchModel::TargetIdRole).toString());
+    }
+    return targetIds;
+}
+
+}  // namespace
 
 class SkyContextControllerSearchTrackingTests final : public QObject {
     Q_OBJECT
@@ -8,9 +191,12 @@ private slots:
     void initTestCase();
     void init();
     void focusSearchTargetCentersBodyResult();
+    void focusSearchTargetUsesSelectedEngineRequest();
     void focusSearchTargetCentersConstellationLabelResult();
     void focusSearchTargetIgnoresInvalidTargets();
     void trackSearchTargetSetsLiveCurrentTimeAndCentersBody();
+    void trackSearchTargetUsesSelectedEngineRequest();
+    void searchModelRemainsCatalogAndLabelOnly();
     void trackSearchTargetRejectsInvalidTargetsWithoutMutation();
     void trackedTargetRecentersOnStepAndManualPan();
     void staleTrackedTargetClearsAndAllowsViewCenterChanges();
@@ -40,10 +226,7 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersBodyResult
             "Demo Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
     });
     QVERIFY(starCatalog != nullptr);
@@ -60,12 +243,23 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersBodyResult
     QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
     QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
-    QVERIFY(
-        azimuthDifferenceDeg(
-            controller->viewCenterAzimuthDeg(),
-            targetState->horizontal.azimuthDeg
-        ) < 1e-6
-    );
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+}
+
+void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSelectedEngineRequest()
+{
+    RequestSensitiveEngine* engine = nullptr;
+    const auto controller = createRequestSensitiveController(engine);
+    QVERIFY(engine != nullptr);
+
+    QVERIFY(controller->focusSearchTarget("body", "demo_target"));
+
+    QCOMPARE(engine->requestComputeCount(), 1);
+    QCOMPARE(engine->contextComputeCount(), 0);
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
+    QCOMPARE(controller->viewCenterAltitudeDeg(), 64.0);
+    QCOMPARE(controller->viewCenterAzimuthDeg(), 222.0);
 }
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersConstellationLabelResult()
@@ -78,26 +272,17 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersConstellat
     const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
     const auto* targetState = findStateById(snapshot, "hip_27989");
     QVERIFY(targetState != nullptr);
-    QVERIFY(
-        std::any_of(
-            controller->constellationLabelRefs().begin(),
-            controller->constellationLabelRefs().end(),
-            [](const SkyContextController::ConstellationLabelRef& labelRef) {
-                return labelRef.first == "Orion";
-            }
-        )
-    );
+    QVERIFY(std::any_of(
+        controller->constellationLabelRefs().begin(),
+        controller->constellationLabelRefs().end(),
+        [](const SkyContextController::ConstellationLabelRef& labelRef) { return labelRef.first == "Orion"; }
+    ));
 
     QVERIFY(controller->focusSearchTarget("constellationLabel", "Orion"));
     QCOMPARE(controller->selectedSearchTargetKind(), QString("constellationLabel"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("Orion"));
     QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
-    QVERIFY(
-        azimuthDifferenceDeg(
-            controller->viewCenterAzimuthDeg(),
-            targetState->horizontal.azimuthDeg
-        ) < 1e-6
-    );
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
 }
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetIgnoresInvalidTargets()
@@ -138,15 +323,47 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetSetsLiveCurrentTi
     const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
     const auto* targetState = findStateById(snapshot, "demo_target");
     QVERIFY(targetState != nullptr);
-    QVERIFY(
-        std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6
-    );
-    QVERIFY(
-        azimuthDifferenceDeg(
-            controller->viewCenterAzimuthDeg(),
-            targetState->horizontal.azimuthDeg
-        ) < 1e-6
-    );
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+}
+
+void SkyContextControllerSearchTrackingTests::trackSearchTargetUsesSelectedEngineRequest()
+{
+    FakeTimeSource timeSource;
+    RequestSensitiveEngine* engine = nullptr;
+    const auto controller = createRequestSensitiveController(engine, &timeSource);
+    QVERIFY(engine != nullptr);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("2000-01-01", "00:00:00"));
+
+    QVERIFY(controller->trackSearchTarget("body", "demo_target"));
+
+    QCOMPARE(engine->requestComputeCount(), 1);
+    QCOMPARE(engine->contextComputeCount(), 0);
+    QCOMPARE(controller->trackedTargetKind(), QString("body"));
+    QCOMPARE(controller->trackedTargetId(), QString("demo_target"));
+    QCOMPARE(controller->trackedTargetDisplayText(), QString("Demo Target"));
+    QCOMPARE(controller->viewCenterAltitudeDeg(), 64.0);
+    QCOMPARE(controller->viewCenterAzimuthDeg(), 222.0);
+    QCOMPARE(controllerUtcTime(*controller), fixedNowUtc());
+}
+
+void SkyContextControllerSearchTrackingTests::searchModelRemainsCatalogAndLabelOnly()
+{
+    RequestSensitiveEngine* engine = nullptr;
+    const auto controller = createRequestSensitiveController(engine);
+    QVERIFY(engine != nullptr);
+    auto* searchModel = qobject_cast<SkyObjectSearchModel*>(controller->objectSearchModel());
+    QVERIFY(searchModel != nullptr);
+
+    searchModel->setFilterText(QStringLiteral("demo"));
+    const QStringList targetIdsBeforeFocus = searchTargetIds(*searchModel);
+
+    QVERIFY(controller->focusSearchTarget("body", "demo_target"));
+    searchModel->setFilterText(QStringLiteral("demo"));
+
+    QCOMPARE(searchTargetIds(*searchModel), targetIdsBeforeFocus);
+    QVERIFY(targetIdsBeforeFocus.contains(QStringLiteral("demo_target")));
 }
 
 void SkyContextControllerSearchTrackingTests::trackSearchTargetRejectsInvalidTargetsWithoutMutation()
@@ -181,15 +398,8 @@ void SkyContextControllerSearchTrackingTests::trackedTargetRecentersOnStepAndMan
     auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
     const auto* targetState = findStateById(snapshot, "demo_target");
     QVERIFY(targetState != nullptr);
-    QVERIFY(
-        std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6
-    );
-    QVERIFY(
-        azimuthDifferenceDeg(
-            controller->viewCenterAzimuthDeg(),
-            targetState->horizontal.azimuthDeg
-        ) < 1e-6
-    );
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
 
     controller->setStepSeconds(3600);
     controller->stepForward();
@@ -197,15 +407,8 @@ void SkyContextControllerSearchTrackingTests::trackedTargetRecentersOnStepAndMan
     snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
     targetState = findStateById(snapshot, "demo_target");
     QVERIFY(targetState != nullptr);
-    QVERIFY(
-        std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6
-    );
-    QVERIFY(
-        azimuthDifferenceDeg(
-            controller->viewCenterAzimuthDeg(),
-            targetState->horizontal.azimuthDeg
-        ) < 1e-6
-    );
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
 }
 
 void SkyContextControllerSearchTrackingTests::staleTrackedTargetClearsAndAllowsViewCenterChanges()
@@ -231,20 +434,14 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingFor
             "Tracked Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
         makeBody(
             "search_target",
             "Search Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.2,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 8.5,
-                .declinationDeg = 12.5
-            }
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 8.5, .declinationDeg = 12.5}
         ),
     });
     QVERIFY(starCatalog != nullptr);
@@ -264,15 +461,8 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingFor
     QVERIFY(!controller->hasTrackedTarget());
     QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("search_target"));
-    QVERIFY(
-        std::abs(controller->viewCenterAltitudeDeg() - searchState->horizontal.altitudeDeg) < 1e-6
-    );
-    QVERIFY(
-        azimuthDifferenceDeg(
-            controller->viewCenterAzimuthDeg(),
-            searchState->horizontal.azimuthDeg
-        ) < 1e-6
-    );
+    QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - searchState->horizontal.altitudeDeg) < 1e-6);
+    QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), searchState->horizontal.azimuthDeg) < 1e-6);
 }
 
 void SkyContextControllerSearchTrackingTests::clearingTrackedTargetPreservesSelectedSearchTarget()
@@ -298,10 +488,7 @@ void SkyContextControllerSearchTrackingTests::collapsingSearchToolbarClearsSelec
             "Demo Target",
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
     });
     QVERIFY(starCatalog != nullptr);
