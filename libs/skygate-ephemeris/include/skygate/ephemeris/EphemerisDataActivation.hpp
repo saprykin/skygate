@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,6 +31,7 @@ enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
     WrongComponentKind,
     MissingAsset,
     MalformedMetadata,
+    MismatchedMetadata,
     UnsupportedCompression,
     CorruptArchive,
     ChecksumMismatch,
@@ -79,6 +81,8 @@ enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
         return "missing-asset";
     case EphemerisStagedUpdateVerificationStatus::MalformedMetadata:
         return "malformed-metadata";
+    case EphemerisStagedUpdateVerificationStatus::MismatchedMetadata:
+        return "mismatched-metadata";
     case EphemerisStagedUpdateVerificationStatus::UnsupportedCompression:
         return "unsupported-compression";
     case EphemerisStagedUpdateVerificationStatus::CorruptArchive:
@@ -116,6 +120,8 @@ struct EphemerisStagedUpdateVerificationRequest {
     struct ExpectedComponent {
         std::string assetId;
         EphemerisDataManifestAssetKind kind = EphemerisDataManifestAssetKind::SolarSystemKernel;
+        std::optional<std::string> expectedVersion;
+        std::optional<EphemerisDateRange> requiredValidityRange;
     };
 
     const EphemerisDataManifest* manifest = nullptr;
