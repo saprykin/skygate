@@ -58,6 +58,8 @@ private:
         std::uint64_t catalogRevision = 0;
         skygate::core::GeoLocation observer;
         skygate::core::UtcTimePoint utcTime{};
+        std::optional<skygate::ephemeris::AstronomicalEpoch> requestEpoch;
+        std::optional<skygate::ephemeris::EphemerisEngineOptions> requestOptions;
 
         [[nodiscard]] bool equals(const SnapshotCacheKey& other) const noexcept;
     };
