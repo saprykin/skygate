@@ -44,8 +44,11 @@ READY
       commit.
   - Required pre-activation cancellation path lacks coverage
     - Action: Fixed
-    - Notes: Added manager coverage for cancellation after successful staged
-      verification and before the first activation write.
+    - Notes: Adjusted the manager's post-verification/pre-install cancellation
+      branch so it preserves `EphemerisStagedUpdateVerificationStatus::Verified`
+      while returning canceled activation. Updated manager coverage to cancel
+      only after staged verification succeeds and before the first activation
+      write.
 - Files changed during fix pass:
   - `apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.hpp`
   - `apps/skygate-ui/src/ephemeris/SkyEphemerisDataManager.cpp`
