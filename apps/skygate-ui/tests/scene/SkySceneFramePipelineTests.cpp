@@ -22,7 +22,16 @@ public:
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
     ) const override
     {
-        return compute(request.context);
+        ++m_requestComputeCount;
+        return makeSnapshot(
+            request.context,
+            request.options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+                ? m_highPrecisionAltitudeDeg
+                : m_simpleAltitudeDeg,
+            hasCorrectionFlag(request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime)
+                ? m_lightTimeAzimuthDeg
+                : m_baseAzimuthDeg
+        );
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
@@ -39,21 +48,23 @@ public:
 
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
     {
-        ++m_computeCount;
-        skygate::ephemeris::CelestialBody body;
-        body.id = m_bodyId;
-        body.displayName = "Target";
-        body.visualMagnitude = 1.0;
+        ++m_contextComputeCount;
+        return makeSnapshot(context, m_simpleAltitudeDeg, m_baseAzimuthDeg);
+    }
 
-        skygate::ephemeris::SkySnapshot snapshot;
-        snapshot.context = context;
-        auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
-        bodies->push_back(std::move(body));
-        snapshot.catalogBodies = std::move(bodies);
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = 0U, .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0}
-        });
-        return snapshot;
+    [[nodiscard]] int computeCount() const noexcept
+    {
+        return m_requestComputeCount + m_contextComputeCount;
+    }
+
+    [[nodiscard]] int requestComputeCount() const noexcept
+    {
+        return m_requestComputeCount;
+    }
+
+    [[nodiscard]] int contextComputeCount() const noexcept
+    {
+        return m_contextComputeCount;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
@@ -68,14 +79,33 @@ public:
         return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(*this, context, bodyIndex);
     }
 
-    [[nodiscard]] int computeCount() const noexcept
+private:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    makeSnapshot(const skygate::core::SkyContext& context, const double altitudeDeg, const double azimuthDeg) const
     {
-        return m_computeCount;
+        skygate::ephemeris::CelestialBody body;
+        body.id = m_bodyId;
+        body.displayName = "Target";
+        body.visualMagnitude = 1.0;
+
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
+        bodies->push_back(std::move(body));
+        snapshot.catalogBodies = std::move(bodies);
+        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U, .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg}
+        });
+        return snapshot;
     }
 
-private:
     std::string m_bodyId;
-    mutable int m_computeCount = 0;
+    double m_simpleAltitudeDeg = 45.0;
+    double m_highPrecisionAltitudeDeg = 55.0;
+    double m_baseAzimuthDeg = 180.0;
+    double m_lightTimeAzimuthDeg = 181.5;
+    mutable int m_requestComputeCount = 0;
+    mutable int m_contextComputeCount = 0;
 };
 
 SkySceneFramePipelineInput makeInput(const CountingEngine& engine)
@@ -101,6 +131,7 @@ class SkySceneFramePipelineTests final : public QObject {
 private slots:
     void rejectsInvalidInputs();
     void repeatedKeysReportNoUpdate();
+    void requestBasedSnapshotsUseSelectedEngineOptions();
     void renderOnlyChangesAvoidSnapshotRecompute();
     void snapshotKeyChangesRecomputeSnapshot();
     void clearReportsWhetherStateWasPresent();
@@ -142,6 +173,40 @@ void SkySceneFramePipelineTests::repeatedKeysReportNoUpdate()
     QCOMPARE(second->snapshotGeneration, 1U);
     QCOMPARE(second->renderFrameGeneration, 1U);
     QCOMPARE(engine.computeCount(), 1);
+}
+
+void SkySceneFramePipelineTests::requestBasedSnapshotsUseSelectedEngineOptions()
+{
+    CountingEngine simpleEngine;
+    CountingEngine highPrecisionEngine;
+    SkySceneFramePipeline pipeline;
+    auto input = makeInput(simpleEngine);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    input.ephemerisRequest = request;
+
+    auto result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(simpleEngine.requestComputeCount(), 1);
+    QCOMPARE(simpleEngine.contextComputeCount(), 0);
+    QCOMPARE(result->snapshot->states.front().horizontal.altitudeDeg, 45.0);
+    QCOMPARE(result->snapshot->states.front().horizontal.azimuthDeg, 180.0);
+
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    input.ephemerisEngine = &highPrecisionEngine;
+    input.ephemerisRequest = request;
+
+    result = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(result.has_value());
+    QCOMPARE(highPrecisionEngine.requestComputeCount(), 1);
+    QCOMPARE(highPrecisionEngine.contextComputeCount(), 0);
+    QCOMPARE(result->snapshot->states.front().horizontal.altitudeDeg, 55.0);
+    QCOMPARE(result->snapshot->states.front().horizontal.azimuthDeg, 181.5);
+    QCOMPARE(result->snapshotGeneration, 2U);
 }
 
 void SkySceneFramePipelineTests::renderOnlyChangesAvoidSnapshotRecompute()

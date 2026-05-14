@@ -22,9 +22,9 @@ class IEphemerisEngine;
 struct SkySceneFramePipelineInput final {
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
     skygate::core::SkyContext skyContext;
+    std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::uint64_t catalogRevision = 0;
-    skygate::core::ProjectionType projectionType =
-        skygate::core::ProjectionType::Stereographic;
+    skygate::core::ProjectionType projectionType = skygate::core::ProjectionType::Stereographic;
     double viewCenterAltitudeDeg = 0.0;
     double viewCenterAzimuthDeg = 0.0;
     double viewFieldOfViewDeg = 0.0;
@@ -48,11 +48,8 @@ struct SkySceneFramePipelineResult final {
 
 class SkySceneFramePipeline final {
 public:
-    [[nodiscard]] std::optional<SkySceneFramePipelineResult> rebuild(
-        const SkySceneFramePipelineInput& input,
-        double viewportWidth,
-        double viewportHeight
-    );
+    [[nodiscard]] std::optional<SkySceneFramePipelineResult>
+    rebuild(const SkySceneFramePipelineInput& input, double viewportWidth, double viewportHeight);
     [[nodiscard]] bool clear();
     [[nodiscard]] std::uint64_t snapshotGeneration() const noexcept;
 
@@ -60,15 +57,14 @@ private:
     struct SnapshotCacheKey final {
         std::uint64_t catalogRevision = 0;
         skygate::core::GeoLocation observer;
-        skygate::core::UtcTimePoint utcTime {};
+        skygate::core::UtcTimePoint utcTime{};
 
         [[nodiscard]] bool equals(const SnapshotCacheKey& other) const noexcept;
     };
 
     struct RenderFrameKey final {
         std::uint64_t snapshotGeneration = 0;
-        skygate::core::ProjectionType projectionType =
-            skygate::core::ProjectionType::Stereographic;
+        skygate::core::ProjectionType projectionType = skygate::core::ProjectionType::Stereographic;
         double viewportWidth = 0.0;
         double viewportHeight = 0.0;
         double viewCenterAltitudeDeg = 0.0;
