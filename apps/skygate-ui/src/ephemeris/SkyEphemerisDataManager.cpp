@@ -39,7 +39,9 @@ EphemerisDataCacheSnapshot normalizedSnapshot(EphemerisDataCacheSnapshot snapsho
     snapshot.installedKernelVersion = trimmed(snapshot.installedKernelVersion);
     snapshot.installedEarthOrientationPath = trimmed(snapshot.installedEarthOrientationPath);
     snapshot.installedEarthOrientationVersion = trimmed(snapshot.installedEarthOrientationVersion);
+    snapshot.installedLeapSecondTablePath = trimmed(snapshot.installedLeapSecondTablePath);
     snapshot.installedLeapSecondTableVersion = trimmed(snapshot.installedLeapSecondTableVersion);
+    snapshot.installedDeltaTDataPath = trimmed(snapshot.installedDeltaTDataPath);
     snapshot.installedDeltaTDataVersion = trimmed(snapshot.installedDeltaTDataVersion);
     snapshot.dataRevisionToken = trimmed(snapshot.dataRevisionToken);
     snapshot.lastUpdateResult = trimmed(snapshot.lastUpdateResult);
@@ -57,14 +59,20 @@ bool hasInstalledMetadata(const EphemerisDataCacheSnapshot& snapshot)
     return !snapshot.installedKernelAssetId.isEmpty() || !snapshot.installedKernelProfileId.isEmpty()
            || !snapshot.installedKernelPath.isEmpty() || !snapshot.installedKernelVersion.isEmpty()
            || !snapshot.installedEarthOrientationPath.isEmpty() || !snapshot.installedEarthOrientationVersion.isEmpty()
-           || !snapshot.installedLeapSecondTableVersion.isEmpty() || !snapshot.installedDeltaTDataVersion.isEmpty()
+           || !snapshot.installedLeapSecondTablePath.isEmpty() || !snapshot.installedLeapSecondTableVersion.isEmpty()
+           || !snapshot.installedDeltaTDataPath.isEmpty() || !snapshot.installedDeltaTDataVersion.isEmpty()
            || snapshot.dataRevisionToken != EphemerisDataCacheSnapshot{}.dataRevisionToken;
 }
 
 QStringList missingInstalledPaths(const EphemerisDataCacheSnapshot& snapshot)
 {
     QStringList missingPaths;
-    const QStringList candidatePaths{snapshot.installedKernelPath, snapshot.installedEarthOrientationPath};
+    const QStringList candidatePaths{
+        snapshot.installedKernelPath,
+        snapshot.installedEarthOrientationPath,
+        snapshot.installedLeapSecondTablePath,
+        snapshot.installedDeltaTDataPath,
+    };
     for (const QString& path : candidatePaths) {
         if (!path.isEmpty() && !QFileInfo::exists(path)) {
             missingPaths.push_back(path);
@@ -81,7 +89,9 @@ bool cacheSnapshotsEqual(const EphemerisDataCacheSnapshot& lhs, const EphemerisD
            && lhs.installedKernelVersion == rhs.installedKernelVersion
            && lhs.installedEarthOrientationPath == rhs.installedEarthOrientationPath
            && lhs.installedEarthOrientationVersion == rhs.installedEarthOrientationVersion
+           && lhs.installedLeapSecondTablePath == rhs.installedLeapSecondTablePath
            && lhs.installedLeapSecondTableVersion == rhs.installedLeapSecondTableVersion
+           && lhs.installedDeltaTDataPath == rhs.installedDeltaTDataPath
            && lhs.installedDeltaTDataVersion == rhs.installedDeltaTDataVersion
            && lhs.dataRevisionToken == rhs.dataRevisionToken && lhs.lastUpdateResult == rhs.lastUpdateResult;
 }
@@ -195,6 +205,56 @@ loadTextAsset(const QString& path, const QString& id, const QString& version, co
     return asset;
 }
 
+bool pathContains(const std::filesystem::path& root, const QString& path)
+{
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    const std::filesystem::path normalizedRoot = root.lexically_normal();
+    const std::filesystem::path normalizedPath = pathFromQString(path).lexically_normal();
+    auto rootIt = normalizedRoot.begin();
+    auto pathIt = normalizedPath.begin();
+    for (; rootIt != normalizedRoot.end() && pathIt != normalizedPath.end(); ++rootIt, ++pathIt) {
+        if (*rootIt != *pathIt) {
+            return false;
+        }
+    }
+    return rootIt == normalizedRoot.end();
+}
+
+bool cacheRootContainsActivePath(const std::filesystem::path& root, const EphemerisDataCacheSnapshot& activeSnapshot)
+{
+    return pathContains(root, activeSnapshot.installedKernelPath)
+           || pathContains(root, activeSnapshot.installedEarthOrientationPath)
+           || pathContains(root, activeSnapshot.installedLeapSecondTablePath)
+           || pathContains(root, activeSnapshot.installedDeltaTDataPath);
+}
+
+std::filesystem::path activationCacheRoot(
+    const std::filesystem::path& writableCacheRoot,
+    const QString& revisionToken,
+    const EphemerisDataCacheSnapshot& activeSnapshot
+)
+{
+    const std::filesystem::path updatesRoot = writableCacheRoot / "updates";
+    const std::filesystem::path baseRoot = updatesRoot / revisionToken.toStdString();
+    if (!cacheRootContainsActivePath(baseRoot, activeSnapshot)) {
+        return baseRoot;
+    }
+
+    for (int suffix = 1; suffix < 1000; ++suffix) {
+        const QString candidateToken = suffix == 1 ? QStringLiteral("%1-activation").arg(revisionToken)
+                                                   : QStringLiteral("%1-activation-%2").arg(revisionToken).arg(suffix);
+        std::filesystem::path candidateRoot = updatesRoot / candidateToken.toStdString();
+        if (!cacheRootContainsActivePath(candidateRoot, activeSnapshot)) {
+            return candidateRoot;
+        }
+    }
+
+    return updatesRoot / QStringLiteral("%1-activation-overflow").arg(revisionToken).toStdString();
+}
+
 EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
     const EphemerisDataManifest& manifest,
     const EphemerisDataManifestProfile& profile,
@@ -234,9 +294,15 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
             break;
         case EphemerisDataManifestAssetKind::LeapSecondTable:
             snapshot.installedLeapSecondTableVersion = stringToQString(asset->version);
+            if (activePath != activePaths.end()) {
+                snapshot.installedLeapSecondTablePath = pathToQString(activePath->second);
+            }
             break;
         case EphemerisDataManifestAssetKind::DeltaTData:
             snapshot.installedDeltaTDataVersion = stringToQString(asset->version);
+            if (activePath != activePaths.end()) {
+                snapshot.installedDeltaTDataPath = pathToQString(activePath->second);
+            }
             break;
         }
     }
@@ -253,12 +319,30 @@ public:
 
     [[nodiscard]] std::optional<EphemerisTextDataAsset> leapSecondTableAsset() const override
     {
-        return std::nullopt;
+        if (!m_installedDataActive) {
+            return std::nullopt;
+        }
+
+        return loadTextAsset(
+            m_cacheSnapshot.installedLeapSecondTablePath,
+            QStringLiteral("installed-leap-second-table"),
+            m_cacheSnapshot.installedLeapSecondTableVersion,
+            QStringLiteral("Installed ephemeris data cache")
+        );
     }
 
     [[nodiscard]] std::optional<EphemerisTextDataAsset> deltaTDataAsset() const override
     {
-        return std::nullopt;
+        if (!m_installedDataActive) {
+            return std::nullopt;
+        }
+
+        return loadTextAsset(
+            m_cacheSnapshot.installedDeltaTDataPath,
+            QStringLiteral("installed-delta-t-data"),
+            m_cacheSnapshot.installedDeltaTDataVersion,
+            QStringLiteral("Installed ephemeris data cache")
+        );
     }
 
     [[nodiscard]] std::optional<EphemerisTextDataAsset> earthOrientationDataAsset() const override
@@ -440,7 +524,7 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
                                                   : request.revisionToken
     );
     const std::filesystem::path revisionCacheRoot =
-        pathFromQString(request.writableCacheRoot) / "updates" / revisionToken.toStdString();
+        activationCacheRoot(pathFromQString(request.writableCacheRoot), revisionToken, m_activeCacheSnapshot);
 
     std::vector<std::pair<std::string, std::filesystem::path>> activePaths;
     activePaths.reserve(profile->assetIds.size());

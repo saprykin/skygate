@@ -59,7 +59,9 @@ public:
         QString installedKernelVersion;
         QString installedEarthOrientationPath;
         QString installedEarthOrientationVersion;
+        QString installedLeapSecondTablePath;
         QString installedLeapSecondTableVersion;
+        QString installedDeltaTDataPath;
         QString installedDeltaTDataVersion;
         QString dataRevisionToken = QStringLiteral("bundled");
         QString lastUpdateResult = QStringLiteral("Bundled fallback");

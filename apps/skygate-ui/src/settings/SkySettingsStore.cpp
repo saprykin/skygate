@@ -347,9 +347,11 @@ bool SkySettingsStore::saveEphemerisDataCache(const EphemerisDataCacheSnapshot& 
     settings.setValue(
         ephemerisDataCacheKey("installedEarthOrientationVersion"), snapshot.installedEarthOrientationVersion
     );
+    settings.setValue(ephemerisDataCacheKey("installedLeapSecondTablePath"), snapshot.installedLeapSecondTablePath);
     settings.setValue(
         ephemerisDataCacheKey("installedLeapSecondTableVersion"), snapshot.installedLeapSecondTableVersion
     );
+    settings.setValue(ephemerisDataCacheKey("installedDeltaTDataPath"), snapshot.installedDeltaTDataPath);
     settings.setValue(ephemerisDataCacheKey("installedDeltaTDataVersion"), snapshot.installedDeltaTDataVersion);
     settings.setValue(
         ephemerisDataCacheKey("dataRevisionToken"),
@@ -381,8 +383,11 @@ SkySettingsStore::EphemerisDataCacheSnapshot SkySettingsStore::loadEphemerisData
         settings.value(ephemerisDataCacheKey("installedEarthOrientationPath")).toString();
     snapshot.installedEarthOrientationVersion =
         settings.value(ephemerisDataCacheKey("installedEarthOrientationVersion")).toString();
+    snapshot.installedLeapSecondTablePath =
+        settings.value(ephemerisDataCacheKey("installedLeapSecondTablePath")).toString();
     snapshot.installedLeapSecondTableVersion =
         settings.value(ephemerisDataCacheKey("installedLeapSecondTableVersion")).toString();
+    snapshot.installedDeltaTDataPath = settings.value(ephemerisDataCacheKey("installedDeltaTDataPath")).toString();
     snapshot.installedDeltaTDataVersion =
         settings.value(ephemerisDataCacheKey("installedDeltaTDataVersion")).toString();
     snapshot.dataRevisionToken =
