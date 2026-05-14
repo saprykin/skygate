@@ -15,6 +15,11 @@ SkyInspectorField inspectorField(const QString& label, const QString& value)
     return SkyInspectorField{.label = label, .value = value};
 }
 
+SkyInspectorField inspectorField(const QString& label, const QString& value, const QString& tooltip)
+{
+    return SkyInspectorField{.label = label, .value = value, .tooltip = tooltip};
+}
+
 bool hasSelectionInputs(const SkySelectionOverlayInput& input)
 {
     return input.snapshot != nullptr && input.preparedProjection != nullptr && input.stateIndexByBodyId != nullptr;
@@ -44,6 +49,67 @@ void appendObservationEventFields(
     fields.push_back(inspectorField(
         "Culmination", skygate::ui::internal::formatObservationCulmination(events.culmination, input.timeController)
     ));
+}
+
+struct EphemerisInspectorMetadata final {
+    QString status;
+    QString warningText;
+    QString provenance;
+    QString dataRange;
+    QString uncertainty;
+    QString corrections;
+};
+
+bool shouldShowHighPrecisionDetails(const SkySelectionOverlayInput& input) noexcept
+{
+    return input.ephemerisRequest.has_value()
+           && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+}
+
+EphemerisInspectorMetadata buildEphemerisInspectorMetadata(
+    const skygate::ephemeris::EphemerisResultMetadata& metadata, const bool includeHighPrecisionDetails
+)
+{
+    EphemerisInspectorMetadata result;
+    result.status = skygate::ui::internal::formatEphemerisStatus(metadata.status);
+    result.warningText = skygate::ui::internal::formatEphemerisWarnings(metadata);
+    if (includeHighPrecisionDetails && !metadata.dataSourceProvenance.empty()) {
+        result.provenance = QString::fromStdString(metadata.dataSourceProvenance);
+    }
+    if (includeHighPrecisionDetails && metadata.effectiveDataValidityRange.has_value()) {
+        result.dataRange = skygate::ui::internal::formatEphemerisDateRange(*metadata.effectiveDataValidityRange);
+    }
+    if (includeHighPrecisionDetails && metadata.estimatedAngularUncertaintyArcsec.has_value()) {
+        result.uncertainty =
+            skygate::ui::internal::formatAngularUncertaintyArcsec(*metadata.estimatedAngularUncertaintyArcsec);
+    }
+    if (includeHighPrecisionDetails) {
+        result.corrections = skygate::ui::internal::formatCorrectionSummary(metadata);
+    }
+    return result;
+}
+
+void appendEphemerisMetadataFields(
+    std::vector<SkyInspectorField>& fields,
+    const EphemerisInspectorMetadata& metadata,
+    const skygate::ephemeris::EphemerisResultStatus status
+)
+{
+    if (status != skygate::ephemeris::EphemerisResultStatus::Valid || !metadata.warningText.isEmpty()) {
+        fields.push_back(inspectorField("Ephemeris", metadata.status, metadata.warningText));
+    }
+    if (!metadata.provenance.isEmpty()) {
+        fields.push_back(inspectorField("Provenance", metadata.provenance));
+    }
+    if (!metadata.dataRange.isEmpty()) {
+        fields.push_back(inspectorField("Data range", metadata.dataRange));
+    }
+    if (!metadata.uncertainty.isEmpty()) {
+        fields.push_back(inspectorField("Uncertainty", metadata.uncertainty));
+    }
+    if (!metadata.corrections.isEmpty()) {
+        fields.push_back(inspectorField("Corrections", metadata.corrections));
+    }
 }
 
 }  // namespace
@@ -95,6 +161,9 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     fields.push_back(inspectorField("Magnitude", skygate::ui::internal::formatMagnitude(body.visualMagnitude)));
     fields.push_back(inspectorField("Alt / Az", skygate::ui::internal::formatHorizontalCoordinate(state.horizontal)));
     fields.push_back(inspectorField("RA / Dec", skygate::ui::internal::formatEquatorialCoordinate(state.equatorial)));
+    const EphemerisInspectorMetadata ephemerisMetadata =
+        buildEphemerisInspectorMetadata(state.metadata, shouldShowHighPrecisionDetails(input));
+    appendEphemerisMetadataFields(fields, ephemerisMetadata, state.metadata.status);
     appendObservationEventFields(fields, input, body, state.bodyIndex);
 
     if (body.deepSkyObject.has_value()) {
@@ -120,6 +189,12 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         .title = QString::fromStdString(body.displayName),
         .pinned = input.inspectorPinned,
         .fields = std::move(fields),
-        .aliases = skygate::ui::internal::aliasesText(body)
+        .aliases = skygate::ui::internal::aliasesText(body),
+        .ephemerisStatus = ephemerisMetadata.status,
+        .ephemerisWarningText = ephemerisMetadata.warningText,
+        .ephemerisProvenance = ephemerisMetadata.provenance,
+        .ephemerisDataRange = ephemerisMetadata.dataRange,
+        .ephemerisUncertainty = ephemerisMetadata.uncertainty,
+        .ephemerisCorrections = ephemerisMetadata.corrections
     };
 }

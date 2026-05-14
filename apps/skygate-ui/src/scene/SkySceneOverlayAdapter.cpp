@@ -20,14 +20,15 @@ QVariantMap inspectorFieldMap(const SkyInspectorField& field)
     QVariantMap entry;
     entry.insert("label", field.label);
     entry.insert("value", field.value);
+    if (!field.tooltip.isEmpty()) {
+        entry.insert("tooltip", field.tooltip);
+    }
     return entry;
 }
 
 }  // namespace
 
-QVariantList SkySceneOverlayAdapter::overlayItems(
-    const std::span<const SkyOverlayItem> overlayItems
-) const
+QVariantList SkySceneOverlayAdapter::overlayItems(const std::span<const SkyOverlayItem> overlayItems) const
 {
     QVariantList items;
     items.reserve(static_cast<qsizetype>(overlayItems.size()));
@@ -37,9 +38,7 @@ QVariantList SkySceneOverlayAdapter::overlayItems(
     return items;
 }
 
-QVariantMap SkySceneOverlayAdapter::selectionMarker(
-    const SkySelectionMarker& marker
-) const
+QVariantMap SkySceneOverlayAdapter::selectionMarker(const SkySelectionMarker& marker) const
 {
     if (!marker.visible) {
         return {};
@@ -52,9 +51,7 @@ QVariantMap SkySceneOverlayAdapter::selectionMarker(
     return entry;
 }
 
-QVariantMap SkySceneOverlayAdapter::selectedObjectInspector(
-    const SkySelectedObjectInspector& inspector
-) const
+QVariantMap SkySceneOverlayAdapter::selectedObjectInspector(const SkySelectedObjectInspector& inspector) const
 {
     if (!inspector.visible) {
         return {};
@@ -76,5 +73,23 @@ QVariantMap SkySceneOverlayAdapter::selectedObjectInspector(
     entry.insert("pinned", inspector.pinned);
     entry.insert("fields", fields);
     entry.insert("aliases", inspector.aliases);
+    if (!inspector.ephemerisStatus.isEmpty()) {
+        entry.insert("ephemerisStatus", inspector.ephemerisStatus);
+    }
+    if (!inspector.ephemerisWarningText.isEmpty()) {
+        entry.insert("ephemerisWarningText", inspector.ephemerisWarningText);
+    }
+    if (!inspector.ephemerisProvenance.isEmpty()) {
+        entry.insert("ephemerisProvenance", inspector.ephemerisProvenance);
+    }
+    if (!inspector.ephemerisDataRange.isEmpty()) {
+        entry.insert("ephemerisDataRange", inspector.ephemerisDataRange);
+    }
+    if (!inspector.ephemerisUncertainty.isEmpty()) {
+        entry.insert("ephemerisUncertainty", inspector.ephemerisUncertainty);
+    }
+    if (!inspector.ephemerisCorrections.isEmpty()) {
+        entry.insert("ephemerisCorrections", inspector.ephemerisCorrections);
+    }
     return entry;
 }

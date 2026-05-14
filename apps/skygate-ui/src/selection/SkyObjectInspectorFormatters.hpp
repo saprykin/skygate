@@ -21,20 +21,20 @@ namespace skygate::ui::internal {
 [[nodiscard]] QString formatEquatorialCoordinate(const core::EquatorialCoordinate& equatorial);
 [[nodiscard]] QString formatUtcTime(const core::UtcTimePoint& utcTime);
 [[nodiscard]] QString formatObservationEvent(const ephemeris::ObservationEvent& event);
-[[nodiscard]] QString formatObservationEvent(
-    const ephemeris::ObservationEvent& event,
-    const SkyTimeController* timeController
-);
+[[nodiscard]] QString
+formatObservationEvent(const ephemeris::ObservationEvent& event, const SkyTimeController* timeController);
 [[nodiscard]] QString formatObservationCulmination(
-    const ephemeris::ObservationCulmination& culmination,
-    const SkyTimeController* timeController
+    const ephemeris::ObservationCulmination& culmination, const SkyTimeController* timeController
 );
 [[nodiscard]] QString angularSizeText(const ephemeris::DeepSkyObjectInfo& deepSkyObject);
 [[nodiscard]] QString aliasesText(const ephemeris::CelestialBody& body);
+[[nodiscard]] QString formatEphemerisStatus(ephemeris::EphemerisResultStatus status);
+[[nodiscard]] QString formatEphemerisWarnings(const ephemeris::EphemerisResultMetadata& metadata);
+[[nodiscard]] QString formatEphemerisDateRange(const ephemeris::EphemerisDateRange& range);
+[[nodiscard]] QString formatAngularUncertaintyArcsec(double arcsec);
+[[nodiscard]] QString formatCorrectionSummary(const ephemeris::EphemerisResultMetadata& metadata);
 [[nodiscard]] QString sourceLabelForBodyIndex(
-    std::span<const std::uint8_t> sourceIds,
-    const QStringList& sourceLabels,
-    std::uint32_t bodyIndex
+    std::span<const std::uint8_t> sourceIds, const QStringList& sourceLabels, std::uint32_t bodyIndex
 );
 
 }  // namespace skygate::ui::internal

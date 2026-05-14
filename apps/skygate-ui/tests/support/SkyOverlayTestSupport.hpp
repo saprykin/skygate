@@ -11,10 +11,8 @@
 
 namespace skygate::ui::tests {
 
-[[nodiscard]] inline QString overlayInspectorFieldValue(
-    const SkySelectedObjectInspector& inspector,
-    const QString& label
-)
+[[nodiscard]] inline QString
+overlayInspectorFieldValue(const SkySelectedObjectInspector& inspector, const QString& label)
 {
     for (const SkyInspectorField& field : inspector.fields) {
         if (field.label == label) {
@@ -24,10 +22,18 @@ namespace skygate::ui::tests {
     return {};
 }
 
-inline void verifyOverlayItemPayload(
-    const QVariant& payload,
-    const SkyOverlayItem& expected
-)
+[[nodiscard]] inline QString
+overlayInspectorFieldTooltip(const SkySelectedObjectInspector& inspector, const QString& label)
+{
+    for (const SkyInspectorField& field : inspector.fields) {
+        if (field.label == label) {
+            return field.tooltip;
+        }
+    }
+    return {};
+}
+
+inline void verifyOverlayItemPayload(const QVariant& payload, const SkyOverlayItem& expected)
 {
     const QVariantMap map = payload.toMap();
     QVERIFY2(!map.isEmpty(), "overlay item payload must be a QVariantMap");
@@ -42,10 +48,7 @@ inline void verifyOverlayItemPayload(
     QCOMPARE(map.value(QStringLiteral("color")).value<QColor>(), expected.color);
 }
 
-inline void verifySelectionMarkerPayload(
-    const QVariantMap& payload,
-    const SkySelectionMarker& expected
-)
+inline void verifySelectionMarkerPayload(const QVariantMap& payload, const SkySelectionMarker& expected)
 {
     if (!expected.visible) {
         QVERIFY(payload.isEmpty());
@@ -58,10 +61,7 @@ inline void verifySelectionMarkerPayload(
     QCOMPARE(payload.value(QStringLiteral("y")).toDouble(), expected.y);
 }
 
-inline void verifySelectedObjectInspectorPayload(
-    const QVariantMap& payload,
-    const SkySelectedObjectInspector& expected
-)
+inline void verifySelectedObjectInspectorPayload(const QVariantMap& payload, const SkySelectedObjectInspector& expected)
 {
     if (!expected.visible) {
         QVERIFY(payload.isEmpty());
@@ -83,12 +83,18 @@ inline void verifySelectedObjectInspectorPayload(
     for (qsizetype index = 0; index < fields.size(); ++index) {
         const QVariantMap fieldMap = fields.at(index).toMap();
         QVERIFY2(!fieldMap.isEmpty(), "inspector field payload must be a QVariantMap");
-        const SkyInspectorField& expectedField = expected.fields.at(
-            static_cast<std::size_t>(index)
-        );
+        const SkyInspectorField& expectedField = expected.fields.at(static_cast<std::size_t>(index));
         QCOMPARE(fieldMap.value(QStringLiteral("label")).toString(), expectedField.label);
         QCOMPARE(fieldMap.value(QStringLiteral("value")).toString(), expectedField.value);
+        QCOMPARE(fieldMap.value(QStringLiteral("tooltip")).toString(), expectedField.tooltip);
     }
+
+    QCOMPARE(payload.value(QStringLiteral("ephemerisStatus")).toString(), expected.ephemerisStatus);
+    QCOMPARE(payload.value(QStringLiteral("ephemerisWarningText")).toString(), expected.ephemerisWarningText);
+    QCOMPARE(payload.value(QStringLiteral("ephemerisProvenance")).toString(), expected.ephemerisProvenance);
+    QCOMPARE(payload.value(QStringLiteral("ephemerisDataRange")).toString(), expected.ephemerisDataRange);
+    QCOMPARE(payload.value(QStringLiteral("ephemerisUncertainty")).toString(), expected.ephemerisUncertainty);
+    QCOMPARE(payload.value(QStringLiteral("ephemerisCorrections")).toString(), expected.ephemerisCorrections);
 }
 
 }  // namespace skygate::ui::tests

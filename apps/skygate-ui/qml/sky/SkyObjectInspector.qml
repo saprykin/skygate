@@ -239,31 +239,56 @@ Rectangle {
                 ? objectInspector.inspectorData.fields
                 : []
 
-            delegate: Row {
-                id: inspectorFieldRow
+            delegate: Item {
+                id: inspectorFieldDelegate
                 required property var modelData
+                objectName: "objectInspectorField_" + modelData.label
+                readonly property bool hasTooltip: modelData.tooltip !== undefined
+                    && modelData.tooltip.length > 0
+                readonly property bool isWarningField: modelData.label === "Ephemeris"
+                    && hasTooltip
                 width: inspectorContent.width
                 height: Math.max(fieldLabel.implicitHeight, fieldValue.implicitHeight)
-                spacing: 8
 
-                Text {
-                    id: fieldLabel
-                    width: 92
-                    text: inspectorFieldRow.modelData.label
-                    color: objectInspector.theme.toolbarSecondaryText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    elide: Text.ElideRight
+                MouseArea {
+                    id: inspectorFieldMouse
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    hoverEnabled: inspectorFieldDelegate.hasTooltip
                 }
 
-                Text {
-                    id: fieldValue
-                    width: parent.width - 100
-                    text: inspectorFieldRow.modelData.value
-                    color: objectInspector.theme.toolbarPrimaryText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 10
-                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                ToolTip.visible: inspectorFieldDelegate.hasTooltip
+                    && inspectorFieldMouse.containsMouse
+                ToolTip.delay: 250
+                ToolTip.text: inspectorFieldDelegate.hasTooltip
+                    ? inspectorFieldDelegate.modelData.tooltip
+                    : ""
+
+                Row {
+                    anchors.fill: parent
+                    spacing: 8
+
+                    Text {
+                        id: fieldLabel
+                        width: 92
+                        text: inspectorFieldDelegate.modelData.label
+                        color: objectInspector.theme.toolbarSecondaryText
+                        font.family: "Avenir Next"
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        id: fieldValue
+                        width: parent.width - 100
+                        text: inspectorFieldDelegate.modelData.value
+                        color: inspectorFieldDelegate.isWarningField
+                            ? objectInspector.theme.errorText
+                            : objectInspector.theme.toolbarPrimaryText
+                        font.family: "Avenir Next"
+                        font.pixelSize: 10
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                    }
                 }
             }
         }

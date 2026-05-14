@@ -23,6 +23,7 @@ struct SkySelectionMarker final {
 struct SkyInspectorField final {
     QString label;
     QString value;
+    QString tooltip;
 };
 
 struct SkySelectedObjectInspector final {
@@ -35,4 +36,10 @@ struct SkySelectedObjectInspector final {
     bool pinned = false;
     std::vector<SkyInspectorField> fields;
     QString aliases;
+    QString ephemerisStatus;
+    QString ephemerisWarningText;
+    QString ephemerisProvenance;
+    QString ephemerisDataRange;
+    QString ephemerisUncertainty;
+    QString ephemerisCorrections;
 };
