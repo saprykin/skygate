@@ -1,6 +1,5 @@
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
-#include "engine/simple/AstronomicalTime.hpp"
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
@@ -47,9 +46,11 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
     return request;
 }
 
-[[nodiscard]] double normalizedLunarCycleFraction(const core::UtcTimePoint& utcTime) noexcept
+[[nodiscard]] double normalizedLunarCycleFraction(const AstronomicalEpoch& epoch) noexcept
 {
-    const double daysSinceKnownNewMoon = AstronomicalTime::julianDayFromUtc(utcTime) - kKnownNewMoonJulianDay;
+    const AstronomicalEpoch normalizedEpoch = normalizedAstronomicalEpoch(epoch);
+    const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
+    const double daysSinceKnownNewMoon = julianDay - kKnownNewMoonJulianDay;
     double fraction = std::fmod(daysSinceKnownNewMoon / kSynodicMonthDays, 1.0);
     if (fraction < 0.0) {
         fraction += 1.0;
@@ -139,7 +140,7 @@ NightConditions NightConditionsCalculator::compute(
         eventCalculator.compute(ephemerisEngine, request, sunBodyIndex, kAstronomicalTwilightAltitudeDeg);
     const auto moonHorizon = eventCalculator.compute(ephemerisEngine, request, moonBodyIndex);
 
-    const double lunarCycleFraction = normalizedLunarCycleFraction(context.utcTime);
+    const double lunarCycleFraction = normalizedLunarCycleFraction(request.epoch);
     conditions.valid = true;
     conditions.sunAltitudeDeg = sunState->horizontal.altitudeDeg;
     conditions.sunrise = sunHorizon.nextRise;

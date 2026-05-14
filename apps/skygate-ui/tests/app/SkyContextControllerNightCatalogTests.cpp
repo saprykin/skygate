@@ -3,6 +3,7 @@
 #include <cmath>
 #include <memory>
 #include <numbers>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -30,6 +31,11 @@ public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         return m_options;
+    }
+
+    void setOptions(const skygate::ephemeris::EphemerisEngineOptions& options) noexcept
+    {
+        m_options = options;
     }
 
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
@@ -63,7 +69,12 @@ public:
             return std::nullopt;
         }
 
-        return stateFor(bodyIndex, requestAltitude(bodyIndex, request.context.utcTime), 150.0);
+        m_lastRequestOptions = request.options;
+        if (isSelectedNightRequest(request)) {
+            ++m_selectedRequestCount;
+        }
+
+        return stateFor(bodyIndex, requestAltitude(bodyIndex, request), 150.0);
     }
 
     [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
@@ -109,6 +120,16 @@ public:
         return m_contextBodyStateCount;
     }
 
+    [[nodiscard]] int selectedRequestCount() const noexcept
+    {
+        return m_selectedRequestCount;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::EphemerisEngineOptions> lastRequestOptions() const
+    {
+        return m_lastRequestOptions;
+    }
+
 private:
     [[nodiscard]] skygate::ephemeris::CelestialBodyState
     stateFor(const std::size_t bodyIndex, const double altitudeDeg, const double azimuthDeg) const
@@ -120,11 +141,23 @@ private:
         };
     }
 
-    [[nodiscard]] double
-    requestAltitude(const std::size_t bodyIndex, const skygate::core::UtcTimePoint& utcTime) const noexcept
+    [[nodiscard]] bool isSelectedNightRequest(const skygate::ephemeris::EphemerisRequest& request) const noexcept
     {
+        return request.options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+               && skygate::ephemeris::hasCorrectionFlag(
+                   request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+               );
+    }
+
+    [[nodiscard]] double
+    requestAltitude(const std::size_t bodyIndex, const skygate::ephemeris::EphemerisRequest& request) const noexcept
+    {
+        if (!isSelectedNightRequest(request)) {
+            return 42.0;
+        }
+
         constexpr double kSecondsPerDay = 86'400.0;
-        const double seconds = static_cast<double>(utcTime.time_since_epoch().count());
+        const double seconds = static_cast<double>(request.context.utcTime.time_since_epoch().count());
         double dayFraction = std::fmod(seconds, kSecondsPerDay) / kSecondsPerDay;
         if (dayFraction < 0.0) {
             dayFraction += 1.0;
@@ -138,6 +171,8 @@ private:
     skygate::ephemeris::EphemerisEngineOptions m_options;
     mutable int m_requestBodyStateCount = 0;
     mutable int m_contextBodyStateCount = 0;
+    mutable int m_selectedRequestCount = 0;
+    mutable std::optional<skygate::ephemeris::EphemerisEngineOptions> m_lastRequestOptions;
 };
 
 std::unique_ptr<SkyContextController> createRequestSensitiveNightController(RequestSensitiveNightEngine*& engine)
@@ -157,6 +192,10 @@ std::unique_ptr<SkyContextController> createRequestSensitiveNightController(Requ
     auto controller = std::make_unique<SkyContextController>(
         std::move(starCatalog), std::move(ephemerisEngine), initializationOptions, nullptr
     );
+    skygate::ephemeris::EphemerisEngineOptions contextAdapterOptions;
+    contextAdapterOptions.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    contextAdapterOptions.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    engine->setOptions(contextAdapterOptions);
     configureFocusTestContext(*controller);
     return controller;
 }
@@ -240,6 +279,16 @@ void SkyContextControllerNightCatalogTests::nightConditionsUseSelectedEngineRequ
     QVERIFY(hasTimedSunEvent);
     QVERIFY(engine->requestBodyStateCount() > 0);
     QCOMPARE(engine->contextBodyStateCount(), 0);
+    QVERIFY(engine->selectedRequestCount() > 0);
+    const auto lastRequestOptions = engine->lastRequestOptions();
+    QVERIFY(lastRequestOptions.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(lastRequestOptions->engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
+        lastRequestOptions->correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+    ));
 }
 
 void SkyContextControllerNightCatalogTests::failedDeepSkyCatalogDownloadKeepsCountLabel()
