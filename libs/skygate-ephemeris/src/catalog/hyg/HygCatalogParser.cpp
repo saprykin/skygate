@@ -21,6 +21,7 @@ constexpr std::size_t kHygRowCountLimitFloor = 2000000;
 constexpr std::size_t kHygMinExpectedBytesPerDataRow = 6;
 constexpr std::size_t kMaxInvalidRowSamples = 5;
 constexpr double kMasPerArcsecond = 1'000.0;
+constexpr double kHygMissingDistanceParsecs = 100'000.0;
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
@@ -55,7 +56,7 @@ optionalFiniteDoubleColumn(const DelimitedCatalogReader::Row& row, const QString
         return parallaxMas;
     }
     if (const std::optional<double> distanceParsecs = optionalFiniteDoubleColumn(row, QStringLiteral("dist"));
-        distanceParsecs.has_value() && *distanceParsecs > 0.0) {
+        distanceParsecs.has_value() && *distanceParsecs > 0.0 && *distanceParsecs < kHygMissingDistanceParsecs) {
         return kMasPerArcsecond / *distanceParsecs;
     }
 
