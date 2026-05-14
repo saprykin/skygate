@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "id": "skygate-high-precision-2026a",
+  "displayName": "SkyGate high-precision ephemeris data",
+  "version": "2026a",
+  "provenance": "SkyGate production ephemeris data manifest",
+  "dateRanges": [
+    {
+      "id": "product-range",
+      "displayName": "Product range",
+      "start": "-13200-01-01",
+      "end": "13200-12-31"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "modern",
+      "displayName": "Modern high-precision data",
+      "bundled": true,
+      "longRange": false,
+      "assetIds": [
+        "de440s-kernel",
+        "leap-seconds",
+        "earth-orientation",
+        "delta-t"
+      ]
+    },
+    {
+      "id": "de441-long-range",
+      "displayName": "DE441 long-range data",
+      "bundled": false,
+      "longRange": true,
+      "assetIds": [
+        "de441-kernel",
+        "leap-seconds",
+        "earth-orientation",
+        "delta-t"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "de440s-kernel",
+      "kind": "solar-system-kernel",
+      "profileId": "modern",
+      "version": "DE440s",
+      "sourceUrl": "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp",
+      "relativePath": "kernels/de440s.bsp",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "external-release-metadata-required"
+      },
+      "compression": {
+        "format": "none"
+      },
+      "validityRange": {
+        "id": "de440s-range",
+        "displayName": "DE440s kernel range",
+        "start": "1849-12-26",
+        "end": "2150-01-22"
+      }
+    },
+    {
+      "id": "de441-kernel",
+      "kind": "solar-system-kernel",
+      "profileId": "de441-long-range",
+      "version": "DE441",
+      "sourceUrl": "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de441.bsp",
+      "relativePath": "kernels/de441.bsp",
+      "optional": true,
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "external-release-metadata-required"
+      },
+      "compression": {
+        "format": "none"
+      },
+      "validityRange": {
+        "id": "de441-range",
+        "displayName": "DE441 long range",
+        "start": "-13200-01-01",
+        "end": "17191-01-01"
+      }
+    },
+    {
+      "id": "leap-seconds",
+      "kind": "leap-second-table",
+      "profileId": "modern",
+      "version": "2026a",
+      "sourceUrl": "https://data.iana.org/time-zones/data/leap-seconds.list",
+      "relativePath": "time/leap-seconds.list",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "external-release-metadata-required"
+      },
+      "compression": {
+        "format": "none"
+      },
+      "validityRange": {
+        "id": "leap-second-range",
+        "displayName": "Leap-second table range",
+        "start": "1972-01-01",
+        "end": "2027-01-01"
+      }
+    },
+    {
+      "id": "earth-orientation",
+      "kind": "earth-orientation-data",
+      "profileId": "modern",
+      "version": "2026a",
+      "sourceUrl": "https://datacenter.iers.org/data/latestVersion/224_EOP_C04_14.62-NOW.IAU1980224.txt",
+      "relativePath": "time/eop.txt",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "external-release-metadata-required"
+      },
+      "compression": {
+        "format": "none"
+      },
+      "validityRange": {
+        "id": "eop-range",
+        "displayName": "Earth orientation range",
+        "start": "1973-01-02",
+        "end": "2026-12-31"
+      }
+    },
+    {
+      "id": "delta-t",
+      "kind": "delta-t-data",
+      "profileId": "modern",
+      "version": "2026a",
+      "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
+      "relativePath": "time/delta-t.data",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "external-release-metadata-required"
+      },
+      "compression": {
+        "format": "none"
+      },
+      "validityRange": {
+        "id": "delta-t-range",
+        "displayName": "Delta T range",
+        "start": "-13200-01-01",
+        "end": "13200-12-31"
+      }
+    }
+  ]
+}

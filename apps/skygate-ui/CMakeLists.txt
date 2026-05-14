@@ -160,6 +160,9 @@ target_sources(skygate-ui-lib PRIVATE ${skygateUiLocationSources})
 qt_add_resources(skygateUiThemeSources resources/themes.qrc)
 target_sources(skygate-ui-lib PRIVATE ${skygateUiThemeSources})
 
+qt_add_resources(skygateUiEphemerisSources resources/ephemeris.qrc)
+target_sources(skygate-ui-lib PRIVATE ${skygateUiEphemerisSources})
+
 if(APPLE)
     target_sources(skygate-ui PRIVATE resources/icons/Skygate.icns)
     set_target_properties(skygate-ui PROPERTIES

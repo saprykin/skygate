@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/ephemeris">
+        <file alias="manifest.json">ephemeris/manifest.json</file>
+    </qresource>
+</RCC>

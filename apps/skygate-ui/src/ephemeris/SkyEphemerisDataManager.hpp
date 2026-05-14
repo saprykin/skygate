@@ -39,6 +39,7 @@ public:
 
     struct StagedUpdateDownloadRequest final {
         const skygate::ephemeris::EphemerisDataManifestAsset* asset = nullptr;
+        QString sourceUrl;
         QString sourceResourceRoot;
         QString stagedResourceRoot;
         std::function<bool()> cancellationRequested;
