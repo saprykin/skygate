@@ -3,6 +3,7 @@
 #include "engine/simple/AstronomicalTime.hpp"
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "skygate/ephemeris/Types.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -16,10 +17,34 @@ constexpr double kNauticalTwilightAltitudeDeg = -12.0;
 constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
 constexpr double kKnownNewMoonJulianDay = 2451550.1;
 constexpr double kSynodicMonthDays = 29.530588853;
+constexpr double kUnixEpochJulianDay = 2'440'587.5;
+constexpr double kSecondsPerDay = 86'400.0;
 
 [[nodiscard]] ObservationEvent unavailableEvent() noexcept
 {
     return ObservationEvent{.status = ObservationEventStatus::Unresolved};
+}
+
+[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
+{
+    const double julianDay =
+        kUnixEpochJulianDay + static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay;
+    const double julianDatePart1 = std::floor(julianDay);
+    return AstronomicalEpoch{
+        .julianDatePart1 = julianDatePart1,
+        .julianDatePart2 = julianDay - julianDatePart1,
+        .timeScale = TimeScale::Utc,
+    };
+}
+
+[[nodiscard]] EphemerisRequest
+requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephemerisEngine) noexcept
+{
+    EphemerisRequest request;
+    request.context = context;
+    request.epoch = epochFromUtcTime(context.utcTime);
+    request.options = ephemerisEngine.options();
+    return request;
 }
 
 [[nodiscard]] double normalizedLunarCycleFraction(const core::UtcTimePoint& utcTime) noexcept
@@ -72,6 +97,16 @@ NightConditions NightConditionsCalculator::compute(
     const std::uint32_t moonBodyIndex
 ) const
 {
+    return compute(ephemerisEngine, requestFromContext(context, ephemerisEngine), sunBodyIndex, moonBodyIndex);
+}
+
+NightConditions NightConditionsCalculator::compute(
+    const IEphemerisEngine& ephemerisEngine,
+    const EphemerisRequest& request,
+    const std::uint32_t sunBodyIndex,
+    const std::uint32_t moonBodyIndex
+) const
+{
     NightConditions conditions;
     conditions.sunrise = unavailableEvent();
     conditions.sunset = unavailableEvent();
@@ -84,24 +119,25 @@ NightConditions NightConditionsCalculator::compute(
     conditions.moonrise = unavailableEvent();
     conditions.moonset = unavailableEvent();
 
+    const core::SkyContext& context = request.context;
     if (!context.observer.isValid()) {
         return conditions;
     }
 
-    const auto sunState = ephemerisEngine.computeBodyState(context, sunBodyIndex);
-    const auto moonState = ephemerisEngine.computeBodyState(context, moonBodyIndex);
+    const auto sunState = ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(sunBodyIndex));
+    const auto moonState = ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(moonBodyIndex));
     if (!sunState.has_value() || !sunState->horizontal.isFinite() || !moonState.has_value()
         || !moonState->horizontal.isFinite()) {
         return conditions;
     }
 
     const ObservationEventCalculator eventCalculator;
-    const auto sunHorizon = eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kSunriseSunsetAltitudeDeg);
-    const auto civil = eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kCivilTwilightAltitudeDeg);
-    const auto nautical = eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kNauticalTwilightAltitudeDeg);
+    const auto sunHorizon = eventCalculator.compute(ephemerisEngine, request, sunBodyIndex, kSunriseSunsetAltitudeDeg);
+    const auto civil = eventCalculator.compute(ephemerisEngine, request, sunBodyIndex, kCivilTwilightAltitudeDeg);
+    const auto nautical = eventCalculator.compute(ephemerisEngine, request, sunBodyIndex, kNauticalTwilightAltitudeDeg);
     const auto astronomical =
-        eventCalculator.compute(ephemerisEngine, context, sunBodyIndex, kAstronomicalTwilightAltitudeDeg);
-    const auto moonHorizon = eventCalculator.compute(ephemerisEngine, context, moonBodyIndex);
+        eventCalculator.compute(ephemerisEngine, request, sunBodyIndex, kAstronomicalTwilightAltitudeDeg);
+    const auto moonHorizon = eventCalculator.compute(ephemerisEngine, request, moonBodyIndex);
 
     const double lunarCycleFraction = normalizedLunarCycleFraction(context.utcTime);
     conditions.valid = true;
