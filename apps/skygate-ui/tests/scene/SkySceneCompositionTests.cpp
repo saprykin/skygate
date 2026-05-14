@@ -83,6 +83,7 @@ private slots:
     void unchangedCompositionKeyAvoidsWork();
     void selectionOnlyKeyChangePreservesFrameContent();
     void referenceOverlayLabelsUseResolvedRequestContextWithoutEngineLookup();
+    void referenceOverlayLabelsUseSnapshotContextWhenItDiffersFromInput();
     void resetForcesNextCompositionToRebuild();
 };
 
@@ -187,7 +188,9 @@ void SkySceneCompositionTests::referenceOverlayLabelsUseResolvedRequestContextWi
             SkySceneFrameData sceneFrame;
             sceneFrame.preparedProjection = projection;
 
-            const skygate::ephemeris::SkySnapshot snapshot;
+            skygate::ephemeris::SkySnapshot snapshot;
+            snapshot.context.observer = observer;
+            snapshot.context.utcTime = utcTime;
             const QHash<QString, std::size_t> stateIndexByBodyId;
             const SkyRenderFrame frame;
             SkySceneCompositionInput input = makeInput();
@@ -226,6 +229,44 @@ void SkySceneCompositionTests::referenceOverlayLabelsUseResolvedRequestContextWi
         ),
         [](SkyOverlayLayerVisibility& overlayLayers) { overlayLayers.circumpolarBoundary = true; }
     );
+}
+
+void SkySceneCompositionTests::referenceOverlayLabelsUseSnapshotContextWhenItDiffersFromInput()
+{
+    const skygate::core::GeoLocation resolvedObserver{
+        .latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0
+    };
+    const skygate::core::UtcTimePoint resolvedUtcTime(std::chrono::seconds(1'717'276'800));
+    const double boundaryDeclinationDeg =
+        skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(resolvedObserver);
+    const skygate::core::HorizontalCoordinate labelCenter =
+        skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+            0, 96, boundaryDeclinationDeg, resolvedObserver, resolvedUtcTime
+        );
+    const auto projection = makeProjection(labelCenter.altitudeDeg, labelCenter.azimuthDeg);
+    QVERIFY(projection.has_value());
+
+    SkySceneComposer composer;
+    SkySceneFrameData sceneFrame;
+    sceneFrame.preparedProjection = projection;
+
+    skygate::ephemeris::SkySnapshot snapshot;
+    snapshot.context.observer = resolvedObserver;
+    snapshot.context.utcTime = resolvedUtcTime;
+
+    const QHash<QString, std::size_t> stateIndexByBodyId;
+    const SkyRenderFrame frame;
+    SkySceneCompositionInput input = makeInput();
+    input.frameInput.ephemerisEngine = nullptr;
+    input.frameInput.overlayLayers.circumpolarBoundary = true;
+    input.frameInput.renderTheme.circumpolarBoundaryLine = QColor("#b366ff");
+
+    const auto result = composer.rebuild(
+        sceneFrame, input, makeFrameResult(true, 5U, *projection, snapshot, frame, stateIndexByBodyId)
+    );
+
+    QVERIFY(result.changed);
+    QVERIFY(overlayItemsContainText(sceneFrame.overlayItems, "Circumpolar"));
 }
 
 void SkySceneCompositionTests::resetForcesNextCompositionToRebuild()

@@ -77,12 +77,11 @@ private:
 
     [[nodiscard]] std::vector<SkyOverlayItem> buildOverlayItems(
         const SkySceneFrameData& sceneFrame,
-        const SkySceneCompositionInput& input
-    ) const;
-    [[nodiscard]] SkySelectionOverlayInput buildSelectionInput(
         const SkySceneCompositionInput& input,
         const SkySceneFramePipelineResult& frameResult
     ) const;
+    [[nodiscard]] SkySelectionOverlayInput
+    buildSelectionInput(const SkySceneCompositionInput& input, const SkySceneFramePipelineResult& frameResult) const;
 
 private:
     SkySelectionOverlayBuilder m_selectionOverlayBuilder;
