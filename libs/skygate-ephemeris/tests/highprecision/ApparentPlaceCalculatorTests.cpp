@@ -887,7 +887,9 @@ void ApparentPlaceCalculatorTests::reportsInvalidObserverForTopocentricRequest()
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingObserver));
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::DiurnalParallax));
 }
 
 void ApparentPlaceCalculatorTests::reportsMissingEarthOrientationForTopocentricRequest()

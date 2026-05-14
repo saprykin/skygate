@@ -339,7 +339,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
                 result.metadata.status = EphemerisResultStatus::Degraded;
             }
             result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
-            result.metadata.unavailableCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+            result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::DiurnalParallax);
         } else if (calculatorResult.observerRelativePositionAu.has_value()) {
             outputVector = subtractVector(outputVector, *observerPosition);
             result.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
