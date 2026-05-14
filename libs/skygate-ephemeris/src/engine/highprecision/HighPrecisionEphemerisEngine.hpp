@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
+#include "skygate/ephemeris/EarthOrientationProvider.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/TimeScaleService.hpp"
 
@@ -23,6 +24,18 @@ struct SolarSystemKernelStateResult {
     std::optional<SolarSystemKernelVector> positionAu;
     std::optional<SolarSystemKernelVector> velocityAuPerDay;
     EphemerisResultMetadata metadata;
+};
+
+struct PreparedEphemerisRequestState {
+    EphemerisResultMetadata tdbKernelEpochMetadata;
+    std::optional<AstronomicalEpoch> tdbKernelEpoch;
+    std::optional<SolarSystemKernelStateResult> annualParallaxEarthState;
+
+    bool topocentricStatePrepared = false;
+    bool topocentricStateAvailable = true;
+    EphemerisResultMetadata topocentricMetadata;
+    std::optional<EarthOrientationSample> earthOrientationSample;
+    std::optional<SolarSystemKernelVector> observerItrsPositionAu;
 };
 
 class ICalcephKernelProvider {
@@ -74,12 +87,38 @@ public:
         static_cast<void>(snapshot);
     }
 
+    [[nodiscard]] virtual std::shared_ptr<const PreparedEphemerisRequestState> findPreparedRequestState(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo
+    ) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(catalogBodies);
+        static_cast<void>(dataSetInfo);
+        return nullptr;
+    }
+
+    virtual void storePreparedRequestState(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedState
+    ) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(catalogBodies);
+        static_cast<void>(dataSetInfo);
+        static_cast<void>(preparedState);
+    }
+
     virtual void clear() const {}
 };
 
 struct HighPrecisionComputationInput {
     const EphemerisRequest& request;
     const CelestialBody& body;
+    std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState;
     std::size_t bodyIndex = 0U;
 };
 
@@ -115,11 +154,15 @@ public:
     virtual ~IStarAstrometryCalculator() = default;
 
     [[nodiscard]] virtual HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const = 0;
-    [[nodiscard]] virtual std::vector<StarAstrometryBatchResult>
-    calculateBatch(const EphemerisRequest& request, const CatalogStarAstrometryArrays& arrays) const
+    [[nodiscard]] virtual std::vector<StarAstrometryBatchResult> calculateBatch(
+        const EphemerisRequest& request,
+        const CatalogStarAstrometryArrays& arrays,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
+    ) const
     {
         static_cast<void>(request);
         static_cast<void>(arrays);
+        static_cast<void>(preparedRequestState);
         return {};
     }
 };
@@ -133,9 +176,11 @@ public:
     [[nodiscard]] virtual std::vector<StarAstrometryBatchResult> applyBatch(
         const EphemerisRequest& request,
         std::span<const CelestialBody> bodies,
-        std::span<const StarAstrometryBatchResult> calculatorResults
+        std::span<const StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
     ) const
     {
+        static_cast<void>(preparedRequestState);
         std::vector<StarAstrometryBatchResult> results;
         results.reserve(calculatorResults.size());
         for (const StarAstrometryBatchResult& calculatorResult : calculatorResults) {
@@ -145,6 +190,7 @@ public:
             const HighPrecisionComputationInput input{
                 .request = request,
                 .body = bodies[calculatorResult.bodyIndex],
+                .preparedRequestState = preparedRequestState,
                 .bodyIndex = calculatorResult.bodyIndex,
             };
             results.push_back(StarAstrometryBatchResult{
@@ -212,8 +258,18 @@ public:
 
 private:
     [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept;
-    [[nodiscard]] SkySnapshot computeUncached(const EphemerisRequest& request) const;
-    [[nodiscard]] CelestialBodyState computeStateForBody(const EphemerisRequest& request, std::size_t bodyIndex) const;
+    [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState>
+    preparedRequestState(const EphemerisRequest& request) const;
+    [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState>
+    buildPreparedRequestState(const EphemerisRequest& request) const;
+    [[nodiscard]] SkySnapshot computeUncached(
+        const EphemerisRequest& request, std::shared_ptr<const PreparedEphemerisRequestState> preparedState
+    ) const;
+    [[nodiscard]] CelestialBodyState computeStateForBody(
+        const EphemerisRequest& request,
+        std::size_t bodyIndex,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedState
+    ) const;
 
     std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
     CatalogStarAstrometryArrays m_catalogStarAstrometryArrays;

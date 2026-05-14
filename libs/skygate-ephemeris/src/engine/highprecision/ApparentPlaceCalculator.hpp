@@ -21,7 +21,8 @@ public:
     [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
         const EphemerisRequest& request,
         std::span<const CelestialBody> bodies,
-        std::span<const StarAstrometryBatchResult> calculatorResults
+        std::span<const StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
     ) const override;
 
 private:
