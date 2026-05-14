@@ -88,6 +88,8 @@ class StarAstrometryCalculatorTests final : public QObject {
 private slots:
     void propagatesFullAstrometryWhenCorrectionsAreEnabled();
     void leavesReferenceCoordinateWhenCorrectionsAreDisabled();
+    void treatsRightAscensionProperMotionAsTangentPlaneComponent();
+    void degradesRadialVelocityWhenStellarParallaxIsDisabled();
     void degradesPartialAstrometryButAppliesAvailableProperMotion();
     void degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested();
     void failsWhenNoCoordinateFallbackExists();
@@ -109,8 +111,8 @@ void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEn
     compareCoordinates(
         *result.equatorial,
         core::EquatorialCoordinate{
-            .rightAscensionHours = 10.0027778,
-            .declinationDeg = 19.98,
+            .rightAscensionHours = 10.0029557,
+            .declinationDeg = 19.9799945,
         },
         0.00005
     );
@@ -132,6 +134,55 @@ void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreD
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
     QCOMPARE(result.metadata.status, EphemerisResultStatus::Valid);
     QCOMPARE(result.metadata.appliedCorrections, EphemerisCorrectionFlags::NoCorrections);
+}
+
+void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPlaneComponent()
+{
+    CelestialBody body = makeAstrometricStar();
+    body.fixedEquatorial = core::EquatorialCoordinate{
+        .rightAscensionHours = 10.0,
+        .declinationDeg = 60.0,
+    };
+    body.starAstrometry->referenceEquatorial = *body.fixedEquatorial;
+    body.starAstrometry->properMotionRightAscensionMasPerYear = 18'000.0;
+    body.starAstrometry->properMotionDeclinationMasPerYear = 0.0;
+    body.starAstrometry->stellarParallaxMas = std::nullopt;
+    body.starAstrometry->radialVelocityKmPerSecond = std::nullopt;
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::ProperMotion, 10.0);
+
+    const StarAstrometryCalculator calculator;
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
+
+    QVERIFY(result.equatorial.has_value());
+    compareCoordinates(
+        *result.equatorial,
+        core::EquatorialCoordinate{
+            .rightAscensionHours = 10.0066667,
+            .declinationDeg = 59.9999622,
+        },
+        0.000001
+    );
+    QCOMPARE(result.metadata.status, EphemerisResultStatus::Valid);
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
+}
+
+void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsDisabled()
+{
+    CelestialBody body = makeAstrometricStar();
+    body.starAstrometry->properMotionRightAscensionMasPerYear = 0.0;
+    body.starAstrometry->properMotionDeclinationMasPerYear = 0.0;
+    body.starAstrometry->radialVelocityKmPerSecond = 25.0;
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::RadialVelocity, 10.0);
+
+    const StarAstrometryCalculator calculator;
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
+
+    QVERIFY(result.equatorial.has_value());
+    compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
+    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::RadialVelocity));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarParallax));
 }
 
 void StarAstrometryCalculatorTests::degradesPartialAstrometryButAppliesAvailableProperMotion()

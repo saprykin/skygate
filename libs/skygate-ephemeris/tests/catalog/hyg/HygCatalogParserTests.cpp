@@ -12,6 +12,7 @@ class HygCatalogParserTests final : public QObject {
 private slots:
     void parsesBasicRows();
     void parsesAstrometryColumns();
+    void treatsMissingDistanceSentinelAsAbsentParallax();
     void supportsFallbackIdsAndQuotedFields();
     void keepsWholeCatalogByDefault();
     void rejectsMalformedInput();
@@ -58,6 +59,27 @@ void HygCatalogParserTests::parsesAstrometryColumns()
     QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), -5.5);
     QVERIFY(astrometry.stellarParallaxMas.has_value());
     QVERIFY(std::abs(*astrometry.stellarParallaxMas - 379.219) < 0.001);
+}
+
+void HygCatalogParserTests::treatsMissingDistanceSentinelAsAbsentParallax()
+{
+    auto result = skygate::ephemeris::loadStarCatalog(
+        skygate::ephemeris::CatalogSourceType::HygCsv,
+        "id,hip,proper,ra,dec,mag,pmra,pmdec,rv,dist\n"
+        "1,999,Sentinel,1.0,45.0,5.0,12.0,-3.0,20.0,100000\n"
+    );
+    QVERIFY(result.isSuccess());
+    const auto& catalog = result.catalog;
+    QVERIFY(catalog != nullptr);
+
+    const auto bodies = catalog->bodies();
+    QVERIFY(bodies.size() == 1U);
+    QVERIFY(bodies[0].starAstrometry.has_value());
+    const auto& astrometry = *bodies[0].starAstrometry;
+    QCOMPARE(astrometry.properMotionRightAscensionMasPerYear.value_or(0.0), 12.0);
+    QCOMPARE(astrometry.properMotionDeclinationMasPerYear.value_or(0.0), -3.0);
+    QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), 20.0);
+    QVERIFY(!astrometry.stellarParallaxMas.has_value());
 }
 
 void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()

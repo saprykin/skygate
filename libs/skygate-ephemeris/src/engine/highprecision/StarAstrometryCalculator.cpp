@@ -52,6 +52,12 @@ struct CartesianVector {
            && *astrometry.stellarParallaxMas > 0.0;
 }
 
+[[nodiscard]] bool
+hasEnabledPositiveParallax(const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags) noexcept
+{
+    return hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax) && hasPositiveParallax(astrometry);
+}
+
 [[nodiscard]] bool requestsAnyAstrometryCorrection(const EphemerisCorrectionFlags flags) noexcept
 {
     return hasCorrectionFlag(flags, EphemerisCorrectionFlags::ProperMotion)
@@ -187,11 +193,10 @@ void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
     const CartesianVector referenceUnit = unitVectorFromEquatorial(reference);
     const CartesianVector east = eastBasisFromEquatorial(reference);
     const CartesianVector north = northBasisFromEquatorial(reference);
-    const double declinationRad = core::AngleMath::toRadians(reference.declinationDeg);
-    const double tangentialRaRadiansPerYear = *properMotionRaMasPerYear * kMasToRadians * std::cos(declinationRad);
+    const double tangentialRaRadiansPerYear = *properMotionRaMasPerYear * kMasToRadians;
     const double tangentialDecRadiansPerYear = *properMotionDecMasPerYear * kMasToRadians;
 
-    if (!hasPositiveParallax(astrometry)) {
+    if (!hasEnabledPositiveParallax(astrometry, flags)) {
         const CartesianVector direction = addVectors(
             referenceUnit,
             addVectors(
@@ -228,7 +233,7 @@ void recordUnavailableRequestedFields(
         markCorrectionUnavailable(metadata);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
-        && (!astrometry.radialVelocityKmPerSecond.has_value() || !hasPositiveParallax(astrometry))) {
+        && (!astrometry.radialVelocityKmPerSecond.has_value() || !hasEnabledPositiveParallax(astrometry, flags))) {
         markCorrectionUnavailable(metadata);
     }
 }
@@ -246,7 +251,7 @@ void recordAppliedCorrections(
         metadata.appliedCorrections |= EphemerisCorrectionFlags::StellarParallax;
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
-        && astrometry.radialVelocityKmPerSecond.has_value() && hasPositiveParallax(astrometry)) {
+        && astrometry.radialVelocityKmPerSecond.has_value() && hasEnabledPositiveParallax(astrometry, flags)) {
         metadata.appliedCorrections |= EphemerisCorrectionFlags::RadialVelocity;
     }
 }
