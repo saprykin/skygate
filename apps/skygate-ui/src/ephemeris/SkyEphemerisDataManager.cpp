@@ -269,6 +269,19 @@ QString installedDatasetInfoText(const EphemerisDataCacheSnapshot& snapshot)
     return parts.join(QStringLiteral(" | "));
 }
 
+bool installedKernelLooksLongRange(const EphemerisDataCacheSnapshot& snapshot)
+{
+    const QString haystack =
+        QStringList{
+            snapshot.installedKernelAssetId,
+            snapshot.installedKernelProfileId,
+            snapshot.installedKernelVersion,
+        }
+            .join(QLatin1Char(' '))
+            .toLower();
+    return haystack.contains(QStringLiteral("de441")) || haystack.contains(QStringLiteral("long"));
+}
+
 std::optional<EphemerisTextDataAsset>
 loadTextAsset(const QString& path, const QString& id, const QString& version, const QString& provenance)
 {
@@ -501,6 +514,66 @@ QString SkyEphemerisDataManager::statusText() const
 QString SkyEphemerisDataManager::datasetInfoText() const
 {
     return m_datasetInfoText;
+}
+
+QString SkyEphemerisDataManager::modernKernelStatusText() const
+{
+    if (usingInstalledData() && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
+        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedKernelVersion);
+    }
+    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
+        return QStringLiteral("Bundled fallback (installed data missing)");
+    }
+    return QStringLiteral("Bundled fallback");
+}
+
+QString SkyEphemerisDataManager::longRangeKernelStatusText() const
+{
+    if (usingInstalledData() && installedKernelLooksLongRange(m_activeCacheSnapshot)) {
+        const QString version = m_activeCacheSnapshot.installedKernelVersion.isEmpty()
+                                    ? QStringLiteral("installed")
+                                    : m_activeCacheSnapshot.installedKernelVersion;
+        return QStringLiteral("Installed: %1").arg(version);
+    }
+    return QStringLiteral("Not installed");
+}
+
+QString SkyEphemerisDataManager::earthOrientationStatusText() const
+{
+    if (usingInstalledData() && !m_activeCacheSnapshot.installedEarthOrientationVersion.isEmpty()) {
+        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedEarthOrientationVersion);
+    }
+    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
+        return QStringLiteral("Bundled fallback (installed data missing)");
+    }
+    return QStringLiteral("Bundled fallback");
+}
+
+QString SkyEphemerisDataManager::leapSecondStatusText() const
+{
+    if (usingInstalledData() && !m_activeCacheSnapshot.installedLeapSecondTableVersion.isEmpty()) {
+        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedLeapSecondTableVersion);
+    }
+    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
+        return QStringLiteral("Bundled fallback (installed data missing)");
+    }
+    return QStringLiteral("Bundled fallback");
+}
+
+QString SkyEphemerisDataManager::deltaTStatusText() const
+{
+    if (usingInstalledData() && !m_activeCacheSnapshot.installedDeltaTDataVersion.isEmpty()) {
+        return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedDeltaTDataVersion);
+    }
+    if (m_activeSource == ActiveSource::MissingInstalledFallback) {
+        return QStringLiteral("Bundled fallback (installed data missing)");
+    }
+    return QStringLiteral("Bundled fallback");
+}
+
+QString SkyEphemerisDataManager::lastUpdateResultText() const
+{
+    return m_activeCacheSnapshot.lastUpdateResult;
 }
 
 QString SkyEphemerisDataManager::dataRevisionToken() const

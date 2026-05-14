@@ -93,6 +93,12 @@ public:
 
     [[nodiscard]] QString statusText() const;
     [[nodiscard]] QString datasetInfoText() const;
+    [[nodiscard]] QString modernKernelStatusText() const;
+    [[nodiscard]] QString longRangeKernelStatusText() const;
+    [[nodiscard]] QString earthOrientationStatusText() const;
+    [[nodiscard]] QString leapSecondStatusText() const;
+    [[nodiscard]] QString deltaTStatusText() const;
+    [[nodiscard]] QString lastUpdateResultText() const;
     [[nodiscard]] QString dataRevisionToken() const;
     [[nodiscard]] bool usingInstalledData() const noexcept;
     [[nodiscard]] std::uint64_t dataRevision() const noexcept;
