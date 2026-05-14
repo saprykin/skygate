@@ -1,6 +1,34 @@
 #include "SkyContextControllerTestSupport.hpp"
 
+#include <cmath>
+
 namespace {
+
+void compareEpoch(
+    const skygate::ephemeris::AstronomicalEpoch& actual, const skygate::ephemeris::AstronomicalEpoch& expected
+)
+{
+    QCOMPARE(actual.timeScale, expected.timeScale);
+    QVERIFY(std::abs(actual.julianDatePart1 - expected.julianDatePart1) < 1.0e-12);
+    QVERIFY(std::abs(actual.julianDatePart2 - expected.julianDatePart2) < 1.0e-12);
+}
+
+skygate::ephemeris::AstronomicalEpoch expectedUtcEpoch(
+    const int astronomicalYear, const int month, const int day, const int hour, const int minute, const int second
+)
+{
+    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+        .astronomicalYear = astronomicalYear,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .minute = minute,
+        .second = second,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    });
+    Q_ASSERT(epoch.has_value());
+    return *epoch;
+}
 
 SkySettingsStore::EphemerisUserSettingsSnapshot customEphemerisUserSettings()
 {
@@ -52,6 +80,9 @@ private slots:
     void init();
     void loadSavePreservesAllEphemerisUserSettings();
     void loadSettingsWithEphemerisSettingsNotifiesSceneConsumers();
+    void requestContextUsesSimpleEngineDefaults();
+    void requestContextCombinesRestoredSettingsObserverTimeAndDataRevision();
+    void requestContextConvertsBceUtcToAstronomicalEpoch();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -110,6 +141,84 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsWithEphemerisSettin
     );
     QCOMPARE(restoredOptions.fallbackToSimpleEngine, snapshot->ephemeris.fallbackToSimpleEngine);
     QCOMPARE(restoredOptions.enableAtmosphericRefraction, snapshot->ephemeris.refractionEnabled);
+}
+
+void SkyContextControllerEphemerisSettingsTests::requestContextUsesSimpleEngineDefaults()
+{
+    const FakeTimeSource timeSource(QDateTime(QDate(2026, 5, 14), QTime(8, 45, 30), QTimeZone::UTC));
+    const auto controller = createControllerWithTimeSource(timeSource, false);
+
+    const auto requestContext = controller->ephemerisRequestContext();
+
+    QCOMPARE(requestContext.request.context.utcTime, controller->skyContext().utcTime);
+    QCOMPARE(requestContext.request.context.observer.latitudeDeg, controller->skyContext().observer.latitudeDeg);
+    QCOMPARE(
+        static_cast<std::uint8_t>(requestContext.request.options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(requestContext.request.options.correctionFlags),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+    );
+    compareEpoch(requestContext.request.epoch, expectedUtcEpoch(2026, 5, 14, 8, 45, 30));
+    QVERIFY(requestContext.activeDataSnapshot != nullptr);
+    QCOMPARE(requestContext.ephemerisDataRevision, controller->ephemerisDataRevision());
+    QCOMPARE(requestContext.catalogRevision, controller->catalogRevision());
+}
+
+void SkyContextControllerEphemerisSettingsTests::requestContextCombinesRestoredSettingsObserverTimeAndDataRevision()
+{
+    auto expectedSettings = customEphemerisUserSettings();
+    expectedSettings.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    expectedSettings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent
+                                       | skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction;
+    expectedSettings.refractionEnabled = true;
+
+    SkySettingsStore store;
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.ephemeris = expectedSettings;
+    snapshot.ephemerisSettingsPresent = true;
+    snapshot.utcEpochSeconds = QDateTime(QDate(2030, 7, 2), QTime(3, 4, 5), QTimeZone::UTC).toSecsSinceEpoch();
+    snapshot.live = false;
+    snapshot.latitudeDeg = 47.3769;
+    snapshot.longitudeDeg = 8.5417;
+    snapshot.elevationMeters = 408.0;
+    QVERIFY(store.saveState(snapshot));
+
+    const auto controller = createController(true);
+    const auto requestContext = controller->ephemerisRequestContext();
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(requestContext.request.options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(requestContext.request.options.correctionFlags),
+        static_cast<std::uint32_t>(expectedSettings.correctionFlags)
+    );
+    QCOMPARE(requestContext.request.options.enableAtmosphericRefraction, expectedSettings.refractionEnabled);
+    QCOMPARE(requestContext.request.options.atmosphericPressureHpa, expectedSettings.atmosphericPressureHpa);
+    QCOMPARE(requestContext.request.options.atmosphericTemperatureC, expectedSettings.atmosphericTemperatureC);
+    QCOMPARE(requestContext.request.options.relativeHumidity, expectedSettings.relativeHumidity);
+    QCOMPARE(
+        requestContext.request.options.observingWavelengthMicrometers, expectedSettings.observingWavelengthMicrometers
+    );
+    QCOMPARE(requestContext.request.context.observer.latitudeDeg, snapshot.latitudeDeg);
+    QCOMPARE(requestContext.request.context.observer.longitudeDeg, snapshot.longitudeDeg);
+    QCOMPARE(requestContext.request.context.observer.elevationMeters, snapshot.elevationMeters);
+    compareEpoch(requestContext.request.epoch, expectedUtcEpoch(2030, 7, 2, 3, 4, 5));
+    QVERIFY(requestContext.activeDataSnapshot != nullptr);
+    QCOMPARE(requestContext.ephemerisDataRevision, controller->ephemerisDataRevision());
+}
+
+void SkyContextControllerEphemerisSettingsTests::requestContextConvertsBceUtcToAstronomicalEpoch()
+{
+    const auto controller = createController(false);
+    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+
+    const auto requestContext = controller->ephemerisRequestContext();
+
+    compareEpoch(requestContext.request.epoch, expectedUtcEpoch(-43, 3, 15, 12, 0, 0));
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerEphemerisSettingsTests)
