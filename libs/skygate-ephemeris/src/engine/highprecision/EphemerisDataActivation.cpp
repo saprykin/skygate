@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -244,6 +245,23 @@ void addDiagnostic(EphemerisStagedUpdateVerificationResult& result, const std::s
     result.diagnostics.emplace_back(diagnostic);
 }
 
+[[nodiscard]] bool cancellationRequested(const std::function<bool()>& callback)
+{
+    return callback != nullptr && callback();
+}
+
+void markCanceled(EphemerisDataActivationResult& result)
+{
+    result.status = EphemerisDataActivationStatus::Canceled;
+    addDiagnostic(result, "Ephemeris data activation was canceled.");
+}
+
+void markCanceled(EphemerisStagedUpdateVerificationResult& result)
+{
+    result.status = EphemerisStagedUpdateVerificationStatus::Canceled;
+    addDiagnostic(result, "Staged ephemeris update verification was canceled.");
+}
+
 [[nodiscard]] bool
 verifySha256File(const QString& path, const std::string& expectedHexDigest, EphemerisDataActivationResult& result)
 {
@@ -306,11 +324,16 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     QIODevice& targetFile,
     QCryptographicHash& hash,
     std::uint64_t& outputBytes,
-    EphemerisDataActivationResult& result
+    EphemerisDataActivationResult& result,
+    const std::function<bool()>& cancellationCallback
 )
 {
     std::array<char, kIoBufferBytes> buffer{};
     while (!sourceFile.atEnd()) {
+        if (cancellationRequested(cancellationCallback)) {
+            markCanceled(result);
+            return false;
+        }
         const qint64 bytesRead = sourceFile.read(buffer.data(), static_cast<qint64>(buffer.size()));
         if (bytesRead < 0) {
             addDiagnostic(result, "Unable to read bundled ephemeris data asset.");
@@ -335,7 +358,8 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     QIODevice& targetFile,
     QCryptographicHash& hash,
     std::uint64_t& outputBytes,
-    EphemerisDataActivationResult& result
+    EphemerisDataActivationResult& result,
+    const std::function<bool()>& cancellationCallback
 )
 {
     const ZstdRuntime& runtime = ZstdRuntime::instance();
@@ -357,6 +381,10 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     std::size_t remainingHint = 1U;
     bool sawFrameEnd = false;
     while (!sourceFile.atEnd()) {
+        if (cancellationRequested(cancellationCallback)) {
+            markCanceled(result);
+            return false;
+        }
         const qint64 bytesRead = sourceFile.read(inputBuffer.data(), static_cast<qint64>(inputBuffer.size()));
         if (bytesRead < 0) {
             addDiagnostic(result, "Unable to read compressed ephemeris data asset.");
@@ -365,6 +393,10 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
 
         ZstdInBuffer input{inputBuffer.data(), static_cast<std::size_t>(bytesRead), 0U};
         while (input.pos < input.size) {
+            if (cancellationRequested(cancellationCallback)) {
+                markCanceled(result);
+                return false;
+            }
             ZstdOutBuffer output{outputBuffer.data(), outputBuffer.size(), 0U};
             remainingHint = runtime.decompressStream(stream.get(), output, input);
             if (runtime.isError(remainingHint)) {
@@ -493,6 +525,8 @@ mappedVerificationStatus(const EphemerisDataActivationStatus status) noexcept
         return EphemerisStagedUpdateVerificationStatus::CorruptArchive;
     case EphemerisDataActivationStatus::ChecksumMismatch:
         return EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
+    case EphemerisDataActivationStatus::Canceled:
+        return EphemerisStagedUpdateVerificationStatus::Canceled;
     case EphemerisDataActivationStatus::IoError:
     case EphemerisDataActivationStatus::MissingSource:
         return EphemerisStagedUpdateVerificationStatus::IoError;
@@ -507,9 +541,17 @@ mappedVerificationStatus(const EphemerisDataActivationStatus status) noexcept
 }
 
 [[nodiscard]] bool verifyAssetPayload(
-    const EphemerisDataManifestAsset& asset, const QString& sourcePath, EphemerisStagedUpdateVerificationResult& result
+    const EphemerisDataManifestAsset& asset,
+    const QString& sourcePath,
+    EphemerisStagedUpdateVerificationResult& result,
+    const std::function<bool()>& cancellationCallback
 )
 {
+    if (cancellationRequested(cancellationCallback)) {
+        markCanceled(result);
+        return false;
+    }
+
     QFileInfo sourceInfo(sourcePath);
     if (!sourceInfo.exists() || !sourceInfo.isFile()) {
         result.status = EphemerisStagedUpdateVerificationStatus::MissingAsset;
@@ -542,15 +584,18 @@ mappedVerificationStatus(const EphemerisDataActivationStatus status) noexcept
     EphemerisDataActivationResult activationResult;
     switch (asset.compression.kind) {
     case EphemerisDataManifestCompressionKind::None:
-        payloadValid = copyUncompressedAsset(sourceFile, sink, hash, outputBytes, activationResult);
+        payloadValid =
+            copyUncompressedAsset(sourceFile, sink, hash, outputBytes, activationResult, cancellationCallback);
         break;
     case EphemerisDataManifestCompressionKind::Zstd:
-        payloadValid = decompressZstdAsset(sourceFile, sink, hash, outputBytes, activationResult);
+        payloadValid = decompressZstdAsset(sourceFile, sink, hash, outputBytes, activationResult, cancellationCallback);
         break;
     }
 
     if (!payloadValid) {
-        result.status = mappedVerificationStatus(activationResult.status);
+        result.status = activationResult.status == EphemerisDataActivationStatus::Canceled
+                            ? EphemerisStagedUpdateVerificationStatus::Canceled
+                            : mappedVerificationStatus(activationResult.status);
         result.diagnostics.insert(
             result.diagnostics.end(), activationResult.diagnostics.begin(), activationResult.diagnostics.end()
         );
@@ -576,6 +621,10 @@ mappedVerificationStatus(const EphemerisDataActivationStatus status) noexcept
 EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActivationRequest& request)
 {
     EphemerisDataActivationResult result;
+    if (cancellationRequested(request.cancellationRequested)) {
+        markCanceled(result);
+        return result;
+    }
     if (request.asset == nullptr) {
         addDiagnostic(result, "Ephemeris data activation requires an asset.");
         return result;
@@ -648,10 +697,12 @@ EphemerisDataActivationResult activateEphemerisDataAsset(const EphemerisDataActi
     bool activated = false;
     switch (request.asset->compression.kind) {
     case EphemerisDataManifestCompressionKind::None:
-        activated = copyUncompressedAsset(sourceFile, targetFile, hash, outputBytes, result);
+        activated =
+            copyUncompressedAsset(sourceFile, targetFile, hash, outputBytes, result, request.cancellationRequested);
         break;
     case EphemerisDataManifestCompressionKind::Zstd:
-        activated = decompressZstdAsset(sourceFile, targetFile, hash, outputBytes, result);
+        activated =
+            decompressZstdAsset(sourceFile, targetFile, hash, outputBytes, result, request.cancellationRequested);
         break;
     }
 
@@ -697,6 +748,10 @@ EphemerisStagedUpdateVerificationResult
 verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& request)
 {
     EphemerisStagedUpdateVerificationResult result;
+    if (cancellationRequested(request.cancellationRequested)) {
+        markCanceled(result);
+        return result;
+    }
     if (request.manifest == nullptr) {
         addDiagnostic(result, "Staged ephemeris update verification requires a manifest.");
         return result;
@@ -720,6 +775,10 @@ verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& r
     std::unordered_set<std::string> seenAssetIds;
     std::vector<EphemerisDataManifestAssetKind> presentKinds;
     for (const std::string& assetId : profile->assetIds) {
+        if (cancellationRequested(request.cancellationRequested)) {
+            markCanceled(result);
+            return result;
+        }
         const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
@@ -745,6 +804,10 @@ verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& r
     }
 
     for (const EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component : request.expectedComponents) {
+        if (cancellationRequested(request.cancellationRequested)) {
+            markCanceled(result);
+            return result;
+        }
         const EphemerisDataManifestAsset* asset = request.manifest->asset(component.assetId);
         if (asset == nullptr || !hasAssetId(profile->assetIds, component.assetId)) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
@@ -782,6 +845,10 @@ verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& r
     }
 
     for (const EphemerisDataManifestAssetKind kind : request.requiredKinds) {
+        if (cancellationRequested(request.cancellationRequested)) {
+            markCanceled(result);
+            return result;
+        }
         if (!hasKind(presentKinds, kind)) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
             addDiagnostic(result, "Selected ephemeris update profile is missing a required component kind.");
@@ -790,13 +857,19 @@ verifyEphemerisStagedUpdateSet(const EphemerisStagedUpdateVerificationRequest& r
     }
 
     for (const std::string& assetId : profile->assetIds) {
+        if (cancellationRequested(request.cancellationRequested)) {
+            markCanceled(result);
+            return result;
+        }
         const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
             addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
             return result;
         }
-        if (!verifyAssetPayload(*asset, stagedSourcePath(request.stagedResourceRoot, *asset), result)) {
+        if (!verifyAssetPayload(
+                *asset, stagedSourcePath(request.stagedResourceRoot, *asset), result, request.cancellationRequested
+            )) {
             return result;
         }
 

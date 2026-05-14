@@ -241,8 +241,10 @@ private slots:
     void rejectsExpectedSizeMismatch();
     void preservesExistingCacheFileWhenReplacementCannotBeWritten();
     void treatsExistingValidCacheFileAsAlreadyActive();
+    void cancelsActivationBeforeWritingCacheFile();
     void rejectsLargeKernelQtResourcePaths();
     void verifiesCompleteStagedUpdateSet();
+    void cancelsStagedUpdateVerification();
     void rejectsStagedUpdateChecksumFailure();
     void rejectsStagedUpdateWrongComponentKind();
     void rejectsStagedUpdateVersionMismatch();
@@ -426,6 +428,32 @@ void EphemerisDataActivationTests::treatsExistingValidCacheFileAsAlreadyActive()
     QVERIFY(secondResult.activePath == firstResult.activePath);
 }
 
+void EphemerisDataActivationTests::cancelsActivationBeforeWritingCacheFile()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    writeFile(
+        uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+
+    skygate::ephemeris::EphemerisDataActivationRequest request = makeRequest(asset, bundledRoot, cacheRoot);
+    request.cancellationRequested = [] { return true; };
+
+    const skygate::ephemeris::EphemerisDataActivationResult result =
+        skygate::ephemeris::activateEphemerisDataAsset(request);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Canceled)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!containsFiles(cacheRoot.path()));
+}
+
 void EphemerisDataActivationTests::rejectsLargeKernelQtResourcePaths()
 {
     QTemporaryDir cacheRoot;
@@ -464,6 +492,27 @@ void EphemerisDataActivationTests::verifiesCompleteStagedUpdateSet()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
     );
     QCOMPARE(result.verifiedAssetIds.size(), std::size_t{4});
+}
+
+void EphemerisDataActivationTests::cancelsStagedUpdateVerification()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    writeAllStagedAssets(stagedRoot, manifest);
+    skygate::ephemeris::EphemerisStagedUpdateVerificationRequest request = verificationRequest(manifest, stagedRoot);
+    request.cancellationRequested = [] { return true; };
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::verifyEphemerisStagedUpdateSet(request);
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Canceled)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(result.verifiedAssetIds.empty());
 }
 
 void EphemerisDataActivationTests::rejectsStagedUpdateChecksumFailure()

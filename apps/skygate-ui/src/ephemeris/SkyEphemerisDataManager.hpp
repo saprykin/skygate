@@ -8,7 +8,9 @@
 #include <QObject>
 #include <QString>
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -23,7 +25,8 @@ public:
         InvalidRequest,
         VerificationFailed,
         ActivationFailed,
-        PersistenceFailed
+        PersistenceFailed,
+        Canceled
     };
 
     struct StagedUpdateActivationRequest final {
@@ -34,8 +37,11 @@ public:
         QString revisionToken;
         std::vector<skygate::ephemeris::EphemerisDataManifestAssetKind> requiredKinds;
         std::vector<skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent> expectedComponents;
+        std::function<bool()> cancellationRequested;
         bool allowQtResourceKernelAssets = false;
         std::uint64_t largeKernelResourceThresholdBytes = 128ULL * 1024ULL * 1024ULL;
+        bool retainStagedResourcesOnCancellation = true;
+        bool cleanupFailedActivationCache = true;
     };
 
     struct StagedUpdateActivationResult final {
@@ -67,6 +73,9 @@ public:
 
     [[nodiscard]] bool restoreFromSettings();
     [[nodiscard]] bool clearInstalledDataCache();
+    void requestUpdateCancellation() noexcept;
+    void clearUpdateCancellation() noexcept;
+    [[nodiscard]] bool updateCancellationRequested() const noexcept;
     [[nodiscard]] StagedUpdateActivationResult
     activateVerifiedStagedUpdateSet(const StagedUpdateActivationRequest& request);
 
@@ -97,4 +106,5 @@ private:
     QString m_datasetInfoText;
     ActiveSource m_activeSource = ActiveSource::BundledFallback;
     std::uint64_t m_dataRevision = 1;
+    std::atomic_bool m_updateCancellationRequested = false;
 };
