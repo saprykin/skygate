@@ -181,6 +181,92 @@ private:
     double m_altitudeDeg = 0.0;
 };
 
+class RequestSensitiveMovingEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = request.context;
+        snapshot.catalogBodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+            std::vector<skygate::ephemeris::CelestialBody>{makeFixedBody({})}
+        );
+        snapshot.states.push_back(*computeBodyState(request, std::size_t{0U}));
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++requestSampleCount;
+        sawLightTimeRequest =
+            sawLightTimeRequest
+            || hasCorrectionFlag(
+                request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+            );
+        if (request.context.utcTime != baseUtcTime
+            && (request.epoch.julianDatePart1 != baseEpoch.julianDatePart1
+                || request.epoch.julianDatePart2 != baseEpoch.julianDatePart2)) {
+            sawSampleEpochUpdate = true;
+        }
+
+        const double altitudeDeg =
+            hasCorrectionFlag(request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime)
+                ? movingAltitudeDeg(request.context.utcTime)
+                : -20.0;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+            .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = 180.0}
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    static double movingAltitudeDeg(const skygate::core::UtcTimePoint& utcTime) noexcept
+    {
+        const double seconds = static_cast<double>(utcTime.time_since_epoch().count());
+        const double phase = std::fmod(seconds, 86400.0) / 86400.0;
+        return 35.0 * std::sin(2.0 * kPi * (phase - 0.25));
+    }
+
+    skygate::core::UtcTimePoint baseUtcTime{};
+    skygate::ephemeris::AstronomicalEpoch baseEpoch;
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+    mutable bool sawLightTimeRequest = false;
+    mutable bool sawSampleEpochUpdate = false;
+};
+
 }  // namespace
 
 class ObservationEventCalculatorTests final : public QObject {
@@ -195,6 +281,7 @@ private slots:
     void invalidAndUnresolvedInputsReturnExplicitStatuses();
     void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
     void movingBodySamplesThroughEphemerisEngine();
+    void requestOverloadPropagatesOptionsAndSampleEpochs();
 };
 
 void ObservationEventCalculatorTests::normalObjectFindsOrderedEventsAndRefinedHorizonCrossings()
@@ -361,6 +448,40 @@ void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
     QVERIFY(summary.culmination.altitudeDeg.has_value());
     QVERIFY(*summary.culmination.altitudeDeg > 34.9);
+}
+
+void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleEpochs()
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    RequestSensitiveMovingEngine engine;
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeContext(0.0, 0.0);
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
+    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+        .astronomicalYear = 1970,
+        .month = 1,
+        .day = 1,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    });
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    engine.baseUtcTime = request.context.utcTime;
+    engine.baseEpoch = request.epoch;
+
+    auto summary = calculator.compute(engine, request, 0U);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    summary = calculator.compute(engine, request, 0U);
+
+    QCOMPARE(engine.contextSampleCount, 0);
+    QVERIFY(engine.requestSampleCount > 300);
+    QVERIFY(engine.sawLightTimeRequest);
+    QVERIFY(engine.sawSampleEpochUpdate);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
 }
 
 QTEST_APPLESS_MAIN(ObservationEventCalculatorTests)

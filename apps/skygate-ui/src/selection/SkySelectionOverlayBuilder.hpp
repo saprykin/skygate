@@ -25,6 +25,7 @@ struct SkySelectionOverlayInput final {
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
     const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
     std::optional<skygate::core::SkyContext> skyContext;
+    std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
     std::span<const std::uint8_t> catalogSourceIds;
     QStringList catalogSourceLabels;
@@ -40,16 +41,9 @@ struct SkySelectionOverlayInput final {
 
 class SkySelectionOverlayBuilder final {
 public:
-    [[nodiscard]] SkySelectionMarker buildSelectionMarkerData(
-        const SkySelectionOverlayInput& input
+    [[nodiscard]] SkySelectionMarker buildSelectionMarkerData(const SkySelectionOverlayInput& input) const;
+    [[nodiscard]] SkySelectedObjectInspector buildSelectedObjectInspectorData(const SkySelectionOverlayInput& input
     ) const;
-    [[nodiscard]] SkySelectedObjectInspector buildSelectedObjectInspectorData(
-        const SkySelectionOverlayInput& input
-    ) const;
-    [[nodiscard]] QString activeTrailTargetBodyId(
-        const SkySelectionOverlayInput& input
-    ) const;
-    [[nodiscard]] std::optional<std::uint32_t> activeTrailTargetBodyIndex(
-        const SkySelectionOverlayInput& input
-    ) const;
+    [[nodiscard]] QString activeTrailTargetBodyId(const SkySelectionOverlayInput& input) const;
+    [[nodiscard]] std::optional<std::uint32_t> activeTrailTargetBodyIndex(const SkySelectionOverlayInput& input) const;
 };

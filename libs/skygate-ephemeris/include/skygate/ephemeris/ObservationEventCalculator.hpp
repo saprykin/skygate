@@ -8,6 +8,7 @@
 namespace skygate::ephemeris {
 
 struct CelestialBody;
+struct EphemerisRequest;
 class IEphemerisEngine;
 
 enum class ObservationEventStatus : std::uint8_t {
@@ -38,11 +39,8 @@ struct ObservationEventSummary {
 
 class ObservationEventCalculator final {
 public:
-    [[nodiscard]] ObservationEventSummary compute(
-        const IEphemerisEngine& ephemerisEngine,
-        const core::SkyContext& context,
-        std::uint32_t bodyIndex
-    ) const;
+    [[nodiscard]] ObservationEventSummary
+    compute(const IEphemerisEngine& ephemerisEngine, const core::SkyContext& context, std::uint32_t bodyIndex) const;
     [[nodiscard]] ObservationEventSummary compute(
         const IEphemerisEngine& ephemerisEngine,
         const core::SkyContext& context,
@@ -58,6 +56,27 @@ public:
     [[nodiscard]] ObservationEventSummary compute(
         const IEphemerisEngine& ephemerisEngine,
         const core::SkyContext& context,
+        std::uint32_t bodyIndex,
+        const CelestialBody& body,
+        double crossingAltitudeDeg
+    ) const;
+    [[nodiscard]] ObservationEventSummary
+    compute(const IEphemerisEngine& ephemerisEngine, const EphemerisRequest& request, std::uint32_t bodyIndex) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t bodyIndex,
+        double crossingAltitudeDeg
+    ) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t bodyIndex,
+        const CelestialBody& body
+    ) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
         std::uint32_t bodyIndex,
         const CelestialBody& body,
         double crossingAltitudeDeg

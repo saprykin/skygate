@@ -14,27 +14,13 @@ namespace {
 constexpr int kReferenceLabelSampleCount = 96;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
 
-SkyOverlayItem overlayEntry(
-    const QString& kind,
-    const double x,
-    const double y,
-    const QString& text,
-    const QColor& color
-)
+SkyOverlayItem
+overlayEntry(const QString& kind, const double x, const double y, const QString& text, const QColor& color)
 {
-    return SkyOverlayItem {
-        .kind = kind,
-        .x = x,
-        .y = y,
-        .text = text,
-        .color = color
-    };
+    return SkyOverlayItem{.kind = kind, .x = x, .y = y, .text = text, .color = color};
 }
 
-QColor cardinalColor(
-    const double azimuthDeg,
-    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
-)
+QColor cardinalColor(const double azimuthDeg, const skygate::ui::internal::SkyThemeRenderPalette& renderTheme)
 {
     if (azimuthDeg == 0.0) {
         return renderTheme.cardinalNorthLine;
@@ -49,14 +35,12 @@ QColor cardinalColor(
 }
 
 bool pointIsInsideLabelMargin(
-    const skygate::core::ScreenPoint& point,
-    const skygate::core::ProjectionParams& params
+    const skygate::core::ScreenPoint& point, const skygate::core::ProjectionParams& params
 ) noexcept
 {
-    return point.x >= kReferenceLabelEdgeMarginPx
-        && point.x <= (params.viewportWidth - kReferenceLabelEdgeMarginPx)
-        && point.y >= kReferenceLabelEdgeMarginPx
-        && point.y <= (params.viewportHeight - kReferenceLabelEdgeMarginPx);
+    return point.x >= kReferenceLabelEdgeMarginPx && point.x <= (params.viewportWidth - kReferenceLabelEdgeMarginPx)
+           && point.y >= kReferenceLabelEdgeMarginPx
+           && point.y <= (params.viewportHeight - kReferenceLabelEdgeMarginPx);
 }
 
 template <typename CoordinateAt>
@@ -83,12 +67,7 @@ void appendReferenceLayerLabel(
             continue;
         }
 
-        const double score = skygate::core::squaredDistance2d(
-            projected.x,
-            projected.y,
-            targetX,
-            targetY
-        );
+        const double score = skygate::core::squaredDistance2d(projected.x, projected.y, targetX, targetY);
         if (score < fallbackScore) {
             fallbackPoint = QPointF(projected.x, projected.y);
             fallbackScore = score;
@@ -104,49 +83,31 @@ void appendReferenceLayerLabel(
         return;
     }
 
-    overlayItems.push_back(overlayEntry(
-        "referenceLine",
-        labelPoint->x(),
-        labelPoint->y(),
-        text,
-        color
-    ));
+    overlayItems.push_back(overlayEntry("referenceLine", labelPoint->x(), labelPoint->y(), text, color));
 }
 
-std::vector<SkyOverlayItem> renderLabelsToOverlayItems(
-    const std::span<const SkyRenderLabel> labels
-)
+std::vector<SkyOverlayItem> renderLabelsToOverlayItems(const std::span<const SkyRenderLabel> labels)
 {
     std::vector<SkyOverlayItem> overlayItems;
     overlayItems.reserve(labels.size());
     for (const SkyRenderLabel& label : labels) {
-        overlayItems.push_back(SkyOverlayItem {
-            .kind = label.kind,
-            .x = label.x,
-            .y = label.y,
-            .text = label.text,
-            .color = label.color
-        });
+        overlayItems.push_back(
+            SkyOverlayItem{.kind = label.kind, .x = label.x, .y = label.y, .text = label.text, .color = label.color}
+        );
     }
     return overlayItems;
 }
 
 }  // namespace
 
-bool SkySceneComposer::CompositionKey::equals(
-    const CompositionKey& other
-) const noexcept
+bool SkySceneComposer::CompositionKey::equals(const CompositionKey& other) const noexcept
 {
-    return renderFrameGeneration == other.renderFrameGeneration
-        && trailTargetBodyIndex == other.trailTargetBodyIndex
-        && selectedObjectTargetId == other.selectedObjectTargetId
-        && selectedSearchTargetKind == other.selectedSearchTargetKind
-        && selectedSearchTargetId == other.selectedSearchTargetId
-        && trackedTargetKind == other.trackedTargetKind
-        && trackedTargetId == other.trackedTargetId
-        && inspectorPinnedX == other.inspectorPinnedX
-        && inspectorPinnedY == other.inspectorPinnedY
-        && inspectorPinned == other.inspectorPinned;
+    return renderFrameGeneration == other.renderFrameGeneration && trailTargetBodyIndex == other.trailTargetBodyIndex
+           && selectedObjectTargetId == other.selectedObjectTargetId
+           && selectedSearchTargetKind == other.selectedSearchTargetKind
+           && selectedSearchTargetId == other.selectedSearchTargetId && trackedTargetKind == other.trackedTargetKind
+           && trackedTargetId == other.trackedTargetId && inspectorPinnedX == other.inspectorPinnedX
+           && inspectorPinnedY == other.inspectorPinnedY && inspectorPinned == other.inspectorPinned;
 }
 
 void SkySceneComposer::reset()
@@ -155,15 +116,12 @@ void SkySceneComposer::reset()
 }
 
 SkySceneCompositionResult SkySceneComposer::rebuild(
-    SkySceneFrameData& sceneFrame,
-    const SkySceneCompositionInput& input,
-    const SkySceneFramePipelineResult& frameResult
+    SkySceneFrameData& sceneFrame, const SkySceneCompositionInput& input, const SkySceneFramePipelineResult& frameResult
 )
 {
     const SkySelectionOverlayInput selectionInput = buildSelectionInput(input, frameResult);
-    const auto trailTargetBodyIndex =
-        m_selectionOverlayBuilder.activeTrailTargetBodyIndex(selectionInput);
-    const CompositionKey compositionKey {
+    const auto trailTargetBodyIndex = m_selectionOverlayBuilder.activeTrailTargetBodyIndex(selectionInput);
+    const CompositionKey compositionKey{
         .renderFrameGeneration = frameResult.renderFrameGeneration,
         .trailTargetBodyIndex = trailTargetBodyIndex,
         .selectedObjectTargetId = input.selectedObjectTargetId,
@@ -175,24 +133,19 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
         .inspectorPinnedY = input.inspectorPinnedY,
         .inspectorPinned = input.inspectorPinned
     };
-    if (
-        !frameResult.updated
-        && m_compositionKey.has_value()
-        && m_compositionKey.value().equals(compositionKey)
-    ) {
+    if (!frameResult.updated && m_compositionKey.has_value() && m_compositionKey.value().equals(compositionKey)) {
         return {};
     }
 
-    const bool frameContentChanged = frameResult.updated
-        || !m_compositionKey.has_value()
-        || m_compositionKey->renderFrameGeneration != compositionKey.renderFrameGeneration
-        || m_compositionKey->trailTargetBodyIndex != compositionKey.trailTargetBodyIndex;
+    const bool frameContentChanged = frameResult.updated || !m_compositionKey.has_value()
+                                     || m_compositionKey->renderFrameGeneration != compositionKey.renderFrameGeneration
+                                     || m_compositionKey->trailTargetBodyIndex != compositionKey.trailTargetBodyIndex;
     if (frameContentChanged) {
         sceneFrame.frame = *frameResult.frame;
         if (trailTargetBodyIndex.has_value()) {
             m_objectTrailBuilder.appendTrail(
                 sceneFrame.frame,
-                SkyObjectTrailInput {
+                SkyObjectTrailInput{
                     .ephemerisEngine = input.frameInput.ephemerisEngine,
                     .preparedProjection = frameResult.preparedProjection,
                     .skyContext = input.frameInput.skyContext,
@@ -207,21 +160,14 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
         sceneFrame.overlayItems = buildOverlayItems(sceneFrame, input);
     }
 
-    sceneFrame.selectionMarker =
-        m_selectionOverlayBuilder.buildSelectionMarkerData(selectionInput);
-    sceneFrame.selectedObjectInspector =
-        m_selectionOverlayBuilder.buildSelectedObjectInspectorData(selectionInput);
+    sceneFrame.selectionMarker = m_selectionOverlayBuilder.buildSelectionMarkerData(selectionInput);
+    sceneFrame.selectedObjectInspector = m_selectionOverlayBuilder.buildSelectedObjectInspectorData(selectionInput);
     m_compositionKey = compositionKey;
-    return SkySceneCompositionResult {
-        .changed = true,
-        .frameContentChanged = frameContentChanged
-    };
+    return SkySceneCompositionResult{.changed = true, .frameContentChanged = frameContentChanged};
 }
 
-std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
-    const SkySceneFrameData& sceneFrame,
-    const SkySceneCompositionInput& input
-) const
+std::vector<SkyOverlayItem>
+SkySceneComposer::buildOverlayItems(const SkySceneFrameData& sceneFrame, const SkySceneCompositionInput& input) const
 {
     std::vector<SkyOverlayItem> overlayItems = renderLabelsToOverlayItems(sceneFrame.frame.labels);
 
@@ -240,12 +186,10 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
             "Ecliptic",
             renderTheme.eclipticLine,
             [&skyContext](const int index) {
-                const double eclipticLongitudeDeg = 360.0 * static_cast<double>(index)
-                    / static_cast<double>(kReferenceLabelSampleCount);
+                const double eclipticLongitudeDeg =
+                    360.0 * static_cast<double>(index) / static_cast<double>(kReferenceLabelSampleCount);
                 return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-                    eclipticLongitudeDeg,
-                    skyContext.observer,
-                    skyContext.utcTime
+                    eclipticLongitudeDeg, skyContext.observer, skyContext.utcTime
                 );
             }
         );
@@ -259,11 +203,7 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
             renderTheme.celestialEquatorLine,
             [&skyContext](const int index) {
                 return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index,
-                    kReferenceLabelSampleCount,
-                    0.0,
-                    skyContext.observer,
-                    skyContext.utcTime
+                    index, kReferenceLabelSampleCount, 0.0, skyContext.observer, skyContext.utcTime
                 );
             }
         );
@@ -271,9 +211,7 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
 
     if (overlayLayers.circumpolarBoundary && skyContext.observer.isValid()) {
         const double boundaryDeclinationDeg =
-            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
-                skyContext.observer
-            );
+            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(skyContext.observer);
         appendReferenceLayerLabel(
             overlayItems,
             *sceneFrame.preparedProjection,
@@ -281,11 +219,7 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
             renderTheme.circumpolarBoundaryLine,
             [boundaryDeclinationDeg, &skyContext](const int index) {
                 return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index,
-                    kReferenceLabelSampleCount,
-                    boundaryDeclinationDeg,
-                    skyContext.observer,
-                    skyContext.utcTime
+                    index, kReferenceLabelSampleCount, boundaryDeclinationDeg, skyContext.observer, skyContext.utcTime
                 );
             }
         );
@@ -295,14 +229,11 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
         return overlayItems;
     }
 
-    constexpr std::array<const char*, 4> kCardinalLabels {"N", "E", "S", "W"};
-    constexpr std::array<double, 4> kCardinalAzimuths {0.0, 90.0, 180.0, 270.0};
+    constexpr std::array<const char*, 4> kCardinalLabels{"N", "E", "S", "W"};
+    constexpr std::array<double, 4> kCardinalAzimuths{0.0, 90.0, 180.0, 270.0};
     for (std::size_t index = 0; index < kCardinalLabels.size(); ++index) {
         const auto projected = sceneFrame.preparedProjection->project(
-            skygate::core::HorizontalCoordinate {
-                .altitudeDeg = 0.0,
-                .azimuthDeg = kCardinalAzimuths[index]
-            }
+            skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = kCardinalAzimuths[index]}
         );
         if (!projected.isVisible) {
             continue;
@@ -321,17 +252,17 @@ std::vector<SkyOverlayItem> SkySceneComposer::buildOverlayItems(
 }
 
 SkySelectionOverlayInput SkySceneComposer::buildSelectionInput(
-    const SkySceneCompositionInput& input,
-    const SkySceneFramePipelineResult& frameResult
+    const SkySceneCompositionInput& input, const SkySceneFramePipelineResult& frameResult
 ) const
 {
-    return SkySelectionOverlayInput {
+    return SkySelectionOverlayInput{
         .snapshot = frameResult.snapshot,
         .ephemerisEngine = input.frameInput.ephemerisEngine,
         .timeController = input.timeController,
         .preparedProjection = frameResult.preparedProjection,
         .stateIndexByBodyId = frameResult.stateIndexByBodyId,
         .skyContext = input.frameInput.skyContext,
+        .ephemerisRequest = input.frameInput.ephemerisRequest,
         .constellationLabelRefs = input.frameInput.constellationLabelRefs,
         .catalogSourceIds = input.catalogSourceIds,
         .catalogSourceLabels = input.catalogSourceLabels,
