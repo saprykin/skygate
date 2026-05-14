@@ -1,6 +1,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
+#include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
@@ -12,6 +13,7 @@
 #include <QtTest/QtTest>
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -22,6 +24,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -384,6 +387,31 @@ private:
     mutable std::string m_lastBodyId;
 };
 
+class ThreadSafeEpochSolarSystemCalculator final : public ISolarSystemStateCalculator {
+public:
+    explicit ThreadSafeEpochSolarSystemCalculator(const double baseRightAscensionHours)
+        : m_baseRightAscensionHours(baseRightAscensionHours)
+    {
+    }
+
+    [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const override
+    {
+        ++m_callCount;
+        return makeCalculatorResult(
+            input, m_baseRightAscensionHours + input.request.epoch.julianDatePart2, -2.5, "thread-safe fake"
+        );
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount.load();
+    }
+
+private:
+    double m_baseRightAscensionHours = 0.0;
+    mutable std::atomic<int> m_callCount = 0;
+};
+
 class LongRangeFallbackKernelProvider final : public ICalcephKernelProvider {
 public:
     [[nodiscard]] SolarSystemKernelStateResult
@@ -741,7 +769,8 @@ private:
     std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator = {},
     std::shared_ptr<IStarAstrometryCalculator> starAstrometryCalculator = {},
     std::shared_ptr<IApparentPlaceCalculator> apparentPlaceCalculator = {},
-    std::shared_ptr<IEphemerisResultBuilder> resultBuilder = {}
+    std::shared_ptr<IEphemerisResultBuilder> resultBuilder = {},
+    std::shared_ptr<IEphemerisComputationCache> computationCache = {}
 )
 {
     HighPrecisionEphemerisEngineDependencies dependencies;
@@ -749,6 +778,7 @@ private:
     dependencies.starAstrometryCalculator = std::move(starAstrometryCalculator);
     dependencies.apparentPlaceCalculator = std::move(apparentPlaceCalculator);
     dependencies.resultBuilder = std::move(resultBuilder);
+    dependencies.computationCache = std::move(computationCache);
     dependencies.dataSetInfo.id = "test-data";
     dependencies.dataSetInfo.displayName = "Test data";
     dependencies.dataSetInfo.version = "fixture";
@@ -795,6 +825,9 @@ private slots:
     void batchesRepresentativeLargeCatalogWithoutSingleStarDispatch();
     void batchesRepresentativeLargeCatalogApparentPlaceTransformsOnce();
     void batchesTopocentricApparentPlaceRequestWideState();
+    void reusesCachedFullFrameSnapshotsWithoutStaleResults();
+    void servesConcurrentReadOnlyComputationsFromCache();
+    void isolatesCachedSnapshotsByDataSetRevision();
     void fallsBackToSingleStarPathWhenBatchReturnsNoResults();
     void forwardsOptionsThroughCollaboratorsAndResultBuilder();
     void bypassesApparentPlaceForGeometricSolarSystemRequests();
@@ -1012,6 +1045,128 @@ void HighPrecisionEphemerisEngineTests::batchesTopocentricApparentPlaceRequestWi
     QCOMPARE(frameTransformer->singleCallCount(), 0);
     QCOMPARE(snapshot.states.front().bodyIndex, std::uint32_t{0});
     QCOMPARE(snapshot.states.back().bodyIndex, static_cast<std::uint32_t>(kRepresentativeCatalogSize - 1U));
+}
+
+void HighPrecisionEphemerisEngineTests::reusesCachedFullFrameSnapshotsWithoutStaleResults()
+{
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<ThreadSafeEpochSolarSystemCalculator>(4.0);
+    auto computationCache = std::make_shared<EphemerisComputationCache>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+    );
+
+    EphemerisRequest firstRequest = makeRequest();
+    firstRequest.epoch.julianDatePart2 = 0.25;
+    const SkySnapshot firstSnapshot = engine.compute(firstRequest);
+    const SkySnapshot repeatedSnapshot = engine.compute(firstRequest);
+
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(firstSnapshot.states[0].equatorial.rightAscensionHours, 4.25);
+    QCOMPARE(repeatedSnapshot.states[0].equatorial.rightAscensionHours, 4.25);
+
+    EphemerisRequest changedRequest = firstRequest;
+    changedRequest.epoch.julianDatePart2 = 0.75;
+    const SkySnapshot changedSnapshot = engine.compute(changedRequest);
+
+    QCOMPARE(solarSystemCalculator->callCount(), 2);
+    QCOMPARE(changedSnapshot.states[0].equatorial.rightAscensionHours, 4.75);
+
+    const auto cachedState = engine.computeBodyState(firstRequest, std::size_t{0});
+
+    QVERIFY(cachedState.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 2);
+    QCOMPARE(cachedState->equatorial.rightAscensionHours, 4.25);
+}
+
+void HighPrecisionEphemerisEngineTests::servesConcurrentReadOnlyComputationsFromCache()
+{
+    constexpr std::size_t kThreadCount = 8U;
+    constexpr int kComputesPerThread = 32;
+
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<ThreadSafeEpochSolarSystemCalculator>(7.0);
+    auto computationCache = std::make_shared<EphemerisComputationCache>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+    );
+
+    EphemerisRequest request = makeRequest();
+    request.epoch.julianDatePart2 = 0.125;
+    const SkySnapshot warmedSnapshot = engine.compute(request);
+    QCOMPARE(warmedSnapshot.states[0].equatorial.rightAscensionHours, 7.125);
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+
+    std::array<bool, kThreadCount> threadResults{};
+    std::vector<std::thread> threads;
+    threads.reserve(kThreadCount);
+    for (std::size_t threadIndex = 0U; threadIndex < kThreadCount; ++threadIndex) {
+        threads.emplace_back([&engine, &request, &threadResults, threadIndex]() {
+            bool matched = true;
+            for (int iteration = 0; iteration < kComputesPerThread; ++iteration) {
+                const SkySnapshot snapshot = engine.compute(request);
+                matched = matched && snapshot.states.size() == 1U
+                          && snapshot.states[0].equatorial.rightAscensionHours == 7.125;
+            }
+            threadResults[threadIndex] = matched;
+        });
+    }
+
+    for (std::thread& thread : threads) {
+        thread.join();
+    }
+
+    for (const bool threadResult : threadResults) {
+        QVERIFY(threadResult);
+    }
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+}
+
+void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetRevision()
+{
+    EphemerisComputationCache computationCache;
+    const std::vector<CelestialBody> bodies{makeSunBody()};
+    const EphemerisRequest request = makeRequest();
+
+    EphemerisDataSetInfo oldDataSet;
+    oldDataSet.id = "test-data";
+    oldDataSet.version = "old";
+    oldDataSet.provenance = "old snapshot";
+
+    EphemerisDataSetInfo newDataSet = oldDataSet;
+    newDataSet.version = "new";
+    newDataSet.provenance = "new snapshot";
+
+    SkySnapshot oldSnapshot;
+    oldSnapshot.states.push_back(CelestialBodyState{
+        .bodyIndex = 0U,
+        .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+    });
+    SkySnapshot newSnapshot;
+    newSnapshot.states.push_back(CelestialBodyState{
+        .bodyIndex = 0U,
+        .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+    });
+
+    computationCache.storeSnapshot(request, bodies, oldDataSet, oldSnapshot);
+    computationCache.storeSnapshot(request, bodies, newDataSet, newSnapshot);
+
+    const std::optional<SkySnapshot> cachedOldSnapshot = computationCache.findSnapshot(request, bodies, oldDataSet);
+    const std::optional<SkySnapshot> cachedNewSnapshot = computationCache.findSnapshot(request, bodies, newDataSet);
+
+    QVERIFY(cachedOldSnapshot.has_value());
+    QVERIFY(cachedNewSnapshot.has_value());
+    QCOMPARE(cachedOldSnapshot->states[0].equatorial.rightAscensionHours, 1.0);
+    QCOMPARE(cachedNewSnapshot->states[0].equatorial.rightAscensionHours, 3.0);
+
+    newSnapshot.states[0].equatorial.rightAscensionHours = 99.0;
+    const std::optional<SkySnapshot> cachedOldSnapshotAfterMutation =
+        computationCache.findSnapshot(request, bodies, oldDataSet);
+
+    QVERIFY(cachedOldSnapshotAfterMutation.has_value());
+    QCOMPARE(cachedOldSnapshotAfterMutation->states[0].equatorial.rightAscensionHours, 1.0);
 }
 
 void HighPrecisionEphemerisEngineTests::fallsBackToSingleStarPathWhenBatchReturnsNoResults()

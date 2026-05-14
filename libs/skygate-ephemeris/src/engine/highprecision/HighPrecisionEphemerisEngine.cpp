@@ -170,6 +170,23 @@ EphemerisEngineOptions HighPrecisionEphemerisEngine::options() const noexcept
 
 SkySnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& request) const
 {
+    if (m_dependencies.computationCache != nullptr) {
+        if (std::optional<SkySnapshot> cachedSnapshot =
+                m_dependencies.computationCache->findSnapshot(request, *m_bodies, m_dependencies.dataSetInfo);
+            cachedSnapshot.has_value()) {
+            return *cachedSnapshot;
+        }
+    }
+
+    SkySnapshot snapshot = computeUncached(request);
+    if (m_dependencies.computationCache != nullptr) {
+        m_dependencies.computationCache->storeSnapshot(request, *m_bodies, m_dependencies.dataSetInfo, snapshot);
+    }
+    return snapshot;
+}
+
+SkySnapshot HighPrecisionEphemerisEngine::computeUncached(const EphemerisRequest& request) const
+{
     SkySnapshot snapshot;
     snapshot.context = request.context;
     snapshot.catalogBodies = m_bodies;
@@ -243,6 +260,14 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
 {
     if (bodyIndex >= m_bodies->size() || bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
         return std::nullopt;
+    }
+
+    if (m_dependencies.computationCache != nullptr) {
+        if (std::optional<SkySnapshot> cachedSnapshot =
+                m_dependencies.computationCache->findSnapshot(request, *m_bodies, m_dependencies.dataSetInfo);
+            cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
+            return cachedSnapshot->states[bodyIndex];
+        }
     }
 
     return computeStateForBody(request, bodyIndex);
