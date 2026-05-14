@@ -41,8 +41,12 @@ bool writeFile(const QString& path, const QByteArray& contents)
     return file.write(contents) == contents.size();
 }
 
-SkySettingsStore::EphemerisDataCacheSnapshot
-installedSnapshot(const QString& kernelPath, const QString& earthOrientationPath)
+SkySettingsStore::EphemerisDataCacheSnapshot installedSnapshot(
+    const QString& kernelPath,
+    const QString& earthOrientationPath,
+    const QString& leapSecondTablePath = {},
+    const QString& deltaTDataPath = {}
+)
 {
     SkySettingsStore::EphemerisDataCacheSnapshot snapshot;
     snapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
@@ -51,7 +55,9 @@ installedSnapshot(const QString& kernelPath, const QString& earthOrientationPath
     snapshot.installedKernelVersion = QStringLiteral("DE-test");
     snapshot.installedEarthOrientationPath = earthOrientationPath;
     snapshot.installedEarthOrientationVersion = QStringLiteral("EOP-test");
+    snapshot.installedLeapSecondTablePath = leapSecondTablePath;
     snapshot.installedLeapSecondTableVersion = QStringLiteral("LS-test");
+    snapshot.installedDeltaTDataPath = deltaTDataPath;
     snapshot.installedDeltaTDataVersion = QStringLiteral("DT-test");
     snapshot.dataRevisionToken = QStringLiteral("installed-rev");
     snapshot.lastUpdateResult = QStringLiteral("Installed");
@@ -256,6 +262,7 @@ private slots:
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
     void activatesVerifiedStagedUpdateSetAtomically();
     void activationFailurePreservesActiveDataAndSettings();
+    void sameRevisionActivationFailurePreservesActiveFilesAndSettings();
     void metadataPersistenceFailurePreservesActiveData();
     void controllerOwnsManagerAndExposesSnapshot();
     void controllerCatalogChangePreservesEphemerisDataSelection();
@@ -294,11 +301,17 @@ void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
 {
     const QString kernelPath = m_settings.filePath(QStringLiteral("kernel.bsp"));
     const QString earthOrientationPath = m_settings.filePath(QStringLiteral("eop.txt"));
+    const QString leapSecondTablePath = m_settings.filePath(QStringLiteral("leap-seconds.list"));
+    const QString deltaTDataPath = m_settings.filePath(QStringLiteral("delta-t.csv"));
     QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel placeholder")));
     QVERIFY(writeFile(earthOrientationPath, QByteArrayLiteral("eop payload")));
+    QVERIFY(writeFile(leapSecondTablePath, QByteArrayLiteral("leap payload")));
+    QVERIFY(writeFile(deltaTDataPath, QByteArrayLiteral("delta t payload")));
 
     SkySettingsStore store;
-    QVERIFY(store.saveEphemerisDataCache(installedSnapshot(kernelPath, earthOrientationPath)));
+    QVERIFY(store.saveEphemerisDataCache(
+        installedSnapshot(kernelPath, earthOrientationPath, leapSecondTablePath, deltaTDataPath)
+    ));
 
     SkyEphemerisDataManager manager(&store);
     QVERIFY(manager.usingInstalledData());
@@ -319,6 +332,12 @@ void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
     const auto eopAsset = snapshot->earthOrientationDataAsset();
     QVERIFY(eopAsset.has_value());
     QCOMPARE(QString::fromStdString(eopAsset->content), QString("eop payload"));
+    const auto leapSecondAsset = snapshot->leapSecondTableAsset();
+    QVERIFY(leapSecondAsset.has_value());
+    QCOMPARE(QString::fromStdString(leapSecondAsset->content), QString("leap payload"));
+    const auto deltaTAsset = snapshot->deltaTDataAsset();
+    QVERIFY(deltaTAsset.has_value());
+    QCOMPARE(QString::fromStdString(deltaTAsset->content), QString("delta t payload"));
 }
 
 void SkyEphemerisDataManagerTests::missingInstalledDataFallsBackToBundled()
@@ -393,7 +412,14 @@ void SkyEphemerisDataManagerTests::activatesVerifiedStagedUpdateSetAtomically()
     QCOMPARE(savedSnapshot.installedKernelProfileId, QString("modern"));
     QCOMPARE(savedSnapshot.installedKernelVersion, QString("test"));
     QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
+    QCOMPARE(
+        savedSnapshot.installedLeapSecondTablePath.contains(QStringLiteral("/updates/installed-rev-2/modern/time/")),
+        true
+    );
     QCOMPARE(savedSnapshot.installedLeapSecondTableVersion, QString("test"));
+    QCOMPARE(
+        savedSnapshot.installedDeltaTDataPath.contains(QStringLiteral("/updates/installed-rev-2/modern/time/")), true
+    );
     QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
     const QString expectedKernelPathFragment = QStringLiteral("/updates/installed-rev-2/modern/kernels/");
     const QString expectedEopPathFragment = QStringLiteral("/updates/installed-rev-2/modern/time/");
@@ -409,6 +435,18 @@ void SkyEphemerisDataManagerTests::activatesVerifiedStagedUpdateSetAtomically()
     QVERIFY(eop.has_value());
     QCOMPARE(
         QString::fromStdString(eop->content),
+        QString::fromUtf8(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+    const auto leapSeconds = snapshot->leapSecondTableAsset();
+    QVERIFY(leapSeconds.has_value());
+    QCOMPARE(
+        QString::fromStdString(leapSeconds->content),
+        QString::fromUtf8(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+    const auto deltaT = snapshot->deltaTDataAsset();
+    QVERIFY(deltaT.has_value());
+    QCOMPARE(
+        QString::fromStdString(deltaT->content),
         QString::fromUtf8(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
     );
 }
@@ -442,6 +480,53 @@ void SkyEphemerisDataManagerTests::activationFailurePreservesActiveDataAndSettin
     QCOMPARE(manager.dataRevision(), originalRevision);
     QCOMPARE(manager.activeCacheSnapshot().installedKernelPath, oldKernelPath);
     QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
+}
+
+void SkyEphemerisDataManagerTests::sameRevisionActivationFailurePreservesActiveFilesAndSettings()
+{
+    const QString activeRoot = m_settings.filePath(QStringLiteral("updates/installed-rev"));
+    const QString oldKernelPath = activeRoot + QStringLiteral("/modern/kernels/de440s.bsp");
+    const QString oldLeapSecondPath = activeRoot + QStringLiteral("/modern/time/leap-seconds.list");
+    QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
+    QVERIFY(writeFile(oldLeapSecondPath, QByteArrayLiteral("old leap seconds")));
+
+    SkySettingsStore store;
+    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot =
+        installedSnapshot(oldKernelPath, QString(), oldLeapSecondPath, QString());
+    QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
+    SkyEphemerisDataManager manager(&store);
+    const std::uint64_t originalRevision = manager.dataRevision();
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifest manifest = stagedManifest();
+    writeStagedAssets(stagedRoot, manifest);
+
+    const QString blockingTimePath =
+        m_settings.filePath(QStringLiteral("updates/installed-rev-activation/modern/time"));
+    QVERIFY(writeFile(blockingTimePath, QByteArrayLiteral("not a directory")));
+
+    SkyEphemerisDataManager::StagedUpdateActivationRequest request =
+        stagedActivationRequest(manifest, stagedRoot, m_settings.path());
+    request.revisionToken = QStringLiteral("installed-rev");
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result =
+        manager.activateVerifiedStagedUpdateSet(request);
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(SkyEphemerisDataManager::StagedUpdateActivationStatus::ActivationFailed)
+    );
+    QCOMPARE(manager.dataRevision(), originalRevision);
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelPath, oldKernelPath);
+    QCOMPARE(store.loadEphemerisDataCache().installedKernelPath, oldKernelPath);
+
+    QFile oldKernelFile(oldKernelPath);
+    QVERIFY(oldKernelFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    QCOMPARE(oldKernelFile.readAll(), QByteArray("old kernel"));
+    QFile oldLeapSecondFile(oldLeapSecondPath);
+    QVERIFY(oldLeapSecondFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    QCOMPARE(oldLeapSecondFile.readAll(), QByteArray("old leap seconds"));
 }
 
 void SkyEphemerisDataManagerTests::metadataPersistenceFailurePreservesActiveData()

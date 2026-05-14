@@ -342,7 +342,9 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
     savedSnapshot.installedKernelVersion = QStringLiteral("DE440s-2026a");
     savedSnapshot.installedEarthOrientationPath = m_settings.filePath(QStringLiteral("eop.csv"));
     savedSnapshot.installedEarthOrientationVersion = QStringLiteral("IERS-2026-05");
+    savedSnapshot.installedLeapSecondTablePath = m_settings.filePath(QStringLiteral("leap-seconds.list"));
     savedSnapshot.installedLeapSecondTableVersion = QStringLiteral("leap-seconds-2025");
+    savedSnapshot.installedDeltaTDataPath = m_settings.filePath(QStringLiteral("delta-t.csv"));
     savedSnapshot.installedDeltaTDataVersion = QStringLiteral("delta-t-2026");
     savedSnapshot.dataRevisionToken = QStringLiteral("ephemeris-rev-42");
     savedSnapshot.lastUpdateResult = QStringLiteral("Updated");
@@ -355,7 +357,9 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
     QCOMPARE(loadedSnapshot.installedKernelVersion, savedSnapshot.installedKernelVersion);
     QCOMPARE(loadedSnapshot.installedEarthOrientationPath, savedSnapshot.installedEarthOrientationPath);
     QCOMPARE(loadedSnapshot.installedEarthOrientationVersion, savedSnapshot.installedEarthOrientationVersion);
+    QCOMPARE(loadedSnapshot.installedLeapSecondTablePath, savedSnapshot.installedLeapSecondTablePath);
     QCOMPARE(loadedSnapshot.installedLeapSecondTableVersion, savedSnapshot.installedLeapSecondTableVersion);
+    QCOMPARE(loadedSnapshot.installedDeltaTDataPath, savedSnapshot.installedDeltaTDataPath);
     QCOMPARE(loadedSnapshot.installedDeltaTDataVersion, savedSnapshot.installedDeltaTDataVersion);
     QCOMPARE(loadedSnapshot.dataRevisionToken, savedSnapshot.dataRevisionToken);
     QCOMPARE(loadedSnapshot.lastUpdateResult, savedSnapshot.lastUpdateResult);
@@ -368,7 +372,9 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
     QVERIFY(clearedSnapshot.installedKernelVersion.isEmpty());
     QVERIFY(clearedSnapshot.installedEarthOrientationPath.isEmpty());
     QVERIFY(clearedSnapshot.installedEarthOrientationVersion.isEmpty());
+    QVERIFY(clearedSnapshot.installedLeapSecondTablePath.isEmpty());
     QVERIFY(clearedSnapshot.installedLeapSecondTableVersion.isEmpty());
+    QVERIFY(clearedSnapshot.installedDeltaTDataPath.isEmpty());
     QVERIFY(clearedSnapshot.installedDeltaTDataVersion.isEmpty());
     QCOMPARE(clearedSnapshot.dataRevisionToken, QString("bundled"));
     QCOMPARE(clearedSnapshot.lastUpdateResult, QString("Bundled fallback"));
@@ -389,6 +395,10 @@ void SkySettingsStoreTests::ephemerisDataCachePathsRoundTripExactly()
         QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced kernel.bsp")));
     savedSnapshot.installedEarthOrientationPath =
         QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced eop.csv")));
+    savedSnapshot.installedLeapSecondTablePath =
+        QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced leap-seconds.list")));
+    savedSnapshot.installedDeltaTDataPath =
+        QStringLiteral("  %1  ").arg(m_settings.filePath(QStringLiteral("spaced delta-t.csv")));
 
     const SkySettingsStore store;
     QVERIFY(store.saveEphemerisDataCache(savedSnapshot));
@@ -396,6 +406,8 @@ void SkySettingsStoreTests::ephemerisDataCachePathsRoundTripExactly()
     const auto loadedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(loadedSnapshot.installedKernelPath, savedSnapshot.installedKernelPath);
     QCOMPARE(loadedSnapshot.installedEarthOrientationPath, savedSnapshot.installedEarthOrientationPath);
+    QCOMPARE(loadedSnapshot.installedLeapSecondTablePath, savedSnapshot.installedLeapSecondTablePath);
+    QCOMPARE(loadedSnapshot.installedDeltaTDataPath, savedSnapshot.installedDeltaTDataPath);
 }
 
 void SkySettingsStoreTests::partialAndMalformedEphemerisDataCacheMetadataFallsBack()
@@ -412,7 +424,9 @@ void SkySettingsStoreTests::partialAndMalformedEphemerisDataCacheMetadataFallsBa
     QCOMPARE(loadedSnapshot.installedKernelVersion, QString("DE440s-2026a"));
     QVERIFY(loadedSnapshot.installedEarthOrientationPath.isEmpty());
     QVERIFY(loadedSnapshot.installedEarthOrientationVersion.isEmpty());
+    QVERIFY(loadedSnapshot.installedLeapSecondTablePath.isEmpty());
     QVERIFY(loadedSnapshot.installedLeapSecondTableVersion.isEmpty());
+    QVERIFY(loadedSnapshot.installedDeltaTDataPath.isEmpty());
     QVERIFY(loadedSnapshot.installedDeltaTDataVersion.isEmpty());
     QCOMPARE(loadedSnapshot.dataRevisionToken, QString("bundled"));
     QCOMPARE(loadedSnapshot.lastUpdateResult, QString("Bundled fallback"));
