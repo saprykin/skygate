@@ -10,6 +10,8 @@
 #include <QRegularExpression>
 #include <QSettings>
 
+#include <cstdint>
+
 namespace {
 
 void ignoreSkySettingsFallbackWarnings(const int count)
@@ -37,6 +39,7 @@ private slots:
     void savesLoadsAndClearsEphemerisDataCacheMetadata();
     void ephemerisDataCachePathsRoundTripExactly();
     void partialAndMalformedEphemerisDataCacheMetadataFallsBack();
+    void malformedEphemerisUserSettingsFallBackToDefaults();
     void savesLoadsAndDefaultsLoggingPreferences();
     void malformedLoggingPreferencesFallBackToDefaults();
 
@@ -91,6 +94,21 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.logToTerminal = false;
     savedSnapshot.logToFile = true;
     savedSnapshot.logFilePath = m_settings.filePath(QStringLiteral("skygate-test.log"));
+    savedSnapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    savedSnapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+                                              | skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration;
+    savedSnapshot.ephemeris.correctionPresetId = QStringLiteral("astrometric");
+    savedSnapshot.ephemeris.fallbackToSimpleEngine = false;
+    savedSnapshot.ephemeris.refractionEnabled = false;
+    savedSnapshot.ephemeris.atmosphericPressureHpa = 810.0;
+    savedSnapshot.ephemeris.atmosphericTemperatureC = -2.5;
+    savedSnapshot.ephemeris.relativeHumidity = 0.62;
+    savedSnapshot.ephemeris.observingWavelengthMicrometers = 0.7;
+    savedSnapshot.ephemeris.preferredDataProfileId = QStringLiteral("de441-long-range");
+    savedSnapshot.ephemeris.onlineUpdatesEnabled = false;
+    savedSnapshot.ephemeris.updatePresetId = QStringLiteral("custom");
+    savedSnapshot.ephemeris.updateManifestUrl = QStringLiteral("https://example.com/ephemeris.json");
+    savedSnapshot.ephemerisSettingsPresent = true;
 
     QVERIFY(store.saveState(savedSnapshot));
     const auto loadedSnapshot = store.loadState();
@@ -114,6 +132,28 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->logToTerminal, savedSnapshot.logToTerminal);
     QCOMPARE(loadedSnapshot->logToFile, savedSnapshot.logToFile);
     QCOMPARE(loadedSnapshot->logFilePath, savedSnapshot.logFilePath);
+    QCOMPARE(
+        static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind),
+        static_cast<std::uint8_t>(savedSnapshot.ephemeris.engineKind)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(loadedSnapshot->ephemeris.correctionFlags),
+        static_cast<std::uint32_t>(savedSnapshot.ephemeris.correctionFlags)
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.correctionPresetId, savedSnapshot.ephemeris.correctionPresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.fallbackToSimpleEngine, savedSnapshot.ephemeris.fallbackToSimpleEngine);
+    QCOMPARE(loadedSnapshot->ephemeris.refractionEnabled, savedSnapshot.ephemeris.refractionEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericPressureHpa, savedSnapshot.ephemeris.atmosphericPressureHpa);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericTemperatureC, savedSnapshot.ephemeris.atmosphericTemperatureC);
+    QCOMPARE(loadedSnapshot->ephemeris.relativeHumidity, savedSnapshot.ephemeris.relativeHumidity);
+    QCOMPARE(
+        loadedSnapshot->ephemeris.observingWavelengthMicrometers, savedSnapshot.ephemeris.observingWavelengthMicrometers
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.preferredDataProfileId, savedSnapshot.ephemeris.preferredDataProfileId);
+    QCOMPARE(loadedSnapshot->ephemeris.onlineUpdatesEnabled, savedSnapshot.ephemeris.onlineUpdatesEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.updatePresetId, savedSnapshot.ephemeris.updatePresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.updateManifestUrl, savedSnapshot.ephemeris.updateManifestUrl);
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, true);
 }
 
 void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
@@ -203,6 +243,7 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     QCOMPARE(loadedSnapshot->logToTerminal, true);
     QCOMPARE(loadedSnapshot->logToFile, false);
     QCOMPARE(loadedSnapshot->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, false);
 }
 
 void SkySettingsStoreTests::partialStateAndUnknownOverlayKeysAreTolerated()
@@ -430,6 +471,51 @@ void SkySettingsStoreTests::partialAndMalformedEphemerisDataCacheMetadataFallsBa
     QVERIFY(loadedSnapshot.installedDeltaTDataVersion.isEmpty());
     QCOMPARE(loadedSnapshot.dataRevisionToken, QString("bundled"));
     QCOMPARE(loadedSnapshot.lastUpdateResult, QString("Bundled fallback"));
+}
+
+void SkySettingsStoreTests::malformedEphemerisUserSettingsFallBackToDefaults()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/ephemeris/engineKind", "experimental");
+    settings.setValue("skyContext/ephemeris/correctionFlags", "full");
+    settings.setValue("skyContext/ephemeris/correctionPresetId", "  ");
+    settings.setValue("skyContext/ephemeris/fallbackToSimpleEngine", "occasionally");
+    settings.setValue("skyContext/ephemeris/refractionEnabled", "sometimes");
+    settings.setValue("skyContext/ephemeris/atmosphericPressureHpa", "heavy");
+    settings.setValue("skyContext/ephemeris/atmosphericTemperatureC", "warm");
+    settings.setValue("skyContext/ephemeris/relativeHumidity", "humid");
+    settings.setValue("skyContext/ephemeris/observingWavelengthMicrometers", "green");
+    settings.setValue("skyContext/ephemeris/preferredDataProfileId", "");
+    settings.setValue("skyContext/ephemeris/onlineUpdatesEnabled", "maybe");
+    settings.setValue("skyContext/ephemeris/updatePresetId", " ");
+    settings.setValue("skyContext/ephemeris/updateManifestUrl", "  https://example.invalid/manifest.json  ");
+
+    const SkySettingsStore store;
+    ignoreSkySettingsFallbackWarnings(8);
+    const auto loadedSnapshot = store.loadState();
+    QVERIFY(loadedSnapshot.has_value());
+    const SkySettingsStore::EphemerisUserSettingsSnapshot defaults;
+    QCOMPARE(
+        static_cast<std::uint8_t>(loadedSnapshot->ephemeris.engineKind), static_cast<std::uint8_t>(defaults.engineKind)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(loadedSnapshot->ephemeris.correctionFlags),
+        static_cast<std::uint32_t>(defaults.correctionFlags)
+    );
+    QCOMPARE(loadedSnapshot->ephemeris.correctionPresetId, defaults.correctionPresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.fallbackToSimpleEngine, defaults.fallbackToSimpleEngine);
+    QCOMPARE(loadedSnapshot->ephemeris.refractionEnabled, defaults.refractionEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericPressureHpa, defaults.atmosphericPressureHpa);
+    QCOMPARE(loadedSnapshot->ephemeris.atmosphericTemperatureC, defaults.atmosphericTemperatureC);
+    QCOMPARE(loadedSnapshot->ephemeris.relativeHumidity, defaults.relativeHumidity);
+    QCOMPARE(loadedSnapshot->ephemeris.observingWavelengthMicrometers, defaults.observingWavelengthMicrometers);
+    QCOMPARE(loadedSnapshot->ephemeris.preferredDataProfileId, defaults.preferredDataProfileId);
+    QCOMPARE(loadedSnapshot->ephemeris.onlineUpdatesEnabled, defaults.onlineUpdatesEnabled);
+    QCOMPARE(loadedSnapshot->ephemeris.updatePresetId, defaults.updatePresetId);
+    QCOMPARE(loadedSnapshot->ephemeris.updateManifestUrl, QString("https://example.invalid/manifest.json"));
+    QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, true);
 }
 
 void SkySettingsStoreTests::savesLoadsAndDefaultsLoggingPreferences()

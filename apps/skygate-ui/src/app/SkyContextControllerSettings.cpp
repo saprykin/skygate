@@ -45,6 +45,15 @@ bool SkyContextController::saveSettings() const
     snapshot.logToTerminal = logToTerminal();
     snapshot.logToFile = logToFile();
     snapshot.logFilePath = logFilePath();
+    snapshot.ephemeris.engineKind = m_ephemerisEngineKind;
+    snapshot.ephemeris.correctionFlags = m_ephemerisEngineOptions.correctionFlags;
+    snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine;
+    snapshot.ephemeris.refractionEnabled = m_ephemerisEngineOptions.enableAtmosphericRefraction;
+    snapshot.ephemeris.atmosphericPressureHpa = m_ephemerisEngineOptions.atmosphericPressureHpa;
+    snapshot.ephemeris.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC;
+    snapshot.ephemeris.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity;
+    snapshot.ephemeris.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers;
+    snapshot.ephemerisSettingsPresent = true;
     return m_settingsStore->saveState(snapshot);
 }
 
@@ -102,6 +111,20 @@ bool SkyContextController::loadSettings()
         setLogToTerminal(stateSnapshot->logToTerminal);
         setLogToFile(stateSnapshot->logToFile);
         setLogFilePath(stateSnapshot->logFilePath);
+
+        if (stateSnapshot->ephemerisSettingsPresent) {
+            m_ephemerisEngineKind = stateSnapshot->ephemeris.engineKind;
+            m_ephemerisEngineOptions.engineKind = stateSnapshot->ephemeris.engineKind;
+            m_ephemerisEngineOptions.correctionFlags = stateSnapshot->ephemeris.correctionFlags;
+            m_ephemerisEngineOptions.fallbackToSimpleEngine = stateSnapshot->ephemeris.fallbackToSimpleEngine;
+            m_ephemerisEngineOptions.enableAtmosphericRefraction = stateSnapshot->ephemeris.refractionEnabled;
+            m_ephemerisEngineOptions.atmosphericPressureHpa = stateSnapshot->ephemeris.atmosphericPressureHpa;
+            m_ephemerisEngineOptions.atmosphericTemperatureC = stateSnapshot->ephemeris.atmosphericTemperatureC;
+            m_ephemerisEngineOptions.relativeHumidity = stateSnapshot->ephemeris.relativeHumidity;
+            m_ephemerisEngineOptions.observingWavelengthMicrometers =
+                stateSnapshot->ephemeris.observingWavelengthMicrometers;
+            rebuildEphemerisEngine();
+        }
     }
 
     if (m_catalogManager != nullptr) {

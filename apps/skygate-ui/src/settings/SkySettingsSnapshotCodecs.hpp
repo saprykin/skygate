@@ -63,17 +63,13 @@ struct SkyStateSettingsSnapshot final {
     SkyOverlayLayerVisibility overlayLayers;
     SkyCatalogSourceSettingsSnapshot catalogSources;
     SkyLoggingSettingsSnapshot logging;
+    SkySettingsStore::EphemerisUserSettingsSnapshot ephemeris;
+    bool ephemerisSettingsPresent = false;
 };
 
-[[nodiscard]] SkyStateSettingsSnapshot splitStateSnapshot(
-    const SkySettingsStore::StateSnapshot& snapshot
-);
-[[nodiscard]] SkySettingsStore::StateSnapshot mergeStateSnapshot(
-    const SkyStateSettingsSnapshot& snapshot
-);
+[[nodiscard]] SkyStateSettingsSnapshot splitStateSnapshot(const SkySettingsStore::StateSnapshot& snapshot);
+[[nodiscard]] SkySettingsStore::StateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapshot& snapshot);
 void saveStateSnapshot(QSettings& settings, const SkySettingsStore::StateSnapshot& snapshot);
-[[nodiscard]] std::optional<SkySettingsStore::StateSnapshot> loadStateSnapshot(
-    QSettings& settings
-);
+[[nodiscard]] std::optional<SkySettingsStore::StateSnapshot> loadStateSnapshot(QSettings& settings);
 
 }  // namespace skygate::ui::internal

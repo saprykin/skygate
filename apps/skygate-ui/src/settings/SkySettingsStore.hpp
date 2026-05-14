@@ -6,12 +6,30 @@
 #include <QtGlobal>
 
 #include "SkyOverlayLayerVisibility.hpp"
+#include "skygate/ephemeris/Types.hpp"
 
 #include <cstddef>
 #include <optional>
 
 class SkySettingsStore final {
 public:
+    struct EphemerisUserSettingsSnapshot final {
+        skygate::ephemeris::EphemerisEngineKind engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+        skygate::ephemeris::EphemerisCorrectionFlags correctionFlags =
+            skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric;
+        QString correctionPresetId = QStringLiteral("apparent-topocentric");
+        bool fallbackToSimpleEngine = true;
+        bool refractionEnabled = true;
+        double atmosphericPressureHpa = 1013.25;
+        double atmosphericTemperatureC = 10.0;
+        double relativeHumidity = 0.0;
+        double observingWavelengthMicrometers = 0.55;
+        QString preferredDataProfileId = QStringLiteral("modern");
+        bool onlineUpdatesEnabled = true;
+        QString updatePresetId = QStringLiteral("bundled");
+        QString updateManifestUrl;
+    };
+
     struct StateSnapshot final {
         bool live = true;
         bool timelineToolbarCollapsed = false;
@@ -39,6 +57,8 @@ public:
         bool logToTerminal = true;
         bool logToFile = false;
         QString logFilePath;
+        EphemerisUserSettingsSnapshot ephemeris;
+        bool ephemerisSettingsPresent = false;
     };
 
     struct CatalogCacheSnapshot final {
