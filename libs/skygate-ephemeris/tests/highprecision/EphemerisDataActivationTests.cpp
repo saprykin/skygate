@@ -242,6 +242,7 @@ private slots:
     void preservesExistingCacheFileWhenReplacementCannotBeWritten();
     void treatsExistingValidCacheFileAsAlreadyActive();
     void cancelsActivationBeforeWritingCacheFile();
+    void cancelsActivationAfterPayloadCopyBeforeCommit();
     void rejectsLargeKernelQtResourcePaths();
     void verifiesCompleteStagedUpdateSet();
     void cancelsStagedUpdateVerification();
@@ -451,6 +452,37 @@ void EphemerisDataActivationTests::cancelsActivationBeforeWritingCacheFile()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Canceled)
     );
     QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!containsFiles(cacheRoot.path()));
+}
+
+void EphemerisDataActivationTests::cancelsActivationAfterPayloadCopyBeforeCommit()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    writeFile(
+        uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+
+    int cancellationChecks = 0;
+    skygate::ephemeris::EphemerisDataActivationRequest request = makeRequest(asset, bundledRoot, cacheRoot);
+    request.cancellationRequested = [&cancellationChecks] {
+        ++cancellationChecks;
+        return cancellationChecks >= 3;
+    };
+
+    const skygate::ephemeris::EphemerisDataActivationResult result =
+        skygate::ephemeris::activateEphemerisDataAsset(request);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Canceled)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!QFileInfo::exists(pathToQString(result.activePath)));
     QVERIFY(!containsFiles(cacheRoot.path()));
 }
 
