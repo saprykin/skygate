@@ -1,6 +1,12 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
+#include "engine/highprecision/ApparentPlaceCalculator.hpp"
+#include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "skygate/ephemeris/DeltaTProvider.hpp"
 #include "skygate/ephemeris/EarthOrientationProvider.hpp"
+#include "skygate/ephemeris/LeapSecondProvider.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 
@@ -78,6 +84,121 @@ namespace core = skygate::core;
     request.options.engineKind = EphemerisEngineKind::HighPrecision;
     request.options.correctionFlags = EphemerisCorrectionFlags::Apparent;
     return request;
+}
+
+[[nodiscard]] AstronomicalEpoch makeEpoch(
+    const TimeScale timeScale,
+    const int year,
+    const int month,
+    const int day,
+    const int hour = 0,
+    const int minute = 0,
+    const int second = 0
+)
+{
+    const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(CivilDateTime{
+        .astronomicalYear = year,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .minute = minute,
+        .second = second,
+        .timeScale = timeScale,
+    });
+    Q_ASSERT(epoch.has_value());
+    return *epoch;
+}
+
+[[nodiscard]] AstronomicalEpoch makeUtcEpoch(
+    const int year, const int month, const int day, const int hour = 0, const int minute = 0, const int second = 0
+)
+{
+    return makeEpoch(TimeScale::Utc, year, month, day, hour, minute, second);
+}
+
+[[nodiscard]] EphemerisTextDataAsset makeLeapSecondAsset()
+{
+    return {
+        .id = "leap-seconds",
+        .version = "test",
+        .provenance = "unit test",
+        .content = "#@ version test\n"
+                   "#@ source unit test\n"
+                   "#@ expires 2027-01-01\n"
+                   "effective_utc_date,tai_minus_utc\n"
+                   "1972-01-01,10\n"
+                   "1972-07-01,11\n"
+                   "2015-07-01,36\n"
+                   "2017-01-01,37\n",
+    };
+}
+
+[[nodiscard]] std::shared_ptr<const ILeapSecondProvider>
+makeLeapSecondProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = std::nullopt)
+{
+    LeapSecondTableLoadOptions options;
+    options.referenceEpoch = referenceEpoch;
+    const LeapSecondTableLoadResult result = loadLeapSecondTableFromTextAsset(makeLeapSecondAsset(), options);
+    Q_ASSERT(result.isSuccess());
+    return result.provider;
+}
+
+[[nodiscard]] EphemerisTextDataAsset makeEarthOrientationAsset()
+{
+    return {
+        .id = "earth-orientation",
+        .version = "test-eop",
+        .provenance = "unit test",
+        .content =
+            "#@ version test-eop\n"
+            "#@ source unit test\n"
+            "#@ expires 2026-07-01\n"
+            "#@ prediction_start 2026-05-01\n"
+            "#@ prediction_end 2026-06-30\n"
+            "effective_utc_date,ut1_minus_utc_seconds,polar_motion_x_arcseconds,polar_motion_y_arcseconds,predicted\n"
+            "2026-04-01,0.10,0.0,0.0,false\n"
+            "2026-04-11,0.30,0.0,0.0,false\n"
+            "2026-05-01,0.50,0.0,0.0,true\n",
+    };
+}
+
+[[nodiscard]] std::shared_ptr<const IEarthOrientationProvider>
+makeEarthOrientationProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = std::nullopt)
+{
+    EarthOrientationDataLoadOptions options;
+    options.referenceEpoch = referenceEpoch;
+    const EarthOrientationDataLoadResult result =
+        loadEarthOrientationDataFromTextAsset(makeEarthOrientationAsset(), options);
+    Q_ASSERT(result.isSuccess());
+    return result.provider;
+}
+
+[[nodiscard]] EphemerisTextDataAsset makeDeltaTAsset()
+{
+    return {
+        .id = "delta-t",
+        .version = "test-delta-t",
+        .provenance = "unit test",
+        .content = "#@ version test-delta-t\n"
+                   "#@ source unit test\n"
+                   "#@ expires 2027-01-01\n"
+                   "#@ ancient_fallback_start -13200-01-01\n"
+                   "#@ ancient_fallback_end 1600-01-01\n"
+                   "#@ ancient_fallback_source historical model\n"
+                   "#@ ancient_fallback_delta_t_seconds 12000.5\n"
+                   "#@ ancient_fallback_uncertainty_seconds 7200\n"
+                   "effective_utc_date,delta_t_seconds\n"
+                   "1900-01-01,-2.72\n"
+                   "2000-01-01,63.83\n"
+                   "2026-01-01,69.20\n",
+    };
+}
+
+[[nodiscard]] std::shared_ptr<const IDeltaTProvider> makeDeltaTProvider()
+{
+    const DeltaTDataLoadResult result = loadDeltaTDataFromTextAsset(makeDeltaTAsset());
+    Q_ASSERT(result.isSuccess());
+    return result.provider;
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult makeCalculatorResult(
@@ -184,6 +305,59 @@ private:
     HighPrecisionCalculatorResult m_result;
     mutable int m_callCount = 0;
     mutable std::string m_lastBodyId;
+};
+
+class LongRangeFallbackKernelProvider final : public ICalcephKernelProvider {
+public:
+    [[nodiscard]] SolarSystemKernelStateResult
+    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
+    {
+        ++m_callCount;
+        m_lastEpoch = epoch;
+        m_lastTargetNaifId = targetNaifId;
+        m_lastCenterNaifId = centerNaifId;
+
+        SolarSystemKernelStateResult result;
+        result.positionAu = SolarSystemKernelVector{.xAu = 0.5, .yAu = 1.0, .zAu = 0.25};
+        result.metadata.status = EphemerisResultStatus::OutOfRange;
+        result.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+        result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+        result.metadata.dataSourceProvenance = "missing DE441 long-range kernel; modern kernel fallback";
+        result.metadata.effectiveDataValidityRange = EphemerisDateRange{
+            .id = "de440-modern",
+            .displayName = "DE440 modern range",
+            .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        };
+        result.metadata.estimatedAngularUncertaintyArcsec = 3600.0;
+        return result;
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+    [[nodiscard]] int lastTargetNaifId() const noexcept
+    {
+        return m_lastTargetNaifId;
+    }
+
+    [[nodiscard]] int lastCenterNaifId() const noexcept
+    {
+        return m_lastCenterNaifId;
+    }
+
+    [[nodiscard]] AstronomicalEpoch lastEpoch() const noexcept
+    {
+        return m_lastEpoch;
+    }
+
+private:
+    mutable int m_callCount = 0;
+    mutable int m_lastTargetNaifId = 0;
+    mutable int m_lastCenterNaifId = 0;
+    mutable AstronomicalEpoch m_lastEpoch;
 };
 
 class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
@@ -322,6 +496,82 @@ private:
 
 class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionCalculator {};
 
+void mergeConversionMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
+{
+    if (conversion.status == TimeScaleConversionStatus::Failed) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return;
+    }
+    if (conversion.status == TimeScaleConversionStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
+    }
+    if (conversion.hasWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::EarthOrientationDataMissing)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::DeltaTUnavailable)) {
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    }
+    if (conversion.hasWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData)) {
+        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    }
+}
+
+class MetadataFrameTransformer final : public IFrameTransformer {
+public:
+    explicit MetadataFrameTransformer(std::shared_ptr<const ITimeScaleService> timeScaleService)
+        : m_timeScaleService(std::move(timeScaleService))
+    {
+    }
+
+    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
+    ) const override
+    {
+        CelestialFrameTransformResult result;
+        result.vector = request.vector;
+        result.metadata.status = EphemerisResultStatus::Valid;
+        result.metadata.dataSourceProvenance = "metadata frame transformer";
+
+        const bool usesTerrestrialFrame = request.sourceFrame == CelestialReferenceFrame::Itrs
+                                          || request.targetFrame == CelestialReferenceFrame::Itrs
+                                          || request.sourceFrame == CelestialReferenceFrame::Tirs
+                                          || request.targetFrame == CelestialReferenceFrame::Tirs;
+        result.metadata.appliedCorrections = usesTerrestrialFrame ? EphemerisCorrectionFlags::EarthOrientation
+                                                                  : EphemerisCorrectionFlags::PrecessionNutation;
+        if (m_timeScaleService == nullptr) {
+            result.vector.reset();
+            result.metadata.status = EphemerisResultStatus::Failed;
+            result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            return result;
+        }
+
+        const TimeScaleConversionResult conversion =
+            m_timeScaleService->convert(request.epoch, usesTerrestrialFrame ? TimeScale::Ut1 : TimeScale::Tt);
+        mergeConversionMetadata(result.metadata, conversion);
+        if (!conversion.isSuccess()) {
+            result.vector.reset();
+        }
+        return result;
+    }
+
+private:
+    std::shared_ptr<const ITimeScaleService> m_timeScaleService;
+};
+
+[[nodiscard]] HighPrecisionCalculatorResult makeApparentPipelineInputResult()
+{
+    HighPrecisionCalculatorResult result;
+    result.equatorial = core::EquatorialCoordinate{
+        .rightAscensionHours = 4.0,
+        .declinationDeg = 20.0,
+    };
+    result.observerRelativePositionAu = SolarSystemKernelVector{.xAu = 0.75, .yAu = 0.25, .zAu = 0.5};
+    result.metadata.dataSourceProvenance = "fixture geometric solar-system state";
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::Geometric;
+    return result;
+}
+
 [[nodiscard]] HighPrecisionEphemerisEngineDependencies makeDependencies(
     std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator = {},
     std::shared_ptr<IStarAstrometryCalculator> starAstrometryCalculator = {},
@@ -347,6 +597,27 @@ class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionC
     return dependencies;
 }
 
+[[nodiscard]] HighPrecisionEphemerisEngineDependencies makeApparentPipelineDependencies(
+    std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator,
+    std::shared_ptr<const ITimeScaleService> timeScaleService,
+    std::shared_ptr<const IEarthOrientationProvider> earthOrientationProviderForFrame,
+    std::shared_ptr<const IEarthOrientationProvider> earthOrientationProviderForApparent
+)
+{
+    static_cast<void>(earthOrientationProviderForFrame);
+    auto frameTransformer = std::make_shared<MetadataFrameTransformer>(timeScaleService);
+    auto apparentPlaceCalculator = std::make_shared<ApparentPlaceCalculator>(
+        frameTransformer, timeScaleService, std::move(earthOrientationProviderForApparent)
+    );
+
+    HighPrecisionEphemerisEngineDependencies dependencies =
+        makeDependencies(std::move(solarSystemCalculator), {}, apparentPlaceCalculator);
+    dependencies.timeScaleService = std::move(timeScaleService);
+    dependencies.earthOrientationProvider = std::move(earthOrientationProviderForFrame);
+    dependencies.frameTransformer = std::move(frameTransformer);
+    return dependencies;
+}
+
 }  // namespace
 
 class HighPrecisionEphemerisEngineTests final : public QObject {
@@ -365,6 +636,10 @@ private slots:
     void defaultResultBuilderPreservesOutOfRangeWithoutFallback();
     void defaultResultBuilderPreservesFailedResultsWithoutFallback();
     void defaultResultBuilderPreservesDegradedDataWarnings();
+    void defaultResultBuilderAssemblesMissingLongRangeKernelFallback();
+    void defaultResultBuilderAssemblesStaleEarthOrientationWarnings();
+    void defaultResultBuilderAssemblesStaleLeapSecondWarnings();
+    void defaultResultBuilderAssemblesAncientDeltaTFallbackWarnings();
 };
 
 void HighPrecisionEphemerisEngineTests::exposesMetadataAndCapabilities()
@@ -726,6 +1001,154 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesDegradedDat
     QVERIFY(state->metadata.dataSourceProvenance == std::string{"stale EOP, stale leap-second, Delta T fallback"});
     QCOMPARE(state->equatorial.rightAscensionHours, 8.0);
     QCOMPARE(state->equatorial.declinationDeg, 9.0);
+}
+
+void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesMissingLongRangeKernelFallback()
+{
+    const std::array bodies{makeSunBody()};
+    auto kernelProvider = std::make_shared<LongRangeFallbackKernelProvider>();
+    auto solarSystemCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+    const HighPrecisionEphemerisEngine engine(bodies, makeRequest().options, makeDependencies(solarSystemCalculator));
+
+    EphemerisRequest request = makeRequest();
+    request.epoch = makeEpoch(TimeScale::Tdb, -5000, 1, 1);
+    request.options.correctionFlags = EphemerisCorrectionFlags::Geometric;
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(kernelProvider->callCount(), 1);
+    QCOMPARE(kernelProvider->lastTargetNaifId(), 10);
+    QCOMPARE(kernelProvider->lastCenterNaifId(), 399);
+    QCOMPARE(
+        static_cast<std::uint8_t>(kernelProvider->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(
+        state->metadata.dataSourceProvenance == std::string{"missing DE441 long-range kernel; modern kernel fallback"}
+    );
+    QVERIFY(state->metadata.effectiveDataValidityRange.has_value());
+    QVERIFY(state->metadata.effectiveDataValidityRange->id == std::string{"de440-modern"});
+    QVERIFY(state->metadata.estimatedAngularUncertaintyArcsec.has_value());
+    QCOMPARE(*state->metadata.estimatedAngularUncertaintyArcsec, 3600.0);
+    QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(state->equatorial.declinationDeg));
+}
+
+void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesStaleEarthOrientationWarnings()
+{
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(makeApparentPipelineInputResult());
+    const std::shared_ptr<const IEarthOrientationProvider> staleEarthOrientationProvider =
+        makeEarthOrientationProvider(makeUtcEpoch(2026, 8, 1));
+    const auto timeScaleService = std::make_shared<LeapSecondTimeScaleService>(
+        makeLeapSecondProvider(), TimeScaleServiceOptions{}, staleEarthOrientationProvider
+    );
+    const HighPrecisionEphemerisEngine engine(
+        bodies,
+        makeRequest().options,
+        makeApparentPipelineDependencies(
+            solarSystemCalculator, timeScaleService, staleEarthOrientationProvider, staleEarthOrientationProvider
+        )
+    );
+
+    EphemerisRequest request = makeRequest();
+    request.epoch = makeUtcEpoch(2026, 4, 1);
+    request.options.correctionFlags = EphemerisCorrectionFlags::Topocentric;
+    request.options.enableAtmosphericRefraction = false;
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(state->metadata.dataSourceProvenance == std::string{"fixture geometric solar-system state"});
+    QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::EarthOrientation));
+    QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
+    QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(state->equatorial.declinationDeg));
+    QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
+    QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
+}
+
+void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesStaleLeapSecondWarnings()
+{
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(makeApparentPipelineInputResult());
+    const auto timeScaleService =
+        std::make_shared<LeapSecondTimeScaleService>(makeLeapSecondProvider(makeUtcEpoch(2027, 2, 1)));
+    const HighPrecisionEphemerisEngine engine(
+        bodies,
+        makeRequest().options,
+        makeApparentPipelineDependencies(solarSystemCalculator, timeScaleService, nullptr, nullptr)
+    );
+
+    EphemerisRequest request = makeRequest();
+    request.epoch = makeUtcEpoch(2026, 4, 1);
+    request.options.correctionFlags = EphemerisCorrectionFlags::Apparent;
+    request.options.enableAtmosphericRefraction = false;
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation));
+    QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(state->equatorial.declinationDeg));
+}
+
+void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesAncientDeltaTFallbackWarnings()
+{
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(makeApparentPipelineInputResult());
+    const std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider = makeEarthOrientationProvider();
+    TimeScaleServiceOptions options;
+    options.allowDegradedLeapSecondFallback = true;
+    options.fallbackTaiMinusUtcSeconds = 0;
+    options.allowUt1DeltaTFallback = true;
+    options.earthOrientationSampleOptions.allowOutOfRangeNearestSampleFallback = false;
+    options.earthOrientationSampleOptions.allowMissingDataZeroFallback = false;
+    const auto timeScaleService = std::make_shared<LeapSecondTimeScaleService>(
+        makeLeapSecondProvider(), options, earthOrientationProvider, makeDeltaTProvider()
+    );
+    const HighPrecisionEphemerisEngine engine(
+        bodies,
+        makeRequest().options,
+        makeApparentPipelineDependencies(solarSystemCalculator, timeScaleService, nullptr, nullptr)
+    );
+
+    EphemerisRequest request = makeRequest();
+    request.epoch = makeUtcEpoch(-5000, 1, 1);
+    request.options.correctionFlags = EphemerisCorrectionFlags::Topocentric;
+    request.options.enableAtmosphericRefraction = false;
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::EarthOrientation));
+    QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
+    QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(state->equatorial.declinationDeg));
+    QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
+    QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
 }
 
 QTEST_APPLESS_MAIN(HighPrecisionEphemerisEngineTests)
