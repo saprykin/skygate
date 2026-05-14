@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -20,7 +21,8 @@ enum class EphemerisDataActivationStatus : std::uint8_t {
     CorruptArchive,
     ChecksumMismatch,
     IoError,
-    LargeKernelInQtResource
+    LargeKernelInQtResource,
+    Canceled
 };
 
 enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
@@ -35,7 +37,8 @@ enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
     UnsupportedCompression,
     CorruptArchive,
     ChecksumMismatch,
-    IoError
+    IoError,
+    Canceled
 };
 
 [[nodiscard]] constexpr std::string_view displayName(const EphemerisDataActivationStatus status) noexcept
@@ -59,6 +62,8 @@ enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
         return "io-error";
     case EphemerisDataActivationStatus::LargeKernelInQtResource:
         return "large-kernel-in-qt-resource";
+    case EphemerisDataActivationStatus::Canceled:
+        return "canceled";
     }
 
     return {};
@@ -91,6 +96,8 @@ enum class EphemerisStagedUpdateVerificationStatus : std::uint8_t {
         return "checksum-mismatch";
     case EphemerisStagedUpdateVerificationStatus::IoError:
         return "io-error";
+    case EphemerisStagedUpdateVerificationStatus::Canceled:
+        return "canceled";
     }
 
     return {};
@@ -102,6 +109,7 @@ struct EphemerisDataActivationRequest {
     std::filesystem::path writableCacheRoot;
     bool allowQtResourceKernelAssets = false;
     std::uint64_t largeKernelResourceThresholdBytes = 128ULL * 1024ULL * 1024ULL;
+    std::function<bool()> cancellationRequested;
 };
 
 struct EphemerisDataActivationResult {
@@ -129,6 +137,7 @@ struct EphemerisStagedUpdateVerificationRequest {
     std::filesystem::path stagedResourceRoot;
     std::vector<EphemerisDataManifestAssetKind> requiredKinds;
     std::vector<ExpectedComponent> expectedComponents;
+    std::function<bool()> cancellationRequested;
 };
 
 struct EphemerisStagedUpdateVerificationResult {
