@@ -45,7 +45,7 @@ Window {
         if (selectedPage === 2) {
             return "Theme and visual presentation"
         }
-        return "Catalog source and download settings"
+        return "Catalog and ephemeris data settings"
     }
 
     PreferencesDraft {

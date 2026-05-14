@@ -201,6 +201,168 @@ Item {
                 PreferencesGroupTitle {
                     columnSpan: 2
                     Layout.topMargin: 8
+                    text: "Ephemeris Data"
+                }
+
+                Label {
+                    text: "Modern kernel"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisModernKernelStatusLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.ephemerisModernKernelStatusText
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "DE441 long range"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisLongRangeStatusLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.ephemerisLongRangeKernelStatusText
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "Earth orientation"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisEarthOrientationStatusLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.ephemerisEarthOrientationStatusText
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "Leap seconds"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisLeapSecondStatusLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.ephemerisLeapSecondStatusText
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "Delta T"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisDeltaTStatusLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.ephemerisDeltaTStatusText
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "Last update"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisLastUpdateStatusLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.ephemerisDataLastUpdateResultText
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "Updates"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 7
+
+                    PreferencesCheckBox {
+                        objectName: "ephemerisDataOnlineUpdatesCheckBox"
+                        checked: skyContextController.ephemerisDataOnlineUpdatesEnabled
+                        onToggled: skyContextController.setEphemerisDataOnlineUpdatesEnabled(checked)
+                    }
+
+                    Label {
+                        text: "Online updates"
+                        color: skyContext.theme.formLabelText
+                        font.family: "Avenir Next"
+                        font.pixelSize: 11
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                }
+
+                PreferencesActionButton {
+                    objectName: "ephemerisDataUpdateButton"
+                    Layout.preferredWidth: 150
+                    text: "Update Data"
+                    enabled: skyContextController.ephemerisDataUpdateEnabled
+                    onClicked: skyContextController.updateEphemerisData()
+                }
+
+                PreferencesActionButton {
+                    objectName: "ephemerisDataClearCacheButton"
+                    Layout.fillWidth: true
+                    text: "Clear Ephemeris Data Cache"
+                    onClicked: skyContextController.clearEphemerisDataCache()
+                }
+
+                PreferencesGroupTitle {
+                    columnSpan: 2
+                    Layout.topMargin: 8
                     text: "Star Catalog"
                 }
 

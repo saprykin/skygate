@@ -107,6 +107,47 @@ class SkyContextController final : public QObject {
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
+        QString ephemerisModernKernelStatusText
+        READ ephemerisModernKernelStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisLongRangeKernelStatusText
+        READ ephemerisLongRangeKernelStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisEarthOrientationStatusText
+        READ ephemerisEarthOrientationStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisLeapSecondStatusText
+        READ ephemerisLeapSecondStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisDeltaTStatusText
+        READ ephemerisDeltaTStatusText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisDataLastUpdateResultText
+        READ ephemerisDataLastUpdateResultText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        bool ephemerisDataOnlineUpdatesEnabled
+        READ ephemerisDataOnlineUpdatesEnabled
+        WRITE setEphemerisDataOnlineUpdatesEnabled
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        bool ephemerisDataUpdateEnabled
+        READ ephemerisDataUpdateEnabled
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
         QString catalogDatasetInfoText
         READ catalogDatasetInfoText
         NOTIFY catalogDatasetInfoTextChanged
@@ -175,6 +216,8 @@ public:
             std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
             std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> calcephKernelRuntime;
             skygate::ephemeris::IEphemerisDiagnosticsSink* diagnosticsSink = nullptr;
+            QString updateResourceRoot;
+            QString writableCacheRoot;
         };
 
         bool loadSettings = true;
@@ -236,6 +279,14 @@ public:
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString ephemerisDataStatusText() const;
+    [[nodiscard]] QString ephemerisModernKernelStatusText() const;
+    [[nodiscard]] QString ephemerisLongRangeKernelStatusText() const;
+    [[nodiscard]] QString ephemerisEarthOrientationStatusText() const;
+    [[nodiscard]] QString ephemerisLeapSecondStatusText() const;
+    [[nodiscard]] QString ephemerisDeltaTStatusText() const;
+    [[nodiscard]] QString ephemerisDataLastUpdateResultText() const;
+    [[nodiscard]] bool ephemerisDataOnlineUpdatesEnabled() const noexcept;
+    [[nodiscard]] bool ephemerisDataUpdateEnabled() const noexcept;
     [[nodiscard]] QString catalogDatasetInfoText() const;
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
@@ -305,6 +356,9 @@ public:
     Q_INVOKABLE bool loadSettings();
     Q_INVOKABLE bool clearCatalogCache();
     Q_INVOKABLE bool clearDeepSkyCatalogCache();
+    Q_INVOKABLE bool clearEphemerisDataCache();
+    Q_INVOKABLE bool updateEphemerisData();
+    Q_INVOKABLE void setEphemerisDataOnlineUpdatesEnabled(bool enabled);
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE void loadDeepSkyCatalogPreset(const QString& presetId);
@@ -404,6 +458,8 @@ private:
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
     const skygate::ephemeris::EphemerisDataSetInfo* m_ephemerisDataSetManifest = nullptr;
     const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
+    QString m_ephemerisUpdateResourceRoot;
+    QString m_ephemerisWritableCacheRoot;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;
     std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_ephemerisEarthOrientationProvider;
     std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> m_ephemerisCalcephKernelRuntime;

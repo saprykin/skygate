@@ -52,30 +52,18 @@ void QmlPreferencesWindowTests::preferencesWindowShellNavigatesAppliesAndCloses(
     QTRY_VERIFY(window->isVisible());
     QCOMPARE(draft->property("latitudeText").toString(), QString("47.000000"));
 
-    QObject* catalogSection = firstObjectWithObjectName(
-        window,
-        QStringLiteral("preferencesCatalogSectionButton")
-    );
+    QObject* catalogSection = firstObjectWithObjectName(window, QStringLiteral("preferencesCatalogSectionButton"));
     QVERIFY(catalogSection != nullptr);
     QVERIFY(activateControl(catalogSection));
     QTRY_COMPARE(window->property("selectedPage").toInt(), 3);
-    QCOMPARE(
-        window->property("currentSectionDescription").toString(),
-        QString("Catalog source and download settings")
-    );
+    QCOMPARE(window->property("currentSectionDescription").toString(), QString("Catalog and ephemeris data settings"));
 
-    QObject* skySection = firstObjectWithObjectName(
-        window,
-        QStringLiteral("preferencesSkySectionButton")
-    );
+    QObject* skySection = firstObjectWithObjectName(window, QStringLiteral("preferencesSkySectionButton"));
     QVERIFY(skySection != nullptr);
     QVERIFY(activateControl(skySection));
     QTRY_COMPARE(window->property("selectedPage").toInt(), 1);
 
-    QObject* applyButton = firstObjectWithObjectName(
-        window,
-        QStringLiteral("preferencesApplyButton")
-    );
+    QObject* applyButton = firstObjectWithObjectName(window, QStringLiteral("preferencesApplyButton"));
     QVERIFY(applyButton != nullptr);
     draft->setProperty("locationSourceText", QStringLiteral("City"));
     draft->setProperty("selectedCityId", QString());

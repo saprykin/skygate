@@ -10,7 +10,9 @@
 #include "SkyTimeController.hpp"
 
 #include <QDateTime>
+#include <QStandardPaths>
 
+#include "skygate/ephemeris/EphemerisDataManifest.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
 #include <memory>
@@ -199,6 +201,12 @@ SkyContextController::SkyContextController(
       m_ephemerisEngine(std::move(ephemerisEngine)),
       m_ephemerisDataSetManifest(initializationOptions.ephemerisFactoryInputs.dataSetManifest),
       m_ephemerisDataManifest(initializationOptions.ephemerisFactoryInputs.dataManifest),
+      m_ephemerisUpdateResourceRoot(initializationOptions.ephemerisFactoryInputs.updateResourceRoot),
+      m_ephemerisWritableCacheRoot(
+          initializationOptions.ephemerisFactoryInputs.writableCacheRoot.trimmed().isEmpty()
+              ? QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/ephemeris-data")
+              : initializationOptions.ephemerisFactoryInputs.writableCacheRoot.trimmed()
+      ),
       m_ephemerisTimeScaleService(std::move(initializationOptions.ephemerisFactoryInputs.timeScaleService)),
       m_ephemerisEarthOrientationProvider(
           std::move(initializationOptions.ephemerisFactoryInputs.earthOrientationProvider)
@@ -256,6 +264,7 @@ SkyContextController::SkyContextController(
     );
     connect(m_ephemerisDataManager.get(), &SkyEphemerisDataManager::activeDataChanged, this, [this] {
         rebuildEphemerisEngine();
+        emit ephemerisDataStatusTextChanged();
         emit ephemerisDataChanged();
         emit skyContextChanged();
     });
@@ -596,6 +605,47 @@ QString SkyContextController::catalogStatusText() const
 QString SkyContextController::ephemerisDataStatusText() const
 {
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->statusText() : QString();
+}
+
+QString SkyContextController::ephemerisModernKernelStatusText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->modernKernelStatusText() : QString();
+}
+
+QString SkyContextController::ephemerisLongRangeKernelStatusText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->longRangeKernelStatusText() : QString();
+}
+
+QString SkyContextController::ephemerisEarthOrientationStatusText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->earthOrientationStatusText() : QString();
+}
+
+QString SkyContextController::ephemerisLeapSecondStatusText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->leapSecondStatusText() : QString();
+}
+
+QString SkyContextController::ephemerisDeltaTStatusText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->deltaTStatusText() : QString();
+}
+
+QString SkyContextController::ephemerisDataLastUpdateResultText() const
+{
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->lastUpdateResultText() : QString();
+}
+
+bool SkyContextController::ephemerisDataOnlineUpdatesEnabled() const noexcept
+{
+    return m_ephemerisUserSettings.onlineUpdatesEnabled;
+}
+
+bool SkyContextController::ephemerisDataUpdateEnabled() const noexcept
+{
+    return m_ephemerisUserSettings.onlineUpdatesEnabled && m_ephemerisDataManifest != nullptr
+           && !m_ephemerisUpdateResourceRoot.trimmed().isEmpty() && !m_ephemerisWritableCacheRoot.trimmed().isEmpty();
 }
 
 QString SkyContextController::catalogDatasetInfoText() const
@@ -960,6 +1010,53 @@ void SkyContextController::setEphemerisWavelengthText(const QString& wavelengthT
     auto settings = m_ephemerisUserSettings;
     settings.observingWavelengthMicrometers = *wavelength;
     applyEphemerisUserSettings(settings);
+}
+
+void SkyContextController::setEphemerisDataOnlineUpdatesEnabled(const bool enabled)
+{
+    if (m_ephemerisUserSettings.onlineUpdatesEnabled == enabled) {
+        return;
+    }
+
+    m_ephemerisUserSettings.onlineUpdatesEnabled = enabled;
+    emit ephemerisDataStatusTextChanged();
+}
+
+bool SkyContextController::clearEphemerisDataCache()
+{
+    return m_ephemerisDataManager != nullptr && m_ephemerisDataManager->clearInstalledDataCache();
+}
+
+bool SkyContextController::updateEphemerisData()
+{
+    if (!ephemerisDataUpdateEnabled() || m_ephemerisDataManager == nullptr) {
+        return false;
+    }
+
+    const std::string profileId = m_ephemerisUserSettings.preferredDataProfileId.trimmed().toStdString();
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = m_ephemerisDataManifest->profile(profileId);
+    if (profile == nullptr) {
+        return false;
+    }
+
+    SkyEphemerisDataManager::StagedUpdateActivationRequest request;
+    request.manifest = m_ephemerisDataManifest;
+    request.profileId = m_ephemerisUserSettings.preferredDataProfileId;
+    request.stagedResourceRoot = m_ephemerisUpdateResourceRoot;
+    request.writableCacheRoot = m_ephemerisWritableCacheRoot;
+    request.revisionToken = QString::fromStdString(profile->id);
+    for (const std::string& assetId : profile->assetIds) {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = m_ephemerisDataManifest->asset(assetId);
+        if (asset == nullptr) {
+            return false;
+        }
+        request.requiredKinds.push_back(asset->kind);
+        auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
+        component.expectedVersion = asset->version;
+        component.requiredValidityRange = asset->validityRange;
+    }
+
+    return m_ephemerisDataManager->activateVerifiedStagedUpdateSet(request).isSuccess();
 }
 
 QString SkyContextController::catalogUrlText() const
