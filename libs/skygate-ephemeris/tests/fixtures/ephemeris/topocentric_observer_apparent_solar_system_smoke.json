@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "source": "JPL Horizons",
+    "sourceUrl": "https://ssd.jpl.nasa.gov/api/horizons.api",
+    "apiParameters": "COMMAND='301','10','499'; CENTER='coord@399'; COORD_TYPE='GEODETIC'; SITE_COORD='-122.4194,37.7749,0.010'; EPHEM_TYPE=OBSERVER; QUANTITIES='2,4'; APPARENT=AIRLESS; REF_SYSTEM=ICRF; companion VECTORS queries used CENTER='399', REF_PLANE=FRAME, OUT_UNITS=AU-D, VEC_CORR='LT+S'",
+    "generatedDate": "2026-05-14",
+    "sourceFrame": "Horizons observer apparent topocentric RA/Dec and AZ/EL, airless",
+    "timeScale": "UTC observer output with apparent vector inputs",
+    "observer": "San Francisco WGS84 geodetic lon=-122.4194 deg, lat=37.7749 deg, elevation=0.010 km"
+  },
+  "request": {
+    "utcJulianDate": 2460310.500000000,
+    "latitudeDegrees": 37.7749,
+    "longitudeDegrees": -122.4194,
+    "elevationMeters": 10.0,
+    "ttMinusUtcSeconds": 69.184,
+    "ut1MinusUtcSeconds": 0.0,
+    "polarMotionXArcseconds": 0.0,
+    "polarMotionYArcseconds": 0.0
+  },
+  "tolerance": {
+    "angularDegrees": 0.05,
+    "horizontalDegrees": 0.5
+  },
+  "cases": [
+    {
+      "target": "Moon body center (301)",
+      "bodyId": "moon",
+      "bodyType": "moon",
+      "inputGcrsPositionAu": [-2.445869295660694E-03, 9.823850946685398E-04, 5.681703014143443E-04],
+      "expected": {
+        "rightAscensionHours": 10.606722222222222,
+        "declinationDegrees": 11.94138888888889,
+        "azimuthDegrees": 358.244549,
+        "altitudeDegrees": -40.267140
+      }
+    },
+    {
+      "target": "Sun body center (10)",
+      "bodyId": "sun",
+      "bodyType": "sun",
+      "inputGcrsPositionAu": [1.657677842988369E-01, -8.892608942214589E-01, -3.855228870896648E-01],
+      "expected": {
+        "rightAscensionHours": 18.72794722222222,
+        "declinationDegrees": -23.060305555555554,
+        "azimuthDegrees": 231.244636,
+        "altitudeDegrees": 9.099448
+      }
+    },
+    {
+      "target": "Mars body center (499)",
+      "bodyId": "mars",
+      "bodyType": "planet",
+      "inputGcrsPositionAu": [-1.279287704851753E-01, -2.211361226673583E+00, -9.840204340295925E-01],
+      "expected": {
+        "rightAscensionHours": 17.803575,
+        "declinationDegrees": -23.962083333333332,
+        "azimuthDegrees": 239.585469,
+        "altitudeDegrees": -0.560969
+      }
+    }
+  ]
+}
