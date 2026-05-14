@@ -60,6 +60,19 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     endif()
 endfunction()
 
+function(add_skygate_disabled_highprecision_test target_name reason)
+    add_test(
+        NAME ${target_name}
+        COMMAND "${CMAKE_COMMAND}" -E echo "SKIP: ${reason}"
+    )
+    set_tests_properties(${target_name}
+        PROPERTIES
+            LABELS "unit;highprecision;validation"
+            SKIP_REGULAR_EXPRESSION "^SKIP:"
+            TIMEOUT 30
+    )
+endfunction()
+
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_executable(skygate-ephemeris-highprecision-dependency-smoke-tests
         highprecision/HighPrecisionDependencySmokeTests.cpp
@@ -153,16 +166,27 @@ add_skygate_ephemeris_qtest(
     highprecision/ApparentRaDecValidationTests.cpp
     LABELS "unit;highprecision;validation;apparent"
 )
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-calceph-kernel-provider-tests
-    highprecision/CalcephKernelProviderTests.cpp
-    LABELS "unit;highprecision"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-solar-system-state-calculator-tests
-    highprecision/SolarSystemStateCalculatorTests.cpp
-    LABELS "unit;highprecision"
-)
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-calceph-kernel-provider-tests
+        highprecision/CalcephKernelProviderTests.cpp
+        LABELS "unit;highprecision;validation;kernel"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-solar-system-state-calculator-tests
+        highprecision/SolarSystemStateCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;geometric"
+    )
+else()
+    add_skygate_disabled_highprecision_test(
+        skygate-ephemeris-calceph-kernel-provider-tests
+        "CALCEPH kernel validation requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON"
+    )
+    add_skygate_disabled_highprecision_test(
+        skygate-ephemeris-solar-system-state-calculator-tests
+        "geometric solar-system validation requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON"
+    )
+endif()
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-fixture-support-tests
     highprecision/EphemerisFixtureSupportTests.cpp
