@@ -293,8 +293,12 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
     QCOMPARE(provider->lastTargetNaifId, 499);
     QCOMPARE(provider->lastCenterNaifId, 399);
     QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.observerRelativePositionAu.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
+    QCOMPARE(result.observerRelativePositionAu->xAu, 0.0);
+    QCOMPARE(result.observerRelativePositionAu->yAu, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->zAu, 1.0);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
     );
@@ -380,8 +384,12 @@ void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTarg
         < request.epoch.julianDatePart1 + request.epoch.julianDatePart2
     );
     QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.observerRelativePositionAu.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
+    QCOMPARE(result.observerRelativePositionAu->xAu, 0.0);
+    QCOMPARE(result.observerRelativePositionAu->yAu, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->zAu, 1.0);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
     );

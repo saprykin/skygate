@@ -63,6 +63,7 @@ struct HighPrecisionComputationInput {
 struct HighPrecisionCalculatorResult {
     std::optional<core::EquatorialCoordinate> equatorial;
     std::optional<core::HorizontalCoordinate> horizontal;
+    std::optional<SolarSystemKernelVector> observerRelativePositionAu;
     EphemerisResultMetadata metadata;
 };
 
