@@ -177,6 +177,11 @@ add_skygate_ephemeris_qtest(
     LABELS "unit;highprecision;validation;fallback"
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-acceptance-matrix-tests
+    highprecision/EphemerisAcceptanceMatrixTests.cpp
+    LABELS "unit;highprecision;validation;acceptance"
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-star-astrometry-calculator-tests
     highprecision/StarAstrometryCalculatorTests.cpp
     LABELS "unit;highprecision;validation;stellar-astrometry"
