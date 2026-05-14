@@ -44,3 +44,34 @@ READY
   `skygate-ui-qml-main-window-rendering-tests` failing because a
   `SkyOverlayLabel` was above the viewport. This was recorded as HP-059 in
   `IMPLEMENTATION_PLAN.md`.
+
+## Review fixes
+
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Finding title: Refraction input validation coverage is incomplete
+  - Action: Fixed
+  - Notes: Added focused coverage for invalid observer input and each
+    atmospheric pressure, temperature, relative-humidity, and wavelength
+    validation branch. The tests assert unchanged altitude, degraded metadata,
+    `CorrectionUnavailable`, and no applied atmospheric-refraction flag. Added
+    boundary-altitude coverage for the accepted -1 degree boundary, high
+    accepted altitude clamping behavior, and rejected zenith input.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/tests/highprecision/AtmosphericRefractionCalculatorTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-029/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-029/fix.md`
+- Tests run after fix:
+  - `clang-format -i
+    libs/skygate-ephemeris/tests/highprecision/AtmosphericRefractionCalculatorTests.cpp`
+  - `cmake --build build-ralph --target
+    skygate-ephemeris-atmospheric-refraction-calculator-tests
+    skygate-ephemeris-apparent-place-calculator-tests
+    skygate-ephemeris-highprecision-engine-tests
+    skygate-ephemeris-apparent-radec-validation-tests` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R
+    '^(skygate-ephemeris-atmospheric-refraction-calculator-tests|skygate-ephemeris-apparent-place-calculator-tests|skygate-ephemeris-highprecision-engine-tests|skygate-ephemeris-apparent-radec-validation-tests)$'`
+    - PASS after correcting an over-strict high-altitude assertion
+  - `ctest --test-dir build-ralph --output-on-failure` - PASS, 121/121 tests
+    passed with CALCEPH-gated tests skipped in this build configuration
+- Remaining concerns: None.
