@@ -468,7 +468,7 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
             dependencies.solarSystemStateCalculator =
                 std::make_shared<highprecision::SolarSystemStateCalculator>(kernelProvider);
             dependencies.starAstrometryCalculator =
-                std::make_shared<highprecision::StarAstrometryCalculator>(kernelProvider);
+                std::make_shared<highprecision::StarAstrometryCalculator>(kernelProvider, request.timeScaleService);
             dependencies.timeScaleService = request.timeScaleService;
             dependencies.earthOrientationProvider = request.earthOrientationProvider;
             dependencies.frameTransformer = std::make_shared<highprecision::ErfaFrameTransformer>(
