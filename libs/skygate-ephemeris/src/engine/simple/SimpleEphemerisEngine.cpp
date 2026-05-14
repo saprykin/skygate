@@ -4,6 +4,7 @@
 #include "StringUtilities.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
@@ -484,6 +485,7 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
                 request.earthOrientationProvider,
                 dependencies.atmosphericRefractionCalculator
             );
+            dependencies.computationCache = std::make_shared<highprecision::EphemerisComputationCache>();
             dependencies.dataSetInfo = request.dataManifest->dataSetInfo;
             if (request.dataSetManifest != nullptr) {
                 dependencies.dataSetInfo = *request.dataSetManifest;

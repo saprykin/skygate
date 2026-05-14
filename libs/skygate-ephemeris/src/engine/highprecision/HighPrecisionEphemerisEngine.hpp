@@ -48,6 +48,33 @@ class IFrameTransformer;
 class IEphemerisComputationCache {
 public:
     virtual ~IEphemerisComputationCache() = default;
+
+    [[nodiscard]] virtual std::optional<SkySnapshot> findSnapshot(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo
+    ) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(catalogBodies);
+        static_cast<void>(dataSetInfo);
+        return std::nullopt;
+    }
+
+    virtual void storeSnapshot(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        const SkySnapshot& snapshot
+    ) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(catalogBodies);
+        static_cast<void>(dataSetInfo);
+        static_cast<void>(snapshot);
+    }
+
+    virtual void clear() const {}
 };
 
 struct HighPrecisionComputationInput {
@@ -185,6 +212,7 @@ public:
 
 private:
     [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept;
+    [[nodiscard]] SkySnapshot computeUncached(const EphemerisRequest& request) const;
     [[nodiscard]] CelestialBodyState computeStateForBody(const EphemerisRequest& request, std::size_t bodyIndex) const;
 
     std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
