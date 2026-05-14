@@ -5,10 +5,18 @@
 #include "SkyContextController.hpp"
 #include "SkySettingsStore.hpp"
 
+#include "skygate/ephemeris/IEphemerisEngine.hpp"
+
 #include <QtTest/QtTest>
 
 #include <QFile>
 #include <QSignalSpy>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -38,6 +46,80 @@ installedSnapshot(const QString& kernelPath, const QString& earthOrientationPath
     return snapshot;
 }
 
+skygate::ephemeris::EphemerisEngineOptions highPrecisionOptions()
+{
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Geometric;
+    options.enableAtmosphericRefraction = false;
+    options.atmosphericPressureHpa = 875.0;
+    options.atmosphericTemperatureC = -4.0;
+    options.relativeHumidity = 0.4;
+    options.observingWavelengthMicrometers = 0.7;
+    return options;
+}
+
+void verifyHighPrecisionOptions(const skygate::ephemeris::IEphemerisEngine& engine)
+{
+    QCOMPARE(
+        static_cast<std::uint8_t>(engine.kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+
+    const skygate::ephemeris::EphemerisEngineOptions options = engine.options();
+    QCOMPARE(
+        static_cast<std::uint8_t>(options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(options.correctionFlags),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Geometric)
+    );
+    QCOMPARE(options.enableAtmosphericRefraction, false);
+    QCOMPARE(options.atmosphericPressureHpa, 875.0);
+    QCOMPARE(options.atmosphericTemperatureC, -4.0);
+    QCOMPARE(options.relativeHumidity, 0.4);
+    QCOMPARE(options.observingWavelengthMicrometers, 0.7);
+}
+
+class ConfiguredEphemerisEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit ConfiguredEphemerisEngine(skygate::ephemeris::EphemerisEngineOptions options) : m_options(options) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return m_options.engineKind;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        return m_options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    {
+        return std::nullopt;
+    }
+
+private:
+    skygate::ephemeris::EphemerisEngineOptions m_options;
+};
+
 }  // namespace
 
 class SkyEphemerisDataManagerTests final : public QObject {
@@ -52,6 +134,8 @@ private slots:
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
     void controllerOwnsManagerAndExposesSnapshot();
     void controllerCatalogChangePreservesEphemerisDataSelection();
+    void controllerCatalogChangePreservesSelectedEngineConfiguration();
+    void controllerActiveDataChangePreservesSelectedEngineConfiguration();
     void managerDoesNotTouchCatalogState();
 
 private:
@@ -195,6 +279,54 @@ void SkyEphemerisDataManagerTests::controllerCatalogChangePreservesEphemerisData
     QVERIFY(currentKernel.has_value());
     QCOMPARE(QString::fromStdString(currentKernel->activePath), kernelPath);
     QVERIFY(controller.ephemerisEngine() != nullptr);
+}
+
+void SkyEphemerisDataManagerTests::controllerCatalogChangePreservesSelectedEngineConfiguration()
+{
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = false;
+    options.initializeLocation = false;
+    SkyContextController controller(
+        nullptr, std::make_unique<ConfiguredEphemerisEngine>(highPrecisionOptions()), options, nullptr
+    );
+
+    QVERIFY(controller.ephemerisEngine() != nullptr);
+    verifyHighPrecisionOptions(*controller.ephemerisEngine());
+
+    const std::uint64_t originalCatalogRevision = controller.catalogRevision();
+    controller.loadDeepSkyCatalogPreset(QStringLiteral("bundled_messier"));
+
+    QVERIFY(controller.catalogRevision() > originalCatalogRevision);
+    QVERIFY(controller.ephemerisEngine() != nullptr);
+    verifyHighPrecisionOptions(*controller.ephemerisEngine());
+}
+
+void SkyEphemerisDataManagerTests::controllerActiveDataChangePreservesSelectedEngineConfiguration()
+{
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = false;
+    options.initializeLocation = false;
+    SkyContextController controller(
+        nullptr, std::make_unique<ConfiguredEphemerisEngine>(highPrecisionOptions()), options, nullptr
+    );
+
+    QVERIFY(controller.ephemerisEngine() != nullptr);
+    verifyHighPrecisionOptions(*controller.ephemerisEngine());
+    const std::uint64_t originalDataRevision = controller.ephemerisDataRevision();
+
+    const QString kernelPath = m_settings.filePath(QStringLiteral("controller-active-data-kernel.bsp"));
+    const QString earthOrientationPath = m_settings.filePath(QStringLiteral("controller-active-data-eop.txt"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+    QVERIFY(writeFile(earthOrientationPath, QByteArrayLiteral("eop")));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(installedSnapshot(kernelPath, earthOrientationPath)));
+
+    static_cast<void>(controller.loadSettings());
+
+    QVERIFY(controller.ephemerisDataRevision() > originalDataRevision);
+    QVERIFY(controller.ephemerisEngine() != nullptr);
+    verifyHighPrecisionOptions(*controller.ephemerisEngine());
 }
 
 void SkyEphemerisDataManagerTests::managerDoesNotTouchCatalogState()

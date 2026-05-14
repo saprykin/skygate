@@ -25,8 +25,16 @@
 #include <vector>
 
 namespace skygate::ephemeris {
+class IEarthOrientationProvider;
 class IEphemerisDataSnapshot;
+class IEphemerisDiagnosticsSink;
+class ITimeScaleService;
+struct EphemerisDataManifest;
+
+namespace highprecision {
+class ICalcephKernelRuntime;
 }
+}  // namespace skygate::ephemeris
 
 class QDateTime;
 class QGeoPositionInfo;
@@ -143,11 +151,21 @@ public:
 
 public:
     struct InitializationOptions final {
+        struct EphemerisFactoryInputs final {
+            const skygate::ephemeris::EphemerisDataSetInfo* dataSetManifest = nullptr;
+            const skygate::ephemeris::EphemerisDataManifest* dataManifest = nullptr;
+            std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
+            std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
+            std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> calcephKernelRuntime;
+            skygate::ephemeris::IEphemerisDiagnosticsSink* diagnosticsSink = nullptr;
+        };
+
         bool loadSettings = true;
         bool initializeLocation = true;
         QGeoPositionInfoSource* positionSource = nullptr;
         bool requestLocationPermission = true;
         const skygate::core::ITimeSource* timeSource = nullptr;
+        EphemerisFactoryInputs ephemerisFactoryInputs;
     };
 
     explicit SkyContextController(
@@ -346,6 +364,12 @@ private:
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
     skygate::ephemeris::EphemerisEngineKind m_ephemerisEngineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
     skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
+    const skygate::ephemeris::EphemerisDataSetInfo* m_ephemerisDataSetManifest = nullptr;
+    const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_ephemerisEarthOrientationProvider;
+    std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> m_ephemerisCalcephKernelRuntime;
+    skygate::ephemeris::IEphemerisDiagnosticsSink* m_ephemerisDiagnosticsSink = nullptr;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     QVariantList m_themeOptions;
