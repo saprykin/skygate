@@ -75,6 +75,20 @@ jobs:
       - name: Verify test fixtures
         run: git lfs fsck
 
+      - name: Configure vcpkg
+        run: |
+          vcpkg_root="${VCPKG_INSTALLATION_ROOT:-}"
+          if [[ -z "${vcpkg_root}" && -d /usr/local/share/vcpkg ]]; then
+            vcpkg_root="/usr/local/share/vcpkg"
+          fi
+          if [[ -z "${vcpkg_root}" ]]; then
+            vcpkg_root="${RUNNER_TEMP}/vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git "${vcpkg_root}"
+            "${vcpkg_root}/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+
+          echo "VCPKG_ROOT=${vcpkg_root}" >> "${GITHUB_ENV}"
+
       - name: Resolve package metadata
         id: package
         run: |
@@ -98,6 +112,9 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DSKYGATE_BUILD_UI=ON
           -DSKYGATE_BUILD_TESTS=OFF
+          -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON
+          -DVCPKG_MANIFEST_FEATURES=high-precision-ephemeris
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DSKYGATE_PACKAGE_ARCHITECTURE="${{ steps.package.outputs.architecture }}"
           -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
 

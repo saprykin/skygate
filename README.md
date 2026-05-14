@@ -58,7 +58,7 @@ grade ephemerides for the far past.
 - Qt 6.5 or newer with `Core`, `Gui`, `Qml`, `Quick`, `Network`, and `Test`
 - `Qt Positioning` (optional, enables the `Current Device` location mode)
 - Zlib
-- vcpkg (recommended on Windows and macOS for the zlib dependency)
+- vcpkg (recommended for release builds and high-precision dependencies)
 
 ## Build
 
@@ -66,18 +66,18 @@ SkyGate uses standard CMake. Qt is resolved from your Qt installation, not from
 vcpkg. If CMake cannot find Qt automatically, point `CMAKE_PREFIX_PATH` at your
 Qt installation root such as `/path/to/Qt/6.x/<platform>`.
 
-On Linux, install zlib from your system package manager. On Windows and macOS,
-the recommended local workflow is to use the checked-in vcpkg presets so zlib is
-provided by `vcpkg.json`:
+On Linux simple-only developer builds can use zlib from your system package
+manager. Release builds and high-precision presets use the checked-in vcpkg
+manifest so zlib, CALCEPH, zstd, and ERFA are resolved consistently:
 
 ```bash
 export VCPKG_ROOT=/path/to/vcpkg
 export CMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 ```
 
-Use the platform-specific presets below for Windows and macOS when possible.
-The plain `cmake -S` example remains useful for custom setups where zlib is
-already discoverable without vcpkg.
+Use the platform-specific presets below when possible. The plain `cmake -S`
+example remains useful for custom simple-only setups where zlib is already
+discoverable without vcpkg.
 
 ```bash
 cmake -S . -B build \
@@ -225,6 +225,16 @@ The repository includes `CMakePresets.json` with `core-debug`, `ui-debug`, and
 builds. They keep a stable local workflow and use the existing
 `build-make/<preset>` layout.
 
+Developer presets keep `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF` unless
+their name contains `highprecision`. Use the `core-debug-highprecision-*`
+vcpkg presets when you need CALCEPH-backed engine tests:
+
+```bash
+cmake --preset core-debug-highprecision-linux-vcpkg
+cmake --build --preset core-debug-highprecision-linux-vcpkg
+ctest --preset core-debug-highprecision-linux-vcpkg
+```
+
 The shared preset file is portable and does not check in developer-specific Qt
 or macOS SDK paths. For UI builds, make Qt discoverable through your local
 environment before running `cmake --preset ui-debug`. A common macOS setup is:
@@ -249,11 +259,12 @@ cmake --preset ui-debug-windows-vcpkg
 cmake --build --preset ui-debug-windows-vcpkg
 ```
 
-The checked-in `vcpkg.json` manifest declares zlib, which is required for gzip
-and ZIP catalog import. The Windows vcpkg presets use the `x64-windows` triplet
-by default, so runtime DLLs from vcpkg are copied next to the build-tree
-executable for `ui-run-windows-vcpkg` and are also collected during install and
-package deployment.
+The checked-in `vcpkg.json` manifest declares zlib for gzip and ZIP catalog
+import. The `high-precision-ephemeris` manifest feature adds CALCEPH, zstd, and
+ERFA. Windows release presets enable that feature and use the `x64-windows`
+triplet by default, so runtime DLLs from vcpkg are copied next to the
+build-tree executable for `ui-run-windows-vcpkg` and are also collected during
+install and package deployment.
 
 macOS can use vcpkg for zlib the same way while keeping Qt outside vcpkg.
 Install vcpkg, set `VCPKG_ROOT`, and point `CMAKE_PREFIX_PATH` at your normal
@@ -296,14 +307,17 @@ The Windows package output is an `.msi` installer.
 On Linux, build a release AppImage with:
 
 ```bash
+export VCPKG_ROOT=/path/to/vcpkg
 export CMAKE_PREFIX_PATH=/path/to/Qt/6.x/gcc_64
 ./packaging/linux/build-appimage.sh
 ```
 
 The script configures a release UI build, installs it into an AppDir, downloads
 `linuxdeploy` plus the Qt plugin, bundles Qt/QML dependencies, and writes the
-AppImage under `dist/`. It expects CMake, Ninja, curl, zlib development files,
-standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop install.
+AppImage under `dist/`. It enables high precision by default; set
+`SKYGATE_APPIMAGE_ENABLE_HIGH_PRECISION=OFF` only for an explicit simple-only
+developer package. It expects CMake, Ninja, curl, vcpkg, standard Qt Linux
+build/runtime dependencies, and a Qt 6.5+ desktop install.
 The manual `Package Linux`, `Package macOS`, and `Package Windows` GitHub
 Actions workflows build the same AppImage, DMG, and Windows installer packages
 as downloadable artifacts. Manual runs produce `latest-<sha>` artifacts, and
@@ -319,9 +333,10 @@ cmake --build --preset ui-install-macos-vcpkg
 cmake --build --preset ui-package-macos-vcpkg
 ```
 
-The install/package flow uses Qt's QML deployment support, so the output
-contains the application executable, Qt runtime files, QML modules/plugins, and
-vcpkg runtime dependencies such as zlib.
+Release vcpkg presets enable high precision. The install/package flow uses
+Qt's QML deployment support, so the output contains the application executable,
+Qt runtime files, QML modules/plugins, and vcpkg runtime dependencies such as
+zlib, CALCEPH, zstd, and ERFA.
 
 Current macOS builds are not notarized. After installing SkyGate from the DMG,
 macOS may block the app until the quarantine attribute is removed:

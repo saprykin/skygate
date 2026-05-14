@@ -13,8 +13,19 @@ are cut from `master` with tags named `vX.Y.Z`.
 - Commit the version and changelog updates.
 - Confirm CI is green on `master` for Linux and Windows, and run the manual
   `CI macOS` workflow if a macOS core preflight is desired.
+- Confirm the high-precision vcpkg preset configures and runs its tests on at
+  least one release platform:
+
+```bash
+cmake --preset core-debug-highprecision-linux-vcpkg
+cmake --build --preset core-debug-highprecision-linux-vcpkg
+ctest --preset core-debug-highprecision-linux-vcpkg
+```
+
 - Run the manual `Package Linux`, `Package macOS`, and `Package Windows`
-  workflows from `master` if a preflight package check is desired.
+  workflows from `master` if a preflight package check is desired. Release
+  packaging enables `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON` through the
+  `high-precision-ephemeris` vcpkg manifest feature.
 - Download and smoke-test the manual package artifacts:
   - Linux AppImage starts on a compatible Linux machine.
   - macOS DMG opens and `SkyGate.app` starts.
