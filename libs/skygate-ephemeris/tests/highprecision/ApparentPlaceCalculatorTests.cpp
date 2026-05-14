@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <memory>
 #include <optional>
 
@@ -73,6 +74,13 @@ namespace core = skygate::core;
     return result;
 }
 
+[[nodiscard]] HighPrecisionCalculatorResult makeSolarSystemCalculatorResult(const SolarSystemKernelVector& positionAu)
+{
+    HighPrecisionCalculatorResult result = makeCalculatorResult();
+    result.observerRelativePositionAu = positionAu;
+    return result;
+}
+
 class RecordingFrameTransformer final : public IFrameTransformer {
 public:
     [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
@@ -118,6 +126,99 @@ private:
     mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
     std::optional<CelestialFrameVector> m_resultVector;
     EphemerisResultMetadata m_resultMetadata = {.status = EphemerisResultStatus::Valid};
+};
+
+class PassThroughFrameTransformer final : public IFrameTransformer {
+public:
+    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
+    ) const override
+    {
+        ++m_callCount;
+        m_lastSourceFrame = request.sourceFrame;
+        m_lastTargetFrame = request.targetFrame;
+        m_lastVector = request.vector;
+
+        EphemerisResultMetadata metadata;
+        metadata.status = EphemerisResultStatus::Valid;
+        if (request.sourceFrame == CelestialReferenceFrame::Gcrs
+            && request.targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox) {
+            metadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+        } else if (request.sourceFrame != request.targetFrame) {
+            metadata.appliedCorrections = EphemerisCorrectionFlags::EarthOrientation;
+        }
+
+        return {
+            .vector = request.vector,
+            .metadata = metadata,
+        };
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+    [[nodiscard]] CelestialReferenceFrame lastSourceFrame() const noexcept
+    {
+        return m_lastSourceFrame;
+    }
+
+    [[nodiscard]] CelestialReferenceFrame lastTargetFrame() const noexcept
+    {
+        return m_lastTargetFrame;
+    }
+
+    [[nodiscard]] CelestialFrameVector lastVector() const noexcept
+    {
+        return m_lastVector;
+    }
+
+private:
+    mutable int m_callCount = 0;
+    mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
+    mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
+    mutable CelestialFrameVector m_lastVector;
+};
+
+class ValidUtcTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    {
+        ++m_convertCallCount;
+        m_lastTargetScale = targetScale;
+        return {
+            .epoch = normalizedAstronomicalEpoch(AstronomicalEpoch{
+                .julianDatePart1 = epoch.julianDatePart1,
+                .julianDatePart2 = epoch.julianDatePart2,
+                .timeScale = targetScale,
+            }),
+            .status = TimeScaleConversionStatus::Valid,
+            .diagnosticText = "unit test conversion",
+        };
+    }
+
+    [[nodiscard]] TimeScaleConversionResult
+    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    {
+        static_cast<void>(dateTime);
+        static_cast<void>(targetScale);
+        return {};
+    }
+
+    [[nodiscard]] int convertCallCount() const noexcept
+    {
+        return m_convertCallCount;
+    }
+
+    [[nodiscard]] TimeScale lastTargetScale() const noexcept
+    {
+        return m_lastTargetScale;
+    }
+
+private:
+    mutable int m_convertCallCount = 0;
+    mutable TimeScale m_lastTargetScale = TimeScale::Utc;
 };
 
 class DegradedTtTimeScaleService final : public ITimeScaleService {
@@ -183,6 +284,9 @@ private slots:
     void appliesPrecessionNutationWhenRequested();
     void propagatesDegradedTransformMetadataForPrecessionNutation();
     void propagatesDegradedRealFrameTransformMetadataForPrecessionNutation();
+    void appliesTopocentricParallaxAndHorizontalCoordinates();
+    void reportsInvalidObserverForTopocentricRequest();
+    void reportsUnavailableParallaxWhenDistanceVectorIsMissing();
     void reportsUnavailableRefractionMode();
 };
 
@@ -388,6 +492,92 @@ void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataF
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
     QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation));
+}
+
+void ApparentPlaceCalculatorTests::appliesTopocentricParallaxAndHorizontalCoordinates()
+{
+    auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
+    const ApparentPlaceCalculator calculator(frameTransformer, timeScaleService, nullptr);
+    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Topocentric);
+    request.context.observer = {
+        .latitudeDeg = 0.0,
+        .longitudeDeg = 0.0,
+        .elevationMeters = 0.0,
+    };
+
+    const HighPrecisionCalculatorResult result = calculator.apply(
+        makeInput(request),
+        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
+            .xAu = 0.0,
+            .yAu = 1.0,
+            .zAu = 0.0,
+        })
+    );
+
+    QCOMPARE(timeScaleService->convertCallCount(), 1);
+    QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Utc));
+    QCOMPARE(frameTransformer->callCount(), 3);
+    QCOMPARE(
+        static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
+    );
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.horizontal.has_value());
+    QVERIFY(result.equatorial->rightAscensionHours > 6.0);
+    QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
+    QVERIFY(result.horizontal->altitudeDeg < 0.0);
+    QVERIFY(std::abs(result.horizontal->azimuthDeg - 90.0) < 1.0e-9);
+    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+}
+
+void ApparentPlaceCalculatorTests::reportsInvalidObserverForTopocentricRequest()
+{
+    auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
+    const ApparentPlaceCalculator calculator(frameTransformer, timeScaleService, nullptr);
+    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Topocentric);
+    request.context.observer.latitudeDeg = 120.0;
+
+    const HighPrecisionCalculatorResult result = calculator.apply(
+        makeInput(request),
+        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
+            .xAu = 0.0,
+            .yAu = 1.0,
+            .zAu = 0.0,
+        })
+    );
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(!result.horizontal.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingObserver));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
+}
+
+void ApparentPlaceCalculatorTests::reportsUnavailableParallaxWhenDistanceVectorIsMissing()
+{
+    auto frameTransformer = std::make_shared<PassThroughFrameTransformer>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
+    const ApparentPlaceCalculator calculator(frameTransformer, timeScaleService, nullptr);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Topocentric);
+
+    const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(result.horizontal.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
 }
 
 void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()

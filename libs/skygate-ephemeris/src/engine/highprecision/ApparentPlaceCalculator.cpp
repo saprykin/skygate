@@ -16,6 +16,9 @@ namespace {
 
 constexpr double kRadiansPerHour = 3.141592653589793238462643383279502884 / 12.0;
 constexpr double kHoursPerRadian = 12.0 / 3.141592653589793238462643383279502884;
+constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
+constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
+constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 
 enum class ApparentPlaceRequestMode : std::uint8_t {
     Geometric,
@@ -68,6 +71,57 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
         .x = cosDeclination * std::cos(rightAscensionRad),
         .y = cosDeclination * std::sin(rightAscensionRad),
         .z = std::sin(declinationRad),
+    };
+}
+
+[[nodiscard]] bool isFiniteSolarSystemVector(const SolarSystemKernelVector& vector) noexcept
+{
+    return std::isfinite(vector.xAu) && std::isfinite(vector.yAu) && std::isfinite(vector.zAu);
+}
+
+[[nodiscard]] CelestialFrameVector celestialVectorFromSolarSystemVector(const SolarSystemKernelVector& vector) noexcept
+{
+    return {
+        .x = vector.xAu,
+        .y = vector.yAu,
+        .z = vector.zAu,
+    };
+}
+
+[[nodiscard]] std::optional<CelestialFrameVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept
+{
+    if (!observer.isValid()) {
+        return std::nullopt;
+    }
+
+    const double latitudeRad = core::AngleMath::toRadians(observer.latitudeDeg);
+    const double longitudeRad = core::AngleMath::toRadians(observer.longitudeDeg);
+    const double sinLatitude = std::sin(latitudeRad);
+    const double cosLatitude = std::cos(latitudeRad);
+    const double sinLongitude = std::sin(longitudeRad);
+    const double cosLongitude = std::cos(longitudeRad);
+    const double firstEccentricitySquared = kWgs84Flattening * (2.0 - kWgs84Flattening);
+    const double primeVerticalRadius =
+        kWgs84EquatorialRadiusMeters / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
+
+    const double xMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * cosLongitude;
+    const double yMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * sinLongitude;
+    const double zMeters =
+        (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
+    return CelestialFrameVector{
+        .x = xMeters / kAstronomicalUnitMeters,
+        .y = yMeters / kAstronomicalUnitMeters,
+        .z = zMeters / kAstronomicalUnitMeters,
+    };
+}
+
+[[nodiscard]] CelestialFrameVector
+subtractVector(const CelestialFrameVector& lhs, const CelestialFrameVector& rhs) noexcept
+{
+    return {
+        .x = lhs.x - rhs.x,
+        .y = lhs.y - rhs.y,
+        .z = lhs.z - rhs.z,
     };
 }
 
@@ -175,6 +229,23 @@ void mergeEarthOrientationMetadata(EphemerisResultMetadata& metadata, const Eart
         metadata.status = EphemerisResultStatus::Degraded;
         metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
     }
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    }
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
+        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    }
+}
+
+[[nodiscard]] CelestialFrameVector
+computationVectorFromCalculatorResult(const HighPrecisionCalculatorResult& calculatorResult) noexcept
+{
+    if (calculatorResult.observerRelativePositionAu.has_value()
+        && isFiniteSolarSystemVector(*calculatorResult.observerRelativePositionAu)) {
+        return celestialVectorFromSolarSystemVector(*calculatorResult.observerRelativePositionAu);
+    }
+
+    return vectorFromEquatorial(*calculatorResult.equatorial);
 }
 
 }  // namespace
@@ -239,7 +310,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         .sourceFrame = CelestialReferenceFrame::Gcrs,
         .targetFrame = targetFrame,
         .epoch = input.request.epoch,
-        .vector = vectorFromEquatorial(*calculatorResult.equatorial),
+        .vector = computationVectorFromCalculatorResult(calculatorResult),
     });
     mergeMetadata(result.metadata, transformResult.metadata);
 
@@ -248,7 +319,57 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         return result;
     }
 
-    if (const std::optional<core::EquatorialCoordinate> equatorial = equatorialFromVector(*transformResult.vector);
+    CelestialFrameVector outputVector = *transformResult.vector;
+    if (targetFrame == CelestialReferenceFrame::Itrs) {
+        const std::optional<CelestialFrameVector> observerPosition =
+            observerItrsPositionAu(input.request.context.observer);
+        if (!observerPosition.has_value()) {
+            if (result.metadata.status == EphemerisResultStatus::Valid) {
+                result.metadata.status = EphemerisResultStatus::Degraded;
+            }
+            result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
+        } else if (calculatorResult.observerRelativePositionAu.has_value()) {
+            outputVector = subtractVector(outputVector, *observerPosition);
+            result.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+        } else {
+            markCorrectionUnavailable(result.metadata);
+        }
+    }
+
+    std::optional<CelestialFrameVector> equatorialVector = outputVector;
+    if (targetFrame == CelestialReferenceFrame::Itrs) {
+        CelestialFrameTransformResult gcrsTransformResult = m_frameTransformer->transformCelestialVector({
+            .sourceFrame = CelestialReferenceFrame::Itrs,
+            .targetFrame = CelestialReferenceFrame::Gcrs,
+            .epoch = input.request.epoch,
+            .vector = outputVector,
+        });
+        mergeMetadata(result.metadata, gcrsTransformResult.metadata);
+        if (gcrsTransformResult.vector.has_value()) {
+            equatorialVector = *gcrsTransformResult.vector;
+        } else {
+            markCorrectionUnavailable(result.metadata);
+        }
+
+        if (equatorialVector.has_value()
+            && hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::PrecessionNutation)) {
+            CelestialFrameTransformResult apparentEquatorialTransformResult =
+                m_frameTransformer->transformCelestialVector({
+                    .sourceFrame = CelestialReferenceFrame::Gcrs,
+                    .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
+                    .epoch = input.request.epoch,
+                    .vector = *equatorialVector,
+                });
+            mergeMetadata(result.metadata, apparentEquatorialTransformResult.metadata);
+            if (apparentEquatorialTransformResult.vector.has_value()) {
+                equatorialVector = *apparentEquatorialTransformResult.vector;
+            } else {
+                markCorrectionUnavailable(result.metadata);
+            }
+        }
+    }
+
+    if (const std::optional<core::EquatorialCoordinate> equatorial = equatorialFromVector(*equatorialVector);
         equatorial.has_value()) {
         result.equatorial = *equatorial;
     } else {
@@ -259,10 +380,9 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 
     if (targetFrame == CelestialReferenceFrame::Itrs) {
         if (const std::optional<core::HorizontalCoordinate> horizontal =
-                horizontalFromItrsVector(*transformResult.vector, input.request.context.observer);
+                horizontalFromItrsVector(outputVector, input.request.context.observer);
             horizontal.has_value()) {
             result.horizontal = *horizontal;
-            result.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
         } else {
             if (result.metadata.status == EphemerisResultStatus::Valid) {
                 result.metadata.status = EphemerisResultStatus::Degraded;

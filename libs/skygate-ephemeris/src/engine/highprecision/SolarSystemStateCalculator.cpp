@@ -370,6 +370,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
         }
     }
 
+    result.observerRelativePositionAu = outputVector;
     result.equatorial = equatorialFromVector(outputVector);
     if (!result.equatorial.has_value()) {
         result.metadata.status = EphemerisResultStatus::Failed;
