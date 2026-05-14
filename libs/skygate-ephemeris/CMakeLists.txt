@@ -42,6 +42,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/EarthOrientationProvider.cpp
     src/engine/highprecision/EphemerisDataActivation.cpp
     src/engine/highprecision/EphemerisDataManifest.cpp
+    src/engine/highprecision/EphemerisResultBuilder.hpp
+    src/engine/highprecision/EphemerisResultBuilder.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
     src/engine/highprecision/FrameTransformer.hpp
