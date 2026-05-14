@@ -8,12 +8,8 @@
 
 namespace skygate::ui::internal {
 
-SkyCatalogRuntime::SkyCatalogRuntime(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog,
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine
-)
+SkyCatalogRuntime::SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog)
     : m_sourceCatalog(std::move(sourceCatalog))
-    , m_ephemerisEngine(std::move(ephemerisEngine))
 {
     static_cast<void>(resetConstellationLineRefs());
 }
@@ -21,11 +17,6 @@ SkyCatalogRuntime::SkyCatalogRuntime(
 const skygate::ephemeris::IStarCatalog* SkyCatalogRuntime::starCatalog() const noexcept
 {
     return m_starCatalog.get();
-}
-
-const skygate::ephemeris::IEphemerisEngine* SkyCatalogRuntime::ephemerisEngine() const noexcept
-{
-    return m_ephemerisEngine.get();
 }
 
 QString SkyCatalogRuntime::sourceLabel() const
@@ -68,21 +59,17 @@ std::span<const std::uint8_t> SkyCatalogRuntime::sourceIds() const noexcept
     return std::span<const std::uint8_t>(m_sourceIds);
 }
 
-std::span<const SkyCatalogRuntime::ConstellationLineRef>
-SkyCatalogRuntime::constellationLineRefs() const noexcept
+std::span<const SkyCatalogRuntime::ConstellationLineRef> SkyCatalogRuntime::constellationLineRefs() const noexcept
 {
     return m_constellationRefs.lineRefs();
 }
 
-std::span<const SkyCatalogRuntime::ConstellationLabelRef>
-SkyCatalogRuntime::constellationLabelRefs() const noexcept
+std::span<const SkyCatalogRuntime::ConstellationLabelRef> SkyCatalogRuntime::constellationLabelRefs() const noexcept
 {
     return m_constellationRefs.labelRefs();
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::initialize(
-    const SkyCatalogRuntimeBuildOptions& options
-)
+SkyCatalogRuntimeResult SkyCatalogRuntime::initialize(const SkyCatalogRuntimeBuildOptions& options)
 {
     return rebuildActiveCatalog(options);
 }
@@ -119,10 +106,8 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::applyDeepSkyCatalog(
     return rebuildActiveCatalog(options);
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::clearDeepSkyCatalog(
-    const QString& sourceLabel,
-    const SkyCatalogRuntimeBuildOptions& options
-)
+SkyCatalogRuntimeResult
+SkyCatalogRuntime::clearDeepSkyCatalog(const QString& sourceLabel, const SkyCatalogRuntimeBuildOptions& options)
 {
     m_deepSkyCatalog.reset();
     m_deepSkyCatalogFoundObjectCount = 0;
@@ -130,9 +115,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::clearDeepSkyCatalog(
     return rebuildActiveCatalog(options);
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(
-    const SkyCatalogRuntimeBuildOptions& options
-)
+SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options)
 {
     if (m_sourceCatalog == nullptr) {
         m_sourceCatalog = skygate::ephemeris::createBundledStarCatalog();
@@ -143,7 +126,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(
         return failedCatalogResult(QStringLiteral("Catalog: Failed to load"));
     }
 
-    const SkyActiveCatalogBuildRequest request {
+    const SkyActiveCatalogBuildRequest request{
         .sourceCatalog = *m_sourceCatalog,
         .deepSkyCatalog = m_deepSkyCatalog.get(),
         .useBundledDeepSkyCatalog = options.useBundledDeepSkyCatalog,
@@ -157,15 +140,12 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(
         m_bodyCount = 0;
         m_constellationRefs.setCount(0);
         m_deepSkyObjectCount = 0;
-        return SkyCatalogRuntimeResult {
-            .statusText = buildResult.errorText,
-            .statusTextChanged = true,
-            .datasetInfoChanged = true
+        return SkyCatalogRuntimeResult{
+            .statusText = buildResult.errorText, .statusTextChanged = true, .datasetInfoChanged = true
         };
     }
 
     m_starCatalog = std::move(buildResult.catalog);
-    m_ephemerisEngine = std::move(buildResult.ephemerisEngine);
     ++m_catalogRevision;
     m_bodyCount = buildResult.bodyCount;
     m_constellationRefs.setCount(buildResult.constellationCount);
@@ -173,7 +153,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(
     m_deepSkyCatalogFoundObjectCount = buildResult.foundDeepSkyObjectCount;
     m_sourceLabels = buildResult.sourceLabels;
     m_sourceIds = std::move(buildResult.sourceIds);
-    return SkyCatalogRuntimeResult {
+    return SkyCatalogRuntimeResult{
         .statusText = buildResult.statusText,
         .statusTextChanged = true,
         .datasetInfoChanged = true,
@@ -186,14 +166,10 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::resetConstellationLineRefs()
 {
     m_constellationRefs.clear();
     ++m_catalogRevision;
-    return SkyCatalogRuntimeResult {
-        .catalogChanged = true
-    };
+    return SkyCatalogRuntimeResult{.catalogChanged = true};
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLineRefs(
-    std::vector<ConstellationLineRef> lineRefs
-)
+SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs)
 {
     if (lineRefs.empty()) {
         return resetConstellationLineRefs();
@@ -201,20 +177,14 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLineRefs(
 
     m_constellationRefs.setLineRefs(std::move(lineRefs));
     ++m_catalogRevision;
-    return SkyCatalogRuntimeResult {
-        .catalogChanged = true
-    };
+    return SkyCatalogRuntimeResult{.catalogChanged = true};
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLabelRefs(
-    std::vector<ConstellationLabelRef> labelRefs
-)
+SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs)
 {
     m_constellationRefs.setLabelRefs(std::move(labelRefs));
     ++m_catalogRevision;
-    return SkyCatalogRuntimeResult {
-        .catalogChanged = true
-    };
+    return SkyCatalogRuntimeResult{.catalogChanged = true};
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::restoreConstellationRefs(
@@ -227,25 +197,17 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::restoreConstellationRefs(
     const SkyCatalogRuntimeResult labelResult = setConstellationLabelRefs(std::move(labelRefs));
     result.catalogChanged = result.catalogChanged || labelResult.catalogChanged;
 
-    if (
-        constellationCount.has_value()
-        && constellationCount.value() != m_constellationRefs.count()
-    ) {
+    if (constellationCount.has_value() && constellationCount.value() != m_constellationRefs.count()) {
         m_constellationRefs.setCount(constellationCount.value());
         result.datasetInfoChanged = true;
     }
     return result;
 }
 
-std::optional<SkyCatalogCachePersistRequest> SkyCatalogRuntime::cachePersistRequest(
-    const QByteArray& catalogPayload,
-    const QByteArray& deepSkyCatalogPayload
-) const
+std::optional<SkyCatalogCachePersistRequest>
+SkyCatalogRuntime::cachePersistRequest(const QByteArray& catalogPayload, const QByteArray& deepSkyCatalogPayload) const
 {
-    if (
-        m_starCatalog == nullptr
-        || (catalogPayload.isEmpty() && deepSkyCatalogPayload.isEmpty())
-    ) {
+    if (m_starCatalog == nullptr || (catalogPayload.isEmpty() && deepSkyCatalogPayload.isEmpty())) {
         return std::nullopt;
     }
 
@@ -272,19 +234,12 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& st
     m_deepSkyObjectCount = 0;
     m_sourceLabels.clear();
     m_sourceIds.clear();
-    return SkyCatalogRuntimeResult {
-        .statusText = statusText,
-        .statusTextChanged = true,
-        .datasetInfoChanged = true
-    };
+    return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .datasetInfoChanged = true};
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::failedDeepSkyCatalogResult(const QString& statusText)
 {
-    return SkyCatalogRuntimeResult {
-        .statusText = statusText,
-        .statusTextChanged = true
-    };
+    return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true};
 }
 
 }  // namespace skygate::ui::internal

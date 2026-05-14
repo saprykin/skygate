@@ -3,7 +3,6 @@
 #include "SkyCatalogCacheController.hpp"
 #include "SkyCatalogConstellationStore.hpp"
 
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 
 #include <QString>
@@ -36,13 +35,9 @@ public:
     using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
 
 public:
-    SkyCatalogRuntime(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog,
-        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine
-    );
+    explicit SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog);
 
     [[nodiscard]] const skygate::ephemeris::IStarCatalog* starCatalog() const noexcept;
-    [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
     [[nodiscard]] QString sourceLabel() const;
     [[nodiscard]] std::size_t bodyCount() const noexcept;
     [[nodiscard]] std::size_t constellationCount() const noexcept;
@@ -66,29 +61,19 @@ public:
         std::size_t foundObjectCount,
         const SkyCatalogRuntimeBuildOptions& options
     );
-    [[nodiscard]] SkyCatalogRuntimeResult clearDeepSkyCatalog(
-        const QString& sourceLabel,
-        const SkyCatalogRuntimeBuildOptions& options
-    );
-    [[nodiscard]] SkyCatalogRuntimeResult rebuildActiveCatalog(
-        const SkyCatalogRuntimeBuildOptions& options
-    );
+    [[nodiscard]] SkyCatalogRuntimeResult
+    clearDeepSkyCatalog(const QString& sourceLabel, const SkyCatalogRuntimeBuildOptions& options);
+    [[nodiscard]] SkyCatalogRuntimeResult rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult resetConstellationLineRefs();
-    [[nodiscard]] SkyCatalogRuntimeResult setConstellationLineRefs(
-        std::vector<ConstellationLineRef> lineRefs
-    );
-    [[nodiscard]] SkyCatalogRuntimeResult setConstellationLabelRefs(
-        std::vector<ConstellationLabelRef> labelRefs
-    );
+    [[nodiscard]] SkyCatalogRuntimeResult setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
+    [[nodiscard]] SkyCatalogRuntimeResult setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
     [[nodiscard]] SkyCatalogRuntimeResult restoreConstellationRefs(
         std::vector<ConstellationLineRef> lineRefs,
         std::vector<ConstellationLabelRef> labelRefs,
         std::optional<std::size_t> constellationCount
     );
-    [[nodiscard]] std::optional<SkyCatalogCachePersistRequest> cachePersistRequest(
-        const QByteArray& catalogPayload,
-        const QByteArray& deepSkyCatalogPayload
-    ) const;
+    [[nodiscard]] std::optional<SkyCatalogCachePersistRequest>
+    cachePersistRequest(const QByteArray& catalogPayload, const QByteArray& deepSkyCatalogPayload) const;
 
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
@@ -98,7 +83,6 @@ private:
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_sourceCatalog;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_deepSkyCatalog;
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
     QString m_sourceLabel = QStringLiteral("Bundled");
     QString m_deepSkySourceLabel = QStringLiteral("Bundled Messier");
     std::uint64_t m_catalogRevision = 0;
