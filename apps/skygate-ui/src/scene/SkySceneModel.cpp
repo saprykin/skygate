@@ -201,6 +201,15 @@ std::optional<skygate::core::PreparedProjection> SkySceneModel::preparedProjecti
     return m_sceneFrame.preparedProjection;
 }
 
+std::optional<skygate::core::SkyContext> SkySceneModel::referenceOverlayContext() const
+{
+    if (m_sceneFrame.snapshot == nullptr) {
+        return std::nullopt;
+    }
+
+    return m_sceneFrame.snapshot->context;
+}
+
 std::span<const SkyRenderPoint> SkySceneModel::renderPointSpan() const
 {
     return std::span<const SkyRenderPoint>(m_sceneFrame.frame.points);
