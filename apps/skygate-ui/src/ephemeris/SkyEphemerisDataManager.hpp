@@ -2,6 +2,7 @@
 
 #include "SkySettingsStore.hpp"
 
+#include "skygate/ephemeris/EphemerisDataActivation.hpp"
 #include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
 
 #include <QObject>
@@ -9,6 +10,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 class SkySettingsStore;
 
@@ -16,6 +18,42 @@ class SkyEphemerisDataManager final : public QObject {
     Q_OBJECT
 
 public:
+    enum class StagedUpdateActivationStatus : std::uint8_t {
+        Activated,
+        InvalidRequest,
+        VerificationFailed,
+        ActivationFailed,
+        PersistenceFailed
+    };
+
+    struct StagedUpdateActivationRequest final {
+        const skygate::ephemeris::EphemerisDataManifest* manifest = nullptr;
+        QString profileId;
+        QString stagedResourceRoot;
+        QString writableCacheRoot;
+        QString revisionToken;
+        std::vector<skygate::ephemeris::EphemerisDataManifestAssetKind> requiredKinds;
+        std::vector<skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent> expectedComponents;
+        bool allowQtResourceKernelAssets = false;
+        std::uint64_t largeKernelResourceThresholdBytes = 128ULL * 1024ULL * 1024ULL;
+    };
+
+    struct StagedUpdateActivationResult final {
+        StagedUpdateActivationStatus status = StagedUpdateActivationStatus::InvalidRequest;
+        skygate::ephemeris::EphemerisStagedUpdateVerificationStatus verificationStatus =
+            skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::InvalidRequest;
+        skygate::ephemeris::EphemerisDataActivationStatus activationStatus =
+            skygate::ephemeris::EphemerisDataActivationStatus::InvalidRequest;
+        SkySettingsStore::EphemerisDataCacheSnapshot cacheSnapshot;
+        std::vector<QString> diagnostics;
+        std::vector<QString> activatedAssetIds;
+
+        [[nodiscard]] bool isSuccess() const noexcept
+        {
+            return status == StagedUpdateActivationStatus::Activated;
+        }
+    };
+
     explicit SkyEphemerisDataManager(SkySettingsStore* settingsStore, QObject* parent = nullptr);
     ~SkyEphemerisDataManager() override;
 
@@ -29,6 +67,8 @@ public:
 
     [[nodiscard]] bool restoreFromSettings();
     [[nodiscard]] bool clearInstalledDataCache();
+    [[nodiscard]] StagedUpdateActivationResult
+    activateVerifiedStagedUpdateSet(const StagedUpdateActivationRequest& request);
 
 signals:
     void statusTextChanged();
