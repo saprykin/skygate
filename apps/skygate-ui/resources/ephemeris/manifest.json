@@ -16,13 +16,13 @@
     {
       "id": "modern",
       "displayName": "Modern high-precision data",
-      "bundled": true,
+      "bundled": false,
       "longRange": false,
       "assetIds": [
         "de440s-kernel",
-        "leap-seconds",
-        "earth-orientation",
-        "delta-t"
+        "modern-leap-seconds",
+        "modern-earth-orientation",
+        "modern-delta-t"
       ]
     },
     {
@@ -32,9 +32,9 @@
       "longRange": true,
       "assetIds": [
         "de441-kernel",
-        "leap-seconds",
-        "earth-orientation",
-        "delta-t"
+        "de441-leap-seconds",
+        "de441-earth-orientation",
+        "de441-delta-t"
       ]
     }
   ],
@@ -48,10 +48,11 @@
       "relativePath": "kernels/de440s.bsp",
       "checksum": {
         "algorithm": "sha256",
-        "value": "external-release-metadata-required"
+        "value": "c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2"
       },
       "compression": {
-        "format": "none"
+        "format": "none",
+        "uncompressedSizeBytes": 32726016
       },
       "validityRange": {
         "id": "de440s-range",
@@ -70,10 +71,11 @@
       "optional": true,
       "checksum": {
         "algorithm": "sha256",
-        "value": "external-release-metadata-required"
+        "value": "9a824e6a8ce3d39f8a513b17278ff7b7ad226f964c76d2019b0a51d8808d6ff5"
       },
       "compression": {
-        "format": "none"
+        "format": "none",
+        "uncompressedSizeBytes": 3307878400
       },
       "validityRange": {
         "id": "de441-range",
@@ -83,7 +85,7 @@
       }
     },
     {
-      "id": "leap-seconds",
+      "id": "modern-leap-seconds",
       "kind": "leap-second-table",
       "profileId": "modern",
       "version": "2026a",
@@ -91,10 +93,11 @@
       "relativePath": "time/leap-seconds.list",
       "checksum": {
         "algorithm": "sha256",
-        "value": "external-release-metadata-required"
+        "value": "506e737d1a950148f0daed3c75a55ad497a0f2fa1a82661a361882dd8f4b2093"
       },
       "compression": {
-        "format": "none"
+        "format": "none",
+        "uncompressedSizeBytes": 5069
       },
       "validityRange": {
         "id": "leap-second-range",
@@ -104,18 +107,19 @@
       }
     },
     {
-      "id": "earth-orientation",
+      "id": "modern-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "modern",
       "version": "2026a",
-      "sourceUrl": "https://datacenter.iers.org/data/latestVersion/224_EOP_C04_14.62-NOW.IAU1980224.txt",
+      "sourceUrl": "https://data.iers.org/products/eop/long-term/c04_14/iau1980/eopc04_14.62-now",
       "relativePath": "time/eop.txt",
       "checksum": {
         "algorithm": "sha256",
-        "value": "external-release-metadata-required"
+        "value": "40347f18a10eb72b15e4f84e647b5f1b7da4709534d935e2e1289697bdfa79df"
       },
       "compression": {
-        "format": "none"
+        "format": "none",
+        "uncompressedSizeBytes": 3648337
       },
       "validityRange": {
         "id": "eop-range",
@@ -125,7 +129,7 @@
       }
     },
     {
-      "id": "delta-t",
+      "id": "modern-delta-t",
       "kind": "delta-t-data",
       "profileId": "modern",
       "version": "2026a",
@@ -133,10 +137,77 @@
       "relativePath": "time/delta-t.data",
       "checksum": {
         "algorithm": "sha256",
-        "value": "external-release-metadata-required"
+        "value": "9f88e53593495a09219fe956eeadea0fa9f8e3e02c310b2aa2b70852383cdf6f"
       },
       "compression": {
-        "format": "none"
+        "format": "none",
+        "uncompressedSizeBytes": 13419
+      },
+      "validityRange": {
+        "id": "delta-t-range",
+        "displayName": "Delta T range",
+        "start": "-13200-01-01",
+        "end": "13200-12-31"
+      }
+    },
+    {
+      "id": "de441-leap-seconds",
+      "kind": "leap-second-table",
+      "profileId": "de441-long-range",
+      "version": "2026a",
+      "sourceUrl": "https://data.iana.org/time-zones/data/leap-seconds.list",
+      "relativePath": "time/leap-seconds.list",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "506e737d1a950148f0daed3c75a55ad497a0f2fa1a82661a361882dd8f4b2093"
+      },
+      "compression": {
+        "format": "none",
+        "uncompressedSizeBytes": 5069
+      },
+      "validityRange": {
+        "id": "leap-second-range",
+        "displayName": "Leap-second table range",
+        "start": "1972-01-01",
+        "end": "2027-01-01"
+      }
+    },
+    {
+      "id": "de441-earth-orientation",
+      "kind": "earth-orientation-data",
+      "profileId": "de441-long-range",
+      "version": "2026a",
+      "sourceUrl": "https://data.iers.org/products/eop/long-term/c04_14/iau1980/eopc04_14.62-now",
+      "relativePath": "time/eop.txt",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "40347f18a10eb72b15e4f84e647b5f1b7da4709534d935e2e1289697bdfa79df"
+      },
+      "compression": {
+        "format": "none",
+        "uncompressedSizeBytes": 3648337
+      },
+      "validityRange": {
+        "id": "eop-range",
+        "displayName": "Earth orientation range",
+        "start": "1973-01-02",
+        "end": "2026-12-31"
+      }
+    },
+    {
+      "id": "de441-delta-t",
+      "kind": "delta-t-data",
+      "profileId": "de441-long-range",
+      "version": "2026a",
+      "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
+      "relativePath": "time/delta-t.data",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "9f88e53593495a09219fe956eeadea0fa9f8e3e02c310b2aa2b70852383cdf6f"
+      },
+      "compression": {
+        "format": "none",
+        "uncompressedSizeBytes": 13419
       },
       "validityRange": {
         "id": "delta-t-range",

@@ -72,6 +72,14 @@ if(NOT smokeOutput MATCHES "INFO skygate\\.app SkyGate started:")
     skygate_smoke_fail("SkyGate did not reach the application startup log line.")
 endif()
 
+if(NOT smokeOutput MATCHES "INFO skygate\\.app Loaded ephemeris data manifest .*/ephemeris/manifest\\.json")
+    skygate_smoke_fail("SkyGate did not load the packaged ephemeris data manifest.")
+endif()
+
+if(smokeOutput MATCHES "No ephemeris data manifest was found")
+    skygate_smoke_fail("SkyGate reported a missing packaged ephemeris data manifest.")
+endif()
+
 if(
     smokeOutput MATCHES "ERROR "
     OR smokeOutput MATCHES "FATAL "

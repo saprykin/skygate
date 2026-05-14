@@ -503,7 +503,8 @@ bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& pro
 
     const std::string normalizedProfileId = profileId.trimmed().toStdString();
     if (!normalizedProfileId.empty()) {
-        return manifest->profile(normalizedProfileId);
+        const EphemerisDataManifestProfile* profile = manifest->profile(normalizedProfileId);
+        return profile != nullptr && profile->bundled ? profile : nullptr;
     }
 
     const auto bundledModern =
@@ -514,7 +515,7 @@ bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& pro
         return &*bundledModern;
     }
 
-    return manifest->profiles.empty() ? nullptr : &manifest->profiles.front();
+    return nullptr;
 }
 
 std::optional<EphemerisTextDataAsset>

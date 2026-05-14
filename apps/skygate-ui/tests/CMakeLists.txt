@@ -236,6 +236,10 @@ add_skygate_ui_qtest(
     TIMEOUT 60
 )
 add_skygate_ui_qtest(skygate-ui-sky-ephemeris-data-manager-tests ephemeris/SkyEphemerisDataManagerTests.cpp)
+target_compile_definitions(skygate-ui-sky-ephemeris-data-manager-tests
+    PRIVATE
+        SKYGATE_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/.."
+)
 add_skygate_ui_qtest(skygate-ui-sky-catalog-runtime-tests catalog/SkyCatalogRuntimeTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-hit-target-index-tests selection/SkyHitTargetIndexTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-object-trail-builder-tests selection/SkyObjectTrailBuilderTests.cpp)
