@@ -4,7 +4,54 @@
 
 #include <QSettings>
 
+#include <string>
+#include <string_view>
+#include <utility>
+
 namespace {
+
+constexpr std::string_view kEmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+skygate::ephemeris::EphemerisDateRange testValidityRange()
+{
+    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+        .astronomicalYear = 1900,
+        .month = 1,
+        .day = 1,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    });
+    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+        .astronomicalYear = 2100,
+        .month = 1,
+        .day = 1,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    });
+    Q_ASSERT(start.has_value());
+    Q_ASSERT(end.has_value());
+    return skygate::ephemeris::EphemerisDateRange{
+        .id = "test-range",
+        .displayName = "Test range",
+        .start = *start,
+        .end = *end,
+    };
+}
+
+skygate::ephemeris::EphemerisDataManifestAsset
+emptyKernelAsset(std::string id, std::string profileId, std::string version, std::string relativePath)
+{
+    skygate::ephemeris::EphemerisDataManifestAsset asset;
+    asset.id = std::move(id);
+    asset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel;
+    asset.profileId = std::move(profileId);
+    asset.version = std::move(version);
+    asset.relativePath = std::move(relativePath);
+    asset.checksum.algorithm = "sha256";
+    asset.checksum.value = std::string{kEmptySha256};
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None;
+    asset.compression.uncompressedSizeBytes = 0U;
+    asset.validityRange = testValidityRange();
+    return asset;
+}
 
 void writeInstalledEphemerisSettings(
     const QString& kernelPath,
@@ -44,9 +91,30 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
         .displayName = "Modern",
         .bundled = true,
         .longRange = false,
-        .assetIds = {},
+        .assetIds = {"de440s-kernel"},
     });
+    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
+        .id = "de441-long-range",
+        .displayName = "DE441 long range",
+        .bundled = false,
+        .longRange = true,
+        .assetIds = {"de441-kernel"},
+    });
+    manifest.assets.push_back(emptyKernelAsset("de440s-kernel", "modern", "DE440s-test", "modern/kernels/de440s.bsp"));
+    manifest.assets.push_back(
+        emptyKernelAsset("de441-kernel", "de441-long-range", "DE441-test", "de441/kernels/de441.bsp")
+    );
     return manifest;
+}
+
+bool writeStagedEphemerisAssets(const QString& root, const skygate::ephemeris::EphemerisDataManifest& manifest)
+{
+    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+        if (!writeFile(root + QLatin1Char('/') + QString::fromStdString(asset.relativePath), QByteArray{})) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::unique_ptr<SkyContextController> makeControllerWithManifest(
@@ -246,10 +314,10 @@ void QmlPreferencesCatalogTests::ephemerisEngineControlsBindDraftAndVisibility()
 void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode()
 {
     const skygate::ephemeris::EphemerisDataManifest manifest = minimalUpdateManifest();
+    const QString updateResourceRoot = m_settings.cachePath(QStringLiteral("ephemeris-source"));
+    QVERIFY(writeStagedEphemerisAssets(updateResourceRoot, manifest));
     auto controller = makeControllerWithManifest(
-        manifest,
-        m_settings.cachePath(QStringLiteral("ephemeris-source")),
-        m_settings.cachePath(QStringLiteral("ephemeris-cache"))
+        manifest, updateResourceRoot, m_settings.cachePath(QStringLiteral("ephemeris-cache"))
     );
     QVERIFY(controller != nullptr);
 
@@ -292,6 +360,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
     QObject* lastUpdateStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLastUpdateStatusLabel"));
     QObject* onlineUpdates = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataOnlineUpdatesCheckBox"));
     QObject* updateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataUpdateButton"));
+    QObject* longRangeUpdateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisLongRangeUpdateButton"));
     QVERIFY(modernStatus != nullptr);
     QVERIFY(longRangeStatus != nullptr);
     QVERIFY(eopStatus != nullptr);
@@ -300,6 +369,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
     QVERIFY(lastUpdateStatus != nullptr);
     QVERIFY(onlineUpdates != nullptr);
     QVERIFY(updateButton != nullptr);
+    QVERIFY(longRangeUpdateButton != nullptr);
 
     QCOMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
     QCOMPARE(longRangeStatus->property("text").toString(), QString("Not installed"));
@@ -309,10 +379,17 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
     QCOMPARE(lastUpdateStatus->property("text").toString(), QString("Bundled fallback"));
     QVERIFY(onlineUpdates->property("checked").toBool());
     QVERIFY(updateButton->property("enabled").toBool());
+    QVERIFY(longRangeUpdateButton->property("enabled").toBool());
+
+    QVERIFY(activateControl(longRangeUpdateButton));
+    QTRY_COMPARE(longRangeStatus->property("text").toString(), QString("Installed: DE441-test"));
+    QTRY_COMPARE(lastUpdateStatus->property("text").toString(), QString("Installed DE441 long range"));
+    QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
 
     QVERIFY(activateControl(onlineUpdates));
     QTRY_VERIFY(!controller->ephemerisDataOnlineUpdatesEnabled());
     QTRY_VERIFY(!updateButton->property("enabled").toBool());
+    QTRY_VERIFY(!longRangeUpdateButton->property("enabled").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
