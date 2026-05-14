@@ -40,6 +40,20 @@ public:
     [[nodiscard]] std::span<const double> referenceEpochJulianDatePart1() const noexcept;
     [[nodiscard]] std::span<const double> referenceEpochJulianDatePart2() const noexcept;
     [[nodiscard]] std::span<const TimeScale> referenceEpochTimeScales() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasCatalogAstrometryMask() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasFixedEquatorialFallbackMask() const noexcept;
+    [[nodiscard]] std::span<const double> fixedRightAscensionHours() const noexcept;
+    [[nodiscard]] std::span<const double> fixedDeclinationDegrees() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasProperMotionRightAscensionMask() const noexcept;
+    [[nodiscard]] std::span<const double> properMotionRightAscensionMasPerYearValues() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasProperMotionDeclinationMask() const noexcept;
+    [[nodiscard]] std::span<const double> properMotionDeclinationMasPerYearValues() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasStellarParallaxMask() const noexcept;
+    [[nodiscard]] std::span<const double> stellarParallaxMasValues() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasRadialVelocityMask() const noexcept;
+    [[nodiscard]] std::span<const double> radialVelocityKmPerSecondValues() const noexcept;
+    [[nodiscard]] std::span<const std::uint8_t> hasValidityRangeMask() const noexcept;
+    [[nodiscard]] std::span<const EphemerisDateRange> validityRanges() const noexcept;
 
 private:
     [[nodiscard]] bool hasValueAt(const std::vector<std::uint8_t>& mask, std::size_t arrayIndex) const noexcept;
