@@ -455,6 +455,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDr
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::LightTime));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
 }
 
@@ -518,6 +519,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsW
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::StellarAberration));
     QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarAberration));
 }
 
@@ -579,6 +581,9 @@ void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWit
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(
+        result.metadata.unavailableCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection
+    ));
     QVERIFY(
         !hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection)
     );

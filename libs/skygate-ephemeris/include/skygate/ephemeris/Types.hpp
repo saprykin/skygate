@@ -298,6 +298,14 @@ hasCorrectionFlag(const EphemerisCorrectionFlags flags, const EphemerisCorrectio
     return (flags & flag) != EphemerisCorrectionFlags::NoCorrections;
 }
 
+[[nodiscard]] constexpr EphemerisCorrectionFlags
+withoutCorrectionFlags(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
+{
+    return static_cast<EphemerisCorrectionFlags>(
+        static_cast<std::uint32_t>(flags) & ~static_cast<std::uint32_t>(removedFlags)
+    );
+}
+
 struct EphemerisEngineOptions {
     EphemerisEngineKind engineKind = EphemerisEngineKind::Simple;
     EphemerisCorrectionFlags correctionFlags = EphemerisCorrectionFlags::ApparentTopocentric;
@@ -424,7 +432,10 @@ struct EphemerisResultMetadata {
     std::string dataSourceProvenance;
     std::optional<EphemerisDateRange> effectiveDataValidityRange;
     std::optional<double> estimatedAngularUncertaintyArcsec;
+    EphemerisCorrectionFlags requestedCorrections = EphemerisCorrectionFlags::NoCorrections;
     EphemerisCorrectionFlags appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    EphemerisCorrectionFlags skippedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    EphemerisCorrectionFlags unavailableCorrections = EphemerisCorrectionFlags::NoCorrections;
 
     [[nodiscard]] bool isSuccessful() const noexcept
     {
@@ -434,6 +445,19 @@ struct EphemerisResultMetadata {
     void addWarning(const EphemerisWarningCode code) noexcept
     {
         warningCodeMask |= ephemerisWarningMask(code);
+    }
+
+    void addUnavailableCorrection(const EphemerisCorrectionFlags correction) noexcept
+    {
+        unavailableCorrections |= correction;
+        addWarning(EphemerisWarningCode::CorrectionUnavailable);
+    }
+
+    void finalizeCorrectionTracking(const EphemerisCorrectionFlags requested) noexcept
+    {
+        requestedCorrections = requested;
+        const EphemerisCorrectionFlags accountedCorrections = appliedCorrections | unavailableCorrections;
+        skippedCorrections = withoutCorrectionFlags(requestedCorrections, accountedCorrections);
     }
 
     [[nodiscard]] bool hasWarning(const EphemerisWarningCode code) const noexcept

@@ -632,6 +632,7 @@ private slots:
     void validatesRequestsBeforeDispatchingCalculators();
     void returnsStructuredUnsupportedStatus();
     void defaultResultBuilderAssemblesValidMetadata();
+    void defaultResultBuilderTracksRequestedAppliedSkippedAndUnavailableCorrections();
     void defaultResultBuilderTurnsOutOfRangeFallbackIntoDegradedResult();
     void defaultResultBuilderPreservesOutOfRangeWithoutFallback();
     void defaultResultBuilderPreservesFailedResultsWithoutFallback();
@@ -897,6 +898,40 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesValidMetada
     QVERIFY(state->metadata.estimatedAngularUncertaintyArcsec.has_value());
     QCOMPARE(*state->metadata.estimatedAngularUncertaintyArcsec, 0.12);
     QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
+}
+
+void HighPrecisionEphemerisEngineTests::defaultResultBuilderTracksRequestedAppliedSkippedAndUnavailableCorrections()
+{
+    HighPrecisionCalculatorResult calculatorResult;
+    calculatorResult.equatorial = core::EquatorialCoordinate{
+        .rightAscensionHours = 4.0,
+        .declinationDeg = 5.0,
+    };
+    calculatorResult.metadata.status = EphemerisResultStatus::Degraded;
+    calculatorResult.metadata.appliedCorrections = EphemerisCorrectionFlags::LightTime;
+    calculatorResult.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::StellarAberration);
+
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
+    const HighPrecisionEphemerisEngine engine(bodies, makeRequest().options, makeDependencies(solarSystemCalculator));
+
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::LightTime | EphemerisCorrectionFlags::StellarAberration
+                                      | EphemerisCorrectionFlags::GravitationalLightDeflection;
+
+    const auto state = engine.computeBodyState(request, "sun");
+
+    QVERIFY(state.has_value());
+    QCOMPARE(state->metadata.requestedCorrections, request.options.correctionFlags);
+    QVERIFY(hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
+    QVERIFY(!hasCorrectionFlag(state->metadata.appliedCorrections, EphemerisCorrectionFlags::StellarAberration));
+    QVERIFY(hasCorrectionFlag(state->metadata.unavailableCorrections, EphemerisCorrectionFlags::StellarAberration));
+    QVERIFY(!hasCorrectionFlag(state->metadata.unavailableCorrections, EphemerisCorrectionFlags::LightTime));
+    QVERIFY(
+        hasCorrectionFlag(state->metadata.skippedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection)
+    );
+    QVERIFY(!hasCorrectionFlag(state->metadata.skippedCorrections, EphemerisCorrectionFlags::LightTime));
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 }
 
 void HighPrecisionEphemerisEngineTests::defaultResultBuilderTurnsOutOfRangeFallbackIntoDegradedResult()

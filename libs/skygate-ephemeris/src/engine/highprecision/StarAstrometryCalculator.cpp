@@ -75,12 +75,14 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
            || hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax);
 }
 
-void markCorrectionUnavailable(EphemerisResultMetadata& metadata) noexcept
+void markCorrectionUnavailable(
+    EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags unavailableCorrection
+) noexcept
 {
     if (metadata.status == EphemerisResultStatus::Valid) {
         metadata.status = EphemerisResultStatus::Degraded;
     }
-    metadata.addWarning(EphemerisWarningCode::CorrectionUnavailable);
+    metadata.addUnavailableCorrection(unavailableCorrection);
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult makeFailedResult() noexcept
@@ -332,17 +334,17 @@ void recordUnavailableRequestedFields(
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::ProperMotion)
         && (!astrometry.properMotionRightAscensionMasPerYear.has_value()
             || !astrometry.properMotionDeclinationMasPerYear.has_value())) {
-        markCorrectionUnavailable(metadata);
+        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::ProperMotion);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax) && !hasPositiveParallax(astrometry)) {
-        markCorrectionUnavailable(metadata);
+        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::StellarParallax);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax) && !hasPositiveParallax(astrometry)) {
-        markCorrectionUnavailable(metadata);
+        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::AnnualParallax);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
         && (!astrometry.radialVelocityKmPerSecond.has_value() || !hasEnabledPositiveParallax(astrometry, flags))) {
-        markCorrectionUnavailable(metadata);
+        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::RadialVelocity);
     }
 }
 
@@ -401,7 +403,14 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
 
     if (!astrometry.has_value()) {
         if (requestsAnyAstrometryCorrection(flags)) {
-            markCorrectionUnavailable(result.metadata);
+            result.metadata.addUnavailableCorrection(
+                flags
+                & (EphemerisCorrectionFlags::ProperMotion | EphemerisCorrectionFlags::RadialVelocity
+                   | EphemerisCorrectionFlags::StellarParallax | EphemerisCorrectionFlags::AnnualParallax)
+            );
+            if (result.metadata.status == EphemerisResultStatus::Valid) {
+                result.metadata.status = EphemerisResultStatus::Degraded;
+            }
         }
         return result;
     }
@@ -419,13 +428,13 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
 
     if (hasAnnualParallaxInput(*astrometry, flags)) {
         if (m_kernelProvider == nullptr) {
-            markCorrectionUnavailable(result.metadata);
+            markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
             result.equatorial = equatorialFromVector(*propagatedVector);
         } else {
             const std::optional<AstronomicalEpoch> kernelEpoch =
                 tdbEpochForKernel(result.metadata, input.request.epoch, m_timeScaleService);
             if (!kernelEpoch.has_value()) {
-                markCorrectionUnavailable(result.metadata);
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
                 result.equatorial = equatorialFromVector(*propagatedVector);
             } else {
                 const SolarSystemKernelStateResult earthState =
@@ -439,7 +448,7 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
                     result.metadata.appliedCorrections |= EphemerisCorrectionFlags::AnnualParallax;
                 } else {
                     result.metadata.status = EphemerisResultStatus::Degraded;
-                    markCorrectionUnavailable(result.metadata);
+                    markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
                     result.equatorial = equatorialFromVector(*propagatedVector);
                 }
             }
