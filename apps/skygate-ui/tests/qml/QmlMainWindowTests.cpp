@@ -45,11 +45,7 @@ bool triggerMenuItem(QObject* menuItem)
     return false;
 }
 
-QQuickWindow* loadMainWindow(
-    QQmlApplicationEngine& engine,
-    SkyContextController& controller,
-    SkySceneModel& sceneModel
-)
+QQuickWindow* loadMainWindow(QQmlApplicationEngine& engine, SkyContextController& controller, SkySceneModel& sceneModel)
 {
     setupEngine(engine, controller, &sceneModel);
     engine.rootContext()->setContextProperty("skygateBuildDateTime", QString("test"));
@@ -96,11 +92,7 @@ void QmlMainWindowTests::responsiveToolbarPolicyKeepsControlsSeparated()
     controller->setSearchToolbarCollapsed(false);
     controller->setTimelineToolbarCollapsed(false);
     QCoreApplication::processEvents();
-    QVERIFY(QMetaObject::invokeMethod(
-        rootWindow,
-        "expandedToolbarsWouldOverlap",
-        Q_RETURN_ARG(QVariant, overlap)
-    ));
+    QVERIFY(QMetaObject::invokeMethod(rootWindow, "expandedToolbarsWouldOverlap", Q_RETURN_ARG(QVariant, overlap)));
     QVERIFY(!overlap.toBool());
     QVERIFY(QMetaObject::invokeMethod(rootWindow, "prepareSearchToolbarExpand"));
     QVERIFY(!controller->timelineToolbarCollapsed());
@@ -116,11 +108,7 @@ void QmlMainWindowTests::responsiveToolbarPolicyKeepsControlsSeparated()
     controller->setSearchToolbarCollapsed(false);
     controller->setTimelineToolbarCollapsed(false);
     QCoreApplication::processEvents();
-    QVERIFY(QMetaObject::invokeMethod(
-        rootWindow,
-        "expandedToolbarsWouldOverlap",
-        Q_RETURN_ARG(QVariant, overlap)
-    ));
+    QVERIFY(QMetaObject::invokeMethod(rootWindow, "expandedToolbarsWouldOverlap", Q_RETURN_ARG(QVariant, overlap)));
     QVERIFY(overlap.toBool());
     QVERIFY(QMetaObject::invokeMethod(rootWindow, "prepareSearchToolbarExpand"));
     QTRY_VERIFY(controller->timelineToolbarCollapsed());
@@ -146,10 +134,7 @@ void QmlMainWindowTests::topToolbarsStayAboveOverlay()
     QVERIFY(rootWindow != nullptr);
 
     auto* searchToolbar = firstQuickItemWithObjectName(rootWindow, QStringLiteral("searchToolbar"));
-    auto* timelineToolbar = firstQuickItemWithObjectName(
-        rootWindow,
-        QStringLiteral("timelineToolbar")
-    );
+    auto* timelineToolbar = firstQuickItemWithObjectName(rootWindow, QStringLiteral("timelineToolbar"));
     auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
     auto* overlayLayer = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyOverlayLayer"));
 
@@ -176,24 +161,18 @@ void QmlMainWindowTests::footerPopupToolbarToggleClickClosesPopupAndTogglesToolb
     auto* rootWindow = loadMainWindow(engine, *controller, *sceneModel);
     QVERIFY(rootWindow != nullptr);
 
+    rootWindow->setWidth(1500);
+    rootWindow->setHeight(760);
+    controller->setSearchToolbarCollapsed(false);
+    controller->setTimelineToolbarCollapsed(false);
+    QCoreApplication::processEvents();
+
     auto* timeMouse = firstQuickItemWithObjectName(rootWindow, QStringLiteral("statusTimeMouse"));
-    auto* nightMouse = firstQuickItemWithObjectName(
-        rootWindow,
-        QStringLiteral("nightConditionsMouse")
-    );
-    auto* searchToggle = firstQuickItemWithObjectName(
-        rootWindow,
-        QStringLiteral("searchToolbarToggle")
-    );
-    auto* timelineToggle = firstQuickItemWithObjectName(
-        rootWindow,
-        QStringLiteral("timelineToolbarToggle")
-    );
+    auto* nightMouse = firstQuickItemWithObjectName(rootWindow, QStringLiteral("nightConditionsMouse"));
+    auto* searchToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("searchToolbarToggle"));
+    auto* timelineToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("timelineToolbarToggle"));
     QObject* datePopup = firstObjectWithObjectName(rootWindow, QStringLiteral("dateTimePopup"));
-    QObject* nightPopup = firstObjectWithObjectName(
-        rootWindow,
-        QStringLiteral("nightConditionsPopup")
-    );
+    QObject* nightPopup = firstObjectWithObjectName(rootWindow, QStringLiteral("nightConditionsPopup"));
 
     QVERIFY(timeMouse != nullptr);
     QVERIFY(nightMouse != nullptr);
@@ -254,17 +233,11 @@ void QmlMainWindowTests::nativeMenuActionsOpenSharedAboutAndPreferencesWindows()
     auto* aboutQuickWindow = qobject_cast<QQuickWindow*>(aboutWindow);
     QVERIFY(aboutQuickWindow != nullptr);
 
-    QObject* preferencesItem = firstObjectWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesMenuItem")
-    );
+    QObject* preferencesItem = firstObjectWithObjectName(rootWindow, QStringLiteral("preferencesMenuItem"));
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(triggerMenuItem(preferencesItem));
-    QObject* preferencesWindow = windowWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesWindow")
-    );
+    QObject* preferencesWindow = windowWithObjectName(rootWindow, QStringLiteral("preferencesWindow"));
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
     auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
@@ -317,18 +290,12 @@ void QmlMainWindowTests::compactAppMenuOpensAboutAndPreferencesWindows()
     QVERIFY(activateControl(appMenuButton));
     QTRY_VERIFY(appMenuPopup->property("opened").toBool());
 
-    QObject* preferencesItem = firstObjectWithObjectName(
-        rootWindow,
-        QStringLiteral("appMenuPreferencesItem")
-    );
+    QObject* preferencesItem = firstObjectWithObjectName(rootWindow, QStringLiteral("appMenuPreferencesItem"));
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(activateControl(preferencesItem));
     QTRY_VERIFY(!appMenuPopup->property("opened").toBool());
-    QObject* preferencesWindow = windowWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesWindow")
-    );
+    QObject* preferencesWindow = windowWithObjectName(rootWindow, QStringLiteral("preferencesWindow"));
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
 
@@ -355,10 +322,7 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     controller->setLive(false);
-    QVERIFY(controller->setUtcDateTimeText(
-        QStringLiteral("2024-06-01"),
-        QStringLiteral("22:00:00")
-    ));
+    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2024-06-01"), QStringLiteral("22:00:00")));
     controller->setViewCenter(45.0, 180.0);
     auto sceneModel = makeSceneModel(*controller);
     QVERIFY(sceneModel != nullptr);
@@ -370,39 +334,25 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     QTRY_VERIFY(sceneModel->snapshotGeneration() > 0U);
     const std::uint64_t baselineGeneration = sceneModel->snapshotGeneration();
 
-    QObject* preferencesItem = firstObjectWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesMenuItem")
-    );
+    QObject* preferencesItem = firstObjectWithObjectName(rootWindow, QStringLiteral("preferencesMenuItem"));
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(triggerMenuItem(preferencesItem));
-    QObject* preferencesWindow = windowWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesWindow")
-    );
+    QObject* preferencesWindow = windowWithObjectName(rootWindow, QStringLiteral("preferencesWindow"));
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->property("visible").toBool());
     auto* preferencesQuickWindow = qobject_cast<QQuickWindow*>(preferencesWindow);
     QVERIFY(preferencesQuickWindow != nullptr);
 
-    auto* latitudeInput = firstQuickItemWithObjectName(
-        preferencesWindow,
-        QStringLiteral("latitudeInput")
-    );
-    auto* longitudeInput = firstQuickItemWithObjectName(
-        preferencesWindow,
-        QStringLiteral("longitudeInput")
-    );
+    auto* latitudeInput = firstQuickItemWithObjectName(preferencesWindow, QStringLiteral("latitudeInput"));
+    auto* longitudeInput = firstQuickItemWithObjectName(preferencesWindow, QStringLiteral("longitudeInput"));
     QVERIFY(latitudeInput != nullptr);
     QVERIFY(longitudeInput != nullptr);
     replaceText(preferencesQuickWindow, latitudeInput, QStringLiteral("35.689500"));
     replaceText(preferencesQuickWindow, longitudeInput, QStringLiteral("139.691700"));
 
-    QObject* appearanceButton = firstObjectWithObjectName(
-        preferencesWindow,
-        QStringLiteral("preferencesAppearanceSectionButton")
-    );
+    QObject* appearanceButton =
+        firstObjectWithObjectName(preferencesWindow, QStringLiteral("preferencesAppearanceSectionButton"));
     QVERIFY(appearanceButton != nullptr);
     QVERIFY(activateControl(appearanceButton));
     QTRY_COMPARE(preferencesWindow->property("selectedPage").toInt(), 2);
@@ -416,10 +366,7 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     themeCombo->setProperty("currentIndex", 1);
     QVERIFY(QMetaObject::invokeMethod(themeCombo, "activated", Q_ARG(int, 1)));
 
-    QObject* applyButton = firstObjectWithObjectName(
-        preferencesWindow,
-        QStringLiteral("preferencesApplyButton")
-    );
+    QObject* applyButton = firstObjectWithObjectName(preferencesWindow, QStringLiteral("preferencesApplyButton"));
     QVERIFY(applyButton != nullptr);
     QVERIFY(activateControl(applyButton));
     QTRY_COMPARE(controller->latitudeText(), QString("35.689500"));
@@ -441,10 +388,7 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
     QCOMPARE(controller->selectedSearchTargetId(), QString("sirius"));
     QTRY_VERIFY(firstVisibleItemWithText(rootWindow, QStringLiteral("Sirius")) != nullptr);
 
-    QObject* trackButton = firstObjectWithObjectName(
-        rootWindow,
-        QStringLiteral("objectInspectorTrackButton")
-    );
+    QObject* trackButton = firstObjectWithObjectName(rootWindow, QStringLiteral("objectInspectorTrackButton"));
     QVERIFY(trackButton != nullptr);
     QVERIFY(activateControl(trackButton));
     QTRY_VERIFY(controller->hasTrackedTarget());
