@@ -84,6 +84,7 @@ cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Debug \
   -DSKYGATE_BUILD_UI=ON \
   -DSKYGATE_BUILD_TESTS=ON \
+  -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF \
   -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 
 cmake --build build
@@ -96,6 +97,7 @@ cmake -S . -B build-core \
   -DCMAKE_BUILD_TYPE=Debug \
   -DSKYGATE_BUILD_UI=OFF \
   -DSKYGATE_BUILD_TESTS=ON \
+  -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF \
   -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 
 cmake --build build-core
@@ -207,6 +209,7 @@ cmake -S . -B build-coverage \
   -DSKYGATE_BUILD_UI=OFF \
   -DSKYGATE_BUILD_TESTS=ON \
   -DSKYGATE_ENABLE_COVERAGE=ON \
+  -DSKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF \
   -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x/<platform>
 
 cmake --build build-coverage --target skygate-coverage-html
@@ -316,8 +319,10 @@ The script configures a release UI build, installs it into an AppDir, downloads
 `linuxdeploy` plus the Qt plugin, bundles Qt/QML dependencies, and writes the
 AppImage under `dist/`. It enables high precision by default; set
 `SKYGATE_APPIMAGE_ENABLE_HIGH_PRECISION=OFF` only for an explicit simple-only
-developer package. It expects CMake, Ninja, curl, vcpkg, standard Qt Linux
-build/runtime dependencies, and a Qt 6.5+ desktop install.
+developer package. The script forwards that opt-out to
+`SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF`. It expects CMake, Ninja, curl,
+vcpkg, standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop
+install.
 The manual `Package Linux`, `Package macOS`, and `Package Windows` GitHub
 Actions workflows build the same AppImage, DMG, and Windows installer packages
 as downloadable artifacts. Manual runs produce `latest-<sha>` artifacts, and

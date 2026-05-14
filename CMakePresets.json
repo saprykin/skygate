@@ -70,7 +70,8 @@
             "displayName": "Core Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF"
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -99,7 +100,8 @@
             },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF"
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -130,7 +132,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
-                "SKYGATE_BUILD_TESTS": "ON"
+                "SKYGATE_BUILD_TESTS": "ON",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -139,7 +142,8 @@
             "displayName": "UI Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "ON"
+                "SKYGATE_BUILD_UI": "ON",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -150,7 +154,8 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "SKYGATE_BUILD_UI": "OFF",
                 "SKYGATE_BUILD_TESTS": "ON",
-                "SKYGATE_ENABLE_COVERAGE": "ON"
+                "SKYGATE_ENABLE_COVERAGE": "ON",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -164,7 +169,8 @@
             },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF"
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -194,7 +200,8 @@
             },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "ON"
+                "SKYGATE_BUILD_UI": "ON",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -226,7 +233,8 @@
             },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "OFF"
+                "SKYGATE_BUILD_UI": "OFF",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
@@ -256,7 +264,8 @@
             },
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "SKYGATE_BUILD_UI": "ON"
+                "SKYGATE_BUILD_UI": "ON",
+                "SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS": "OFF"
             }
         },
         {
