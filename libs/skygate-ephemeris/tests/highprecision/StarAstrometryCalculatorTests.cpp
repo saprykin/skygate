@@ -2,6 +2,7 @@
 
 #include <QtTest/QtTest>
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
@@ -10,6 +11,8 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 namespace core = skygate::core;
+
+constexpr double kPi = 3.141592653589793238462643383279502884;
 
 [[nodiscard]] AstronomicalEpoch epochForYearOffset(const double years) noexcept
 {
@@ -80,6 +83,72 @@ void compareCoordinates(
     QVERIFY(std::abs(actual.declinationDeg - expected.declinationDeg) <= toleranceDegrees);
 }
 
+[[nodiscard]] double
+angularSeparationDegrees(const core::EquatorialCoordinate& lhs, const core::EquatorialCoordinate& rhs) noexcept
+{
+    const double lhsRaRad = lhs.rightAscensionHours * 15.0 * kPi / 180.0;
+    const double rhsRaRad = rhs.rightAscensionHours * 15.0 * kPi / 180.0;
+    const double lhsDecRad = lhs.declinationDeg * kPi / 180.0;
+    const double rhsDecRad = rhs.declinationDeg * kPi / 180.0;
+    const double cosine = std::sin(lhsDecRad) * std::sin(rhsDecRad)
+                          + std::cos(lhsDecRad) * std::cos(rhsDecRad) * std::cos(lhsRaRad - rhsRaRad);
+    return std::acos(std::clamp(cosine, -1.0, 1.0)) * 180.0 / kPi;
+}
+
+class FixedEarthKernelProvider final : public ICalcephKernelProvider {
+public:
+    explicit FixedEarthKernelProvider(std::optional<SolarSystemKernelVector> earthPositionAu)
+        : m_earthPositionAu(earthPositionAu)
+    {
+    }
+
+    [[nodiscard]] SolarSystemKernelStateResult
+    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
+    {
+        ++m_callCount;
+        m_lastEpoch = epoch;
+        m_lastTargetNaifId = targetNaifId;
+        m_lastCenterNaifId = centerNaifId;
+
+        SolarSystemKernelStateResult result;
+        result.positionAu = m_earthPositionAu;
+        result.metadata.status =
+            m_earthPositionAu.has_value() ? EphemerisResultStatus::Valid : EphemerisResultStatus::Failed;
+        result.metadata.dataSourceProvenance = "unit-test Earth barycentric state";
+        if (!m_earthPositionAu.has_value()) {
+            result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+        }
+        return result;
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+    [[nodiscard]] int lastTargetNaifId() const noexcept
+    {
+        return m_lastTargetNaifId;
+    }
+
+    [[nodiscard]] int lastCenterNaifId() const noexcept
+    {
+        return m_lastCenterNaifId;
+    }
+
+    [[nodiscard]] AstronomicalEpoch lastEpoch() const noexcept
+    {
+        return m_lastEpoch;
+    }
+
+private:
+    std::optional<SolarSystemKernelVector> m_earthPositionAu;
+    mutable int m_callCount = 0;
+    mutable int m_lastTargetNaifId = 0;
+    mutable int m_lastCenterNaifId = 0;
+    mutable AstronomicalEpoch m_lastEpoch;
+};
+
 }  // namespace
 
 class StarAstrometryCalculatorTests final : public QObject {
@@ -89,6 +158,9 @@ private slots:
     void propagatesFullAstrometryWhenCorrectionsAreEnabled();
     void leavesReferenceCoordinateWhenCorrectionsAreDisabled();
     void treatsRightAscensionProperMotionAsTangentPlaneComponent();
+    void appliesAnnualParallaxWithEarthBarycentricState();
+    void degradesAnnualParallaxWhenKernelProviderIsMissing();
+    void degradesAnnualParallaxWhenSourceParallaxIsMissing();
     void degradesRadialVelocityWhenStellarParallaxIsDisabled();
     void degradesPartialAstrometryButAppliesAvailableProperMotion();
     void degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested();
@@ -164,6 +236,63 @@ void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPla
     );
     QCOMPARE(result.metadata.status, EphemerisResultStatus::Valid);
     QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
+}
+
+void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricState()
+{
+    const CelestialBody body = makeAstrometricStar();
+    const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::StellarParallax, 0.0);
+    const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    auto kernelProvider =
+        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+
+    const StarAstrometryCalculator calculator(kernelProvider);
+    const HighPrecisionCalculatorResult referenceResult = calculator.calculate(makeInput(body, referenceRequest));
+    const HighPrecisionCalculatorResult parallaxResult = calculator.calculate(makeInput(body, parallaxRequest));
+
+    QVERIFY(referenceResult.equatorial.has_value());
+    QVERIFY(parallaxResult.equatorial.has_value());
+    QVERIFY(parallaxResult.observerRelativePositionAu.has_value());
+    QVERIFY(angularSeparationDegrees(*referenceResult.equatorial, *parallaxResult.equatorial) > 1.0e-6);
+    QCOMPARE(parallaxResult.metadata.status, EphemerisResultStatus::Valid);
+    QVERIFY(hasCorrectionFlag(parallaxResult.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
+    QCOMPARE(kernelProvider->callCount(), 1);
+    QCOMPARE(kernelProvider->lastTargetNaifId(), 399);
+    QCOMPARE(kernelProvider->lastCenterNaifId(), 0);
+}
+
+void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()
+{
+    const CelestialBody body = makeAstrometricStar();
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+
+    const StarAstrometryCalculator calculator;
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
+
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(!result.observerRelativePositionAu.has_value());
+    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
+}
+
+void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMissing()
+{
+    CelestialBody body = makeAstrometricStar();
+    body.starAstrometry->stellarParallaxMas = std::nullopt;
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    auto kernelProvider =
+        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+
+    const StarAstrometryCalculator calculator(kernelProvider);
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
+
+    QVERIFY(result.equatorial.has_value());
+    compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
+    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
+    QCOMPARE(kernelProvider->callCount(), 0);
 }
 
 void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsDisabled()
