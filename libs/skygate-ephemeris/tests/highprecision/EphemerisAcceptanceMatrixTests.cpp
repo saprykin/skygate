@@ -1,7 +1,10 @@
+#include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "EphemerisFixtureSupport.hpp"
+#include "skygate/ephemeris/EphemerisDataManifest.hpp"
+#include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 
 #include <QtTest/QtTest>
@@ -14,6 +17,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -28,6 +32,7 @@ constexpr int kNaifMars = 499;
 constexpr int kNaifSun = 10;
 constexpr int kNaifSolarSystemBarycenter = 0;
 constexpr double kCoordinateTolerance = 1.0e-9;
+constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d1114de63b7cf39eded66afc08e8f98";
 
 [[nodiscard]] CelestialBody makeMarsBody()
 {
@@ -80,6 +85,14 @@ constexpr double kCoordinateTolerance = 1.0e-9;
     };
 }
 
+[[nodiscard]] AstronomicalEpoch makeCivilEpoch(const int year, const int month, const int day)
+{
+    const std::optional<AstronomicalEpoch> epoch =
+        astronomicalEpochFromCivilDateTime(CivilDateTime{.astronomicalYear = year, .month = month, .day = day});
+    Q_ASSERT(epoch.has_value());
+    return *epoch;
+}
+
 [[nodiscard]] EphemerisRequest makeRequest(const EphemerisCorrectionFlags correctionFlags)
 {
     EphemerisRequest request;
@@ -89,6 +102,14 @@ constexpr double kCoordinateTolerance = 1.0e-9;
     request.options.correctionFlags = correctionFlags;
     request.options.enableAtmosphericRefraction =
         hasCorrectionFlag(correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction);
+    return request;
+}
+
+[[nodiscard]] EphemerisRequest
+makeRequestForEpoch(const EphemerisCorrectionFlags correctionFlags, const AstronomicalEpoch epoch)
+{
+    EphemerisRequest request = makeRequest(correctionFlags);
+    request.epoch = epoch;
     return request;
 }
 
@@ -116,6 +137,51 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
         );
     }
     return info;
+}
+
+[[nodiscard]] EphemerisDataManifest makeFixtureDataManifest()
+{
+    EphemerisDataManifest manifest;
+    manifest.dataSetInfo = makeDataSetInfo(true);
+    manifest.profiles.push_back(EphemerisDataManifestProfile{
+        .id = "de405s-modern",
+        .displayName = "DE405s acceptance fixture",
+        .bundled = true,
+        .longRange = false,
+        .assetIds = {"de405s-kernel"},
+    });
+    manifest.profiles.push_back(EphemerisDataManifestProfile{
+        .id = "de441-long-range",
+        .displayName = "DE441 long-range acceptance profile",
+        .bundled = false,
+        .longRange = true,
+        .assetIds = {"de441-kernel"},
+    });
+    manifest.assets.push_back(EphemerisDataManifestAsset{
+        .id = "de405s-kernel",
+        .kind = EphemerisDataManifestAssetKind::SolarSystemKernel,
+        .profileId = "de405s-modern",
+        .version = "DE405s",
+        .sourceUrl = "https://naif.jpl.nasa.gov/pub/naif/M01/kernels/spk/de405s.bsp",
+        .relativePath = "ephemeris/kernels/de405s.bsp",
+        .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
+        .compression = {.kind = EphemerisDataManifestCompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
+        .validityRange = makeRange("de405s-modern-range", "DE405s fixture range", 2'451'544.5, 2'455'197.5),
+        .optional = false,
+    });
+    manifest.assets.push_back(EphemerisDataManifestAsset{
+        .id = "de441-kernel",
+        .kind = EphemerisDataManifestAssetKind::SolarSystemKernel,
+        .profileId = "de441-long-range",
+        .version = "DE441 fixture substitute",
+        .sourceUrl = "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de441.bsp",
+        .relativePath = "ephemeris/kernels/de405s.bsp",
+        .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
+        .compression = {.kind = EphemerisDataManifestCompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
+        .validityRange = makeRange("de441-long-range", "Optional DE441 long range", -3'100'000.5, 8'000'000.5),
+        .optional = true,
+    });
+    return manifest;
 }
 
 [[nodiscard]] EphemerisEngineOptions makeOptions(const EphemerisCorrectionFlags correctionFlags)
@@ -188,6 +254,40 @@ private:
     mutable int m_callCount = 0;
 };
 
+class AcceptanceDataSnapshot final : public IEphemerisDataSnapshot {
+public:
+    AcceptanceDataSnapshot(std::string assetId, std::string profileId, std::string activePath)
+        : m_assetId(std::move(assetId)), m_profileId(std::move(profileId)), m_activePath(std::move(activePath))
+    {
+    }
+
+    [[nodiscard]] std::optional<EphemerisTextDataAsset> leapSecondTableAsset() const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<EphemerisKernelDataAsset> solarSystemKernelAsset(const std::string_view assetId
+    ) const override
+    {
+        if (assetId != m_assetId) {
+            return std::nullopt;
+        }
+
+        return EphemerisKernelDataAsset{
+            .id = m_assetId,
+            .profileId = m_profileId,
+            .version = "acceptance-fixture",
+            .provenance = "NAIF DE405s acceptance fixture",
+            .activePath = m_activePath,
+        };
+    }
+
+private:
+    std::string m_assetId;
+    std::string m_profileId;
+    std::string m_activePath;
+};
+
 class CountingSolarSystemCalculator final : public ISolarSystemStateCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput& input) const override
@@ -211,6 +311,101 @@ public:
 
 private:
     mutable int m_callCount = 0;
+};
+
+class AcceptanceTimeScaleService final : public ITimeScaleService {
+public:
+    [[nodiscard]] TimeScaleConversionResult
+    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    {
+        TimeScaleConversionResult result;
+        result.epoch = epoch;
+        result.epoch.timeScale = targetScale;
+        result.status = TimeScaleConversionStatus::Valid;
+        return result;
+    }
+
+    [[nodiscard]] TimeScaleConversionResult
+    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    {
+        TimeScaleConversionResult result;
+        const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(dateTime);
+        result.epoch = epoch.value_or(AstronomicalEpoch{});
+        result.epoch.timeScale = targetScale;
+        result.status = epoch.has_value() ? TimeScaleConversionStatus::Valid : TimeScaleConversionStatus::Failed;
+        return result;
+    }
+};
+
+class AcceptanceEarthOrientationProvider final : public IEarthOrientationProvider {
+public:
+    AcceptanceEarthOrientationProvider()
+    {
+        m_dataInfo.status = EarthOrientationDataStatus::Available;
+        m_dataInfo.version = "acceptance-eop";
+        m_dataInfo.provenance = "acceptance test";
+        m_entries.push_back(EarthOrientationTableEntry{
+            .effectiveUtcDate = {.astronomicalYear = 2024, .month = 1, .day = 1, .timeScale = TimeScale::Utc},
+            .effectiveUtcEpoch = makeEpoch(),
+            .ut1MinusUtcSeconds = 0.05,
+            .polarMotionXArcseconds = 0.01,
+            .polarMotionYArcseconds = -0.02,
+        });
+    }
+
+    [[nodiscard]] const EarthOrientationDataInfo& dataInfo() const noexcept override
+    {
+        return m_dataInfo;
+    }
+
+    [[nodiscard]] std::span<const EarthOrientationTableEntry> entries() const noexcept override
+    {
+        return m_entries;
+    }
+
+private:
+    EarthOrientationDataInfo m_dataInfo;
+    std::vector<EarthOrientationTableEntry> m_entries;
+};
+
+class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
+public:
+    [[nodiscard]] HighPrecisionCalculatorResult apply(
+        const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
+    ) const override
+    {
+        ++m_callCount;
+        m_lastRequestedCorrections = input.request.options.correctionFlags;
+        m_sawTopocentricState =
+            input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared;
+
+        HighPrecisionCalculatorResult result = calculatorResult;
+        result.metadata.appliedCorrections |= input.request.options.correctionFlags;
+        if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax)) {
+            result.horizontal = core::HorizontalCoordinate{.altitudeDeg = 42.0, .azimuthDeg = 128.0};
+        }
+        return result;
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+    [[nodiscard]] EphemerisCorrectionFlags lastRequestedCorrections() const noexcept
+    {
+        return m_lastRequestedCorrections;
+    }
+
+    [[nodiscard]] bool sawTopocentricState() const noexcept
+    {
+        return m_sawTopocentricState;
+    }
+
+private:
+    mutable int m_callCount = 0;
+    mutable EphemerisCorrectionFlags m_lastRequestedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    mutable bool m_sawTopocentricState = false;
 };
 
 class DegradedSolarSystemCalculator final : public ISolarSystemStateCalculator {
@@ -249,8 +444,10 @@ class EphemerisAcceptanceMatrixTests final : public QObject {
 private slots:
     void factorySelectionStrictFailureAndFallbackRemainExplicit();
     void calcephProviderBackedSolarSystemRaDecSupportsCorrectionOptions();
+    void realCalcephRuntimeComputesFixtureSolarSystemRaDecWhenAvailable();
+    void correctionMatrixRoutesAstrometricApparentAndTopocentricRequests();
     void absentLongRangeKernelProducesDegradedFallbackMetadata();
-    void bundledAndOptionalLongRangeDataSetMetadataRemainDistinct();
+    void bundledAndOptionalLongRangeDataSetProfilesDriveProviderSelection();
     void deterministicHorizonsFixturesRemainReadable();
     void fullFrameComputationCacheAvoidsPerObjectRecompute();
 };
@@ -327,6 +524,96 @@ void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSuppor
     QVERIFY(kernelProvider->callCount() > 1);
 }
 
+void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSystemRaDecWhenAvailable()
+{
+    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de405s.bsp";
+    const EphemerisDataManifest manifest = makeFixtureDataManifest();
+    AcceptanceDataSnapshot snapshot("de405s-kernel", "de405s-modern", kernelPath);
+
+    auto kernelProvider = std::make_shared<CalcephKernelProvider>(snapshot, manifest);
+    if (kernelProvider->status() == CalcephKernelProviderStatus::CalcephUnavailable) {
+        QSKIP("Real CALCEPH provider acceptance row requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON.");
+    }
+    const QByteArray diagnostics = kernelProvider->diagnostics().empty()
+                                       ? QByteArray{}
+                                       : QByteArray(kernelProvider->diagnostics().front().c_str());
+    QVERIFY2(kernelProvider->isReady(), diagnostics.constData());
+
+    HighPrecisionEphemerisEngineDependencies dependencies;
+    dependencies.calcephKernelProvider = kernelProvider;
+    dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+    dependencies.dataSetInfo = manifest.dataSetInfo;
+    const HighPrecisionEphemerisEngine engine =
+        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), dependencies);
+
+    AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
+    epoch.timeScale = TimeScale::Tdb;
+    const auto state = engine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::Geometric, epoch), "mars");
+
+    QVERIFY(state.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QCOMPARE(state->metadata.dataSourceProvenance, std::string{"NAIF DE405s acceptance fixture"});
+    QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(state->equatorial.declinationDeg));
+    QCOMPARE(
+        static_cast<std::uint32_t>(state->metadata.requestedCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::Geometric)
+    );
+}
+
+void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAndTopocentricRequests()
+{
+    const std::array matrix{
+        EphemerisCorrectionFlags::Geometric,
+        EphemerisCorrectionFlags::Astrometric,
+        EphemerisCorrectionFlags::Apparent,
+        EphemerisCorrectionFlags::ApparentTopocentric,
+    };
+
+    for (const EphemerisCorrectionFlags correctionFlags : matrix) {
+        auto kernelProvider = std::make_shared<AcceptanceKernelProvider>();
+        auto apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
+        HighPrecisionEphemerisEngineDependencies dependencies;
+        dependencies.calcephKernelProvider = kernelProvider;
+        dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+        dependencies.timeScaleService = std::make_shared<AcceptanceTimeScaleService>();
+        dependencies.earthOrientationProvider = std::make_shared<AcceptanceEarthOrientationProvider>();
+        dependencies.apparentPlaceCalculator = apparentPlaceCalculator;
+        dependencies.dataSetInfo = makeDataSetInfo(false);
+        const HighPrecisionEphemerisEngine engine =
+            makeHighPrecisionEngine({makeMarsBody()}, makeOptions(correctionFlags), dependencies);
+
+        const auto state = engine.computeBodyState(makeRequest(correctionFlags), "mars");
+        QVERIFY(state.has_value());
+        QCOMPARE(
+            static_cast<std::uint32_t>(state->metadata.requestedCorrections),
+            static_cast<std::uint32_t>(correctionFlags)
+        );
+        QVERIFY(
+            static_cast<std::uint32_t>(state->metadata.appliedCorrections)
+            == static_cast<std::uint32_t>(correctionFlags)
+        );
+
+        if (correctionFlags == EphemerisCorrectionFlags::Geometric) {
+            QCOMPARE(apparentPlaceCalculator->callCount(), 0);
+        } else {
+            QCOMPARE(apparentPlaceCalculator->callCount(), 1);
+            QCOMPARE(
+                static_cast<std::uint32_t>(apparentPlaceCalculator->lastRequestedCorrections()),
+                static_cast<std::uint32_t>(correctionFlags)
+            );
+        }
+
+        if (correctionFlags == EphemerisCorrectionFlags::ApparentTopocentric) {
+            QVERIFY(apparentPlaceCalculator->sawTopocentricState());
+            QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
+            QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
+        }
+    }
+}
+
 void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallbackMetadata()
 {
     HighPrecisionEphemerisEngineDependencies dependencies;
@@ -353,30 +640,65 @@ void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallba
     QCOMPARE(state->metadata.effectiveDataValidityRange->id, std::string{"de440-modern"});
 }
 
-void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetMetadataRemainDistinct()
+void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesDriveProviderSelection()
 {
+    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de405s.bsp";
+    const EphemerisDataManifest manifest = makeFixtureDataManifest();
+    AcceptanceDataSnapshot bundledSnapshot("de405s-kernel", "de405s-modern", kernelPath);
+    auto bundledKernelProvider = std::make_shared<CalcephKernelProvider>(bundledSnapshot, manifest);
+    if (bundledKernelProvider->status() == CalcephKernelProviderStatus::CalcephUnavailable) {
+        QSKIP("Provider-selection acceptance row requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON.");
+    }
+
     HighPrecisionEphemerisEngineDependencies bundledDependencies;
-    bundledDependencies.solarSystemStateCalculator = std::make_shared<CountingSolarSystemCalculator>();
-    bundledDependencies.dataSetInfo = makeDataSetInfo(false);
+    bundledDependencies.calcephKernelProvider = bundledKernelProvider;
+    bundledDependencies.solarSystemStateCalculator =
+        std::make_shared<SolarSystemStateCalculator>(bundledKernelProvider);
+    bundledDependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine bundledEngine = makeHighPrecisionEngine(
         {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), bundledDependencies
     );
 
-    QCOMPARE(bundledEngine.dataSetInfo().id, std::string{"acceptance-modern"});
-    QCOMPARE(bundledEngine.supportedDateRanges().size(), std::size_t{1});
-    QCOMPARE(bundledEngine.supportedDateRanges()[0].id, std::string{"de440-modern"});
+    QVERIFY(bundledKernelProvider->isReady());
+    QVERIFY(bundledKernelProvider->kernelInfo().has_value());
+    QCOMPARE(bundledKernelProvider->kernelInfo()->id, std::string{"de405s-kernel"});
+    QCOMPARE(bundledKernelProvider->kernelInfo()->profileId, std::string{"de405s-modern"});
+    QVERIFY(!bundledKernelProvider->kernelInfo()->longRange);
 
+    AcceptanceDataSnapshot longRangeSnapshot("de441-kernel", "de441-long-range", kernelPath);
+    CalcephKernelSelectionOptions selectionOptions;
+    selectionOptions.preferLongRange = true;
+    auto longRangeKernelProvider =
+        std::make_shared<CalcephKernelProvider>(longRangeSnapshot, manifest, selectionOptions);
     HighPrecisionEphemerisEngineDependencies longRangeDependencies;
-    longRangeDependencies.solarSystemStateCalculator = std::make_shared<CountingSolarSystemCalculator>();
-    longRangeDependencies.dataSetInfo = makeDataSetInfo(true);
+    longRangeDependencies.calcephKernelProvider = longRangeKernelProvider;
+    longRangeDependencies.solarSystemStateCalculator =
+        std::make_shared<SolarSystemStateCalculator>(longRangeKernelProvider);
+    longRangeDependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine longRangeEngine = makeHighPrecisionEngine(
         {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), longRangeDependencies
     );
+
+    QVERIFY(longRangeKernelProvider->isReady());
+    QVERIFY(longRangeKernelProvider->kernelInfo().has_value());
+    QCOMPARE(longRangeKernelProvider->kernelInfo()->id, std::string{"de441-kernel"});
+    QCOMPARE(longRangeKernelProvider->kernelInfo()->profileId, std::string{"de441-long-range"});
+    QVERIFY(longRangeKernelProvider->kernelInfo()->longRange);
+    QVERIFY(longRangeKernelProvider->kernelInfo()->optional);
 
     QCOMPARE(longRangeEngine.dataSetInfo().id, std::string{"acceptance-with-de441"});
     QCOMPARE(longRangeEngine.supportedDateRanges().size(), std::size_t{2});
     QCOMPARE(longRangeEngine.supportedDateRanges()[1].id, std::string{"de441-long-range"});
     QVERIFY(longRangeEngine.capabilities().supportsExtendedHistoricalRange);
+
+    AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
+    epoch.timeScale = TimeScale::Tdb;
+    const auto state =
+        longRangeEngine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::Geometric, epoch), "mars");
+    QVERIFY(state.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
 }
 
 void EphemerisAcceptanceMatrixTests::deterministicHorizonsFixturesRemainReadable()

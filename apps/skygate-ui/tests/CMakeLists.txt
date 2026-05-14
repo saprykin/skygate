@@ -157,6 +157,12 @@ add_skygate_ui_qtest(
     TIMEOUT 60
 )
 add_skygate_ui_qtest(
+    skygate-ui-acceptance-matrix-tests
+    app/SkyAcceptanceMatrixTests.cpp
+    LABELS "integration;acceptance"
+    TIMEOUT 60
+)
+add_skygate_ui_qtest(
     skygate-ui-context-controller-night-catalog-tests
     app/SkyContextControllerNightCatalogTests.cpp
     LABELS integration
