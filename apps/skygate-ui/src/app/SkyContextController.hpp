@@ -172,6 +172,7 @@ public:
         QGeoPositionInfoSource* positionSource = nullptr;
         bool requestLocationPermission = true;
         const skygate::core::ITimeSource* timeSource = nullptr;
+        bool rebuildEphemerisEngineOnStartup = true;
         EphemerisFactoryInputs ephemerisFactoryInputs;
     };
 
@@ -352,6 +353,7 @@ private:
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
+    [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
     void rebuildEphemerisEngine();
 
 private:
