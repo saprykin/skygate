@@ -52,10 +52,40 @@ READY
   - `cmake --build build-ralph --target skygate-ui-acceptance-matrix-tests
     skygate-ui-qml-preferences-catalog-tests -j2` - PASS
   - `ctest --test-dir build-ralph --output-on-failure -R
-    '^(skygate-ui-acceptance-matrix-tests|skygate-ui-qml-preferences-catalog-tests)$'`
+    'skygate-ui-(acceptance-matrix|qml-preferences-catalog)-tests'`
     - PASS
   - `cmake --build build-ralph -j2` - PASS
   - `ctest --test-dir build-ralph --output-on-failure` - PASS, 127/127 tests
     passed with two existing high-precision CALCEPH-backed tests skipped
     because this build tree has high precision disabled.
+- Remaining concerns: None.
+
+## Review fixes
+
+- Review verdict addressed: NEEDS_FIX
+- Findings addressed:
+  - Explicit kernel profile selection can be silently overridden
+    - Action: Fixed
+    - Notes: Restricted CALCEPH provider snapshot-kernel fallback to default
+      selection only. Explicit `preferredProfileId` and `preferLongRange`
+      requests now preserve `MissingKernelFile` when the selected asset is not
+      active, instead of silently opening another profile's kernel.
+- Files changed during fix pass:
+  - `libs/skygate-ephemeris/src/engine/highprecision/CalcephKernelProvider.cpp`
+  - `libs/skygate-ephemeris/tests/CMakeLists.txt`
+  - `libs/skygate-ephemeris/tests/highprecision/CalcephKernelProviderTests.cpp`
+  - `.ralph/high-precision-ephemeris-engine/HP-047/implementation.md`
+  - `.ralph/high-precision-ephemeris-engine/HP-047/fix.md`
+- Tests run after fix:
+  - `cmake -S . -B build-ralph` - PASS
+  - `cmake --build build-ralph --target
+    skygate-ephemeris-calceph-kernel-provider-tests
+    skygate-ui-acceptance-matrix-tests -j2` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure -R
+    'skygate-.*-(calceph-kernel-provider|acceptance-matrix)-tests'`
+    - PASS
+  - `cmake --build build-ralph -j2` - PASS
+  - `ctest --test-dir build-ralph --output-on-failure` - PASS, 0 failures out
+    of 127 tests with `skygate-ephemeris-solar-system-state-calculator-tests`
+    skipped because this build tree has high precision disabled.
 - Remaining concerns: None.
