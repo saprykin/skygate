@@ -9,15 +9,14 @@
 #include <QSettings>
 #include <QTemporaryDir>
 
+#include <cstdint>
+
 namespace {
 
 void ignoreFallbackWarnings(const int count)
 {
     for (int index = 0; index < count; ++index) {
-        QTest::ignoreMessage(
-            QtWarningMsg,
-            QRegularExpression("Invalid .*setting .* - using fallback .*")
-        );
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid .*setting .* - using fallback .*"));
     }
 }
 
@@ -109,6 +108,20 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
     snapshot.logFilePath = "/tmp/skygate.log";
+    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+    snapshot.ephemeris.correctionPresetId = "apparent";
+    snapshot.ephemeris.fallbackToSimpleEngine = false;
+    snapshot.ephemeris.refractionEnabled = false;
+    snapshot.ephemeris.atmosphericPressureHpa = 812.5;
+    snapshot.ephemeris.atmosphericTemperatureC = -4.0;
+    snapshot.ephemeris.relativeHumidity = 0.65;
+    snapshot.ephemeris.observingWavelengthMicrometers = 0.62;
+    snapshot.ephemeris.preferredDataProfileId = "long-range";
+    snapshot.ephemeris.onlineUpdatesEnabled = false;
+    snapshot.ephemeris.updatePresetId = "custom";
+    snapshot.ephemeris.updateManifestUrl = "https://example.invalid/ephemeris.json";
+    snapshot.ephemerisSettingsPresent = true;
 
     const auto domains = skygate::ui::internal::splitStateSnapshot(snapshot);
     QCOMPARE(domains.timeline.live, false);
@@ -117,6 +130,12 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     QCOMPARE(domains.location.displayTimeZoneId, QString("Europe/Zurich"));
     QCOMPARE(domains.catalogSources.deepSkyPresetIndex, 2);
     QCOMPARE(domains.logging.logToFile, true);
+    QCOMPARE(
+        static_cast<std::uint8_t>(domains.ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(domains.ephemeris.preferredDataProfileId, QString("long-range"));
+    QCOMPARE(domains.ephemerisSettingsPresent, true);
 
     const auto merged = skygate::ui::internal::mergeStateSnapshot(domains);
     QCOMPARE(merged.live, snapshot.live);
@@ -129,6 +148,12 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     QVERIFY(merged.overlayLayers.equals(snapshot.overlayLayers));
     QCOMPARE(merged.deepSkyCatalogUrlText, snapshot.deepSkyCatalogUrlText);
     QCOMPARE(merged.logFilePath, snapshot.logFilePath);
+    QCOMPARE(
+        static_cast<std::uint32_t>(merged.ephemeris.correctionFlags),
+        static_cast<std::uint32_t>(snapshot.ephemeris.correctionFlags)
+    );
+    QCOMPARE(merged.ephemeris.updateManifestUrl, snapshot.ephemeris.updateManifestUrl);
+    QCOMPARE(merged.ephemerisSettingsPresent, true);
 }
 
 void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAndAppliesDefaults()
@@ -153,6 +178,12 @@ void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAndAppliesDefaults(
     QCOMPARE(loaded->logToTerminal, true);
     QCOMPARE(loaded->logToFile, false);
     QCOMPARE(loaded->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
+    QCOMPARE(
+        static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("modern"));
+    QCOMPARE(loaded->ephemerisSettingsPresent, false);
 }
 
 void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
@@ -165,6 +196,8 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
     snapshot.logFilePath = "  ";
+    snapshot.ephemeris.correctionPresetId = "  ";
+    snapshot.ephemeris.preferredDataProfileId = "";
 
     skygate::ui::internal::saveStateSnapshot(settings, snapshot);
     const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
@@ -172,6 +205,9 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     QCOMPARE(loaded->logToTerminal, false);
     QCOMPARE(loaded->logToFile, true);
     QCOMPARE(loaded->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
+    QCOMPARE(loaded->ephemeris.correctionPresetId, QString("apparent-topocentric"));
+    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("modern"));
+    QCOMPARE(loaded->ephemerisSettingsPresent, true);
 }
 
 QTEST_APPLESS_MAIN(SkySettingsCodecsTests)
