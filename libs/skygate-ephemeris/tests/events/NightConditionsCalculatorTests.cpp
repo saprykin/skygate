@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 
 namespace {
 
@@ -19,11 +20,7 @@ namespace {
 [[nodiscard]] skygate::core::SkyContext makeZurichContext()
 {
     skygate::core::SkyContext context;
-    context.observer = {
-        .latitudeDeg = 47.3769,
-        .longitudeDeg = 8.5417,
-        .elevationMeters = 408.0
-    };
+    context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
     context.utcTime = utcFromUnixSeconds(1'711'024'800);  // 2024-03-21 12:00:00 UTC
     return context;
 }
@@ -31,19 +28,13 @@ namespace {
 [[nodiscard]] skygate::core::SkyContext makePolarSummerContext()
 {
     skygate::core::SkyContext context;
-    context.observer = {
-        .latitudeDeg = 80.0,
-        .longitudeDeg = 0.0,
-        .elevationMeters = 0.0
-    };
+    context.observer = {.latitudeDeg = 80.0, .longitudeDeg = 0.0, .elevationMeters = 0.0};
     context.utcTime = utcFromUnixSeconds(1'719'576'000);  // 2024-06-30 12:00:00 UTC
     return context;
 }
 
-[[nodiscard]] std::optional<std::uint32_t> bodyIndexById(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies,
-    const std::string_view bodyId
-)
+[[nodiscard]] std::optional<std::uint32_t>
+bodyIndexById(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string_view bodyId)
 {
     for (std::size_t index = 0; index < bodies.size(); ++index) {
         if (bodies[index].id == bodyId) {
@@ -78,9 +69,52 @@ struct TestRig final {
 
 [[nodiscard]] bool isAvailable(const skygate::ephemeris::ObservationEvent& event)
 {
-    return event.status == skygate::ephemeris::ObservationEventStatus::Available
-        && event.utcTime.has_value();
+    return event.status == skygate::ephemeris::ObservationEventStatus::Available && event.utcTime.has_value();
 }
+
+class FixedNightEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.states.push_back(*computeBodyState(context, 0U));
+        snapshot.states.push_back(*computeBodyState(context, 1U));
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view bodyId) const override
+    {
+        if (bodyId == "sun") {
+            return stateFor(0U, 12.0);
+        }
+        if (bodyId == "moon") {
+            return stateFor(1U, 24.0);
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::uint32_t bodyIndex) const override
+    {
+        if (bodyIndex > 1U) {
+            return std::nullopt;
+        }
+        return stateFor(bodyIndex, bodyIndex == 0U ? 12.0 : 24.0);
+    }
+
+private:
+    [[nodiscard]] skygate::ephemeris::CelestialBodyState
+    stateFor(const std::uint32_t bodyIndex, const double altitudeDeg) const noexcept
+    {
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = bodyIndex,
+            .equatorial = {.rightAscensionHours = static_cast<double>(bodyIndex), .declinationDeg = altitudeDeg},
+            .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = 180.0}
+        };
+    }
+};
 
 }  // namespace
 
@@ -93,6 +127,7 @@ private slots:
     void polarTwilightReportsStableUnavailableStatuses();
     void moonRiseSetAndIlluminationArePopulated();
     void lunarPhaseBucketsAreDeterministic();
+    void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
 };
 
 void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation()
@@ -100,12 +135,7 @@ void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation
     auto rig = makeTestRig();
     const skygate::ephemeris::NightConditionsCalculator calculator;
 
-    const auto conditions = calculator.compute(
-        *rig.engine,
-        makeZurichContext(),
-        rig.sunIndex,
-        rig.moonIndex
-    );
+    const auto conditions = calculator.compute(*rig.engine, makeZurichContext(), rig.sunIndex, rig.moonIndex);
 
     QVERIFY(conditions.valid);
     QVERIFY(conditions.sunAltitudeDeg.has_value());
@@ -129,12 +159,7 @@ void NightConditionsCalculatorTests::invalidObserverReturnsUnavailableConditions
     context.observer.latitudeDeg = 120.0;
     const skygate::ephemeris::NightConditionsCalculator calculator;
 
-    const auto conditions = calculator.compute(
-        *rig.engine,
-        context,
-        rig.sunIndex,
-        rig.moonIndex
-    );
+    const auto conditions = calculator.compute(*rig.engine, context, rig.sunIndex, rig.moonIndex);
 
     QVERIFY(!conditions.valid);
     QVERIFY(!conditions.sunAltitudeDeg.has_value());
@@ -149,25 +174,14 @@ void NightConditionsCalculatorTests::polarTwilightReportsStableUnavailableStatus
     auto rig = makeTestRig();
     const skygate::ephemeris::NightConditionsCalculator calculator;
 
-    const auto conditions = calculator.compute(
-        *rig.engine,
-        makePolarSummerContext(),
-        rig.sunIndex,
-        rig.moonIndex
-    );
+    const auto conditions = calculator.compute(*rig.engine, makePolarSummerContext(), rig.sunIndex, rig.moonIndex);
 
     QVERIFY(conditions.valid);
     QVERIFY(conditions.sunAltitudeDeg.has_value());
     QVERIFY(conditions.sunrise.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
     QVERIFY(conditions.sunset.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
-    QVERIFY(
-        conditions.astronomicalDusk.status
-        != skygate::ephemeris::ObservationEventStatus::InvalidInput
-    );
-    QVERIFY(
-        conditions.astronomicalDawn.status
-        != skygate::ephemeris::ObservationEventStatus::InvalidInput
-    );
+    QVERIFY(conditions.astronomicalDusk.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
+    QVERIFY(conditions.astronomicalDawn.status != skygate::ephemeris::ObservationEventStatus::InvalidInput);
 }
 
 void NightConditionsCalculatorTests::moonRiseSetAndIlluminationArePopulated()
@@ -175,12 +189,7 @@ void NightConditionsCalculatorTests::moonRiseSetAndIlluminationArePopulated()
     auto rig = makeTestRig();
     const skygate::ephemeris::NightConditionsCalculator calculator;
 
-    const auto conditions = calculator.compute(
-        *rig.engine,
-        makeZurichContext(),
-        rig.sunIndex,
-        rig.moonIndex
-    );
+    const auto conditions = calculator.compute(*rig.engine, makeZurichContext(), rig.sunIndex, rig.moonIndex);
 
     QVERIFY(conditions.valid);
     QVERIFY(isAvailable(conditions.moonrise));
@@ -213,6 +222,29 @@ void NightConditionsCalculatorTests::lunarPhaseBucketsAreDeterministic()
     context.utcTime += std::chrono::seconds(7 * 86400 + 9 * 3600);
     conditions = calculator.compute(*rig.engine, context, rig.sunIndex, rig.moonIndex);
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("Last quarter"));
+}
+
+void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTimeDiffers()
+{
+    const FixedNightEngine engine;
+    const skygate::ephemeris::NightConditionsCalculator calculator;
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeZurichContext();
+    request.context.utcTime = utcFromUnixSeconds(1'711'024'800);  // 2024-03-21 12:00:00 UTC
+    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
+        .astronomicalYear = 2000,
+        .month = 1,
+        .day = 6,
+        .hour = 18,
+        .minute = 14,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    });
+
+    const auto conditions = calculator.compute(engine, request, 0U, 1U);
+
+    QVERIFY(conditions.valid);
+    QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("New Moon"));
+    QVERIFY(conditions.moonIlluminationPercent < 1.0);
 }
 
 QTEST_APPLESS_MAIN(NightConditionsCalculatorTests)
