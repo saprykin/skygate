@@ -12,6 +12,7 @@
 #include "SkySceneOverlayAdapter.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
+#include "skygate/core/Types.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -54,6 +55,7 @@ public:
     Q_INVOKABLE void moveSelectedObjectInspector(double x, double y);
 
     [[nodiscard]] std::optional<skygate::core::PreparedProjection> preparedProjection() const;
+    [[nodiscard]] std::optional<skygate::core::SkyContext> referenceOverlayContext() const;
     [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan() const;
     [[nodiscard]] std::span<const SkyRenderLine> renderLineSpan() const;
     [[nodiscard]] std::span<const SkyRenderGlyph> renderGlyphSpan() const;

@@ -19,14 +19,13 @@ struct SkyViewportItem::ViewportRenderData final {
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
     SkyOverlayLayerVisibility overlayLayers;
     skygate::core::GeoLocation observer;
-    skygate::core::UtcTimePoint utcTime {};
+    skygate::core::UtcTimePoint utcTime{};
     std::vector<SkyRenderLine> lines;
     std::vector<SkyRenderPoint> points;
     std::vector<SkyRenderGlyph> glyphs;
 };
 
-SkyViewportItem::SkyViewportItem(QQuickItem* parent)
-    : QQuickItem(parent)
+SkyViewportItem::SkyViewportItem(QQuickItem* parent) : QQuickItem(parent)
 {
     setFlag(ItemHasContents, true);
 }
@@ -47,12 +46,8 @@ void SkyViewportItem::setSkySceneModel(QObject* skySceneModel)
     m_skySceneModel = model;
 
     if (m_skySceneModel != nullptr) {
-        m_sceneFrameChangedConnection = connect(
-            m_skySceneModel,
-            &SkySceneModel::sceneFrameChanged,
-            this,
-            &SkyViewportItem::synchronizeRenderData
-        );
+        m_sceneFrameChangedConnection =
+            connect(m_skySceneModel, &SkySceneModel::sceneFrameChanged, this, &SkyViewportItem::synchronizeRenderData);
         m_skySceneModel->setViewportSize(width(), height());
     }
 
@@ -84,32 +79,23 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     }
 
     const std::vector<skygate::ui::internal::SkyViewportLineSegment> lineSegments =
-        skygate::ui::internal::buildSkyViewportLineSegments(
-            skygate::ui::internal::SkyViewportGeometryInput {
-                .projection = *renderData->preparedProjection,
-                .viewportWidth = renderData->viewportWidth,
-                .viewportHeight = renderData->viewportHeight,
-                .renderTheme = renderData->renderTheme,
-                .overlayLayers = renderData->overlayLayers,
-                .observer = renderData->observer,
-                .utcTime = renderData->utcTime,
-                .renderLines = std::span<const SkyRenderLine>(
-                    renderData->lines.data(),
-                    renderData->lines.size()
-                ),
-                .renderGlyphs = std::span<const SkyRenderGlyph>(
-                    renderData->glyphs.data(),
-                    renderData->glyphs.size()
-                )
-            }
-        );
+        skygate::ui::internal::buildSkyViewportLineSegments(skygate::ui::internal::SkyViewportGeometryInput{
+            .projection = *renderData->preparedProjection,
+            .viewportWidth = renderData->viewportWidth,
+            .viewportHeight = renderData->viewportHeight,
+            .renderTheme = renderData->renderTheme,
+            .overlayLayers = renderData->overlayLayers,
+            .observer = renderData->observer,
+            .utcTime = renderData->utcTime,
+            .renderLines = std::span<const SkyRenderLine>(renderData->lines.data(), renderData->lines.size()),
+            .renderGlyphs = std::span<const SkyRenderGlyph>(renderData->glyphs.data(), renderData->glyphs.size())
+        });
 
     skygate::ui::internal::clearSkyViewportChildNodes(rootNode->lineRoot());
     skygate::ui::internal::clearSkyViewportChildNodes(rootNode->pointRoot());
     skygate::ui::internal::syncSkyViewportLineNodes(rootNode->lineRoot(), lineSegments);
     skygate::ui::internal::syncSkyViewportPointNodes(
-        rootNode->pointRoot(),
-        std::span<const SkyRenderPoint>(renderData->points.data(), renderData->points.size())
+        rootNode->pointRoot(), std::span<const SkyRenderPoint>(renderData->points.data(), renderData->points.size())
     );
 
     return rootNode;
@@ -136,23 +122,17 @@ void SkyViewportItem::synchronizeRenderData()
     nextRenderData->viewportWidth = width();
     nextRenderData->viewportHeight = height();
 
-    if (
-        m_skySceneModel != nullptr
-        && nextRenderData->viewportWidth > 0.0
-        && nextRenderData->viewportHeight > 0.0
-    ) {
-        m_skySceneModel->setViewportSize(
-            nextRenderData->viewportWidth,
-            nextRenderData->viewportHeight
-        );
+    if (m_skySceneModel != nullptr && nextRenderData->viewportWidth > 0.0 && nextRenderData->viewportHeight > 0.0) {
+        m_skySceneModel->setViewportSize(nextRenderData->viewportWidth, nextRenderData->viewportHeight);
         nextRenderData->preparedProjection = m_skySceneModel->preparedProjection();
-        if (auto* controller = qobject_cast<SkyContextController*>(
-                m_skySceneModel->skyContextController()
-            )) {
+        if (auto* controller = qobject_cast<SkyContextController*>(m_skySceneModel->skyContextController())) {
             nextRenderData->renderTheme = controller->renderTheme();
             nextRenderData->overlayLayers = controller->overlayLayerVisibility();
-            nextRenderData->observer = controller->skyContext().observer;
-            nextRenderData->utcTime = controller->skyContext().utcTime;
+            const auto referenceOverlayContext = m_skySceneModel->referenceOverlayContext();
+            const skygate::core::SkyContext skyContext =
+                referenceOverlayContext.has_value() ? *referenceOverlayContext : controller->skyContext();
+            nextRenderData->observer = skyContext.observer;
+            nextRenderData->utcTime = skyContext.utcTime;
         }
         if (nextRenderData->preparedProjection.has_value()) {
             const auto lines = m_skySceneModel->renderLineSpan();

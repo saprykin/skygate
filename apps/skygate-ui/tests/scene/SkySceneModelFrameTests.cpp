@@ -2,8 +2,103 @@
 
 #include "SkySceneModelTestSupport.hpp"
 
+#include "skygate/ephemeris/EphemerisEngineQueries.hpp"
+#include "skygate/ephemeris/IEphemerisEngine.hpp"
+
+#include <chrono>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <vector>
+
 using skygate::ui::tests::makeFixedBody;
 using skygate::ui::tests::SkySceneModelTestHarness;
+
+namespace {
+
+class SnapshotContextEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineOptions options;
+        options.engineKind = kind();
+        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        return options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
+    ) const override
+    {
+        ++m_requestComputeCount;
+        skygate::core::SkyContext resolvedContext = request.context;
+        resolvedContext.observer.longitudeDeg += 12.5;
+        resolvedContext.utcTime += std::chrono::seconds(75);
+        return makeSnapshot(resolvedContext);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateById(compute(request), bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateByIndex(
+            compute(request), static_cast<std::uint32_t>(bodyIndex)
+        );
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        return makeSnapshot(context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateById(compute(context), bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    {
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateByIndex(compute(context), bodyIndex);
+    }
+
+    [[nodiscard]] int requestComputeCount() const noexcept
+    {
+        return m_requestComputeCount;
+    }
+
+private:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot makeSnapshot(const skygate::core::SkyContext& context) const
+    {
+        auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
+        bodies->push_back(
+            makeFixedBody("resolved", "Resolved", skygate::ephemeris::CelestialBodyType::Star, 1.0, 0.0, 0.0)
+        );
+
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.catalogBodies = bodies;
+        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
+        });
+        return snapshot;
+    }
+
+    mutable int m_requestComputeCount = 0;
+};
+
+}  // namespace
 
 class SkySceneModelFrameTests final : public QObject {
     Q_OBJECT
@@ -11,19 +106,13 @@ class SkySceneModelFrameTests final : public QObject {
 private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
+    void referenceOverlayContextComesFromSelectedRequestSnapshot();
 };
 
 void SkySceneModelFrameTests::buildsFrameAndSupportsHitTesting()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_planet",
-            "Demo Planet",
-            skygate::ephemeris::CelestialBodyType::Planet,
-            -1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_planet", "Demo Planet", skygate::ephemeris::CelestialBodyType::Planet, -1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     QVERIFY(harness.centerOnBody("demo_planet"));
@@ -56,6 +145,33 @@ void SkySceneModelFrameTests::reusesSnapshotAcrossViewChanges()
 
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:30:00"));
     QVERIFY(sceneModel.snapshotGeneration() > initialSnapshotGeneration);
+}
+
+void SkySceneModelFrameTests::referenceOverlayContextComesFromSelectedRequestSnapshot()
+{
+    auto starCatalog = skygate::ui::tests::createTestCatalog({
+        makeFixedBody("resolved", "Resolved", skygate::ephemeris::CelestialBodyType::Star, 1.0, 0.0, 0.0),
+    });
+    QVERIFY(starCatalog != nullptr);
+    auto engine = std::make_unique<SnapshotContextEngine>();
+    const SnapshotContextEngine* enginePtr = engine.get();
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = false;
+    options.initializeLocation = false;
+    options.rebuildEphemerisEngineOnStartup = false;
+    SkyContextController controller(std::move(starCatalog), std::move(engine), options, nullptr);
+    QVERIFY(skygate::ui::tests::configureTestSkyContext(controller));
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    const auto overlayContext = sceneModel.referenceOverlayContext();
+    QVERIFY(overlayContext.has_value());
+    QVERIFY(enginePtr->requestComputeCount() > 0);
+    QCOMPARE(overlayContext->observer.longitudeDeg, controller.skyContext().observer.longitudeDeg + 12.5);
+    QCOMPARE(overlayContext->utcTime, controller.skyContext().utcTime + std::chrono::seconds(75));
 }
 
 QTEST_GUILESS_MAIN(SkySceneModelFrameTests)
