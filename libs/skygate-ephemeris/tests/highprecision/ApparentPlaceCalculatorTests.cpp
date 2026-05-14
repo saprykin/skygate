@@ -38,6 +38,10 @@ struct TopocentricFixtureCase {
 };
 
 struct TopocentricFixture {
+    QString source;
+    QString apiParameters;
+    QString sourceFrame;
+    QString observer;
     EphemerisRequest request;
     double ttMinusUtcSeconds = 0.0;
     double ut1MinusUtcSeconds = 0.0;
@@ -200,6 +204,7 @@ struct TopocentricFixture {
     }
 
     const QJsonObject root = document.object();
+    const QJsonObject metadataObject = root.value(QStringLiteral("metadata")).toObject();
     const QJsonObject requestObject = root.value(QStringLiteral("request")).toObject();
     const QJsonObject toleranceObject = root.value(QStringLiteral("tolerance")).toObject();
     const QJsonArray cases = root.value(QStringLiteral("cases")).toArray();
@@ -208,6 +213,10 @@ struct TopocentricFixture {
     }
 
     TopocentricFixture fixture;
+    fixture.source = metadataObject.value(QStringLiteral("source")).toString();
+    fixture.apiParameters = metadataObject.value(QStringLiteral("apiParameters")).toString();
+    fixture.sourceFrame = metadataObject.value(QStringLiteral("sourceFrame")).toString();
+    fixture.observer = metadataObject.value(QStringLiteral("observer")).toString();
     fixture.request.context.observer = {
         .latitudeDeg = requestObject.value(QStringLiteral("latitudeDegrees")).toDouble(),
         .longitudeDeg = requestObject.value(QStringLiteral("longitudeDegrees")).toDouble(),
@@ -779,6 +788,11 @@ void ApparentPlaceCalculatorTests::validatesTopocentricMoonSunPlanetAgainstHoriz
     const std::optional<TopocentricFixture> loadedFixture = loadTopocentricFixture(&errorText);
     QVERIFY2(loadedFixture.has_value(), qPrintable(errorText));
     const TopocentricFixture& fixture = *loadedFixture;
+    QCOMPARE(fixture.source, QStringLiteral("JPL Horizons"));
+    QVERIFY(fixture.apiParameters.contains(QStringLiteral("EPHEM_TYPE=OBSERVER")));
+    QVERIFY(fixture.apiParameters.contains(QStringLiteral("APPARENT=AIRLESS")));
+    QVERIFY(fixture.sourceFrame.contains(QStringLiteral("observer apparent topocentric"), Qt::CaseInsensitive));
+    QVERIFY(fixture.observer.contains(QStringLiteral("San Francisco"), Qt::CaseInsensitive));
     QCOMPARE(fixture.cases.size(), static_cast<std::size_t>(3U));
 
     auto timeScaleService =
