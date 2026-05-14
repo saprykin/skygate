@@ -132,6 +132,7 @@ private slots:
     void rejectsInvalidInputs();
     void repeatedKeysReportNoUpdate();
     void requestBasedSnapshotsUseSelectedEngineOptions();
+    void requestOptionChangesOnSameEngineRecomputeSnapshot();
     void renderOnlyChangesAvoidSnapshotRecompute();
     void snapshotKeyChangesRecomputeSnapshot();
     void clearReportsWhetherStateWasPresent();
@@ -207,6 +208,45 @@ void SkySceneFramePipelineTests::requestBasedSnapshotsUseSelectedEngineOptions()
     QCOMPARE(result->snapshot->states.front().horizontal.altitudeDeg, 55.0);
     QCOMPARE(result->snapshot->states.front().horizontal.azimuthDeg, 181.5);
     QCOMPARE(result->snapshotGeneration, 2U);
+}
+
+void SkySceneFramePipelineTests::requestOptionChangesOnSameEngineRecomputeSnapshot()
+{
+    CountingEngine engine;
+    SkySceneFramePipeline pipeline;
+    auto input = makeInput(engine);
+
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    input.ephemerisRequest = request;
+
+    const auto first = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(first.has_value());
+    QCOMPARE(engine.requestComputeCount(), 1);
+    QCOMPARE(engine.contextComputeCount(), 0);
+    QCOMPARE(first->snapshotGeneration, 1U);
+    QCOMPARE(first->renderFrameGeneration, 1U);
+    QVERIFY(!first->frame->points.empty());
+    const double firstX = first->frame->points.front().x;
+    const double firstY = first->frame->points.front().y;
+
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    input.ephemerisRequest = request;
+
+    const auto second = pipeline.rebuild(input, 1000.0, 800.0);
+    QVERIFY(second.has_value());
+    QVERIFY(second->updated);
+    QCOMPARE(engine.requestComputeCount(), 2);
+    QCOMPARE(engine.contextComputeCount(), 0);
+    QCOMPARE(second->snapshotGeneration, 2U);
+    QCOMPARE(second->renderFrameGeneration, 2U);
+    QCOMPARE(second->snapshot->states.front().horizontal.altitudeDeg, 55.0);
+    QCOMPARE(second->snapshot->states.front().horizontal.azimuthDeg, 181.5);
+    QVERIFY(!second->frame->points.empty());
+    QVERIFY(second->frame->points.front().x != firstX || second->frame->points.front().y != firstY);
 }
 
 void SkySceneFramePipelineTests::renderOnlyChangesAvoidSnapshotRecompute()

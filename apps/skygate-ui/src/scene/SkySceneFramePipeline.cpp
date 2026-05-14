@@ -5,11 +5,60 @@
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
+namespace {
+
+[[nodiscard]] bool
+epochsEqual(const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::ephemeris::AstronomicalEpoch& rhs) noexcept
+{
+    return lhs.julianDatePart1 == rhs.julianDatePart1 && lhs.julianDatePart2 == rhs.julianDatePart2
+           && lhs.timeScale == rhs.timeScale;
+}
+
+[[nodiscard]] bool optionalEpochsEqual(
+    const std::optional<skygate::ephemeris::AstronomicalEpoch>& lhs,
+    const std::optional<skygate::ephemeris::AstronomicalEpoch>& rhs
+) noexcept
+{
+    if (lhs.has_value() != rhs.has_value()) {
+        return false;
+    }
+
+    return !lhs.has_value() || epochsEqual(*lhs, *rhs);
+}
+
+[[nodiscard]] bool optionsEqual(
+    const skygate::ephemeris::EphemerisEngineOptions& lhs, const skygate::ephemeris::EphemerisEngineOptions& rhs
+) noexcept
+{
+    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
+           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
+           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
+           && lhs.atmosphericPressureHpa == rhs.atmosphericPressureHpa
+           && lhs.atmosphericTemperatureC == rhs.atmosphericTemperatureC && lhs.relativeHumidity == rhs.relativeHumidity
+           && lhs.observingWavelengthMicrometers == rhs.observingWavelengthMicrometers;
+}
+
+[[nodiscard]] bool optionalOptionsEqual(
+    const std::optional<skygate::ephemeris::EphemerisEngineOptions>& lhs,
+    const std::optional<skygate::ephemeris::EphemerisEngineOptions>& rhs
+) noexcept
+{
+    if (lhs.has_value() != rhs.has_value()) {
+        return false;
+    }
+
+    return !lhs.has_value() || optionsEqual(*lhs, *rhs);
+}
+
+}  // namespace
+
 bool SkySceneFramePipeline::SnapshotCacheKey::equals(const SnapshotCacheKey& other) const noexcept
 {
     return catalogRevision == other.catalogRevision && observer.latitudeDeg == other.observer.latitudeDeg
            && observer.longitudeDeg == other.observer.longitudeDeg
-           && observer.elevationMeters == other.observer.elevationMeters && utcTime == other.utcTime;
+           && observer.elevationMeters == other.observer.elevationMeters && utcTime == other.utcTime
+           && optionalEpochsEqual(requestEpoch, other.requestEpoch)
+           && optionalOptionsEqual(requestOptions, other.requestOptions);
 }
 
 bool SkySceneFramePipeline::RenderFrameKey::equals(const RenderFrameKey& other) const noexcept
@@ -43,7 +92,12 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
     const SnapshotCacheKey snapshotKey{
         .catalogRevision = input.catalogRevision,
         .observer = snapshotContext.observer,
-        .utcTime = snapshotContext.utcTime
+        .utcTime = snapshotContext.utcTime,
+        .requestEpoch = input.ephemerisRequest.has_value() ? std::make_optional(input.ephemerisRequest->epoch)
+                                                           : std::optional<skygate::ephemeris::AstronomicalEpoch>{},
+        .requestOptions = input.ephemerisRequest.has_value()
+                              ? std::make_optional(input.ephemerisRequest->options)
+                              : std::optional<skygate::ephemeris::EphemerisEngineOptions>{}
     };
     if (m_cachedEphemerisEngine != input.ephemerisEngine || !m_snapshotCacheKey.has_value()
         || !m_snapshotCacheKey.value().equals(snapshotKey)) {
