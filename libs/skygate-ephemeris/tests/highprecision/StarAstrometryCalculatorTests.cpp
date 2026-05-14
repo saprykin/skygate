@@ -471,6 +471,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
 {
     const std::vector<CelestialBody> bodies{
         makeAstrometricStar(),
+        makeAstrometricStar(),
         makePartialAstrometricStar(),
         makeFixedOnlyStar(),
     };
@@ -483,7 +484,9 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
     const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
     const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
 
-    QCOMPARE(batchResults.size(), 3U);
+    QCOMPARE(batchResults.size(), 4U);
+    QCOMPARE(kernelProvider->callCount(), 1);
+    QCOMPARE(timeScaleService->callCount(), 1);
     for (const StarAstrometryBatchResult& batchResult : batchResults) {
         const HighPrecisionCalculatorResult singleResult =
             calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));

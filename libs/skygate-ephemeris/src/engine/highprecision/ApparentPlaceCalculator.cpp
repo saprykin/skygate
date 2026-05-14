@@ -415,4 +415,280 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     return result;
 }
 
+std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
+    const EphemerisRequest& request,
+    const std::span<const CelestialBody> bodies,
+    const std::span<const StarAstrometryBatchResult> calculatorResults
+) const
+{
+    const EphemerisCorrectionFlags requestedCorrections = request.options.correctionFlags;
+    const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
+    const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
+    const bool isTopocentric = targetFrame == CelestialReferenceFrame::Itrs;
+    const bool requestsAtmosphericRefraction =
+        request.options.enableAtmosphericRefraction
+        && hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction);
+
+    EphemerisResultMetadata topocentricMetadata;
+    bool topocentricRequestWideStateAvailable = true;
+    if (isTopocentric) {
+        if (m_timeScaleService == nullptr) {
+            topocentricMetadata.status = EphemerisResultStatus::Failed;
+            topocentricMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            topocentricMetadata.addUnavailableCorrection(EphemerisCorrectionFlags::EarthOrientation);
+            topocentricRequestWideStateAvailable = false;
+        } else {
+            const TimeScaleConversionResult utcConversion = m_timeScaleService->convert(request.epoch, TimeScale::Utc);
+            mergeTimeScaleMetadata(topocentricMetadata, utcConversion);
+            if (!utcConversion.isSuccess()) {
+                markCorrectionUnavailable(topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation);
+                topocentricRequestWideStateAvailable = false;
+            } else {
+                const EarthOrientationSample earthOrientationSample = sampleEarthOrientation(
+                    m_earthOrientationProvider,
+                    utcConversion.epoch,
+                    EarthOrientationSampleOptions{
+                        .allowOutOfRangeNearestSampleFallback = true,
+                        .allowMissingDataZeroFallback = true,
+                    }
+                );
+                mergeEarthOrientationMetadata(topocentricMetadata, earthOrientationSample);
+                if (!earthOrientationSample.isSuccess()) {
+                    markCorrectionUnavailable(topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation);
+                    topocentricRequestWideStateAvailable = false;
+                }
+            }
+        }
+    }
+
+    std::vector<StarAstrometryBatchResult> results;
+    results.reserve(calculatorResults.size());
+    std::vector<std::optional<CelestialFrameVector>> outputVectors;
+    outputVectors.reserve(calculatorResults.size());
+    std::vector<bool> hasObserverRelativePosition;
+    hasObserverRelativePosition.reserve(calculatorResults.size());
+    std::vector<CelestialFrameVector> transformInputs;
+    transformInputs.reserve(calculatorResults.size());
+    std::vector<std::size_t> transformResultIndices;
+    transformResultIndices.reserve(calculatorResults.size());
+
+    for (const StarAstrometryBatchResult& calculatorResult : calculatorResults) {
+        if (calculatorResult.bodyIndex >= bodies.size()) {
+            continue;
+        }
+
+        HighPrecisionCalculatorResult result = calculatorResult.result;
+        if (!calculatorResult.result.equatorial.has_value()
+            || !isFiniteEquatorial(*calculatorResult.result.equatorial)) {
+            results.push_back(StarAstrometryBatchResult{
+                .bodyIndex = calculatorResult.bodyIndex,
+                .result = std::move(result),
+            });
+            outputVectors.push_back(std::nullopt);
+            hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
+            continue;
+        }
+        if (isTopocentric) {
+            mergeMetadata(result.metadata, topocentricMetadata);
+            if (!topocentricRequestWideStateAvailable) {
+                results.push_back(StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = std::move(result),
+                });
+                outputVectors.push_back(std::nullopt);
+                hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
+                continue;
+            }
+        }
+
+        CelestialFrameVector outputVector = computationVectorFromCalculatorResult(calculatorResult.result);
+        if (targetFrame == CelestialReferenceFrame::Gcrs) {
+            results.push_back(StarAstrometryBatchResult{
+                .bodyIndex = calculatorResult.bodyIndex,
+                .result = std::move(result),
+            });
+            outputVectors.push_back(outputVector);
+            hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
+            continue;
+        }
+
+        results.push_back(StarAstrometryBatchResult{
+            .bodyIndex = calculatorResult.bodyIndex,
+            .result = std::move(result),
+        });
+        outputVectors.push_back(std::nullopt);
+        hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
+        if (m_frameTransformer != nullptr) {
+            transformInputs.push_back(outputVector);
+            transformResultIndices.push_back(results.size() - 1U);
+        } else {
+            markCorrectionUnavailable(
+                results.back().result.metadata,
+                isTopocentric
+                    ? (EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation)
+                    : EphemerisCorrectionFlags::PrecessionNutation
+            );
+        }
+    }
+
+    if (m_frameTransformer != nullptr && !transformInputs.empty()) {
+        const std::vector<CelestialFrameTransformResult> transformResults =
+            m_frameTransformer->transformCelestialVectors(CelestialFrameBatchTransformRequest{
+                .sourceFrame = CelestialReferenceFrame::Gcrs,
+                .targetFrame = targetFrame,
+                .epoch = request.epoch,
+                .vectors = transformInputs,
+            });
+        const std::size_t transformCount = std::min(transformResults.size(), transformResultIndices.size());
+        for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
+            const std::size_t resultIndex = transformResultIndices[transformIndex];
+            HighPrecisionCalculatorResult& result = results[resultIndex].result;
+            const CelestialFrameTransformResult& transformResult = transformResults[transformIndex];
+            mergeMetadata(result.metadata, transformResult.metadata);
+            if (!transformResult.vector.has_value()) {
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::PrecessionNutation);
+                continue;
+            }
+
+            outputVectors[resultIndex] = *transformResult.vector;
+        }
+    }
+
+    std::vector<std::optional<CelestialFrameVector>> equatorialVectors = outputVectors;
+    if (isTopocentric) {
+        const std::optional<CelestialFrameVector> observerPosition = observerItrsPositionAu(request.context.observer);
+        for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
+            if (!outputVectors[resultIndex].has_value()) {
+                continue;
+            }
+
+            HighPrecisionCalculatorResult& result = results[resultIndex].result;
+            if (!observerPosition.has_value()) {
+                if (result.metadata.status == EphemerisResultStatus::Valid) {
+                    result.metadata.status = EphemerisResultStatus::Degraded;
+                }
+                result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
+                result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::DiurnalParallax);
+            } else if (hasObserverRelativePosition[resultIndex]) {
+                outputVectors[resultIndex] = subtractVector(*outputVectors[resultIndex], *observerPosition);
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+            } else {
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::DiurnalParallax);
+            }
+
+            equatorialVectors[resultIndex] = outputVectors[resultIndex];
+            if (const std::optional<core::HorizontalCoordinate> horizontal =
+                    horizontalFromItrsVector(*outputVectors[resultIndex], request.context.observer);
+                horizontal.has_value()) {
+                result.horizontal = *horizontal;
+            } else {
+                if (result.metadata.status == EphemerisResultStatus::Valid) {
+                    result.metadata.status = EphemerisResultStatus::Degraded;
+                }
+                result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
+            }
+        }
+
+        std::vector<CelestialFrameVector> gcrsInputs;
+        std::vector<std::size_t> gcrsResultIndices;
+        gcrsInputs.reserve(results.size());
+        gcrsResultIndices.reserve(results.size());
+        for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
+            if (outputVectors[resultIndex].has_value()) {
+                gcrsInputs.push_back(*outputVectors[resultIndex]);
+                gcrsResultIndices.push_back(resultIndex);
+            }
+        }
+
+        if (m_frameTransformer != nullptr && !gcrsInputs.empty()) {
+            const std::vector<CelestialFrameTransformResult> gcrsTransformResults =
+                m_frameTransformer->transformCelestialVectors(CelestialFrameBatchTransformRequest{
+                    .sourceFrame = CelestialReferenceFrame::Itrs,
+                    .targetFrame = CelestialReferenceFrame::Gcrs,
+                    .epoch = request.epoch,
+                    .vectors = gcrsInputs,
+                });
+            const std::size_t transformCount = std::min(gcrsTransformResults.size(), gcrsResultIndices.size());
+            for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
+                const std::size_t resultIndex = gcrsResultIndices[transformIndex];
+                HighPrecisionCalculatorResult& result = results[resultIndex].result;
+                const CelestialFrameTransformResult& transformResult = gcrsTransformResults[transformIndex];
+                mergeMetadata(result.metadata, transformResult.metadata);
+                if (transformResult.vector.has_value()) {
+                    equatorialVectors[resultIndex] = *transformResult.vector;
+                } else {
+                    markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::EarthOrientation);
+                }
+            }
+        }
+
+        if (hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::PrecessionNutation)) {
+            std::vector<CelestialFrameVector> apparentInputs;
+            std::vector<std::size_t> apparentResultIndices;
+            apparentInputs.reserve(results.size());
+            apparentResultIndices.reserve(results.size());
+            for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
+                if (equatorialVectors[resultIndex].has_value()) {
+                    apparentInputs.push_back(*equatorialVectors[resultIndex]);
+                    apparentResultIndices.push_back(resultIndex);
+                }
+            }
+
+            if (m_frameTransformer != nullptr && !apparentInputs.empty()) {
+                const std::vector<CelestialFrameTransformResult> apparentTransformResults =
+                    m_frameTransformer->transformCelestialVectors(CelestialFrameBatchTransformRequest{
+                        .sourceFrame = CelestialReferenceFrame::Gcrs,
+                        .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
+                        .epoch = request.epoch,
+                        .vectors = apparentInputs,
+                    });
+                const std::size_t transformCount =
+                    std::min(apparentTransformResults.size(), apparentResultIndices.size());
+                for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
+                    const std::size_t resultIndex = apparentResultIndices[transformIndex];
+                    HighPrecisionCalculatorResult& result = results[resultIndex].result;
+                    const CelestialFrameTransformResult& transformResult = apparentTransformResults[transformIndex];
+                    mergeMetadata(result.metadata, transformResult.metadata);
+                    if (transformResult.vector.has_value()) {
+                        equatorialVectors[resultIndex] = *transformResult.vector;
+                    } else {
+                        markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::PrecessionNutation);
+                    }
+                }
+            }
+        }
+    }
+
+    for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
+        HighPrecisionCalculatorResult& result = results[resultIndex].result;
+        if (!equatorialVectors[resultIndex].has_value()) {
+            continue;
+        }
+
+        if (const std::optional<core::EquatorialCoordinate> equatorial =
+                equatorialFromVector(*equatorialVectors[resultIndex]);
+            equatorial.has_value()) {
+            result.equatorial = *equatorial;
+        } else {
+            result.metadata.status = EphemerisResultStatus::Failed;
+            result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        }
+
+        if (requestsAtmosphericRefraction) {
+            if (m_atmosphericRefractionCalculator == nullptr) {
+                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AtmosphericRefraction);
+            } else {
+                const HighPrecisionComputationInput input{
+                    .request = request,
+                    .body = bodies[results[resultIndex].bodyIndex],
+                    .bodyIndex = results[resultIndex].bodyIndex,
+                };
+                result = m_atmosphericRefractionCalculator->apply(input, result);
+            }
+        }
+    }
+
+    return results;
+}
+
 }  // namespace skygate::ephemeris::highprecision

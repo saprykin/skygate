@@ -103,6 +103,30 @@ public:
 
     [[nodiscard]] virtual HighPrecisionCalculatorResult
     apply(const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult) const = 0;
+    [[nodiscard]] virtual std::vector<StarAstrometryBatchResult> applyBatch(
+        const EphemerisRequest& request,
+        std::span<const CelestialBody> bodies,
+        std::span<const StarAstrometryBatchResult> calculatorResults
+    ) const
+    {
+        std::vector<StarAstrometryBatchResult> results;
+        results.reserve(calculatorResults.size());
+        for (const StarAstrometryBatchResult& calculatorResult : calculatorResults) {
+            if (calculatorResult.bodyIndex >= bodies.size()) {
+                continue;
+            }
+            const HighPrecisionComputationInput input{
+                .request = request,
+                .body = bodies[calculatorResult.bodyIndex],
+                .bodyIndex = calculatorResult.bodyIndex,
+            };
+            results.push_back(StarAstrometryBatchResult{
+                .bodyIndex = calculatorResult.bodyIndex,
+                .result = apply(input, calculatorResult.result),
+            });
+        }
+        return results;
+    }
 };
 
 class IEphemerisResultBuilder {
