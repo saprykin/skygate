@@ -69,8 +69,8 @@ void verifyCrossingAltitude(
 
 class MovingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -128,8 +128,8 @@ class ConstantAltitudeEngine final : public skygate::ephemeris::IEphemerisEngine
 public:
     explicit ConstantAltitudeEngine(const double altitudeDeg) : m_altitudeDeg(altitudeDeg) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -183,8 +183,8 @@ private:
 
 class RequestSensitiveMovingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = request.context;
@@ -277,6 +277,81 @@ public:
     mutable bool sawSampleEpochUpdate = false;
 };
 
+class GuidedHighPrecisionFixedEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit GuidedHighPrecisionFixedEngine(const skygate::ephemeris::CelestialBody& body)
+        : m_engine(makeEngineForBody(body))
+    {
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineOptions options;
+        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        return options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        return m_engine->compute(request);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        ++requestSampleCount;
+        return m_engine->computeBodyState(request, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        ++requestSampleCount;
+        return m_engine->computeBodyState(request, bodyIndex);
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        return compute(requestFromContext(context));
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, std::string_view bodyId) const override
+    {
+        ++contextSampleCount;
+        return m_engine->computeBodyState(context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    {
+        ++contextSampleCount;
+        return m_engine->computeBodyState(context, bodyIndex);
+    }
+
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+
+private:
+    [[nodiscard]] skygate::ephemeris::EphemerisRequest
+    requestFromContext(const skygate::core::SkyContext& context) const noexcept
+    {
+        skygate::ephemeris::EphemerisRequest request;
+        request.context = context;
+        request.options = options();
+        return request;
+    }
+
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_engine;
+};
+
 }  // namespace
 
 class ObservationEventCalculatorTests final : public QObject {
@@ -291,6 +366,7 @@ private slots:
     void invalidAndUnresolvedInputsReturnExplicitStatuses();
     void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
     void movingBodySamplesThroughEphemerisEngine();
+    void highPrecisionFixedBodyUsesGuidedCoarseSearch();
     void requestOverloadPropagatesOptionsAndSampleEpochs();
     void contextOverloadSeedsRequestOptionsFromEngine();
 };
@@ -461,6 +537,33 @@ void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()
     QVERIFY(*summary.culmination.altitudeDeg > 34.9);
 }
 
+void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSearch()
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
+    GuidedHighPrecisionFixedEngine engine(body);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeContext();
+    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 2024,
+            .month = 6,
+            .day = 2,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
+    request.options = engine.options();
+
+    const auto summary = calculator.compute(engine, request, 0U, body);
+
+    QCOMPARE(engine.contextSampleCount, 0);
+    QVERIFY(engine.requestSampleCount > 0);
+    QVERIFY(engine.requestSampleCount < 120);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+}
+
 void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleEpochs()
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
@@ -468,12 +571,14 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext(0.0, 0.0);
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
-    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = 1970,
-        .month = 1,
-        .day = 1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 1970,
+            .month = 1,
+            .day = 1,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
     request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
     engine.baseUtcTime = request.context.utcTime;

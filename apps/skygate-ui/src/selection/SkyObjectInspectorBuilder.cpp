@@ -3,12 +3,27 @@
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkySceneShared.hpp"
 
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/ObservationEventCalculator.hpp"
 
+#include <QElapsedTimer>
+#include <QLoggingCategory>
+
+#include <array>
+#include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
 namespace {
+
+Q_LOGGING_CATEGORY(skygatePerfLog, "skygate.perf")
+
+bool performanceLoggingEnabled()
+{
+    static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
+    return enabled;
+}
 
 SkyInspectorField inspectorField(const QString& label, const QString& value)
 {
@@ -25,6 +40,10 @@ bool hasSelectionInputs(const SkySelectionOverlayInput& input)
     return input.snapshot != nullptr && input.preparedProjection != nullptr && input.stateIndexByBodyId != nullptr;
 }
 
+skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
+    const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body, std::uint32_t bodyIndex
+);
+
 void appendObservationEventFields(
     std::vector<SkyInspectorField>& fields,
     const SkySelectionOverlayInput& input,
@@ -36,10 +55,17 @@ void appendObservationEventFields(
         return;
     }
 
-    const skygate::ephemeris::ObservationEventCalculator calculator;
-    const auto events = input.ephemerisRequest.has_value()
-                            ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body)
-                            : calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex, body);
+    QElapsedTimer timer;
+    if (performanceLoggingEnabled()) {
+        timer.start();
+    }
+
+    const auto events = observationEventsForInspector(input, body, bodyIndex);
+    if (performanceLoggingEnabled()) {
+        qCInfo(skygatePerfLog) << "object inspector events elapsedMs=" << timer.nsecsElapsed() / 1000000.0
+                               << "bodyId=" << QString::fromStdString(body.id)
+                               << "request=" << input.ephemerisRequest.has_value();
+    }
     fields.push_back(
         inspectorField("Rise", skygate::ui::internal::formatObservationEvent(events.nextRise, input.timeController))
     );
@@ -71,6 +97,27 @@ bool shouldComputeHighPrecisionInspectorState(const SkySelectionOverlayInput& in
     return input.ephemerisEngine != nullptr
            && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision
            && shouldShowHighPrecisionDetails(input);
+}
+
+skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
+    const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body, const std::uint32_t bodyIndex
+)
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator;
+    if (shouldShowHighPrecisionDetails(input) && input.ephemerisRequest.has_value()) {
+        const std::array<skygate::ephemeris::CelestialBody, 1> bodies{body};
+        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
+            skygate::ephemeris::createEphemerisEngine(
+                std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
+            );
+        if (guidanceEngine != nullptr) {
+            return calculator.compute(*guidanceEngine, input.ephemerisRequest->context, 0U, body);
+        }
+    }
+
+    return input.ephemerisRequest.has_value()
+               ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body)
+               : calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex, body);
 }
 
 skygate::ephemeris::CelestialBodyState
@@ -136,6 +183,11 @@ void appendEphemerisMetadataFields(
 
 SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOverlayInput& input) const
 {
+    QElapsedTimer timer;
+    if (performanceLoggingEnabled()) {
+        timer.start();
+    }
+
     if (!hasSelectionInputs(input)) {
         return {};
     }
@@ -176,7 +228,9 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         inspectorY = projected.y + 18.0;
     }
 
+    const qint64 lookupNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
     const skygate::ephemeris::CelestialBodyState state = detailedInspectorState(input, sceneState);
+    const qint64 detailStateNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : lookupNs;
 
     std::vector<SkyInspectorField> fields;
     fields.push_back(inspectorField("Type", skygate::ui::internal::celestialBodyTypeText(body)));
@@ -201,6 +255,15 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
             input.catalogSourceIds, input.catalogSourceLabels, sceneState.bodyIndex
         )
     ));
+    const qint64 fieldsNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : detailStateNs;
+
+    if (performanceLoggingEnabled()) {
+        qCInfo(skygatePerfLog) << "object inspector build elapsedMs=" << timer.nsecsElapsed() / 1000000.0
+                               << "lookupMs=" << lookupNs / 1000000.0
+                               << "detailStateMs=" << (detailStateNs - lookupNs) / 1000000.0
+                               << "fieldsMs=" << (fieldsNs - detailStateNs) / 1000000.0
+                               << "bodyId=" << QString::fromStdString(body.id);
+    }
 
     return SkySelectedObjectInspector{
         .visible = true,

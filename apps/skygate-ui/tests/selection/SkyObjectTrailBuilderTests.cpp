@@ -18,8 +18,8 @@ class TrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit TrailEngine(const std::uint32_t expectedBodyIndex = 7U) : m_expectedBodyIndex(expectedBodyIndex) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -72,9 +72,10 @@ public:
 
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = bodyIndex,
-            .horizontal =
-                {.altitudeDeg = 45.0 + (static_cast<double>(offsetMinutes) / 6000.0),
-                 .azimuthDeg = 180.0 + (static_cast<double>(offsetMinutes) / 6000.0)}
+            .horizontal = {
+                .altitudeDeg = 45.0 + (static_cast<double>(offsetMinutes) / 6000.0),
+                .azimuthDeg = 180.0 + (static_cast<double>(offsetMinutes) / 6000.0)
+            }
         };
     }
 
@@ -114,8 +115,8 @@ private:
 
 class CrossingTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -214,7 +215,8 @@ private slots:
     void invalidInputsAppendNoLines();
     void appendsPastDashesFutureSegmentsAndTickLabels();
     void invalidSamplesBreakContinuity();
-    void requestTrailSamplingUsesSelectedEngineOptions();
+    void highPrecisionFixedTargetTrailUsesEquatorialModel();
+    void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
 };
@@ -282,7 +284,42 @@ void SkyObjectTrailBuilderTests::invalidSamplesBreakContinuity()
     QVERIFY(gappedFrame.lines.size() < continuousFrame.lines.size());
 }
 
-void SkyObjectTrailBuilderTests::requestTrailSamplingUsesSelectedEngineOptions()
+void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialModel()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    input.ephemerisRequest = request;
+
+    const skygate::ephemeris::CelestialBody body{
+        .id = "fixed-star",
+        .displayName = "Fixed Star",
+        .type = skygate::ephemeris::CelestialBodyType::Star,
+        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Star,
+        .fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0}
+    };
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0}
+    };
+    input.targetBody = &body;
+    input.targetState = &state;
+
+    builder.appendTrail(frame, input);
+
+    QVERIFY(frame.lines.size() > 5U);
+    QCOMPARE(engine.requestBodyStateCalls(), 0);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+}
+
+void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolatedSamples()
 {
     const auto projection = makeProjection();
     QVERIFY(projection.has_value());
@@ -305,7 +342,8 @@ void SkyObjectTrailBuilderTests::requestTrailSamplingUsesSelectedEngineOptions()
 
     QVERIFY(engine.sawExpectedBodyIndex());
     QVERIFY(frame.lines.size() > 40U);
-    QVERIFY(engine.requestBodyStateCalls() > 0);
+    QCOMPARE(countLabelsOfKind(frame.labels, "trailTick"), 3);
+    QCOMPARE(engine.requestBodyStateCalls(), 13);
     QCOMPARE(engine.contextBodyStateCalls(), 0);
     QVERIFY(engine.lastRequest().has_value());
     QCOMPARE(
@@ -320,6 +358,15 @@ void SkyObjectTrailBuilderTests::requestTrailSamplingUsesSelectedEngineOptions()
     QCOMPARE(engine.lastRequest()->context.utcTime.time_since_epoch().count(), std::int64_t{65400});
     QCOMPARE(engine.lastRequest()->epoch.julianDatePart1, 2'451'546.0);
     QVERIFY(std::abs(engine.lastRequest()->epoch.julianDatePart2) < 1e-12);
+
+    const auto pannedProjection = makeProjection(70.0);
+    QVERIFY(pannedProjection.has_value());
+    SkyRenderFrame pannedFrame;
+    input.preparedProjection = &*pannedProjection;
+    builder.appendTrail(pannedFrame, input);
+
+    QVERIFY(pannedFrame.lines.size() > 40U);
+    QCOMPARE(engine.requestBodyStateCalls(), 13);
 }
 
 void SkyObjectTrailBuilderTests::longProjectedJumpsAreDropped()

@@ -5,7 +5,7 @@
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/core/math/LinePattern.hpp"
 #include "skygate/core/math/ProjectedPolylineBuilder.hpp"
-#include "skygate/ephemeris/BodyTrailCalculator.hpp"
+#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <QColor>
@@ -13,12 +13,19 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
+#include <numbers>
+#include <optional>
+#include <vector>
 
 namespace {
 
 constexpr int kObjectTrailPastHours = 6;
 constexpr int kObjectTrailFutureHours = 18;
 constexpr int kObjectTrailSampleStepMinutes = 30;
+constexpr int kObjectTrailHighPrecisionRenderStepMinutes = 10;
+constexpr int kObjectTrailHighPrecisionSampleStepMinutes = 120;
 constexpr double kObjectTrailPastWidthPx = 1.4;
 constexpr double kObjectTrailFutureWidthPx = 2.0;
 constexpr double kObjectTrailPastDashLengthPx = 8.0;
@@ -31,6 +38,276 @@ QColor colorWithAlpha(const QColor& color, const int alpha)
     QColor adjusted = color;
     adjusted.setAlpha(alpha);
     return adjusted;
+}
+
+[[nodiscard]] bool usesHighPrecisionRequest(const SkyObjectTrailInput& input) noexcept
+{
+    return input.ephemerisRequest.has_value()
+           && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+}
+
+[[nodiscard]] bool isFixedEquatorialTrailTarget(const SkyObjectTrailInput& input) noexcept
+{
+    if (!usesHighPrecisionRequest(input) || input.targetBody == nullptr || input.targetState == nullptr
+        || !input.targetState->equatorial.isFinite()) {
+        return false;
+    }
+
+    return input.targetBody->fixedEquatorial.has_value() || input.targetBody->starAstrometry.has_value()
+           || input.targetBody->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+           || input.targetBody->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::Star;
+}
+
+[[nodiscard]] bool
+epochsEqual(const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::ephemeris::AstronomicalEpoch& rhs) noexcept
+{
+    return lhs.julianDatePart1 == rhs.julianDatePart1 && lhs.julianDatePart2 == rhs.julianDatePart2
+           && lhs.timeScale == rhs.timeScale;
+}
+
+[[nodiscard]] bool optionalEpochsEqual(
+    const std::optional<skygate::ephemeris::AstronomicalEpoch>& lhs,
+    const std::optional<skygate::ephemeris::AstronomicalEpoch>& rhs
+) noexcept
+{
+    if (lhs.has_value() != rhs.has_value()) {
+        return false;
+    }
+
+    return !lhs.has_value() || epochsEqual(*lhs, *rhs);
+}
+
+[[nodiscard]] bool optionsEqual(
+    const skygate::ephemeris::EphemerisEngineOptions& lhs, const skygate::ephemeris::EphemerisEngineOptions& rhs
+) noexcept
+{
+    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
+           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
+           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
+           && lhs.atmosphericPressureHpa == rhs.atmosphericPressureHpa
+           && lhs.atmosphericTemperatureC == rhs.atmosphericTemperatureC && lhs.relativeHumidity == rhs.relativeHumidity
+           && lhs.observingWavelengthMicrometers == rhs.observingWavelengthMicrometers;
+}
+
+[[nodiscard]] bool optionalOptionsEqual(
+    const std::optional<skygate::ephemeris::EphemerisEngineOptions>& lhs,
+    const std::optional<skygate::ephemeris::EphemerisEngineOptions>& rhs
+) noexcept
+{
+    if (lhs.has_value() != rhs.has_value()) {
+        return false;
+    }
+
+    return !lhs.has_value() || optionsEqual(*lhs, *rhs);
+}
+
+[[nodiscard]] bool
+equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::core::EquatorialCoordinate& rhs) noexcept
+{
+    return lhs.rightAscensionHours == rhs.rightAscensionHours && lhs.declinationDeg == rhs.declinationDeg;
+}
+
+[[nodiscard]] bool optionalEquatorialsEqual(
+    const std::optional<skygate::core::EquatorialCoordinate>& lhs,
+    const std::optional<skygate::core::EquatorialCoordinate>& rhs
+) noexcept
+{
+    if (lhs.has_value() != rhs.has_value()) {
+        return false;
+    }
+
+    return !lhs.has_value() || equatorialEqual(*lhs, *rhs);
+}
+
+[[nodiscard]] bool observersEqual(const skygate::core::GeoLocation& lhs, const skygate::core::GeoLocation& rhs) noexcept
+{
+    return lhs.latitudeDeg == rhs.latitudeDeg && lhs.longitudeDeg == rhs.longitudeDeg
+           && lhs.elevationMeters == rhs.elevationMeters;
+}
+
+[[nodiscard]] double normalizeDegrees(const double valueDeg) noexcept
+{
+    double normalizedDeg = std::fmod(valueDeg, 360.0);
+    return normalizedDeg < 0.0 ? normalizedDeg + 360.0 : normalizedDeg;
+}
+
+struct UnitVector3d final {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+};
+
+[[nodiscard]] UnitVector3d horizontalToUnitVector(const skygate::core::HorizontalCoordinate& coordinate) noexcept
+{
+    constexpr double degreesToRadians = std::numbers::pi / 180.0;
+    const double altitudeRad = coordinate.altitudeDeg * degreesToRadians;
+    const double azimuthRad = coordinate.azimuthDeg * degreesToRadians;
+    const double cosAltitude = std::cos(altitudeRad);
+    return UnitVector3d{
+        .x = cosAltitude * std::sin(azimuthRad),
+        .y = cosAltitude * std::cos(azimuthRad),
+        .z = std::sin(altitudeRad),
+    };
+}
+
+[[nodiscard]] skygate::core::HorizontalCoordinate unitVectorToHorizontal(const UnitVector3d& vector) noexcept
+{
+    constexpr double radiansToDegrees = 180.0 / std::numbers::pi;
+    const double altitudeDeg = std::asin(std::clamp(vector.z, -1.0, 1.0)) * radiansToDegrees;
+    const double azimuthDeg = normalizeDegrees(std::atan2(vector.x, vector.y) * radiansToDegrees);
+    return skygate::core::HorizontalCoordinate{.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg};
+}
+
+[[nodiscard]] UnitVector3d normalized(const UnitVector3d& vector) noexcept
+{
+    const double length = std::sqrt((vector.x * vector.x) + (vector.y * vector.y) + (vector.z * vector.z));
+    if (length <= 0.0) {
+        return UnitVector3d{.x = 0.0, .y = 0.0, .z = 1.0};
+    }
+
+    return UnitVector3d{.x = vector.x / length, .y = vector.y / length, .z = vector.z / length};
+}
+
+[[nodiscard]] skygate::core::HorizontalCoordinate interpolateHorizontalCoordinate(
+    const skygate::core::HorizontalCoordinate& previous,
+    const skygate::core::HorizontalCoordinate& next,
+    const double fraction
+) noexcept
+{
+    const UnitVector3d previousVector = horizontalToUnitVector(previous);
+    const UnitVector3d nextVector = horizontalToUnitVector(next);
+    return unitVectorToHorizontal(normalized(
+        UnitVector3d{
+            .x = previousVector.x + ((nextVector.x - previousVector.x) * fraction),
+            .y = previousVector.y + ((nextVector.y - previousVector.y) * fraction),
+            .z = previousVector.z + ((nextVector.z - previousVector.z) * fraction),
+        }
+    ));
+}
+
+[[nodiscard]] std::optional<skygate::core::HorizontalCoordinate> interpolateSampleAtOffset(
+    const std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
+    const int offsetMinutes,
+    std::size_t& nextAnchorIndex
+)
+{
+    while (nextAnchorIndex < anchors.size() && anchors[nextAnchorIndex].offsetMinutes < offsetMinutes) {
+        ++nextAnchorIndex;
+    }
+    if (nextAnchorIndex >= anchors.size()) {
+        return std::nullopt;
+    }
+
+    const skygate::ephemeris::BodyTrailSample& next = anchors[nextAnchorIndex];
+    if (next.offsetMinutes == offsetMinutes) {
+        return next.horizontal;
+    }
+    if (nextAnchorIndex == 0U) {
+        return std::nullopt;
+    }
+
+    const skygate::ephemeris::BodyTrailSample& previous = anchors[nextAnchorIndex - 1U];
+    if (!previous.horizontal.has_value() || !next.horizontal.has_value()) {
+        return std::nullopt;
+    }
+
+    const int spanMinutes = next.offsetMinutes - previous.offsetMinutes;
+    if (spanMinutes <= 0) {
+        return std::nullopt;
+    }
+
+    return interpolateHorizontalCoordinate(
+        *previous.horizontal,
+        *next.horizontal,
+        static_cast<double>(offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
+    );
+}
+
+[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> interpolateTrailSamples(
+    const std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
+    const skygate::ephemeris::BodyTrailOptions& renderOptions
+)
+{
+    std::vector<skygate::ephemeris::BodyTrailSample> samples;
+    const int startOffsetMinutes = -renderOptions.pastHours * 60;
+    const int endOffsetMinutes = renderOptions.futureHours * 60;
+    samples.reserve(
+        static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / renderOptions.sampleStepMinutes) + 1U
+    );
+
+    std::size_t nextAnchorIndex = 0U;
+    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
+         offsetMinutes += renderOptions.sampleStepMinutes) {
+        samples.push_back(
+            skygate::ephemeris::BodyTrailSample{
+                .offsetMinutes = offsetMinutes,
+                .horizontal = interpolateSampleAtOffset(anchors, offsetMinutes, nextAnchorIndex)
+            }
+        );
+    }
+
+    return samples;
+}
+
+[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample>
+sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions)
+{
+    const skygate::core::SkyContext& context =
+        input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
+    const skygate::core::EquatorialCoordinate equatorial = input.targetState->equatorial;
+    const int startOffsetMinutes = -renderOptions.pastHours * 60;
+    const int endOffsetMinutes = renderOptions.futureHours * 60;
+
+    std::vector<skygate::ephemeris::BodyTrailSample> samples;
+    samples.reserve(
+        static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / renderOptions.sampleStepMinutes) + 1U
+    );
+
+    for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
+         offsetMinutes += renderOptions.sampleStepMinutes) {
+        const skygate::core::UtcTimePoint sampleTime = context.utcTime + std::chrono::minutes(offsetMinutes);
+        samples.push_back(
+            skygate::ephemeris::BodyTrailSample{
+                .offsetMinutes = offsetMinutes,
+                .horizontal = skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(
+                    equatorial.rightAscensionHours, equatorial.declinationDeg, context.observer, sampleTime
+                )
+            }
+        );
+    }
+
+    return samples;
+}
+
+[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> sampleTrail(
+    const SkyObjectTrailInput& input,
+    const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
+    const skygate::ephemeris::BodyTrailOptions& renderOptions
+)
+{
+    if (isFixedEquatorialTrailTarget(input)) {
+        return sampleFixedEquatorialTrail(input, renderOptions);
+    }
+
+    if (usesHighPrecisionRequest(input)) {
+        const skygate::ephemeris::BodyTrailOptions anchorOptions{
+            .pastHours = renderOptions.pastHours,
+            .futureHours = renderOptions.futureHours,
+            .sampleStepMinutes = kObjectTrailHighPrecisionSampleStepMinutes
+        };
+        return interpolateTrailSamples(
+            trailCalculator.sample(
+                *input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, anchorOptions
+            ),
+            renderOptions
+        );
+    }
+
+    return input.ephemerisRequest.has_value()
+               ? trailCalculator.sample(
+                     *input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, renderOptions
+                 )
+               : trailCalculator.sample(*input.ephemerisEngine, input.skyContext, input.targetBodyIndex, renderOptions);
 }
 
 void appendTrailLine(
@@ -96,6 +373,51 @@ void appendFutureTrailTick(
 
 }  // namespace
 
+SkyObjectTrailBuilder::TrailSampleCacheKey SkyObjectTrailBuilder::sampleCacheKeyFor(const SkyObjectTrailInput& input)
+{
+    const skygate::core::SkyContext& context =
+        input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
+    return TrailSampleCacheKey{
+        .ephemerisEngine = input.ephemerisEngine,
+        .context = context,
+        .requestEpoch = input.ephemerisRequest.has_value() ? std::make_optional(input.ephemerisRequest->epoch)
+                                                           : std::optional<skygate::ephemeris::AstronomicalEpoch>{},
+        .requestOptions = input.ephemerisRequest.has_value()
+                              ? std::make_optional(input.ephemerisRequest->options)
+                              : std::optional<skygate::ephemeris::EphemerisEngineOptions>{},
+        .targetEquatorial = input.targetState != nullptr && input.targetState->equatorial.isFinite()
+                                ? std::make_optional(input.targetState->equatorial)
+                                : std::optional<skygate::core::EquatorialCoordinate>{},
+        .targetBodyIndex = input.targetBodyIndex
+    };
+}
+
+bool SkyObjectTrailBuilder::sampleCacheKeysEqual(
+    const TrailSampleCacheKey& lhs, const TrailSampleCacheKey& rhs
+) noexcept
+{
+    return lhs.ephemerisEngine == rhs.ephemerisEngine && lhs.targetBodyIndex == rhs.targetBodyIndex
+           && lhs.context.utcTime == rhs.context.utcTime && observersEqual(lhs.context.observer, rhs.context.observer)
+           && optionalEpochsEqual(lhs.requestEpoch, rhs.requestEpoch)
+           && optionalOptionsEqual(lhs.requestOptions, rhs.requestOptions)
+           && optionalEquatorialsEqual(lhs.targetEquatorial, rhs.targetEquatorial);
+}
+
+const std::vector<skygate::ephemeris::BodyTrailSample>& SkyObjectTrailBuilder::trailSamples(
+    const SkyObjectTrailInput& input,
+    const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
+    const skygate::ephemeris::BodyTrailOptions& trailOptions
+) const
+{
+    const TrailSampleCacheKey cacheKey = sampleCacheKeyFor(input);
+    if (!m_sampleCacheKey.has_value() || !sampleCacheKeysEqual(*m_sampleCacheKey, cacheKey)) {
+        m_sampleCache = sampleTrail(input, trailCalculator, trailOptions);
+        m_sampleCacheKey = cacheKey;
+    }
+
+    return m_sampleCache;
+}
+
 void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTrailInput& input) const
 {
     const skygate::core::SkyContext& context =
@@ -118,14 +440,10 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
     const skygate::ephemeris::BodyTrailOptions trailOptions{
         .pastHours = kObjectTrailPastHours,
         .futureHours = kObjectTrailFutureHours,
-        .sampleStepMinutes = kObjectTrailSampleStepMinutes
+        .sampleStepMinutes =
+            usesHighPrecisionRequest(input) ? kObjectTrailHighPrecisionRenderStepMinutes : kObjectTrailSampleStepMinutes
     };
-    const auto samples =
-        input.ephemerisRequest.has_value()
-            ? trailCalculator.sample(
-                  *input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, trailOptions
-              )
-            : trailCalculator.sample(*input.ephemerisEngine, input.skyContext, input.targetBodyIndex, trailOptions);
+    const auto& samples = trailSamples(input, trailCalculator, trailOptions);
 
     for (const auto& sample : samples) {
         if (!sample.horizontal.has_value() || !sample.horizontal->isValid()) {

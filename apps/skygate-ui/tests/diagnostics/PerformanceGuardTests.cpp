@@ -34,6 +34,7 @@ class PerformanceGuardTests final : public QObject {
 private slots:
     void buildsLargeSceneWithinGuardrail();
     void buildsHighPrecisionLargeFixedCatalogWithinGuardrail();
+    void profilesHighPrecisionLargeFixedCatalogSelection();
     void searchesLargeMixedCatalogWithinGuardrail();
     void hitTestsDenseRenderFrameWithinGuardrail();
     void buildsManyObjectTrailsWithinGuardrail();
@@ -562,6 +563,151 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
     verifyElapsedBelow(
         timeUpdateElapsedMs, kHighPrecisionLargeSceneBuildBudgetMs, "high precision large fixed catalog time update"
     );
+}
+
+void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
+    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    QVERIFY(catalog != nullptr);
+
+    auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
+    auto apparentPlaceCalculator = std::make_shared<GuardApparentPlaceCalculator>();
+    auto computationCache = std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+
+    skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
+    dependencies.starAstrometryCalculator = starAstrometryCalculator;
+    dependencies.apparentPlaceCalculator = apparentPlaceCalculator;
+    dependencies.computationCache = computationCache;
+    dependencies.dataSetInfo = makeHighPrecisionGuardDataSetInfo();
+
+    auto engine = std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
+        bodies, options, dependencies
+    );
+
+    SkyContextController::InitializationOptions initializationOptions = testInitializationOptions();
+    initializationOptions.rebuildEphemerisEngineOnStartup = false;
+    SkyContextController controller(std::move(catalog), std::move(engine), initializationOptions, nullptr);
+    controller.setLatitudeText(QStringLiteral("47.4"));
+    controller.setLongitudeText(QStringLiteral("8.5"));
+    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    controller.setMagnitudeCutoff(12.0);
+    controller.setViewCenter(45.0, 180.0);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1280.0, 800.0);
+    QVERIFY(sceneModel.snapshotGeneration() > 0U);
+
+    const SkyRenderPoint* targetPoint = nullptr;
+    for (const SkyRenderPoint& point : sceneModel.renderPointSpan()) {
+        targetPoint = &point;
+        break;
+    }
+    QVERIFY(targetPoint != nullptr);
+
+    const int astrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
+    const int astrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
+    const int apparentBatchCallsBefore = apparentPlaceCalculator->batchCallCount();
+    const int apparentSingleCallsBefore = apparentPlaceCalculator->singleCallCount();
+
+    QElapsedTimer timer;
+    timer.start();
+    QVERIFY(sceneModel.selectObjectAt(targetPoint->x, targetPoint->y));
+    const qint64 selectElapsedMs = timer.elapsed();
+
+    qInfo().noquote() << performanceMetricMessage(
+        selectElapsedMs,
+        kHighPrecisionLargeSceneBuildBudgetMs,
+        "high precision large fixed catalog selection",
+        isStrictPerformanceGuardMode()
+    );
+    qInfo().noquote() << QStringLiteral(
+                             "perf high precision selection counters: astrometryBatchDelta=%1 "
+                             "astrometrySingleDelta=%2 apparentBatchDelta=%3 apparentSingleDelta=%4"
+    )
+                             .arg(starAstrometryCalculator->batchCallCount() - astrometryBatchCallsBefore)
+                             .arg(starAstrometryCalculator->singleCallCount() - astrometrySingleCallsBefore)
+                             .arg(apparentPlaceCalculator->batchCallCount() - apparentBatchCallsBefore)
+                             .arg(apparentPlaceCalculator->singleCallCount() - apparentSingleCallsBefore);
+
+    QVERIFY(sceneModel.selectedObjectInspector().value("visible").toBool());
+
+    const int moveAstrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
+    const int moveAstrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
+    const int moveApparentBatchCallsBefore = apparentPlaceCalculator->batchCallCount();
+    const int moveApparentSingleCallsBefore = apparentPlaceCalculator->singleCallCount();
+
+    timer.restart();
+    sceneModel.moveSelectedObjectInspector(240.0, 180.0);
+    const qint64 moveElapsedMs = timer.elapsed();
+
+    qInfo().noquote() << performanceMetricMessage(
+        moveElapsedMs,
+        kHighPrecisionLargeSceneBuildBudgetMs,
+        "high precision large fixed catalog inspector move",
+        isStrictPerformanceGuardMode()
+    );
+    qInfo().noquote() << QStringLiteral(
+                             "perf high precision inspector move counters: astrometryBatchDelta=%1 "
+                             "astrometrySingleDelta=%2 apparentBatchDelta=%3 apparentSingleDelta=%4"
+    )
+                             .arg(starAstrometryCalculator->batchCallCount() - moveAstrometryBatchCallsBefore)
+                             .arg(starAstrometryCalculator->singleCallCount() - moveAstrometrySingleCallsBefore)
+                             .arg(apparentPlaceCalculator->batchCallCount() - moveApparentBatchCallsBefore)
+                             .arg(apparentPlaceCalculator->singleCallCount() - moveApparentSingleCallsBefore);
+
+    const int panAstrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
+    const int panAstrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
+    const int panApparentBatchCallsBefore = apparentPlaceCalculator->batchCallCount();
+    const int panApparentSingleCallsBefore = apparentPlaceCalculator->singleCallCount();
+
+    timer.restart();
+    controller.panViewBy(1.0, 1.0);
+    const qint64 panElapsedMs = timer.elapsed();
+
+    qInfo().noquote() << performanceMetricMessage(
+        panElapsedMs,
+        kHighPrecisionLargeSceneBuildBudgetMs,
+        "high precision large fixed catalog trail pan",
+        isStrictPerformanceGuardMode()
+    );
+    qInfo().noquote() << QStringLiteral(
+                             "perf high precision trail pan counters: astrometryBatchDelta=%1 "
+                             "astrometrySingleDelta=%2 apparentBatchDelta=%3 apparentSingleDelta=%4"
+    )
+                             .arg(starAstrometryCalculator->batchCallCount() - panAstrometryBatchCallsBefore)
+                             .arg(starAstrometryCalculator->singleCallCount() - panAstrometrySingleCallsBefore)
+                             .arg(apparentPlaceCalculator->batchCallCount() - panApparentBatchCallsBefore)
+                             .arg(apparentPlaceCalculator->singleCallCount() - panApparentSingleCallsBefore);
+
+    const int zoomAstrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
+    const int zoomAstrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
+    const int zoomApparentBatchCallsBefore = apparentPlaceCalculator->batchCallCount();
+    const int zoomApparentSingleCallsBefore = apparentPlaceCalculator->singleCallCount();
+
+    timer.restart();
+    controller.zoomViewByScaleDelta(1.2);
+    const qint64 zoomElapsedMs = timer.elapsed();
+
+    qInfo().noquote() << performanceMetricMessage(
+        zoomElapsedMs,
+        kHighPrecisionLargeSceneBuildBudgetMs,
+        "high precision large fixed catalog trail zoom",
+        isStrictPerformanceGuardMode()
+    );
+    qInfo().noquote() << QStringLiteral(
+                             "perf high precision trail zoom counters: astrometryBatchDelta=%1 "
+                             "astrometrySingleDelta=%2 apparentBatchDelta=%3 apparentSingleDelta=%4"
+    )
+                             .arg(starAstrometryCalculator->batchCallCount() - zoomAstrometryBatchCallsBefore)
+                             .arg(starAstrometryCalculator->singleCallCount() - zoomAstrometrySingleCallsBefore)
+                             .arg(apparentPlaceCalculator->batchCallCount() - zoomApparentBatchCallsBefore)
+                             .arg(apparentPlaceCalculator->singleCallCount() - zoomApparentSingleCallsBefore);
 }
 
 void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
