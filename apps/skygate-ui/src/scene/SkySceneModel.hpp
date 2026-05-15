@@ -91,4 +91,5 @@ private:
     double m_selectedObjectInspectorPinnedX = 0.0;
     double m_selectedObjectInspectorPinnedY = 0.0;
     bool m_selectedObjectInspectorPinned = false;
+    bool m_ignoringSearchTargetChange = false;
 };

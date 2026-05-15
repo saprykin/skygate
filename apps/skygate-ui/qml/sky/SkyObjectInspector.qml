@@ -22,6 +22,8 @@ Rectangle {
     property real dragStartPointerY: 0
     property real dragStartPanelX: 0
     property real dragStartPanelY: 0
+    property real dragCurrentPanelX: 0
+    property real dragCurrentPanelY: 0
 
     function clampedInspectorX(value) {
         return Math.min(
@@ -45,10 +47,10 @@ Rectangle {
     width: Math.min(350, Math.max(280, inspectorContent.implicitWidth + 22))
     height: inspectorContent.implicitHeight + 18
     x: hasInspector
-        ? clampedInspectorX(inspectorData.x)
+        ? (draggingInspector ? dragCurrentPanelX : clampedInspectorX(inspectorData.x))
         : 0
     y: hasInspector
-        ? clampedInspectorY(inspectorData.y)
+        ? (draggingInspector ? dragCurrentPanelY : clampedInspectorY(inspectorData.y))
         : 0
     radius: 8
     color: theme.toolbarDropdownBackground
@@ -71,11 +73,13 @@ Rectangle {
             }
 
             const pointer = objectInspector.pointerPositionInOverlay(mouse)
-            objectInspector.draggingInspector = true
             objectInspector.dragStartPointerX = pointer.x
             objectInspector.dragStartPointerY = pointer.y
             objectInspector.dragStartPanelX = objectInspector.x
             objectInspector.dragStartPanelY = objectInspector.y
+            objectInspector.dragCurrentPanelX = objectInspector.x
+            objectInspector.dragCurrentPanelY = objectInspector.y
+            objectInspector.draggingInspector = true
         }
         onPositionChanged: function(mouse) {
             if (!objectInspector.draggingInspector) {
@@ -89,9 +93,16 @@ Rectangle {
             const nextY = objectInspector.clampedInspectorY(
                 objectInspector.dragStartPanelY + pointer.y - objectInspector.dragStartPointerY
             )
-            objectInspector.sceneModel.moveSelectedObjectInspector(nextX, nextY)
+            objectInspector.dragCurrentPanelX = nextX
+            objectInspector.dragCurrentPanelY = nextY
         }
         onReleased: function() {
+            if (objectInspector.draggingInspector) {
+                objectInspector.sceneModel.moveSelectedObjectInspector(
+                    objectInspector.dragCurrentPanelX,
+                    objectInspector.dragCurrentPanelY
+                )
+            }
             objectInspector.draggingInspector = false
         }
         onCanceled: {

@@ -198,9 +198,12 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
     QVERIFY(activateControl(unpinButton));
     QTRY_VERIFY(scene->property("unpinned").toBool());
 
+    scene->setProperty("dragged", false);
     const QPoint dragStart = inspectorItem->mapToScene(QPointF(30.0, 20.0)).toPoint();
     QTest::mousePress(exposed.window(), Qt::LeftButton, Qt::NoModifier, dragStart);
     QTest::mouseMove(exposed.window(), dragStart + QPoint(-120, 80));
+    QVERIFY(!scene->property("dragged").toBool());
+    QVERIFY(inspectorItem->x() < root->width());
     QTest::mouseRelease(
         exposed.window(),
         Qt::LeftButton,

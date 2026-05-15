@@ -146,10 +146,21 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
         false
     );
     QCoreApplication::sendEvent(exposed.window(), &wheelEvent);
+    QWheelEvent secondWheelEvent(
+        QPointF(162.0, 172.0),
+        exposed.window()->mapToGlobal(QPoint(162, 172)),
+        QPoint(),
+        QPoint(0, 120),
+        Qt::NoButton,
+        Qt::NoModifier,
+        Qt::NoScrollPhase,
+        false
+    );
+    QCoreApplication::sendEvent(exposed.window(), &secondWheelEvent);
     QCoreApplication::processEvents();
     QTRY_COMPARE(fakeController->property("zoomWheelCalls").toInt(), 1);
-    QCOMPARE(fakeController->property("lastWheelDelta").toInt(), 120);
-    QCOMPARE(interaction->property("hoveredObjectLabel").toString(), QString("label-160-170"));
+    QCOMPARE(fakeController->property("lastWheelDelta").toInt(), 240);
+    QCOMPARE(interaction->property("hoveredObjectLabel").toString(), QString("label-162-172"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

@@ -70,6 +70,9 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
         );
         m_selectedSearchTargetChangedConnection =
             connect(m_skyContextController, &SkyContextController::selectedSearchTargetChanged, this, [this] {
+                if (m_ignoringSearchTargetChange) {
+                    return;
+                }
                 m_selectedObjectTargetId.clear();
                 m_selectedObjectInspectorPinned = false;
                 m_sceneComposer.reset();
@@ -162,7 +165,9 @@ bool SkySceneModel::selectObjectAt(const double x, const double y)
     }
 
     if (m_skyContextController != nullptr) {
+        m_ignoringSearchTargetChange = true;
         m_skyContextController->clearSelectedSearchTarget();
+        m_ignoringSearchTargetChange = false;
     }
     m_selectedObjectTargetId = QString::fromStdString(body.id);
     m_selectedObjectInspectorPinned = false;
@@ -198,6 +203,11 @@ void SkySceneModel::setSelectedObjectInspectorPinned(const bool pinned)
 
         m_selectedObjectInspectorPinnedX = m_sceneFrame.selectedObjectInspector.x;
         m_selectedObjectInspectorPinnedY = m_sceneFrame.selectedObjectInspector.y;
+        m_selectedObjectInspectorPinned = true;
+        m_sceneFrame.selectedObjectInspector.pinned = true;
+        m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
+        emit sceneFrameChanged();
+        return;
     }
 
     m_selectedObjectInspectorPinned = pinned;
@@ -214,6 +224,15 @@ void SkySceneModel::moveSelectedObjectInspector(const double x, const double y)
     m_selectedObjectInspectorPinnedX = x;
     m_selectedObjectInspectorPinnedY = y;
     m_selectedObjectInspectorPinned = true;
+    if (m_sceneFrame.selectedObjectInspector.visible) {
+        m_sceneFrame.selectedObjectInspector.x = x;
+        m_sceneFrame.selectedObjectInspector.y = y;
+        m_sceneFrame.selectedObjectInspector.pinned = true;
+        m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
+        emit sceneFrameChanged();
+        return;
+    }
+
     m_sceneComposer.reset();
     rebuildSceneFrame();
 }
@@ -350,6 +369,7 @@ void SkySceneModel::rebuildSceneFrame()
     }
 
     const auto input = buildSceneInput();
+    const qint64 inputNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
     if (!input.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
@@ -361,6 +381,7 @@ void SkySceneModel::rebuildSceneFrame()
     }
 
     const auto frameResult = m_framePipeline.rebuild(input->frameInput, m_viewportWidth, m_viewportHeight);
+    const qint64 pipelineNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
     if (!frameResult.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
@@ -375,6 +396,7 @@ void SkySceneModel::rebuildSceneFrame()
     m_sceneFrame.snapshot = frameResult->snapshot;
 
     const SkySceneCompositionResult compositionResult = m_sceneComposer.rebuild(m_sceneFrame, *input, *frameResult);
+    const qint64 compositionNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
     if (!compositionResult.changed) {
         return;
     }
@@ -382,13 +404,20 @@ void SkySceneModel::rebuildSceneFrame()
     if (compositionResult.frameContentChanged) {
         m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
     }
+    const qint64 hitIndexNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
     m_overlayItems = m_sceneOverlayAdapter.overlayItems(m_sceneFrame.overlayItems);
     m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
     m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
+    const qint64 adapterNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
     emit sceneFrameChanged();
 
     if (performanceLoggingEnabled()) {
         qCInfo(skygatePerfLog) << "scene rebuild elapsedMs=" << timer.nsecsElapsed() / 1000000.0
+                               << "inputMs=" << inputNs / 1000000.0
+                               << "pipelineMs=" << (pipelineNs - inputNs) / 1000000.0
+                               << "compositionMs=" << (compositionNs - pipelineNs) / 1000000.0
+                               << "hitIndexMs=" << (hitIndexNs - compositionNs) / 1000000.0
+                               << "adapterMs=" << (adapterNs - hitIndexNs) / 1000000.0
                                << "pipelineUpdated=" << frameResult->updated
                                << "frameContentChanged=" << compositionResult.frameContentChanged
                                << "points=" << static_cast<qsizetype>(m_sceneFrame.frame.points.size())
