@@ -110,22 +110,22 @@
       "id": "modern-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "modern",
-      "version": "2026a",
-      "sourceUrl": "https://data.iers.org/products/eop/long-term/c04_14/iau1980/eopc04_14.62-now",
+      "version": "2026-05-07",
+      "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
       "relativePath": "time/eop.txt",
       "checksum": {
         "algorithm": "sha256",
-        "value": "40347f18a10eb72b15e4f84e647b5f1b7da4709534d935e2e1289697bdfa79df"
+        "value": "4842dd19493393f25d26076d4973fccc6f7e0ad9474b458b2062cf6521c4cb58"
       },
       "compression": {
         "format": "none",
-        "uncompressedSizeBytes": 3648337
+        "uncompressedSizeBytes": 3743832
       },
       "validityRange": {
         "id": "eop-range",
         "displayName": "Earth orientation range",
         "start": "1973-01-02",
-        "end": "2026-12-31"
+        "end": "2027-05-22"
       }
     },
     {
@@ -176,22 +176,22 @@
       "id": "de441-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "de441-long-range",
-      "version": "2026a",
-      "sourceUrl": "https://data.iers.org/products/eop/long-term/c04_14/iau1980/eopc04_14.62-now",
+      "version": "2026-05-07",
+      "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
       "relativePath": "time/eop.txt",
       "checksum": {
         "algorithm": "sha256",
-        "value": "40347f18a10eb72b15e4f84e647b5f1b7da4709534d935e2e1289697bdfa79df"
+        "value": "4842dd19493393f25d26076d4973fccc6f7e0ad9474b458b2062cf6521c4cb58"
       },
       "compression": {
         "format": "none",
-        "uncompressedSizeBytes": 3648337
+        "uncompressedSizeBytes": 3743832
       },
       "validityRange": {
         "id": "eop-range",
         "displayName": "Earth orientation range",
         "start": "1973-01-02",
-        "end": "2026-12-31"
+        "end": "2027-05-22"
       }
     },
     {

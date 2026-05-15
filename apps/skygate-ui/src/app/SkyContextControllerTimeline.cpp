@@ -30,15 +30,31 @@ void SkyContextController::setLive(bool live)
         return;
     }
 
+    m_highPrecisionLiveTickTimer.invalidate();
     if (m_timeline.live()) {
         const QDateTime currentUtc = currentUtcDateTime();
-        const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(
-            m_location.utcTime()
-        );
+        const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime());
         m_timeline.setCatchingUpToCurrentUtc(timelineUtc < currentUtc);
     }
 
     emit liveChanged();
+}
+
+bool SkyContextController::highPrecisionLiveTickThrottled() const
+{
+    if (m_ephemerisEngineKind != skygate::ephemeris::EphemerisEngineKind::HighPrecision
+        || !m_highPrecisionLiveTickTimer.isValid()) {
+        return false;
+    }
+
+    return m_highPrecisionLiveTickTimer.elapsed() < SkyContextControllerConstants::kHighPrecisionLiveTickIntervalMs;
+}
+
+void SkyContextController::markHighPrecisionLiveTick()
+{
+    if (m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
+        m_highPrecisionLiveTickTimer.restart();
+    }
 }
 
 bool SkyContextController::timelineToolbarCollapsed() const noexcept
@@ -135,10 +151,7 @@ void SkyContextController::panViewBy(const double deltaAzimuthDeg, const double 
         return;
     }
 
-    setViewCenter(
-        m_view.centerAltitudeDeg() + deltaAltitudeDeg,
-        m_view.centerAzimuthDeg() + deltaAzimuthDeg
-    );
+    setViewCenter(m_view.centerAltitudeDeg() + deltaAltitudeDeg, m_view.centerAzimuthDeg() + deltaAzimuthDeg);
 }
 
 void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
@@ -147,12 +160,8 @@ void SkyContextController::zoomViewByWheelDelta(const int wheelDeltaY)
         return;
     }
 
-    const double wheelSteps =
-        static_cast<double>(wheelDeltaY) / SkyContextControllerConstants::kWheelAngleDeltaStep;
-    const double zoomMultiplier = std::pow(
-        SkyContextControllerConstants::kWheelZoomStepScale,
-        wheelSteps
-    );
+    const double wheelSteps = static_cast<double>(wheelDeltaY) / SkyContextControllerConstants::kWheelAngleDeltaStep;
+    const double zoomMultiplier = std::pow(SkyContextControllerConstants::kWheelZoomStepScale, wheelSteps);
     setViewFieldOfViewDeg(m_view.fieldOfViewDeg() * zoomMultiplier);
 }
 
@@ -168,8 +177,7 @@ void SkyContextController::zoomViewByScaleDelta(const double scaleDelta)
 void SkyContextController::resetViewDirection()
 {
     setViewCenter(
-        skygate::core::ViewportMath::kDefaultCenterAltitudeDeg,
-        skygate::core::ViewportMath::kDefaultCenterAzimuthDeg
+        skygate::core::ViewportMath::kDefaultCenterAltitudeDeg, skygate::core::ViewportMath::kDefaultCenterAzimuthDeg
     );
 }
 
@@ -193,18 +201,12 @@ void SkyContextController::stepBackward()
     stepBySeconds(-m_timeline.stepSeconds());
 }
 
-QString SkyContextController::validateUtcDateTimeText(
-    const QString& utcDateText,
-    const QString& utcTimeText
-) const
+QString SkyContextController::validateUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText) const
 {
     return SkyContextUtcDateTimeTextCodec::parse(utcDateText, utcTimeText).errorText;
 }
 
-bool SkyContextController::setUtcDateTimeText(
-    const QString& utcDateText,
-    const QString& utcTimeText
-)
+bool SkyContextController::setUtcDateTimeText(const QString& utcDateText, const QString& utcTimeText)
 {
     const auto parseResult = SkyContextUtcDateTimeTextCodec::parse(utcDateText, utcTimeText);
     if (!parseResult.isValid()) {
@@ -294,11 +296,13 @@ void SkyContextController::tickUtcTime()
     if (!m_timeline.live()) {
         return;
     }
+    if (highPrecisionLiveTickThrottled()) {
+        return;
+    }
 
     const QDateTime currentUtc = currentUtcDateTime();
     const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime());
-    const bool catchingUpToCurrentUtc =
-        m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentUtc;
+    const bool catchingUpToCurrentUtc = m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentUtc;
     if (catchingUpToCurrentUtc) {
         m_timeline.addSpeedRemainderSeconds(
             m_timeline.speedMultiplier() * static_cast<double>(m_timeline.stepSeconds())
@@ -310,22 +314,21 @@ void SkyContextController::tickUtcTime()
 
         int appliedStepSeconds = wholeSeconds;
         const qint64 secondsUntilCurrentUtc = timelineUtc.secsTo(currentUtc);
-        appliedStepSeconds = std::min(
-            appliedStepSeconds,
-            static_cast<int>(secondsUntilCurrentUtc)
-        );
+        appliedStepSeconds = std::min(appliedStepSeconds, static_cast<int>(secondsUntilCurrentUtc));
         m_timeline.setCatchingUpToCurrentUtc(appliedStepSeconds < secondsUntilCurrentUtc);
         if (!m_timeline.catchingUpToCurrentUtc()) {
             m_timeline.resetSpeedProgress();
         }
 
         stepBySeconds(appliedStepSeconds);
+        markHighPrecisionLiveTick();
         return;
     }
 
     m_timeline.setCatchingUpToCurrentUtc(false);
     m_timeline.resetSpeedProgress();
     stepBySeconds(1);
+    markHighPrecisionLiveTick();
 }
 
 void SkyContextController::stepBySeconds(const int stepSeconds)
@@ -338,9 +341,7 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
         m_timeline.resetSpeedProgress();
     }
 
-    setCurrentUtc(
-        SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).addSecs(stepSeconds)
-    );
+    setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).addSecs(stepSeconds));
 }
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
@@ -382,8 +383,7 @@ void SkyContextController::applyObserverLocation(const skygate::core::GeoLocatio
 
     const bool latitudeChanged = m_location.observer().latitudeDeg != observer.latitudeDeg;
     const bool longitudeChanged = m_location.observer().longitudeDeg != observer.longitudeDeg;
-    const bool elevationChanged =
-        m_location.observer().elevationMeters != observer.elevationMeters;
+    const bool elevationChanged = m_location.observer().elevationMeters != observer.elevationMeters;
     if (!latitudeChanged && !longitudeChanged && !elevationChanged) {
         return;
     }
@@ -459,9 +459,7 @@ void SkyContextController::initializeCurrentLocation()
 
     auto startLocationUpdate = [this] {
         setLocationStatusText("Location: Locating");
-        m_location.positionSource()->requestUpdate(
-            SkyContextControllerConstants::kLocationUpdateTimeoutMs
-        );
+        m_location.positionSource()->requestUpdate(SkyContextControllerConstants::kLocationUpdateTimeoutMs);
     };
 
     if (!m_location.requestLocationPermission()) {
@@ -483,22 +481,18 @@ void SkyContextController::initializeCurrentLocation()
 
     if (permissionStatus == Qt::PermissionStatus::Undetermined) {
         setLocationStatusText("Location: Waiting for permission");
-        app->requestPermission(
-            permission,
-            this,
-            [this, startLocationUpdate](const QPermission& requestPermission) {
-                if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
-                    return;
-                }
-
-                if (requestPermission.status() == Qt::PermissionStatus::Granted) {
-                    startLocationUpdate();
-                    return;
-                }
-
-                setLocationStatusText("Location: Permission denied");
+        app->requestPermission(permission, this, [this, startLocationUpdate](const QPermission& requestPermission) {
+            if (m_location.source() != SkyContextLocationSource::CurrentDevice) {
+                return;
             }
-        );
+
+            if (requestPermission.status() == Qt::PermissionStatus::Granted) {
+                startLocationUpdate();
+                return;
+            }
+
+            setLocationStatusText("Location: Permission denied");
+        });
         return;
     }
 

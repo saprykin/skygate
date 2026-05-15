@@ -27,6 +27,7 @@ enum class SkyContextLocationSource {
 class SkyContextControllerConstants final {
 public:
     static constexpr int kTickIntervalMs = 1000;
+    static constexpr int kHighPrecisionLiveTickIntervalMs = 10000;
     static constexpr int kLocationUpdateTimeoutMs = 5000;
     static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
@@ -59,17 +60,13 @@ public:
 class SkyContextProjectionTypeCodec final {
 public:
     [[nodiscard]] static QString toString(skygate::core::ProjectionType projectionType);
-    [[nodiscard]] static std::optional<skygate::core::ProjectionType> fromString(
-        const QString& value
-    );
+    [[nodiscard]] static std::optional<skygate::core::ProjectionType> fromString(const QString& value);
 };
 
 class SkyContextLocationSourceCodec final {
 public:
     [[nodiscard]] static QString toString(SkyContextLocationSource locationSource);
-    [[nodiscard]] static std::optional<SkyContextLocationSource> fromString(
-        const QString& value
-    );
+    [[nodiscard]] static std::optional<SkyContextLocationSource> fromString(const QString& value);
     [[nodiscard]] static QStringList availableOptions();
     [[nodiscard]] static SkyContextLocationSource defaultSource();
     [[nodiscard]] static bool isAvailable(SkyContextLocationSource locationSource);
@@ -90,10 +87,7 @@ public:
         [[nodiscard]] bool isValid() const noexcept;
     };
 
-    [[nodiscard]] static ParseResult parse(
-        const QString& utcDateText,
-        const QString& utcTimeText
-    );
+    [[nodiscard]] static ParseResult parse(const QString& utcDateText, const QString& utcTimeText);
     [[nodiscard]] static QString formatDate(const QDateTime& utcTime);
 };
 
@@ -106,15 +100,13 @@ public:
 
 class SkyContextCatalogCodec final {
 public:
-    [[nodiscard]] static QByteArray serializeConstellationLineRows(
-        const std::vector<std::pair<std::string, std::string>>& lineRefs
-    );
+    [[nodiscard]] static QByteArray
+    serializeConstellationLineRows(const std::vector<std::pair<std::string, std::string>>& lineRefs);
     [[nodiscard]] static std::vector<std::pair<std::string, std::string>>
     parseConstellationLineRows(std::string_view rows);
 
-    [[nodiscard]] static QByteArray serializeConstellationLabelRows(
-        const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
-    );
+    [[nodiscard]] static QByteArray
+    serializeConstellationLabelRows(const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs);
     [[nodiscard]] static std::vector<std::pair<std::string, std::vector<std::string>>>
     parseConstellationLabelRows(std::string_view rows);
 };
@@ -122,13 +114,9 @@ public:
 class SkyContextRenderStyle final {
 public:
     [[nodiscard]] static double pointSizeForMagnitude(double magnitude);
-    [[nodiscard]] static QColor colorForBodyType(
-        skygate::ephemeris::CelestialBodyType type,
-        const SkyThemeRenderPalette& renderPalette
-    );
-    [[nodiscard]] static QColor constellationLineColor(
-        const SkyThemeRenderPalette& renderPalette
-    );
+    [[nodiscard]] static QColor
+    colorForBodyType(skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderPalette);
+    [[nodiscard]] static QColor constellationLineColor(const SkyThemeRenderPalette& renderPalette);
 };
 
 }  // namespace skygate::ui::internal

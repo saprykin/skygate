@@ -16,6 +16,10 @@
 
 #include "skygate/ephemeris/EphemerisDataManifest.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/DeltaTProvider.hpp"
+#include "skygate/ephemeris/EarthOrientationProvider.hpp"
+#include "skygate/ephemeris/LeapSecondProvider.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <memory>
 #include <optional>
@@ -40,16 +44,18 @@ astronomicalEpochFromUtcDateTime(const QDateTime& utcDateTime) noexcept
         return std::nullopt;
     }
 
-    return skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = *astronomicalYear,
-        .month = date.month(),
-        .day = date.day(),
-        .hour = time.hour(),
-        .minute = time.minute(),
-        .second = time.second(),
-        .nanosecond = static_cast<std::uint32_t>(time.msec()) * 1'000'000U,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    return skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = *astronomicalYear,
+            .month = date.month(),
+            .day = date.day(),
+            .hour = time.hour(),
+            .minute = time.minute(),
+            .second = time.second(),
+            .nanosecond = static_cast<std::uint32_t>(time.msec()) * 1'000'000U,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
 }
 
 [[nodiscard]] EphemerisEngineKind engineKindFromIndex(const int index) noexcept
@@ -184,6 +190,43 @@ void appendRevisionComponent(std::uint64_t& revision, const std::string_view val
     appendRevisionComponent(revision, asset->version);
     appendRevisionComponent(revision, asset->provenance);
     return revision;
+}
+
+struct EphemerisProviderBundle final {
+    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
+    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
+};
+
+[[nodiscard]] EphemerisProviderBundle
+ephemerisProvidersFromSnapshot(const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& snapshot)
+{
+    EphemerisProviderBundle bundle;
+    if (snapshot == nullptr) {
+        return bundle;
+    }
+
+    const skygate::ephemeris::EarthOrientationDataLoadResult earthOrientationData =
+        skygate::ephemeris::loadEarthOrientationDataFromSnapshot(*snapshot);
+    if (earthOrientationData.isSuccess()) {
+        bundle.earthOrientationProvider = earthOrientationData.provider;
+    }
+
+    const skygate::ephemeris::LeapSecondTableLoadResult leapSecondTable =
+        skygate::ephemeris::loadLeapSecondTableFromSnapshot(*snapshot);
+    const skygate::ephemeris::DeltaTDataLoadResult deltaTData =
+        skygate::ephemeris::loadDeltaTDataFromSnapshot(*snapshot);
+    if (leapSecondTable.isSuccess()) {
+        skygate::ephemeris::TimeScaleServiceOptions timeScaleOptions;
+        timeScaleOptions.earthOrientationSampleOptions.degradePredictedData = false;
+        bundle.timeScaleService = std::make_shared<skygate::ephemeris::LeapSecondTimeScaleService>(
+            leapSecondTable.provider,
+            timeScaleOptions,
+            bundle.earthOrientationProvider,
+            deltaTData.isSuccess() ? deltaTData.provider : nullptr
+        );
+    }
+
+    return bundle;
 }
 
 }  // namespace
@@ -769,6 +812,13 @@ std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalog
 
 void SkyContextController::rebuildEphemerisEngine()
 {
+    const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot =
+        activeEphemerisDataSnapshot();
+    const EphemerisProviderBundle snapshotProviders =
+        m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+                && (m_ephemerisTimeScaleService == nullptr || m_ephemerisEarthOrientationProvider == nullptr)
+            ? ephemerisProvidersFromSnapshot(activeDataSnapshot)
+            : EphemerisProviderBundle{};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = m_ephemerisEngineKind;
     request.catalogBodies = catalogBodies();
@@ -776,9 +826,12 @@ void SkyContextController::rebuildEphemerisEngine()
     request.options.engineKind = m_ephemerisEngineKind;
     request.dataSetManifest = m_ephemerisDataSetManifest;
     request.dataManifest = m_ephemerisDataManifest;
-    request.activeDataSnapshot = activeEphemerisDataSnapshot();
-    request.timeScaleService = m_ephemerisTimeScaleService;
-    request.earthOrientationProvider = m_ephemerisEarthOrientationProvider;
+    request.activeDataSnapshot = activeDataSnapshot;
+    request.timeScaleService =
+        m_ephemerisTimeScaleService != nullptr ? m_ephemerisTimeScaleService : snapshotProviders.timeScaleService;
+    request.earthOrientationProvider = m_ephemerisEarthOrientationProvider != nullptr
+                                           ? m_ephemerisEarthOrientationProvider
+                                           : snapshotProviders.earthOrientationProvider;
     request.calcephKernelRuntime = m_ephemerisCalcephKernelRuntime;
     request.diagnosticsSink = m_ephemerisDiagnosticsSink;
     request.fallbackPolicy = m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
@@ -961,8 +1014,10 @@ void SkyContextController::setEphemerisEngineKindIndex(const int engineKindIndex
         settings.correctionPresetId = correctionPresetId(0);
         settings.correctionFlags = EphemerisCorrectionFlags::NoCorrections;
         settings.refractionEnabled = false;
-    } else if (m_ephemerisEngineKind == EphemerisEngineKind::Simple
-               && m_ephemerisEngineOptions.correctionFlags == EphemerisCorrectionFlags::NoCorrections) {
+    } else if (
+        m_ephemerisEngineKind == EphemerisEngineKind::Simple
+        && m_ephemerisEngineOptions.correctionFlags == EphemerisCorrectionFlags::NoCorrections
+    ) {
         settings.correctionPresetId = correctionPresetId(3);
         settings.refractionEnabled = true;
         settings.correctionFlags = EphemerisCorrectionFlags::ApparentTopocentric;

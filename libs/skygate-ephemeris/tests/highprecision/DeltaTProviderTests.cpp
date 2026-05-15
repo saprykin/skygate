@@ -53,12 +53,14 @@ private:
 
 [[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = year,
-        .month = month,
-        .day = day,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = year,
+            .month = month,
+            .day = day,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -70,6 +72,7 @@ class DeltaTProviderTests final : public QObject {
 
 private slots:
     void loadsPresentDataFromSnapshot();
+    void loadsUsnoDeltaTData();
     void reportsMissingData();
     void rejectsMalformedRows();
     void exposesAncientFallbackMetadata();
@@ -105,6 +108,27 @@ void DeltaTProviderTests::loadsPresentDataFromSnapshot()
     QVERIFY(estimate.deltaTSeconds.has_value());
     QVERIFY(std::abs(*estimate.deltaTSeconds - 63.83) < 0.001);
     QVERIFY(!estimate.diagnosticText.empty());
+}
+
+void DeltaTProviderTests::loadsUsnoDeltaTData()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "1973  2  1  43.4724\n"
+                    "1973  3  1  43.5648\n"
+                    "2026  1  1  69.2000\n";
+
+    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromTextAsset(asset);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+    QCOMPARE(result.provider->entries().size(), std::size_t{3});
+    QCOMPARE(result.provider->entries().front().effectiveUtcDate.astronomicalYear, 1973);
+    QCOMPARE(result.provider->entries().front().effectiveUtcDate.month, 2);
+    QCOMPARE(result.provider->entries().front().effectiveUtcDate.day, 1);
+    const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(2026, 1, 1));
+    QVERIFY(estimate.isUsable());
+    QVERIFY(estimate.deltaTSeconds.has_value());
+    QVERIFY(std::abs(*estimate.deltaTSeconds - 69.2) < 0.001);
 }
 
 void DeltaTProviderTests::reportsMissingData()

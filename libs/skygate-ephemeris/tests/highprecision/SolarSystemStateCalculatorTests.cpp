@@ -162,7 +162,9 @@ struct LightTimeFixture {
 [[nodiscard]] GeometricFixture loadSmokeFixture()
 {
     QFile file(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/geometric_solar_system_smoke.csv"));
-    Q_ASSERT(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qFatal("Unable to open geometric solar-system smoke fixture.");
+    }
 
     while (!file.atEnd()) {
         const QString line = QString::fromUtf8(file.readLine()).trimmed();
@@ -194,7 +196,9 @@ struct LightTimeFixture {
 [[nodiscard]] LightTimeFixture loadLightTimeFixture()
 {
     QFile file(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/light_time_solar_system_mars.csv"));
-    Q_ASSERT(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qFatal("Unable to open light-time solar-system smoke fixture.");
+    }
 
     LightTimeFixture fixture;
     while (!file.atEnd()) {
@@ -264,6 +268,8 @@ private slots:
     void computesGeometricRaDecFromKernelVector();
     void computesGeometricRaDecAgainstHorizonsSmokeFixture();
     void mapsSupportedBodiesToNaifIds();
+    void fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing();
+    void prefersPlanetarySystemBarycenterWhenConfigured();
     void appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth();
     void computesLightTimeRaDecAgainstHorizonsFixture();
     void reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult();
@@ -358,6 +364,45 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
         QCOMPARE(provider->lastTargetNaifId, item.naifId);
         QCOMPARE(provider->lastCenterNaifId, 399);
     }
+}
+
+void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    SolarSystemKernelStateResult missingBodyCenter;
+    missingBodyCenter.metadata.status = EphemerisResultStatus::Failed;
+    missingBodyCenter.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+    provider->responses[{499, 399}] = missingBodyCenter;
+    provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    const SolarSystemStateCalculator calculator(provider);
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+
+    QCOMPARE(provider->callCount, 2);
+    QCOMPARE(provider->calls[0].targetNaifId, 499);
+    QCOMPARE(provider->calls[1].targetNaifId, 4);
+    QCOMPARE(provider->lastCenterNaifId, 399);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+}
+
+void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfigured()
+{
+    const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    const SolarSystemStateCalculator calculator(provider, true);
+
+    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+
+    QCOMPARE(provider->callCount, 1);
+    QCOMPARE(provider->lastTargetNaifId, 4);
+    QCOMPARE(provider->lastCenterNaifId, 399);
+    QVERIFY(result.equatorial.has_value());
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
 }
 
 void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth()

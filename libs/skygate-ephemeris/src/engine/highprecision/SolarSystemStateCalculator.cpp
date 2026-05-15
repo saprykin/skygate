@@ -21,6 +21,11 @@ constexpr double kSpeedOfLightAuPerDay = 173.144632674240;
 constexpr double kSolarSchwarzschildRadiusAu = 1.97412574336e-8;
 constexpr int kLightTimeIterationCount = 3;
 
+struct TargetKernelState {
+    SolarSystemKernelStateResult state;
+    int targetNaifId = 0;
+};
+
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
 {
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
@@ -66,6 +71,40 @@ constexpr int kLightTimeIterationCount = 3;
     return std::nullopt;
 }
 
+[[nodiscard]] std::optional<int> planetarySystemBarycenterNaifIdForBody(const CelestialBody& body) noexcept
+{
+    if (body.ephemerisSource != CelestialBodyEphemerisSource::Planet && body.type != CelestialBodyType::Planet) {
+        return std::nullopt;
+    }
+
+    if (strings::equalsIgnoreAsciiCase(body.id, "mercury")) {
+        return 1;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "venus")) {
+        return 2;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "mars")) {
+        return 4;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "jupiter")) {
+        return 5;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "saturn")) {
+        return 6;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "uranus")) {
+        return 7;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "neptune")) {
+        return 8;
+    }
+    if (strings::equalsIgnoreAsciiCase(body.id, "pluto")) {
+        return 9;
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] HighPrecisionCalculatorResult
 makeStatusResult(const EphemerisResultStatus status, const EphemerisWarningCode warningCode)
 {
@@ -76,8 +115,8 @@ makeStatusResult(const EphemerisResultStatus status, const EphemerisWarningCode 
     return result;
 }
 
-[[nodiscard]] std::optional<core::EquatorialCoordinate> equatorialFromVector(const SolarSystemKernelVector& vector
-) noexcept
+[[nodiscard]] std::optional<core::EquatorialCoordinate>
+equatorialFromVector(const SolarSystemKernelVector& vector) noexcept
 {
     if (!std::isfinite(vector.xAu) || !std::isfinite(vector.yAu) || !std::isfinite(vector.zAu)) {
         return std::nullopt;
@@ -165,11 +204,13 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
 
 [[nodiscard]] AstronomicalEpoch retardedEpoch(const AstronomicalEpoch& epoch, const double lightTimeDays) noexcept
 {
-    return normalizedAstronomicalEpoch(AstronomicalEpoch{
-        .julianDatePart1 = epoch.julianDatePart1,
-        .julianDatePart2 = epoch.julianDatePart2 - lightTimeDays,
-        .timeScale = epoch.timeScale,
-    });
+    return normalizedAstronomicalEpoch(
+        AstronomicalEpoch{
+            .julianDatePart1 = epoch.julianDatePart1,
+            .julianDatePart2 = epoch.julianDatePart2 - lightTimeDays,
+            .timeScale = epoch.timeScale,
+        }
+    );
 }
 
 void mergeKernelMetadata(EphemerisResultMetadata& target, const EphemerisResultMetadata& source) noexcept
@@ -204,6 +245,49 @@ void markCorrectionUnavailable(
         metadata.status = EphemerisResultStatus::Degraded;
     }
     metadata.addUnavailableCorrection(unavailableCorrection);
+}
+
+[[nodiscard]] TargetKernelState computeTargetKernelState(
+    const ICalcephKernelProvider& kernelProvider,
+    const AstronomicalEpoch& epoch,
+    const int targetNaifId,
+    const std::optional<int> fallbackTargetNaifId,
+    const int centerNaifId,
+    const bool preferFallbackTarget
+)
+{
+    if (preferFallbackTarget && fallbackTargetNaifId.has_value() && *fallbackTargetNaifId != targetNaifId) {
+        const SolarSystemKernelStateResult preferredState =
+            kernelProvider.computeGeometricState(epoch, *fallbackTargetNaifId, centerNaifId);
+        if (preferredState.positionAu.has_value() || preferredState.metadata.status != EphemerisResultStatus::Failed) {
+            return TargetKernelState{
+                .state = preferredState,
+                .targetNaifId = *fallbackTargetNaifId,
+            };
+        }
+    }
+
+    TargetKernelState result{
+        .state = kernelProvider.computeGeometricState(epoch, targetNaifId, centerNaifId),
+        .targetNaifId = targetNaifId,
+    };
+    if (result.state.positionAu.has_value() || !fallbackTargetNaifId.has_value()
+        || *fallbackTargetNaifId == targetNaifId) {
+        return result;
+    }
+    if (result.state.metadata.status != EphemerisResultStatus::Failed) {
+        return result;
+    }
+
+    SolarSystemKernelStateResult fallbackState =
+        kernelProvider.computeGeometricState(epoch, *fallbackTargetNaifId, centerNaifId);
+    if (!fallbackState.positionAu.has_value()) {
+        return result;
+    }
+
+    result.state = std::move(fallbackState);
+    result.targetNaifId = *fallbackTargetNaifId;
+    return result;
 }
 
 [[nodiscard]] std::optional<SolarSystemKernelVector>
@@ -243,8 +327,10 @@ applySolarGravitationalDeflection(const SolarSystemKernelVector& vector, const S
 
 }  // namespace
 
-SolarSystemStateCalculator::SolarSystemStateCalculator(std::shared_ptr<const ICalcephKernelProvider> kernelProvider)
-    : m_kernelProvider(std::move(kernelProvider))
+SolarSystemStateCalculator::SolarSystemStateCalculator(
+    std::shared_ptr<const ICalcephKernelProvider> kernelProvider, const bool preferPlanetarySystemBarycenters
+)
+    : m_kernelProvider(std::move(kernelProvider)), m_preferPlanetarySystemBarycenters(preferPlanetarySystemBarycenters)
 {
 }
 
@@ -261,12 +347,21 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     }
 
     const std::optional<int> targetNaifId = naifIdForBody(input.body);
+    const std::optional<int> fallbackTargetNaifId = planetarySystemBarycenterNaifIdForBody(input.body);
     if (!targetNaifId.has_value() || *targetNaifId == kNaifEarth) {
         return makeStatusResult(EphemerisResultStatus::Unsupported, EphemerisWarningCode::UnsupportedBody);
     }
 
-    const SolarSystemKernelStateResult kernelResult =
-        m_kernelProvider->computeGeometricState(input.request.epoch, *targetNaifId, kNaifEarth);
+    const TargetKernelState targetKernelResult = computeTargetKernelState(
+        *m_kernelProvider,
+        input.request.epoch,
+        *targetNaifId,
+        fallbackTargetNaifId,
+        kNaifEarth,
+        m_preferPlanetarySystemBarycenters
+    );
+    const SolarSystemKernelStateResult& kernelResult = targetKernelResult.state;
+    const int effectiveTargetNaifId = targetKernelResult.targetNaifId;
     HighPrecisionCalculatorResult result;
     result.metadata = kernelResult.metadata;
     result.metadata.appliedCorrections = EphemerisCorrectionFlags::Geometric;
@@ -303,8 +398,15 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             std::optional<SolarSystemKernelVector> correctedVector;
             for (int iteration = 0; iteration < kLightTimeIterationCount; ++iteration) {
                 const AstronomicalEpoch targetEpoch = retardedEpoch(input.request.epoch, lightTimeDays);
-                const SolarSystemKernelStateResult targetState =
-                    m_kernelProvider->computeGeometricState(targetEpoch, *targetNaifId, kNaifSolarSystemBarycenter);
+                const TargetKernelState retardedTargetState = computeTargetKernelState(
+                    *m_kernelProvider,
+                    targetEpoch,
+                    effectiveTargetNaifId,
+                    fallbackTargetNaifId,
+                    kNaifSolarSystemBarycenter,
+                    m_preferPlanetarySystemBarycenters
+                );
+                const SolarSystemKernelStateResult& targetState = retardedTargetState.state;
                 if (!targetState.positionAu.has_value()) {
                     result.metadata.warningCodeMask |= targetState.metadata.warningCodeMask;
                     correctedVector = std::nullopt;
@@ -327,7 +429,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     }
 
     if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::GravitationalLightDeflection)
-        && *targetNaifId != kNaifSun) {
+        && effectiveTargetNaifId != kNaifSun) {
         const SolarSystemKernelStateResult sunState =
             m_kernelProvider->computeGeometricState(input.request.epoch, kNaifSun, kNaifEarth);
         if (!sunState.positionAu.has_value()) {

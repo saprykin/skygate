@@ -29,6 +29,7 @@ struct SkySceneFrameData final {
 
 struct SkySceneCompositionInput final {
     SkySceneFramePipelineInput frameInput;
+    std::optional<skygate::ephemeris::EphemerisRequest> selectionEphemerisRequest;
     std::span<const std::uint8_t> catalogSourceIds;
     QStringList catalogSourceLabels;
     const SkyTimeController* timeController = nullptr;

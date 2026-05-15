@@ -159,20 +159,24 @@ makeKernelAsset(std::string id, std::string profileId, const int startYear, cons
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "unit-test";
     manifest.dataSetInfo.dateRanges.push_back(makeRange("product", -13200, 13200));
-    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
-        .id = "modern",
-        .displayName = "Modern",
-        .bundled = true,
-        .longRange = false,
-        .assetIds = {"de440s-kernel"},
-    });
-    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
-        .id = "long-range",
-        .displayName = "Long range",
-        .bundled = false,
-        .longRange = true,
-        .assetIds = {"de441-kernel"},
-    });
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "modern",
+            .displayName = "Modern",
+            .bundled = true,
+            .longRange = false,
+            .assetIds = {"de440s-kernel"},
+        }
+    );
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "long-range",
+            .displayName = "Long range",
+            .bundled = false,
+            .longRange = true,
+            .assetIds = {"de441-kernel"},
+        }
+    );
     manifest.assets.push_back(makeKernelAsset("de440s-kernel", "modern", 1550, 2650));
     skygate::ephemeris::EphemerisDataManifestAsset longRange =
         makeKernelAsset("de441-kernel", "long-range", -13200, 13200);
@@ -190,7 +194,9 @@ void writeFile(const QString& path, const QByteArray& payload)
 
 [[nodiscard]] QString writeKernel(QTemporaryDir& root, QByteArray payload = {})
 {
-    Q_ASSERT(QDir(root.path()).mkpath(QStringLiteral("kernels")));
+    if (!QDir(root.path()).mkpath(QStringLiteral("kernels"))) {
+        qFatal("Unable to create temporary kernel test directory.");
+    }
     const QString path = root.path() + QStringLiteral("/kernels/test.bsp");
     if (payload.isEmpty()) {
         payload = QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()));

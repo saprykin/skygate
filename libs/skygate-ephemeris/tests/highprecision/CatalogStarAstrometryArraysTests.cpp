@@ -45,18 +45,16 @@ namespace core = skygate::core;
         .properMotionDeclinationMasPerYear = -55.0,
         .stellarParallaxMas = 7.5,
         .radialVelocityKmPerSecond = 21.0,
-        .validityRange =
-            EphemerisDateRange{
-                .id = "test-validity",
-                .displayName = "Test validity",
-                .start = referenceEpoch(),
-                .end =
-                    {
-                        .julianDatePart1 = 2'452'545.0,
-                        .julianDatePart2 = 0.25,
-                        .timeScale = TimeScale::Tt,
-                    },
+        .validityRange = EphemerisDateRange{
+            .id = "test-validity",
+            .displayName = "Test validity",
+            .start = referenceEpoch(),
+            .end = {
+                .julianDatePart1 = 2'452'545.0,
+                .julianDatePart2 = 0.25,
+                .timeScale = TimeScale::Tt,
             },
+        },
     };
     return body;
 }
@@ -131,7 +129,7 @@ class CatalogStarAstrometryArraysTests final : public QObject {
 
 private slots:
     void buildsCacheFriendlyArraysFromFullPartialAndFixedStars();
-    void excludesFixedCoordinateNonStarBodies();
+    void batchesFixedCoordinateNonStarBodies();
     void masksOnlyUsableNumericAstrometryValues();
     void copiesCatalogDataAndSurvivesSourceLifetimeChanges();
 };
@@ -208,7 +206,7 @@ void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialA
     QCOMPARE(arrays.validityRanges().size(), arrays.size());
 }
 
-void CatalogStarAstrometryArraysTests::excludesFixedCoordinateNonStarBodies()
+void CatalogStarAstrometryArraysTests::batchesFixedCoordinateNonStarBodies()
 {
     const std::vector<CelestialBody> bodies{
         makeFixedDeepSkyObject(),
@@ -217,10 +215,15 @@ void CatalogStarAstrometryArraysTests::excludesFixedCoordinateNonStarBodies()
 
     const CatalogStarAstrometryArrays arrays(bodies);
 
-    QCOMPARE(arrays.size(), 1U);
-    QCOMPARE(arrays.bodyIndices()[0], 1U);
-    QVERIFY(!arrays.arrayIndexForBodyIndex(0).has_value());
-    QCOMPARE(*arrays.arrayIndexForBodyIndex(1), 0U);
+    QCOMPARE(arrays.size(), 2U);
+    QCOMPARE(arrays.bodyIndices()[0], 0U);
+    QCOMPARE(arrays.bodyIndices()[1], 1U);
+    QCOMPARE(*arrays.arrayIndexForBodyIndex(0), 0U);
+    QCOMPARE(*arrays.arrayIndexForBodyIndex(1), 1U);
+    QVERIFY(!arrays.hasCatalogAstrometry(0));
+    QVERIFY(arrays.hasFixedEquatorialFallback(0));
+    QCOMPARE(arrays.referenceEquatorial(0).rightAscensionHours, 0.7);
+    QCOMPARE(arrays.referenceEquatorial(0).declinationDeg, 41.3);
 }
 
 void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()

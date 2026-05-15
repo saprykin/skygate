@@ -42,12 +42,14 @@ private:
 
 [[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = year,
-        .month = month,
-        .day = day,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = year,
+            .month = month,
+            .day = day,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -59,6 +61,7 @@ class LeapSecondProviderTests final : public QObject {
 
 private slots:
     void loadsValidTableFromSnapshot();
+    void loadsIanaLeapSecondList();
     void reportsMissingTable();
     void rejectsMalformedRows();
     void rejectsMalformedExpirationMetadata();
@@ -86,6 +89,31 @@ void LeapSecondProviderTests::loadsValidTableFromSnapshot()
     QCOMPARE(result.provider->taiMinusUtcSeconds(epochForDate(1972, 3, 1)).value_or(-1), 10);
     QCOMPARE(result.provider->taiMinusUtcSeconds(epochForDate(2018, 1, 1)).value_or(-1), 37);
     QVERIFY(!result.provider->taiMinusUtcSeconds(epochForDate(1971, 12, 31)).has_value());
+}
+
+void LeapSecondProviderTests::loadsIanaLeapSecondList()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "# IANA leap-second file sample\n"
+                    "# File expires on 28 December 2026\n"
+                    "#@\t4007404800\n"
+                    "#NTP Time      DTAI    Day Month Year\n"
+                    "2272060800     10      # 1 Jan 1972\n"
+                    "2287785600     11      # 1 Jul 1972\n"
+                    "3692217600     37      # 1 Jan 2017\n";
+
+    const skygate::ephemeris::LeapSecondTableLoadResult result =
+        skygate::ephemeris::loadLeapSecondTableFromTextAsset(asset);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+    QCOMPARE(result.provider->entries().size(), std::size_t{3});
+    QCOMPARE(result.provider->entries().front().effectiveUtcDate.astronomicalYear, 1972);
+    QCOMPARE(result.provider->entries().front().effectiveUtcDate.month, 1);
+    QCOMPARE(result.provider->entries().front().effectiveUtcDate.day, 1);
+    QCOMPARE(result.provider->taiMinusUtcSeconds(epochForDate(2018, 1, 1)).value_or(-1), 37);
+    QVERIFY(result.tableInfo.expiresAt.has_value());
+    QCOMPARE(result.tableInfo.expiresAt->julianDatePart1, epochForDate(2026, 12, 28).julianDatePart1);
 }
 
 void LeapSecondProviderTests::reportsMissingTable()

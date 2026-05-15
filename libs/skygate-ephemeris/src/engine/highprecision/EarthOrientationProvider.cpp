@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cctype>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -59,6 +60,32 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     const char* end = begin + trimmed.size();
     const std::from_chars_result result = std::from_chars(begin, end, value);
     return result.ec == std::errc{} && result.ptr == end && std::isfinite(value);
+}
+
+[[nodiscard]] std::vector<std::string_view> splitAsciiWhitespace(std::string_view text)
+{
+    std::vector<std::string_view> tokens;
+    while (true) {
+        text = trimAsciiWhitespace(text);
+        if (text.empty()) {
+            break;
+        }
+
+        std::size_t end = 0U;
+        while (end < text.size() && std::isspace(static_cast<unsigned char>(text[end])) == 0) {
+            ++end;
+        }
+        tokens.push_back(text.substr(0U, end));
+        text.remove_prefix(end);
+    }
+    return tokens;
+}
+
+[[nodiscard]] bool startsWithIntegerYear(const std::string_view line) noexcept
+{
+    const std::vector<std::string_view> columns = splitAsciiWhitespace(line);
+    int year = 0;
+    return !columns.empty() && parseInt(columns.front(), year);
 }
 
 [[nodiscard]] bool parseBool(const std::string_view text, bool& value) noexcept
@@ -249,11 +276,210 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     return columns;
 }
 
+[[nodiscard]] std::string_view
+fixedColumn(const std::string_view line, const std::size_t offset, const std::size_t length) noexcept
+{
+    if (offset >= line.size()) {
+        return {};
+    }
+
+    return trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset)));
+}
+
+[[nodiscard]] bool
+isBlankFixedColumn(const std::string_view line, const std::size_t offset, const std::size_t length) noexcept
+{
+    if (offset >= line.size()) {
+        return true;
+    }
+
+    return trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset))).empty();
+}
+
+[[nodiscard]] std::optional<int> finalsYearFromMjd(const int twoDigitYear, const double mjd) noexcept
+{
+    if (twoDigitYear < 0 || twoDigitYear > 99 || !std::isfinite(mjd)) {
+        return std::nullopt;
+    }
+
+    return (mjd <= 51543.0 ? 1900 : 2000) + twoDigitYear;
+}
+
+[[nodiscard]] bool assignFinals2000AEntry(
+    const int twoDigitYear,
+    const int month,
+    const int day,
+    const double mjd,
+    const char polarMotionFlag,
+    const char ut1Flag,
+    const double polarMotionXArcseconds,
+    const double polarMotionYArcseconds,
+    const double ut1MinusUtcSeconds,
+    EarthOrientationTableEntry& entry
+) noexcept
+{
+    const std::optional<int> year = finalsYearFromMjd(twoDigitYear, mjd);
+    if (!year.has_value()) {
+        return false;
+    }
+    if ((polarMotionFlag != 'I' && polarMotionFlag != 'P') || (ut1Flag != 'I' && ut1Flag != 'P')) {
+        return false;
+    }
+
+    CivilDateTime effectiveDate;
+    effectiveDate.astronomicalYear = *year;
+    effectiveDate.month = month;
+    effectiveDate.day = day;
+    effectiveDate.timeScale = TimeScale::Utc;
+    if (!isValidCivilDateTime(effectiveDate)) {
+        return false;
+    }
+
+    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(effectiveDate);
+    if (!effectiveEpoch.has_value()) {
+        return false;
+    }
+
+    entry.effectiveUtcDate = effectiveDate;
+    entry.effectiveUtcEpoch = *effectiveEpoch;
+    entry.ut1MinusUtcSeconds = ut1MinusUtcSeconds;
+    entry.polarMotionXArcseconds = polarMotionXArcseconds;
+    entry.polarMotionYArcseconds = polarMotionYArcseconds;
+    entry.predicted = polarMotionFlag == 'P' || ut1Flag == 'P';
+    entry.estimated = false;
+    return true;
+}
+
+[[nodiscard]] bool parseFinals2000AWhitespaceEntryLine(
+    const std::vector<std::string_view>& columns, EarthOrientationTableEntry& entry
+) noexcept
+{
+    if (columns.size() < 11U || (columns[4] != "I" && columns[4] != "P") || (columns[9] != "I" && columns[9] != "P")) {
+        return false;
+    }
+
+    int twoDigitYear = 0;
+    int month = 0;
+    int day = 0;
+    double mjd = 0.0;
+    double polarMotionXArcseconds = 0.0;
+    double polarMotionYArcseconds = 0.0;
+    double ut1MinusUtcSeconds = 0.0;
+    if (!parseInt(columns[0], twoDigitYear) || !parseInt(columns[1], month) || !parseInt(columns[2], day)
+        || !parseDouble(columns[3], mjd) || !parseDouble(columns[5], polarMotionXArcseconds)
+        || !parseDouble(columns[7], polarMotionYArcseconds) || !parseDouble(columns[10], ut1MinusUtcSeconds)) {
+        return false;
+    }
+
+    return assignFinals2000AEntry(
+        twoDigitYear,
+        month,
+        day,
+        mjd,
+        columns[4].front(),
+        columns[9].front(),
+        polarMotionXArcseconds,
+        polarMotionYArcseconds,
+        ut1MinusUtcSeconds,
+        entry
+    );
+}
+
+[[nodiscard]] bool parseFinals2000AEntryLine(std::string_view line, EarthOrientationTableEntry& entry) noexcept
+{
+    if (line.find(',') != std::string_view::npos) {
+        return false;
+    }
+    if (parseFinals2000AWhitespaceEntryLine(splitAsciiWhitespace(line), entry)) {
+        return true;
+    }
+
+    int twoDigitYear = 0;
+    int month = 0;
+    int day = 0;
+    double mjd = 0.0;
+    if (!parseInt(fixedColumn(line, 0U, 2U), twoDigitYear) || !parseInt(fixedColumn(line, 2U, 2U), month)
+        || !parseInt(fixedColumn(line, 4U, 2U), day) || !parseDouble(fixedColumn(line, 7U, 8U), mjd)) {
+        return false;
+    }
+
+    const char polarMotionFlag = line.size() > 16U ? line[16U] : '\0';
+    const char ut1Flag = line.size() > 57U ? line[57U] : '\0';
+    double polarMotionXArcseconds = 0.0;
+    double polarMotionYArcseconds = 0.0;
+    double ut1MinusUtcSeconds = 0.0;
+    if (!parseDouble(fixedColumn(line, 18U, 9U), polarMotionXArcseconds)
+        || !parseDouble(fixedColumn(line, 37U, 9U), polarMotionYArcseconds)
+        || !parseDouble(fixedColumn(line, 58U, 10U), ut1MinusUtcSeconds)) {
+        return false;
+    }
+
+    return assignFinals2000AEntry(
+        twoDigitYear,
+        month,
+        day,
+        mjd,
+        polarMotionFlag,
+        ut1Flag,
+        polarMotionXArcseconds,
+        polarMotionYArcseconds,
+        ut1MinusUtcSeconds,
+        entry
+    );
+}
+
+[[nodiscard]] bool parseIersC04EntryLine(std::string_view line, EarthOrientationTableEntry& entry) noexcept
+{
+    const std::vector<std::string_view> columns = splitAsciiWhitespace(line);
+    if (columns.size() < 7U) {
+        return false;
+    }
+
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    double polarMotionXArcseconds = 0.0;
+    double polarMotionYArcseconds = 0.0;
+    double ut1MinusUtcSeconds = 0.0;
+    if (!parseInt(columns[0], year) || !parseInt(columns[1], month) || !parseInt(columns[2], day)
+        || !parseDouble(columns[4], polarMotionXArcseconds) || !parseDouble(columns[5], polarMotionYArcseconds)
+        || !parseDouble(columns[6], ut1MinusUtcSeconds)) {
+        return false;
+    }
+
+    CivilDateTime effectiveDate;
+    effectiveDate.astronomicalYear = year;
+    effectiveDate.month = month;
+    effectiveDate.day = day;
+    effectiveDate.timeScale = TimeScale::Utc;
+    if (!isValidCivilDateTime(effectiveDate)) {
+        return false;
+    }
+
+    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(effectiveDate);
+    if (!effectiveEpoch.has_value()) {
+        return false;
+    }
+
+    entry.effectiveUtcDate = effectiveDate;
+    entry.effectiveUtcEpoch = *effectiveEpoch;
+    entry.ut1MinusUtcSeconds = ut1MinusUtcSeconds;
+    entry.polarMotionXArcseconds = polarMotionXArcseconds;
+    entry.polarMotionYArcseconds = polarMotionYArcseconds;
+    entry.predicted = false;
+    entry.estimated = false;
+    return true;
+}
+
 [[nodiscard]] bool parseEntryLine(std::string_view line, EarthOrientationTableEntry& entry) noexcept
 {
+    if (parseFinals2000AEntryLine(line, entry)) {
+        return true;
+    }
+
     const std::vector<std::string_view> columns = splitCsvLine(line);
     if (columns.size() < 4U || columns.size() > 6U) {
-        return false;
+        return parseIersC04EntryLine(line, entry);
     }
 
     const std::optional<CivilDateTime> effectiveDate = parseUtcDate(columns[0]);
@@ -264,7 +490,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     bool estimated = false;
     if (!effectiveDate.has_value() || !parseDouble(columns[1], ut1MinusUtcSeconds)
         || !parseDouble(columns[2], polarMotionXArcseconds) || !parseDouble(columns[3], polarMotionYArcseconds)) {
-        return false;
+        return parseIersC04EntryLine(line, entry);
     }
     if (columns.size() == 5U && !parseBool(columns[4], predicted)) {
         return false;
@@ -288,9 +514,40 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     return true;
 }
 
+[[nodiscard]] bool isFinals2000ADateOnlyLine(const std::string_view line) noexcept
+{
+    const std::vector<std::string_view> columns = splitAsciiWhitespace(line);
+    if (columns.size() == 4U) {
+        int twoDigitYear = 0;
+        int month = 0;
+        int day = 0;
+        double mjd = 0.0;
+        return parseInt(columns[0], twoDigitYear) && parseInt(columns[1], month) && parseInt(columns[2], day)
+               && parseDouble(columns[3], mjd) && finalsYearFromMjd(twoDigitYear, mjd).has_value();
+    }
+
+    int twoDigitYear = 0;
+    int month = 0;
+    int day = 0;
+    double mjd = 0.0;
+    if (!parseInt(fixedColumn(line, 0U, 2U), twoDigitYear) || !parseInt(fixedColumn(line, 2U, 2U), month)
+        || !parseInt(fixedColumn(line, 4U, 2U), day) || !parseDouble(fixedColumn(line, 7U, 8U), mjd)
+        || !finalsYearFromMjd(twoDigitYear, mjd).has_value()) {
+        return false;
+    }
+
+    return isBlankFixedColumn(line, 16U, 1U) && isBlankFixedColumn(line, 18U, 9U) && isBlankFixedColumn(line, 37U, 9U)
+           && isBlankFixedColumn(line, 57U, 1U) && isBlankFixedColumn(line, 58U, 10U);
+}
+
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
 {
     return startsWith(line, "effective_utc_date");
+}
+
+[[nodiscard]] bool isIgnorableHeaderLine(const std::string_view line) noexcept
+{
+    return line.find(',') == std::string_view::npos && !startsWithIntegerYear(line);
 }
 
 [[nodiscard]] EarthOrientationDataLoadResult
@@ -407,7 +664,10 @@ sampleFromEntry(const AstronomicalEpoch& requestedEpoch, const EarthOrientationT
 }
 
 void applyDataWarnings(
-    EarthOrientationSample& sample, const EarthOrientationDataInfo& info, const AstronomicalEpoch& utcEpoch
+    EarthOrientationSample& sample,
+    const EarthOrientationDataInfo& info,
+    const AstronomicalEpoch& utcEpoch,
+    const EarthOrientationSampleOptions& options
 ) noexcept
 {
     if (info.status == EarthOrientationDataStatus::Stale
@@ -422,7 +682,11 @@ void applyDataWarnings(
 
     if (sample.predicted || (info.predictionRange.has_value() && epochInRange(utcEpoch, *info.predictionRange))) {
         sample.predicted = true;
-        addSampleWarning(sample, EarthOrientationSampleWarningCode::PredictedData);
+        if (options.degradePredictedData) {
+            addSampleWarning(sample, EarthOrientationSampleWarningCode::PredictedData);
+        } else {
+            sample.addWarning(EarthOrientationSampleWarningCode::PredictedData);
+        }
     }
 }
 
@@ -484,13 +748,13 @@ EarthOrientationDataLoadResult loadEarthOrientationDataFromTextAsset(
             line.remove_suffix(1U);
         }
 
-        line = trimAsciiWhitespace(line);
-        if (line.empty()) {
+        const std::string_view trimmedLine = trimAsciiWhitespace(line);
+        if (trimmedLine.empty()) {
             continue;
         }
-        if (startsWith(line, "#@ ")) {
+        if (startsWith(trimmedLine, "#@ ")) {
             if (std::optional<std::string> diagnosticText =
-                    applyMetadataLine(info, line, lineNumber, hasPredictionStart, hasPredictionEnd);
+                    applyMetadataLine(info, trimmedLine, lineNumber, hasPredictionStart, hasPredictionEnd);
                 diagnosticText.has_value()) {
                 return failureResult(
                     std::move(info), EarthOrientationDataStatus::Malformed, std::move(*diagnosticText)
@@ -498,10 +762,13 @@ EarthOrientationDataLoadResult loadEarthOrientationDataFromTextAsset(
             }
             continue;
         }
-        if (startsWith(line, "#")) {
+        if (startsWith(trimmedLine, "#")) {
             continue;
         }
-        if (isHeaderLine(line)) {
+        if (isFinals2000ADateOnlyLine(line)) {
+            continue;
+        }
+        if (isHeaderLine(trimmedLine) || (entries.empty() && isIgnorableHeaderLine(trimmedLine))) {
             continue;
         }
 
@@ -613,7 +880,7 @@ EarthOrientationSample sampleEarthOrientation(
         sample = interpolateSamples(utcEpoch, *(lowerBound - 1), *lowerBound);
     }
 
-    applyDataWarnings(sample, provider->dataInfo(), utcEpoch);
+    applyDataWarnings(sample, provider->dataInfo(), utcEpoch, options);
     if (sample.status == EarthOrientationSampleStatus::Degraded
         && sample.diagnosticText == "Earth-orientation sample resolved.") {
         sample.diagnosticText = "Earth-orientation sample resolved with degraded metadata.";

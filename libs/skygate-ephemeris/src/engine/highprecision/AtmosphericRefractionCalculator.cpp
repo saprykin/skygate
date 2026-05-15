@@ -43,6 +43,11 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
     return std::isfinite(altitudeDeg) && altitudeDeg >= kMinimumModelAltitudeDeg && altitudeDeg < 90.0;
 }
 
+[[nodiscard]] bool isBelowModelAltitude(const double altitudeDeg) noexcept
+{
+    return std::isfinite(altitudeDeg) && altitudeDeg < kMinimumModelAltitudeDeg;
+}
+
 void markUnavailable(EphemerisResultMetadata& metadata) noexcept
 {
     if (metadata.status == EphemerisResultStatus::Valid) {
@@ -94,7 +99,14 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
     }
 
     if (!result.horizontal.has_value() || !input.request.context.observer.isValid()
-        || !hasValidAtmosphere(input.request.options) || !hasModelAltitude(result.horizontal->altitudeDeg)) {
+        || !hasValidAtmosphere(input.request.options)) {
+        markUnavailable(result.metadata);
+        return result;
+    }
+    if (isBelowModelAltitude(result.horizontal->altitudeDeg)) {
+        return result;
+    }
+    if (!hasModelAltitude(result.horizontal->altitudeDeg)) {
         markUnavailable(result.metadata);
         return result;
     }

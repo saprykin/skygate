@@ -9,7 +9,8 @@ namespace {
 
 [[nodiscard]] bool isCatalogStarBody(const CelestialBody& body) noexcept
 {
-    return body.type == CelestialBodyType::Star || body.ephemerisSource == CelestialBodyEphemerisSource::Star;
+    return body.type == CelestialBodyType::Star || body.ephemerisSource == CelestialBodyEphemerisSource::Star
+           || body.ephemerisSource == CelestialBodyEphemerisSource::FixedEquatorial;
 }
 
 [[nodiscard]] double optionalOrQuietNaN(const std::optional<double> value) noexcept
@@ -122,8 +123,8 @@ std::span<const std::size_t> CatalogStarAstrometryArrays::bodyIndices() const no
     return m_bodyIndices;
 }
 
-std::optional<std::size_t> CatalogStarAstrometryArrays::arrayIndexForBodyIndex(const std::size_t bodyIndex
-) const noexcept
+std::optional<std::size_t>
+CatalogStarAstrometryArrays::arrayIndexForBodyIndex(const std::size_t bodyIndex) const noexcept
 {
     const auto iterator = std::find(m_bodyIndices.begin(), m_bodyIndices.end(), bodyIndex);
     if (iterator == m_bodyIndices.end()) {
@@ -182,14 +183,14 @@ std::optional<EphemerisDateRange> CatalogStarAstrometryArrays::validityRange(con
     return m_validityRanges[arrayIndex];
 }
 
-std::optional<double> CatalogStarAstrometryArrays::properMotionRightAscensionMasPerYear(const std::size_t arrayIndex
-) const noexcept
+std::optional<double>
+CatalogStarAstrometryArrays::properMotionRightAscensionMasPerYear(const std::size_t arrayIndex) const noexcept
 {
     return optionalValueAt(m_hasProperMotionRightAscension, m_properMotionRightAscensionMasPerYear, arrayIndex);
 }
 
-std::optional<double> CatalogStarAstrometryArrays::properMotionDeclinationMasPerYear(const std::size_t arrayIndex
-) const noexcept
+std::optional<double>
+CatalogStarAstrometryArrays::properMotionDeclinationMasPerYear(const std::size_t arrayIndex) const noexcept
 {
     return optionalValueAt(m_hasProperMotionDeclination, m_properMotionDeclinationMasPerYear, arrayIndex);
 }
@@ -199,8 +200,8 @@ std::optional<double> CatalogStarAstrometryArrays::stellarParallaxMas(const std:
     return optionalValueAt(m_hasStellarParallax, m_stellarParallaxMas, arrayIndex);
 }
 
-std::optional<double> CatalogStarAstrometryArrays::radialVelocityKmPerSecond(const std::size_t arrayIndex
-) const noexcept
+std::optional<double>
+CatalogStarAstrometryArrays::radialVelocityKmPerSecond(const std::size_t arrayIndex) const noexcept
 {
     return optionalValueAt(m_hasRadialVelocity, m_radialVelocityKmPerSecond, arrayIndex);
 }
@@ -300,8 +301,9 @@ std::span<const EphemerisDateRange> CatalogStarAstrometryArrays::validityRanges(
     return m_validityRanges;
 }
 
-bool CatalogStarAstrometryArrays::hasValueAt(const std::vector<std::uint8_t>& mask, const std::size_t arrayIndex)
-    const noexcept
+bool CatalogStarAstrometryArrays::hasValueAt(
+    const std::vector<std::uint8_t>& mask, const std::size_t arrayIndex
+) const noexcept
 {
     return arrayIndex < mask.size() && mask[arrayIndex] != 0U;
 }

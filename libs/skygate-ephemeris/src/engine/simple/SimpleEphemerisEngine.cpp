@@ -113,8 +113,8 @@ void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOp
     return engineOptions;
 }
 
-[[nodiscard]] EphemerisEngineOptions simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions
-) noexcept
+[[nodiscard]] EphemerisEngineOptions
+simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions) noexcept
 {
     EphemerisEngineOptions engineOptions = requestOptions;
     engineOptions.engineKind = EphemerisEngineKind::Simple;
@@ -203,6 +203,15 @@ void appendKernelDateRangeIfMissing(
     }
 
     dataSetInfo.dateRanges.push_back(kernelInfo->validityRange);
+}
+
+[[nodiscard]] bool
+prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& kernelProvider) noexcept
+{
+    const std::optional<highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
+    return kernelInfo.has_value()
+           && (strings::equalsIgnoreAsciiCase(kernelInfo->id, "de440s-kernel")
+               || strings::equalsIgnoreAsciiCase(kernelInfo->version, "DE440s"));
 }
 
 void publishDiagnostics(
@@ -468,8 +477,9 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
         } else {
             highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
             dependencies.calcephKernelProvider = kernelProvider;
-            dependencies.solarSystemStateCalculator =
-                std::make_shared<highprecision::SolarSystemStateCalculator>(kernelProvider);
+            dependencies.solarSystemStateCalculator = std::make_shared<highprecision::SolarSystemStateCalculator>(
+                kernelProvider, prefersPlanetarySystemBarycenters(*kernelProvider)
+            );
             dependencies.starAstrometryCalculator =
                 std::make_shared<highprecision::StarAstrometryCalculator>(kernelProvider, request.timeScaleService);
             dependencies.timeScaleService = request.timeScaleService;
@@ -492,9 +502,11 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
             }
             appendKernelDateRangeIfMissing(dependencies.dataSetInfo, *kernelProvider);
 
-            return EphemerisEngineFactoryResult::success(std::make_unique<highprecision::HighPrecisionEphemerisEngine>(
-                request.catalogBodies, request.options, std::move(dependencies)
-            ));
+            return EphemerisEngineFactoryResult::success(
+                std::make_unique<highprecision::HighPrecisionEphemerisEngine>(
+                    request.catalogBodies, request.options, std::move(dependencies)
+                )
+            );
         }
     }
 
