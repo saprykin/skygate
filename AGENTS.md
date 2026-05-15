@@ -73,3 +73,7 @@ repository.
   change.
 - If a rule conflicts with explicit user instruction, follow the user
   instruction.
+
+## Other Conventions
+- When editing Markdown files, `*.md`, make sure line width do not exceed 80
+  characters, unless long path or name does not fit limits alone.
