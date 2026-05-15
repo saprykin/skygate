@@ -89,7 +89,7 @@ private slots:
     void reportsInvalidObserverInput();
     void reportsInvalidAtmosphereInputs_data();
     void reportsInvalidAtmosphereInputs();
-    void reportsAltitudeOutsideModelRange();
+    void skipsRefractionBelowModelAltitude();
     void appliesRefractionAtModelAltitudeBoundaries();
     void appliesSmallCorrectionNearZenith();
 };
@@ -211,14 +211,23 @@ void AtmosphericRefractionCalculatorTests::reportsInvalidAtmosphereInputs()
     verifyRefractionUnavailable(result, 20.0);
 }
 
-void AtmosphericRefractionCalculatorTests::reportsAltitudeOutsideModelRange()
+void AtmosphericRefractionCalculatorTests::skipsRefractionBelowModelAltitude()
 {
     const AtmosphericRefractionCalculator calculator;
     const EphemerisRequest request = makeRequest();
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult(-2.0));
 
-    verifyRefractionUnavailable(result, -2.0);
+    QVERIFY(result.horizontal.has_value());
+    QCOMPARE(result.horizontal->altitudeDeg, -2.0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(
+        !hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AtmosphericRefraction)
+    );
+    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
 }
 
 void AtmosphericRefractionCalculatorTests::appliesRefractionAtModelAltitudeBoundaries()

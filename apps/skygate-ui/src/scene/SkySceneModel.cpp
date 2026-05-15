@@ -18,6 +18,28 @@ bool performanceLoggingEnabled()
     return enabled;
 }
 
+[[nodiscard]] skygate::ephemeris::EphemerisRequest
+sceneRenderEphemerisRequest(skygate::ephemeris::EphemerisRequest request) noexcept
+{
+    if (request.options.engineKind != skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
+        return request;
+    }
+
+    using skygate::ephemeris::EphemerisCorrectionFlags;
+    EphemerisCorrectionFlags renderCorrections = EphemerisCorrectionFlags::PrecessionNutation
+                                                 | EphemerisCorrectionFlags::EarthOrientation
+                                                 | EphemerisCorrectionFlags::DiurnalParallax;
+    if (request.options.enableAtmosphericRefraction
+        && skygate::ephemeris::hasCorrectionFlag(
+            request.options.correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction
+        )) {
+        renderCorrections |= EphemerisCorrectionFlags::AtmosphericRefraction;
+    }
+
+    request.options.correctionFlags = renderCorrections;
+    return request;
+}
+
 }  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent) : QObject(parent) {}
@@ -278,13 +300,14 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
         return std::nullopt;
     }
     const auto ephemerisRequestContext = m_skyContextController->ephemerisRequestContext();
+    const auto renderEphemerisRequest = sceneRenderEphemerisRequest(ephemerisRequestContext.request);
 
     return SkySceneCompositionInput{
         .frameInput =
             SkySceneFramePipelineInput{
                 .ephemerisEngine = ephemerisEngine,
                 .skyContext = ephemerisRequestContext.request.context,
-                .ephemerisRequest = ephemerisRequestContext.request,
+                .ephemerisRequest = renderEphemerisRequest,
                 .catalogRevision = ephemerisRequestContext.catalogRevision,
                 .engineKind = ephemerisRequestContext.request.options.engineKind,
                 .engineOptionsRevision = ephemerisRequestContext.engineOptionsRevision,
@@ -302,6 +325,7 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
                 .constellationLineRefs = m_skyContextController->constellationLineRefs(),
                 .constellationLabelRefs = m_skyContextController->constellationLabelRefs()
             },
+        .selectionEphemerisRequest = ephemerisRequestContext.request,
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),
         .catalogSourceLabels = m_skyContextController->catalogSourceLabels(),
         .timeController = m_skyContextController->timeController(),

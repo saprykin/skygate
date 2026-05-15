@@ -63,8 +63,8 @@ struct OverlayFixture final {
 
 class RequestOnlyObservationEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = request.context;
@@ -93,9 +93,83 @@ public:
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = 0U,
             .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
-            .horizontal =
-                {.altitudeDeg = usesLightTime ? 35.0 * std::sin(2.0 * 3.14159265358979323846 * (phase - 0.25)) : -20.0,
-                 .azimuthDeg = 180.0}
+            .horizontal = {
+                .altitudeDeg = usesLightTime ? 35.0 * std::sin(2.0 * 3.14159265358979323846 * (phase - 0.25)) : -20.0,
+                .azimuthDeg = 180.0
+            }
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+    mutable bool sawLightTimeRequest = false;
+};
+
+class HighPrecisionInspectorEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = request.context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++requestSampleCount;
+        sawLightTimeRequest =
+            sawLightTimeRequest
+            || hasCorrectionFlag(
+                request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+            );
+        skygate::ephemeris::EphemerisResultMetadata metadata;
+        metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+        metadata.dataSourceProvenance = "Selected-object precision fixture";
+        metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        metadata.finalizeCorrectionTracking(skygate::ephemeris::EphemerisCorrectionFlags::LightTime);
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 6.5, .declinationDeg = 7.5},
+            .horizontal = {.altitudeDeg = 12.3, .azimuthDeg = 234.5},
+            .metadata = metadata
         };
     }
 
@@ -198,6 +272,7 @@ private slots:
     void constellationLabelMarkerUsesLabelReferences();
     void inspectorFormatsSourceAliasesAndFallbacks();
     void inspectorSurfacesEphemerisMetadataAndWarnings();
+    void inspectorUsesHighPrecisionStateForSelectedObject();
     void inspectorIncludesObservationEventsAndFallbacks();
     void inspectorObservationEventsUseRequestOptions();
     void pinnedInspectorRendersForUnprojectableBody();
@@ -277,16 +352,20 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
     metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
         .displayName = "Modern kernel",
-        .start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-            .astronomicalYear = 1849,
-            .month = 12,
-            .day = 26,
-        }),
-        .end = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-            .astronomicalYear = 2150,
-            .month = 1,
-            .day = 22,
-        })
+        .start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+            skygate::ephemeris::CivilDateTime{
+                .astronomicalYear = 1849,
+                .month = 12,
+                .day = 26,
+            }
+        ),
+        .end = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+            skygate::ephemeris::CivilDateTime{
+                .astronomicalYear = 2150,
+                .month = 1,
+                .day = 22,
+            }
+        )
     };
     metadata.estimatedAngularUncertaintyArcsec = 0.42;
     metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
@@ -302,10 +381,9 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
         .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
-        .options =
-            skygate::ephemeris::EphemerisEngineOptions{
-                .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-            },
+        .options = skygate::ephemeris::EphemerisEngineOptions{
+            .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+        },
     };
 
     const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
@@ -321,6 +399,36 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Unavailable: atmospheric refraction"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Skipped: precession/nutation"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorUsesHighPrecisionStateForSelectedObject()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto engine = std::make_unique<HighPrecisionInspectorEngine>();
+    const auto* enginePtr = engine.get();
+    fixture.ephemerisEngine = std::move(engine);
+
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "selected";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
+        .context = fixture.skyContext,
+        .options = skygate::ephemeris::EphemerisEngineOptions{
+            .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+            .correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime,
+        },
+    };
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Alt / Az"), QString("12.3 / 234.5 deg"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("6h 30m 00s / +7d 30m 00s"));
+    QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("Selected-object precision fixture"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
+    QCOMPARE(enginePtr->contextSampleCount, 0);
+    QVERIFY(enginePtr->requestSampleCount > 0);
+    QVERIFY(enginePtr->sawLightTimeRequest);
 }
 
 void SkySelectionOverlayBuilderTests::inspectorIncludesObservationEventsAndFallbacks()
@@ -361,18 +469,19 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-            .astronomicalYear = 1970,
-            .month = 1,
-            .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
-        }),
+        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+            skygate::ephemeris::CivilDateTime{
+                .astronomicalYear = 1970,
+                .month = 1,
+                .day = 1,
+                .timeScale = skygate::ephemeris::TimeScale::Utc,
+            }
+        ),
         .context = fixture.skyContext,
-        .options =
-            skygate::ephemeris::EphemerisEngineOptions{
-                .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-                .correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections,
-            },
+        .options = skygate::ephemeris::EphemerisEngineOptions{
+            .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
+            .correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections,
+        },
     };
 
     SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);

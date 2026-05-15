@@ -111,11 +111,13 @@ multiplyTranspose(const Matrix3x3& matrix, const CelestialFrameVector& vector) n
 [[nodiscard]] AstronomicalEpoch
 addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
 {
-    return normalizedAstronomicalEpoch(AstronomicalEpoch{
-        .julianDatePart1 = epoch.julianDatePart1,
-        .julianDatePart2 = epoch.julianDatePart2 + seconds / kSecondsPerDay,
-        .timeScale = targetScale,
-    });
+    return normalizedAstronomicalEpoch(
+        AstronomicalEpoch{
+            .julianDatePart1 = epoch.julianDatePart1,
+            .julianDatePart2 = epoch.julianDatePart2 + seconds / kSecondsPerDay,
+            .timeScale = targetScale,
+        }
+    );
 }
 
 [[nodiscard]] Matrix3x3 earthRotationMatrix(const double earthRotationAngle) noexcept
@@ -257,6 +259,7 @@ struct FrameTransformContext {
                 EarthOrientationSampleOptions{
                     .allowOutOfRangeNearestSampleFallback = true,
                     .allowMissingDataZeroFallback = true,
+                    .degradePredictedData = false,
                 }
             );
             earthOrientationSampleComputed = true;
@@ -318,10 +321,12 @@ celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisResul
         EphemerisResultMetadata cachedMetadata;
         const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, cachedMetadata);
         if (ttEpoch.has_value()) {
-            context.celestialIntermediateMatrixValue = celestialToIntermediateMatrix06A(JulianDateParts{
-                .day1 = ttEpoch->julianDatePart1,
-                .day2 = ttEpoch->julianDatePart2,
-            });
+            context.celestialIntermediateMatrixValue = celestialToIntermediateMatrix06A(
+                JulianDateParts{
+                    .day1 = ttEpoch->julianDatePart1,
+                    .day2 = ttEpoch->julianDatePart2,
+                }
+            );
             if (!context.celestialIntermediateMatrixValue.has_value()) {
                 cachedMetadata.status = EphemerisResultStatus::Failed;
                 cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);
@@ -342,10 +347,12 @@ intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context
         EphemerisResultMetadata cachedMetadata;
         const std::optional<AstronomicalEpoch> ut1Epoch = context.ut1Epoch(cachedMetadata);
         if (ut1Epoch.has_value()) {
-            const std::optional<double> earthRotationAngle = earthRotationAngle00(JulianDateParts{
-                .day1 = ut1Epoch->julianDatePart1,
-                .day2 = ut1Epoch->julianDatePart2,
-            });
+            const std::optional<double> earthRotationAngle = earthRotationAngle00(
+                JulianDateParts{
+                    .day1 = ut1Epoch->julianDatePart1,
+                    .day2 = ut1Epoch->julianDatePart2,
+                }
+            );
             if (earthRotationAngle.has_value()) {
                 context.earthRotationMatrixValue = earthRotationMatrix(*earthRotationAngle);
             } else {
@@ -369,10 +376,12 @@ terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context,
         const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, cachedMetadata);
         const std::optional<EarthOrientationSample> earthOrientationSample = context.earthOrientation(cachedMetadata);
         if (ttEpoch.has_value() && earthOrientationSample.has_value()) {
-            const std::optional<double> tioLocator = tioLocatorS00(JulianDateParts{
-                .day1 = ttEpoch->julianDatePart1,
-                .day2 = ttEpoch->julianDatePart2,
-            });
+            const std::optional<double> tioLocator = tioLocatorS00(
+                JulianDateParts{
+                    .day1 = ttEpoch->julianDatePart1,
+                    .day2 = ttEpoch->julianDatePart2,
+                }
+            );
             if (tioLocator.has_value()) {
                 context.polarMotionMatrixValue = polarMotionMatrix00(
                     earthOrientationSample->polarMotionXArcseconds * kArcsecondsToRadians,
@@ -419,8 +428,10 @@ void mergeStageMetadata(
 {
     if (stageMetadata.status == EphemerisResultStatus::Failed) {
         aggregateMetadata.status = EphemerisResultStatus::Failed;
-    } else if (stageMetadata.status == EphemerisResultStatus::Degraded
-               && aggregateMetadata.status == EphemerisResultStatus::Valid) {
+    } else if (
+        stageMetadata.status == EphemerisResultStatus::Degraded
+        && aggregateMetadata.status == EphemerisResultStatus::Valid
+    ) {
         aggregateMetadata.status = EphemerisResultStatus::Degraded;
     }
 
@@ -461,10 +472,12 @@ apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisR
         EphemerisResultMetadata cachedMetadata;
         const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, cachedMetadata);
         if (ttEpoch.has_value()) {
-            context.apparentEquatorAndEquinoxMatrixValue = precessionNutationMatrix06A(JulianDateParts{
-                .day1 = ttEpoch->julianDatePart1,
-                .day2 = ttEpoch->julianDatePart2,
-            });
+            context.apparentEquatorAndEquinoxMatrixValue = precessionNutationMatrix06A(
+                JulianDateParts{
+                    .day1 = ttEpoch->julianDatePart1,
+                    .day2 = ttEpoch->julianDatePart2,
+                }
+            );
             if (!context.apparentEquatorAndEquinoxMatrixValue.has_value()) {
                 cachedMetadata.status = EphemerisResultStatus::Failed;
                 cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);

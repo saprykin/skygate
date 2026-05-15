@@ -51,12 +51,14 @@ private:
 
 [[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = year,
-        .month = month,
-        .day = day,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = year,
+            .month = month,
+            .day = day,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -68,6 +70,8 @@ class EarthOrientationProviderTests final : public QObject {
 
 private slots:
     void loadsValidDataFromSnapshot();
+    void loadsIersC04Data();
+    void loadsIersFinals2000AData();
     void reportsMissingData();
     void rejectsMalformedRows();
     void rejectsMissingValues();
@@ -80,6 +84,7 @@ private slots:
     void samplesAtRangeBoundaries();
     void reportsOutOfRangeFallback();
     void reportsOutOfRangeFailureWhenFallbackDisallowed();
+    void canTreatPredictedSamplesAsUsable();
     void reportsStaleAndPredictedSamplesAsDegraded();
     void reportsEstimatedSamplesAsDegraded();
     void reportsMissingDataFallback();
@@ -109,6 +114,71 @@ void EarthOrientationProviderTests::loadsValidDataFromSnapshot()
     QCOMPARE(firstEntry.polarMotionYArcseconds, 0.2187);
     QVERIFY(!firstEntry.predicted);
     QVERIFY(result.provider->entries()[1].predicted);
+}
+
+void EarthOrientationProviderTests::loadsIersC04Data()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "EARTH ORIENTATION PARAMETER (EOP) PRODUCT CENTER CENTER (PARIS OBSERVATORY)\n"
+                    "Date      MJD      x          y        UT1-UTC       LOD\n"
+                    "(0h UTC)\n"
+                    "1962  1  1  37665   0.003212   0.195335   0.0326330   0.001723  "
+                    "-0.001136  -0.003667\n"
+                    "1962  1  2  37666   0.004421   0.196297   0.0320540   0.001669  "
+                    "-0.001163  -0.003646\n";
+
+    const skygate::ephemeris::EarthOrientationDataLoadResult result =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(asset);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+    QCOMPARE(result.provider->entries().size(), std::size_t{2});
+    const skygate::ephemeris::EarthOrientationTableEntry& firstEntry = result.provider->entries().front();
+    QCOMPARE(firstEntry.effectiveUtcDate.astronomicalYear, 1962);
+    QCOMPARE(firstEntry.effectiveUtcDate.month, 1);
+    QCOMPARE(firstEntry.effectiveUtcDate.day, 1);
+    QCOMPARE(firstEntry.ut1MinusUtcSeconds, 0.0326330);
+    QCOMPARE(firstEntry.polarMotionXArcseconds, 0.003212);
+    QCOMPARE(firstEntry.polarMotionYArcseconds, 0.195335);
+    QVERIFY(!firstEntry.predicted);
+    QVERIFY(!firstEntry.estimated);
+}
+
+void EarthOrientationProviderTests::loadsIersFinals2000AData()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 "
+                    "0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   "
+                    ".143000   .137000   .8075000   -18.637    -3.667  \n"
+                    "26 515 61175.00 P  0.170615 0.000604  0.411608 0.000484  P "
+                    "0.0271380 0.0001080                 P     0.002    0.128    -0.196    "
+                    "0.160                                                     \n"
+                    "27 710 61596.00\n";
+
+    const skygate::ephemeris::EarthOrientationDataLoadResult result =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(asset);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.provider != nullptr);
+    QCOMPARE(result.provider->entries().size(), std::size_t{2});
+    const skygate::ephemeris::EarthOrientationTableEntry& firstEntry = result.provider->entries().front();
+    QCOMPARE(firstEntry.effectiveUtcDate.astronomicalYear, 1973);
+    QCOMPARE(firstEntry.effectiveUtcDate.month, 1);
+    QCOMPARE(firstEntry.effectiveUtcDate.day, 2);
+    QCOMPARE(firstEntry.ut1MinusUtcSeconds, 0.8084178);
+    QCOMPARE(firstEntry.polarMotionXArcseconds, 0.120733);
+    QCOMPARE(firstEntry.polarMotionYArcseconds, 0.136966);
+    QVERIFY(!firstEntry.predicted);
+
+    const skygate::ephemeris::EarthOrientationTableEntry& lastEntry = result.provider->entries().back();
+    QCOMPARE(lastEntry.effectiveUtcDate.astronomicalYear, 2026);
+    QCOMPARE(lastEntry.effectiveUtcDate.month, 5);
+    QCOMPARE(lastEntry.effectiveUtcDate.day, 15);
+    QCOMPARE(lastEntry.ut1MinusUtcSeconds, 0.0271380);
+    QCOMPARE(lastEntry.polarMotionXArcseconds, 0.170615);
+    QCOMPARE(lastEntry.polarMotionYArcseconds, 0.411608);
+    QVERIFY(lastEntry.predicted);
+    QVERIFY(!lastEntry.estimated);
 }
 
 void EarthOrientationProviderTests::reportsMissingData()
@@ -327,6 +397,26 @@ void EarthOrientationProviderTests::reportsOutOfRangeFailureWhenFallbackDisallow
     );
     QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::EpochOutsideRange));
     QVERIFY(!sample.diagnosticText.empty());
+}
+
+void EarthOrientationProviderTests::canTreatPredictedSamplesAsUsable()
+{
+    const skygate::ephemeris::EarthOrientationDataLoadResult loadResult =
+        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeValidAsset());
+    QVERIFY(loadResult.isSuccess());
+
+    skygate::ephemeris::EarthOrientationSampleOptions options;
+    options.degradePredictedData = false;
+    const skygate::ephemeris::EarthOrientationSample sample =
+        skygate::ephemeris::sampleEarthOrientation(loadResult.provider, epochForDate(2026, 5, 1), options);
+
+    QVERIFY(sample.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(sample.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EarthOrientationSampleStatus::Valid)
+    );
+    QVERIFY(sample.predicted);
+    QVERIFY(sample.hasWarning(skygate::ephemeris::EarthOrientationSampleWarningCode::PredictedData));
 }
 
 void EarthOrientationProviderTests::reportsStaleAndPredictedSamplesAsDegraded()

@@ -66,6 +66,26 @@ bool shouldShowHighPrecisionDetails(const SkySelectionOverlayInput& input) noexc
            && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
 }
 
+bool shouldComputeHighPrecisionInspectorState(const SkySelectionOverlayInput& input) noexcept
+{
+    return input.ephemerisEngine != nullptr
+           && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+           && shouldShowHighPrecisionDetails(input);
+}
+
+skygate::ephemeris::CelestialBodyState
+detailedInspectorState(const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBodyState& sceneState)
+{
+    if (!shouldComputeHighPrecisionInspectorState(input)) {
+        return sceneState;
+    }
+
+    const auto preciseState = input.ephemerisEngine->computeBodyState(
+        *input.ephemerisRequest, static_cast<std::size_t>(sceneState.bodyIndex)
+    );
+    return preciseState.value_or(sceneState);
+}
+
 EphemerisInspectorMetadata buildEphemerisInspectorMetadata(
     const skygate::ephemeris::EphemerisResultMetadata& metadata, const bool includeHighPrecisionDetails
 )
@@ -134,8 +154,8 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         return {};
     }
 
-    const auto& state = input.snapshot->states.at(*stateIndexIt);
-    const auto& body = input.snapshot->bodyAt(state.bodyIndex);
+    const auto& sceneState = input.snapshot->states.at(*stateIndexIt);
+    const auto& body = input.snapshot->bodyAt(sceneState.bodyIndex);
     if (body.displayName.empty()) {
         return {};
     }
@@ -143,11 +163,11 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     double inspectorX = input.inspectorPinnedX;
     double inspectorY = input.inspectorPinnedY;
     if (!input.inspectorPinned) {
-        if (!state.horizontal.isFinite()) {
+        if (!sceneState.horizontal.isFinite()) {
             return {};
         }
 
-        const auto projected = input.preparedProjection->project(state.horizontal);
+        const auto projected = input.preparedProjection->project(sceneState.horizontal);
         if (!projected.isVisible) {
             return {};
         }
@@ -155,6 +175,8 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         inspectorX = projected.x + 18.0;
         inspectorY = projected.y + 18.0;
     }
+
+    const skygate::ephemeris::CelestialBodyState state = detailedInspectorState(input, sceneState);
 
     std::vector<SkyInspectorField> fields;
     fields.push_back(inspectorField("Type", skygate::ui::internal::celestialBodyTypeText(body)));
@@ -164,7 +186,7 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     const EphemerisInspectorMetadata ephemerisMetadata =
         buildEphemerisInspectorMetadata(state.metadata, shouldShowHighPrecisionDetails(input));
     appendEphemerisMetadataFields(fields, ephemerisMetadata, state.metadata.status);
-    appendObservationEventFields(fields, input, body, state.bodyIndex);
+    appendObservationEventFields(fields, input, body, sceneState.bodyIndex);
 
     if (body.deepSkyObject.has_value()) {
         const QString sizeText = skygate::ui::internal::angularSizeText(*body.deepSkyObject);
@@ -176,7 +198,7 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     fields.push_back(inspectorField(
         "Source",
         skygate::ui::internal::sourceLabelForBodyIndex(
-            input.catalogSourceIds, input.catalogSourceLabels, state.bodyIndex
+            input.catalogSourceIds, input.catalogSourceLabels, sceneState.bodyIndex
         )
     ));
 

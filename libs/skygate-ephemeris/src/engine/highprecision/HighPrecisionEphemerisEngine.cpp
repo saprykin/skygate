@@ -124,6 +124,46 @@ void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleCo
     }
 }
 
+void mergeKernelEpochTimeScaleMetadata(
+    EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion
+) noexcept
+{
+    constexpr std::uint32_t kTdbApproximationWarning =
+        timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied);
+    if (conversion.status == TimeScaleConversionStatus::Degraded
+        && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
+        return;
+    }
+
+    mergeTimeScaleMetadata(metadata, conversion);
+}
+
+void mergeEphemerisMetadata(EphemerisResultMetadata& target, const EphemerisResultMetadata& source) noexcept
+{
+    if (source.status == EphemerisResultStatus::Failed) {
+        target.status = EphemerisResultStatus::Failed;
+    } else if (source.status == EphemerisResultStatus::OutOfRange) {
+        target.status = EphemerisResultStatus::OutOfRange;
+    } else if (source.status == EphemerisResultStatus::Unsupported) {
+        target.status = EphemerisResultStatus::Unsupported;
+    } else if (source.status == EphemerisResultStatus::Degraded && target.status == EphemerisResultStatus::Valid) {
+        target.status = EphemerisResultStatus::Degraded;
+    }
+
+    target.warningCodeMask |= source.warningCodeMask;
+    target.appliedCorrections |= source.appliedCorrections;
+    target.unavailableCorrections |= source.unavailableCorrections;
+    if (target.dataSourceProvenance.empty()) {
+        target.dataSourceProvenance = source.dataSourceProvenance;
+    }
+    if (!target.effectiveDataValidityRange.has_value()) {
+        target.effectiveDataValidityRange = source.effectiveDataValidityRange;
+    }
+    if (!target.estimatedAngularUncertaintyArcsec.has_value()) {
+        target.estimatedAngularUncertaintyArcsec = source.estimatedAngularUncertaintyArcsec;
+    }
+}
+
 void mergeEarthOrientationMetadata(EphemerisResultMetadata& metadata, const EarthOrientationSample& sample) noexcept
 {
     if (sample.status == EarthOrientationSampleStatus::Failed) {
@@ -185,6 +225,35 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
     }
 
     return apparentPlaceCalculator(dependencies).apply(input, calculatorResult);
+}
+
+[[nodiscard]] std::optional<AstronomicalEpoch> kernelEpochForSolarSystemState(
+    EphemerisResultMetadata& metadata,
+    const EphemerisRequest& request,
+    const PreparedEphemerisRequestState* preparedState,
+    const std::shared_ptr<const ITimeScaleService>& timeScaleService
+)
+{
+    if (request.epoch.timeScale == TimeScale::Tdb) {
+        return normalizedAstronomicalEpoch(request.epoch);
+    }
+    if (preparedState != nullptr && preparedState->tdbKernelEpoch.has_value()) {
+        mergeEphemerisMetadata(metadata, preparedState->tdbKernelEpochMetadata);
+        return preparedState->tdbKernelEpoch;
+    }
+    if (timeScaleService == nullptr) {
+        metadata.status = EphemerisResultStatus::Failed;
+        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        return std::nullopt;
+    }
+
+    const TimeScaleConversionResult conversion = timeScaleService->convert(request.epoch, TimeScale::Tdb);
+    mergeKernelEpochTimeScaleMetadata(metadata, conversion);
+    if (!conversion.isSuccess()) {
+        return std::nullopt;
+    }
+
+    return normalizedAstronomicalEpoch(conversion.epoch);
 }
 
 [[nodiscard]] std::vector<StarAstrometryBatchResult> applyApparentPlaceBatchIfRequested(
@@ -423,7 +492,7 @@ std::shared_ptr<const PreparedEphemerisRequestState>
 HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& request) const
 {
     auto preparedState = std::make_shared<PreparedEphemerisRequestState>();
-    if (requestsAnnualParallaxState(request)) {
+    {
         if (request.epoch.timeScale == TimeScale::Tdb) {
             preparedState->tdbKernelEpoch = normalizedAstronomicalEpoch(request.epoch);
         } else if (m_dependencies.timeScaleService == nullptr) {
@@ -432,13 +501,14 @@ HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& 
         } else {
             const TimeScaleConversionResult conversion =
                 m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Tdb);
-            mergeTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
+            mergeKernelEpochTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
             if (conversion.isSuccess()) {
-                preparedState->tdbKernelEpoch = conversion.epoch;
+                preparedState->tdbKernelEpoch = normalizedAstronomicalEpoch(conversion.epoch);
             }
         }
 
-        if (preparedState->tdbKernelEpoch.has_value() && m_dependencies.calcephKernelProvider != nullptr) {
+        if (requestsAnnualParallaxState(request) && preparedState->tdbKernelEpoch.has_value()
+            && m_dependencies.calcephKernelProvider != nullptr) {
             preparedState->annualParallaxEarthState = m_dependencies.calcephKernelProvider->computeGeometricState(
                 *preparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter
             );
@@ -461,6 +531,7 @@ HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& 
                 EarthOrientationSampleOptions{
                     .allowOutOfRangeNearestSampleFallback = true,
                     .allowMissingDataZeroFallback = true,
+                    .degradePredictedData = false,
                 }
             );
             mergeEarthOrientationMetadata(preparedState->topocentricMetadata, *preparedState->earthOrientationSample);
@@ -497,7 +568,23 @@ CelestialBodyState HighPrecisionEphemerisEngine::computeStateForBody(
 
     const ISolarSystemStateCalculator* solarSystemCalculator = m_dependencies.solarSystemStateCalculator.get();
     if (isSolarSystemBody(body) && solarSystemCalculator != nullptr) {
-        HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(input);
+        HighPrecisionCalculatorResult kernelEpochMetadata;
+        const std::optional<AstronomicalEpoch> kernelEpoch = kernelEpochForSolarSystemState(
+            kernelEpochMetadata.metadata, request, input.preparedRequestState.get(), m_dependencies.timeScaleService
+        );
+        if (!kernelEpoch.has_value()) {
+            return builder.buildState(input, kernelEpochMetadata);
+        }
+        EphemerisRequest kernelRequest = request;
+        kernelRequest.epoch = *kernelEpoch;
+        const HighPrecisionComputationInput kernelInput{
+            .request = kernelRequest,
+            .body = body,
+            .preparedRequestState = input.preparedRequestState,
+            .bodyIndex = bodyIndex,
+        };
+        HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(kernelInput);
+        mergeEphemerisMetadata(calculatorResult.metadata, kernelEpochMetadata.metadata);
         HighPrecisionCalculatorResult apparentResult =
             applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);
         return builder.buildState(input, apparentResult);

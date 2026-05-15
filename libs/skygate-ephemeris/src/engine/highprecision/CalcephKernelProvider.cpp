@@ -21,6 +21,7 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 constexpr std::size_t kIoBufferBytes = 1U << 16U;
+constexpr double kAstronomicalUnitKilometers = 149'597'870.7;
 
 [[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
 {
@@ -158,7 +159,7 @@ public:
             epoch.julianDatePart2,
             targetNaifId,
             centerNaifId,
-            CALCEPH_USE_NAIFID + CALCEPH_UNIT_AU + CALCEPH_UNIT_DAY,
+            CALCEPH_USE_NAIFID + CALCEPH_UNIT_KM + CALCEPH_UNIT_DAY,
             positionVelocity
         );
         if (result == 0) {
@@ -166,14 +167,14 @@ public:
         }
 
         state.positionAu = SolarSystemKernelVector{
-            .xAu = positionVelocity[0],
-            .yAu = positionVelocity[1],
-            .zAu = positionVelocity[2],
+            .xAu = positionVelocity[0] / kAstronomicalUnitKilometers,
+            .yAu = positionVelocity[1] / kAstronomicalUnitKilometers,
+            .zAu = positionVelocity[2] / kAstronomicalUnitKilometers,
         };
         state.velocityAuPerDay = SolarSystemKernelVector{
-            .xAu = positionVelocity[3],
-            .yAu = positionVelocity[4],
-            .zAu = positionVelocity[5],
+            .xAu = positionVelocity[3] / kAstronomicalUnitKilometers,
+            .yAu = positionVelocity[4] / kAstronomicalUnitKilometers,
+            .zAu = positionVelocity[5] / kAstronomicalUnitKilometers,
         };
         return state;
     }

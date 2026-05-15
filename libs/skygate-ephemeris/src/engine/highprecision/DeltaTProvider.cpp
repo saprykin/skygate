@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace skygate::ephemeris {
 
@@ -60,6 +61,25 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return result.ec == std::errc{} && result.ptr == end && std::isfinite(value);
 }
 
+[[nodiscard]] std::vector<std::string_view> splitAsciiWhitespace(std::string_view text)
+{
+    std::vector<std::string_view> tokens;
+    while (true) {
+        text = trimAsciiWhitespace(text);
+        if (text.empty()) {
+            break;
+        }
+
+        std::size_t end = 0U;
+        while (end < text.size() && std::isspace(static_cast<unsigned char>(text[end])) == 0) {
+            ++end;
+        }
+        tokens.push_back(text.substr(0U, end));
+        text.remove_prefix(end);
+    }
+    return tokens;
+}
+
 [[nodiscard]] std::optional<CivilDateTime> parseUtcDate(std::string_view text) noexcept
 {
     text = trimAsciiWhitespace(text);
@@ -90,6 +110,19 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     }
 
     return dateTime;
+}
+
+[[nodiscard]] CivilDateTime civilDateFromDecimalYear(const double decimalYear) noexcept
+{
+    const int year = static_cast<int>(std::floor(decimalYear));
+    const double fraction = decimalYear - static_cast<double>(year);
+    const int daysInYear = detail::isGregorianLeapYear(year) ? 366 : 365;
+    int dayOffset = static_cast<int>(std::floor(fraction * static_cast<double>(daysInYear) + 0.5));
+    dayOffset = std::clamp(dayOffset, 0, daysInYear - 1);
+
+    CivilDateTime date = detail::civilDateFromDays(detail::daysFromCivilDate(year, 1, 1) + dayOffset);
+    date.timeScale = TimeScale::Utc;
+    return date;
 }
 
 [[nodiscard]] std::optional<AstronomicalEpoch> epochFromUtcDate(const CivilDateTime& dateTime) noexcept
@@ -246,11 +279,60 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     return std::nullopt;
 }
 
+[[nodiscard]] bool parseUsnoEntryLine(std::string_view line, DeltaTTableEntry& entry) noexcept
+{
+    const std::vector<std::string_view> columns = splitAsciiWhitespace(line);
+    if (columns.size() < 2U) {
+        return false;
+    }
+
+    CivilDateTime effectiveDate;
+    double deltaTSeconds = 0.0;
+    int year = 0;
+    int month = 0;
+    int day = 1;
+    if (columns.size() >= 4U && parseInt(columns[0], year) && parseInt(columns[1], month) && parseInt(columns[2], day)
+        && month >= 1 && month <= 12 && parseDouble(columns[3], deltaTSeconds)) {
+        effectiveDate.astronomicalYear = year;
+        effectiveDate.month = month;
+        effectiveDate.day = day;
+        effectiveDate.timeScale = TimeScale::Utc;
+    } else if (
+        columns.size() >= 3U && parseInt(columns[0], year) && parseInt(columns[1], month) && month >= 1 && month <= 12
+        && parseDouble(columns[2], deltaTSeconds)
+    ) {
+        effectiveDate.astronomicalYear = year;
+        effectiveDate.month = month;
+        effectiveDate.day = 1;
+        effectiveDate.timeScale = TimeScale::Utc;
+    } else {
+        double decimalYear = 0.0;
+        if (!parseDouble(columns[0], decimalYear) || !parseDouble(columns[1], deltaTSeconds)) {
+            return false;
+        }
+        effectiveDate = civilDateFromDecimalYear(decimalYear);
+    }
+
+    if (!isValidCivilDateTime(effectiveDate)) {
+        return false;
+    }
+
+    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(effectiveDate);
+    if (!effectiveEpoch.has_value()) {
+        return false;
+    }
+
+    entry.effectiveUtcDate = effectiveDate;
+    entry.effectiveUtcEpoch = *effectiveEpoch;
+    entry.deltaTSeconds = deltaTSeconds;
+    return true;
+}
+
 [[nodiscard]] bool parseEntryLine(std::string_view line, DeltaTTableEntry& entry) noexcept
 {
     const std::size_t comma = line.find(',');
     if (comma == std::string_view::npos) {
-        return false;
+        return parseUsnoEntryLine(line, entry);
     }
 
     const std::optional<CivilDateTime> effectiveDate = parseUtcDate(line.substr(0U, comma));

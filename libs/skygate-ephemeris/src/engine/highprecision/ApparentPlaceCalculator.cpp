@@ -134,8 +134,8 @@ subtractVector(const CelestialFrameVector& lhs, const CelestialFrameVector& rhs)
     };
 }
 
-[[nodiscard]] std::optional<core::EquatorialCoordinate> equatorialFromVector(const CelestialFrameVector& vector
-) noexcept
+[[nodiscard]] std::optional<core::EquatorialCoordinate>
+equatorialFromVector(const CelestialFrameVector& vector) noexcept
 {
     if (!std::isfinite(vector.x) || !std::isfinite(vector.y) || !std::isfinite(vector.z)) {
         return std::nullopt;
@@ -312,6 +312,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
             EarthOrientationSampleOptions{
                 .allowOutOfRangeNearestSampleFallback = true,
                 .allowMissingDataZeroFallback = true,
+                .degradePredictedData = false,
             }
         );
         mergeEarthOrientationMetadata(result.metadata, earthOrientationSample);
@@ -470,6 +471,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                     EarthOrientationSampleOptions{
                         .allowOutOfRangeNearestSampleFallback = true,
                         .allowMissingDataZeroFallback = true,
+                        .degradePredictedData = false,
                     }
                 );
                 mergeEarthOrientationMetadata(topocentricMetadata, earthOrientationSample);
@@ -500,10 +502,12 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         HighPrecisionCalculatorResult result = calculatorResult.result;
         if (!calculatorResult.result.equatorial.has_value()
             || !isFiniteEquatorial(*calculatorResult.result.equatorial)) {
-            results.push_back(StarAstrometryBatchResult{
-                .bodyIndex = calculatorResult.bodyIndex,
-                .result = std::move(result),
-            });
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = std::move(result),
+                }
+            );
             outputVectors.push_back(std::nullopt);
             hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
             continue;
@@ -511,10 +515,12 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         if (isTopocentric) {
             mergeMetadata(result.metadata, topocentricMetadata);
             if (!topocentricRequestWideStateAvailable) {
-                results.push_back(StarAstrometryBatchResult{
-                    .bodyIndex = calculatorResult.bodyIndex,
-                    .result = std::move(result),
-                });
+                results.push_back(
+                    StarAstrometryBatchResult{
+                        .bodyIndex = calculatorResult.bodyIndex,
+                        .result = std::move(result),
+                    }
+                );
                 outputVectors.push_back(std::nullopt);
                 hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
                 continue;
@@ -523,19 +529,23 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
         CelestialFrameVector outputVector = computationVectorFromCalculatorResult(calculatorResult.result);
         if (targetFrame == CelestialReferenceFrame::Gcrs) {
-            results.push_back(StarAstrometryBatchResult{
-                .bodyIndex = calculatorResult.bodyIndex,
-                .result = std::move(result),
-            });
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = std::move(result),
+                }
+            );
             outputVectors.push_back(outputVector);
             hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
             continue;
         }
 
-        results.push_back(StarAstrometryBatchResult{
-            .bodyIndex = calculatorResult.bodyIndex,
-            .result = std::move(result),
-        });
+        results.push_back(
+            StarAstrometryBatchResult{
+                .bodyIndex = calculatorResult.bodyIndex,
+                .result = std::move(result),
+            }
+        );
         outputVectors.push_back(std::nullopt);
         hasObserverRelativePosition.push_back(calculatorResult.result.observerRelativePositionAu.has_value());
         if (m_frameTransformer != nullptr) {
@@ -553,12 +563,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
     if (m_frameTransformer != nullptr && !transformInputs.empty()) {
         const std::vector<CelestialFrameTransformResult> transformResults =
-            m_frameTransformer->transformCelestialVectors(CelestialFrameBatchTransformRequest{
-                .sourceFrame = CelestialReferenceFrame::Gcrs,
-                .targetFrame = targetFrame,
-                .epoch = request.epoch,
-                .vectors = transformInputs,
-            });
+            m_frameTransformer->transformCelestialVectors(
+                CelestialFrameBatchTransformRequest{
+                    .sourceFrame = CelestialReferenceFrame::Gcrs,
+                    .targetFrame = targetFrame,
+                    .epoch = request.epoch,
+                    .vectors = transformInputs,
+                }
+            );
         const std::size_t transformCount = std::min(transformResults.size(), transformResultIndices.size());
         for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
             const std::size_t resultIndex = transformResultIndices[transformIndex];
@@ -625,12 +637,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
         if (m_frameTransformer != nullptr && !gcrsInputs.empty()) {
             const std::vector<CelestialFrameTransformResult> gcrsTransformResults =
-                m_frameTransformer->transformCelestialVectors(CelestialFrameBatchTransformRequest{
-                    .sourceFrame = CelestialReferenceFrame::Itrs,
-                    .targetFrame = CelestialReferenceFrame::Gcrs,
-                    .epoch = request.epoch,
-                    .vectors = gcrsInputs,
-                });
+                m_frameTransformer->transformCelestialVectors(
+                    CelestialFrameBatchTransformRequest{
+                        .sourceFrame = CelestialReferenceFrame::Itrs,
+                        .targetFrame = CelestialReferenceFrame::Gcrs,
+                        .epoch = request.epoch,
+                        .vectors = gcrsInputs,
+                    }
+                );
             const std::size_t transformCount = std::min(gcrsTransformResults.size(), gcrsResultIndices.size());
             for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
                 const std::size_t resultIndex = gcrsResultIndices[transformIndex];
@@ -659,12 +673,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
             if (m_frameTransformer != nullptr && !apparentInputs.empty()) {
                 const std::vector<CelestialFrameTransformResult> apparentTransformResults =
-                    m_frameTransformer->transformCelestialVectors(CelestialFrameBatchTransformRequest{
-                        .sourceFrame = CelestialReferenceFrame::Gcrs,
-                        .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
-                        .epoch = request.epoch,
-                        .vectors = apparentInputs,
-                    });
+                    m_frameTransformer->transformCelestialVectors(
+                        CelestialFrameBatchTransformRequest{
+                            .sourceFrame = CelestialReferenceFrame::Gcrs,
+                            .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
+                            .epoch = request.epoch,
+                            .vectors = apparentInputs,
+                        }
+                    );
                 const std::size_t transformCount =
                     std::min(apparentTransformResults.size(), apparentResultIndices.size());
                 for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {

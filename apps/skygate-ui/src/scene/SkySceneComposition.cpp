@@ -267,7 +267,7 @@ SkySelectionOverlayInput SkySceneComposer::buildSelectionInput(
         .preparedProjection = frameResult.preparedProjection,
         .stateIndexByBodyId = frameResult.stateIndexByBodyId,
         .skyContext = input.frameInput.skyContext,
-        .ephemerisRequest = input.frameInput.ephemerisRequest,
+        .ephemerisRequest = input.selectionEphemerisRequest,
         .constellationLabelRefs = input.frameInput.constellationLabelRefs,
         .catalogSourceIds = input.catalogSourceIds,
         .catalogSourceLabels = input.catalogSourceLabels,

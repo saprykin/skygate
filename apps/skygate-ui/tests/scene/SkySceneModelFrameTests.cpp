@@ -31,10 +31,11 @@ public:
         return options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestComputeCount;
+        m_lastRequest = request;
         skygate::core::SkyContext resolvedContext = request.context;
         resolvedContext.observer.longitudeDeg += 12.5;
         resolvedContext.utcTime += std::chrono::seconds(75);
@@ -77,6 +78,11 @@ public:
         return m_requestComputeCount;
     }
 
+    [[nodiscard]] const std::optional<skygate::ephemeris::EphemerisRequest>& lastRequest() const noexcept
+    {
+        return m_lastRequest;
+    }
+
 private:
     [[nodiscard]] skygate::ephemeris::SkySnapshot makeSnapshot(const skygate::core::SkyContext& context) const
     {
@@ -88,14 +94,17 @@ private:
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = bodies;
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = 0U,
-            .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
-        });
+        snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = 0U,
+                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
+            }
+        );
         return snapshot;
     }
 
     mutable int m_requestComputeCount = 0;
+    mutable std::optional<skygate::ephemeris::EphemerisRequest> m_lastRequest;
 };
 
 }  // namespace
@@ -106,6 +115,7 @@ class SkySceneModelFrameTests final : public QObject {
 private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
+    void highPrecisionSceneFrameUsesLeanRenderRequest();
     void referenceOverlayContextComesFromSelectedRequestSnapshot();
 };
 
@@ -145,6 +155,34 @@ void SkySceneModelFrameTests::reusesSnapshotAcrossViewChanges()
 
     QVERIFY(controller.setUtcDateTimeText("2024-06-01", "22:30:00"));
     QVERIFY(sceneModel.snapshotGeneration() > initialSnapshotGeneration);
+}
+
+void SkySceneModelFrameTests::highPrecisionSceneFrameUsesLeanRenderRequest()
+{
+    auto starCatalog = skygate::ui::tests::createTestCatalog({
+        makeFixedBody("resolved", "Resolved", skygate::ephemeris::CelestialBodyType::Star, 1.0, 0.0, 0.0),
+    });
+    QVERIFY(starCatalog != nullptr);
+    auto engine = std::make_unique<SnapshotContextEngine>();
+    const SnapshotContextEngine* enginePtr = engine.get();
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = false;
+    options.initializeLocation = false;
+    options.rebuildEphemerisEngineOnStartup = false;
+    SkyContextController controller(std::move(starCatalog), std::move(engine), options, nullptr);
+    QVERIFY(skygate::ui::tests::configureTestSkyContext(controller));
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    QVERIFY(enginePtr->lastRequest().has_value());
+    const auto renderCorrections = enginePtr->lastRequest()->options.correctionFlags;
+    QVERIFY(!hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime));
+    QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation));
+    QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::EarthOrientation));
+    QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax));
 }
 
 void SkySceneModelFrameTests::referenceOverlayContextComesFromSelectedRequestSnapshot()

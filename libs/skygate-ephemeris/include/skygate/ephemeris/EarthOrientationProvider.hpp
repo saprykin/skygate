@@ -78,8 +78,8 @@ enum class EarthOrientationSampleWarningCode : std::uint8_t {
     EstimatedData
 };
 
-[[nodiscard]] constexpr std::string_view earthOrientationSampleWarningText(const EarthOrientationSampleWarningCode code
-) noexcept
+[[nodiscard]] constexpr std::string_view
+earthOrientationSampleWarningText(const EarthOrientationSampleWarningCode code) noexcept
 {
     switch (code) {
     case EarthOrientationSampleWarningCode::StaleData:
@@ -99,8 +99,8 @@ enum class EarthOrientationSampleWarningCode : std::uint8_t {
     return "Earth-orientation warning.";
 }
 
-[[nodiscard]] constexpr std::uint32_t earthOrientationSampleWarningMask(const EarthOrientationSampleWarningCode code
-) noexcept
+[[nodiscard]] constexpr std::uint32_t
+earthOrientationSampleWarningMask(const EarthOrientationSampleWarningCode code) noexcept
 {
     return 1U << static_cast<std::uint8_t>(code);
 }
@@ -108,6 +108,7 @@ enum class EarthOrientationSampleWarningCode : std::uint8_t {
 struct EarthOrientationSampleOptions {
     bool allowOutOfRangeNearestSampleFallback = true;
     bool allowMissingDataZeroFallback = false;
+    bool degradePredictedData = true;
 };
 
 struct EarthOrientationSample {

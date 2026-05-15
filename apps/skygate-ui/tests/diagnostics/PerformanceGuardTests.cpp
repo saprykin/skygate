@@ -14,6 +14,9 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
+#include "engine/highprecision/EphemerisComputationCache.hpp"
+#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+
 #include <QElapsedTimer>
 
 #include <chrono>
@@ -30,6 +33,7 @@ class PerformanceGuardTests final : public QObject {
 
 private slots:
     void buildsLargeSceneWithinGuardrail();
+    void buildsHighPrecisionLargeFixedCatalogWithinGuardrail();
     void searchesLargeMixedCatalogWithinGuardrail();
     void hitTestsDenseRenderFrameWithinGuardrail();
     void buildsManyObjectTrailsWithinGuardrail();
@@ -40,6 +44,8 @@ private slots:
 namespace {
 
 constexpr qint64 kLargeSceneBuildBudgetMs = 15000;
+constexpr qint64 kHighPrecisionLargeSceneBuildBudgetMs = 15000;
+constexpr qint64 kHighPrecisionCacheKeyBudgetMs = 2000;
 constexpr qint64 kLargeSearchLoadBudgetMs = 10000;
 constexpr qint64 kLargeSearchQueryBudgetMs = 3000;
 constexpr qint64 kDenseHitTestBudgetMs = 5000;
@@ -61,8 +67,10 @@ QString performanceMetricMessage(
     const qint64 deltaMs = budgetMs - elapsedMs;
     const double budgetPercent =
         budgetMs > 0 ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs)) : 0.0;
-    return QStringLiteral("perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
-                          "strict=%7")
+    return QStringLiteral(
+               "perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
+               "strict=%7"
+    )
         .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget") : QStringLiteral("over-budget"))
         .arg(QString::fromUtf8(operationName))
         .arg(elapsedMs)
@@ -74,8 +82,8 @@ QString performanceMetricMessage(
 
 class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -113,11 +121,150 @@ public:
         const double bodyOffset = static_cast<double>(bodyIndex % 40U) * 0.015;
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = bodyIndex,
-            .horizontal =
-                {.altitudeDeg = 45.0 + bodyOffset + (offsetMinutes / 8000.0),
-                 .azimuthDeg = 180.0 + bodyOffset + (offsetMinutes / 8000.0)}
+            .horizontal = {
+                .altitudeDeg = 45.0 + bodyOffset + (offsetMinutes / 8000.0),
+                .azimuthDeg = 180.0 + bodyOffset + (offsetMinutes / 8000.0)
+            }
         };
     }
+};
+
+class GuardBatchStarAstrometryCalculator final : public skygate::ephemeris::highprecision::IStarAstrometryCalculator {
+public:
+    [[nodiscard]] skygate::ephemeris::highprecision::HighPrecisionCalculatorResult
+    calculate(const skygate::ephemeris::highprecision::HighPrecisionComputationInput& input) const override
+    {
+        ++m_singleCallCount;
+        skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result;
+        result.equatorial = input.body.fixedEquatorial;
+        result.metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+        result.metadata.dataSourceProvenance = "performance guard single fallback";
+        return result;
+    }
+
+    [[nodiscard]] std::vector<skygate::ephemeris::highprecision::StarAstrometryBatchResult> calculateBatch(
+        const skygate::ephemeris::EphemerisRequest& request,
+        const skygate::ephemeris::highprecision::CatalogStarAstrometryArrays& arrays,
+        std::shared_ptr<const skygate::ephemeris::highprecision::PreparedEphemerisRequestState> preparedRequestState =
+            {}
+    ) const override
+    {
+        static_cast<void>(request);
+        static_cast<void>(preparedRequestState);
+
+        ++m_batchCallCount;
+        m_lastBatchSize = arrays.size();
+
+        std::vector<skygate::ephemeris::highprecision::StarAstrometryBatchResult> results;
+        results.reserve(arrays.size());
+        for (std::size_t arrayIndex = 0; arrayIndex < arrays.size(); ++arrayIndex) {
+            skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result;
+            result.equatorial = arrays.referenceEquatorial(arrayIndex);
+            result.metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+            result.metadata.dataSourceProvenance = "performance guard batch astrometry";
+            results.push_back(
+                skygate::ephemeris::highprecision::StarAstrometryBatchResult{
+                    .bodyIndex = arrays.bodyIndices()[arrayIndex],
+                    .result = result,
+                }
+            );
+        }
+        return results;
+    }
+
+    [[nodiscard]] int singleCallCount() const noexcept
+    {
+        return m_singleCallCount;
+    }
+
+    [[nodiscard]] int batchCallCount() const noexcept
+    {
+        return m_batchCallCount;
+    }
+
+    [[nodiscard]] std::size_t lastBatchSize() const noexcept
+    {
+        return m_lastBatchSize;
+    }
+
+private:
+    mutable int m_singleCallCount = 0;
+    mutable int m_batchCallCount = 0;
+    mutable std::size_t m_lastBatchSize = 0U;
+};
+
+class GuardApparentPlaceCalculator final : public skygate::ephemeris::highprecision::IApparentPlaceCalculator {
+public:
+    [[nodiscard]] skygate::ephemeris::highprecision::HighPrecisionCalculatorResult apply(
+        const skygate::ephemeris::highprecision::HighPrecisionComputationInput& input,
+        const skygate::ephemeris::highprecision::HighPrecisionCalculatorResult& calculatorResult
+    ) const override
+    {
+        ++m_singleCallCount;
+        skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result = calculatorResult;
+        result.horizontal = horizontalForBodyIndex(input.bodyIndex);
+        result.metadata.appliedCorrections = input.request.options.correctionFlags;
+        return result;
+    }
+
+    [[nodiscard]] std::vector<skygate::ephemeris::highprecision::StarAstrometryBatchResult> applyBatch(
+        const skygate::ephemeris::EphemerisRequest& request,
+        std::span<const skygate::ephemeris::CelestialBody> bodies,
+        std::span<const skygate::ephemeris::highprecision::StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const skygate::ephemeris::highprecision::PreparedEphemerisRequestState> preparedRequestState =
+            {}
+    ) const override
+    {
+        static_cast<void>(bodies);
+        static_cast<void>(preparedRequestState);
+
+        ++m_batchCallCount;
+        m_lastBatchSize = calculatorResults.size();
+
+        std::vector<skygate::ephemeris::highprecision::StarAstrometryBatchResult> results;
+        results.reserve(calculatorResults.size());
+        for (const skygate::ephemeris::highprecision::StarAstrometryBatchResult& calculatorResult : calculatorResults) {
+            skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result = calculatorResult.result;
+            result.horizontal = horizontalForBodyIndex(calculatorResult.bodyIndex);
+            result.metadata.appliedCorrections = request.options.correctionFlags;
+            results.push_back(
+                skygate::ephemeris::highprecision::StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = result,
+                }
+            );
+        }
+        return results;
+    }
+
+    [[nodiscard]] int singleCallCount() const noexcept
+    {
+        return m_singleCallCount;
+    }
+
+    [[nodiscard]] int batchCallCount() const noexcept
+    {
+        return m_batchCallCount;
+    }
+
+    [[nodiscard]] std::size_t lastBatchSize() const noexcept
+    {
+        return m_lastBatchSize;
+    }
+
+private:
+    [[nodiscard]] static skygate::core::HorizontalCoordinate
+    horizontalForBodyIndex(const std::size_t bodyIndex) noexcept
+    {
+        return skygate::core::HorizontalCoordinate{
+            .altitudeDeg = -20.0 + static_cast<double>(bodyIndex % 90U),
+            .azimuthDeg = std::fmod(static_cast<double>(bodyIndex) * 0.37, 360.0),
+        };
+    }
+
+    mutable int m_singleCallCount = 0;
+    mutable int m_batchCallCount = 0;
+    mutable std::size_t m_lastBatchSize = 0U;
 };
 
 void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const char* operationName)
@@ -130,8 +277,10 @@ void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const cha
         return;
     }
 
-    const QString strictHint = QStringLiteral("%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
-                                              "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail")
+    const QString strictHint = QStringLiteral(
+                                   "%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
+                                   "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail"
+    )
                                    .arg(message);
     if (!strictMode) {
         qWarning().noquote() << strictHint;
@@ -207,6 +356,74 @@ std::vector<skygate::ephemeris::CelestialBody> makeLargeMixedCatalog()
     return bodies;
 }
 
+skygate::ephemeris::CelestialBody makeHighPrecisionGuardBody(
+    std::string id,
+    std::string displayName,
+    const skygate::ephemeris::CelestialBodyType type,
+    const double visualMagnitude,
+    const double rightAscensionHours,
+    const double declinationDeg
+)
+{
+    skygate::ephemeris::CelestialBody body =
+        makeBody(std::move(id), std::move(displayName), type, visualMagnitude, rightAscensionHours, declinationDeg);
+    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial;
+    return body;
+}
+
+std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionGuardCatalog()
+{
+    constexpr int kHygScaleStarCount = 119626;
+    constexpr int kOpenNgcScaleDeepSkyCount = 13308;
+
+    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    bodies.reserve(static_cast<std::size_t>(kHygScaleStarCount + kOpenNgcScaleDeepSkyCount));
+    for (int index = 0; index < kHygScaleStarCount; ++index) {
+        bodies.push_back(makeHighPrecisionGuardBody(
+            "hp_guard_star_" + std::to_string(index),
+            "HP Guard Star " + std::to_string(index),
+            skygate::ephemeris::CelestialBodyType::Star,
+            2.0 + static_cast<double>(index % 100) / 10.0,
+            std::fmod(static_cast<double>(index) * 0.011, 24.0),
+            -75.0 + static_cast<double>(index % 150)
+        ));
+    }
+    for (int index = 0; index < kOpenNgcScaleDeepSkyCount; ++index) {
+        bodies.push_back(makeHighPrecisionGuardBody(
+            "hp_guard_dso_" + std::to_string(index),
+            "HP Guard Galaxy " + std::to_string(index),
+            skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+            4.0 + static_cast<double>(index % 80) / 10.0,
+            std::fmod(static_cast<double>(index) * 0.073, 24.0),
+            -55.0 + static_cast<double>(index % 110)
+        ));
+    }
+    return bodies;
+}
+
+skygate::ephemeris::EphemerisDataSetInfo makeHighPrecisionGuardDataSetInfo()
+{
+    skygate::ephemeris::EphemerisDataSetInfo dataSetInfo;
+    dataSetInfo.id = "performance-guard-data";
+    dataSetInfo.displayName = "Performance guard data";
+    dataSetInfo.version = "1";
+    dataSetInfo.provenance = "synthetic performance guard";
+    dataSetInfo.dateRanges.push_back(
+        skygate::ephemeris::EphemerisDateRange{
+            .id = "guard-range",
+            .displayName = "Guard range",
+            .start =
+                {.julianDatePart1 = 2'400'000.5,
+                 .julianDatePart2 = 0.0,
+                 .timeScale = skygate::ephemeris::TimeScale::Tdb},
+            .end = {
+                .julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
+            },
+        }
+    );
+    return dataSetInfo;
+}
+
 SkyContextController::InitializationOptions testInitializationOptions()
 {
     return SkyContextController::InitializationOptions{.loadSettings = false, .initializeLocation = false};
@@ -270,6 +487,83 @@ void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
     verifyElapsedBelow(elapsedMs, kLargeSceneBuildBudgetMs, "large scene build");
 }
 
+void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
+    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    QVERIFY(catalog != nullptr);
+
+    auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
+    auto apparentPlaceCalculator = std::make_shared<GuardApparentPlaceCalculator>();
+    auto computationCache = std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+
+    skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
+    dependencies.starAstrometryCalculator = starAstrometryCalculator;
+    dependencies.apparentPlaceCalculator = apparentPlaceCalculator;
+    dependencies.computationCache = computationCache;
+    dependencies.dataSetInfo = makeHighPrecisionGuardDataSetInfo();
+
+    auto engine = std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
+        bodies, options, dependencies
+    );
+
+    SkyContextController::InitializationOptions initializationOptions = testInitializationOptions();
+    initializationOptions.rebuildEphemerisEngineOnStartup = false;
+    SkyContextController controller(std::move(catalog), std::move(engine), initializationOptions, nullptr);
+    controller.setLatitudeText(QStringLiteral("47.4"));
+    controller.setLongitudeText(QStringLiteral("8.5"));
+    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    controller.setMagnitudeCutoff(12.0);
+    controller.setViewCenter(45.0, 180.0);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+
+    QElapsedTimer timer;
+    timer.start();
+    sceneModel.setViewportSize(1280.0, 800.0);
+    const qint64 firstBuildElapsedMs = timer.elapsed();
+
+    QVERIFY(sceneModel.snapshotGeneration() > 0U);
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 1);
+    QCOMPARE(starAstrometryCalculator->singleCallCount(), 0);
+    QCOMPARE(starAstrometryCalculator->lastBatchSize(), bodies.size());
+    QCOMPARE(apparentPlaceCalculator->batchCallCount(), 1);
+    QCOMPARE(apparentPlaceCalculator->singleCallCount(), 0);
+    verifyElapsedBelow(
+        firstBuildElapsedMs, kHighPrecisionLargeSceneBuildBudgetMs, "high precision large fixed catalog scene build"
+    );
+
+    skygate::ephemeris::SkySnapshot cacheSnapshot;
+    cacheSnapshot.states.push_back(skygate::ephemeris::CelestialBodyState{.bodyIndex = 0U});
+    timer.restart();
+    computationCache->storeSnapshot(
+        controller.ephemerisRequestContext().request, bodies, dependencies.dataSetInfo, cacheSnapshot
+    );
+    const std::optional<skygate::ephemeris::SkySnapshot> cachedSnapshot =
+        computationCache->findSnapshot(controller.ephemerisRequestContext().request, bodies, dependencies.dataSetInfo);
+    const qint64 cacheElapsedMs = timer.elapsed();
+
+    QVERIFY(cachedSnapshot.has_value());
+    verifyElapsedBelow(
+        cacheElapsedMs, kHighPrecisionCacheKeyBudgetMs, "high precision large cache key store and lookup"
+    );
+
+    timer.restart();
+    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:10")));
+    const qint64 timeUpdateElapsedMs = timer.elapsed();
+
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 2);
+    QCOMPARE(starAstrometryCalculator->singleCallCount(), 0);
+    verifyElapsedBelow(
+        timeUpdateElapsedMs, kHighPrecisionLargeSceneBuildBudgetMs, "high precision large fixed catalog time update"
+    );
+}
+
 void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
 {
     std::vector<skygate::ephemeris::CelestialBody> bodies = makeLargeMixedCatalog();
@@ -310,12 +604,14 @@ void PerformanceGuardTests::hitTestsDenseRenderFrameWithinGuardrail()
     SkyRenderFrame frame;
     frame.points.reserve(kTargetCount);
     for (int index = 0; index < kTargetCount; ++index) {
-        frame.points.push_back(SkyRenderPoint{
-            .x = 10.0 + static_cast<double>((index * 37) % 1180),
-            .y = 10.0 + static_cast<double>((index * 53) % 780),
-            .sizePx = 3.0,
-            .bodyIndex = static_cast<std::uint32_t>(index)
-        });
+        frame.points.push_back(
+            SkyRenderPoint{
+                .x = 10.0 + static_cast<double>((index * 37) % 1180),
+                .y = 10.0 + static_cast<double>((index * 53) % 780),
+                .sizePx = 3.0,
+                .bodyIndex = static_cast<std::uint32_t>(index)
+            }
+        );
     }
 
     SkyHitTargetIndex hitIndex;

@@ -1,142 +1,198 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 
+#include <array>
+#include <bit>
+#include <charconv>
 #include <cstdint>
-#include <iomanip>
-#include <ios>
 #include <optional>
-#include <sstream>
+#include <string_view>
 
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-void appendDouble(std::ostringstream& stream, const double value)
+constexpr std::uint64_t kFnvOffsetBasis = 14'695'981'039'346'656'037ULL;
+constexpr std::uint64_t kFnvPrime = 1'099'511'628'211ULL;
+
+void mixByte(std::uint64_t& hash, const std::uint8_t value) noexcept
 {
-    stream << std::hexfloat << value << std::defaultfloat;
+    hash ^= value;
+    hash *= kFnvPrime;
 }
 
-void appendEpoch(std::ostringstream& stream, const AstronomicalEpoch& epoch)
+void mixUint64(std::uint64_t& hash, std::uint64_t value) noexcept
 {
-    appendDouble(stream, epoch.julianDatePart1);
-    stream << ',';
-    appendDouble(stream, epoch.julianDatePart2);
-    stream << ',' << static_cast<int>(epoch.timeScale);
-}
-
-void appendOptions(std::ostringstream& stream, const EphemerisEngineOptions& options)
-{
-    stream << static_cast<int>(options.engineKind) << ',' << static_cast<std::uint32_t>(options.correctionFlags) << ','
-           << options.fallbackToSimpleEngine << ',' << options.enableAtmosphericRefraction << ',';
-    appendDouble(stream, options.atmosphericPressureHpa);
-    stream << ',';
-    appendDouble(stream, options.atmosphericTemperatureC);
-    stream << ',';
-    appendDouble(stream, options.relativeHumidity);
-    stream << ',';
-    appendDouble(stream, options.observingWavelengthMicrometers);
-}
-
-void appendObserver(std::ostringstream& stream, const core::GeoLocation& observer)
-{
-    appendDouble(stream, observer.latitudeDeg);
-    stream << ',';
-    appendDouble(stream, observer.longitudeDeg);
-    stream << ',';
-    appendDouble(stream, observer.elevationMeters);
-}
-
-void appendDateRange(std::ostringstream& stream, const EphemerisDateRange& range)
-{
-    stream << range.id << ',' << range.displayName << ',';
-    appendEpoch(stream, range.start);
-    stream << ',';
-    appendEpoch(stream, range.end);
-}
-
-void appendOptionalDateRange(std::ostringstream& stream, const std::optional<EphemerisDateRange>& range)
-{
-    stream << range.has_value();
-    if (!range.has_value()) {
-        return;
+    for (int byteIndex = 0; byteIndex < 8; ++byteIndex) {
+        mixByte(hash, static_cast<std::uint8_t>(value & 0xffU));
+        value >>= 8U;
     }
-    stream << ',';
-    appendDateRange(stream, *range);
 }
 
-void appendOptionalDouble(std::ostringstream& stream, const std::optional<double>& value)
+void mixBool(std::uint64_t& hash, const bool value) noexcept
 {
-    stream << value.has_value();
-    if (!value.has_value()) {
-        return;
+    mixByte(hash, value ? 1U : 0U);
+}
+
+void mixDouble(std::uint64_t& hash, const double value) noexcept
+{
+    mixUint64(hash, std::bit_cast<std::uint64_t>(value));
+}
+
+void mixString(std::uint64_t& hash, const std::string_view value) noexcept
+{
+    mixUint64(hash, value.size());
+    for (const char character : value) {
+        mixByte(hash, static_cast<std::uint8_t>(character));
     }
-    stream << ',';
-    appendDouble(stream, *value);
 }
 
-void appendOptionalEquatorial(std::ostringstream& stream, const std::optional<core::EquatorialCoordinate>& coordinate)
+void mixEpoch(std::uint64_t& hash, const AstronomicalEpoch& epoch) noexcept
 {
-    stream << coordinate.has_value();
+    mixDouble(hash, epoch.julianDatePart1);
+    mixDouble(hash, epoch.julianDatePart2);
+    mixUint64(hash, static_cast<std::uint64_t>(epoch.timeScale));
+}
+
+void mixOptions(std::uint64_t& hash, const EphemerisEngineOptions& options) noexcept
+{
+    mixUint64(hash, static_cast<std::uint64_t>(options.engineKind));
+    mixUint64(hash, static_cast<std::uint32_t>(options.correctionFlags));
+    mixBool(hash, options.fallbackToSimpleEngine);
+    mixBool(hash, options.enableAtmosphericRefraction);
+    mixDouble(hash, options.atmosphericPressureHpa);
+    mixDouble(hash, options.atmosphericTemperatureC);
+    mixDouble(hash, options.relativeHumidity);
+    mixDouble(hash, options.observingWavelengthMicrometers);
+}
+
+void mixObserver(std::uint64_t& hash, const core::GeoLocation& observer) noexcept
+{
+    mixDouble(hash, observer.latitudeDeg);
+    mixDouble(hash, observer.longitudeDeg);
+    mixDouble(hash, observer.elevationMeters);
+}
+
+void mixDateRange(std::uint64_t& hash, const EphemerisDateRange& range) noexcept
+{
+    mixString(hash, range.id);
+    mixString(hash, range.displayName);
+    mixEpoch(hash, range.start);
+    mixEpoch(hash, range.end);
+}
+
+void mixOptionalDateRange(std::uint64_t& hash, const std::optional<EphemerisDateRange>& range) noexcept
+{
+    mixBool(hash, range.has_value());
+    if (range.has_value()) {
+        mixDateRange(hash, *range);
+    }
+}
+
+void mixOptionalDouble(std::uint64_t& hash, const std::optional<double>& value) noexcept
+{
+    mixBool(hash, value.has_value());
+    if (value.has_value()) {
+        mixDouble(hash, *value);
+    }
+}
+
+void mixOptionalEquatorial(std::uint64_t& hash, const std::optional<core::EquatorialCoordinate>& coordinate) noexcept
+{
+    mixBool(hash, coordinate.has_value());
     if (!coordinate.has_value()) {
         return;
     }
-    stream << ',';
-    appendDouble(stream, coordinate->rightAscensionHours);
-    stream << ',';
-    appendDouble(stream, coordinate->declinationDeg);
+
+    mixDouble(hash, coordinate->rightAscensionHours);
+    mixDouble(hash, coordinate->declinationDeg);
 }
 
-void appendOptionalAstrometry(std::ostringstream& stream, const std::optional<CatalogStarAstrometry>& astrometry)
+void mixOptionalAstrometry(std::uint64_t& hash, const std::optional<CatalogStarAstrometry>& astrometry) noexcept
 {
-    stream << astrometry.has_value();
+    mixBool(hash, astrometry.has_value());
     if (!astrometry.has_value()) {
         return;
     }
-    stream << ',';
-    appendDouble(stream, astrometry->referenceEquatorial.rightAscensionHours);
-    stream << ',';
-    appendDouble(stream, astrometry->referenceEquatorial.declinationDeg);
-    stream << ',';
-    appendEpoch(stream, astrometry->referenceEpoch);
-    stream << ',';
-    appendOptionalDouble(stream, astrometry->properMotionRightAscensionMasPerYear);
-    stream << ',';
-    appendOptionalDouble(stream, astrometry->properMotionDeclinationMasPerYear);
-    stream << ',';
-    appendOptionalDouble(stream, astrometry->stellarParallaxMas);
-    stream << ',';
-    appendOptionalDouble(stream, astrometry->radialVelocityKmPerSecond);
-    stream << ',';
-    appendOptionalDateRange(stream, astrometry->validityRange);
+
+    mixDouble(hash, astrometry->referenceEquatorial.rightAscensionHours);
+    mixDouble(hash, astrometry->referenceEquatorial.declinationDeg);
+    mixEpoch(hash, astrometry->referenceEpoch);
+    mixOptionalDouble(hash, astrometry->properMotionRightAscensionMasPerYear);
+    mixOptionalDouble(hash, astrometry->properMotionDeclinationMasPerYear);
+    mixOptionalDouble(hash, astrometry->stellarParallaxMas);
+    mixOptionalDouble(hash, astrometry->radialVelocityKmPerSecond);
+    mixOptionalDateRange(hash, astrometry->validityRange);
 }
 
-void appendDeepSkyObject(std::ostringstream& stream, const std::optional<DeepSkyObjectInfo>& deepSkyObject)
+void mixDeepSkyObject(std::uint64_t& hash, const std::optional<DeepSkyObjectInfo>& deepSkyObject) noexcept
 {
-    stream << deepSkyObject.has_value();
+    mixBool(hash, deepSkyObject.has_value());
     if (!deepSkyObject.has_value()) {
         return;
     }
-    stream << ',' << static_cast<int>(deepSkyObject->kind) << ',';
-    appendOptionalDouble(stream, deepSkyObject->majorAxisArcmin);
-    stream << ',';
-    appendOptionalDouble(stream, deepSkyObject->minorAxisArcmin);
-    stream << ',';
-    appendOptionalDouble(stream, deepSkyObject->positionAngleDeg);
-    stream << ",aliases:" << deepSkyObject->aliases.size();
+
+    mixUint64(hash, static_cast<std::uint64_t>(deepSkyObject->kind));
+    mixOptionalDouble(hash, deepSkyObject->majorAxisArcmin);
+    mixOptionalDouble(hash, deepSkyObject->minorAxisArcmin);
+    mixOptionalDouble(hash, deepSkyObject->positionAngleDeg);
+    mixUint64(hash, deepSkyObject->aliases.size());
     for (const std::string& alias : deepSkyObject->aliases) {
-        stream << ',' << alias;
+        mixString(hash, alias);
     }
 }
 
-void appendCatalogBody(std::ostringstream& stream, const CelestialBody& body)
+void mixCatalogBody(std::uint64_t& hash, const CelestialBody& body) noexcept
 {
-    stream << body.id << ',' << body.displayName << ',' << static_cast<int>(body.type) << ','
-           << static_cast<int>(body.ephemerisSource) << ',';
-    appendDouble(stream, body.visualMagnitude);
-    stream << ',';
-    appendOptionalEquatorial(stream, body.fixedEquatorial);
-    stream << ',';
-    appendOptionalAstrometry(stream, body.starAstrometry);
-    stream << ',';
-    appendDeepSkyObject(stream, body.deepSkyObject);
+    mixString(hash, body.id);
+    mixString(hash, body.displayName);
+    mixUint64(hash, static_cast<std::uint64_t>(body.type));
+    mixUint64(hash, static_cast<std::uint64_t>(body.ephemerisSource));
+    mixDouble(hash, body.visualMagnitude);
+    mixOptionalEquatorial(hash, body.fixedEquatorial);
+    mixOptionalAstrometry(hash, body.starAstrometry);
+    mixDeepSkyObject(hash, body.deepSkyObject);
+}
+
+[[nodiscard]] std::uint64_t hashRequest(const EphemerisRequest& request) noexcept
+{
+    std::uint64_t hash = kFnvOffsetBasis;
+    mixEpoch(hash, request.epoch);
+    mixUint64(hash, static_cast<std::uint64_t>(request.context.utcTime.time_since_epoch().count()));
+    mixObserver(hash, request.context.observer);
+    mixOptions(hash, request.options);
+    return hash;
+}
+
+[[nodiscard]] std::uint64_t hashCatalogBodies(const std::vector<CelestialBody>& catalogBodies) noexcept
+{
+    std::uint64_t hash = kFnvOffsetBasis;
+    mixUint64(hash, catalogBodies.size());
+    for (const CelestialBody& body : catalogBodies) {
+        mixCatalogBody(hash, body);
+    }
+    return hash;
+}
+
+[[nodiscard]] std::uint64_t hashDataSetInfo(const EphemerisDataSetInfo& dataSetInfo) noexcept
+{
+    std::uint64_t hash = kFnvOffsetBasis;
+    mixString(hash, dataSetInfo.id);
+    mixString(hash, dataSetInfo.displayName);
+    mixString(hash, dataSetInfo.version);
+    mixString(hash, dataSetInfo.provenance);
+    mixUint64(hash, dataSetInfo.dateRanges.size());
+    for (const EphemerisDateRange& range : dataSetInfo.dateRanges) {
+        mixDateRange(hash, range);
+    }
+    return hash;
+}
+
+void appendKeyPart(std::string& key, const std::string_view label, const std::uint64_t value)
+{
+    std::array<char, 16> buffer{};
+    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value, 16);
+    key.append(label);
+    key.push_back(':');
+    key.append(buffer.data(), result.ptr);
 }
 
 }  // namespace
@@ -241,26 +297,14 @@ std::string EphemerisComputationCache::makeRequestKey(
     const EphemerisDataSetInfo& dataSetInfo
 )
 {
-    std::ostringstream stream;
-    stream << "epoch:";
-    appendEpoch(stream, request.epoch);
-    stream << "|utc:" << request.context.utcTime.time_since_epoch().count();
-    stream << "|observer:";
-    appendObserver(stream, request.context.observer);
-    stream << "|options:";
-    appendOptions(stream, request.options);
-    stream << "|catalog:" << catalogBodies.size();
-    for (const CelestialBody& body : catalogBodies) {
-        stream << ';';
-        appendCatalogBody(stream, body);
-    }
-    stream << "|dataset:" << dataSetInfo.id << ',' << dataSetInfo.displayName << ',' << dataSetInfo.version << ','
-           << dataSetInfo.provenance << ',' << dataSetInfo.dateRanges.size();
-    for (const EphemerisDateRange& range : dataSetInfo.dateRanges) {
-        stream << ';';
-        appendDateRange(stream, range);
-    }
-    return stream.str();
+    std::string key;
+    key.reserve(96);
+    appendKeyPart(key, "request", hashRequest(request));
+    key.push_back('|');
+    appendKeyPart(key, "catalog", hashCatalogBodies(catalogBodies));
+    key.push_back('|');
+    appendKeyPart(key, "dataset", hashDataSetInfo(dataSetInfo));
+    return key;
 }
 
 std::string EphemerisComputationCache::makeSnapshotKey(
