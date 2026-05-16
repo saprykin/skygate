@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -30,7 +31,7 @@ void SkyContextController::setLive(bool live)
         return;
     }
 
-    m_highPrecisionLiveTickTimer.invalidate();
+    m_liveRecomputeThrottleTimer.invalidate();
     if (m_timeline.live()) {
         const QDateTime currentUtc = currentUtcDateTime();
         const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime());
@@ -40,20 +41,37 @@ void SkyContextController::setLive(bool live)
     emit liveChanged();
 }
 
-bool SkyContextController::highPrecisionLiveTickThrottled() const
+bool SkyContextController::liveRecomputeThrottleApplies() const
 {
-    if (m_ephemerisEngineKind != skygate::ephemeris::EphemerisEngineKind::HighPrecision
-        || !m_highPrecisionLiveTickTimer.isValid()) {
+    return m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+}
+
+bool SkyContextController::liveRecomputeThrottled() const
+{
+    if (!liveRecomputeThrottleApplies() || !m_liveRecomputeThrottleTimer.isValid()) {
         return false;
     }
 
-    return m_highPrecisionLiveTickTimer.elapsed() < SkyContextControllerConstants::kHighPrecisionLiveTickIntervalMs;
+    return m_liveRecomputeThrottleTimer.elapsed() < SkyContextControllerConstants::kThrottledLiveRecomputeIntervalMs;
 }
 
-void SkyContextController::markHighPrecisionLiveTick()
+int SkyContextController::acceptedLiveTickSeconds() const
 {
-    if (m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
-        m_highPrecisionLiveTickTimer.restart();
+    if (!liveRecomputeThrottleApplies() || !m_liveRecomputeThrottleTimer.isValid()) {
+        return 1;
+    }
+
+    const qint64 elapsedSeconds = std::max<qint64>(1, m_liveRecomputeThrottleTimer.elapsed() / 1000);
+    if (elapsedSeconds > std::numeric_limits<int>::max()) {
+        return std::numeric_limits<int>::max();
+    }
+    return static_cast<int>(elapsedSeconds);
+}
+
+void SkyContextController::markLiveRecomputeTick()
+{
+    if (liveRecomputeThrottleApplies()) {
+        m_liveRecomputeThrottleTimer.restart();
     }
 }
 
@@ -296,16 +314,18 @@ void SkyContextController::tickUtcTime()
     if (!m_timeline.live()) {
         return;
     }
-    if (highPrecisionLiveTickThrottled()) {
+    if (liveRecomputeThrottled()) {
         return;
     }
 
+    const int liveTickSeconds = acceptedLiveTickSeconds();
     const QDateTime currentUtc = currentUtcDateTime();
     const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime());
     const bool catchingUpToCurrentUtc = m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentUtc;
     if (catchingUpToCurrentUtc) {
         m_timeline.addSpeedRemainderSeconds(
             m_timeline.speedMultiplier() * static_cast<double>(m_timeline.stepSeconds())
+            * static_cast<double>(liveTickSeconds)
         );
         const int wholeSeconds = m_timeline.takeWholeSpeedRemainderSeconds();
         if (wholeSeconds <= 0) {
@@ -321,14 +341,14 @@ void SkyContextController::tickUtcTime()
         }
 
         stepBySeconds(appliedStepSeconds);
-        markHighPrecisionLiveTick();
+        markLiveRecomputeTick();
         return;
     }
 
     m_timeline.setCatchingUpToCurrentUtc(false);
     m_timeline.resetSpeedProgress();
-    stepBySeconds(1);
-    markHighPrecisionLiveTick();
+    stepBySeconds(liveTickSeconds);
+    markLiveRecomputeTick();
 }
 
 void SkyContextController::stepBySeconds(const int stepSeconds)
