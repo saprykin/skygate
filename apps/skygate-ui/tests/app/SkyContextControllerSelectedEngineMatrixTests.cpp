@@ -93,6 +93,11 @@ public:
     return !nearlyEqual(lhs.x(), rhs.x(), kPointTolerance) || !nearlyEqual(lhs.y(), rhs.y(), kPointTolerance);
 }
 
+[[nodiscard]] bool pointsEqual(const QPointF& lhs, const QPointF& rhs) noexcept
+{
+    return !pointsDiffer(lhs, rhs);
+}
+
 [[nodiscard]] bool lineFingerprintsDiffer(const QVector<double>& lhs, const QVector<double>& rhs) noexcept
 {
     constexpr double kLineTolerance = 1.0e-3;
@@ -106,6 +111,20 @@ public:
         }
     }
     return false;
+}
+
+[[nodiscard]] skygate::ephemeris::EphemerisCorrectionFlags sceneRenderCorrectionFlagsFor(
+    const skygate::ephemeris::EphemerisEngineKind kind,
+    const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
+) noexcept
+{
+    if (kind != skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
+        return correctionFlags;
+    }
+
+    return skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation
+           | skygate::ephemeris::EphemerisCorrectionFlags::EarthOrientation
+           | skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax;
 }
 
 [[nodiscard]] const SkyRenderPoint*
@@ -196,8 +215,8 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestSnapshotCount;
         m_lastRequestOptions = request.options;
@@ -445,13 +464,18 @@ void verifyConsumerMatrix(
 
     const auto initialRequestContext = controller.ephemerisRequestContext();
     verifyRequestOptions(initialRequestContext.request.options, kind, correctionFlags);
+    auto renderRequest = initialRequestContext.request;
+    renderRequest.options.correctionFlags = sceneRenderCorrectionFlagsFor(kind, correctionFlags);
+    QVERIFY(engine.lastRequestOptions().has_value());
+    verifyRequestOptions(*engine.lastRequestOptions(), kind, renderRequest.options.correctionFlags);
+
     const auto expectedFocusHorizontal = engine.expectedTargetHorizontal(initialRequestContext.request);
 
     const auto* targetPoint = renderPointForBodyIndex(sceneModel, static_cast<std::uint32_t>(kTargetIndex));
     QVERIFY(targetPoint != nullptr);
     const auto projection = sceneModel.preparedProjection();
     QVERIFY(projection.has_value());
-    const auto expectedTargetPoint = projection->project(expectedFocusHorizontal);
+    const auto expectedTargetPoint = projection->project(engine.expectedTargetHorizontal(renderRequest));
     QVERIFY(expectedTargetPoint.isVisible);
     QVERIFY(nearlyEqual(targetPoint->x, expectedTargetPoint.x));
     QVERIFY(nearlyEqual(targetPoint->y, expectedTargetPoint.y));
@@ -461,7 +485,7 @@ void verifyConsumerMatrix(
     QVERIFY(referenceContext.has_value());
     QVERIFY(nearlyEqual(
         referenceContext->observer.longitudeDeg,
-        controller.skyContext().observer.longitudeDeg + expectedLongitudeOffset(initialRequestContext.request.options)
+        controller.skyContext().observer.longitudeDeg + expectedLongitudeOffset(renderRequest.options)
     ));
     observations.referenceLongitudeDeg = referenceContext->observer.longitudeDeg;
 
@@ -637,13 +661,13 @@ void SkyContextControllerSelectedEngineMatrixTests::optionChangesAffectPositions
         skygate::ephemeris::EphemerisCorrectionFlags::LightTime
     );
 
-    QVERIFY(pointsDiffer(astrometricObservations.targetRenderPoint, apparentObservations.targetRenderPoint));
-    QVERIFY(!nearlyEqual(astrometricObservations.referenceLongitudeDeg, apparentObservations.referenceLongitudeDeg));
-    QVERIFY(pointsDiffer(astrometricObservations.eclipticLabelPoint, apparentObservations.eclipticLabelPoint));
-    QVERIFY(pointsDiffer(
-        astrometricObservations.celestialEquatorLabelPoint, apparentObservations.celestialEquatorLabelPoint
-    ));
-    QVERIFY(pointsDiffer(astrometricObservations.circumpolarLabelPoint, apparentObservations.circumpolarLabelPoint));
+    QVERIFY(pointsEqual(astrometricObservations.targetRenderPoint, apparentObservations.targetRenderPoint));
+    QVERIFY(nearlyEqual(astrometricObservations.referenceLongitudeDeg, apparentObservations.referenceLongitudeDeg));
+    QVERIFY(pointsEqual(astrometricObservations.eclipticLabelPoint, apparentObservations.eclipticLabelPoint));
+    QVERIFY(
+        pointsEqual(astrometricObservations.celestialEquatorLabelPoint, apparentObservations.celestialEquatorLabelPoint)
+    );
+    QVERIFY(pointsEqual(astrometricObservations.circumpolarLabelPoint, apparentObservations.circumpolarLabelPoint));
     QVERIFY(astrometricObservations.altAzText != apparentObservations.altAzText);
     QVERIFY(astrometricObservations.raDecText != apparentObservations.raDecText);
     QVERIFY(
