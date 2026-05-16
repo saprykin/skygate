@@ -414,8 +414,20 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
                     cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
                     return cachedSnapshot->states[bodyIndex];
                 }
+                if (std::optional<CelestialBodyState> cachedBodyState = m_dependencies.computationCache->findBodyState(
+                        request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex
+                    );
+                    cachedBodyState.has_value()) {
+                    return cachedBodyState;
+                }
             }
-            return computeStateForBody(request, bodyIndex, preparedRequestState(request));
+            CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
+            if (m_dependencies.computationCache != nullptr) {
+                m_dependencies.computationCache->storeBodyState(
+                    request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex, state
+                );
+            }
+            return state;
         }
     }
 
@@ -435,9 +447,21 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
             cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
             return cachedSnapshot->states[bodyIndex];
         }
+        if (std::optional<CelestialBodyState> cachedBodyState = m_dependencies.computationCache->findBodyState(
+                request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex
+            );
+            cachedBodyState.has_value()) {
+            return cachedBodyState;
+        }
     }
 
-    return computeStateForBody(request, bodyIndex, preparedRequestState(request));
+    CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
+    if (m_dependencies.computationCache != nullptr) {
+        m_dependencies.computationCache->storeBodyState(
+            request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex, state
+        );
+    }
+    return state;
 }
 
 SkySnapshot HighPrecisionEphemerisEngine::compute(const core::SkyContext& context) const

@@ -41,9 +41,58 @@ public:
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const override;
 
+    [[nodiscard]] std::optional<CelestialBodyState> findBodyState(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        std::size_t bodyIndex
+    ) const override;
+
+    void storeBodyState(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        std::size_t bodyIndex,
+        const CelestialBodyState& state
+    ) const override;
+
     void clear() const override;
 
 private:
+    struct RequestIdentity {
+        EphemerisRequest request;
+        std::vector<CelestialBody> catalogBodies;
+        EphemerisDataSetInfo dataSetInfo;
+    };
+
+    struct SnapshotEntry {
+        RequestIdentity identity;
+        SkySnapshot snapshot;
+    };
+
+    struct PreparedStateEntry {
+        RequestIdentity identity;
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedState;
+    };
+
+    struct BodyStateEntry {
+        RequestIdentity identity;
+        std::size_t bodyIndex = 0U;
+        CelestialBodyState state;
+    };
+
+    [[nodiscard]] static RequestIdentity makeIdentity(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo
+    );
+    [[nodiscard]] static bool matchesIdentity(
+        const RequestIdentity& identity,
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo
+    );
+
     [[nodiscard]] static std::string makeRequestKey(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
@@ -60,13 +109,21 @@ private:
         const std::vector<CelestialBody>& catalogBodies,
         const EphemerisDataSetInfo& dataSetInfo
     );
+    [[nodiscard]] static std::string makeBodyStateKey(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        std::size_t bodyIndex
+    );
 
     std::size_t m_maxEntries = 8U;
     mutable std::mutex m_mutex;
     mutable std::deque<std::string> m_snapshotOrder;
-    mutable std::unordered_map<std::string, SkySnapshot> m_snapshots;
+    mutable std::unordered_map<std::string, SnapshotEntry> m_snapshots;
     mutable std::deque<std::string> m_preparedStateOrder;
-    mutable std::unordered_map<std::string, std::shared_ptr<const PreparedEphemerisRequestState>> m_preparedStates;
+    mutable std::unordered_map<std::string, PreparedStateEntry> m_preparedStates;
+    mutable std::deque<std::string> m_bodyStateOrder;
+    mutable std::unordered_map<std::string, BodyStateEntry> m_bodyStates;
 };
 
 }  // namespace skygate::ephemeris::highprecision

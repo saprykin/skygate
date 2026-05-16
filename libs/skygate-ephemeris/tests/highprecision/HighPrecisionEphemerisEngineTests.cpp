@@ -139,15 +139,17 @@ makeFixedStarBody(std::string id, const double rightAscensionHours, const double
     const int second = 0
 )
 {
-    const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(CivilDateTime{
-        .astronomicalYear = year,
-        .month = month,
-        .day = day,
-        .hour = hour,
-        .minute = minute,
-        .second = second,
-        .timeScale = timeScale,
-    });
+    const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(
+        CivilDateTime{
+            .astronomicalYear = year,
+            .month = month,
+            .day = day,
+            .hour = hour,
+            .minute = minute,
+            .second = second,
+            .timeScale = timeScale,
+        }
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -353,10 +355,12 @@ public:
             };
             result.metadata.status = EphemerisResultStatus::Valid;
             result.metadata.dataSourceProvenance = "batch star astrometry";
-            results.push_back(StarAstrometryBatchResult{
-                .bodyIndex = arrays.bodyIndices()[arrayIndex],
-                .result = result,
-            });
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = arrays.bodyIndices()[arrayIndex],
+                    .result = result,
+                }
+            );
         }
         return results;
     }
@@ -527,8 +531,8 @@ private:
 
 class BatchRecordingFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
-    ) const override
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
     {
         ++m_singleCallCount;
         return transform(request.vector);
@@ -746,8 +750,8 @@ public:
     {
     }
 
-    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
-    ) const override
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
     {
         CelestialFrameTransformResult result;
         result.vector = request.vector;
@@ -811,12 +815,14 @@ private:
     dependencies.dataSetInfo.displayName = "Test data";
     dependencies.dataSetInfo.version = "fixture";
     dependencies.dataSetInfo.provenance = "unit test";
-    dependencies.dataSetInfo.dateRanges.push_back(EphemerisDateRange{
-        .id = "modern",
-        .displayName = "Modern",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-    });
+    dependencies.dataSetInfo.dateRanges.push_back(
+        EphemerisDateRange{
+            .id = "modern",
+            .displayName = "Modern",
+            .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        }
+    );
     return dependencies;
 }
 
@@ -855,6 +861,8 @@ private slots:
     void batchesTopocentricApparentPlaceRequestWideState();
     void reusesCachedFullFrameSnapshotsWithoutStaleResults();
     void reusesPreparedRequestStateAcrossSingleBodyComputations();
+    void reusesCachedSingleBodyStatesWithoutFullFrameSnapshots();
+    void isolatesCachedSingleBodyStatesByBodyIndex();
     void servesConcurrentReadOnlyComputationsFromCache();
     void isolatesCachedSnapshotsByDataSetRevision();
     void isolatesCachedSnapshotsByDataSetDateRangeContents();
@@ -1137,6 +1145,66 @@ void HighPrecisionEphemerisEngineTests::reusesPreparedRequestStateAcrossSingleBo
     QCOMPARE(kernelProvider->callCount(), 1);
 }
 
+void HighPrecisionEphemerisEngineTests::reusesCachedSingleBodyStatesWithoutFullFrameSnapshots()
+{
+    const std::array bodies{makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<ThreadSafeEpochSolarSystemCalculator>(9.0);
+    auto computationCache = std::make_shared<EphemerisComputationCache>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+    );
+
+    EphemerisRequest request = makeRequest();
+    request.epoch.julianDatePart2 = 0.125;
+    const auto firstState = engine.computeBodyState(request, std::size_t{0});
+    const auto repeatedState = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(firstState.has_value());
+    QVERIFY(repeatedState.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(firstState->equatorial.rightAscensionHours, 9.125);
+    QCOMPARE(repeatedState->equatorial.rightAscensionHours, 9.125);
+
+    EphemerisRequest changedRequest = request;
+    changedRequest.epoch.julianDatePart2 = 0.375;
+    const auto changedState = engine.computeBodyState(changedRequest, std::size_t{0});
+
+    QVERIFY(changedState.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 2);
+    QCOMPARE(changedState->equatorial.rightAscensionHours, 9.375);
+
+    const auto originalState = engine.computeBodyState(request, std::string_view{"sun"});
+
+    QVERIFY(originalState.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 2);
+    QCOMPARE(originalState->equatorial.rightAscensionHours, 9.125);
+}
+
+void HighPrecisionEphemerisEngineTests::isolatesCachedSingleBodyStatesByBodyIndex()
+{
+    const std::array bodies{makeSunBody(), makeSunBody()};
+    auto solarSystemCalculator = std::make_shared<ThreadSafeEpochSolarSystemCalculator>(11.0);
+    auto computationCache = std::make_shared<EphemerisComputationCache>();
+
+    const HighPrecisionEphemerisEngine engine(
+        bodies, makeRequest().options, makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+    );
+
+    const EphemerisRequest request = makeRequest();
+    const auto firstState = engine.computeBodyState(request, std::size_t{0});
+    const auto secondState = engine.computeBodyState(request, std::size_t{1});
+    const auto repeatedFirstState = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(firstState.has_value());
+    QVERIFY(secondState.has_value());
+    QVERIFY(repeatedFirstState.has_value());
+    QCOMPARE(solarSystemCalculator->callCount(), 2);
+    QCOMPARE(firstState->bodyIndex, std::uint32_t{0});
+    QCOMPARE(secondState->bodyIndex, std::uint32_t{1});
+    QCOMPARE(repeatedFirstState->bodyIndex, std::uint32_t{0});
+}
+
 void HighPrecisionEphemerisEngineTests::servesConcurrentReadOnlyComputationsFromCache()
 {
     constexpr std::size_t kThreadCount = 8U;
@@ -1197,15 +1265,19 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetRevision
     newDataSet.provenance = "new snapshot";
 
     SkySnapshot oldSnapshot;
-    oldSnapshot.states.push_back(CelestialBodyState{
-        .bodyIndex = 0U,
-        .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
-    });
+    oldSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        }
+    );
     SkySnapshot newSnapshot;
-    newSnapshot.states.push_back(CelestialBodyState{
-        .bodyIndex = 0U,
-        .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
-    });
+    newSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+        }
+    );
 
     computationCache.storeSnapshot(request, bodies, oldDataSet, oldSnapshot);
     computationCache.storeSnapshot(request, bodies, newDataSet, newSnapshot);
@@ -1236,26 +1308,32 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetDateRang
     oldDataSet.id = "test-data";
     oldDataSet.version = "same-version";
     oldDataSet.provenance = "same provenance";
-    oldDataSet.dateRanges.push_back(EphemerisDateRange{
-        .id = "modern",
-        .displayName = "Modern",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-    });
+    oldDataSet.dateRanges.push_back(
+        EphemerisDateRange{
+            .id = "modern",
+            .displayName = "Modern",
+            .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        }
+    );
 
     EphemerisDataSetInfo newDataSet = oldDataSet;
     newDataSet.dateRanges[0].end.julianDatePart1 = 2'600'000.5;
 
     SkySnapshot oldSnapshot;
-    oldSnapshot.states.push_back(CelestialBodyState{
-        .bodyIndex = 0U,
-        .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
-    });
+    oldSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        }
+    );
     SkySnapshot newSnapshot;
-    newSnapshot.states.push_back(CelestialBodyState{
-        .bodyIndex = 0U,
-        .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
-    });
+    newSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+        }
+    );
 
     computationCache.storeSnapshot(request, bodies, oldDataSet, oldSnapshot);
     computationCache.storeSnapshot(request, bodies, newDataSet, newSnapshot);
@@ -1277,10 +1355,12 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByCatalogContents
     const EphemerisDataSetInfo dataSet = makeDependencies().dataSetInfo;
 
     SkySnapshot oldSnapshot;
-    oldSnapshot.states.push_back(CelestialBodyState{
-        .bodyIndex = 0U,
-        .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
-    });
+    oldSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        }
+    );
     computationCache.storeSnapshot(request, bodies, dataSet, oldSnapshot);
 
     bodies[0] = makeFixedStarBody("star-b", 5.0, 6.0);
