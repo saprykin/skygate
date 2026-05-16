@@ -343,6 +343,10 @@ add_skygate_ephemeris_qtest(
     engine/CelestialReferenceCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-precision-policy-tests
+    engine/EphemerisPrecisionPolicyTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-observation-event-calculator-tests
     events/ObservationEventCalculatorTests.cpp
 )

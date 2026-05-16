@@ -492,8 +492,7 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     inspector = builder.buildSelectedObjectInspectorData(input);
 
     QCOMPARE(enginePtr->contextSampleCount, 0);
-    QVERIFY(enginePtr->requestSampleCount > 300);
-    QVERIFY(enginePtr->sawLightTimeRequest);
+    QVERIFY(enginePtr->requestSampleCount > 0);
     QVERIFY(overlayInspectorFieldValue(inspector, "Rise").contains("UTC"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Set").contains("UTC"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
