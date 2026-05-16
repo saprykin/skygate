@@ -8,7 +8,10 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -116,6 +119,94 @@ private:
     }
 };
 
+[[nodiscard]] skygate::ephemeris::CelestialBody
+makeFixedBody(std::string id, const double rightAscensionHours, const double declinationDeg)
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = std::move(id);
+    body.displayName = body.id;
+    body.type = skygate::ephemeris::CelestialBodyType::Star;
+    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+        .rightAscensionHours = rightAscensionHours,
+        .declinationDeg = declinationDeg,
+    };
+    return body;
+}
+
+class GuidedNightEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit GuidedNightEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
+        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+    {
+        auto catalog = skygate::ephemeris::createStarCatalogFromBodies(*m_bodies);
+        Q_ASSERT(catalog != nullptr);
+        m_engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+        Q_ASSERT(m_engine != nullptr);
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineOptions options;
+        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        return options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot = m_engine->compute(request);
+        snapshot.catalogBodies = m_bodies;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        ++requestSampleCount;
+        return m_engine->computeBodyState(request, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        ++requestSampleCount;
+        return m_engine->computeBodyState(request, bodyIndex);
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot = m_engine->compute(context);
+        snapshot.catalogBodies = m_bodies;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    {
+        ++contextSampleCount;
+        return m_engine->computeBodyState(context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    {
+        ++contextSampleCount;
+        return m_engine->computeBodyState(context, bodyIndex);
+    }
+
+    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_engine;
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+};
+
 }  // namespace
 
 class NightConditionsCalculatorTests final : public QObject {
@@ -128,6 +219,7 @@ private slots:
     void moonRiseSetAndIlluminationArePopulated();
     void lunarPhaseBucketsAreDeterministic();
     void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
+    void highPrecisionNightConditionsAvoidEventSearchSamples();
 };
 
 void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation()
@@ -231,20 +323,38 @@ void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTi
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeZurichContext();
     request.context.utcTime = utcFromUnixSeconds(1'711'024'800);  // 2024-03-21 12:00:00 UTC
-    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = 2000,
-        .month = 1,
-        .day = 6,
-        .hour = 18,
-        .minute = 14,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 2000,
+            .month = 1,
+            .day = 6,
+            .hour = 18,
+            .minute = 14,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
 
     const auto conditions = calculator.compute(engine, request, 0U, 1U);
 
     QVERIFY(conditions.valid);
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("New Moon"));
     QVERIFY(conditions.moonIlluminationPercent < 1.0);
+}
+
+void NightConditionsCalculatorTests::highPrecisionNightConditionsAvoidEventSearchSamples()
+{
+    const std::vector<skygate::ephemeris::CelestialBody> bodies{
+        makeFixedBody("sun", 8.0, 20.0),
+        makeFixedBody("moon", 14.0, -8.0),
+    };
+    const GuidedNightEngine engine(bodies);
+    const skygate::ephemeris::NightConditionsCalculator calculator;
+
+    const auto conditions = calculator.compute(engine, makeZurichContext(), 0U, bodies[0], 1U, bodies[1]);
+
+    QVERIFY(conditions.valid);
+    QCOMPARE(engine.contextSampleCount, 0);
+    QCOMPARE(engine.requestSampleCount, 2);
 }
 
 QTEST_APPLESS_MAIN(NightConditionsCalculatorTests)
