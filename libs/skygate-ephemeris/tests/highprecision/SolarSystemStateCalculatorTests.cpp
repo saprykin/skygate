@@ -385,8 +385,11 @@ void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBo
     QVERIFY(result.equatorial.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+    QVERIFY(result.metadata.dataSourceProvenance.find("mars body center (499)") != std::string::npos);
+    QVERIFY(result.metadata.dataSourceProvenance.find("planetary-system barycenter (4)") != std::string::npos);
 }
 
 void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfigured()
@@ -403,6 +406,12 @@ void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfig
     QCOMPARE(provider->lastCenterNaifId, 399);
     QVERIFY(result.equatorial.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+    QVERIFY(result.metadata.dataSourceProvenance.find("mars body center (499)") != std::string::npos);
+    QVERIFY(result.metadata.dataSourceProvenance.find("planetary-system barycenter (4)") != std::string::npos);
 }
 
 void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth()

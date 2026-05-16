@@ -332,6 +332,7 @@ QString formatEphemerisWarnings(const ephemeris::EphemerisResultMetadata& metada
         EphemerisWarningCode::TimeScaleDataUnavailable,
         EphemerisWarningCode::CorrectionUnavailable,
         EphemerisWarningCode::ComputationFailed,
+        EphemerisWarningCode::BarycenterFallback,
     };
 
     QStringList warnings;

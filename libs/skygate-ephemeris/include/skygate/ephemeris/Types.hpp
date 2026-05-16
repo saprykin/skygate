@@ -381,7 +381,8 @@ enum class EphemerisWarningCode : std::uint8_t {
     MissingObserver,
     TimeScaleDataUnavailable,
     CorrectionUnavailable,
-    ComputationFailed
+    ComputationFailed,
+    BarycenterFallback
 };
 
 [[nodiscard]] constexpr std::string_view ephemerisWarningText(const EphemerisWarningCode code) noexcept
@@ -403,6 +404,8 @@ enum class EphemerisWarningCode : std::uint8_t {
         return "One or more requested correction terms could not be applied.";
     case EphemerisWarningCode::ComputationFailed:
         return "The ephemeris computation failed.";
+    case EphemerisWarningCode::BarycenterFallback:
+        return "A planetary-system barycenter was used because the requested body center is unavailable.";
     }
 
     return "Ephemeris warning.";
