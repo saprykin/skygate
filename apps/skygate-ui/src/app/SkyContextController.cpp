@@ -764,6 +764,11 @@ const skygate::ephemeris::IEphemerisEngine* SkyContextController::ephemerisEngin
     return m_ephemerisEngine.get();
 }
 
+skygate::ephemeris::EphemerisEngineKind SkyContextController::activeEphemerisEngineKind() const noexcept
+{
+    return m_ephemerisEngine != nullptr ? m_ephemerisEngine->kind() : m_ephemerisEngineKind;
+}
+
 std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
 SkyContextController::activeEphemerisDataSnapshot() const noexcept
 {

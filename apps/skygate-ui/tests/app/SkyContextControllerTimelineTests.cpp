@@ -101,6 +101,7 @@ private slots:
     void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
     void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
     void throttledLivePlaybackAdvancesByElapsedWallTime();
+    void fallbackSimpleEngineLivePlaybackUsesOneSecondTicks();
     void goLiveNowJumpsToCurrentUtcAndEnablesLive();
     void restoresLiveSettingsAtCurrentUtc();
     void restoresPausedSettingsAtSavedUtc();
@@ -328,6 +329,40 @@ void SkyContextControllerTimelineTests::throttledLivePlaybackAdvancesByElapsedWa
 
     const qint64 afterSecondTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     QVERIFY(afterSecondTickSeconds - afterFirstTickSeconds >= 9);
+
+    controller->setLive(false);
+}
+
+void SkyContextControllerTimelineTests::fallbackSimpleEngineLivePlaybackUsesOneSecondTicks()
+{
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithTimeSource(timeSource);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("2026-05-06", "09:30:00"));
+
+    controller->setEphemerisEngineKindIndex(1);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
+    QVERIFY(controller->ephemerisEngine() != nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+    );
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    skyContextChangedSpy.clear();
+
+    const qint64 startSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    controller->setLive(true);
+
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+    const qint64 afterFirstTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QCOMPARE(afterFirstTickSeconds - startSeconds, 1);
+
+    skyContextChangedSpy.clear();
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 2500);
+
+    const qint64 afterSecondTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QCOMPARE(afterSecondTickSeconds - afterFirstTickSeconds, 1);
 
     controller->setLive(false);
 }

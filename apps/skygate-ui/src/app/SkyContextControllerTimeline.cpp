@@ -43,7 +43,7 @@ void SkyContextController::setLive(bool live)
 
 bool SkyContextController::liveRecomputeThrottleApplies() const
 {
-    return m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    return activeEphemerisEngineKind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
 }
 
 bool SkyContextController::liveRecomputeThrottled() const
