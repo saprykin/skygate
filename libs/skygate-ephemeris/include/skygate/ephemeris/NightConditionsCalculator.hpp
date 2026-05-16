@@ -37,9 +37,35 @@ public:
     ) const;
     [[nodiscard]] NightConditions compute(
         const IEphemerisEngine& ephemerisEngine,
+        const core::SkyContext& context,
+        std::uint32_t sunBodyIndex,
+        const CelestialBody& sunBody,
+        std::uint32_t moonBodyIndex,
+        const CelestialBody& moonBody
+    ) const;
+    [[nodiscard]] NightConditions compute(
+        const IEphemerisEngine& ephemerisEngine,
         const EphemerisRequest& request,
         std::uint32_t sunBodyIndex,
         std::uint32_t moonBodyIndex
+    ) const;
+    [[nodiscard]] NightConditions compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t sunBodyIndex,
+        const CelestialBody& sunBody,
+        std::uint32_t moonBodyIndex,
+        const CelestialBody& moonBody
+    ) const;
+
+private:
+    [[nodiscard]] NightConditions compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t sunBodyIndex,
+        const CelestialBody* sunBody,
+        std::uint32_t moonBodyIndex,
+        const CelestialBody* moonBody
     ) const;
 };
 

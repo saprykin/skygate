@@ -152,8 +152,9 @@ void SkyContextController::refreshNightConditions()
     if (engine != nullptr && sunIndex.has_value() && moonIndex.has_value()) {
         const skygate::ephemeris::NightConditionsCalculator calculator;
         const auto requestContext = ephemerisRequestContext();
-        nextData =
-            dataBuilder.conditionsData(calculator.compute(*engine, requestContext.request, *sunIndex, *moonIndex));
+        nextData = dataBuilder.conditionsData(calculator.compute(
+            *engine, requestContext.request, *sunIndex, bodies[*sunIndex], *moonIndex, bodies[*moonIndex]
+        ));
     }
     const QVariantMap nextConditions = adapter.nightConditions(nextData);
 
