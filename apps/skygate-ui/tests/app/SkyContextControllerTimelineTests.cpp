@@ -1,5 +1,88 @@
 #include "SkyContextControllerTestSupport.hpp"
 
+namespace {
+
+class ThrottledLiveTestEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    ThrottledLiveTestEngine()
+    {
+        m_options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return m_options.engineKind;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Throttled live test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisCapabilities capabilities() const noexcept override
+    {
+        skygate::ephemeris::EphemerisCapabilities capabilities;
+        capabilities.engineKind = m_options.engineKind;
+        return capabilities;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        return m_options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        return snapshotFor(request.context);
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        return snapshotFor(context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, std::string_view bodyId) const override
+    {
+        Q_UNUSED(context);
+        Q_UNUSED(bodyId);
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext& context, std::uint32_t bodyIndex) const override
+    {
+        Q_UNUSED(context);
+        Q_UNUSED(bodyIndex);
+        return std::nullopt;
+    }
+
+private:
+    [[nodiscard]] static skygate::ephemeris::SkySnapshot snapshotFor(const skygate::core::SkyContext& context)
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+private:
+    skygate::ephemeris::EphemerisEngineOptions m_options;
+};
+
+std::unique_ptr<SkyContextController>
+createControllerWithThrottledLiveEngine(const skygate::core::ITimeSource& timeSource)
+{
+    auto initializationOptions = controllerInitializationOptions(false, &timeSource);
+    initializationOptions.rebuildEphemerisEngineOnStartup = false;
+
+    return std::make_unique<SkyContextController>(
+        createTestCatalog(), std::make_unique<ThrottledLiveTestEngine>(), initializationOptions, nullptr
+    );
+}
+
+}  // namespace
+
 class SkyContextControllerTimelineTests final : public QObject {
     Q_OBJECT
 
@@ -17,6 +100,7 @@ private slots:
     void livePlaybackUsesManualStepWhileCatchingUp();
     void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
     void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
+    void throttledLivePlaybackAdvancesByElapsedWallTime();
     void goLiveNowJumpsToCurrentUtcAndEnablesLive();
     void restoresLiveSettingsAtCurrentUtc();
     void restoresPausedSettingsAtSavedUtc();
@@ -70,10 +154,7 @@ void SkyContextControllerTimelineTests::bceAliasesResolveToTheSameInstant()
     bceController->setLive(false);
     QVERIFY(bceController->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
 
-    QCOMPARE(
-        controllerUtcTime(*bcController).toSecsSinceEpoch(),
-        controllerUtcTime(*bceController).toSecsSinceEpoch()
-    );
+    QCOMPARE(controllerUtcTime(*bcController).toSecsSinceEpoch(), controllerUtcTime(*bceController).toSecsSinceEpoch());
 }
 
 void SkyContextControllerTimelineTests::invalidUtcDateTimeInputLeavesTimelineUnchanged()
@@ -157,10 +238,7 @@ void SkyContextControllerTimelineTests::livePlaybackUsesManualStepWhileCatchingU
     controller->setSpeedMultiplier(2.0);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-5 * 60);
-    QVERIFY(controller->setUtcDateTimeText(
-        startUtc.toString("yyyy-MM-dd"),
-        startUtc.toString("HH:mm:ss")
-    ));
+    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
     skyContextChangedSpy.clear();
@@ -185,10 +263,7 @@ void SkyContextControllerTimelineTests::livePlaybackDoesNotOvershootCurrentUtcWh
     controller->setSpeedMultiplier(2.0);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-30);
-    QVERIFY(controller->setUtcDateTimeText(
-        startUtc.toString("yyyy-MM-dd"),
-        startUtc.toString("HH:mm:ss")
-    ));
+    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
     skyContextChangedSpy.clear();
@@ -212,10 +287,7 @@ void SkyContextControllerTimelineTests::livePlaybackFallsBackToOneSecondTicksAft
     controller->setSpeedMultiplier(4.0);
 
     const QDateTime startUtc = fixedNowUtc().addSecs(-2);
-    QVERIFY(controller->setUtcDateTimeText(
-        startUtc.toString("yyyy-MM-dd"),
-        startUtc.toString("HH:mm:ss")
-    ));
+    QVERIFY(controller->setUtcDateTimeText(startUtc.toString("yyyy-MM-dd"), startUtc.toString("HH:mm:ss")));
 
     QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
     skyContextChangedSpy.clear();
@@ -230,6 +302,32 @@ void SkyContextControllerTimelineTests::livePlaybackFallsBackToOneSecondTicksAft
 
     const qint64 afterLiveTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     QCOMPARE(afterLiveTickSeconds - afterCatchUpSeconds, 1);
+
+    controller->setLive(false);
+}
+
+void SkyContextControllerTimelineTests::throttledLivePlaybackAdvancesByElapsedWallTime()
+{
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithThrottledLiveEngine(timeSource);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("2026-05-06", "09:30:00"));
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    skyContextChangedSpy.clear();
+
+    const qint64 startSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    controller->setLive(true);
+
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+    const qint64 afterFirstTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QCOMPARE(afterFirstTickSeconds - startSeconds, 1);
+
+    skyContextChangedSpy.clear();
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 13000);
+
+    const qint64 afterSecondTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QVERIFY(afterSecondTickSeconds - afterFirstTickSeconds >= 9);
 
     controller->setLive(false);
 }
@@ -259,8 +357,7 @@ void SkyContextControllerTimelineTests::restoresLiveSettingsAtCurrentUtc()
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.live = true;
-    snapshot.utcEpochSeconds =
-        QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
+    snapshot.utcEpochSeconds = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
     QVERIFY(store.saveState(snapshot));
 
     const auto controller = createControllerWithTimeSource(timeSource, true);
@@ -276,8 +373,7 @@ void SkyContextControllerTimelineTests::restoresPausedSettingsAtSavedUtc()
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.live = false;
-    snapshot.utcEpochSeconds =
-        QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
+    snapshot.utcEpochSeconds = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
     QVERIFY(store.saveState(snapshot));
 
     const auto controller = createController(true);

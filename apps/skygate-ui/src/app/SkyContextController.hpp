@@ -421,8 +421,10 @@ signals:
 
 private:
     [[nodiscard]] QDateTime currentUtcDateTime() const;
-    [[nodiscard]] bool highPrecisionLiveTickThrottled() const;
-    void markHighPrecisionLiveTick();
+    [[nodiscard]] bool liveRecomputeThrottleApplies() const;
+    [[nodiscard]] bool liveRecomputeThrottled() const;
+    [[nodiscard]] int acceptedLiveTickSeconds() const;
+    void markLiveRecomputeTick();
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
@@ -455,7 +457,7 @@ private:
     skygate::ui::internal::SkyLocationController m_location;
     skygate::ui::internal::SkySearchController m_search;
     QTimer m_timer;
-    QElapsedTimer m_highPrecisionLiveTickTimer;
+    QElapsedTimer m_liveRecomputeThrottleTimer;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
     std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;

@@ -27,7 +27,7 @@ enum class SkyContextLocationSource {
 class SkyContextControllerConstants final {
 public:
     static constexpr int kTickIntervalMs = 1000;
-    static constexpr int kHighPrecisionLiveTickIntervalMs = 10000;
+    static constexpr int kThrottledLiveRecomputeIntervalMs = 10000;
     static constexpr int kLocationUpdateTimeoutMs = 5000;
     static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
