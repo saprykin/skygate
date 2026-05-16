@@ -112,6 +112,35 @@ public:
         static_cast<void>(preparedState);
     }
 
+    [[nodiscard]] virtual std::optional<CelestialBodyState> findBodyState(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        std::size_t bodyIndex
+    ) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(catalogBodies);
+        static_cast<void>(dataSetInfo);
+        static_cast<void>(bodyIndex);
+        return std::nullopt;
+    }
+
+    virtual void storeBodyState(
+        const EphemerisRequest& request,
+        const std::vector<CelestialBody>& catalogBodies,
+        const EphemerisDataSetInfo& dataSetInfo,
+        std::size_t bodyIndex,
+        const CelestialBodyState& state
+    ) const
+    {
+        static_cast<void>(request);
+        static_cast<void>(catalogBodies);
+        static_cast<void>(dataSetInfo);
+        static_cast<void>(bodyIndex);
+        static_cast<void>(state);
+    }
+
     virtual void clear() const {}
 };
 
@@ -193,10 +222,12 @@ public:
                 .preparedRequestState = preparedRequestState,
                 .bodyIndex = calculatorResult.bodyIndex,
             };
-            results.push_back(StarAstrometryBatchResult{
-                .bodyIndex = calculatorResult.bodyIndex,
-                .result = apply(input, calculatorResult.result),
-            });
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = apply(input, calculatorResult.result),
+                }
+            );
         }
         return results;
     }
@@ -210,8 +241,8 @@ public:
         const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
     ) const = 0;
 
-    [[nodiscard]] virtual CelestialBodyState buildUnsupportedState(const HighPrecisionComputationInput& input
-    ) const = 0;
+    [[nodiscard]] virtual CelestialBodyState
+    buildUnsupportedState(const HighPrecisionComputationInput& input) const = 0;
     [[nodiscard]] virtual CelestialBodyState buildFailedState(const HighPrecisionComputationInput& input) const = 0;
 };
 
