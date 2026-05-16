@@ -3,15 +3,11 @@
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkySceneShared.hpp"
 
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/ObservationEventCalculator.hpp"
 
 #include <QElapsedTimer>
 #include <QLoggingCategory>
 
-#include <array>
-#include <memory>
-#include <span>
 #include <utility>
 #include <vector>
 
@@ -104,17 +100,6 @@ skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
 )
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
-    if (shouldShowHighPrecisionDetails(input) && input.ephemerisRequest.has_value()) {
-        const std::array<skygate::ephemeris::CelestialBody, 1> bodies{body};
-        std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
-            skygate::ephemeris::createEphemerisEngine(
-                std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
-            );
-        if (guidanceEngine != nullptr) {
-            return calculator.compute(*guidanceEngine, input.ephemerisRequest->context, 0U, body);
-        }
-    }
-
     return input.ephemerisRequest.has_value()
                ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body)
                : calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex, body);
