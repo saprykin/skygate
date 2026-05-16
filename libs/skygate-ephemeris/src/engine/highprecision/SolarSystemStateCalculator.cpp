@@ -6,6 +6,7 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -24,6 +25,7 @@ constexpr int kLightTimeIterationCount = 3;
 struct TargetKernelState {
     SolarSystemKernelStateResult state;
     int targetNaifId = 0;
+    int requestedTargetNaifId = 0;
 };
 
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
@@ -103,6 +105,53 @@ struct TargetKernelState {
     }
 
     return std::nullopt;
+}
+
+[[nodiscard]] std::string barycenterFallbackProvenance(
+    const CelestialBody& body, const int requestedTargetNaifId, const int effectiveTargetNaifId
+)
+{
+    std::string bodyName = body.id.empty() ? body.displayName : body.id;
+    if (bodyName.empty()) {
+        bodyName = "planet";
+    }
+
+    return bodyName + " body center (" + std::to_string(requestedTargetNaifId)
+           + ") served by planetary-system barycenter (" + std::to_string(effectiveTargetNaifId) + ")";
+}
+
+void appendProvenance(EphemerisResultMetadata& metadata, std::string provenance)
+{
+    if (provenance.empty()) {
+        return;
+    }
+    if (metadata.dataSourceProvenance.empty()) {
+        metadata.dataSourceProvenance = std::move(provenance);
+        return;
+    }
+
+    metadata.dataSourceProvenance += "; ";
+    metadata.dataSourceProvenance += provenance;
+}
+
+void markBarycenterFallback(
+    EphemerisResultMetadata& metadata,
+    const CelestialBody& body,
+    const int requestedTargetNaifId,
+    const int effectiveTargetNaifId
+)
+{
+    if (requestedTargetNaifId == effectiveTargetNaifId) {
+        return;
+    }
+    if (metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+    }
+    const bool alreadyReported = metadata.hasWarning(EphemerisWarningCode::BarycenterFallback);
+    metadata.addWarning(EphemerisWarningCode::BarycenterFallback);
+    if (!alreadyReported) {
+        appendProvenance(metadata, barycenterFallbackProvenance(body, requestedTargetNaifId, effectiveTargetNaifId));
+    }
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult
@@ -263,6 +312,7 @@ void markCorrectionUnavailable(
             return TargetKernelState{
                 .state = preferredState,
                 .targetNaifId = *fallbackTargetNaifId,
+                .requestedTargetNaifId = targetNaifId,
             };
         }
     }
@@ -270,6 +320,7 @@ void markCorrectionUnavailable(
     TargetKernelState result{
         .state = kernelProvider.computeGeometricState(epoch, targetNaifId, centerNaifId),
         .targetNaifId = targetNaifId,
+        .requestedTargetNaifId = targetNaifId,
     };
     if (result.state.positionAu.has_value() || !fallbackTargetNaifId.has_value()
         || *fallbackTargetNaifId == targetNaifId) {
@@ -368,6 +419,9 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     if (result.metadata.dataSourceProvenance.empty()) {
         result.metadata.dataSourceProvenance = "CALCEPH geometric solar-system state";
     }
+    markBarycenterFallback(
+        result.metadata, input.body, targetKernelResult.requestedTargetNaifId, effectiveTargetNaifId
+    );
 
     if (!kernelResult.positionAu.has_value()) {
         if (result.metadata.status == EphemerisResultStatus::Valid) {
@@ -414,6 +468,12 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                 }
 
                 mergeKernelMetadata(result.metadata, targetState.metadata);
+                markBarycenterFallback(
+                    result.metadata,
+                    input.body,
+                    retardedTargetState.requestedTargetNaifId,
+                    retardedTargetState.targetNaifId
+                );
                 correctedVector = relativeVector(*targetState.positionAu, *earthState.positionAu);
                 lightTimeDays = vectorDistanceAu(*correctedVector) / kSpeedOfLightAuPerDay;
             }
