@@ -444,6 +444,7 @@ private:
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind activeEphemerisEngineKind() const noexcept;
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
     void setEphemerisDataOperationStatusText(QString statusText);
