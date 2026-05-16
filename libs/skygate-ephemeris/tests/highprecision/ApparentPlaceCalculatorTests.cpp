@@ -54,8 +54,9 @@ struct TopocentricFixture {
 
 [[nodiscard]] QString topocentricFixturePath()
 {
-    return QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR
-                          "/ephemeris/topocentric_observer_apparent_solar_system_smoke.json");
+    return QStringLiteral(
+        SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/topocentric_observer_apparent_solar_system_smoke.json"
+    );
 }
 
 [[nodiscard]] core::SkyContext makeContext()
@@ -240,22 +241,24 @@ struct TopocentricFixture {
     for (const QJsonValue& value : cases) {
         const QJsonObject object = value.toObject();
         const QJsonObject expected = object.value(QStringLiteral("expected")).toObject();
-        fixture.cases.push_back(TopocentricFixtureCase{
-            .body = makeBody(
-                object.value(QStringLiteral("bodyId")).toString(), object.value(QStringLiteral("bodyType")).toString()
-            ),
-            .inputGcrsPositionAu = parseKernelVector(object.value(QStringLiteral("inputGcrsPositionAu")).toArray()),
-            .expectedEquatorial =
-                {
-                    .rightAscensionHours = expected.value(QStringLiteral("rightAscensionHours")).toDouble(),
-                    .declinationDegrees = expected.value(QStringLiteral("declinationDegrees")).toDouble(),
-                },
-            .expectedHorizontal =
-                {
+        fixture.cases.push_back(
+            TopocentricFixtureCase{
+                .body = makeBody(
+                    object.value(QStringLiteral("bodyId")).toString(),
+                    object.value(QStringLiteral("bodyType")).toString()
+                ),
+                .inputGcrsPositionAu = parseKernelVector(object.value(QStringLiteral("inputGcrsPositionAu")).toArray()),
+                .expectedEquatorial =
+                    {
+                        .rightAscensionHours = expected.value(QStringLiteral("rightAscensionHours")).toDouble(),
+                        .declinationDegrees = expected.value(QStringLiteral("declinationDegrees")).toDouble(),
+                    },
+                .expectedHorizontal = {
                     .altitudeDeg = expected.value(QStringLiteral("altitudeDegrees")).toDouble(),
                     .azimuthDeg = expected.value(QStringLiteral("azimuthDegrees")).toDouble(),
                 },
-        });
+            }
+        );
     }
 
     return fixture;
@@ -263,8 +266,8 @@ struct TopocentricFixture {
 
 class RecordingFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
-    ) const override
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
     {
         ++m_callCount;
         m_lastSourceFrame = request.sourceFrame;
@@ -308,10 +311,61 @@ private:
     EphemerisResultMetadata m_resultMetadata = {.status = EphemerisResultStatus::Valid};
 };
 
+class ShortBatchFrameTransformer final : public IFrameTransformer {
+public:
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
+    {
+        return transformResult(request.sourceFrame, request.targetFrame, request.vector);
+    }
+
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const override
+    {
+        ++m_batchCallCount;
+        std::vector<CelestialFrameTransformResult> results;
+        const std::size_t resultCount = request.vectors.empty() ? 0U : request.vectors.size() - 1U;
+        results.reserve(resultCount);
+        for (std::size_t index = 0U; index < resultCount; ++index) {
+            results.push_back(transformResult(request.sourceFrame, request.targetFrame, request.vectors[index]));
+        }
+        return results;
+    }
+
+    [[nodiscard]] int batchCallCount() const noexcept
+    {
+        return m_batchCallCount;
+    }
+
+private:
+    [[nodiscard]] static CelestialFrameTransformResult transformResult(
+        const CelestialReferenceFrame sourceFrame,
+        const CelestialReferenceFrame targetFrame,
+        const CelestialFrameVector& vector
+    )
+    {
+        EphemerisResultMetadata metadata;
+        metadata.status = EphemerisResultStatus::Valid;
+        if (sourceFrame == CelestialReferenceFrame::Gcrs
+            && targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox) {
+            metadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+        } else if (sourceFrame != targetFrame) {
+            metadata.appliedCorrections = EphemerisCorrectionFlags::EarthOrientation;
+        }
+
+        return {
+            .vector = vector,
+            .metadata = metadata,
+        };
+    }
+
+    mutable int m_batchCallCount = 0;
+};
+
 class PassThroughFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
-    ) const override
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
     {
         ++m_callCount;
         m_lastSourceFrame = request.sourceFrame;
@@ -368,11 +422,13 @@ public:
         ++m_convertCallCount;
         m_lastTargetScale = targetScale;
         return {
-            .epoch = normalizedAstronomicalEpoch(AstronomicalEpoch{
-                .julianDatePart1 = epoch.julianDatePart1,
-                .julianDatePart2 = epoch.julianDatePart2,
-                .timeScale = targetScale,
-            }),
+            .epoch = normalizedAstronomicalEpoch(
+                AstronomicalEpoch{
+                    .julianDatePart1 = epoch.julianDatePart1,
+                    .julianDatePart2 = epoch.julianDatePart2,
+                    .timeScale = targetScale,
+                }
+            ),
             .status = TimeScaleConversionStatus::Valid,
             .diagnosticText = "unit test conversion",
         };
@@ -454,11 +510,13 @@ public:
         }
 
         TimeScaleConversionResult result;
-        result.epoch = normalizedAstronomicalEpoch(AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2,
-            .timeScale = TimeScale::Tt,
-        });
+        result.epoch = normalizedAstronomicalEpoch(
+            AstronomicalEpoch{
+                .julianDatePart1 = epoch.julianDatePart1,
+                .julianDatePart2 = epoch.julianDatePart2,
+                .timeScale = TimeScale::Tt,
+            }
+        );
         result.status = TimeScaleConversionStatus::Degraded;
         result.diagnosticText = "unit test degraded TT conversion";
         result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing);
@@ -534,6 +592,7 @@ private slots:
     void changesTopocentricPositionWhenObserverElevationChanges();
     void appliesAtmosphericRefractionToTopocentricHorizontalCoordinates();
     void reportsUnavailableRefractionMode();
+    void degradesMissingApparentBatchTransformResults();
 };
 
 void ApparentPlaceCalculatorTests::routesGeometricRequestsToGcrs()
@@ -641,11 +700,13 @@ void ApparentPlaceCalculatorTests::routesApparentRequestsToTrueEquatorAndEquinox
 void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
-    frameTransformer->setResultVector(CelestialFrameVector{
-        .x = 0.0,
-        .y = 1.0,
-        .z = 0.0,
-    });
+    frameTransformer->setResultVector(
+        CelestialFrameVector{
+            .x = 0.0,
+            .y = 1.0,
+            .z = 0.0,
+        }
+    );
     EphemerisResultMetadata transformMetadata;
     transformMetadata.status = EphemerisResultStatus::Valid;
     transformMetadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
@@ -702,8 +763,8 @@ void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecess
 void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataForPrecessionNutation()
 {
     const ErfaFrameTransformer availabilityTransformer(nullptr);
-    const CelestialFrameTransformResult availabilityResult =
-        availabilityTransformer.transformCelestialVector(CelestialFrameTransformRequest{
+    const CelestialFrameTransformResult availabilityResult = availabilityTransformer.transformCelestialVector(
+        CelestialFrameTransformRequest{
             .sourceFrame = CelestialReferenceFrame::Gcrs,
             .targetFrame = CelestialReferenceFrame::Cirs,
             .epoch =
@@ -713,7 +774,8 @@ void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataF
                     .timeScale = TimeScale::Tt,
                 },
             .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        });
+        }
+    );
     if (!availabilityResult.vector.has_value()) {
         QSKIP("ERFA-backed frame transforms are not available in this build.");
     }
@@ -755,11 +817,13 @@ void ApparentPlaceCalculatorTests::appliesTopocentricParallaxAndHorizontalCoordi
 
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
-        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
-            .xAu = 0.0,
-            .yAu = 1.0,
-            .zAu = 0.0,
-        })
+        makeSolarSystemCalculatorResult(
+            SolarSystemKernelVector{
+                .xAu = 0.0,
+                .yAu = 1.0,
+                .zAu = 0.0,
+            }
+        )
     );
 
     QCOMPARE(timeScaleService->convertCallCount(), 1);
@@ -805,13 +869,14 @@ void ApparentPlaceCalculatorTests::validatesTopocentricMoonSunPlanetAgainstHoriz
         fixture.polarMotionYArcseconds
     );
     auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService, earthOrientationProvider);
-    const CelestialFrameTransformResult availabilityResult =
-        frameTransformer->transformCelestialVector(CelestialFrameTransformRequest{
+    const CelestialFrameTransformResult availabilityResult = frameTransformer->transformCelestialVector(
+        CelestialFrameTransformRequest{
             .sourceFrame = CelestialReferenceFrame::Gcrs,
             .targetFrame = CelestialReferenceFrame::Itrs,
             .epoch = fixture.request.epoch,
             .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        });
+        }
+    );
     if (!availabilityResult.vector.has_value()) {
         QSKIP("ERFA-backed topocentric validation is not available in this build.");
     }
@@ -874,11 +939,13 @@ void ApparentPlaceCalculatorTests::reportsInvalidObserverForTopocentricRequest()
 
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
-        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
-            .xAu = 0.0,
-            .yAu = 1.0,
-            .zAu = 0.0,
-        })
+        makeSolarSystemCalculatorResult(
+            SolarSystemKernelVector{
+                .xAu = 0.0,
+                .yAu = 1.0,
+                .zAu = 0.0,
+            }
+        )
     );
 
     QVERIFY(result.equatorial.has_value());
@@ -901,11 +968,13 @@ void ApparentPlaceCalculatorTests::reportsMissingEarthOrientationForTopocentricR
 
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
-        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
-            .xAu = 0.0,
-            .yAu = 1.0,
-            .zAu = 0.0,
-        })
+        makeSolarSystemCalculatorResult(
+            SolarSystemKernelVector{
+                .xAu = 0.0,
+                .yAu = 1.0,
+                .zAu = 0.0,
+            }
+        )
     );
 
     QVERIFY(result.equatorial.has_value());
@@ -962,7 +1031,8 @@ void ApparentPlaceCalculatorTests::leavesApparentRequestGeocentricWhenParallaxIs
     QVERIFY(std::abs(apparentResult.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QVERIFY(topocentricResult.equatorial->rightAscensionHours > apparentResult.equatorial->rightAscensionHours);
     QVERIFY(!hasCorrectionFlag(apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax));
-    QVERIFY(hasCorrectionFlag(topocentricResult.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax)
+    QVERIFY(
+        hasCorrectionFlag(topocentricResult.metadata.appliedCorrections, EphemerisCorrectionFlags::DiurnalParallax)
     );
 }
 
@@ -1012,11 +1082,13 @@ void ApparentPlaceCalculatorTests::appliesAtmosphericRefractionToTopocentricHori
 
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
-        makeSolarSystemCalculatorResult(SolarSystemKernelVector{
-            .xAu = 1.0,
-            .yAu = 0.0,
-            .zAu = 1.0,
-        })
+        makeSolarSystemCalculatorResult(
+            SolarSystemKernelVector{
+                .xAu = 1.0,
+                .yAu = 0.0,
+                .zAu = 1.0,
+            }
+        )
     );
 
     QVERIFY(result.horizontal.has_value());
@@ -1046,6 +1118,46 @@ void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+}
+
+void ApparentPlaceCalculatorTests::degradesMissingApparentBatchTransformResults()
+{
+    auto frameTransformer = std::make_shared<ShortBatchFrameTransformer>();
+    const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::PrecessionNutation);
+    const std::vector<CelestialBody> bodies = {makeBody(), makeBody()};
+    const std::vector<StarAstrometryBatchResult> calculatorResults = {
+        {
+            .bodyIndex = 0U,
+            .result = makeCalculatorResult(),
+        },
+        {
+            .bodyIndex = 1U,
+            .result = makeCalculatorResult(),
+        },
+    };
+
+    const std::vector<StarAstrometryBatchResult> results =
+        calculator.applyBatch(request, bodies, calculatorResults, nullptr);
+
+    QCOMPARE(frameTransformer->batchCallCount(), 1);
+    QCOMPARE(results.size(), 2U);
+    QCOMPARE(
+        static_cast<std::uint8_t>(results[0].result.metadata.status),
+        static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+    );
+    QVERIFY(
+        hasCorrectionFlag(results[0].result.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(results[1].result.metadata.status),
+        static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(results[1].result.metadata.hasWarning(EphemerisWarningCode::ComputationFailed));
+    QVERIFY(results[1].result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(hasCorrectionFlag(
+        results[1].result.metadata.unavailableCorrections, EphemerisCorrectionFlags::PrecessionNutation
+    ));
 }
 
 QTEST_APPLESS_MAIN(ApparentPlaceCalculatorTests)
