@@ -217,6 +217,17 @@ void markCorrectionUnavailable(
     metadata.addUnavailableCorrection(unavailableCorrection);
 }
 
+void markMissingBatchTransformResult(
+    EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags unavailableCorrection
+) noexcept
+{
+    if (metadata.status == EphemerisResultStatus::Valid) {
+        metadata.status = EphemerisResultStatus::Degraded;
+    }
+    metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+    metadata.addUnavailableCorrection(unavailableCorrection);
+}
+
 void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
 {
     if (conversion.status == TimeScaleConversionStatus::Failed) {
@@ -584,6 +595,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
             outputVectors[resultIndex] = *transformResult.vector;
         }
+        const EphemerisCorrectionFlags unavailableCorrection =
+            isTopocentric ? (EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation)
+                          : EphemerisCorrectionFlags::PrecessionNutation;
+        for (std::size_t transformIndex = transformCount; transformIndex < transformResultIndices.size();
+             ++transformIndex) {
+            HighPrecisionCalculatorResult& result = results[transformResultIndices[transformIndex]].result;
+            markMissingBatchTransformResult(result.metadata, unavailableCorrection);
+        }
     }
 
     std::vector<std::optional<CelestialFrameVector>> equatorialVectors = outputVectors;
@@ -657,6 +676,11 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                     markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::EarthOrientation);
                 }
             }
+            for (std::size_t transformIndex = transformCount; transformIndex < gcrsResultIndices.size();
+                 ++transformIndex) {
+                HighPrecisionCalculatorResult& result = results[gcrsResultIndices[transformIndex]].result;
+                markMissingBatchTransformResult(result.metadata, EphemerisCorrectionFlags::EarthOrientation);
+            }
         }
 
         if (hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::PrecessionNutation)) {
@@ -693,6 +717,11 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                     } else {
                         markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::PrecessionNutation);
                     }
+                }
+                for (std::size_t transformIndex = transformCount; transformIndex < apparentResultIndices.size();
+                     ++transformIndex) {
+                    HighPrecisionCalculatorResult& result = results[apparentResultIndices[transformIndex]].result;
+                    markMissingBatchTransformResult(result.metadata, EphemerisCorrectionFlags::PrecessionNutation);
                 }
             }
         }
