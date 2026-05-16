@@ -557,8 +557,7 @@ void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSear
     const auto summary = calculator.compute(engine, request, 0U, body);
 
     QCOMPARE(engine.contextSampleCount, 0);
-    QVERIFY(engine.requestSampleCount > 0);
-    QVERIFY(engine.requestSampleCount < 120);
+    QCOMPARE(engine.requestSampleCount, 0);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);

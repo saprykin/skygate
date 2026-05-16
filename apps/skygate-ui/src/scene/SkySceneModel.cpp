@@ -3,6 +3,8 @@
 #include "SkyContextController.hpp"
 #include "SkyTimeController.hpp"
 
+#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
+
 #include <QElapsedTimer>
 #include <QLoggingCategory>
 
@@ -16,28 +18,6 @@ bool performanceLoggingEnabled()
 {
     static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
     return enabled;
-}
-
-[[nodiscard]] skygate::ephemeris::EphemerisRequest
-sceneRenderEphemerisRequest(skygate::ephemeris::EphemerisRequest request) noexcept
-{
-    if (request.options.engineKind != skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
-        return request;
-    }
-
-    using skygate::ephemeris::EphemerisCorrectionFlags;
-    EphemerisCorrectionFlags renderCorrections = EphemerisCorrectionFlags::PrecessionNutation
-                                                 | EphemerisCorrectionFlags::EarthOrientation
-                                                 | EphemerisCorrectionFlags::DiurnalParallax;
-    if (request.options.enableAtmosphericRefraction
-        && skygate::ephemeris::hasCorrectionFlag(
-            request.options.correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction
-        )) {
-        renderCorrections |= EphemerisCorrectionFlags::AtmosphericRefraction;
-    }
-
-    request.options.correctionFlags = renderCorrections;
-    return request;
 }
 
 }  // namespace
@@ -319,7 +299,9 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
         return std::nullopt;
     }
     const auto ephemerisRequestContext = m_skyContextController->ephemerisRequestContext();
-    const auto renderEphemerisRequest = sceneRenderEphemerisRequest(ephemerisRequestContext.request);
+    const auto renderEphemerisRequest = skygate::ephemeris::ephemerisRequestForPrecisionPolicy(
+        ephemerisRequestContext.request, skygate::ephemeris::EphemerisPrecisionPolicy::SceneRender
+    );
 
     return SkySceneCompositionInput{
         .frameInput =

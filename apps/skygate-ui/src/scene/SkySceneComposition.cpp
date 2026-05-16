@@ -2,6 +2,7 @@
 
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>
@@ -131,6 +132,24 @@ std::vector<SkyOverlayItem> renderLabelsToOverlayItems(const std::span<const Sky
 
 }  // namespace
 
+namespace {
+
+std::optional<skygate::ephemeris::EphemerisRequest> trailEphemerisRequestFor(
+    const std::optional<skygate::ephemeris::EphemerisRequest>& selectionRequest,
+    const std::optional<skygate::ephemeris::EphemerisRequest>& frameRequest
+) noexcept
+{
+    if (selectionRequest.has_value()) {
+        return skygate::ephemeris::ephemerisRequestForPrecisionPolicy(
+            *selectionRequest, skygate::ephemeris::EphemerisPrecisionPolicy::Trail
+        );
+    }
+
+    return frameRequest;
+}
+
+}  // namespace
+
 bool SkySceneComposer::CompositionKey::equals(const CompositionKey& other) const noexcept
 {
     return renderFrameGeneration == other.renderFrameGeneration && trailTargetBodyIndex == other.trailTargetBodyIndex
@@ -197,7 +216,8 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
                     .targetBody = trailTarget.body,
                     .targetState = trailTarget.state,
                     .skyContext = input.frameInput.skyContext,
-                    .ephemerisRequest = input.frameInput.ephemerisRequest,
+                    .ephemerisRequest =
+                        trailEphemerisRequestFor(input.selectionEphemerisRequest, input.frameInput.ephemerisRequest),
                     .renderTheme = input.frameInput.renderTheme,
                     .targetBodyIndex = *trailTargetBodyIndex,
                     .viewportWidth = input.viewportWidth,

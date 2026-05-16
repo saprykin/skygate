@@ -1,14 +1,12 @@
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
 #include "skygate/core/math/MathConstants.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <memory>
 
 namespace skygate::ephemeris {
 namespace {
@@ -92,85 +90,10 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
     return "Waning crescent";
 }
 
-[[nodiscard]] ObservationEventSummary computeEventSummary(
-    const ObservationEventCalculator& eventCalculator,
-    const IEphemerisEngine& ephemerisEngine,
-    const EphemerisRequest& request,
-    const std::uint32_t bodyIndex,
-    const CelestialBody* body,
-    const double crossingAltitudeDeg
-)
+[[nodiscard]] ObservationEventSearchMode observationSearchMode(const NightConditionsEventSearchMode mode) noexcept
 {
-    if (body != nullptr) {
-        return eventCalculator.compute(ephemerisEngine, request, bodyIndex, *body, crossingAltitudeDeg);
-    }
-
-    return eventCalculator.compute(ephemerisEngine, request, bodyIndex, crossingAltitudeDeg);
-}
-
-[[nodiscard]] ObservationEventSummary computeEventSummary(
-    const ObservationEventCalculator& eventCalculator,
-    const IEphemerisEngine& ephemerisEngine,
-    const EphemerisRequest& request,
-    const std::uint32_t bodyIndex,
-    const CelestialBody* body
-)
-{
-    if (body != nullptr) {
-        return eventCalculator.compute(ephemerisEngine, request, bodyIndex, *body);
-    }
-
-    return eventCalculator.compute(ephemerisEngine, request, bodyIndex);
-}
-
-[[nodiscard]] bool shouldUseApproximateEventEngine(const EphemerisRequest& request, const CelestialBody* body) noexcept
-{
-    return body != nullptr && request.options.engineKind == EphemerisEngineKind::HighPrecision;
-}
-
-[[nodiscard]] EphemerisRequest
-approximateEventRequest(const EphemerisRequest& request, const IEphemerisEngine& eventEngine) noexcept
-{
-    EphemerisRequest eventRequest = request;
-    eventRequest.options = eventEngine.options();
-    eventRequest.options.engineKind = eventEngine.kind();
-    return eventRequest;
-}
-
-[[nodiscard]] CelestialBody approximateEventBody(CelestialBody body)
-{
-    if (body.fixedEquatorial.has_value()) {
-        body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
-        return body;
-    }
-
-    if (body.ephemerisSource != CelestialBodyEphemerisSource::Unresolved) {
-        return body;
-    }
-
-    switch (body.type) {
-    case CelestialBodyType::Sun:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Sun;
-        break;
-    case CelestialBodyType::Moon:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Moon;
-        break;
-    case CelestialBodyType::Planet:
-        body.ephemerisSource = CelestialBodyEphemerisSource::Planet;
-        break;
-    case CelestialBodyType::Star:
-    case CelestialBodyType::Constellation:
-    case CelestialBodyType::DeepSkyObject:
-        break;
-    }
-
-    return body;
-}
-
-[[nodiscard]] std::unique_ptr<IEphemerisEngine> makeApproximateEventEngine(const CelestialBody& body)
-{
-    const std::array<CelestialBody, 1> bodies{approximateEventBody(body)};
-    return createEphemerisEngine(std::span<const CelestialBody>{bodies.data(), bodies.size()});
+    return mode == NightConditionsEventSearchMode::Verified ? ObservationEventSearchMode::Direct
+                                                            : ObservationEventSearchMode::Guided;
 }
 
 [[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
@@ -179,20 +102,23 @@ approximateEventRequest(const EphemerisRequest& request, const IEphemerisEngine&
     const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const CelestialBody* body,
-    const double crossingAltitudeDeg
+    const double crossingAltitudeDeg,
+    const NightConditionsEventSearchMode eventSearchMode
 )
 {
-    if (!shouldUseApproximateEventEngine(request, body)) {
-        return computeEventSummary(eventCalculator, ephemerisEngine, request, bodyIndex, body, crossingAltitudeDeg);
+    const EphemerisRequest eventRequest = ephemerisRequestForPrecisionPolicy(
+        request,
+        eventSearchMode == NightConditionsEventSearchMode::Verified
+            ? EphemerisPrecisionPolicy::NightConditionsVerified
+            : EphemerisPrecisionPolicy::NightConditionsApproximate
+    );
+    if (body != nullptr) {
+        return eventCalculator.compute(
+            ephemerisEngine, eventRequest, bodyIndex, *body, crossingAltitudeDeg, observationSearchMode(eventSearchMode)
+        );
     }
 
-    std::unique_ptr<IEphemerisEngine> eventEngine = makeApproximateEventEngine(*body);
-    if (eventEngine == nullptr) {
-        return computeEventSummary(eventCalculator, ephemerisEngine, request, bodyIndex, body, crossingAltitudeDeg);
-    }
-
-    const EphemerisRequest eventRequest = approximateEventRequest(request, *eventEngine);
-    return eventCalculator.compute(*eventEngine, eventRequest, 0U, *body, crossingAltitudeDeg);
+    return eventCalculator.compute(ephemerisEngine, eventRequest, bodyIndex, crossingAltitudeDeg);
 }
 
 [[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
@@ -200,20 +126,13 @@ approximateEventRequest(const EphemerisRequest& request, const IEphemerisEngine&
     const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
-    const CelestialBody* body
+    const CelestialBody* body,
+    const NightConditionsEventSearchMode eventSearchMode
 )
 {
-    if (!shouldUseApproximateEventEngine(request, body)) {
-        return computeEventSummary(eventCalculator, ephemerisEngine, request, bodyIndex, body);
-    }
-
-    std::unique_ptr<IEphemerisEngine> eventEngine = makeApproximateEventEngine(*body);
-    if (eventEngine == nullptr) {
-        return computeEventSummary(eventCalculator, ephemerisEngine, request, bodyIndex, body);
-    }
-
-    const EphemerisRequest eventRequest = approximateEventRequest(request, *eventEngine);
-    return eventCalculator.compute(*eventEngine, eventRequest, 0U, *body);
+    return computeEventSummaryForNightConditions(
+        eventCalculator, ephemerisEngine, request, bodyIndex, body, 0.0, eventSearchMode
+    );
 }
 
 }  // namespace
@@ -225,7 +144,15 @@ NightConditions NightConditionsCalculator::compute(
     const std::uint32_t moonBodyIndex
 ) const
 {
-    return compute(ephemerisEngine, requestFromContext(context, ephemerisEngine), sunBodyIndex, moonBodyIndex);
+    return compute(
+        ephemerisEngine,
+        requestFromContext(context, ephemerisEngine),
+        sunBodyIndex,
+        nullptr,
+        moonBodyIndex,
+        nullptr,
+        NightConditionsEventSearchMode::Approximate
+    );
 }
 
 NightConditions NightConditionsCalculator::compute(
@@ -238,7 +165,13 @@ NightConditions NightConditionsCalculator::compute(
 ) const
 {
     return compute(
-        ephemerisEngine, requestFromContext(context, ephemerisEngine), sunBodyIndex, sunBody, moonBodyIndex, moonBody
+        ephemerisEngine,
+        requestFromContext(context, ephemerisEngine),
+        sunBodyIndex,
+        &sunBody,
+        moonBodyIndex,
+        &moonBody,
+        NightConditionsEventSearchMode::Approximate
     );
 }
 
@@ -249,7 +182,15 @@ NightConditions NightConditionsCalculator::compute(
     const std::uint32_t moonBodyIndex
 ) const
 {
-    return compute(ephemerisEngine, request, sunBodyIndex, nullptr, moonBodyIndex, nullptr);
+    return compute(
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        nullptr,
+        moonBodyIndex,
+        nullptr,
+        NightConditionsEventSearchMode::Approximate
+    );
 }
 
 NightConditions NightConditionsCalculator::compute(
@@ -261,7 +202,28 @@ NightConditions NightConditionsCalculator::compute(
     const CelestialBody& moonBody
 ) const
 {
-    return compute(ephemerisEngine, request, sunBodyIndex, &sunBody, moonBodyIndex, &moonBody);
+    return compute(
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        &sunBody,
+        moonBodyIndex,
+        &moonBody,
+        NightConditionsEventSearchMode::Approximate
+    );
+}
+
+NightConditions NightConditionsCalculator::compute(
+    const IEphemerisEngine& ephemerisEngine,
+    const EphemerisRequest& request,
+    const std::uint32_t sunBodyIndex,
+    const CelestialBody& sunBody,
+    const std::uint32_t moonBodyIndex,
+    const CelestialBody& moonBody,
+    const NightConditionsEventSearchMode eventSearchMode
+) const
+{
+    return compute(ephemerisEngine, request, sunBodyIndex, &sunBody, moonBodyIndex, &moonBody, eventSearchMode);
 }
 
 NightConditions NightConditionsCalculator::compute(
@@ -270,7 +232,8 @@ NightConditions NightConditionsCalculator::compute(
     const std::uint32_t sunBodyIndex,
     const CelestialBody* sunBody,
     const std::uint32_t moonBodyIndex,
-    const CelestialBody* moonBody
+    const CelestialBody* moonBody,
+    const NightConditionsEventSearchMode eventSearchMode
 ) const
 {
     NightConditions conditions;
@@ -299,19 +262,26 @@ NightConditions NightConditionsCalculator::compute(
 
     const ObservationEventCalculator eventCalculator;
     const auto sunHorizon = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kSunriseSunsetAltitudeDeg
+        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kSunriseSunsetAltitudeDeg, eventSearchMode
     );
     const auto civil = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kCivilTwilightAltitudeDeg
+        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kCivilTwilightAltitudeDeg, eventSearchMode
     );
     const auto nautical = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kNauticalTwilightAltitudeDeg
+        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kNauticalTwilightAltitudeDeg, eventSearchMode
     );
     const auto astronomical = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kAstronomicalTwilightAltitudeDeg
+        eventCalculator,
+        ephemerisEngine,
+        request,
+        sunBodyIndex,
+        sunBody,
+        kAstronomicalTwilightAltitudeDeg,
+        eventSearchMode
     );
-    const auto moonHorizon =
-        computeEventSummaryForNightConditions(eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody);
+    const auto moonHorizon = computeEventSummaryForNightConditions(
+        eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, eventSearchMode
+    );
 
     const double lunarCycleFraction = normalizedLunarCycleFraction(request.epoch);
     conditions.valid = true;

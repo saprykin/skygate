@@ -37,6 +37,11 @@ struct ObservationEventSummary {
     ObservationCulmination culmination;
 };
 
+enum class ObservationEventSearchMode : std::uint8_t {
+    Guided,
+    Direct
+};
+
 class ObservationEventCalculator final {
 public:
     [[nodiscard]] ObservationEventSummary
@@ -80,6 +85,14 @@ public:
         std::uint32_t bodyIndex,
         const CelestialBody& body,
         double crossingAltitudeDeg
+    ) const;
+    [[nodiscard]] ObservationEventSummary compute(
+        const IEphemerisEngine& ephemerisEngine,
+        const EphemerisRequest& request,
+        std::uint32_t bodyIndex,
+        const CelestialBody& body,
+        double crossingAltitudeDeg,
+        ObservationEventSearchMode searchMode
     ) const;
 };
 

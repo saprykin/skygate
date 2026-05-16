@@ -96,6 +96,7 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/EphemerisDataSnapshot.hpp
     include/skygate/ephemeris/EphemerisEngineFactory.hpp
     include/skygate/ephemeris/EphemerisEngineQueries.hpp
+    include/skygate/ephemeris/EphemerisPrecisionPolicy.hpp
     include/skygate/ephemeris/IEphemerisEngine.hpp
     include/skygate/ephemeris/LeapSecondProvider.hpp
     include/skygate/ephemeris/NightConditionsCalculator.hpp

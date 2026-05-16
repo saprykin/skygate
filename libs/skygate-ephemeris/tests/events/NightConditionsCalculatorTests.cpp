@@ -219,7 +219,8 @@ private slots:
     void moonRiseSetAndIlluminationArePopulated();
     void lunarPhaseBucketsAreDeterministic();
     void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
-    void highPrecisionNightConditionsAvoidEventSearchSamples();
+    void highPrecisionNightConditionsUseGuidedEventSearch();
+    void verifiedHighPrecisionNightConditionsUseSelectedEngineSamples();
 };
 
 void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation()
@@ -341,7 +342,39 @@ void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTi
     QVERIFY(conditions.moonIlluminationPercent < 1.0);
 }
 
-void NightConditionsCalculatorTests::highPrecisionNightConditionsAvoidEventSearchSamples()
+void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventSearch()
+{
+    const std::vector<skygate::ephemeris::CelestialBody> bodies{
+        makeFixedBody("sun", 8.0, 20.0),
+        makeFixedBody("moon", 14.0, -8.0),
+    };
+    const GuidedNightEngine approximateEngine(bodies);
+    const GuidedNightEngine verifiedEngine(bodies);
+    const skygate::ephemeris::NightConditionsCalculator calculator;
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeZurichContext();
+    request.options = approximateEngine.options();
+
+    const auto approximateConditions = calculator.compute(approximateEngine, request, 0U, bodies[0], 1U, bodies[1]);
+    const auto verifiedConditions = calculator.compute(
+        verifiedEngine,
+        request,
+        0U,
+        bodies[0],
+        1U,
+        bodies[1],
+        skygate::ephemeris::NightConditionsEventSearchMode::Verified
+    );
+
+    QVERIFY(approximateConditions.valid);
+    QVERIFY(verifiedConditions.valid);
+    QCOMPARE(approximateEngine.contextSampleCount, 0);
+    QCOMPARE(verifiedEngine.contextSampleCount, 0);
+    QVERIFY(approximateEngine.requestSampleCount > 2);
+    QVERIFY(approximateEngine.requestSampleCount < verifiedEngine.requestSampleCount);
+}
+
+void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSelectedEngineSamples()
 {
     const std::vector<skygate::ephemeris::CelestialBody> bodies{
         makeFixedBody("sun", 8.0, 20.0),
@@ -349,12 +382,17 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsAvoidEventSearc
     };
     const GuidedNightEngine engine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeZurichContext();
+    request.options = engine.options();
 
-    const auto conditions = calculator.compute(engine, makeZurichContext(), 0U, bodies[0], 1U, bodies[1]);
+    const auto conditions = calculator.compute(
+        engine, request, 0U, bodies[0], 1U, bodies[1], skygate::ephemeris::NightConditionsEventSearchMode::Verified
+    );
 
     QVERIFY(conditions.valid);
+    QVERIFY(engine.requestSampleCount > 2);
     QCOMPARE(engine.contextSampleCount, 0);
-    QCOMPARE(engine.requestSampleCount, 2);
 }
 
 QTEST_APPLESS_MAIN(NightConditionsCalculatorTests)
