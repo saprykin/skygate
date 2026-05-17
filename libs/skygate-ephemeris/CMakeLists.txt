@@ -54,6 +54,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaAstrometry.cpp
     src/engine/highprecision/FrameTransformer.hpp
     src/engine/highprecision/FrameTransformer.cpp
+    src/engine/highprecision/HighPrecisionTextParser.hpp
+    src/engine/highprecision/HighPrecisionTextParser.cpp
     src/engine/highprecision/LeapSecondProvider.cpp
     src/engine/highprecision/SolarSystemStateCalculator.hpp
     src/engine/highprecision/SolarSystemStateCalculator.cpp

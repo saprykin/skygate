@@ -1,9 +1,9 @@
 #include "skygate/ephemeris/DeltaTProvider.hpp"
 
+#include "engine/highprecision/HighPrecisionTextParser.hpp"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
-#include <cctype>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -19,97 +19,10 @@ constexpr std::string_view kValidityRangeDisplayName = "Delta T data";
 constexpr std::string_view kAncientFallbackRangeId = "delta-t-ancient-fallback";
 constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T fallback model";
 
-[[nodiscard]] std::string_view trimAsciiWhitespace(std::string_view text) noexcept
+[[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
 {
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
-        text.remove_prefix(1U);
-    }
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
-        text.remove_suffix(1U);
-    }
-    return text;
-}
-
-[[nodiscard]] bool startsWith(std::string_view text, const std::string_view prefix) noexcept
-{
-    return text.size() >= prefix.size() && text.substr(0U, prefix.size()) == prefix;
-}
-
-[[nodiscard]] bool parseInt(const std::string_view text, int& value) noexcept
-{
-    const std::string_view trimmed = trimAsciiWhitespace(text);
-    if (trimmed.empty()) {
-        return false;
-    }
-
-    const char* begin = trimmed.data();
-    const char* end = begin + trimmed.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    return result.ec == std::errc{} && result.ptr == end;
-}
-
-[[nodiscard]] bool parseDouble(const std::string_view text, double& value) noexcept
-{
-    const std::string_view trimmed = trimAsciiWhitespace(text);
-    if (trimmed.empty()) {
-        return false;
-    }
-
-    const char* begin = trimmed.data();
-    const char* end = begin + trimmed.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    return result.ec == std::errc{} && result.ptr == end && std::isfinite(value);
-}
-
-[[nodiscard]] std::vector<std::string_view> splitAsciiWhitespace(std::string_view text)
-{
-    std::vector<std::string_view> tokens;
-    while (true) {
-        text = trimAsciiWhitespace(text);
-        if (text.empty()) {
-            break;
-        }
-
-        std::size_t end = 0U;
-        while (end < text.size() && std::isspace(static_cast<unsigned char>(text[end])) == 0) {
-            ++end;
-        }
-        tokens.push_back(text.substr(0U, end));
-        text.remove_prefix(end);
-    }
-    return tokens;
-}
-
-[[nodiscard]] std::optional<CivilDateTime> parseUtcDate(std::string_view text) noexcept
-{
-    text = trimAsciiWhitespace(text);
-    const std::size_t yearSearchStart = startsWith(text, "-") ? 1U : 0U;
-    const std::size_t firstDash = text.find('-', yearSearchStart);
-    const std::size_t secondDash =
-        firstDash == std::string_view::npos ? std::string_view::npos : text.find('-', firstDash + 1U);
-    if (firstDash == std::string_view::npos || secondDash == std::string_view::npos) {
-        return std::nullopt;
-    }
-
-    int year = 0;
-    int month = 0;
-    int day = 0;
-    if (!parseInt(text.substr(0U, firstDash), year)
-        || !parseInt(text.substr(firstDash + 1U, secondDash - firstDash - 1U), month)
-        || !parseInt(text.substr(secondDash + 1U), day)) {
-        return std::nullopt;
-    }
-
-    CivilDateTime dateTime;
-    dateTime.astronomicalYear = year;
-    dateTime.month = month;
-    dateTime.day = day;
-    dateTime.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(dateTime)) {
-        return std::nullopt;
-    }
-
-    return dateTime;
+    static const HighPrecisionTextParser parser;
+    return parser;
 }
 
 [[nodiscard]] CivilDateTime civilDateFromDecimalYear(const double decimalYear) noexcept
@@ -141,19 +54,6 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
 }
 
-[[nodiscard]] std::optional<std::string> metadataValue(const std::string_view line, const std::string_view key)
-{
-    const std::string prefix = "#@ " + std::string(key);
-    if (!startsWith(line, prefix)) {
-        return std::nullopt;
-    }
-    if (line.size() > prefix.size() && std::isspace(static_cast<unsigned char>(line[prefix.size()])) == 0) {
-        return std::nullopt;
-    }
-
-    return std::string(trimAsciiWhitespace(line.substr(prefix.size())));
-}
-
 [[nodiscard]] EphemerisDateRange makeRange(
     const std::string_view id,
     const std::string_view displayName,
@@ -172,7 +72,7 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 [[nodiscard]] std::optional<std::string>
 setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackStart)
 {
-    const std::optional<CivilDateTime> date = parseUtcDate(value);
+    const std::optional<CivilDateTime> date = textParser().parseUtcDate(value);
     const std::optional<AstronomicalEpoch> epoch = date.has_value() ? epochFromUtcDate(*date) : std::nullopt;
     if (!epoch.has_value()) {
         return "Delta T data contains malformed ancient fallback start metadata at line " + std::to_string(lineNumber)
@@ -191,7 +91,7 @@ setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size
 [[nodiscard]] std::optional<std::string>
 setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackEnd)
 {
-    const std::optional<CivilDateTime> date = parseUtcDate(value);
+    const std::optional<CivilDateTime> date = textParser().parseUtcDate(value);
     const std::optional<AstronomicalEpoch> epoch = date.has_value() ? epochFromUtcDate(*date) : std::nullopt;
     if (!epoch.has_value()) {
         return "Delta T data contains malformed ancient fallback end metadata at line " + std::to_string(lineNumber)
@@ -215,20 +115,20 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     bool& hasFallbackEnd
 )
 {
-    if (std::optional<std::string> value = metadataValue(line, "version"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
         if (!value->empty()) {
             info.version = std::move(*value);
         }
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "source"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "source"); value.has_value()) {
         if (!value->empty()) {
             info.provenance = std::move(*value);
         }
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "expires"); value.has_value()) {
-        const std::optional<CivilDateTime> expiresDate = parseUtcDate(*value);
+    if (std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
+        const std::optional<CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
         const std::optional<AstronomicalEpoch> expiresEpoch =
             expiresDate.has_value() ? epochFromUtcDate(*expiresDate) : std::nullopt;
         if (!expiresEpoch.has_value()) {
@@ -238,21 +138,25 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
         info.expiresAt = *expiresEpoch;
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "ancient_fallback_start"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_start");
+        value.has_value()) {
         return setFallbackStart(info, *value, lineNumber, hasFallbackStart);
     }
-    if (std::optional<std::string> value = metadataValue(line, "ancient_fallback_end"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_end");
+        value.has_value()) {
         return setFallbackEnd(info, *value, lineNumber, hasFallbackEnd);
     }
-    if (std::optional<std::string> value = metadataValue(line, "ancient_fallback_source"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_source");
+        value.has_value()) {
         DeltaTFallbackModelInfo fallback = info.ancientFallbackModel.value_or(DeltaTFallbackModelInfo{});
         fallback.provenance = std::move(*value);
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "ancient_fallback_delta_t_seconds"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_delta_t_seconds");
+        value.has_value()) {
         double seconds = 0.0;
-        if (!parseDouble(*value, seconds)) {
+        if (!textParser().parseFiniteDouble(*value, seconds)) {
             return "Delta T data contains malformed ancient fallback estimate metadata at line "
                    + std::to_string(lineNumber) + ".";
         }
@@ -262,10 +166,10 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "ancient_fallback_uncertainty_seconds");
+    if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_uncertainty_seconds");
         value.has_value()) {
         double seconds = 0.0;
-        if (!parseDouble(*value, seconds) || seconds < 0.0) {
+        if (!textParser().parseFiniteDouble(*value, seconds) || seconds < 0.0) {
             return "Delta T data contains malformed ancient fallback uncertainty metadata at line "
                    + std::to_string(lineNumber) + ".";
         }
@@ -281,7 +185,7 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
 
 [[nodiscard]] bool parseUsnoEntryLine(std::string_view line, DeltaTTableEntry& entry) noexcept
 {
-    const std::vector<std::string_view> columns = splitAsciiWhitespace(line);
+    const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(line);
     if (columns.size() < 2U) {
         return false;
     }
@@ -291,15 +195,16 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     int year = 0;
     int month = 0;
     int day = 1;
-    if (columns.size() >= 4U && parseInt(columns[0], year) && parseInt(columns[1], month) && parseInt(columns[2], day)
-        && month >= 1 && month <= 12 && parseDouble(columns[3], deltaTSeconds)) {
+    if (columns.size() >= 4U && textParser().parseInt(columns[0], year) && textParser().parseInt(columns[1], month)
+        && textParser().parseInt(columns[2], day) && month >= 1 && month <= 12
+        && textParser().parseFiniteDouble(columns[3], deltaTSeconds)) {
         effectiveDate.astronomicalYear = year;
         effectiveDate.month = month;
         effectiveDate.day = day;
         effectiveDate.timeScale = TimeScale::Utc;
     } else if (
-        columns.size() >= 3U && parseInt(columns[0], year) && parseInt(columns[1], month) && month >= 1 && month <= 12
-        && parseDouble(columns[2], deltaTSeconds)
+        columns.size() >= 3U && textParser().parseInt(columns[0], year) && textParser().parseInt(columns[1], month)
+        && month >= 1 && month <= 12 && textParser().parseFiniteDouble(columns[2], deltaTSeconds)
     ) {
         effectiveDate.astronomicalYear = year;
         effectiveDate.month = month;
@@ -307,7 +212,8 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
         effectiveDate.timeScale = TimeScale::Utc;
     } else {
         double decimalYear = 0.0;
-        if (!parseDouble(columns[0], decimalYear) || !parseDouble(columns[1], deltaTSeconds)) {
+        if (!textParser().parseFiniteDouble(columns[0], decimalYear)
+            || !textParser().parseFiniteDouble(columns[1], deltaTSeconds)) {
             return false;
         }
         effectiveDate = civilDateFromDecimalYear(decimalYear);
@@ -335,9 +241,9 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
         return parseUsnoEntryLine(line, entry);
     }
 
-    const std::optional<CivilDateTime> effectiveDate = parseUtcDate(line.substr(0U, comma));
+    const std::optional<CivilDateTime> effectiveDate = textParser().parseUtcDate(line.substr(0U, comma));
     double deltaTSeconds = 0.0;
-    if (!effectiveDate.has_value() || !parseDouble(line.substr(comma + 1U), deltaTSeconds)) {
+    if (!effectiveDate.has_value() || !textParser().parseFiniteDouble(line.substr(comma + 1U), deltaTSeconds)) {
         return false;
     }
 
@@ -354,7 +260,7 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
 
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
 {
-    return startsWith(line, "effective_utc_date");
+    return textParser().startsWith(line, "effective_utc_date");
 }
 
 [[nodiscard]] DeltaTDataLoadResult
@@ -500,11 +406,11 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
             line.remove_suffix(1U);
         }
 
-        line = trimAsciiWhitespace(line);
+        line = textParser().trimAsciiWhitespace(line);
         if (line.empty()) {
             continue;
         }
-        if (startsWith(line, "#@ ")) {
+        if (textParser().startsWith(line, "#@ ")) {
             if (std::optional<std::string> diagnosticText =
                     applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd);
                 diagnosticText.has_value()) {
@@ -512,7 +418,7 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
             }
             continue;
         }
-        if (startsWith(line, "#")) {
+        if (textParser().startsWith(line, "#")) {
             continue;
         }
         if (isHeaderLine(line)) {
