@@ -2,6 +2,7 @@
 
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ObserverGeodesy.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/ephemeris/EarthOrientationProvider.hpp"
 
@@ -17,9 +18,6 @@ namespace {
 
 constexpr double kRadiansPerHour = 3.141592653589793238462643383279502884 / 12.0;
 constexpr double kHoursPerRadian = 12.0 / 3.141592653589793238462643383279502884;
-constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
-constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
-constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 constexpr EphemerisMetadataMergeOptions kTransformMetadataMergeOptions{
     .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
     .mergeCorrections = true,
@@ -103,33 +101,6 @@ celestialVectorFromSolarSystemVector(const std::optional<SolarSystemKernelVector
         return std::nullopt;
     }
     return celestialVectorFromSolarSystemVector(*vector);
-}
-
-[[nodiscard]] std::optional<CelestialFrameVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept
-{
-    if (!observer.isValid()) {
-        return std::nullopt;
-    }
-
-    const double latitudeRad = core::AngleMath::toRadians(observer.latitudeDeg);
-    const double longitudeRad = core::AngleMath::toRadians(observer.longitudeDeg);
-    const double sinLatitude = std::sin(latitudeRad);
-    const double cosLatitude = std::cos(latitudeRad);
-    const double sinLongitude = std::sin(longitudeRad);
-    const double cosLongitude = std::cos(longitudeRad);
-    const double firstEccentricitySquared = kWgs84Flattening * (2.0 - kWgs84Flattening);
-    const double primeVerticalRadius =
-        kWgs84EquatorialRadiusMeters / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
-
-    const double xMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * cosLongitude;
-    const double yMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * sinLongitude;
-    const double zMeters =
-        (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
-    return CelestialFrameVector{
-        .x = xMeters / kAstronomicalUnitMeters,
-        .y = yMeters / kAstronomicalUnitMeters,
-        .z = zMeters / kAstronomicalUnitMeters,
-    };
 }
 
 [[nodiscard]] CelestialFrameVector
@@ -321,7 +292,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         const std::optional<CelestialFrameVector> observerPosition =
             input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared
                 ? celestialVectorFromSolarSystemVector(input.preparedRequestState->observerItrsPositionAu)
-                : observerItrsPositionAu(input.request.context.observer);
+                : celestialVectorFromSolarSystemVector(observerItrsPositionAu(input.request.context.observer));
         if (!observerPosition.has_value()) {
             if (result.metadata.status == EphemerisResultStatus::Valid) {
                 result.metadata.status = EphemerisResultStatus::Degraded;
@@ -588,7 +559,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         const std::optional<CelestialFrameVector> observerPosition =
             preparedRequestState != nullptr && preparedRequestState->topocentricStatePrepared
                 ? celestialVectorFromSolarSystemVector(preparedRequestState->observerItrsPositionAu)
-                : observerItrsPositionAu(request.context.observer);
+                : celestialVectorFromSolarSystemVector(observerItrsPositionAu(request.context.observer));
         for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
             if (!outputVectors[resultIndex].has_value()) {
                 continue;

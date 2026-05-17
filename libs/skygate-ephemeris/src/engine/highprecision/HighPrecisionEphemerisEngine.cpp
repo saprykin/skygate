@@ -3,6 +3,7 @@
 #include "StringUtilities.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
+#include "engine/highprecision/ObserverGeodesy.hpp"
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 
 #include <cmath>
@@ -20,9 +21,6 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
-constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
-constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
-constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 
@@ -59,33 +57,6 @@ constexpr int kNaifSolarSystemBarycenter = 0;
 [[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
 {
     return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax);
-}
-
-[[nodiscard]] std::optional<SolarSystemKernelVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept
-{
-    if (!observer.isValid()) {
-        return std::nullopt;
-    }
-
-    const double latitudeRad = observer.latitudeDeg * 3.141592653589793238462643383279502884 / 180.0;
-    const double longitudeRad = observer.longitudeDeg * 3.141592653589793238462643383279502884 / 180.0;
-    const double sinLatitude = std::sin(latitudeRad);
-    const double cosLatitude = std::cos(latitudeRad);
-    const double sinLongitude = std::sin(longitudeRad);
-    const double cosLongitude = std::cos(longitudeRad);
-    const double firstEccentricitySquared = kWgs84Flattening * (2.0 - kWgs84Flattening);
-    const double primeVerticalRadius =
-        kWgs84EquatorialRadiusMeters / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
-
-    const double xMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * cosLongitude;
-    const double yMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * sinLongitude;
-    const double zMeters =
-        (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
-    return SolarSystemKernelVector{
-        .xAu = xMeters / kAstronomicalUnitMeters,
-        .yAu = yMeters / kAstronomicalUnitMeters,
-        .zAu = zMeters / kAstronomicalUnitMeters,
-    };
 }
 
 void mergeKernelEpochTimeScaleMetadata(
