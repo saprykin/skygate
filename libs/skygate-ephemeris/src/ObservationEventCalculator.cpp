@@ -1,6 +1,7 @@
 #include "skygate/ephemeris/ObservationEventCalculator.hpp"
 
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
@@ -23,8 +24,6 @@ constexpr int kSearchHorizonSeconds = 72 * 60 * 60;
 constexpr int kRefinementToleranceSeconds = 1;
 constexpr int kGuidedRefinementToleranceSeconds = 60;
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;
-constexpr double kUnixEpochJulianDay = 2'440'587.5;
-constexpr double kSecondsPerDay = 86'400.0;
 
 struct AltitudeSample final {
     core::UtcTimePoint utcTime;
@@ -47,42 +46,10 @@ struct AltitudeSamples final {
     return utcTime + std::chrono::seconds(seconds);
 }
 
-[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
-{
-    const double julianDay =
-        kUnixEpochJulianDay + static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay;
-    const double julianDatePart1 = std::floor(julianDay);
-    return AstronomicalEpoch{
-        .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 = julianDay - julianDatePart1,
-        .timeScale = TimeScale::Utc,
-    };
-}
-
 [[nodiscard]] EphemerisRequest
 requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephemerisEngine) noexcept
 {
-    EphemerisRequest request;
-    request.context = context;
-    request.epoch = epochFromUtcTime(context.utcTime);
-    request.options = ephemerisEngine.options();
-    return request;
-}
-
-[[nodiscard]] EphemerisRequest
-requestAtUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& utcTime) noexcept
-{
-    EphemerisRequest request = baseRequest;
-    const double offsetSeconds = std::chrono::duration<double>(utcTime - baseRequest.context.utcTime).count();
-    request.context.utcTime = utcTime;
-    request.epoch = normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = baseRequest.epoch.julianDatePart1,
-            .julianDatePart2 = baseRequest.epoch.julianDatePart2 + offsetSeconds / kSecondsPerDay,
-            .timeScale = baseRequest.epoch.timeScale,
-        }
-    );
-    return request;
+    return EphemerisRequestFactory::fromContext(context, ephemerisEngine.options());
 }
 
 [[nodiscard]] std::optional<double> altitudeAt(
@@ -92,7 +59,7 @@ requestAtUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& 
     const core::UtcTimePoint& utcTime
 )
 {
-    const auto request = requestAtUtcTime(baseRequest, utcTime);
+    const auto request = EphemerisRequestFactory::atUtcTime(baseRequest, utcTime);
     const auto state = ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(bodyIndex));
     if (!state.has_value() || !state->horizontal.isFinite()) {
         return std::nullopt;

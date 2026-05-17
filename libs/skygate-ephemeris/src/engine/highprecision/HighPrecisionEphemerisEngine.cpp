@@ -2,8 +2,8 @@
 
 #include "StringUtilities.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
+#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -19,8 +19,6 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
-constexpr double kSecondsPerDay = 86'400.0;
-constexpr double kUnixEpochJulianDay = 2'440'587.5;
 constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
 constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
 constexpr double kWgs84Flattening = 1.0 / 298.257223563;
@@ -30,18 +28,6 @@ constexpr int kNaifSolarSystemBarycenter = 0;
 [[nodiscard]] bool hasValidEpoch(const AstronomicalEpoch& epoch) noexcept
 {
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
-[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
-{
-    const double julianDay =
-        static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay + kUnixEpochJulianDay;
-    const double julianDatePart1 = std::floor(julianDay);
-    return AstronomicalEpoch{
-        .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 = julianDay - julianDatePart1,
-        .timeScale = TimeScale::Utc,
-    };
 }
 
 [[nodiscard]] bool isSolarSystemBody(const CelestialBody& body) noexcept
@@ -483,11 +469,7 @@ HighPrecisionEphemerisEngine::computeBodyState(const core::SkyContext& context, 
 
 EphemerisRequest HighPrecisionEphemerisEngine::makeCompatibilityRequest(const core::SkyContext& context) const noexcept
 {
-    EphemerisRequest request;
-    request.epoch = epochFromUtcTime(context.utcTime);
-    request.context = context;
-    request.options = m_options;
-    return request;
+    return EphemerisRequestFactory::fromContext(context, m_options);
 }
 
 std::shared_ptr<const PreparedEphemerisRequestState>

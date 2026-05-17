@@ -1,4 +1,5 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <QtTest/QtTest>
@@ -22,11 +23,10 @@ namespace {
         .id = "vega",
         .displayName = "Vega",
         .type = skygate::ephemeris::CelestialBodyType::Star,
-        .fixedEquatorial =
-            skygate::core::EquatorialCoordinate{
-                .rightAscensionHours = 18.6156,
-                .declinationDeg = 38.7837,
-            },
+        .fixedEquatorial = skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = 18.6156,
+            .declinationDeg = 38.7837,
+        },
     };
 }
 
@@ -53,6 +53,7 @@ private slots:
     void constructsHighPrecisionModelDefaults();
     void combinesCorrectionFlags();
     void constructsRequestAndDataSetModels();
+    void constructsRequestsWithFactory();
     void constructsCatalogStarAstrometryModel();
     void constructsAndNormalizesAstronomicalTimePrimitives();
     void convertsCivilDatesAndDefinesNoYearZeroPolicy();
@@ -90,9 +91,11 @@ void EphemerisApiModelTests::constructsHighPrecisionModelDefaults()
     QVERIFY(options.enableAtmosphericRefraction);
     QVERIFY(options.atmosphericPressureHpa > 0.0);
     QVERIFY(options.observingWavelengthMicrometers > 0.0);
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
-    ));
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
+        )
+    );
 
     skygate::ephemeris::EphemerisCapabilities capabilities;
     QCOMPARE(
@@ -117,24 +120,29 @@ void EphemerisApiModelTests::combinesCorrectionFlags()
     QVERIFY(
         skygate::ephemeris::hasCorrectionFlag(flags, skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration)
     );
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(flags, skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax)
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(flags, skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax)
     );
     QVERIFY(!skygate::ephemeris::hasCorrectionFlag(
         flags, skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
     ));
 
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        skygate::ephemeris::EphemerisCorrectionFlags::Astrometric,
-        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
-    ));
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            skygate::ephemeris::EphemerisCorrectionFlags::Astrometric,
+            skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        )
+    );
     QVERIFY(!skygate::ephemeris::hasCorrectionFlag(
         skygate::ephemeris::EphemerisCorrectionFlags::Astrometric,
         skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax
     ));
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric,
-        skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
-    ));
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric,
+            skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
+        )
+    );
 }
 
 void EphemerisApiModelTests::constructsRequestAndDataSetModels()
@@ -182,6 +190,44 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
     QCOMPARE(
         static_cast<std::uint8_t>(dataSet.dateRanges.front().start.timeScale),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
+    );
+}
+
+void EphemerisApiModelTests::constructsRequestsWithFactory()
+{
+    skygate::core::SkyContext context;
+    context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::fromContext(context, options);
+    QVERIFY(skygate::ephemeris::EphemerisRequestFactory::hasExplicitEpoch(request.epoch));
+    QCOMPARE(
+        static_cast<std::uint8_t>(request.options.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+    );
+    QCOMPARE(
+        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(request).utcTime.time_since_epoch().count(),
+        1'704'067'200
+    );
+
+    const auto shiftedUtc = context.utcTime + std::chrono::seconds(90);
+    const skygate::ephemeris::EphemerisRequest shiftedRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, shiftedUtc);
+    QCOMPARE(shiftedRequest.context.utcTime.time_since_epoch().count(), 1'704'067'290);
+    QCOMPARE(
+        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(shiftedRequest)
+            .utcTime.time_since_epoch()
+            .count(),
+        1'704'067'290
+    );
+    QCOMPARE(
+        static_cast<std::uint32_t>(shiftedRequest.options.correctionFlags),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Apparent)
     );
 }
 
@@ -423,12 +469,16 @@ void EphemerisApiModelTests::constructsFactoryResultAndCreationDiagnostics()
         QVERIFY(!skygate::ephemeris::displayName(status).empty());
     }
 
-    QVERIFY(skygate::ephemeris::isFactoryCreationSuccess(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedRequestedEngine
-    ));
-    QVERIFY(skygate::ephemeris::isFactoryCreationSuccess(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback
-    ));
+    QVERIFY(
+        skygate::ephemeris::isFactoryCreationSuccess(
+            skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedRequestedEngine
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::isFactoryCreationSuccess(
+            skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback
+        )
+    );
     QVERIFY(!skygate::ephemeris::isFactoryCreationSuccess(
         skygate::ephemeris::EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable
     ));
@@ -524,11 +574,12 @@ void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
     QVERIFY(emptyBraceEngine->compute(context).states.empty());
 
     const std::array bodies{makeFactoryTestBody()};
-    const auto spanEngine =
-        skygate::ephemeris::createEphemerisEngine(std::span<const skygate::ephemeris::CelestialBody>{
+    const auto spanEngine = skygate::ephemeris::createEphemerisEngine(
+        std::span<const skygate::ephemeris::CelestialBody>{
             bodies.data(),
             bodies.size(),
-        });
+        }
+    );
     QVERIFY(spanEngine != nullptr);
 
     const auto spanState = spanEngine->computeBodyState(context, "vega");
@@ -630,15 +681,21 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
     QVERIFY(metadata.effectiveDataValidityRange.has_value());
     QVERIFY(metadata.effectiveDataValidityRange->id == std::string{"modern"});
     QVERIFY(metadata.dataSourceProvenance == std::string{"test source"});
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
-    ));
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        metadata.unavailableCorrections, skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration
-    ));
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        metadata.skippedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::GravitationalLightDeflection
-    ));
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            metadata.unavailableCorrections, skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            metadata.skippedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::GravitationalLightDeflection
+        )
+    );
 }
 
 void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
@@ -650,11 +707,10 @@ void EphemerisApiModelTests::keepsLegacyBodyStateFieldsReadableWithMetadata()
                 .rightAscensionHours = 12.5,
                 .declinationDeg = -4.0,
             },
-        .horizontal =
-            {
-                .altitudeDeg = 30.0,
-                .azimuthDeg = 180.0,
-            },
+        .horizontal = {
+            .altitudeDeg = 30.0,
+            .azimuthDeg = 180.0,
+        },
     };
 
     QCOMPARE(state.bodyIndex, 42U);

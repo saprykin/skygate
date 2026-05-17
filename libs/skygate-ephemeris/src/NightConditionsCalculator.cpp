@@ -2,6 +2,7 @@
 
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
+#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
@@ -17,34 +18,16 @@ constexpr double kNauticalTwilightAltitudeDeg = -12.0;
 constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
 constexpr double kKnownNewMoonJulianDay = 2451550.1;
 constexpr double kSynodicMonthDays = 29.530588853;
-constexpr double kUnixEpochJulianDay = 2'440'587.5;
-constexpr double kSecondsPerDay = 86'400.0;
 
 [[nodiscard]] ObservationEvent unavailableEvent() noexcept
 {
     return ObservationEvent{.status = ObservationEventStatus::Unresolved};
 }
 
-[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
-{
-    const double julianDay =
-        kUnixEpochJulianDay + static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay;
-    const double julianDatePart1 = std::floor(julianDay);
-    return AstronomicalEpoch{
-        .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 = julianDay - julianDatePart1,
-        .timeScale = TimeScale::Utc,
-    };
-}
-
 [[nodiscard]] EphemerisRequest
 requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephemerisEngine) noexcept
 {
-    EphemerisRequest request;
-    request.context = context;
-    request.epoch = epochFromUtcTime(context.utcTime);
-    request.options = ephemerisEngine.options();
-    return request;
+    return EphemerisRequestFactory::fromContext(context, ephemerisEngine.options());
 }
 
 [[nodiscard]] double normalizedLunarCycleFraction(const AstronomicalEpoch& epoch) noexcept
