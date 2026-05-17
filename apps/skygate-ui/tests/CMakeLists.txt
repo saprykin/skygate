@@ -238,6 +238,12 @@ target_include_directories(skygate-ui-performance-guard-tests
         ${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src
 )
 add_skygate_ui_qtest(
+    skygate-ui-resource-diagnostics-tests
+    diagnostics/ResourceDiagnosticsTests.cpp
+    LABELS "integration;platform"
+    TIMEOUT 45
+)
+add_skygate_ui_qtest(
     skygate-ui-sky-catalog-manager-tests
     catalog/SkyCatalogManagerTests.cpp
     LABELS integration

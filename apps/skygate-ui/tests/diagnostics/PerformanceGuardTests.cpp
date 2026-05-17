@@ -1,13 +1,10 @@
 #include <QtTest>
 
-#include "LocationCatalogModel.hpp"
-#include "MacDockIcon.hpp"
 #include "SkyContextController.hpp"
 #include "SkyHitTargetIndex.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneModel.hpp"
-#include "SkyTheme.hpp"
 
 #include "skygate/core/math/ViewportMath.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
@@ -38,8 +35,6 @@ private slots:
     void searchesLargeMixedCatalogWithinGuardrail();
     void hitTestsDenseRenderFrameWithinGuardrail();
     void buildsManyObjectTrailsWithinGuardrail();
-    void packagedResourceDependenciesResolve();
-    void platformNativeHooksTolerateEmptyInputs();
 };
 
 namespace {
@@ -812,26 +807,6 @@ void PerformanceGuardTests::buildsManyObjectTrailsWithinGuardrail()
 
     QVERIFY(!frame.lines.empty());
     verifyElapsedBelow(elapsedMs, kManyTrailsBudgetMs, "many object trails");
-}
-
-void PerformanceGuardTests::packagedResourceDependenciesResolve()
-{
-    const skygate::ui::internal::SkyThemeRepository themeRepository;
-    QVERIFY(themeRepository.themeOptions().size() >= 2);
-    QVERIFY(themeRepository.defaultTheme().ui.windowBackground.isValid());
-
-    LocationCatalogModel locations;
-    QVERIFY(locations.rowCount() > 0);
-    QVERIFY(!locations.index(0, 0).data(LocationCatalogModel::DisplayTextRole).toString().isEmpty());
-}
-
-void PerformanceGuardTests::platformNativeHooksTolerateEmptyInputs()
-{
-#ifdef Q_OS_MACOS
-    skygate::ui::setMacDockIcon(QString());
-#else
-    QSKIP("Mac dock icon hook is only built on macOS.");
-#endif
 }
 
 QTEST_GUILESS_MAIN(PerformanceGuardTests)
