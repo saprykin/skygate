@@ -29,10 +29,10 @@
       "bodyType": "moon",
       "inputGcrsPositionAu": [-2.445869295660694E-03, 9.823850946685398E-04, 5.681703014143443E-04],
       "expected": {
-        "rightAscensionHours": 10.606722222222222,
-        "declinationDegrees": 11.94138888888889,
-        "azimuthDegrees": 358.244549,
-        "altitudeDegrees": -40.267140
+        "rightAscensionHours": 10.561690106010,
+        "declinationDegrees": 11.359461178142,
+        "azimuthDegrees": 359.100975523458,
+        "altitudeDegrees": -40.861338234375
       }
     },
     {
@@ -41,10 +41,10 @@
       "bodyType": "sun",
       "inputGcrsPositionAu": [1.657677842988369E-01, -8.892608942214589E-01, -3.855228870896648E-01],
       "expected": {
-        "rightAscensionHours": 18.72794722222222,
-        "declinationDegrees": -23.060305555555554,
-        "azimuthDegrees": 231.244636,
-        "altitudeDegrees": 9.099448
+        "rightAscensionHours": 18.727968223817,
+        "declinationDegrees": -23.062453492345,
+        "azimuthDegrees": 231.242973997067,
+        "altitudeDegrees": 9.098034374577
       }
     },
     {
@@ -53,10 +53,10 @@
       "bodyType": "planet",
       "inputGcrsPositionAu": [-1.279287704851753E-01, -2.211361226673583E+00, -9.840204340295925E-01],
       "expected": {
-        "rightAscensionHours": 17.803575,
-        "declinationDegrees": -23.962083333333332,
-        "azimuthDegrees": 239.585469,
-        "altitudeDegrees": -0.560969
+        "rightAscensionHours": 17.803556160302,
+        "declinationDegrees": -23.962928830467,
+        "azimuthDegrees": 239.585022340117,
+        "altitudeDegrees": -0.561738400781
       }
     }
   ]
