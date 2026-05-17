@@ -13,8 +13,8 @@
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
 #include "engine/simple/SunEquatorialCalculator.hpp"
+#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -35,43 +35,6 @@ constexpr std::string_view kSimpleDataSourceProvenance = "Simple ephemeris engin
 constexpr std::string_view kSimpleEngineName = "Simple ephemeris engine";
 constexpr std::string_view kSimpleDataSetId = "simple";
 constexpr std::string_view kSimpleDataSetVersion = "built-in";
-constexpr double kSecondsPerDay = 86'400.0;
-constexpr double kUnixEpochJulianDay = 2'440'587.5;
-
-[[nodiscard]] bool hasExplicitEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2)
-           && (epoch.julianDatePart1 != 0.0 || epoch.julianDatePart2 != 0.0);
-}
-
-[[nodiscard]] core::UtcTimePoint utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    const double julianDay = epoch.julianDatePart1 + epoch.julianDatePart2;
-    const double epochSeconds = std::round((julianDay - kUnixEpochJulianDay) * kSecondsPerDay);
-    return core::UtcTimePoint(std::chrono::seconds(static_cast<std::int64_t>(epochSeconds)));
-}
-
-[[nodiscard]] AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
-{
-    const double julianDay =
-        static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay + kUnixEpochJulianDay;
-    const double julianDatePart1 = std::floor(julianDay);
-    return AstronomicalEpoch{
-        .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 = julianDay - julianDatePart1,
-        .timeScale = TimeScale::Utc,
-    };
-}
-
-[[nodiscard]] core::SkyContext contextFromRequest(const EphemerisRequest& request) noexcept
-{
-    core::SkyContext context = request.context;
-    if (request.epoch.timeScale == TimeScale::Utc && hasExplicitEpoch(request.epoch)) {
-        context.utcTime = utcTimeFromEpoch(request.epoch);
-    }
-
-    return context;
-}
 
 [[nodiscard]] bool requestsUnsupportedSimpleOptions(const EphemerisEngineOptions& options) noexcept
 {
@@ -284,7 +247,7 @@ public:
 
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override
     {
-        SkySnapshot snapshot = computeSnapshot(contextFromRequest(request));
+        SkySnapshot snapshot = computeSnapshot(EphemerisRequestFactory::contextFromRequest(request));
         markUnsupportedSimpleOptions(snapshot, request.options);
         return snapshot;
     }
@@ -292,7 +255,8 @@ public:
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, const std::string_view bodyId) const override
     {
-        std::optional<CelestialBodyState> state = computeBodyStateById(contextFromRequest(request), bodyId);
+        std::optional<CelestialBodyState> state =
+            computeBodyStateById(EphemerisRequestFactory::contextFromRequest(request), bodyId);
         if (state.has_value()) {
             markUnsupportedSimpleOptions(*state, request.options);
         }
@@ -306,7 +270,9 @@ public:
             return std::nullopt;
         }
 
-        CelestialBodyState state = computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, contextFromRequest(request));
+        CelestialBodyState state = computeStateForBody(
+            (*m_bodies)[bodyIndex], bodyIndex, EphemerisRequestFactory::contextFromRequest(request)
+        );
         markUnsupportedSimpleOptions(state, request.options);
         return state;
     }
@@ -331,11 +297,7 @@ public:
 private:
     [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept
     {
-        EphemerisRequest request;
-        request.epoch = epochFromUtcTime(context.utcTime);
-        request.context = context;
-        request.options = options();
-        return request;
+        return EphemerisRequestFactory::fromContext(context, options());
     }
 
     [[nodiscard]] SkySnapshot computeSnapshot(const core::SkyContext& context) const

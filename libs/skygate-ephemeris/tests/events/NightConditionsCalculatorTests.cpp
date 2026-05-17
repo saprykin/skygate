@@ -1,5 +1,6 @@
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 #include "skygate/ephemeris/NightConditionsCalculator.hpp"
 
 #include <QtTest/QtTest>
@@ -351,9 +352,8 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
     const GuidedNightEngine approximateEngine(bodies);
     const GuidedNightEngine verifiedEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
-    skygate::ephemeris::EphemerisRequest request;
-    request.context = makeZurichContext();
-    request.options = approximateEngine.options();
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), approximateEngine.options());
 
     const auto approximateConditions = calculator.compute(approximateEngine, request, 0U, bodies[0], 1U, bodies[1]);
     const auto verifiedConditions = calculator.compute(
@@ -370,7 +370,7 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
     QVERIFY(verifiedConditions.valid);
     QCOMPARE(approximateEngine.contextSampleCount, 0);
     QCOMPARE(verifiedEngine.contextSampleCount, 0);
-    QVERIFY(approximateEngine.requestSampleCount > 2);
+    QCOMPARE(approximateEngine.requestSampleCount, 2);
     QVERIFY(approximateEngine.requestSampleCount < verifiedEngine.requestSampleCount);
 }
 
@@ -382,9 +382,8 @@ void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSele
     };
     const GuidedNightEngine engine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
-    skygate::ephemeris::EphemerisRequest request;
-    request.context = makeZurichContext();
-    request.options = engine.options();
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), engine.options());
 
     const auto conditions = calculator.compute(
         engine, request, 0U, bodies[0], 1U, bodies[1], skygate::ephemeris::NightConditionsEventSearchMode::Verified
