@@ -48,6 +48,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/EphemerisDataManifest.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
     src/engine/highprecision/EphemerisComputationCache.cpp
+    src/engine/highprecision/EphemerisMetadataMerge.hpp
+    src/engine/highprecision/EphemerisMetadataMerge.cpp
     src/engine/highprecision/EphemerisResultBuilder.hpp
     src/engine/highprecision/EphemerisResultBuilder.cpp
     src/engine/highprecision/ErfaAstrometry.hpp

@@ -1,5 +1,6 @@
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 
 #include <cmath>
@@ -74,16 +75,6 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
            || hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
            || hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax)
            || hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax);
-}
-
-void markCorrectionUnavailable(
-    EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags unavailableCorrection
-) noexcept
-{
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-    }
-    metadata.addUnavailableCorrection(unavailableCorrection);
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult makeFailedResult() noexcept
@@ -254,45 +245,6 @@ void markCorrectionUnavailable(
     };
 }
 
-void mergeKernelMetadata(EphemerisResultMetadata& target, const EphemerisResultMetadata& source) noexcept
-{
-    if (source.status == EphemerisResultStatus::Failed) {
-        target.status = EphemerisResultStatus::Failed;
-    } else if (source.status == EphemerisResultStatus::OutOfRange) {
-        target.status = EphemerisResultStatus::OutOfRange;
-    } else if (source.status == EphemerisResultStatus::Unsupported) {
-        target.status = EphemerisResultStatus::Unsupported;
-    } else if (source.status == EphemerisResultStatus::Degraded && target.status == EphemerisResultStatus::Valid) {
-        target.status = EphemerisResultStatus::Degraded;
-    }
-
-    target.warningCodeMask |= source.warningCodeMask;
-    if (target.dataSourceProvenance.empty()) {
-        target.dataSourceProvenance = source.dataSourceProvenance;
-    }
-    if (!target.effectiveDataValidityRange.has_value()) {
-        target.effectiveDataValidityRange = source.effectiveDataValidityRange;
-    }
-    if (!target.estimatedAngularUncertaintyArcsec.has_value()) {
-        target.estimatedAngularUncertaintyArcsec = source.estimatedAngularUncertaintyArcsec;
-    }
-}
-
-void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
-{
-    if (conversion.status == TimeScaleConversionStatus::Failed) {
-        if (metadata.status == EphemerisResultStatus::Valid) {
-            metadata.status = EphemerisResultStatus::Degraded;
-        }
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return;
-    }
-    if (conversion.status == TimeScaleConversionStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
-    }
-}
-
 [[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
     EphemerisResultMetadata& metadata,
     const AstronomicalEpoch& epoch,
@@ -311,7 +263,7 @@ void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleCo
     }
 
     const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, TimeScale::Tdb);
-    mergeTimeScaleMetadata(metadata, conversion);
+    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
     if (!conversion.isSuccess()) {
         return std::nullopt;
     }
@@ -330,7 +282,9 @@ void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleCo
         return tdbEpochForKernel(metadata, epoch, timeScaleService);
     }
 
-    mergeKernelMetadata(metadata, preparedState->tdbKernelEpochMetadata);
+    EphemerisMetadataMerger::merge(
+        metadata, preparedState->tdbKernelEpochMetadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+    );
     return preparedState->tdbKernelEpoch;
 }
 
@@ -354,18 +308,18 @@ void recordUnavailableRequestedFields(
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::ProperMotion)
         && (!hasFiniteOptionalValue(astrometry.properMotionRightAscensionMasPerYear)
             || !hasFiniteOptionalValue(astrometry.properMotionDeclinationMasPerYear))) {
-        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::ProperMotion);
+        EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::ProperMotion);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::StellarParallax) && !hasPositiveParallax(astrometry)) {
-        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::StellarParallax);
+        EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::StellarParallax);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::AnnualParallax) && !hasPositiveParallax(astrometry)) {
-        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::AnnualParallax);
+        EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::AnnualParallax);
     }
     if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::RadialVelocity)
         && (!hasFiniteOptionalValue(astrometry.radialVelocityKmPerSecond)
             || !hasEnabledPositiveParallax(astrometry, flags))) {
-        markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::RadialVelocity);
+        EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::RadialVelocity);
     }
 }
 
@@ -444,18 +398,24 @@ void recordAppliedCorrections(
 
     if (hasAnnualParallaxInput(*astrometry, flags)) {
         if (kernelProvider == nullptr) {
-            markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
+            EphemerisMetadataMerger::markCorrectionUnavailable(
+                result.metadata, EphemerisCorrectionFlags::AnnualParallax
+            );
             result.equatorial = equatorialFromVector(*propagatedVector);
         } else {
             const std::optional<AstronomicalEpoch> kernelEpoch =
                 tdbEpochForKernel(result.metadata, request.epoch, timeScaleService, preparedState);
             if (!kernelEpoch.has_value()) {
-                markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
+                EphemerisMetadataMerger::markCorrectionUnavailable(
+                    result.metadata, EphemerisCorrectionFlags::AnnualParallax
+                );
                 result.equatorial = equatorialFromVector(*propagatedVector);
             } else {
                 const SolarSystemKernelStateResult earthState =
                     earthStateForAnnualParallax(*kernelEpoch, kernelProvider, preparedState);
-                mergeKernelMetadata(result.metadata, earthState.metadata);
+                EphemerisMetadataMerger::merge(
+                    result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
+                );
                 if (earthState.positionAu.has_value()) {
                     const CartesianVector geocentricVector =
                         subtractVectors(*propagatedVector, cartesianFromSolarSystemVector(*earthState.positionAu));
@@ -464,7 +424,9 @@ void recordAppliedCorrections(
                     result.metadata.appliedCorrections |= EphemerisCorrectionFlags::AnnualParallax;
                 } else {
                     result.metadata.status = EphemerisResultStatus::Degraded;
-                    markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::AnnualParallax);
+                    EphemerisMetadataMerger::markCorrectionUnavailable(
+                        result.metadata, EphemerisCorrectionFlags::AnnualParallax
+                    );
                     result.equatorial = equatorialFromVector(*propagatedVector);
                 }
             }
@@ -545,12 +507,19 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
     for (std::size_t arrayIndex = 0U; arrayIndex < arrays.size(); ++arrayIndex) {
         const std::optional<CatalogStarAstrometry> astrometry = astrometryFromArrays(arrays, arrayIndex);
         const std::optional<core::EquatorialCoordinate> fixedEquatorial = arrays.fixedEquatorialFallback(arrayIndex);
-        results.push_back(StarAstrometryBatchResult{
-            .bodyIndex = arrays.bodyIndices()[arrayIndex],
-            .result = calculateStarAstrometry(
-                request, astrometry, fixedEquatorial, m_kernelProvider, m_timeScaleService, preparedRequestState.get()
-            ),
-        });
+        results.push_back(
+            StarAstrometryBatchResult{
+                .bodyIndex = arrays.bodyIndices()[arrayIndex],
+                .result = calculateStarAstrometry(
+                    request,
+                    astrometry,
+                    fixedEquatorial,
+                    m_kernelProvider,
+                    m_timeScaleService,
+                    preparedRequestState.get()
+                ),
+            }
+        );
     }
 
     return results;

@@ -1,6 +1,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
 #include "StringUtilities.hpp"
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 
@@ -87,29 +88,6 @@ constexpr int kNaifSolarSystemBarycenter = 0;
     };
 }
 
-void addUnavailableCorrection(EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags correction) noexcept
-{
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-    }
-    metadata.addUnavailableCorrection(correction);
-}
-
-void mergeTimeScaleMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
-{
-    if (conversion.status == TimeScaleConversionStatus::Failed) {
-        if (metadata.status == EphemerisResultStatus::Valid) {
-            metadata.status = EphemerisResultStatus::Degraded;
-        }
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return;
-    }
-    if (conversion.status == TimeScaleConversionStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
-    }
-}
-
 void mergeKernelEpochTimeScaleMetadata(
     EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion
 ) noexcept
@@ -121,52 +99,7 @@ void mergeKernelEpochTimeScaleMetadata(
         return;
     }
 
-    mergeTimeScaleMetadata(metadata, conversion);
-}
-
-void mergeEphemerisMetadata(EphemerisResultMetadata& target, const EphemerisResultMetadata& source) noexcept
-{
-    if (source.status == EphemerisResultStatus::Failed) {
-        target.status = EphemerisResultStatus::Failed;
-    } else if (source.status == EphemerisResultStatus::OutOfRange) {
-        target.status = EphemerisResultStatus::OutOfRange;
-    } else if (source.status == EphemerisResultStatus::Unsupported) {
-        target.status = EphemerisResultStatus::Unsupported;
-    } else if (source.status == EphemerisResultStatus::Degraded && target.status == EphemerisResultStatus::Valid) {
-        target.status = EphemerisResultStatus::Degraded;
-    }
-
-    target.warningCodeMask |= source.warningCodeMask;
-    target.appliedCorrections |= source.appliedCorrections;
-    target.unavailableCorrections |= source.unavailableCorrections;
-    if (target.dataSourceProvenance.empty()) {
-        target.dataSourceProvenance = source.dataSourceProvenance;
-    }
-    if (!target.effectiveDataValidityRange.has_value()) {
-        target.effectiveDataValidityRange = source.effectiveDataValidityRange;
-    }
-    if (!target.estimatedAngularUncertaintyArcsec.has_value()) {
-        target.estimatedAngularUncertaintyArcsec = source.estimatedAngularUncertaintyArcsec;
-    }
-}
-
-void mergeEarthOrientationMetadata(EphemerisResultMetadata& metadata, const EarthOrientationSample& sample) noexcept
-{
-    if (sample.status == EarthOrientationSampleStatus::Failed) {
-        metadata.status = EphemerisResultStatus::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-        return;
-    }
-    if (sample.status == EarthOrientationSampleStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-        metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
-    }
-    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-    }
-    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
-        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
-    }
+    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
 }
 
 class DefaultApparentPlaceCalculator final : public IApparentPlaceCalculator {
@@ -224,7 +157,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
         return normalizedAstronomicalEpoch(request.epoch);
     }
     if (preparedState != nullptr && preparedState->tdbKernelEpoch.has_value()) {
-        mergeEphemerisMetadata(metadata, preparedState->tdbKernelEpochMetadata);
+        EphemerisMetadataMerger::merge(metadata, preparedState->tdbKernelEpochMetadata);
         return preparedState->tdbKernelEpoch;
     }
     if (timeScaleService == nullptr) {
@@ -526,10 +459,12 @@ HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& 
         preparedState->observerItrsPositionAu = observerItrsPositionAu(request.context.observer);
         const TimeScaleConversionResult utcConversion =
             m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Utc);
-        mergeTimeScaleMetadata(preparedState->topocentricMetadata, utcConversion);
+        EphemerisMetadataMerger::mergeTimeScale(preparedState->topocentricMetadata, utcConversion);
         if (!utcConversion.isSuccess()) {
             preparedState->topocentricStateAvailable = false;
-            addUnavailableCorrection(preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation);
+            EphemerisMetadataMerger::markCorrectionUnavailable(
+                preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
+            );
         } else {
             preparedState->earthOrientationSample = sampleEarthOrientation(
                 m_dependencies.earthOrientationProvider,
@@ -540,10 +475,12 @@ HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& 
                     .degradePredictedData = false,
                 }
             );
-            mergeEarthOrientationMetadata(preparedState->topocentricMetadata, *preparedState->earthOrientationSample);
+            EphemerisMetadataMerger::mergeEarthOrientation(
+                preparedState->topocentricMetadata, *preparedState->earthOrientationSample
+            );
             if (!preparedState->earthOrientationSample->isSuccess()) {
                 preparedState->topocentricStateAvailable = false;
-                addUnavailableCorrection(
+                EphemerisMetadataMerger::markCorrectionUnavailable(
                     preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
                 );
             }
@@ -590,7 +527,7 @@ CelestialBodyState HighPrecisionEphemerisEngine::computeStateForBody(
             .bodyIndex = bodyIndex,
         };
         HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(kernelInput);
-        mergeEphemerisMetadata(calculatorResult.metadata, kernelEpochMetadata.metadata);
+        EphemerisMetadataMerger::merge(calculatorResult.metadata, kernelEpochMetadata.metadata);
         HighPrecisionCalculatorResult apparentResult =
             applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);
         return builder.buildState(input, apparentResult);

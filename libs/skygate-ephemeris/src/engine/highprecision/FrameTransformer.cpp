@@ -1,5 +1,6 @@
 #include "engine/highprecision/FrameTransformer.hpp"
 
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/ErfaAstrometry.hpp"
 
 #include <array>
@@ -174,13 +175,17 @@ void mergeEarthOrientationWarnings(EphemerisResultMetadata& metadata, const Eart
 
 void mergeCachedTransformMetadata(EphemerisResultMetadata& target, const EphemerisResultMetadata& source) noexcept
 {
-    if (source.status == EphemerisResultStatus::Failed) {
-        target.status = EphemerisResultStatus::Failed;
-    } else if (source.status == EphemerisResultStatus::Degraded && target.status == EphemerisResultStatus::Valid) {
-        target.status = EphemerisResultStatus::Degraded;
-    }
-
-    target.warningCodeMask |= source.warningCodeMask;
+    EphemerisMetadataMerger::merge(
+        target,
+        source,
+        EphemerisMetadataMergeOptions{
+            .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
+            .mergeCorrections = false,
+            .mergeProvenance = false,
+            .mergeValidityRange = false,
+            .mergeAngularUncertainty = false,
+        }
+    );
 }
 
 struct FrameTransformContext {
@@ -426,17 +431,17 @@ void mergeStageMetadata(
     EphemerisResultMetadata& aggregateMetadata, const EphemerisResultMetadata& stageMetadata
 ) noexcept
 {
-    if (stageMetadata.status == EphemerisResultStatus::Failed) {
-        aggregateMetadata.status = EphemerisResultStatus::Failed;
-    } else if (
-        stageMetadata.status == EphemerisResultStatus::Degraded
-        && aggregateMetadata.status == EphemerisResultStatus::Valid
-    ) {
-        aggregateMetadata.status = EphemerisResultStatus::Degraded;
-    }
-
-    aggregateMetadata.warningCodeMask |= stageMetadata.warningCodeMask;
-    aggregateMetadata.appliedCorrections |= stageMetadata.appliedCorrections;
+    EphemerisMetadataMerger::merge(
+        aggregateMetadata,
+        stageMetadata,
+        EphemerisMetadataMergeOptions{
+            .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
+            .mergeCorrections = true,
+            .mergeProvenance = false,
+            .mergeValidityRange = false,
+            .mergeAngularUncertainty = false,
+        }
+    );
 }
 
 [[nodiscard]] CelestialFrameTransformStageMetadata
