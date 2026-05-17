@@ -1,26 +1,14 @@
 #include "SkySceneModel.hpp"
 
 #include "SkyContextController.hpp"
+#include "SkyPerformanceLogging.hpp"
 #include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
 
 #include <QElapsedTimer>
-#include <QLoggingCategory>
 
 #include <cmath>
-
-namespace {
-
-Q_LOGGING_CATEGORY(skygatePerfLog, "skygate.perf")
-
-bool performanceLoggingEnabled()
-{
-    static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
-    return enabled;
-}
-
-}  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent) : QObject(parent) {}
 
@@ -346,30 +334,30 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
 void SkySceneModel::rebuildSceneFrame()
 {
     QElapsedTimer timer;
-    if (performanceLoggingEnabled()) {
-        timer.start();
-    }
+    skygate::ui::startPerformanceTimer(timer);
 
     const auto input = buildSceneInput();
-    const qint64 inputNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 inputNs = skygate::ui::performanceElapsedNanoseconds(timer);
     if (!input.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
         }
-        if (performanceLoggingEnabled()) {
-            qCInfo(skygatePerfLog) << "scene rebuild skipped no-input elapsedMs=" << timer.nsecsElapsed() / 1000000.0;
+        if (skygate::ui::performanceLoggingEnabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "scene rebuild skipped no-input elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer);
         }
         return;
     }
 
     const auto frameResult = m_framePipeline.rebuild(input->frameInput, m_viewportWidth, m_viewportHeight);
-    const qint64 pipelineNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 pipelineNs = skygate::ui::performanceElapsedNanoseconds(timer);
     if (!frameResult.has_value()) {
         if (clearSceneFrame()) {
             emit sceneFrameChanged();
         }
-        if (performanceLoggingEnabled()) {
-            qCInfo(skygatePerfLog) << "scene rebuild skipped no-frame elapsedMs=" << timer.nsecsElapsed() / 1000000.0;
+        if (skygate::ui::performanceLoggingEnabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "scene rebuild skipped no-frame elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer);
         }
         return;
     }
@@ -378,7 +366,7 @@ void SkySceneModel::rebuildSceneFrame()
     m_sceneFrame.snapshot = frameResult->snapshot;
 
     const SkySceneCompositionResult compositionResult = m_sceneComposer.rebuild(m_sceneFrame, *input, *frameResult);
-    const qint64 compositionNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 compositionNs = skygate::ui::performanceElapsedNanoseconds(timer);
     if (!compositionResult.changed) {
         return;
     }
@@ -386,26 +374,27 @@ void SkySceneModel::rebuildSceneFrame()
     if (compositionResult.frameContentChanged) {
         m_hitTargetIndex.rebuild(m_sceneFrame.frame, *frameResult->snapshot);
     }
-    const qint64 hitIndexNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 hitIndexNs = skygate::ui::performanceElapsedNanoseconds(timer);
     m_overlayItems = m_sceneOverlayAdapter.overlayItems(m_sceneFrame.overlayItems);
     m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
     m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
-    const qint64 adapterNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 adapterNs = skygate::ui::performanceElapsedNanoseconds(timer);
     emit sceneFrameChanged();
 
-    if (performanceLoggingEnabled()) {
-        qCInfo(skygatePerfLog) << "scene rebuild elapsedMs=" << timer.nsecsElapsed() / 1000000.0
-                               << "inputMs=" << inputNs / 1000000.0
-                               << "pipelineMs=" << (pipelineNs - inputNs) / 1000000.0
-                               << "compositionMs=" << (compositionNs - pipelineNs) / 1000000.0
-                               << "hitIndexMs=" << (hitIndexNs - compositionNs) / 1000000.0
-                               << "adapterMs=" << (adapterNs - hitIndexNs) / 1000000.0
-                               << "pipelineUpdated=" << frameResult->updated
-                               << "frameContentChanged=" << compositionResult.frameContentChanged
-                               << "points=" << static_cast<qsizetype>(m_sceneFrame.frame.points.size())
-                               << "lines=" << static_cast<qsizetype>(m_sceneFrame.frame.lines.size())
-                               << "glyphs=" << static_cast<qsizetype>(m_sceneFrame.frame.glyphs.size())
-                               << "labels=" << static_cast<qsizetype>(m_sceneFrame.frame.labels.size())
-                               << "overlays=" << static_cast<qsizetype>(m_sceneFrame.overlayItems.size());
+    if (skygate::ui::performanceLoggingEnabled()) {
+        qCInfo(skygate::ui::skygatePerfLog)
+            << "scene rebuild elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+            << "inputMs=" << skygate::ui::performanceMilliseconds(inputNs)
+            << "pipelineMs=" << skygate::ui::performanceMilliseconds(pipelineNs - inputNs)
+            << "compositionMs=" << skygate::ui::performanceMilliseconds(compositionNs - pipelineNs)
+            << "hitIndexMs=" << skygate::ui::performanceMilliseconds(hitIndexNs - compositionNs)
+            << "adapterMs=" << skygate::ui::performanceMilliseconds(adapterNs - hitIndexNs)
+            << "pipelineUpdated=" << frameResult->updated
+            << "frameContentChanged=" << compositionResult.frameContentChanged
+            << "points=" << static_cast<qsizetype>(m_sceneFrame.frame.points.size())
+            << "lines=" << static_cast<qsizetype>(m_sceneFrame.frame.lines.size())
+            << "glyphs=" << static_cast<qsizetype>(m_sceneFrame.frame.glyphs.size())
+            << "labels=" << static_cast<qsizetype>(m_sceneFrame.frame.labels.size())
+            << "overlays=" << static_cast<qsizetype>(m_sceneFrame.overlayItems.size());
     }
 }
