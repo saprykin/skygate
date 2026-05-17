@@ -286,6 +286,63 @@ void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const cha
     QVERIFY2(false, qPrintable(strictHint));
 }
 
+void verifyCounterDelta(
+    const int before, const int after, const int expectedDelta, const char* counterName, const char* operationName
+)
+{
+    const int actualDelta = after - before;
+    const QString message = QStringLiteral("perf counter %1 during %2: expected delta=%3 actual delta=%4")
+                                .arg(QString::fromUtf8(counterName))
+                                .arg(QString::fromUtf8(operationName))
+                                .arg(expectedDelta)
+                                .arg(actualDelta);
+    QVERIFY2(actualDelta == expectedDelta, qPrintable(message));
+}
+
+void verifyHighPrecisionCounterDeltas(
+    const GuardBatchStarAstrometryCalculator& starAstrometryCalculator,
+    const GuardApparentPlaceCalculator& apparentPlaceCalculator,
+    const int astrometryBatchCallsBefore,
+    const int astrometrySingleCallsBefore,
+    const int apparentBatchCallsBefore,
+    const int apparentSingleCallsBefore,
+    const int expectedAstrometryBatchDelta,
+    const int expectedAstrometrySingleDelta,
+    const int expectedApparentBatchDelta,
+    const int expectedApparentSingleDelta,
+    const char* operationName
+)
+{
+    verifyCounterDelta(
+        astrometryBatchCallsBefore,
+        starAstrometryCalculator.batchCallCount(),
+        expectedAstrometryBatchDelta,
+        "astrometry batch",
+        operationName
+    );
+    verifyCounterDelta(
+        astrometrySingleCallsBefore,
+        starAstrometryCalculator.singleCallCount(),
+        expectedAstrometrySingleDelta,
+        "astrometry single",
+        operationName
+    );
+    verifyCounterDelta(
+        apparentBatchCallsBefore,
+        apparentPlaceCalculator.batchCallCount(),
+        expectedApparentBatchDelta,
+        "apparent batch",
+        operationName
+    );
+    verifyCounterDelta(
+        apparentSingleCallsBefore,
+        apparentPlaceCalculator.singleCallCount(),
+        expectedApparentSingleDelta,
+        "apparent single",
+        operationName
+    );
+}
+
 skygate::ephemeris::CelestialBody makeBody(
     std::string id,
     std::string displayName,
@@ -629,6 +686,19 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
                              .arg(starAstrometryCalculator->singleCallCount() - astrometrySingleCallsBefore)
                              .arg(apparentPlaceCalculator->batchCallCount() - apparentBatchCallsBefore)
                              .arg(apparentPlaceCalculator->singleCallCount() - apparentSingleCallsBefore);
+    verifyHighPrecisionCounterDeltas(
+        *starAstrometryCalculator,
+        *apparentPlaceCalculator,
+        astrometryBatchCallsBefore,
+        astrometrySingleCallsBefore,
+        apparentBatchCallsBefore,
+        apparentSingleCallsBefore,
+        0,
+        1,
+        0,
+        1,
+        "high precision large fixed catalog selection"
+    );
 
     QVERIFY(sceneModel.selectedObjectInspector().value("visible").toBool());
 
@@ -655,6 +725,19 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
                              .arg(starAstrometryCalculator->singleCallCount() - moveAstrometrySingleCallsBefore)
                              .arg(apparentPlaceCalculator->batchCallCount() - moveApparentBatchCallsBefore)
                              .arg(apparentPlaceCalculator->singleCallCount() - moveApparentSingleCallsBefore);
+    verifyHighPrecisionCounterDeltas(
+        *starAstrometryCalculator,
+        *apparentPlaceCalculator,
+        moveAstrometryBatchCallsBefore,
+        moveAstrometrySingleCallsBefore,
+        moveApparentBatchCallsBefore,
+        moveApparentSingleCallsBefore,
+        0,
+        0,
+        0,
+        0,
+        "high precision large fixed catalog inspector move"
+    );
 
     const int panAstrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
     const int panAstrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
@@ -679,6 +762,19 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
                              .arg(starAstrometryCalculator->singleCallCount() - panAstrometrySingleCallsBefore)
                              .arg(apparentPlaceCalculator->batchCallCount() - panApparentBatchCallsBefore)
                              .arg(apparentPlaceCalculator->singleCallCount() - panApparentSingleCallsBefore);
+    verifyHighPrecisionCounterDeltas(
+        *starAstrometryCalculator,
+        *apparentPlaceCalculator,
+        panAstrometryBatchCallsBefore,
+        panAstrometrySingleCallsBefore,
+        panApparentBatchCallsBefore,
+        panApparentSingleCallsBefore,
+        0,
+        0,
+        0,
+        0,
+        "high precision large fixed catalog trail pan"
+    );
 
     const int zoomAstrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
     const int zoomAstrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
@@ -703,6 +799,19 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
                              .arg(starAstrometryCalculator->singleCallCount() - zoomAstrometrySingleCallsBefore)
                              .arg(apparentPlaceCalculator->batchCallCount() - zoomApparentBatchCallsBefore)
                              .arg(apparentPlaceCalculator->singleCallCount() - zoomApparentSingleCallsBefore);
+    verifyHighPrecisionCounterDeltas(
+        *starAstrometryCalculator,
+        *apparentPlaceCalculator,
+        zoomAstrometryBatchCallsBefore,
+        zoomAstrometrySingleCallsBefore,
+        zoomApparentBatchCallsBefore,
+        zoomApparentSingleCallsBefore,
+        0,
+        0,
+        0,
+        0,
+        "high precision large fixed catalog trail zoom"
+    );
 }
 
 void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
