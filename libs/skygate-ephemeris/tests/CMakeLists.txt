@@ -11,6 +11,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
 
     add_executable(${target_name}
         ${source_file}
+        support/EphemerisEngineTestDoubles.cpp
     )
 
     set_target_properties(${target_name} PROPERTIES AUTOMOC ON)
