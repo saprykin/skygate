@@ -14,6 +14,8 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
+#include "skygate/testsupport/PerformanceBudget.hpp"
+
 #include <QElapsedTimer>
 
 #include <chrono>
@@ -35,6 +37,7 @@ private slots:
     void searchesLargeMixedCatalogWithinGuardrail();
     void hitTestsDenseRenderFrameWithinGuardrail();
     void buildsManyObjectTrailsWithinGuardrail();
+    void wallClockBudgetsAreAdvisoryByDefault();
 };
 
 namespace {
@@ -46,35 +49,6 @@ constexpr qint64 kLargeSearchLoadBudgetMs = 10000;
 constexpr qint64 kLargeSearchQueryBudgetMs = 3000;
 constexpr qint64 kDenseHitTestBudgetMs = 5000;
 constexpr qint64 kManyTrailsBudgetMs = 12000;
-
-bool isStrictPerformanceGuardMode()
-{
-    const QString mode = QString::fromUtf8(qgetenv("SKYGATE_PERFORMANCE_GUARD_MODE")).trimmed().toLower();
-    const QString legacyStrict = QString::fromUtf8(qgetenv("SKYGATE_STRICT_PERFORMANCE_GUARDS")).trimmed().toLower();
-    return mode == QStringLiteral("strict")
-           || (!legacyStrict.isEmpty() && legacyStrict != QStringLiteral("0") && legacyStrict != QStringLiteral("false")
-               && legacyStrict != QStringLiteral("no") && legacyStrict != QStringLiteral("off"));
-}
-
-QString performanceMetricMessage(
-    const qint64 elapsedMs, const qint64 budgetMs, const char* operationName, const bool strictMode
-)
-{
-    const qint64 deltaMs = budgetMs - elapsedMs;
-    const double budgetPercent =
-        budgetMs > 0 ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs)) : 0.0;
-    return QStringLiteral(
-               "perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
-               "strict=%7"
-    )
-        .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget") : QStringLiteral("over-budget"))
-        .arg(QString::fromUtf8(operationName))
-        .arg(elapsedMs)
-        .arg(budgetMs)
-        .arg(deltaMs)
-        .arg(QString::number(budgetPercent, 'f', 1))
-        .arg(strictMode ? QStringLiteral("on") : QStringLiteral("off"));
-}
 
 class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
@@ -265,25 +239,16 @@ private:
 
 void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const char* operationName)
 {
-    const bool strictMode = isStrictPerformanceGuardMode();
-    const QString message = performanceMetricMessage(elapsedMs, budgetMs, operationName, strictMode);
-
-    if (elapsedMs < budgetMs) {
-        qInfo().noquote() << message;
-        return;
-    }
-
-    const QString strictHint = QStringLiteral(
-                                   "%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
-                                   "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail"
-    )
-                                   .arg(message);
-    if (!strictMode) {
-        qWarning().noquote() << strictHint;
-        return;
-    }
-
-    QVERIFY2(false, qPrintable(strictHint));
+    const skygate::testsupport::PerformanceBudgetDecision decision =
+        skygate::testsupport::reportPerformanceBudget(elapsedMs, budgetMs, operationName);
+    QVERIFY2(
+        decision != skygate::testsupport::PerformanceBudgetDecision::StrictOverBudget,
+        qPrintable(
+            skygate::testsupport::strictPerformanceBudgetHint(
+                skygate::testsupport::performanceMetricMessage(elapsedMs, budgetMs, operationName, true)
+            )
+        )
+    );
 }
 
 void verifyCounterDelta(
@@ -672,11 +637,11 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
     QVERIFY(sceneModel.selectObjectAt(targetPoint->x, targetPoint->y));
     const qint64 selectElapsedMs = timer.elapsed();
 
-    qInfo().noquote() << performanceMetricMessage(
+    qInfo().noquote() << skygate::testsupport::performanceMetricMessage(
         selectElapsedMs,
         kHighPrecisionLargeSceneBuildBudgetMs,
         "high precision large fixed catalog selection",
-        isStrictPerformanceGuardMode()
+        skygate::testsupport::isStrictPerformanceGuardMode()
     );
     qInfo().noquote() << QStringLiteral(
                              "perf high precision selection counters: astrometryBatchDelta=%1 "
@@ -711,11 +676,11 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
     sceneModel.moveSelectedObjectInspector(240.0, 180.0);
     const qint64 moveElapsedMs = timer.elapsed();
 
-    qInfo().noquote() << performanceMetricMessage(
+    qInfo().noquote() << skygate::testsupport::performanceMetricMessage(
         moveElapsedMs,
         kHighPrecisionLargeSceneBuildBudgetMs,
         "high precision large fixed catalog inspector move",
-        isStrictPerformanceGuardMode()
+        skygate::testsupport::isStrictPerformanceGuardMode()
     );
     qInfo().noquote() << QStringLiteral(
                              "perf high precision inspector move counters: astrometryBatchDelta=%1 "
@@ -748,11 +713,11 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
     controller.panViewBy(1.0, 1.0);
     const qint64 panElapsedMs = timer.elapsed();
 
-    qInfo().noquote() << performanceMetricMessage(
+    qInfo().noquote() << skygate::testsupport::performanceMetricMessage(
         panElapsedMs,
         kHighPrecisionLargeSceneBuildBudgetMs,
         "high precision large fixed catalog trail pan",
-        isStrictPerformanceGuardMode()
+        skygate::testsupport::isStrictPerformanceGuardMode()
     );
     qInfo().noquote() << QStringLiteral(
                              "perf high precision trail pan counters: astrometryBatchDelta=%1 "
@@ -785,11 +750,11 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
     controller.zoomViewByScaleDelta(1.2);
     const qint64 zoomElapsedMs = timer.elapsed();
 
-    qInfo().noquote() << performanceMetricMessage(
+    qInfo().noquote() << skygate::testsupport::performanceMetricMessage(
         zoomElapsedMs,
         kHighPrecisionLargeSceneBuildBudgetMs,
         "high precision large fixed catalog trail zoom",
-        isStrictPerformanceGuardMode()
+        skygate::testsupport::isStrictPerformanceGuardMode()
     );
     qInfo().noquote() << QStringLiteral(
                              "perf high precision trail zoom counters: astrometryBatchDelta=%1 "
@@ -916,6 +881,19 @@ void PerformanceGuardTests::buildsManyObjectTrailsWithinGuardrail()
 
     QVERIFY(!frame.lines.empty());
     verifyElapsedBelow(elapsedMs, kManyTrailsBudgetMs, "many object trails");
+}
+
+void PerformanceGuardTests::wallClockBudgetsAreAdvisoryByDefault()
+{
+    using skygate::testsupport::PerformanceBudgetDecision;
+
+    QCOMPARE(
+        skygate::testsupport::performanceBudgetDecision(200, 100, false), PerformanceBudgetDecision::AdvisoryOverBudget
+    );
+    QCOMPARE(
+        skygate::testsupport::performanceBudgetDecision(200, 100, true), PerformanceBudgetDecision::StrictOverBudget
+    );
+    QCOMPARE(skygate::testsupport::performanceBudgetDecision(99, 100, true), PerformanceBudgetDecision::WithinBudget);
 }
 
 QTEST_GUILESS_MAIN(PerformanceGuardTests)
