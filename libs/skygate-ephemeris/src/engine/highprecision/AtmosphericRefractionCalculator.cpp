@@ -1,5 +1,6 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 
 #include <algorithm>
@@ -50,10 +51,7 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
 
 void markUnavailable(EphemerisResultMetadata& metadata) noexcept
 {
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
-    }
-    metadata.addUnavailableCorrection(EphemerisCorrectionFlags::AtmosphericRefraction);
+    EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::AtmosphericRefraction);
 }
 
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept
