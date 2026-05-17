@@ -1,3 +1,4 @@
+#include "EphemerisEngineTestDoubles.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
@@ -76,137 +77,17 @@ struct TestRig final {
     return event.status == skygate::ephemeris::ObservationEventStatus::Available && event.utcTime.has_value();
 }
 
-class FixedNightEngine final : public skygate::ephemeris::IEphemerisEngine {
-public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
-    {
-        skygate::ephemeris::SkySnapshot snapshot;
-        snapshot.context = context;
-        snapshot.states.push_back(*computeBodyState(context, 0U));
-        snapshot.states.push_back(*computeBodyState(context, 1U));
-        return snapshot;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view bodyId) const override
-    {
-        if (bodyId == "sun") {
-            return stateFor(0U, 12.0);
-        }
-        if (bodyId == "moon") {
-            return stateFor(1U, 24.0);
-        }
-        return std::nullopt;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t bodyIndex) const override
-    {
-        if (bodyIndex > 1U) {
-            return std::nullopt;
-        }
-        return stateFor(bodyIndex, bodyIndex == 0U ? 12.0 : 24.0);
-    }
-
-private:
-    [[nodiscard]] skygate::ephemeris::CelestialBodyState
-    stateFor(const std::uint32_t bodyIndex, const double altitudeDeg) const noexcept
-    {
-        return skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = bodyIndex,
-            .equatorial = {.rightAscensionHours = static_cast<double>(bodyIndex), .declinationDeg = altitudeDeg},
-            .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = 180.0}
-        };
-    }
-};
-
-[[nodiscard]] skygate::ephemeris::CelestialBody
-makeFixedBody(std::string id, const double rightAscensionHours, const double declinationDeg)
+[[nodiscard]] skygate::ephemeris::tests::RequestCountingEphemerisEngine
+makeGuidedNightEngine(std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> bodies)
 {
-    skygate::ephemeris::CelestialBody body;
-    body.id = std::move(id);
-    body.displayName = body.id;
-    body.type = skygate::ephemeris::CelestialBodyType::Star;
-    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial;
-    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
-        .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = declinationDeg,
-    };
-    return body;
+    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(*bodies);
+    Q_ASSERT(catalog != nullptr);
+    auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    Q_ASSERT(engine != nullptr);
+    return skygate::ephemeris::tests::RequestCountingEphemerisEngine(
+        std::move(engine), skygate::ephemeris::tests::highPrecisionLightTimeOptions(), std::move(bodies)
+    );
 }
-
-class GuidedNightEngine final : public skygate::ephemeris::IEphemerisEngine {
-public:
-    explicit GuidedNightEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
-        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
-    {
-        auto catalog = skygate::ephemeris::createStarCatalogFromBodies(*m_bodies);
-        Q_ASSERT(catalog != nullptr);
-        m_engine = skygate::ephemeris::createEphemerisEngine(*catalog);
-        Q_ASSERT(m_engine != nullptr);
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
-    {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    }
-
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
-    {
-        skygate::ephemeris::EphemerisEngineOptions options;
-        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
-        return options;
-    }
-
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
-    compute(const skygate::ephemeris::EphemerisRequest& request) const override
-    {
-        skygate::ephemeris::SkySnapshot snapshot = m_engine->compute(request);
-        snapshot.catalogBodies = m_bodies;
-        return snapshot;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
-    {
-        ++requestSampleCount;
-        return m_engine->computeBodyState(request, bodyId);
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
-    {
-        ++requestSampleCount;
-        return m_engine->computeBodyState(request, bodyIndex);
-    }
-
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
-    {
-        skygate::ephemeris::SkySnapshot snapshot = m_engine->compute(context);
-        snapshot.catalogBodies = m_bodies;
-        return snapshot;
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
-    {
-        ++contextSampleCount;
-        return m_engine->computeBodyState(context, bodyId);
-    }
-
-    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
-    {
-        ++contextSampleCount;
-        return m_engine->computeBodyState(context, bodyIndex);
-    }
-
-    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_engine;
-    mutable int requestSampleCount = 0;
-    mutable int contextSampleCount = 0;
-};
 
 }  // namespace
 
@@ -320,7 +201,18 @@ void NightConditionsCalculatorTests::lunarPhaseBucketsAreDeterministic()
 
 void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTimeDiffers()
 {
-    const FixedNightEngine engine;
+    const skygate::ephemeris::tests::FixedAltitudeEngine engine(
+        std::vector<skygate::ephemeris::tests::FixedAltitudeBody>{
+            {
+                .body = skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 0.0, 12.0),
+                .altitudeDeg = 12.0,
+            },
+            {
+                .body = skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 1.0, 24.0),
+                .altitudeDeg = 24.0,
+            },
+        }
+    );
     const skygate::ephemeris::NightConditionsCalculator calculator;
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeZurichContext();
@@ -345,53 +237,64 @@ void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTi
 
 void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventSearch()
 {
-    const std::vector<skygate::ephemeris::CelestialBody> bodies{
-        makeFixedBody("sun", 8.0, 20.0),
-        makeFixedBody("moon", 14.0, -8.0),
-    };
-    const GuidedNightEngine approximateEngine(bodies);
-    const GuidedNightEngine verifiedEngine(bodies);
+    const auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+        std::vector<skygate::ephemeris::CelestialBody>{
+            skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
+            skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
+        }
+    );
+    const auto approximateEngine = makeGuidedNightEngine(bodies);
+    const auto verifiedEngine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), approximateEngine.options());
 
-    const auto approximateConditions = calculator.compute(approximateEngine, request, 0U, bodies[0], 1U, bodies[1]);
+    const auto approximateConditions =
+        calculator.compute(approximateEngine, request, 0U, (*bodies)[0], 1U, (*bodies)[1]);
     const auto verifiedConditions = calculator.compute(
         verifiedEngine,
         request,
         0U,
-        bodies[0],
+        (*bodies)[0],
         1U,
-        bodies[1],
+        (*bodies)[1],
         skygate::ephemeris::NightConditionsEventSearchMode::Verified
     );
 
     QVERIFY(approximateConditions.valid);
     QVERIFY(verifiedConditions.valid);
-    QCOMPARE(approximateEngine.contextSampleCount, 0);
-    QCOMPARE(verifiedEngine.contextSampleCount, 0);
-    QCOMPARE(approximateEngine.requestSampleCount, 2);
-    QVERIFY(approximateEngine.requestSampleCount < verifiedEngine.requestSampleCount);
+    QCOMPARE(approximateEngine.contextSampleCount(), 0);
+    QCOMPARE(verifiedEngine.contextSampleCount(), 0);
+    QCOMPARE(approximateEngine.requestSampleCount(), 2);
+    QVERIFY(approximateEngine.requestSampleCount() < verifiedEngine.requestSampleCount());
 }
 
 void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSelectedEngineSamples()
 {
-    const std::vector<skygate::ephemeris::CelestialBody> bodies{
-        makeFixedBody("sun", 8.0, 20.0),
-        makeFixedBody("moon", 14.0, -8.0),
-    };
-    const GuidedNightEngine engine(bodies);
+    const auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+        std::vector<skygate::ephemeris::CelestialBody>{
+            skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
+            skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
+        }
+    );
+    const auto engine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), engine.options());
 
     const auto conditions = calculator.compute(
-        engine, request, 0U, bodies[0], 1U, bodies[1], skygate::ephemeris::NightConditionsEventSearchMode::Verified
+        engine,
+        request,
+        0U,
+        (*bodies)[0],
+        1U,
+        (*bodies)[1],
+        skygate::ephemeris::NightConditionsEventSearchMode::Verified
     );
 
     QVERIFY(conditions.valid);
-    QVERIFY(engine.requestSampleCount > 2);
-    QCOMPARE(engine.contextSampleCount, 0);
+    QVERIFY(engine.requestSampleCount() > 2);
+    QCOMPARE(engine.contextSampleCount(), 0);
 }
 
 QTEST_APPLESS_MAIN(NightConditionsCalculatorTests)
