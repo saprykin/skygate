@@ -1,9 +1,9 @@
 #include "skygate/ephemeris/LeapSecondProvider.hpp"
 
+#include "engine/highprecision/HighPrecisionTextParser.hpp"
+
 #include <algorithm>
-#include <charconv>
 #include <cmath>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -18,96 +18,10 @@ namespace {
 constexpr std::string_view kValidityRangeId = "leap-seconds";
 constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 
-[[nodiscard]] std::string_view trimAsciiWhitespace(std::string_view text) noexcept
+[[nodiscard]] const HighPrecisionTextParser& textParser() noexcept
 {
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
-        text.remove_prefix(1U);
-    }
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
-        text.remove_suffix(1U);
-    }
-    return text;
-}
-
-[[nodiscard]] bool startsWith(std::string_view text, const std::string_view prefix) noexcept
-{
-    return text.size() >= prefix.size() && text.substr(0U, prefix.size()) == prefix;
-}
-
-[[nodiscard]] bool parseInt(const std::string_view text, int& value) noexcept
-{
-    const std::string_view trimmed = trimAsciiWhitespace(text);
-    if (trimmed.empty()) {
-        return false;
-    }
-
-    const char* begin = trimmed.data();
-    const char* end = begin + trimmed.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    return result.ec == std::errc{} && result.ptr == end;
-}
-
-[[nodiscard]] bool parseUint64(const std::string_view text, std::uint64_t& value) noexcept
-{
-    const std::string_view trimmed = trimAsciiWhitespace(text);
-    if (trimmed.empty()) {
-        return false;
-    }
-
-    const char* begin = trimmed.data();
-    const char* end = begin + trimmed.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    return result.ec == std::errc{} && result.ptr == end;
-}
-
-[[nodiscard]] std::vector<std::string_view> splitAsciiWhitespace(std::string_view text)
-{
-    std::vector<std::string_view> tokens;
-    while (true) {
-        text = trimAsciiWhitespace(text);
-        if (text.empty()) {
-            break;
-        }
-
-        std::size_t end = 0U;
-        while (end < text.size() && std::isspace(static_cast<unsigned char>(text[end])) == 0) {
-            ++end;
-        }
-        tokens.push_back(text.substr(0U, end));
-        text.remove_prefix(end);
-    }
-    return tokens;
-}
-
-[[nodiscard]] std::optional<CivilDateTime> parseUtcDate(std::string_view text) noexcept
-{
-    text = trimAsciiWhitespace(text);
-    const std::size_t firstDash = text.find('-');
-    const std::size_t secondDash =
-        firstDash == std::string_view::npos ? std::string_view::npos : text.find('-', firstDash + 1U);
-    if (firstDash == std::string_view::npos || secondDash == std::string_view::npos) {
-        return std::nullopt;
-    }
-
-    int year = 0;
-    int month = 0;
-    int day = 0;
-    if (!parseInt(text.substr(0U, firstDash), year)
-        || !parseInt(text.substr(firstDash + 1U, secondDash - firstDash - 1U), month)
-        || !parseInt(text.substr(secondDash + 1U), day)) {
-        return std::nullopt;
-    }
-
-    CivilDateTime dateTime;
-    dateTime.astronomicalYear = year;
-    dateTime.month = month;
-    dateTime.day = day;
-    dateTime.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(dateTime)) {
-        return std::nullopt;
-    }
-
-    return dateTime;
+    static const HighPrecisionTextParser parser;
+    return parser;
 }
 
 [[nodiscard]] std::optional<int> monthFromEnglishAbbreviation(const std::string_view text) noexcept
@@ -154,7 +68,7 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 
 [[nodiscard]] std::optional<CivilDateTime> parseIanaCommentDate(const std::string_view text) noexcept
 {
-    const std::vector<std::string_view> tokens = splitAsciiWhitespace(text);
+    const std::vector<std::string_view> tokens = textParser().splitAsciiWhitespace(text);
     if (tokens.size() < 3U) {
         return std::nullopt;
     }
@@ -162,7 +76,7 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     int day = 0;
     int year = 0;
     const std::optional<int> month = monthFromEnglishAbbreviation(tokens[1]);
-    if (!parseInt(tokens[0], day) || !month.has_value() || !parseInt(tokens[2], year)) {
+    if (!textParser().parseInt(tokens[0], day) || !month.has_value() || !textParser().parseInt(tokens[2], year)) {
         return std::nullopt;
     }
 
@@ -208,36 +122,23 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
            && std::isfinite(epoch.julianDatePart2);
 }
 
-[[nodiscard]] std::optional<std::string> metadataValue(const std::string_view line, const std::string_view key)
-{
-    const std::string prefix = "#@ " + std::string(key);
-    if (!startsWith(line, prefix)) {
-        return std::nullopt;
-    }
-    if (line.size() > prefix.size() && std::isspace(static_cast<unsigned char>(line[prefix.size()])) == 0) {
-        return std::nullopt;
-    }
-
-    return std::string(trimAsciiWhitespace(line.substr(prefix.size())));
-}
-
 [[nodiscard]] std::optional<std::string>
 applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const std::size_t lineNumber)
 {
-    if (std::optional<std::string> value = metadataValue(line, "version"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
         if (!value->empty()) {
             info.version = std::move(*value);
         }
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "source"); value.has_value()) {
+    if (std::optional<std::string> value = textParser().metadataValue(line, "source"); value.has_value()) {
         if (!value->empty()) {
             info.provenance = std::move(*value);
         }
         return std::nullopt;
     }
-    if (std::optional<std::string> value = metadataValue(line, "expires"); value.has_value()) {
-        const std::optional<CivilDateTime> expiresDate = parseUtcDate(*value);
+    if (std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
+        const std::optional<CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
         if (!expiresDate.has_value()) {
             return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
                    + ".";
@@ -252,9 +153,9 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
         info.expiresAt = *expiresEpoch;
         return std::nullopt;
     }
-    if (startsWith(line, "#@")) {
+    if (textParser().startsWith(line, "#@")) {
         std::uint64_t ntpExpiration = 0U;
-        if (!parseUint64(line.substr(2U), ntpExpiration)) {
+        if (!textParser().parseUint64(line.substr(2U), ntpExpiration)) {
             return "Leap-second table contains malformed expiration metadata at line " + std::to_string(lineNumber)
                    + ".";
         }
@@ -272,9 +173,9 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
         return false;
     }
 
-    const std::optional<CivilDateTime> effectiveDate = parseUtcDate(line.substr(0U, comma));
+    const std::optional<CivilDateTime> effectiveDate = textParser().parseUtcDate(line.substr(0U, comma));
     int taiMinusUtcSeconds = 0;
-    if (!effectiveDate.has_value() || !parseInt(line.substr(comma + 1U), taiMinusUtcSeconds)) {
+    if (!effectiveDate.has_value() || !textParser().parseInt(line.substr(comma + 1U), taiMinusUtcSeconds)) {
         return false;
     }
 
@@ -292,16 +193,17 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
 [[nodiscard]] bool parseIanaEntryLine(std::string_view line, LeapSecondTableEntry& entry) noexcept
 {
     const std::size_t commentOffset = line.find('#');
-    const std::string_view payload =
-        trimAsciiWhitespace(commentOffset == std::string_view::npos ? line : line.substr(0U, commentOffset));
-    const std::vector<std::string_view> columns = splitAsciiWhitespace(payload);
+    const std::string_view payload = textParser().trimAsciiWhitespace(
+        commentOffset == std::string_view::npos ? line : line.substr(0U, commentOffset)
+    );
+    const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(payload);
     if (columns.size() < 2U) {
         return false;
     }
 
     std::uint64_t ntpTimestamp = 0U;
     int taiMinusUtcSeconds = 0;
-    if (!parseUint64(columns[0], ntpTimestamp) || !parseInt(columns[1], taiMinusUtcSeconds)) {
+    if (!textParser().parseUint64(columns[0], ntpTimestamp) || !textParser().parseInt(columns[1], taiMinusUtcSeconds)) {
         return false;
     }
 
@@ -330,7 +232,7 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
 
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
 {
-    return startsWith(line, "effective_utc_date");
+    return textParser().startsWith(line, "effective_utc_date");
 }
 
 [[nodiscard]] EphemerisDateRange makeValidityRange(
@@ -430,18 +332,18 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
             line.remove_suffix(1U);
         }
 
-        line = trimAsciiWhitespace(line);
+        line = textParser().trimAsciiWhitespace(line);
         if (line.empty()) {
             continue;
         }
-        if (startsWith(line, "#@")) {
+        if (textParser().startsWith(line, "#@")) {
             if (std::optional<std::string> diagnosticText = applyMetadataLine(info, line, lineNumber);
                 diagnosticText.has_value()) {
                 return failureResult(std::move(info), LeapSecondTableStatus::Malformed, std::move(*diagnosticText));
             }
             continue;
         }
-        if (startsWith(line, "#")) {
+        if (textParser().startsWith(line, "#")) {
             continue;
         }
         if (isHeaderLine(line)) {
