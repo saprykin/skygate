@@ -1,12 +1,13 @@
 #include "SkySceneComposition.hpp"
 
+#include "SkyPerformanceLogging.hpp"
+
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
 #include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>
-#include <QLoggingCategory>
 #include <QPointF>
 
 #include <array>
@@ -14,16 +15,8 @@
 
 namespace {
 
-Q_LOGGING_CATEGORY(skygatePerfLog, "skygate.perf")
-
 constexpr int kReferenceLabelSampleCount = 96;
 constexpr double kReferenceLabelEdgeMarginPx = 36.0;
-
-bool performanceLoggingEnabled()
-{
-    static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
-    return enabled;
-}
 
 SkyOverlayItem
 overlayEntry(const QString& kind, const double x, const double y, const QString& text, const QColor& color)
@@ -170,14 +163,12 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
 )
 {
     QElapsedTimer timer;
-    if (performanceLoggingEnabled()) {
-        timer.start();
-    }
+    skygate::ui::startPerformanceTimer(timer);
 
     const SkySelectionOverlayInput selectionInput = buildSelectionInput(input, frameResult);
-    const qint64 selectionInputNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 selectionInputNs = skygate::ui::performanceElapsedNanoseconds(timer);
     const auto trailTargetBodyIndex = m_selectionOverlayBuilder.activeTrailTargetBodyIndex(selectionInput);
-    const qint64 trailResolveNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 trailResolveNs = skygate::ui::performanceElapsedNanoseconds(timer);
     const CompositionKey compositionKey{
         .renderFrameGeneration = frameResult.renderFrameGeneration,
         .trailTargetBodyIndex = trailTargetBodyIndex,
@@ -191,8 +182,9 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
         .inspectorPinned = input.inspectorPinned
     };
     if (!frameResult.updated && m_compositionKey.has_value() && m_compositionKey.value().equals(compositionKey)) {
-        if (performanceLoggingEnabled()) {
-            qCInfo(skygatePerfLog) << "scene composition skipped elapsedMs=" << timer.nsecsElapsed() / 1000000.0;
+        if (skygate::ui::performanceLoggingEnabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "scene composition skipped elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer);
         }
         return {};
     }
@@ -205,7 +197,7 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
     qint64 overlayNs = trailResolveNs;
     if (frameContentChanged) {
         sceneFrame.frame = *frameResult.frame;
-        frameCopyNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+        frameCopyNs = skygate::ui::performanceElapsedNanoseconds(timer);
         if (trailTargetBodyIndex.has_value()) {
             const TrailTargetPointers trailTarget = trailTargetPointers(frameResult.snapshot, *trailTargetBodyIndex);
             m_objectTrailBuilder.appendTrail(
@@ -225,28 +217,28 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
                 }
             );
         }
-        trailNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : frameCopyNs;
+        trailNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : frameCopyNs;
 
         sceneFrame.overlayItems = buildOverlayItems(sceneFrame, input, frameResult);
-        overlayNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : trailNs;
+        overlayNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : trailNs;
     }
 
     sceneFrame.selectionMarker = m_selectionOverlayBuilder.buildSelectionMarkerData(selectionInput);
-    const qint64 markerNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : overlayNs;
+    const qint64 markerNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : overlayNs;
     sceneFrame.selectedObjectInspector = m_selectionOverlayBuilder.buildSelectedObjectInspectorData(selectionInput);
-    const qint64 inspectorNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : markerNs;
+    const qint64 inspectorNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : markerNs;
     m_compositionKey = compositionKey;
-    if (performanceLoggingEnabled()) {
-        qCInfo(skygatePerfLog) << "scene composition elapsedMs=" << timer.nsecsElapsed() / 1000000.0
-                               << "selectionInputMs=" << selectionInputNs / 1000000.0
-                               << "trailResolveMs=" << (trailResolveNs - selectionInputNs) / 1000000.0
-                               << "frameCopyMs=" << (frameCopyNs - trailResolveNs) / 1000000.0
-                               << "trailMs=" << (trailNs - frameCopyNs) / 1000000.0
-                               << "overlayMs=" << (overlayNs - trailNs) / 1000000.0
-                               << "markerMs=" << (markerNs - overlayNs) / 1000000.0
-                               << "inspectorMs=" << (inspectorNs - markerNs) / 1000000.0
-                               << "frameContentChanged=" << frameContentChanged
-                               << "hasTrail=" << trailTargetBodyIndex.has_value();
+    if (skygate::ui::performanceLoggingEnabled()) {
+        qCInfo(skygate::ui::skygatePerfLog)
+            << "scene composition elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+            << "selectionInputMs=" << skygate::ui::performanceMilliseconds(selectionInputNs)
+            << "trailResolveMs=" << skygate::ui::performanceMilliseconds(trailResolveNs - selectionInputNs)
+            << "frameCopyMs=" << skygate::ui::performanceMilliseconds(frameCopyNs - trailResolveNs)
+            << "trailMs=" << skygate::ui::performanceMilliseconds(trailNs - frameCopyNs)
+            << "overlayMs=" << skygate::ui::performanceMilliseconds(overlayNs - trailNs)
+            << "markerMs=" << skygate::ui::performanceMilliseconds(markerNs - overlayNs)
+            << "inspectorMs=" << skygate::ui::performanceMilliseconds(inspectorNs - markerNs)
+            << "frameContentChanged=" << frameContentChanged << "hasTrail=" << trailTargetBodyIndex.has_value();
     }
     return SkySceneCompositionResult{.changed = true, .frameContentChanged = frameContentChanged};
 }

@@ -23,6 +23,8 @@ qt_add_library(skygate-ui-lib STATIC
     src/selection/SkyHitTargetIndex.hpp
     src/diagnostics/SkyLogging.cpp
     src/diagnostics/SkyLogging.hpp
+    src/diagnostics/SkyPerformanceLogging.cpp
+    src/diagnostics/SkyPerformanceLogging.hpp
     src/ephemeris/SkyEphemerisDataManager.cpp
     src/ephemeris/SkyEphemerisDataManager.hpp
     src/selection/SkyObjectTrailBuilder.cpp

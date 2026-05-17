@@ -1,25 +1,17 @@
 #include "SkyObjectInspectorBuilder.hpp"
 
+#include "SkyPerformanceLogging.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkySceneShared.hpp"
 
 #include "skygate/ephemeris/ObservationEventCalculator.hpp"
 
 #include <QElapsedTimer>
-#include <QLoggingCategory>
 
 #include <utility>
 #include <vector>
 
 namespace {
-
-Q_LOGGING_CATEGORY(skygatePerfLog, "skygate.perf")
-
-bool performanceLoggingEnabled()
-{
-    static const bool enabled = qEnvironmentVariableIsSet("SKYGATE_PERF_LOG");
-    return enabled;
-}
 
 SkyInspectorField inspectorField(const QString& label, const QString& value)
 {
@@ -52,15 +44,13 @@ void appendObservationEventFields(
     }
 
     QElapsedTimer timer;
-    if (performanceLoggingEnabled()) {
-        timer.start();
-    }
+    skygate::ui::startPerformanceTimer(timer);
 
     const auto events = observationEventsForInspector(input, body, bodyIndex);
-    if (performanceLoggingEnabled()) {
-        qCInfo(skygatePerfLog) << "object inspector events elapsedMs=" << timer.nsecsElapsed() / 1000000.0
-                               << "bodyId=" << QString::fromStdString(body.id)
-                               << "request=" << input.ephemerisRequest.has_value();
+    if (skygate::ui::performanceLoggingEnabled()) {
+        qCInfo(skygate::ui::skygatePerfLog)
+            << "object inspector events elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+            << "bodyId=" << QString::fromStdString(body.id) << "request=" << input.ephemerisRequest.has_value();
     }
     fields.push_back(
         inspectorField("Rise", skygate::ui::internal::formatObservationEvent(events.nextRise, input.timeController))
@@ -169,9 +159,7 @@ void appendEphemerisMetadataFields(
 SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOverlayInput& input) const
 {
     QElapsedTimer timer;
-    if (performanceLoggingEnabled()) {
-        timer.start();
-    }
+    skygate::ui::startPerformanceTimer(timer);
 
     if (!hasSelectionInputs(input)) {
         return {};
@@ -213,9 +201,9 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
         inspectorY = projected.y + 18.0;
     }
 
-    const qint64 lookupNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : 0;
+    const qint64 lookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
     const skygate::ephemeris::CelestialBodyState state = detailedInspectorState(input, sceneState);
-    const qint64 detailStateNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : lookupNs;
+    const qint64 detailStateNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : lookupNs;
 
     std::vector<SkyInspectorField> fields;
     fields.push_back(inspectorField("Type", skygate::ui::internal::celestialBodyTypeText(body)));
@@ -240,14 +228,15 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
             input.catalogSourceIds, input.catalogSourceLabels, sceneState.bodyIndex
         )
     ));
-    const qint64 fieldsNs = performanceLoggingEnabled() ? timer.nsecsElapsed() : detailStateNs;
+    const qint64 fieldsNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : detailStateNs;
 
-    if (performanceLoggingEnabled()) {
-        qCInfo(skygatePerfLog) << "object inspector build elapsedMs=" << timer.nsecsElapsed() / 1000000.0
-                               << "lookupMs=" << lookupNs / 1000000.0
-                               << "detailStateMs=" << (detailStateNs - lookupNs) / 1000000.0
-                               << "fieldsMs=" << (fieldsNs - detailStateNs) / 1000000.0
-                               << "bodyId=" << QString::fromStdString(body.id);
+    if (skygate::ui::performanceLoggingEnabled()) {
+        qCInfo(skygate::ui::skygatePerfLog)
+            << "object inspector build elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+            << "lookupMs=" << skygate::ui::performanceMilliseconds(lookupNs)
+            << "detailStateMs=" << skygate::ui::performanceMilliseconds(detailStateNs - lookupNs)
+            << "fieldsMs=" << skygate::ui::performanceMilliseconds(fieldsNs - detailStateNs)
+            << "bodyId=" << QString::fromStdString(body.id);
     }
 
     return SkySelectedObjectInspector{
