@@ -1,12 +1,12 @@
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 #include "catalog/io/zip/ZipCodec.hpp"
+#include "skygate/testsupport/PerformanceBudget.hpp"
 
 #include <QtTest/QtTest>
 
 #include <QElapsedTimer>
 
 #include <cmath>
-#include <cstdlib>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -19,55 +19,13 @@ private slots:
     void parsesModeratelyLargeHygCatalogWithinGuardrail();
     void parsesModeratelyLargeOpenNgcCatalogWithinGuardrail();
     void scansZipWithManyEntriesWithinGuardrail();
+    void wallClockBudgetsAreAdvisoryByDefault();
 };
 
 namespace {
 
 constexpr qint64 kLargeCatalogParseBudgetMs = 15000;
 constexpr qint64 kZipScanBudgetMs = 5000;
-
-bool isStrictPerformanceGuardMode()
-{
-    const QString mode = QString::fromUtf8(
-        qgetenv("SKYGATE_PERFORMANCE_GUARD_MODE")
-    ).trimmed().toLower();
-    const QString legacyStrict = QString::fromUtf8(
-        qgetenv("SKYGATE_STRICT_PERFORMANCE_GUARDS")
-    ).trimmed().toLower();
-    return mode == QStringLiteral("strict")
-        || (
-            !legacyStrict.isEmpty()
-            && legacyStrict != QStringLiteral("0")
-            && legacyStrict != QStringLiteral("false")
-            && legacyStrict != QStringLiteral("no")
-            && legacyStrict != QStringLiteral("off")
-        );
-}
-
-QString performanceMetricMessage(
-    const qint64 elapsedMs,
-    const qint64 budgetMs,
-    const char* operationName,
-    const bool strictMode
-)
-{
-    const qint64 deltaMs = budgetMs - elapsedMs;
-    const double budgetPercent = budgetMs > 0
-        ? (static_cast<double>(elapsedMs) * 100.0 / static_cast<double>(budgetMs))
-        : 0.0;
-    return QStringLiteral(
-        "perf %1: %2 elapsed=%3 ms budget=%4 ms delta=%5 ms budget_used=%6% "
-        "strict=%7"
-    )
-        .arg(elapsedMs < budgetMs ? QStringLiteral("within-budget")
-                                  : QStringLiteral("over-budget"))
-        .arg(QString::fromUtf8(operationName))
-        .arg(elapsedMs)
-        .arg(budgetMs)
-        .arg(deltaMs)
-        .arg(QString::number(budgetPercent, 'f', 1))
-        .arg(strictMode ? QStringLiteral("on") : QStringLiteral("off"));
-}
 
 struct ZipEntrySpec final {
     std::string path;
@@ -132,8 +90,7 @@ std::string makeZip(const std::vector<ZipEntrySpec>& entries)
         zipData += entry.path;
     }
 
-    const std::uint32_t centralDirectorySize =
-        static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
+    const std::uint32_t centralDirectorySize = static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
     appendLe32(zipData, 0x06054b50U);
     appendLe16(zipData, 0U);
     appendLe16(zipData, 0U);
@@ -145,35 +102,18 @@ std::string makeZip(const std::vector<ZipEntrySpec>& entries)
     return zipData;
 }
 
-void verifyElapsedBelow(
-    const qint64 elapsedMs,
-    const qint64 budgetMs,
-    const char* operationName
-)
+void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const char* operationName)
 {
-    const bool strictMode = isStrictPerformanceGuardMode();
-    const QString message = performanceMetricMessage(
-        elapsedMs,
-        budgetMs,
-        operationName,
-        strictMode
+    const skygate::testsupport::PerformanceBudgetDecision decision =
+        skygate::testsupport::reportPerformanceBudget(elapsedMs, budgetMs, operationName);
+    QVERIFY2(
+        decision != skygate::testsupport::PerformanceBudgetDecision::StrictOverBudget,
+        qPrintable(
+            skygate::testsupport::strictPerformanceBudgetHint(
+                skygate::testsupport::performanceMetricMessage(elapsedMs, budgetMs, operationName, true)
+            )
+        )
     );
-
-    if (elapsedMs < budgetMs) {
-        qInfo().noquote() << message;
-        return;
-    }
-
-    const QString strictHint = QStringLiteral(
-        "%1; set SKYGATE_PERFORMANCE_GUARD_MODE=strict or "
-        "SKYGATE_STRICT_PERFORMANCE_GUARDS=1 to make advisory budgets fail"
-    ).arg(message);
-    if (!strictMode) {
-        qWarning().noquote() << strictHint;
-        return;
-    }
-
-    QVERIFY2(false, qPrintable(strictHint));
 }
 
 std::string makeLargeHygCatalog(const int rowCount)
@@ -202,10 +142,9 @@ std::string makeLargeHygCatalog(const int rowCount)
 
 std::string makeLargeOpenNgcCatalog(const int rowCount)
 {
-    std::string csv =
-        "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
-        "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
-        "Identifiers;Common names;NED notes;OpenNGC notes\n";
+    std::string csv = "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
+                      "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
+                      "Identifiers;Common names;NED notes;OpenNGC notes\n";
     csv.reserve(static_cast<std::size_t>(rowCount) * 96U);
     for (int index = 0; index < rowCount; ++index) {
         const int hour = (index / 3600) % 24;
@@ -219,15 +158,12 @@ std::string makeLargeOpenNgcCatalog(const int rowCount)
         csv += std::to_string(ngcId);
         csv += ";G;";
         csv += QStringLiteral("%1:%2:%3.00")
-            .arg(hour, 2, 10, QLatin1Char('0'))
-            .arg(minute, 2, 10, QLatin1Char('0'))
-            .arg(second, 2, 10, QLatin1Char('0'))
-            .toStdString();
+                   .arg(hour, 2, 10, QLatin1Char('0'))
+                   .arg(minute, 2, 10, QLatin1Char('0'))
+                   .arg(second, 2, 10, QLatin1Char('0'))
+                   .toStdString();
         csv += ';';
-        csv += QStringLiteral("%1%2:00:00.0")
-            .arg(QChar(sign))
-            .arg(absDecDeg, 2, 10, QLatin1Char('0'))
-            .toStdString();
+        csv += QStringLiteral("%1%2:00:00.0").arg(QChar(sign)).arg(absDecDeg, 2, 10, QLatin1Char('0')).toStdString();
         csv += ";Tst;1.5;1.0;0;;";
         csv += std::to_string(8.0 + static_cast<double>(index % 50) / 10.0);
         csv += ";;;;;;;;;";
@@ -285,25 +221,36 @@ void CatalogPerformanceGuardTests::scansZipWithManyEntriesWithinGuardrail()
     std::vector<ZipEntrySpec> entries;
     entries.reserve(3001U);
     for (int index = 0; index < 3000; ++index) {
-        entries.push_back(ZipEntrySpec {
-            .path = "notes/readme-" + std::to_string(index) + ".txt",
-            .data = "not a catalog\n"
-        });
+        entries.push_back(
+            ZipEntrySpec{.path = "notes/readme-" + std::to_string(index) + ".txt", .data = "not a catalog\n"}
+        );
     }
-    entries.push_back(ZipEntrySpec {
-        .path = "catalogs/hyg.csv",
-        .data = "id,hip,proper,ra,dec,mag\n1,42,Target,1.0,2.0,3.0\n"
-    });
+    entries.push_back(
+        ZipEntrySpec{.path = "catalogs/hyg.csv", .data = "id,hip,proper,ra,dec,mag\n1,42,Target,1.0,2.0,3.0\n"}
+    );
     const std::string zipData = makeZip(entries);
 
     QElapsedTimer timer;
     timer.start();
-    const auto extracted = skygate::ephemeris::ZipCodec {}.extractFirstCsvEntry(zipData);
+    const auto extracted = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
     const qint64 elapsedMs = timer.elapsed();
 
     QVERIFY(extracted.has_value());
     QVERIFY(extracted->find("Target") != std::string::npos);
     verifyElapsedBelow(elapsedMs, kZipScanBudgetMs, "large ZIP entry scan");
+}
+
+void CatalogPerformanceGuardTests::wallClockBudgetsAreAdvisoryByDefault()
+{
+    using skygate::testsupport::PerformanceBudgetDecision;
+
+    QCOMPARE(
+        skygate::testsupport::performanceBudgetDecision(200, 100, false), PerformanceBudgetDecision::AdvisoryOverBudget
+    );
+    QCOMPARE(
+        skygate::testsupport::performanceBudgetDecision(200, 100, true), PerformanceBudgetDecision::StrictOverBudget
+    );
+    QCOMPARE(skygate::testsupport::performanceBudgetDecision(99, 100, true), PerformanceBudgetDecision::WithinBudget);
 }
 
 QTEST_APPLESS_MAIN(CatalogPerformanceGuardTests)
