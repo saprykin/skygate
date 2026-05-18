@@ -1,5 +1,7 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 
+#include "skygate/core/UtcTimeCodec.hpp"
+
 #include <array>
 #include <bit>
 #include <charconv>
@@ -156,7 +158,7 @@ void mixCatalogBody(std::uint64_t& hash, const CelestialBody& body) noexcept
 {
     std::uint64_t hash = kFnvOffsetBasis;
     mixEpoch(hash, request.epoch);
-    mixUint64(hash, static_cast<std::uint64_t>(request.context.utcTime.time_since_epoch().count()));
+    mixUint64(hash, static_cast<std::uint64_t>(core::UtcTimeCodec::toEpochMicros(request.context.utcTime)));
     mixObserver(hash, request.context.observer);
     mixOptions(hash, request.options);
     return hash;
@@ -227,7 +229,8 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
 [[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
 {
     return sameEpoch(lhs.epoch, rhs.epoch)
-           && lhs.context.utcTime.time_since_epoch().count() == rhs.context.utcTime.time_since_epoch().count()
+           && core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
+                  == core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
            && sameObserver(lhs.context.observer, rhs.context.observer) && sameOptions(lhs.options, rhs.options);
 }
 

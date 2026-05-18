@@ -1,5 +1,7 @@
 #include "SkyContextControllerSupport.hpp"
 
+#include "SkyQtTimeCodec.hpp"
+
 #include <QDate>
 #include <QDir>
 #include <QRegularExpression>
@@ -17,8 +19,7 @@ namespace {
 const QRegularExpression& utcDateInputPattern()
 {
     static const QRegularExpression pattern(
-        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)",
-        QRegularExpression::CaseInsensitiveOption
+        R"(^(\d{4,})-(\d{2})-(\d{2})(?:\s+(BCE|BC))?$)", QRegularExpression::CaseInsensitiveOption
     );
     return pattern;
 }
@@ -26,17 +27,11 @@ const QRegularExpression& utcDateInputPattern()
 QString formatDateText(const QDate& date)
 {
     const int year = date.year();
-    const qint64 displayYear = year < 0
-        ? -static_cast<qint64>(year)
-        : static_cast<qint64>(year);
+    const qint64 displayYear = year < 0 ? -static_cast<qint64>(year) : static_cast<qint64>(year);
     const QString yearText = QString::number(displayYear).rightJustified(4, '0');
-    const QString dateText = QString("%1-%2-%3")
-        .arg(yearText)
-        .arg(date.month(), 2, 10, QChar('0'))
-        .arg(date.day(), 2, 10, QChar('0'));
-    return year < 0
-        ? QString("%1 BCE").arg(dateText)
-        : dateText;
+    const QString dateText =
+        QString("%1-%2-%3").arg(yearText).arg(date.month(), 2, 10, QChar('0')).arg(date.day(), 2, 10, QChar('0'));
+    return year < 0 ? QString("%1 BCE").arg(dateText) : dateText;
 }
 
 }  // namespace
@@ -65,9 +60,7 @@ QString SkyContextProjectionTypeCodec::toString(const skygate::core::ProjectionT
     return "Unknown";
 }
 
-std::optional<skygate::core::ProjectionType> SkyContextProjectionTypeCodec::fromString(
-    const QString& value
-)
+std::optional<skygate::core::ProjectionType> SkyContextProjectionTypeCodec::fromString(const QString& value)
 {
     const QString normalized = value.trimmed().toLower();
     if (normalized == "stereographic") {
@@ -99,9 +92,7 @@ QString SkyContextLocationSourceCodec::toString(const SkyContextLocationSource l
     return "Custom";
 }
 
-std::optional<SkyContextLocationSource> SkyContextLocationSourceCodec::fromString(
-    const QString& value
-)
+std::optional<SkyContextLocationSource> SkyContextLocationSourceCodec::fromString(const QString& value)
 {
     const QString normalized = value.trimmed().toCaseFolded();
     if (normalized == "current device") {
@@ -151,13 +142,12 @@ bool SkyContextLocationSourceCodec::isAvailable(const SkyContextLocationSource l
 
 QDateTime SkyContextTimeCodec::toQDateTimeUtc(const skygate::core::UtcTimePoint& utcTime)
 {
-    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(utcTime.time_since_epoch());
-    return QDateTime::fromSecsSinceEpoch(seconds.count(), QTimeZone::UTC);
+    return SkyQtTimeCodec::toQDateTimeUtc(utcTime);
 }
 
 skygate::core::UtcTimePoint SkyContextTimeCodec::toUtcTimePoint(const QDateTime& utcTime)
 {
-    return skygate::core::UtcTimePoint(std::chrono::seconds(utcTime.toSecsSinceEpoch()));
+    return SkyQtTimeCodec::toUtcTimePoint(utcTime);
 }
 
 bool SkyContextUtcDateTimeTextCodec::ParseResult::isValid() const noexcept
@@ -165,26 +155,18 @@ bool SkyContextUtcDateTimeTextCodec::ParseResult::isValid() const noexcept
     return utcDateTime.isValid() && errorText.isEmpty();
 }
 
-SkyContextUtcDateTimeTextCodec::ParseResult SkyContextUtcDateTimeTextCodec::parse(
-    const QString& utcDateText,
-    const QString& utcTimeText
-)
+SkyContextUtcDateTimeTextCodec::ParseResult
+SkyContextUtcDateTimeTextCodec::parse(const QString& utcDateText, const QString& utcTimeText)
 {
     const QRegularExpressionMatch dateMatch = utcDateInputPattern().match(utcDateText.trimmed());
     if (!dateMatch.hasMatch()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."
-        };
+        return {.utcDateTime = {}, .errorText = "Use YYYY-MM-DD for CE or YYYY-MM-DD BCE for ancient dates."};
     }
 
     bool isValidYear = false;
     const int yearMagnitude = dateMatch.captured(1).toInt(&isValidYear);
     if (!isValidYear || yearMagnitude == 0) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE."
-        };
+        return {.utcDateTime = {}, .errorText = "Year 0000 is invalid. Use 0001 BCE for the year before 0001 CE."};
     }
 
     bool isValidMonth = false;
@@ -192,44 +174,27 @@ SkyContextUtcDateTimeTextCodec::ParseResult SkyContextUtcDateTimeTextCodec::pars
     bool isValidDay = false;
     const int day = dateMatch.captured(3).toInt(&isValidDay);
     if (!isValidMonth || !isValidDay) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Enter a valid UTC date."
-        };
+        return {.utcDateTime = {}, .errorText = "Enter a valid UTC date."};
     }
 
     const bool isBce = !dateMatch.captured(4).isEmpty();
-    const int year = isBce
-        ? -yearMagnitude
-        : yearMagnitude;
+    const int year = isBce ? -yearMagnitude : yearMagnitude;
     const QDate date(year, month, day);
     if (!date.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Enter a valid UTC date."
-        };
+        return {.utcDateTime = {}, .errorText = "Enter a valid UTC date."};
     }
 
     const QTime time = QTime::fromString(utcTimeText.trimmed(), "HH:mm:ss");
     if (!time.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Use HH:mm:ss for the UTC time."
-        };
+        return {.utcDateTime = {}, .errorText = "Use HH:mm:ss for the UTC time."};
     }
 
     const QDateTime utcDateTime(date, time, QTimeZone::UTC);
     if (!utcDateTime.isValid()) {
-        return {
-            .utcDateTime = {},
-            .errorText = "Enter a valid UTC date and time."
-        };
+        return {.utcDateTime = {}, .errorText = "Enter a valid UTC date and time."};
     }
 
-    return {
-        .utcDateTime = utcDateTime,
-        .errorText = {}
-    };
+    return {.utcDateTime = utcDateTime, .errorText = {}};
 }
 
 QString SkyContextUtcDateTimeTextCodec::formatDate(const QDateTime& utcTime)
@@ -249,9 +214,7 @@ QString SkyContextSettings::defaultCatalogCachePath()
         return {};
     }
 
-    return QDir(appDataPath).filePath(
-        QString::fromUtf8(SkyContextControllerConstants::kCatalogCacheFileName)
-    );
+    return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kCatalogCacheFileName));
 }
 
 QString SkyContextSettings::defaultDeepSkyCatalogCachePath()
@@ -261,23 +224,17 @@ QString SkyContextSettings::defaultDeepSkyCatalogCachePath()
         return {};
     }
 
-    return QDir(appDataPath).filePath(
-        QString::fromUtf8(SkyContextControllerConstants::kDeepSkyCatalogCacheFileName)
-    );
+    return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kDeepSkyCatalogCacheFileName));
 }
 
-QByteArray SkyContextCatalogCodec::serializeConstellationLineRows(
-    const std::vector<std::pair<std::string, std::string>>& lineRefs
-)
+QByteArray
+SkyContextCatalogCodec::serializeConstellationLineRows(const std::vector<std::pair<std::string, std::string>>& lineRefs)
 {
-    return QByteArray::fromStdString(
-        skygate::ephemeris::ConstellationDataCodec::serializeLineRows(lineRefs)
-    );
+    return QByteArray::fromStdString(skygate::ephemeris::ConstellationDataCodec::serializeLineRows(lineRefs));
 }
 
-std::vector<std::pair<std::string, std::string>> SkyContextCatalogCodec::parseConstellationLineRows(
-    const std::string_view rows
-)
+std::vector<std::pair<std::string, std::string>>
+SkyContextCatalogCodec::parseConstellationLineRows(const std::string_view rows)
 {
     return skygate::ephemeris::ConstellationDataCodec::parseLineRows(rows);
 }
@@ -286,9 +243,7 @@ QByteArray SkyContextCatalogCodec::serializeConstellationLabelRows(
     const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
 )
 {
-    return QByteArray::fromStdString(
-        skygate::ephemeris::ConstellationDataCodec::serializeLabelRows(labelRefs)
-    );
+    return QByteArray::fromStdString(skygate::ephemeris::ConstellationDataCodec::serializeLabelRows(labelRefs));
 }
 
 std::vector<std::pair<std::string, std::vector<std::string>>>
@@ -304,8 +259,7 @@ double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)
 }
 
 QColor SkyContextRenderStyle::colorForBodyType(
-    const skygate::ephemeris::CelestialBodyType type,
-    const SkyThemeRenderPalette& renderPalette
+    const skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderPalette
 )
 {
     switch (type) {
@@ -326,9 +280,7 @@ QColor SkyContextRenderStyle::colorForBodyType(
     return renderPalette.bodyStar;
 }
 
-QColor SkyContextRenderStyle::constellationLineColor(
-    const SkyThemeRenderPalette& renderPalette
-)
+QColor SkyContextRenderStyle::constellationLineColor(const SkyThemeRenderPalette& renderPalette)
 {
     return renderPalette.constellationLine;
 }

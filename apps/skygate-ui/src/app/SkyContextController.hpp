@@ -18,6 +18,7 @@
 #include "SkyContextDomainControllers.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkySettingsStore.hpp"
+#include "SkyLiveClock.hpp"
 #include "SkyTimeController.hpp"
 
 #include <cstdint>
@@ -421,13 +422,14 @@ signals:
 
 private:
     [[nodiscard]] QDateTime currentUtcDateTime() const;
+    [[nodiscard]] skygate::core::UtcTimePoint currentUtcTime() const;
     [[nodiscard]] bool liveRecomputeThrottleApplies() const;
     [[nodiscard]] bool liveRecomputeThrottled() const;
-    [[nodiscard]] int acceptedLiveTickSeconds() const;
     void markLiveRecomputeTick();
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
+    void setCurrentUtcTime(const skygate::core::UtcTimePoint& utcTime);
     [[nodiscard]] bool setViewCenterInternal(double altitudeDeg, double azimuthDeg);
     [[nodiscard]] bool recenterTrackedTarget(bool emitSkyContextChangedWhenUnchanged = false);
     void setViewFieldOfViewDeg(double viewFieldOfViewDeg);
@@ -459,6 +461,7 @@ private:
     skygate::ui::internal::SkySearchController m_search;
     QTimer m_timer;
     QElapsedTimer m_liveRecomputeThrottleTimer;
+    SkyLiveClock m_liveClock;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
     std::unique_ptr<skygate::ui::internal::SkyThemeRepository> m_themeRepository;

@@ -1,8 +1,11 @@
 #include <QtTest>
 
+#include "SkyLiveClock.hpp"
+#include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 
 #include "skygate/core/ITimeSource.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <QSignalSpy>
 #include <QTimeZone>
@@ -12,6 +15,7 @@
 namespace {
 
 constexpr qint64 kFixedUtcEpochSeconds = 1'778'064'600;
+constexpr qint64 kFixedUtcEpochMicros = kFixedUtcEpochSeconds * 1'000'000 + 123'000;
 
 bool isExpectedZurichLabel(const QString& label, const QString& abbreviation, const QString& offset)
 {
@@ -22,7 +26,7 @@ class FixedTimeSource final : public skygate::core::ITimeSource {
 public:
     [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
     {
-        return skygate::core::UtcTimePoint(std::chrono::seconds(kFixedUtcEpochSeconds));
+        return skygate::core::UtcTimeCodec::fromEpochMicros(kFixedUtcEpochMicros);
     }
 };
 
@@ -33,6 +37,9 @@ class SkyTimeControllerTests final : public QObject {
 
 private slots:
     void usesInjectedTimeSourceForInitialUtc();
+    void preservesInjectedMicrosecondTimePoint();
+    void qtTimeCodecPreservesMillisecondPrecision();
+    void liveClockAdvancesFromMonotonicElapsedTime();
     void defaultsToSystemTimeZoneOrUtc();
     void rejectsInvalidTimeZoneIds();
     void changingTimeZonePreservesUtcInstant();
@@ -47,10 +54,38 @@ void SkyTimeControllerTests::usesInjectedTimeSourceForInitialUtc()
     FixedTimeSource timeSource;
     SkyTimeController controller(timeSource);
 
-    QCOMPARE(
-        controller.utcDateTime(),
-        QDateTime::fromSecsSinceEpoch(kFixedUtcEpochSeconds, QTimeZone::UTC)
-    );
+    QCOMPARE(controller.utcDateTime(), QDateTime::fromMSecsSinceEpoch(kFixedUtcEpochMicros / 1000, QTimeZone::UTC));
+}
+
+void SkyTimeControllerTests::preservesInjectedMicrosecondTimePoint()
+{
+    FixedTimeSource timeSource;
+    SkyTimeController controller(timeSource);
+
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(controller.utcTimePoint()), kFixedUtcEpochMicros);
+}
+
+void SkyTimeControllerTests::qtTimeCodecPreservesMillisecondPrecision()
+{
+    const QDateTime utcDateTime(QDate(2026, 5, 6), QTime(9, 30, 0, 987), QTimeZone::UTC);
+    const auto utcTime = SkyQtTimeCodec::toUtcTimePoint(utcDateTime);
+
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(utcTime), utcDateTime.toMSecsSinceEpoch() * 1000);
+    QCOMPARE(SkyQtTimeCodec::toQDateTimeUtc(utcTime), utcDateTime);
+}
+
+void SkyTimeControllerTests::liveClockAdvancesFromMonotonicElapsedTime()
+{
+    SkyLiveClock liveClock;
+    const auto anchorUtc = skygate::core::UtcTimeCodec::fromEpochMicros(1'717'276'800'000'000LL);
+    liveClock.start(anchorUtc);
+
+    QTest::qWait(20);
+
+    const auto elapsedMicros = skygate::core::UtcTimeCodec::toEpochMicros(liveClock.currentUtc())
+                               - skygate::core::UtcTimeCodec::toEpochMicros(anchorUtc);
+    QVERIFY(elapsedMicros >= 10'000);
+    QVERIFY(elapsedMicros < 500'000);
 }
 
 void SkyTimeControllerTests::defaultsToSystemTimeZoneOrUtc()
@@ -58,8 +93,8 @@ void SkyTimeControllerTests::defaultsToSystemTimeZoneOrUtc()
     SkyTimeController controller;
     const QByteArray systemId = QTimeZone::systemTimeZoneId();
     const QString expectedId = !systemId.isEmpty() && QTimeZone::isTimeZoneIdAvailable(systemId)
-        ? QString::fromUtf8(systemId)
-        : QStringLiteral("UTC");
+                                   ? QString::fromUtf8(systemId)
+                                   : QStringLiteral("UTC");
     QCOMPARE(controller.timeZoneId(), expectedId);
     QVERIFY(!controller.dateText().isEmpty());
     QVERIFY(!controller.timeText().isEmpty());
@@ -96,20 +131,12 @@ void SkyTimeControllerTests::formatsSeasonalDstLabels()
     QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
 
     controller.setUtcDateTime(QDateTime(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC));
-    QVERIFY(isExpectedZurichLabel(
-        controller.timeZoneLabel(),
-        QStringLiteral("CET"),
-        QStringLiteral("UTC+01:00")
-    ));
+    QVERIFY(isExpectedZurichLabel(controller.timeZoneLabel(), QStringLiteral("CET"), QStringLiteral("UTC+01:00")));
     QCOMPARE(controller.dateText(), QStringLiteral("2026-01-15"));
     QCOMPARE(controller.timeText(), QStringLiteral("13:00:00"));
 
     controller.setUtcDateTime(QDateTime(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC));
-    QVERIFY(isExpectedZurichLabel(
-        controller.timeZoneLabel(),
-        QStringLiteral("CEST"),
-        QStringLiteral("UTC+02:00")
-    ));
+    QVERIFY(isExpectedZurichLabel(controller.timeZoneLabel(), QStringLiteral("CEST"), QStringLiteral("UTC+02:00")));
     QCOMPARE(controller.timeText(), QStringLiteral("14:00:00"));
 }
 
@@ -118,18 +145,12 @@ void SkyTimeControllerTests::parsesSelectedZoneWallTimeToUtc()
     SkyTimeController controller;
     QVERIFY(controller.setTimeZoneId(QStringLiteral("Europe/Zurich")));
     connect(
-        &controller,
-        &SkyTimeController::utcDateTimeChangeRequested,
-        &controller,
-        &SkyTimeController::setUtcDateTime
+        &controller, &SkyTimeController::utcDateTimeChangeRequested, &controller, &SkyTimeController::setUtcDateTime
     );
 
     QVERIFY(controller.setDateTimeText(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30")));
 
-    QCOMPARE(
-        controller.utcDateTime(),
-        QDateTime(QDate(2026, 5, 6), QTime(7, 30, 30), QTimeZone::UTC)
-    );
+    QCOMPARE(controller.utcDateTime(), QDateTime(QDate(2026, 5, 6), QTime(7, 30, 30), QTimeZone::UTC));
     QCOMPARE(controller.dateText(), QStringLiteral("2026-05-06"));
     QCOMPARE(controller.timeText(), QStringLiteral("09:30:30"));
 }
@@ -139,10 +160,7 @@ void SkyTimeControllerTests::validatesBceInput()
     SkyTimeController controller;
     QVERIFY(controller.setTimeZoneId(QStringLiteral("UTC")));
     connect(
-        &controller,
-        &SkyTimeController::utcDateTimeChangeRequested,
-        &controller,
-        &SkyTimeController::setUtcDateTime
+        &controller, &SkyTimeController::utcDateTimeChangeRequested, &controller, &SkyTimeController::setUtcDateTime
     );
 
     QCOMPARE(

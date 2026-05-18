@@ -1,9 +1,12 @@
 #include "skygate/core/ProjectionTypes.hpp"
 #include "skygate/core/SkyTypes.hpp"
+#include "skygate/core/SystemTimeSource.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 
 class CoreTypesTests final : public QObject {
@@ -13,6 +16,9 @@ private slots:
     void defaultSkyContextStartsAtEpoch();
     void horizontalCoordinateNormalizesAzimuth();
     void horizontalCoordinatePreservesNonFiniteAzimuthDuringNormalization();
+    void utcTimeCodecRoundTripsMicroseconds();
+    void utcTimeCodecFloorsNegativeEpochSeconds();
+    void systemTimeSourceUsesMicrosecondStorage();
     void projectionParamsUseCoreProjectionPolicy();
     void projectionParamsRejectNonFiniteValues();
 };
@@ -25,7 +31,7 @@ void CoreTypesTests::defaultSkyContextStartsAtEpoch()
 
 void CoreTypesTests::horizontalCoordinateNormalizesAzimuth()
 {
-    const skygate::core::HorizontalCoordinate coordinate {
+    const skygate::core::HorizontalCoordinate coordinate{
         .altitudeDeg = 15.0,
         .azimuthDeg = -30.0,
     };
@@ -40,7 +46,7 @@ void CoreTypesTests::horizontalCoordinateNormalizesAzimuth()
 void CoreTypesTests::horizontalCoordinatePreservesNonFiniteAzimuthDuringNormalization()
 {
     const double nan = std::numeric_limits<double>::quiet_NaN();
-    const skygate::core::HorizontalCoordinate coordinate {
+    const skygate::core::HorizontalCoordinate coordinate{
         .altitudeDeg = 15.0,
         .azimuthDeg = nan,
     };
@@ -53,9 +59,37 @@ void CoreTypesTests::horizontalCoordinatePreservesNonFiniteAzimuthDuringNormaliz
     QVERIFY(!normalized.isValid());
 }
 
+void CoreTypesTests::utcTimeCodecRoundTripsMicroseconds()
+{
+    const auto utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(1'717'276'800'123'456LL);
+
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(utcTime), 1'717'276'800'123'456LL);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochSecondsFloor(utcTime), 1'717'276'800LL);
+    QCOMPARE(
+        skygate::core::UtcTimeCodec::toEpochMicros(skygate::core::UtcTimeCodec::fromEpochSeconds(42)), 42'000'000LL
+    );
+    QCOMPARE(skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime), 1'717'276'800.123456);
+}
+
+void CoreTypesTests::utcTimeCodecFloorsNegativeEpochSeconds()
+{
+    const auto utcTime = skygate::core::UtcTimeCodec::fromEpochMicros(-1'234'001LL);
+
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochSecondsFloor(utcTime), -2LL);
+}
+
+void CoreTypesTests::systemTimeSourceUsesMicrosecondStorage()
+{
+    const skygate::core::SystemTimeSource timeSource;
+    const auto nowUtc = timeSource.nowUtc();
+
+    const auto micros = skygate::core::UtcTimeCodec::toEpochMicros(nowUtc);
+    QVERIFY(std::llabs(micros) > 1'000'000LL);
+}
+
 void CoreTypesTests::projectionParamsUseCoreProjectionPolicy()
 {
-    skygate::core::ProjectionParams params {
+    skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 360.0},
         .fovDeg = skygate::core::ProjectionParams::kFieldOfViewMinDeg,
         .rollDeg = 0.0,
@@ -85,7 +119,7 @@ void CoreTypesTests::projectionParamsRejectNonFiniteValues()
 {
     const double nan = std::numeric_limits<double>::quiet_NaN();
     const double infinity = std::numeric_limits<double>::infinity();
-    skygate::core::ProjectionParams params {
+    skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 180.0},
         .fovDeg = 90.0,
         .rollDeg = 0.0,

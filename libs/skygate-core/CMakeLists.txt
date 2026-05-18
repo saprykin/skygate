@@ -7,6 +7,7 @@ add_library(skygate-core STATIC
     include/skygate/core/SkyTypes.hpp
     include/skygate/core/SystemTimeSource.hpp
     include/skygate/core/Types.hpp
+    include/skygate/core/UtcTimeCodec.hpp
     include/skygate/core/math/AngleMath.hpp
     include/skygate/core/math/Geometry2d.hpp
     include/skygate/core/math/LinePattern.hpp
@@ -22,6 +23,7 @@ add_library(skygate-core STATIC
     src/PreparedProjection.cpp
     src/ProjectionTypes.cpp
     src/SystemTimeSource.cpp
+    src/UtcTimeCodec.cpp
     src/math/AngleMath.cpp
     src/math/Geometry2d.cpp
     src/math/LinePattern.cpp

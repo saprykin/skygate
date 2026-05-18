@@ -1,5 +1,7 @@
 #include "SkyObjectInspectorFormatters.hpp"
 
+#include "SkyQtTimeCodec.hpp"
+
 #include "SkyTimeController.hpp"
 
 #include <QDateTime>
@@ -236,8 +238,7 @@ QString formatEquatorialCoordinate(const core::EquatorialCoordinate& equatorial)
 
 QString formatUtcTime(const core::UtcTimePoint& utcTime)
 {
-    return QDateTime::fromSecsSinceEpoch(utcTime.time_since_epoch().count(), QTimeZone::UTC)
-        .toString("yyyy-MM-dd HH:mm:ss 'UTC'");
+    return SkyQtTimeCodec::toQDateTimeUtc(utcTime).toString("yyyy-MM-dd HH:mm:ss 'UTC'");
 }
 
 QString formatObservationEvent(const ephemeris::ObservationEvent& event)

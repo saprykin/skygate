@@ -1,4 +1,5 @@
 #include "SkyContextControllerTestSupport.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <cmath>
 #include <memory>
@@ -38,8 +39,8 @@ public:
         m_options = options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = request.context;
@@ -157,7 +158,7 @@ private:
         }
 
         constexpr double kSecondsPerDay = 86'400.0;
-        const double seconds = static_cast<double>(request.context.utcTime.time_since_epoch().count());
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(request.context.utcTime);
         double dayFraction = std::fmod(seconds, kSecondsPerDay) / kSecondsPerDay;
         if (dayFraction < 0.0) {
             dayFraction += 1.0;
@@ -286,9 +287,11 @@ void SkyContextControllerNightCatalogTests::nightConditionsUseSelectedEngineRequ
         static_cast<std::uint8_t>(lastRequestOptions->engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
     );
-    QVERIFY(skygate::ephemeris::hasCorrectionFlag(
-        lastRequestOptions->correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
-    ));
+    QVERIFY(
+        skygate::ephemeris::hasCorrectionFlag(
+            lastRequestOptions->correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        )
+    );
 }
 
 void SkyContextControllerNightCatalogTests::failedDeepSkyCatalogDownloadKeepsCountLabel()

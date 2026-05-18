@@ -1,5 +1,6 @@
 #include "engine/simple/AstronomicalTime.hpp"
 
+#include "skygate/core/UtcTimeCodec.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 
 namespace skygate::ephemeris {
@@ -13,8 +14,7 @@ constexpr double kSecondsPerDay = 86400.0;
 
 double AstronomicalTime::julianDayFromUtc(const core::UtcTimePoint& utcTime) noexcept
 {
-    const auto epochSeconds = utcTime.time_since_epoch().count();
-    return static_cast<double>(epochSeconds) / kSecondsPerDay + kUnixEpochJulianDay;
+    return core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / kSecondsPerDay + kUnixEpochJulianDay;
 }
 
 double AstronomicalTime::daysSinceJ2000(const core::UtcTimePoint& utcTime) noexcept

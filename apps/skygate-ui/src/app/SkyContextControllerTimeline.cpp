@@ -8,8 +8,8 @@
 #include "skygate/core/math/ViewportMath.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
-#include <limits>
 
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
@@ -22,7 +22,12 @@ using namespace skygate::ui::internal;
 
 QDateTime SkyContextController::currentUtcDateTime() const
 {
-    return SkyContextTimeCodec::toQDateTimeUtc(m_timeSource->nowUtc());
+    return SkyContextTimeCodec::toQDateTimeUtc(currentUtcTime());
+}
+
+skygate::core::UtcTimePoint SkyContextController::currentUtcTime() const
+{
+    return m_timeSource->nowUtc();
 }
 
 void SkyContextController::setLive(bool live)
@@ -33,9 +38,12 @@ void SkyContextController::setLive(bool live)
 
     m_liveRecomputeThrottleTimer.invalidate();
     if (m_timeline.live()) {
-        const QDateTime currentUtc = currentUtcDateTime();
-        const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime());
+        m_liveClock.start(m_location.utcTime());
+        const skygate::core::UtcTimePoint currentUtc = currentUtcTime();
+        const skygate::core::UtcTimePoint timelineUtc = m_location.utcTime();
         m_timeline.setCatchingUpToCurrentUtc(timelineUtc < currentUtc);
+    } else {
+        m_liveClock.stop();
     }
 
     emit liveChanged();
@@ -53,19 +61,6 @@ bool SkyContextController::liveRecomputeThrottled() const
     }
 
     return m_liveRecomputeThrottleTimer.elapsed() < SkyContextControllerConstants::kThrottledLiveRecomputeIntervalMs;
-}
-
-int SkyContextController::acceptedLiveTickSeconds() const
-{
-    if (!liveRecomputeThrottleApplies() || !m_liveRecomputeThrottleTimer.isValid()) {
-        return 1;
-    }
-
-    const qint64 elapsedSeconds = std::max<qint64>(1, m_liveRecomputeThrottleTimer.elapsed() / 1000);
-    if (elapsedSeconds > std::numeric_limits<int>::max()) {
-        return std::numeric_limits<int>::max();
-    }
-    return static_cast<int>(elapsedSeconds);
 }
 
 void SkyContextController::markLiveRecomputeTick()
@@ -201,7 +196,7 @@ void SkyContextController::resetViewDirection()
 
 void SkyContextController::goLiveNow()
 {
-    setCurrentUtc(currentUtcDateTime());
+    setCurrentUtcTime(currentUtcTime());
     m_timeline.resetSpeedProgress();
     m_timeline.setCatchingUpToCurrentUtc(false);
     setLive(true);
@@ -314,40 +309,48 @@ void SkyContextController::tickUtcTime()
     if (!m_timeline.live()) {
         return;
     }
+
+    skygate::core::UtcTimePoint nextUtc = m_liveClock.currentUtc();
+    const skygate::core::UtcTimePoint currentWallUtc = currentUtcTime();
+    const skygate::core::UtcTimePoint timelineUtc = m_location.utcTime();
+    const bool catchingUpToCurrentUtc = m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentWallUtc;
+    if (catchingUpToCurrentUtc) {
+        const double elapsedSeconds = std::chrono::duration<double>(nextUtc - timelineUtc).count();
+        const double timelineAdvanceSeconds =
+            elapsedSeconds * m_timeline.speedMultiplier() * static_cast<double>(m_timeline.stepSeconds());
+        if (timelineAdvanceSeconds <= 0.0) {
+            return;
+        }
+
+        nextUtc = timelineUtc
+                  + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(
+                      std::chrono::duration<double>(timelineAdvanceSeconds)
+                  );
+        if (nextUtc > currentWallUtc) {
+            nextUtc = currentWallUtc;
+        }
+    }
+
+    m_timeController->setUtcTimePoint(nextUtc);
     if (liveRecomputeThrottled()) {
         return;
     }
 
-    const int liveTickSeconds = acceptedLiveTickSeconds();
-    const QDateTime currentUtc = currentUtcDateTime();
-    const QDateTime timelineUtc = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime());
-    const bool catchingUpToCurrentUtc = m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentUtc;
     if (catchingUpToCurrentUtc) {
-        m_timeline.addSpeedRemainderSeconds(
-            m_timeline.speedMultiplier() * static_cast<double>(m_timeline.stepSeconds())
-            * static_cast<double>(liveTickSeconds)
-        );
-        const int wholeSeconds = m_timeline.takeWholeSpeedRemainderSeconds();
-        if (wholeSeconds <= 0) {
-            return;
-        }
-
-        int appliedStepSeconds = wholeSeconds;
-        const qint64 secondsUntilCurrentUtc = timelineUtc.secsTo(currentUtc);
-        appliedStepSeconds = std::min(appliedStepSeconds, static_cast<int>(secondsUntilCurrentUtc));
-        m_timeline.setCatchingUpToCurrentUtc(appliedStepSeconds < secondsUntilCurrentUtc);
+        m_timeline.setCatchingUpToCurrentUtc(nextUtc < currentWallUtc);
         if (!m_timeline.catchingUpToCurrentUtc()) {
             m_timeline.resetSpeedProgress();
         }
 
-        stepBySeconds(appliedStepSeconds);
+        setCurrentUtcTime(nextUtc);
+        m_liveClock.resetAnchor(nextUtc);
         markLiveRecomputeTick();
         return;
     }
 
     m_timeline.setCatchingUpToCurrentUtc(false);
     m_timeline.resetSpeedProgress();
-    stepBySeconds(liveTickSeconds);
+    setCurrentUtcTime(nextUtc);
     markLiveRecomputeTick();
 }
 
@@ -361,18 +364,22 @@ void SkyContextController::stepBySeconds(const int stepSeconds)
         m_timeline.resetSpeedProgress();
     }
 
-    setCurrentUtc(SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).addSecs(stepSeconds));
+    setCurrentUtcTime(m_location.utcTime() + std::chrono::seconds(stepSeconds));
 }
 
 void SkyContextController::setCurrentUtc(const QDateTime& utcTime)
 {
-    const auto nextUtc = SkyContextTimeCodec::toUtcTimePoint(utcTime.toUTC());
-    if (m_location.utcTime() == nextUtc) {
+    setCurrentUtcTime(SkyContextTimeCodec::toUtcTimePoint(utcTime.toUTC()));
+}
+
+void SkyContextController::setCurrentUtcTime(const skygate::core::UtcTimePoint& utcTime)
+{
+    if (m_location.utcTime() == utcTime) {
         return;
     }
 
-    m_location.setUtcTime(nextUtc);
-    m_timeController->setUtcDateTime(utcTime.toUTC());
+    m_location.setUtcTime(utcTime);
+    m_timeController->setUtcTimePoint(utcTime);
     emit utcDateTextChanged();
     emit utcTimeTextChanged();
     emit nightConditionsChanged();

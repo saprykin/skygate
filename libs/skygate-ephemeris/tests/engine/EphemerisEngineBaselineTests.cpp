@@ -1,4 +1,5 @@
 #include "TestHelpers.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 #include "skygate/ephemeris/CatalogComposer.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
@@ -36,7 +37,7 @@ skygate::ephemeris::CelestialBody makeBody(
 skygate::ephemeris::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimePoint& utcTime)
 {
     const double julianDay =
-        static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay + kUnixEpochJulianDay;
+        skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / kSecondsPerDay + kUnixEpochJulianDay;
     const double julianDatePart1 = std::floor(julianDay);
     return {
         .julianDatePart1 = julianDatePart1,
@@ -299,7 +300,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
     const auto contextSnapshot = engine->compute(context);
     const auto requestSnapshot = engine->compute(request);
 
-    QCOMPARE(requestSnapshot.context.utcTime.time_since_epoch().count(), context.utcTime.time_since_epoch().count());
+    QCOMPARE(requestSnapshot.context.utcTime, context.utcTime);
     QCOMPARE(requestSnapshot.context.observer.latitudeDeg, context.observer.latitudeDeg);
     QCOMPARE(requestSnapshot.context.observer.longitudeDeg, context.observer.longitudeDeg);
     QCOMPARE(requestSnapshot.states.size(), contextSnapshot.states.size());
@@ -311,18 +312,26 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
         QCOMPARE(requestState.metadata.status, contextState.metadata.status);
         QCOMPARE(requestState.metadata.warningCodeMask, contextState.metadata.warningCodeMask);
         QCOMPARE(requestState.metadata.appliedCorrections, contextState.metadata.appliedCorrections);
-        QVERIFY(skygate::ephemeris::tests::isNear(
-            requestState.equatorial.rightAscensionHours, contextState.equatorial.rightAscensionHours, 1e-12
-        ));
-        QVERIFY(skygate::ephemeris::tests::isNear(
-            requestState.equatorial.declinationDeg, contextState.equatorial.declinationDeg, 1e-12
-        ));
-        QVERIFY(skygate::ephemeris::tests::isNear(
-            requestState.horizontal.altitudeDeg, contextState.horizontal.altitudeDeg, 1e-12
-        ));
-        QVERIFY(skygate::ephemeris::tests::isNear(
-            requestState.horizontal.azimuthDeg, contextState.horizontal.azimuthDeg, 1e-12
-        ));
+        QVERIFY(
+            skygate::ephemeris::tests::isNear(
+                requestState.equatorial.rightAscensionHours, contextState.equatorial.rightAscensionHours, 1e-12
+            )
+        );
+        QVERIFY(
+            skygate::ephemeris::tests::isNear(
+                requestState.equatorial.declinationDeg, contextState.equatorial.declinationDeg, 1e-12
+            )
+        );
+        QVERIFY(
+            skygate::ephemeris::tests::isNear(
+                requestState.horizontal.altitudeDeg, contextState.horizontal.altitudeDeg, 1e-12
+            )
+        );
+        QVERIFY(
+            skygate::ephemeris::tests::isNear(
+                requestState.horizontal.azimuthDeg, contextState.horizontal.azimuthDeg, 1e-12
+            )
+        );
     }
 }
 
@@ -369,15 +378,21 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     QCOMPARE(requestState.metadata.status, skygate::ephemeris::EphemerisResultStatus::Degraded);
     QVERIFY(requestState.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
     QCOMPARE(requestState.metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections);
-    QVERIFY(skygate::ephemeris::tests::isNear(
-        requestState.equatorial.rightAscensionHours, contextState.equatorial.rightAscensionHours, 1e-12
-    ));
-    QVERIFY(skygate::ephemeris::tests::isNear(
-        requestState.equatorial.declinationDeg, contextState.equatorial.declinationDeg, 1e-12
-    ));
-    QVERIFY(skygate::ephemeris::tests::isNear(
-        requestState.horizontal.altitudeDeg, contextState.horizontal.altitudeDeg, 1e-12
-    ));
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            requestState.equatorial.rightAscensionHours, contextState.equatorial.rightAscensionHours, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            requestState.equatorial.declinationDeg, contextState.equatorial.declinationDeg, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            requestState.horizontal.altitudeDeg, contextState.horizontal.altitudeDeg, 1e-12
+        )
+    );
     QVERIFY(
         skygate::ephemeris::tests::isNear(requestState.horizontal.azimuthDeg, contextState.horizontal.azimuthDeg, 1e-12)
     );
@@ -515,13 +530,18 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
     QVERIFY(byId.has_value());
     QCOMPARE(byId->bodyIndex, 0U);
     QCOMPARE(byId->metadata.status, contextState->metadata.status);
-    QVERIFY(skygate::ephemeris::tests::isNear(
-        byId->equatorial.rightAscensionHours, contextState->equatorial.rightAscensionHours, 1e-12
-    ));
-    QVERIFY(skygate::ephemeris::tests::isNear(
-        byId->equatorial.declinationDeg, contextState->equatorial.declinationDeg, 1e-12
-    ));
-    QVERIFY(skygate::ephemeris::tests::isNear(byId->horizontal.altitudeDeg, contextState->horizontal.altitudeDeg, 1e-12)
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            byId->equatorial.rightAscensionHours, contextState->equatorial.rightAscensionHours, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            byId->equatorial.declinationDeg, contextState->equatorial.declinationDeg, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(byId->horizontal.altitudeDeg, contextState->horizontal.altitudeDeg, 1e-12)
     );
     QVERIFY(skygate::ephemeris::tests::isNear(byId->horizontal.azimuthDeg, contextState->horizontal.azimuthDeg, 1e-12));
 
@@ -529,9 +549,11 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
     QVERIFY(byIndex.has_value());
     QCOMPARE(byIndex->bodyIndex, 0U);
     QCOMPARE(byIndex->metadata.status, byId->metadata.status);
-    QVERIFY(skygate::ephemeris::tests::isNear(
-        byIndex->equatorial.rightAscensionHours, byId->equatorial.rightAscensionHours, 1e-12
-    ));
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            byIndex->equatorial.rightAscensionHours, byId->equatorial.rightAscensionHours, 1e-12
+        )
+    );
     QVERIFY(
         skygate::ephemeris::tests::isNear(byIndex->equatorial.declinationDeg, byId->equatorial.declinationDeg, 1e-12)
     );

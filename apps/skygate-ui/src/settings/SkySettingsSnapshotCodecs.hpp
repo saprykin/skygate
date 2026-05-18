@@ -17,7 +17,7 @@ struct SkyTimelineSettingsSnapshot final {
     bool toolbarCollapsed = false;
     double speedMultiplier = 1.0;
     int stepSeconds = 60;
-    qint64 utcEpochSeconds = 0;
+    qint64 utcEpochMicros = 0;
 };
 
 struct SkySearchSettingsSnapshot final {

@@ -1,4 +1,5 @@
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 
@@ -21,7 +22,7 @@ constexpr double kUnixEpochJulianDay = 2'440'587.5;
 skygate::ephemeris::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimePoint& utcTime)
 {
     const double julianDay =
-        static_cast<double>(utcTime.time_since_epoch().count()) / kSecondsPerDay + kUnixEpochJulianDay;
+        skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / kSecondsPerDay + kUnixEpochJulianDay;
     const double julianDatePart1 = std::floor(julianDay);
     return {
         .julianDatePart1 = julianDatePart1,
@@ -37,11 +38,10 @@ skygate::ephemeris::CelestialBody makeTargetBody()
         .displayName = "Target",
         .type = skygate::ephemeris::CelestialBodyType::Star,
         .visualMagnitude = 1.0,
-        .fixedEquatorial =
-            skygate::core::EquatorialCoordinate{
-                .rightAscensionHours = 3.0,
-                .declinationDeg = 4.0,
-            },
+        .fixedEquatorial = skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = 3.0,
+            .declinationDeg = 4.0,
+        },
     };
 }
 
@@ -64,8 +64,8 @@ makeState(const skygate::ephemeris::EphemerisRequest& request, const std::uint32
 
 class MetadataDefaultEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -114,8 +114,8 @@ public:
         return engineOptions;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestComputeCount;
         m_lastRequestOptions = request.options;
@@ -194,8 +194,8 @@ public:
     }
 
 private:
-    [[nodiscard]] skygate::ephemeris::EphemerisRequest makeCompatibilityRequest(const skygate::core::SkyContext& context
-    ) const noexcept
+    [[nodiscard]] skygate::ephemeris::EphemerisRequest
+    makeCompatibilityRequest(const skygate::core::SkyContext& context) const noexcept
     {
         skygate::ephemeris::EphemerisRequest request;
         request.context = context;
@@ -273,7 +273,7 @@ void EphemerisEngineInterfaceMigrationTests::requestComputeReceivesFullRequest()
     const auto snapshot = engine.compute(request);
 
     QCOMPARE(engine.requestComputeCount(), 1);
-    QCOMPARE(snapshot.context.utcTime.time_since_epoch().count(), 1234);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochSecondsFloor(snapshot.context.utcTime), 1234);
     QCOMPARE(snapshot.states.size(), std::size_t{1});
     QCOMPARE(
         static_cast<std::uint32_t>(snapshot.states.front().metadata.appliedCorrections),

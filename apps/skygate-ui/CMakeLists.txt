@@ -60,6 +60,10 @@ qt_add_library(skygate-ui-lib STATIC
     src/theme/SkyTheme.hpp
     src/time/SkyTimeController.cpp
     src/time/SkyTimeController.hpp
+    src/time/SkyLiveClock.cpp
+    src/time/SkyLiveClock.hpp
+    src/time/SkyQtTimeCodec.cpp
+    src/time/SkyQtTimeCodec.hpp
     src/time/TimeZoneAliasCatalog.cpp
     src/time/TimeZoneAliasCatalog.hpp
     src/time/TimeZoneCatalogModel.cpp

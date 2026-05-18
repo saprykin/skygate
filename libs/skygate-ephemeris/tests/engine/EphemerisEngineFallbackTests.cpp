@@ -34,8 +34,8 @@ skygate::ephemeris::CelestialBody makeBody(
 
 class SnapshotOnlyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -67,11 +67,13 @@ public:
         skygate::ephemeris::SkySnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = std::move(bodies);
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = 0,
-            .equatorial = {.rightAscensionHours = 2.0, .declinationDeg = 3.0},
-            .horizontal = {.altitudeDeg = 4.0, .azimuthDeg = 5.0}
-        });
+        snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = 0,
+                .equatorial = {.rightAscensionHours = 2.0, .declinationDeg = 3.0},
+                .horizontal = {.altitudeDeg = 4.0, .azimuthDeg = 5.0}
+            }
+        );
         return snapshot;
     }
 
@@ -228,9 +230,11 @@ void EphemerisEngineFallbackTests::keepsExplicitSnapshotLookupBehaviorForEmptyId
 
     skygate::ephemeris::SkySnapshot snapshot;
     snapshot.catalogBodies = std::move(bodies);
-    snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
-        .bodyIndex = 0, .equatorial = {.rightAscensionHours = 6.0, .declinationDeg = 7.0}
-    });
+    snapshot.states.push_back(
+        skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0, .equatorial = {.rightAscensionHours = 6.0, .declinationDeg = 7.0}
+        }
+    );
 
     const auto state = skygate::ephemeris::EphemerisEngineQueries::findBodyStateById(snapshot, "");
     QVERIFY(state.has_value());

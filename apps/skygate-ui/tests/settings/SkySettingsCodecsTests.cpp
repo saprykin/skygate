@@ -86,7 +86,7 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     snapshot.searchToolbarCollapsed = true;
     snapshot.speedMultiplier = 2.5;
     snapshot.stepSeconds = 300;
-    snapshot.utcEpochSeconds = -1234;
+    snapshot.utcEpochMicros = -1'234'567;
     snapshot.magnitudeCutoff = 7.25;
     snapshot.viewCenterAltitudeDeg = 12.0;
     snapshot.viewCenterAzimuthDeg = 220.0;
@@ -143,7 +143,7 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     QCOMPARE(merged.searchToolbarCollapsed, snapshot.searchToolbarCollapsed);
     QCOMPARE(merged.speedMultiplier, snapshot.speedMultiplier);
     QCOMPARE(merged.stepSeconds, snapshot.stepSeconds);
-    QCOMPARE(merged.utcEpochSeconds, snapshot.utcEpochSeconds);
+    QCOMPARE(merged.utcEpochMicros, snapshot.utcEpochMicros);
     QCOMPARE(merged.projectionTypeText, snapshot.projectionTypeText);
     QVERIFY(merged.overlayLayers.equals(snapshot.overlayLayers));
     QCOMPARE(merged.deepSkyCatalogUrlText, snapshot.deepSkyCatalogUrlText);

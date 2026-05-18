@@ -7,6 +7,8 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
+#include "skygate/core/UtcTimeCodec.hpp"
+
 #include <QDateTime>
 #include <QTimeZone>
 
@@ -28,7 +30,7 @@ bool SkyContextController::saveSettings() const
     snapshot.viewCenterAltitudeDeg = m_view.centerAltitudeDeg();
     snapshot.viewCenterAzimuthDeg = m_view.centerAzimuthDeg();
     snapshot.viewFieldOfViewDeg = m_view.fieldOfViewDeg();
-    snapshot.utcEpochSeconds = SkyContextTimeCodec::toQDateTimeUtc(m_location.utcTime()).toSecsSinceEpoch();
+    snapshot.utcEpochMicros = static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(m_location.utcTime()));
     snapshot.latitudeDeg = m_location.observer().latitudeDeg;
     snapshot.longitudeDeg = m_location.observer().longitudeDeg;
     snapshot.elevationMeters = m_location.observer().elevationMeters;
@@ -74,7 +76,7 @@ bool SkyContextController::loadSettings()
             goLiveNow();
         } else {
             setLive(false);
-            setCurrentUtc(QDateTime::fromSecsSinceEpoch(stateSnapshot->utcEpochSeconds, QTimeZone::UTC));
+            setCurrentUtcTime(skygate::core::UtcTimeCodec::fromEpochMicros(stateSnapshot->utcEpochMicros));
         }
 
         skygate::core::GeoLocation observer = m_location.observer();
