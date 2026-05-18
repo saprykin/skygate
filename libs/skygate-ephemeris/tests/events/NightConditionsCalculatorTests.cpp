@@ -72,6 +72,19 @@ struct TestRig final {
     return rig;
 }
 
+[[nodiscard]] std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> makeSunMoonBodies()
+{
+    auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    Q_ASSERT(catalog != nullptr);
+    const auto sunIndex = bodyIndexById(catalog->bodies(), "sun");
+    const auto moonIndex = bodyIndexById(catalog->bodies(), "moon");
+    Q_ASSERT(sunIndex.has_value());
+    Q_ASSERT(moonIndex.has_value());
+    return std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
+        std::vector<skygate::ephemeris::CelestialBody>{catalog->bodies()[*sunIndex], catalog->bodies()[*moonIndex]}
+    );
+}
+
 [[nodiscard]] bool isAvailable(const skygate::ephemeris::ObservationEvent& event)
 {
     return event.status == skygate::ephemeris::ObservationEventStatus::Available && event.utcTime.has_value();
@@ -102,6 +115,7 @@ private slots:
     void lunarPhaseBucketsAreDeterministic();
     void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
     void highPrecisionNightConditionsUseGuidedEventSearch();
+    void approximateHighPrecisionSunMoonEventsUseSimpleEstimates();
     void verifiedHighPrecisionNightConditionsUseSelectedEngineSamples();
 };
 
@@ -267,6 +281,35 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
     QCOMPARE(verifiedEngine.contextSampleCount(), 0);
     QCOMPARE(approximateEngine.requestSampleCount(), 2);
     QVERIFY(approximateEngine.requestSampleCount() < verifiedEngine.requestSampleCount());
+}
+
+void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSimpleEstimates()
+{
+    const auto bodies = makeSunMoonBodies();
+    const auto approximateEngine = makeGuidedNightEngine(bodies);
+    const auto verifiedEngine = makeGuidedNightEngine(bodies);
+    const skygate::ephemeris::NightConditionsCalculator calculator;
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), approximateEngine.options());
+
+    const auto approximateConditions =
+        calculator.compute(approximateEngine, request, 0U, (*bodies)[0], 1U, (*bodies)[1]);
+    const auto verifiedConditions = calculator.compute(
+        verifiedEngine,
+        request,
+        0U,
+        (*bodies)[0],
+        1U,
+        (*bodies)[1],
+        skygate::ephemeris::NightConditionsEventSearchMode::Verified
+    );
+
+    QVERIFY(approximateConditions.valid);
+    QVERIFY(verifiedConditions.valid);
+    QCOMPARE(approximateEngine.contextSampleCount(), 0);
+    QCOMPARE(verifiedEngine.contextSampleCount(), 0);
+    QCOMPARE(approximateEngine.requestSampleCount(), 2);
+    QVERIFY(verifiedEngine.requestSampleCount() > 300);
 }
 
 void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSelectedEngineSamples()

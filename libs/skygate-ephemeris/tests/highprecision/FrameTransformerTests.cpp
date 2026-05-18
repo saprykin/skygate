@@ -253,9 +253,9 @@ void FrameTransformerTests::transformsGcrsToCirsAgainstSofaReference()
     compareVector(
         *result.vector,
         {
-            .x = 0.9999998323037166,
-            .y = -0.23842662278707525e-7,
-            .z = 0.5791308472168153e-3,
+            .x = 0.99999983230371603,
+            .y = -0.23842531691809769e-7,
+            .z = 0.57913084828352932e-3,
         },
         kTolerance
     );

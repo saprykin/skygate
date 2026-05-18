@@ -26,8 +26,14 @@ using namespace skygate::ephemeris::tests;
 {
     const QString path = QDir(directory.path()).filePath(QStringLiteral("fixture.json"));
     QFile file(path);
-    Q_ASSERT(file.open(QIODevice::WriteOnly | QIODevice::Text));
-    Q_ASSERT(file.write(payload) == payload.size());
+    const bool opened = file.open(QIODevice::WriteOnly | QIODevice::Text);
+    Q_ASSERT(opened);
+    if (!opened) {
+        return path;
+    }
+
+    const qint64 bytesWritten = file.write(payload);
+    Q_ASSERT(bytesWritten == payload.size());
     return path;
 }
 
