@@ -1,5 +1,7 @@
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 
+#include "skygate/core/UtcTimeCodec.hpp"
+
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -15,7 +17,7 @@ bool EphemerisRequestFactory::hasExplicitEpoch(const AstronomicalEpoch& epoch) n
 AstronomicalEpoch EphemerisRequestFactory::epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
 {
     const double julianDay =
-        static_cast<double>(utcTime.time_since_epoch().count()) / static_cast<double>(detail::kSecondsPerDay)
+        core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / static_cast<double>(detail::kSecondsPerDay)
         + detail::kJulianDateUnixEpoch;
     const double julianDatePart1 = std::floor(julianDay);
     return AstronomicalEpoch{
@@ -29,9 +31,10 @@ core::UtcTimePoint EphemerisRequestFactory::utcTimeFromEpoch(const AstronomicalE
 {
     const AstronomicalEpoch normalizedEpoch = normalizedAstronomicalEpoch(epoch);
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
-    const double epochSeconds =
-        std::round((julianDay - detail::kJulianDateUnixEpoch) * static_cast<double>(detail::kSecondsPerDay));
-    return core::UtcTimePoint(std::chrono::seconds(static_cast<std::int64_t>(epochSeconds)));
+    const double epochMicros = std::round(
+        (julianDay - detail::kJulianDateUnixEpoch) * static_cast<double>(detail::kSecondsPerDay) * 1'000'000.0
+    );
+    return core::UtcTimeCodec::fromEpochMicros(static_cast<std::int64_t>(epochMicros));
 }
 
 core::SkyContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept

@@ -865,6 +865,7 @@ private slots:
     void isolatesCachedSingleBodyStatesByBodyIndex();
     void servesConcurrentReadOnlyComputationsFromCache();
     void isolatesCachedSnapshotsByDataSetRevision();
+    void isolatesCachedSnapshotsByMicrosecondUtc();
     void isolatesCachedSnapshotsByDataSetDateRangeContents();
     void isolatesCachedSnapshotsByCatalogContents();
     void fallsBackToSingleStarPathWhenBatchReturnsNoResults();
@@ -1296,6 +1297,43 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetRevision
 
     QVERIFY(cachedOldSnapshotAfterMutation.has_value());
     QCOMPARE(cachedOldSnapshotAfterMutation->states[0].equatorial.rightAscensionHours, 1.0);
+}
+
+void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByMicrosecondUtc()
+{
+    EphemerisComputationCache computationCache;
+    const std::vector<CelestialBody> bodies{makeSunBody()};
+    const EphemerisDataSetInfo dataSet;
+    const EphemerisRequest baseRequest = makeRequest();
+    EphemerisRequest shiftedRequest = baseRequest;
+    shiftedRequest.context.utcTime += std::chrono::microseconds(500);
+
+    SkySnapshot baseSnapshot;
+    baseSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        }
+    );
+    SkySnapshot shiftedSnapshot;
+    shiftedSnapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+        }
+    );
+
+    computationCache.storeSnapshot(baseRequest, bodies, dataSet, baseSnapshot);
+    computationCache.storeSnapshot(shiftedRequest, bodies, dataSet, shiftedSnapshot);
+
+    const std::optional<SkySnapshot> cachedBaseSnapshot = computationCache.findSnapshot(baseRequest, bodies, dataSet);
+    const std::optional<SkySnapshot> cachedShiftedSnapshot =
+        computationCache.findSnapshot(shiftedRequest, bodies, dataSet);
+
+    QVERIFY(cachedBaseSnapshot.has_value());
+    QVERIFY(cachedShiftedSnapshot.has_value());
+    QCOMPARE(cachedBaseSnapshot->states[0].equatorial.rightAscensionHours, 1.0);
+    QCOMPARE(cachedShiftedSnapshot->states[0].equatorial.rightAscensionHours, 3.0);
 }
 
 void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetDateRangeContents()

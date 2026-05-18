@@ -1,6 +1,7 @@
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 #include "skygate/ephemeris/Types.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 
@@ -8,6 +9,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <span>
 #include <string>
 #include <string_view>
@@ -166,7 +168,7 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
         static_cast<std::uint8_t>(request.options.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
     );
-    QCOMPARE(request.context.utcTime.time_since_epoch().count(), 1'704'067'200);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(request.context.utcTime), 1'704'067'200'000'000LL);
 
     skygate::ephemeris::EphemerisDateRange modernRange;
     modernRange.id = "modern";
@@ -211,20 +213,30 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
     );
     QCOMPARE(
-        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(request).utcTime.time_since_epoch().count(),
-        1'704'067'200
+        skygate::core::UtcTimeCodec::toEpochMicros(
+            skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(request).utcTime
+        ),
+        1'704'067'200'000'000LL
     );
+
+    const auto microsShiftedUtc = context.utcTime + std::chrono::microseconds(123'456);
+    const skygate::ephemeris::EphemerisRequest microsShiftedRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, microsShiftedUtc);
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(microsShiftedRequest.context.utcTime), 1'704'067'200'123'456LL);
+    const qint64 microsRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
+        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(microsShiftedRequest).utcTime
+    );
+    QVERIFY(microsRoundTrip != 1'704'067'200'000'000LL);
+    QVERIFY(std::llabs(microsRoundTrip - 1'704'067'200'123'456LL) <= 100);
 
     const auto shiftedUtc = context.utcTime + std::chrono::seconds(90);
     const skygate::ephemeris::EphemerisRequest shiftedRequest =
         skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, shiftedUtc);
-    QCOMPARE(shiftedRequest.context.utcTime.time_since_epoch().count(), 1'704'067'290);
-    QCOMPARE(
-        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(shiftedRequest)
-            .utcTime.time_since_epoch()
-            .count(),
-        1'704'067'290
+    QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(shiftedRequest.context.utcTime), 1'704'067'290'000'000LL);
+    const qint64 shiftedRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
+        skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(shiftedRequest).utcTime
     );
+    QVERIFY(std::llabs(shiftedRoundTrip - 1'704'067'290'000'000LL) <= 100);
     QCOMPARE(
         static_cast<std::uint32_t>(shiftedRequest.options.correctionFlags),
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Apparent)

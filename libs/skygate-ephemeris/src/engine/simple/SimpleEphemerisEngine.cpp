@@ -279,27 +279,34 @@ public:
 
     [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override
     {
-        return compute(makeCompatibilityRequest(context));
+        SkySnapshot snapshot = computeSnapshot(context);
+        markUnsupportedSimpleOptions(snapshot, options());
+        return snapshot;
     }
 
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const core::SkyContext& context, const std::string_view bodyId) const override
     {
-        return computeBodyState(makeCompatibilityRequest(context), bodyId);
+        std::optional<CelestialBodyState> state = computeBodyStateById(context, bodyId);
+        if (state.has_value()) {
+            markUnsupportedSimpleOptions(*state, options());
+        }
+        return state;
     }
 
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const core::SkyContext& context, const std::uint32_t bodyIndex) const override
     {
-        return computeBodyState(makeCompatibilityRequest(context), static_cast<std::size_t>(bodyIndex));
+        if (bodyIndex >= m_bodies->size()) {
+            return std::nullopt;
+        }
+
+        CelestialBodyState state = computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, context);
+        markUnsupportedSimpleOptions(state, options());
+        return state;
     }
 
 private:
-    [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept
-    {
-        return EphemerisRequestFactory::fromContext(context, options());
-    }
-
     [[nodiscard]] SkySnapshot computeSnapshot(const core::SkyContext& context) const
     {
         SkySnapshot snapshot;

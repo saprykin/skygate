@@ -29,7 +29,8 @@ class SkySettingsStoreTests final : public QObject {
 private slots:
     void initTestCase();
     void savesAndLoadsStateSnapshot();
-    void savesAndLoadsNegativeUtcEpochSeconds();
+    void savesAndLoadsNegativeUtcEpochMicros();
+    void loadsLegacyUtcEpochSecondsAsMicros();
     void savesLoadsAndDefaultsMainWindowSize();
     void malformedStateValuesFallBackToDefaults();
     void partialStateAndUnknownOverlayKeysAreTolerated();
@@ -68,7 +69,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.viewCenterAltitudeDeg = 18.0;
     savedSnapshot.viewCenterAzimuthDeg = 220.0;
     savedSnapshot.viewFieldOfViewDeg = 74.0;
-    savedSnapshot.utcEpochSeconds = 1'717'276'800;
+    savedSnapshot.utcEpochMicros = 1'717'276'800'123'000LL;
     savedSnapshot.latitudeDeg = 47.0;
     savedSnapshot.longitudeDeg = 8.0;
     savedSnapshot.elevationMeters = 409.0;
@@ -118,7 +119,7 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->searchToolbarCollapsed, savedSnapshot.searchToolbarCollapsed);
     QCOMPARE(loadedSnapshot->speedMultiplier, savedSnapshot.speedMultiplier);
     QCOMPARE(loadedSnapshot->stepSeconds, savedSnapshot.stepSeconds);
-    QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
+    QCOMPARE(loadedSnapshot->utcEpochMicros, savedSnapshot.utcEpochMicros);
     QCOMPARE(loadedSnapshot->locationSourceText, savedSnapshot.locationSourceText);
     QCOMPARE(loadedSnapshot->selectedCityId, savedSnapshot.selectedCityId);
     QCOMPARE(loadedSnapshot->displayTimeZoneId, savedSnapshot.displayTimeZoneId);
@@ -156,19 +157,33 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     QCOMPARE(loadedSnapshot->ephemerisSettingsPresent, true);
 }
 
-void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochSeconds()
+void SkySettingsStoreTests::savesAndLoadsNegativeUtcEpochMicros()
 {
     QSettings settings;
     settings.clear();
 
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot savedSnapshot;
-    savedSnapshot.utcEpochSeconds = -63'555'595'200LL;
+    savedSnapshot.utcEpochMicros = -63'555'595'200'123'000LL;
 
     QVERIFY(store.saveState(savedSnapshot));
     const auto loadedSnapshot = store.loadState();
     QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->utcEpochSeconds, savedSnapshot.utcEpochSeconds);
+    QCOMPARE(loadedSnapshot->utcEpochMicros, savedSnapshot.utcEpochMicros);
+}
+
+void SkySettingsStoreTests::loadsLegacyUtcEpochSecondsAsMicros()
+{
+    QSettings settings;
+    settings.clear();
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/utcEpochSeconds", -1234LL);
+
+    const SkySettingsStore store;
+    const auto loadedSnapshot = store.loadState();
+
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->utcEpochMicros, -1'234'000'000LL);
 }
 
 void SkySettingsStoreTests::savesLoadsAndDefaultsMainWindowSize()
@@ -203,7 +218,7 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     settings.setValue("skyContext/viewCenterAltitudeDeg", "above");
     settings.setValue("skyContext/viewCenterAzimuthDeg", "east-ish");
     settings.setValue("skyContext/viewFieldOfViewDeg", "wide");
-    settings.setValue("skyContext/utcEpochSeconds", "yesterday");
+    settings.setValue("skyContext/utcEpochMicros", "yesterday");
     settings.setValue("skyContext/latitudeDeg", "north");
     settings.setValue("skyContext/longitudeDeg", "west");
     settings.setValue("skyContext/elevationMeters", "high");
@@ -229,7 +244,7 @@ void SkySettingsStoreTests::malformedStateValuesFallBackToDefaults()
     QCOMPARE(loadedSnapshot->viewCenterAltitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->viewCenterAzimuthDeg, 0.0);
     QCOMPARE(loadedSnapshot->viewFieldOfViewDeg, 100.0);
-    QCOMPARE(loadedSnapshot->utcEpochSeconds, 0LL);
+    QCOMPARE(loadedSnapshot->utcEpochMicros, 0LL);
     QCOMPARE(loadedSnapshot->latitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->longitudeDeg, 0.0);
     QCOMPARE(loadedSnapshot->elevationMeters, 0.0);

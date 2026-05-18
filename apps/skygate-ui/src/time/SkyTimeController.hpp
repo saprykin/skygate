@@ -27,10 +27,7 @@ class SkyTimeController final : public QObject {
 
 public:
     explicit SkyTimeController(QObject* parent = nullptr);
-    explicit SkyTimeController(
-        const skygate::core::ITimeSource& timeSource,
-        QObject* parent = nullptr
-    );
+    explicit SkyTimeController(const skygate::core::ITimeSource& timeSource, QObject* parent = nullptr);
     ~SkyTimeController() override;
 
     [[nodiscard]] QString dateText() const;
@@ -46,21 +43,13 @@ public:
     void setUtcTimePoint(const skygate::core::UtcTimePoint& utcTime);
     bool setInitialTimeZoneId(const QString& timeZoneId);
 
-    Q_INVOKABLE QString validateDateTimeText(
-        const QString& dateText,
-        const QString& timeText
-    ) const;
+    Q_INVOKABLE QString validateDateTimeText(const QString& dateText, const QString& timeText) const;
     Q_INVOKABLE bool setDateTimeText(const QString& dateText, const QString& timeText);
     Q_INVOKABLE bool setTimeZoneId(const QString& timeZoneId);
     Q_INVOKABLE void goLiveNow();
-    [[nodiscard]] QString formatUtcTime(
-        const skygate::core::UtcTimePoint& utcTime,
-        bool includeSeconds = true
-    ) const;
-    [[nodiscard]] QString formatUtcTimeRange(
-        const skygate::core::UtcTimePoint& startUtc,
-        const skygate::core::UtcTimePoint& endUtc
-    ) const;
+    [[nodiscard]] QString formatUtcTime(const skygate::core::UtcTimePoint& utcTime, bool includeSeconds = true) const;
+    [[nodiscard]] QString
+    formatUtcTimeRange(const skygate::core::UtcTimePoint& startUtc, const skygate::core::UtcTimePoint& endUtc) const;
 
 signals:
     void dateTextChanged();
@@ -79,16 +68,13 @@ private:
 
 private:
     [[nodiscard]] QDateTime displayDateTime() const;
-    [[nodiscard]] ParseResult parseDisplayDateTime(
-        const QString& dateText,
-        const QString& timeText
-    ) const;
+    [[nodiscard]] ParseResult parseDisplayDateTime(const QString& dateText, const QString& timeText) const;
     [[nodiscard]] QString formattedDateText() const;
     [[nodiscard]] QString formattedTimeText() const;
     void emitDisplayTextChanges(const QString& previousDateText, const QString& previousTimeText);
 
 private:
-    QDateTime m_utcDateTime;
+    skygate::core::UtcTimePoint m_utcTime{};
     QTimeZone m_timeZone;
     TimeZoneCatalogModel* m_timeZoneCatalogModel = nullptr;
 };

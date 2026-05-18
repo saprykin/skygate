@@ -40,7 +40,7 @@ public:
         double viewCenterAltitudeDeg = 0.0;
         double viewCenterAzimuthDeg = 0.0;
         double viewFieldOfViewDeg = 100.0;
-        qint64 utcEpochSeconds = 0;
+        qint64 utcEpochMicros = 0;
         double latitudeDeg = 0.0;
         double longitudeDeg = 0.0;
         double elevationMeters = 0.0;

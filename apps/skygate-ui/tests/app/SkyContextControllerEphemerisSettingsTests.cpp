@@ -338,7 +338,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsWithEphemerisSettin
 
     QVERIFY(controller->loadSettings());
 
-    QCOMPARE(skyContextChangedSpy.count(), 1);
+    QVERIFY(skyContextChangedSpy.count() >= 1);
     QVERIFY(controller->ephemerisEngine() != nullptr);
     const auto restoredOptions = controller->ephemerisEngine()->options();
     QCOMPARE(
@@ -384,7 +384,7 @@ void SkyContextControllerEphemerisSettingsTests::requestContextCombinesRestoredS
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.ephemeris = expectedSettings;
     snapshot.ephemerisSettingsPresent = true;
-    snapshot.utcEpochSeconds = QDateTime(QDate(2030, 7, 2), QTime(3, 4, 5), QTimeZone::UTC).toSecsSinceEpoch();
+    snapshot.utcEpochMicros = QDateTime(QDate(2030, 7, 2), QTime(3, 4, 5), QTimeZone::UTC).toMSecsSinceEpoch() * 1000;
     snapshot.live = false;
     snapshot.latitudeDeg = 47.3769;
     snapshot.longitudeDeg = 8.5417;

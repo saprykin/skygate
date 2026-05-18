@@ -25,7 +25,7 @@ void saveTimelineSettings(QSettings& settings, const SkyTimelineSettingsSnapshot
     settings.setValue(settingsKey("timelineToolbarCollapsed"), snapshot.toolbarCollapsed);
     settings.setValue(settingsKey("speedMultiplier"), snapshot.speedMultiplier);
     settings.setValue(settingsKey("stepSeconds"), snapshot.stepSeconds);
-    settings.setValue(settingsKey("utcEpochSeconds"), snapshot.utcEpochSeconds);
+    settings.setValue(settingsKey("utcEpochMicros"), snapshot.utcEpochMicros);
 }
 
 SkyTimelineSettingsSnapshot loadTimelineSettings(QSettings& settings)
@@ -36,7 +36,11 @@ SkyTimelineSettingsSnapshot loadTimelineSettings(QSettings& settings)
         readBoolSetting(settings, settingsKey("timelineToolbarCollapsed"), snapshot.toolbarCollapsed);
     snapshot.speedMultiplier = readDoubleSetting(settings, settingsKey("speedMultiplier"), snapshot.speedMultiplier);
     snapshot.stepSeconds = readIntSetting(settings, settingsKey("stepSeconds"), snapshot.stepSeconds);
-    snapshot.utcEpochSeconds = readLongLongSetting(settings, settingsKey("utcEpochSeconds"), snapshot.utcEpochSeconds);
+    snapshot.utcEpochMicros =
+        settings.contains(settingsKey("utcEpochMicros"))
+            ? readLongLongSetting(settings, settingsKey("utcEpochMicros"), snapshot.utcEpochMicros)
+            : readLongLongSetting(settings, settingsKey("utcEpochSeconds"), snapshot.utcEpochMicros / 1'000'000)
+                  * 1'000'000;
     return snapshot;
 }
 
@@ -302,7 +306,7 @@ SkyStateSettingsSnapshot splitStateSnapshot(const SkySettingsStore::StateSnapsho
     domains.timeline.toolbarCollapsed = snapshot.timelineToolbarCollapsed;
     domains.timeline.speedMultiplier = snapshot.speedMultiplier;
     domains.timeline.stepSeconds = snapshot.stepSeconds;
-    domains.timeline.utcEpochSeconds = snapshot.utcEpochSeconds;
+    domains.timeline.utcEpochMicros = snapshot.utcEpochMicros;
     domains.search.toolbarCollapsed = snapshot.searchToolbarCollapsed;
     domains.view.magnitudeCutoff = snapshot.magnitudeCutoff;
     domains.view.centerAltitudeDeg = snapshot.viewCenterAltitudeDeg;
@@ -341,7 +345,7 @@ SkySettingsStore::StateSnapshot mergeStateSnapshot(const SkyStateSettingsSnapsho
     snapshot.viewCenterAltitudeDeg = domains.view.centerAltitudeDeg;
     snapshot.viewCenterAzimuthDeg = domains.view.centerAzimuthDeg;
     snapshot.viewFieldOfViewDeg = domains.view.fieldOfViewDeg;
-    snapshot.utcEpochSeconds = domains.timeline.utcEpochSeconds;
+    snapshot.utcEpochMicros = domains.timeline.utcEpochMicros;
     snapshot.latitudeDeg = domains.location.latitudeDeg;
     snapshot.longitudeDeg = domains.location.longitudeDeg;
     snapshot.elevationMeters = domains.location.elevationMeters;

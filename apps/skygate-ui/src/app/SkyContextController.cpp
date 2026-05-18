@@ -9,6 +9,9 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
+#include "SkyQtTimeCodec.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
+
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -33,10 +36,19 @@ namespace {
 using skygate::ephemeris::EphemerisCorrectionFlags;
 using skygate::ephemeris::EphemerisEngineKind;
 
-[[nodiscard]] std::optional<skygate::ephemeris::AstronomicalEpoch>
-astronomicalEpochFromUtcDateTime(const QDateTime& utcDateTime) noexcept
+[[nodiscard]] qint64 floorMod(const qint64 numerator, const qint64 denominator) noexcept
 {
-    const QDateTime normalizedUtcDateTime = utcDateTime.toUTC();
+    qint64 remainder = numerator % denominator;
+    if (remainder < 0) {
+        remainder += denominator;
+    }
+    return remainder;
+}
+
+[[nodiscard]] std::optional<skygate::ephemeris::AstronomicalEpoch>
+astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept
+{
+    const QDateTime normalizedUtcDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime);
     const QDate date = normalizedUtcDateTime.date();
     const QTime time = normalizedUtcDateTime.time();
     const auto astronomicalYear = skygate::ephemeris::astronomicalYearFromHistoricalYear(date.year());
@@ -52,7 +64,10 @@ astronomicalEpochFromUtcDateTime(const QDateTime& utcDateTime) noexcept
             .hour = time.hour(),
             .minute = time.minute(),
             .second = time.second(),
-            .nanosecond = static_cast<std::uint32_t>(time.msec()) * 1'000'000U,
+            .nanosecond = static_cast<std::uint32_t>(floorMod(
+                              static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(utcTime)), 1'000'000
+                          ))
+                          * 1000U,
             .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
@@ -380,6 +395,9 @@ SkyContextController::SkyContextController(
     m_timeController->setUtcTimePoint(m_location.utcTime());
     if (initializationOptions.loadSettings) {
         loadSettings();
+    }
+    if (m_timeline.live() && !m_liveClock.isRunning()) {
+        m_liveClock.start(m_location.utcTime());
     }
     updateLocationStatusText();
 
@@ -801,8 +819,7 @@ SkyContextController::ephemerisRequestContextFor(const skygate::core::SkyContext
         textDataAssetRevision(context.activeDataSnapshot, context.ephemerisDataRevision, false);
     context.catalogRevision = catalogRevision();
 
-    if (const auto epoch = astronomicalEpochFromUtcDateTime(SkyContextTimeCodec::toQDateTimeUtc(skyContext.utcTime));
-        epoch.has_value()) {
+    if (const auto epoch = astronomicalEpochFromUtcTime(skyContext.utcTime); epoch.has_value()) {
         context.request.epoch = *epoch;
     }
 

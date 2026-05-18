@@ -4,6 +4,7 @@
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <array>
 #include <chrono>
@@ -342,15 +343,15 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, const d
     const core::UtcTimePoint& endUtc
 )
 {
-    auto lowSeconds = startUtc.time_since_epoch().count();
-    auto highSeconds = endUtc.time_since_epoch().count();
+    auto lowSeconds = core::UtcTimeCodec::toEpochSecondsFloor(startUtc);
+    auto highSeconds = core::UtcTimeCodec::toEpochSecondsFloor(endUtc);
 
     while (highSeconds - lowSeconds > 3) {
         const auto spanSeconds = highSeconds - lowSeconds;
         const auto firstSeconds = lowSeconds + spanSeconds / 3;
         const auto secondSeconds = highSeconds - spanSeconds / 3;
-        const core::UtcTimePoint firstUtc{std::chrono::seconds(firstSeconds)};
-        const core::UtcTimePoint secondUtc{std::chrono::seconds(secondSeconds)};
+        const core::UtcTimePoint firstUtc = core::UtcTimeCodec::fromEpochSeconds(firstSeconds);
+        const core::UtcTimePoint secondUtc = core::UtcTimeCodec::fromEpochSeconds(secondSeconds);
         const auto firstAltitude = altitudeAt(ephemerisEngine, request, bodyIndex, firstUtc);
         const auto secondAltitude = altitudeAt(ephemerisEngine, request, bodyIndex, secondUtc);
         if (!firstAltitude.has_value() || !secondAltitude.has_value()) {
@@ -366,7 +367,7 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, const d
 
     AltitudeSample best{.utcTime = startUtc, .altitudeDeg = -std::numeric_limits<double>::infinity()};
     for (auto seconds = lowSeconds; seconds <= highSeconds; ++seconds) {
-        const core::UtcTimePoint utcTime{std::chrono::seconds(seconds)};
+        const core::UtcTimePoint utcTime = core::UtcTimeCodec::fromEpochSeconds(seconds);
         const auto altitude = altitudeAt(ephemerisEngine, request, bodyIndex, utcTime);
         if (altitude.has_value() && *altitude > best.altitudeDeg) {
             best.utcTime = utcTime;

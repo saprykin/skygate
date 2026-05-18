@@ -17,7 +17,7 @@ struct GeoLocation {
     [[nodiscard]] bool isValid() const noexcept;
 };
 
-using UtcTimePoint = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>;
+using UtcTimePoint = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
 
 struct EquatorialCoordinate {
     double rightAscensionHours = 0.0;
@@ -40,7 +40,7 @@ struct HorizontalCoordinate {
 
 struct SkyContext {
     GeoLocation observer;
-    UtcTimePoint utcTime {};
+    UtcTimePoint utcTime{};
 };
 
 }  // namespace skygate::core

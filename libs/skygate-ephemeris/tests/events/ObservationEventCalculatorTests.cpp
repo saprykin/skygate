@@ -1,5 +1,6 @@
 #include "engine/simple/AstronomicalTime.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
@@ -113,7 +114,7 @@ public:
         }
 
         ++sampleCount;
-        const double seconds = static_cast<double>(context.utcTime.time_since_epoch().count());
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(context.utcTime);
         const double phase = std::fmod(seconds, 86400.0) / 86400.0;
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = 0U,
@@ -206,7 +207,7 @@ public:
 
     static double movingAltitudeDeg(const skygate::core::UtcTimePoint& utcTime) noexcept
     {
-        const double seconds = static_cast<double>(utcTime.time_since_epoch().count());
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime);
         const double phase = std::fmod(seconds, 86400.0) / 86400.0;
         return 35.0 * std::sin(2.0 * kPi * (phase - 0.25));
     }

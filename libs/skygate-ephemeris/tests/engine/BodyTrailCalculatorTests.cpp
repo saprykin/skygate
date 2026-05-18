@@ -1,4 +1,5 @@
 #include "skygate/ephemeris/BodyTrailCalculator.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 
@@ -14,8 +15,8 @@ namespace {
 
 class FakeTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
     }
@@ -73,8 +74,8 @@ public:
         std::size_t bodyIndex = 0U;
     };
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return skygate::ephemeris::SkySnapshot{.context = request.context};
     }
@@ -88,12 +89,14 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        m_requestSamples.push_back(RequestSample{
-            .utcSeconds = request.context.utcTime.time_since_epoch().count(),
-            .epoch = request.epoch,
-            .options = request.options,
-            .bodyIndex = bodyIndex
-        });
+        m_requestSamples.push_back(
+            RequestSample{
+                .utcSeconds = skygate::core::UtcTimeCodec::toEpochSecondsFloor(request.context.utcTime),
+                .epoch = request.epoch,
+                .options = request.options,
+                .bodyIndex = bodyIndex
+            }
+        );
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = static_cast<std::uint32_t>(bodyIndex), .horizontal = {.altitudeDeg = 42.0, .azimuthDeg = 120.0}
         };
@@ -191,8 +194,8 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
 {
     class MissingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
     public:
-        [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-        ) const override
+        [[nodiscard]] skygate::ephemeris::SkySnapshot
+        compute(const skygate::ephemeris::EphemerisRequest& request) const override
         {
             return compute(request.context);
         }

@@ -101,6 +101,7 @@ private slots:
     void livePlaybackDoesNotOvershootCurrentUtcWhenCatchingUp();
     void livePlaybackFallsBackToOneSecondTicksAfterCatchUp();
     void throttledLivePlaybackAdvancesByElapsedWallTime();
+    void throttledLivePlaybackKeepsDisplayedTimeTicking();
     void fallbackSimpleEngineLivePlaybackUsesOneSecondTicks();
     void goLiveNowJumpsToCurrentUtcAndEnablesLive();
     void restoresLiveSettingsAtCurrentUtc();
@@ -296,13 +297,13 @@ void SkyContextControllerTimelineTests::livePlaybackFallsBackToOneSecondTicksAft
     controller->setLive(true);
     QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
 
-    const qint64 afterCatchUpSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    const qint64 afterCatchUpMillis = controllerUtcTime(*controller).toMSecsSinceEpoch();
     skyContextChangedSpy.clear();
 
     QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
 
-    const qint64 afterLiveTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    QCOMPARE(afterLiveTickSeconds - afterCatchUpSeconds, 1);
+    const qint64 afterLiveTickMillis = controllerUtcTime(*controller).toMSecsSinceEpoch();
+    QVERIFY(afterLiveTickMillis > afterCatchUpMillis);
 
     controller->setLive(false);
 }
@@ -329,6 +330,36 @@ void SkyContextControllerTimelineTests::throttledLivePlaybackAdvancesByElapsedWa
 
     const qint64 afterSecondTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     QVERIFY(afterSecondTickSeconds - afterFirstTickSeconds >= 9);
+
+    controller->setLive(false);
+}
+
+void SkyContextControllerTimelineTests::throttledLivePlaybackKeepsDisplayedTimeTicking()
+{
+    FakeTimeSource timeSource;
+    const auto controller = createControllerWithThrottledLiveEngine(timeSource);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("2026-05-06", "09:30:00"));
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    QSignalSpy displayedTimeSpy(controller->timeController(), &SkyTimeController::timeTextChanged);
+    skyContextChangedSpy.clear();
+    displayedTimeSpy.clear();
+
+    const qint64 startContextSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    controller->setLive(true);
+
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+    const qint64 firstContextSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QCOMPARE(firstContextSeconds - startContextSeconds, 1);
+
+    skyContextChangedSpy.clear();
+    displayedTimeSpy.clear();
+
+    QTRY_VERIFY_WITH_TIMEOUT(displayedTimeSpy.count() >= 1, 2500);
+    QCOMPARE(skyContextChangedSpy.count(), 0);
+    QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), firstContextSeconds);
+    QVERIFY(controller->timeController()->utcDateTime().toSecsSinceEpoch() > firstContextSeconds);
 
     controller->setLive(false);
 }
@@ -361,8 +392,8 @@ void SkyContextControllerTimelineTests::fallbackSimpleEngineLivePlaybackUsesOneS
     skyContextChangedSpy.clear();
     QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 2500);
 
-    const qint64 afterSecondTickSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    QCOMPARE(afterSecondTickSeconds - afterFirstTickSeconds, 1);
+    const qint64 afterSecondTickMillis = controllerUtcTime(*controller).toMSecsSinceEpoch();
+    QVERIFY(afterSecondTickMillis > afterFirstTickSeconds * 1000);
 
     controller->setLive(false);
 }
@@ -392,7 +423,7 @@ void SkyContextControllerTimelineTests::restoresLiveSettingsAtCurrentUtc()
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.live = true;
-    snapshot.utcEpochSeconds = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
+    snapshot.utcEpochMicros = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toMSecsSinceEpoch() * 1000;
     QVERIFY(store.saveState(snapshot));
 
     const auto controller = createControllerWithTimeSource(timeSource, true);
@@ -400,7 +431,7 @@ void SkyContextControllerTimelineTests::restoresLiveSettingsAtCurrentUtc()
     QVERIFY(controller->live());
     const qint64 timelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
     QCOMPARE(timelineSeconds, fixedNowUtc().toSecsSinceEpoch());
-    QVERIFY(timelineSeconds != snapshot.utcEpochSeconds);
+    QVERIFY(timelineSeconds != snapshot.utcEpochMicros / 1'000'000);
 }
 
 void SkyContextControllerTimelineTests::restoresPausedSettingsAtSavedUtc()
@@ -408,13 +439,13 @@ void SkyContextControllerTimelineTests::restoresPausedSettingsAtSavedUtc()
     SkySettingsStore store;
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.live = false;
-    snapshot.utcEpochSeconds = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toSecsSinceEpoch();
+    snapshot.utcEpochMicros = QDateTime::fromString("2000-01-01T00:00:00Z", Qt::ISODate).toMSecsSinceEpoch() * 1000;
     QVERIFY(store.saveState(snapshot));
 
     const auto controller = createController(true);
 
     QVERIFY(!controller->live());
-    QCOMPARE(controllerUtcTime(*controller).toSecsSinceEpoch(), snapshot.utcEpochSeconds);
+    QCOMPARE(controllerUtcTime(*controller).toMSecsSinceEpoch() * 1000, snapshot.utcEpochMicros);
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerTimelineTests)

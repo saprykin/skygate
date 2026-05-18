@@ -1,6 +1,7 @@
 #include "SkySelectionOverlayBuilder.hpp"
 #include "SkyOverlayTestSupport.hpp"
 #include "SkyTimeController.hpp"
+#include "skygate/core/UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 
@@ -88,7 +89,7 @@ public:
         const bool usesLightTime =
             hasCorrectionFlag(request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime);
         sawLightTimeRequest = sawLightTimeRequest || usesLightTime;
-        const double seconds = static_cast<double>(request.context.utcTime.time_since_epoch().count());
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(request.context.utcTime);
         const double phase = std::fmod(seconds, 86400.0) / 86400.0;
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = 0U,
