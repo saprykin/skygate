@@ -39,6 +39,7 @@ struct ObservationEventSummary {
 
 enum class ObservationEventSearchMode : std::uint8_t {
     Guided,
+    GuidedApproximate,
     Direct
 };
 

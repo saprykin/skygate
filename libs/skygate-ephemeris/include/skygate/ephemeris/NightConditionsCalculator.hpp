@@ -62,7 +62,7 @@ public:
         std::uint32_t moonBodyIndex,
         const CelestialBody& moonBody
     ) const;
-    // Approximate mode uses the shared guided event search for high-precision
+    // Approximate mode uses simple-engine event estimates for high-precision
     // requests. Verified mode samples the selected engine directly for event
     // times and should be used when night-condition event times are audited.
     [[nodiscard]] NightConditions compute(

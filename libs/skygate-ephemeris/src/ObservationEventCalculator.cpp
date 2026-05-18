@@ -90,12 +90,14 @@ sampleAltitudes(const IEphemerisEngine& ephemerisEngine, const EphemerisRequest&
     const EphemerisRequest& request, const CelestialBody* body, const ObservationEventSearchMode searchMode
 ) noexcept
 {
-    return searchMode == ObservationEventSearchMode::Guided && body != nullptr
-           && request.options.engineKind == EphemerisEngineKind::HighPrecision;
+    return (searchMode == ObservationEventSearchMode::Guided
+            || searchMode == ObservationEventSearchMode::GuidedApproximate)
+           && body != nullptr && request.options.engineKind == EphemerisEngineKind::HighPrecision;
 }
 
-[[nodiscard]] std::optional<AltitudeSamples>
-sampleGuidanceAltitudes(const EphemerisRequest& request, const CelestialBody& body)
+[[nodiscard]] std::optional<AltitudeSamples> sampleGuidanceAltitudes(
+    const EphemerisRequest& request, const CelestialBody& body, const ObservationEventSearchMode searchMode
+)
 {
     const std::array<CelestialBody, 1> bodies{body};
     std::unique_ptr<IEphemerisEngine> guidanceEngine =
@@ -111,8 +113,9 @@ sampleGuidanceAltitudes(const EphemerisRequest& request, const CelestialBody& bo
     return AltitudeSamples{
         .values = sampleAltitudes(*guidanceEngine, guidanceRequest, 0U),
         .role = SampleRole::Guidance,
-        .trustGuidanceModel = body.fixedEquatorial.has_value()
-                              && request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections,
+        .trustGuidanceModel = searchMode == ObservationEventSearchMode::GuidedApproximate
+                              || (body.fixedEquatorial.has_value()
+                                  && request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections)
     };
 }
 
@@ -125,7 +128,7 @@ sampleGuidanceAltitudes(const EphemerisRequest& request, const CelestialBody& bo
 )
 {
     if (shouldUseGuidanceEngine(request, body, searchMode)) {
-        if (std::optional<AltitudeSamples> guidanceSamples = sampleGuidanceAltitudes(request, *body);
+        if (std::optional<AltitudeSamples> guidanceSamples = sampleGuidanceAltitudes(request, *body, searchMode);
             guidanceSamples.has_value() && !guidanceSamples->values.empty()) {
             return std::move(*guidanceSamples);
         }
@@ -463,6 +466,11 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, const d
     );
     ObservationCulmination culmination =
         findCulmination(ephemerisEngine, request, bodyIndex, samples.values, samples.trustGuidanceModel);
+
+    const bool approximateGuidance = searchMode == ObservationEventSearchMode::GuidedApproximate;
+    if (approximateGuidance && samples.role == SampleRole::Guidance) {
+        return ObservationEventSummary{.nextRise = nextRise, .nextSet = nextSet, .culmination = culmination};
+    }
 
     const bool fixedGuidanceBody = body != nullptr && body->fixedEquatorial.has_value();
     const bool nonFixedGuidanceMiss = samples.role == SampleRole::Guidance && !fixedGuidanceBody

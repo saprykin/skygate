@@ -76,7 +76,7 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
 [[nodiscard]] ObservationEventSearchMode observationSearchMode(const NightConditionsEventSearchMode mode) noexcept
 {
     return mode == NightConditionsEventSearchMode::Verified ? ObservationEventSearchMode::Direct
-                                                            : ObservationEventSearchMode::Guided;
+                                                            : ObservationEventSearchMode::GuidedApproximate;
 }
 
 [[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
