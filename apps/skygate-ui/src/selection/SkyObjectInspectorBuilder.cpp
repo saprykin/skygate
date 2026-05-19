@@ -63,6 +63,21 @@ void appendObservationEventFields(
     ));
 }
 
+skygate::ephemeris::ObservationEventSearchMode observationEventSearchModeForInspector(
+    const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body
+) noexcept
+{
+    if (input.ephemerisEngine != nullptr
+        && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+        && input.ephemerisRequest.has_value()
+        && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+        && !body.fixedEquatorial.has_value()) {
+        return skygate::ephemeris::ObservationEventSearchMode::GuidedApproximate;
+    }
+
+    return skygate::ephemeris::ObservationEventSearchMode::Guided;
+}
+
 struct EphemerisInspectorMetadata final {
     QString status;
     QString warningText;
@@ -90,8 +105,10 @@ skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
 )
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventSearchMode searchMode =
+        observationEventSearchModeForInspector(input, body);
     return input.ephemerisRequest.has_value()
-               ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body)
+               ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body, 0.0, searchMode)
                : calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex, body);
 }
 

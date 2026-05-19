@@ -1,10 +1,14 @@
 #include "SkyContextController.hpp"
 
+#include "SkyPerformanceLogging.hpp"
 #include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
 
+#include <QElapsedTimer>
+
 #include <cmath>
+#include <string>
 
 namespace {
 
@@ -58,17 +62,22 @@ void SkyContextController::setSearchToolbarCollapsed(const bool searchToolbarCol
 
 bool SkyContextController::focusSearchTarget(const QString& targetKind, const QString& targetId)
 {
+    QElapsedTimer timer;
+    skygate::ui::startPerformanceTimer(timer);
+
     const auto* engine = ephemerisEngine();
     if (engine == nullptr || targetKind.trimmed().isEmpty() || targetId.trimmed().isEmpty()) {
         return false;
     }
 
     const auto requestContext = ephemerisRequestContext();
-    const auto snapshot = engine->compute(requestContext.request);
+    const qint64 requestContextNs = skygate::ui::performanceElapsedNanoseconds(timer);
     const QString normalizedTargetKind = normalizedLookupKey(targetKind);
     if (normalizedTargetKind == "body") {
-        const auto* bodyState = findBodyStateById(snapshot, targetId);
-        if (bodyState == nullptr || !hasFiniteHorizontal(bodyState->horizontal)) {
+        const std::string trimmedTargetId = targetId.trimmed().toStdString();
+        const auto bodyState = engine->computeBodyState(requestContext.request, trimmedTargetId);
+        const qint64 lookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        if (!bodyState.has_value() || !hasFiniteHorizontal(bodyState->horizontal)) {
             return false;
         }
 
@@ -77,16 +86,32 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
                 || normalizedLookupKey(m_search.trackedTargetId()) != normalizedLookupKey(targetId))) {
             clearTrackedTarget();
         }
+        const qint64 trackingNs = skygate::ui::performanceElapsedNanoseconds(timer);
 
         setSelectedSearchTarget("body", targetId);
+        const qint64 selectedNs = skygate::ui::performanceElapsedNanoseconds(timer);
         setViewCenter(bodyState->horizontal.altitudeDeg, bodyState->horizontal.azimuthDeg);
+        const qint64 centerNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        if (skygate::ui::performanceLoggingEnabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "search focus elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+                << "requestContextMs=" << skygate::ui::performanceMilliseconds(requestContextNs)
+                << "bodyLookupMs=" << skygate::ui::performanceMilliseconds(lookupNs - requestContextNs)
+                << "trackingMs=" << skygate::ui::performanceMilliseconds(trackingNs - lookupNs)
+                << "selectedSignalMs=" << skygate::ui::performanceMilliseconds(selectedNs - trackingNs)
+                << "viewCenterMs=" << skygate::ui::performanceMilliseconds(centerNs - selectedNs)
+                << "kind=" << targetKind << "id=" << targetId;
+        }
         return true;
     }
 
     if (normalizedTargetKind == "constellationlabel") {
+        const auto snapshot = engine->compute(requestContext.request);
+        const qint64 snapshotNs = skygate::ui::performanceElapsedNanoseconds(timer);
         const auto center = skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(
             snapshot, constellationLabelRefs(), targetId.toStdString()
         );
+        const qint64 centerLookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
         if (!center.has_value()) {
             return false;
         }
@@ -94,9 +119,23 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         if (hasTrackedTarget()) {
             clearTrackedTarget();
         }
+        const qint64 trackingNs = skygate::ui::performanceElapsedNanoseconds(timer);
 
         setSelectedSearchTarget("constellationLabel", targetId);
+        const qint64 selectedNs = skygate::ui::performanceElapsedNanoseconds(timer);
         setViewCenter(center->altitudeDeg, center->azimuthDeg);
+        const qint64 centerNs = skygate::ui::performanceElapsedNanoseconds(timer);
+        if (skygate::ui::performanceLoggingEnabled()) {
+            qCInfo(skygate::ui::skygatePerfLog)
+                << "search focus elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+                << "requestContextMs=" << skygate::ui::performanceMilliseconds(requestContextNs)
+                << "snapshotMs=" << skygate::ui::performanceMilliseconds(snapshotNs - requestContextNs)
+                << "labelLookupMs=" << skygate::ui::performanceMilliseconds(centerLookupNs - snapshotNs)
+                << "trackingMs=" << skygate::ui::performanceMilliseconds(trackingNs - centerLookupNs)
+                << "selectedSignalMs=" << skygate::ui::performanceMilliseconds(selectedNs - trackingNs)
+                << "viewCenterMs=" << skygate::ui::performanceMilliseconds(centerNs - selectedNs)
+                << "kind=" << targetKind << "id=" << targetId;
+        }
         return true;
     }
 

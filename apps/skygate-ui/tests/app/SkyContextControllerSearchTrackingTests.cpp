@@ -149,6 +149,120 @@ private:
     mutable int m_contextComputeCount = 0;
 };
 
+class BodyLookupCountingEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit BodyLookupCountingEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
+        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+    {
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineOptions options;
+        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        return options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        ++m_requestComputeCount;
+        return makeSnapshot(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
+    {
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            if ((*m_bodies)[bodyIndex].id == bodyId) {
+                return computeBodyState(request, bodyIndex);
+            }
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest&, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex >= m_bodies->size()) {
+            return std::nullopt;
+        }
+
+        ++m_requestBodyStateCount;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+            .horizontal = {.altitudeDeg = 23.0, .azimuthDeg = 42.0},
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        ++m_contextComputeCount;
+        return makeSnapshot(context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, const std::string_view bodyId) const override
+    {
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            if ((*m_bodies)[bodyIndex].id == bodyId) {
+                return computeBodyState(skygate::ephemeris::EphemerisRequest{}, bodyIndex);
+            }
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, const std::uint32_t bodyIndex) const override
+    {
+        return computeBodyState(skygate::ephemeris::EphemerisRequest{}, static_cast<std::size_t>(bodyIndex));
+    }
+
+    [[nodiscard]] int requestComputeCount() const noexcept
+    {
+        return m_requestComputeCount;
+    }
+
+    [[nodiscard]] int contextComputeCount() const noexcept
+    {
+        return m_contextComputeCount;
+    }
+
+    [[nodiscard]] int requestBodyStateCount() const noexcept
+    {
+        return m_requestBodyStateCount;
+    }
+
+private:
+    [[nodiscard]] skygate::ephemeris::SkySnapshot makeSnapshot(const skygate::core::SkyContext& context) const
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        snapshot.catalogBodies = m_bodies;
+        snapshot.states.reserve(m_bodies->size());
+        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            snapshot.states.push_back(
+                skygate::ephemeris::CelestialBodyState{
+                    .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+                    .horizontal = {.altitudeDeg = 23.0, .azimuthDeg = 42.0},
+                }
+            );
+        }
+        return snapshot;
+    }
+
+    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    mutable int m_requestComputeCount = 0;
+    mutable int m_contextComputeCount = 0;
+    mutable int m_requestBodyStateCount = 0;
+};
+
 std::unique_ptr<SkyContextController> createRequestSensitiveController(
     RequestSensitiveEngine*& engine, const skygate::core::ITimeSource* timeSource = nullptr
 )
@@ -194,6 +308,7 @@ private slots:
     void init();
     void focusSearchTargetCentersBodyResult();
     void focusSearchTargetUsesSelectedEngineRequest();
+    void focusSearchTargetUsesSingleBodyLookupForMoon();
     void focusSearchTargetCentersConstellationLabelResult();
     void focusSearchTargetIgnoresInvalidTargets();
     void trackSearchTargetSetsLiveCurrentTimeAndCentersBody();
@@ -262,6 +377,35 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSelectedEngin
     QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
     QCOMPARE(controller->viewCenterAltitudeDeg(), 64.0);
     QCOMPARE(controller->viewCenterAzimuthDeg(), 222.0);
+}
+
+void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSingleBodyLookupForMoon()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies{
+        makeBody("moon", "Moon", skygate::ephemeris::CelestialBodyType::Moon, -12.0)
+    };
+    bodies.front().ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon;
+    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    QVERIFY(starCatalog != nullptr);
+
+    auto ephemerisEngine = std::make_unique<BodyLookupCountingEngine>(std::move(bodies));
+    const auto* engine = ephemerisEngine.get();
+    auto initializationOptions = controllerInitializationOptions(false);
+    initializationOptions.rebuildEphemerisEngineOnStartup = false;
+    auto controller = std::make_unique<SkyContextController>(
+        std::move(starCatalog), std::move(ephemerisEngine), initializationOptions, nullptr
+    );
+    configureFocusTestContext(*controller);
+
+    QVERIFY(controller->focusSearchTarget("body", "moon"));
+
+    QCOMPARE(engine->requestComputeCount(), 0);
+    QCOMPARE(engine->contextComputeCount(), 0);
+    QCOMPARE(engine->requestBodyStateCount(), 1);
+    QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
+    QCOMPARE(controller->selectedSearchTargetId(), QString("moon"));
+    QCOMPARE(controller->viewCenterAltitudeDeg(), 23.0);
+    QCOMPARE(controller->viewCenterAzimuthDeg(), 42.0);
 }
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersConstellationLabelResult()

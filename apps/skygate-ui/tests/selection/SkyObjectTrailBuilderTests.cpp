@@ -3,12 +3,14 @@
 #include <QtTest/QtTest>
 
 #include "skygate/core/math/ViewportMath.hpp"
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <numbers>
 #include <optional>
 #include <string_view>
@@ -282,6 +284,19 @@ bool containsOffset(const std::vector<int>& offsets, const int offsetMinutes)
     return std::find(offsets.begin(), offsets.end(), offsetMinutes) != offsets.end();
 }
 
+bool lineTouchesPoint(const SkyRenderLine& line, const double x, const double y, const double tolerancePx)
+{
+    const auto closeToPoint = [x, y, tolerancePx](const double lineX, const double lineY) {
+        return std::hypot(lineX - x, lineY - y) <= tolerancePx;
+    };
+    return closeToPoint(line.x1, line.y1) || closeToPoint(line.x2, line.y2);
+}
+
+double lineLength(const SkyRenderLine& line)
+{
+    return std::hypot(line.x2 - line.x1, line.y2 - line.y1);
+}
+
 }  // namespace
 
 class SkyObjectTrailBuilderTests final : public QObject {
@@ -293,6 +308,7 @@ private slots:
     void invalidSamplesBreakContinuity();
     void highPrecisionFixedTargetTrailUsesEquatorialModel();
     void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
+    void highPrecisionNonFixedTargetTrailUsesGuidanceEngine();
     void highPrecisionTrailRefinesCurvedInterpolation();
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
@@ -444,6 +460,79 @@ void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolated
 
     QVERIFY(pannedFrame.lines.size() > 40U);
     QCOMPARE(engine.requestBodyStateCalls(), 25);
+}
+
+void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEngine()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::ephemeris::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
+    };
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Astrometric;
+    input.ephemerisRequest = request;
+
+    const skygate::ephemeris::CelestialBody body{
+        .id = "moon",
+        .displayName = "Moon",
+        .type = skygate::ephemeris::CelestialBodyType::Moon,
+        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon
+    };
+
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
+        skygate::ephemeris::createEphemerisEngine({body});
+    QVERIFY(guidanceEngine != nullptr);
+    skygate::ephemeris::EphemerisRequest guidanceRequest = request;
+    guidanceRequest.options = guidanceEngine->options();
+    guidanceRequest.options.engineKind = guidanceEngine->kind();
+    const std::optional<skygate::ephemeris::CelestialBodyState> guidanceState =
+        guidanceEngine->computeBodyState(guidanceRequest, std::size_t{0U});
+    QVERIFY(guidanceState.has_value());
+    QVERIFY(guidanceState->horizontal.isFinite());
+
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 12.0},
+        .horizontal = skygate::core::HorizontalCoordinate{
+            .altitudeDeg = guidanceState->horizontal.altitudeDeg + 8.0,
+            .azimuthDeg = guidanceState->horizontal.azimuthDeg + 8.0,
+        }
+    };
+    const std::optional<skygate::core::PreparedProjection> anchoredProjection =
+        skygate::core::PreparedProjection::create(
+            skygate::core::ProjectionType::Stereographic,
+            skygate::core::ViewportMath::buildProjectionParams(
+                1000.0, 800.0, state.horizontal.altitudeDeg, state.horizontal.azimuthDeg, 90.0
+            )
+        );
+    QVERIFY(anchoredProjection.has_value());
+    input.preparedProjection = &*anchoredProjection;
+    input.targetBody = &body;
+    input.targetState = &state;
+
+    builder.appendTrail(frame, input);
+
+    QVERIFY(!frame.lines.empty());
+    QCOMPARE(engine.requestBodyStateCalls(), 0);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+
+    const skygate::core::ScreenPoint selectedPoint = anchoredProjection->project(state.horizontal);
+    QVERIFY(selectedPoint.isVisible);
+    QVERIFY(std::any_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
+        return line.widthPx == 2.0 && line.color.alpha() == 175
+               && lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0);
+    }));
+    QVERIFY(std::none_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
+        return lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0) && lineLength(line) > 50.0;
+    }));
 }
 
 void SkyObjectTrailBuilderTests::highPrecisionTrailRefinesCurvedInterpolation()
