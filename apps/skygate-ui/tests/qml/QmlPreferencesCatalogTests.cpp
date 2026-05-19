@@ -14,18 +14,22 @@ constexpr std::string_view kEmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae4
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = 1900,
-        .month = 1,
-        .day = 1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
-    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = 2100,
-        .month = 1,
-        .day = 1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 1900,
+            .month = 1,
+            .day = 1,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
+    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = 2100,
+            .month = 1,
+            .day = 1,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(start.has_value());
     Q_ASSERT(end.has_value());
     return skygate::ephemeris::EphemerisDateRange{
@@ -86,20 +90,24 @@ void writeInstalledEphemerisSettings(
 skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
 {
     skygate::ephemeris::EphemerisDataManifest manifest;
-    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
-        .id = "modern",
-        .displayName = "Modern",
-        .bundled = true,
-        .longRange = false,
-        .assetIds = {"de440s-kernel"},
-    });
-    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
-        .id = "de441-long-range",
-        .displayName = "DE441 long range",
-        .bundled = false,
-        .longRange = true,
-        .assetIds = {"de441-kernel"},
-    });
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "modern",
+            .displayName = "Modern",
+            .bundled = true,
+            .longRange = false,
+            .assetIds = {"de440s-kernel"},
+        }
+    );
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "de441-long-range",
+            .displayName = "DE441 long range",
+            .bundled = false,
+            .longRange = true,
+            .assetIds = {"de441-kernel"},
+        }
+    );
     manifest.assets.push_back(emptyKernelAsset("de440s-kernel", "modern", "DE440s-test", "modern/kernels/de440s.bsp"));
     manifest.assets.push_back(
         emptyKernelAsset("de441-kernel", "de441-long-range", "DE441-test", "de441/kernels/de441.bsp")
@@ -233,6 +241,8 @@ void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
     QObject* downloadButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogDownloadButton"));
     QVERIFY(downloadButton != nullptr);
     QVERIFY(downloadButton->property("enabled").toBool());
+    QVERIFY(firstObjectWithObjectName(root, QStringLiteral("ephemerisEngineSelectorCombo")) == nullptr);
+    QVERIFY(firstObjectWithObjectName(root, QStringLiteral("ephemerisDataUpdateButton")) == nullptr);
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -259,7 +269,7 @@ void QmlPreferencesCatalogTests::ephemerisEngineControlsBindDraftAndVisibility()
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
-            PreferencesCatalogSection {
+            PreferencesEngineSection {
                 anchors.fill: parent
                 skyContextController: skyContext
                 preferencesDraft: draft
@@ -339,7 +349,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
-            PreferencesCatalogSection {
+            PreferencesEngineSection {
                 anchors.fill: parent
                 skyContextController: skyContext
                 preferencesDraft: draft
@@ -353,43 +363,35 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
     QVERIFY(root != nullptr);
 
     QObject* modernStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisModernKernelStatusLabel"));
-    QObject* longRangeStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLongRangeStatusLabel"));
     QObject* eopStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
     QObject* leapSecondStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLeapSecondStatusLabel"));
     QObject* deltaTStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisDeltaTStatusLabel"));
-    QObject* lastUpdateStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLastUpdateStatusLabel"));
-    QObject* onlineUpdates = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataOnlineUpdatesCheckBox"));
     QObject* updateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataUpdateButton"));
     QObject* longRangeUpdateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisLongRangeUpdateButton"));
     QVERIFY(modernStatus != nullptr);
-    QVERIFY(longRangeStatus != nullptr);
     QVERIFY(eopStatus != nullptr);
     QVERIFY(leapSecondStatus != nullptr);
     QVERIFY(deltaTStatus != nullptr);
-    QVERIFY(lastUpdateStatus != nullptr);
-    QVERIFY(onlineUpdates != nullptr);
     QVERIFY(updateButton != nullptr);
     QVERIFY(longRangeUpdateButton != nullptr);
 
     QCOMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
-    QCOMPARE(longRangeStatus->property("text").toString(), QString("Not installed"));
     QCOMPARE(eopStatus->property("text").toString(), QString("Bundled fallback"));
     QCOMPARE(leapSecondStatus->property("text").toString(), QString("Bundled fallback"));
     QCOMPARE(deltaTStatus->property("text").toString(), QString("Bundled fallback"));
-    QCOMPARE(lastUpdateStatus->property("text").toString(), QString("Bundled fallback"));
-    QVERIFY(onlineUpdates->property("checked").toBool());
     QVERIFY(updateButton->property("enabled").toBool());
     QVERIFY(longRangeUpdateButton->property("enabled").toBool());
 
     QVERIFY(activateControl(longRangeUpdateButton));
-    QTRY_COMPARE(longRangeStatus->property("text").toString(), QString("Installed: DE441-test"));
-    QTRY_COMPARE(lastUpdateStatus->property("text").toString(), QString("Installed DE441 long range"));
+    QTRY_COMPARE(modernStatus->property("text").toString(), QString("Installed: DE441-test"));
+    QTRY_COMPARE(eopStatus->property("text").toString(), QString("Bundled fallback"));
+    QTRY_COMPARE(leapSecondStatus->property("text").toString(), QString("Bundled fallback"));
+    QTRY_COMPARE(deltaTStatus->property("text").toString(), QString("Bundled fallback"));
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
 
-    QVERIFY(activateControl(onlineUpdates));
-    QTRY_VERIFY(!controller->ephemerisDataOnlineUpdatesEnabled());
-    QTRY_VERIFY(!updateButton->property("enabled").toBool());
-    QTRY_VERIFY(!longRangeUpdateButton->property("enabled").toBool());
+    controller->setEphemerisDataOnlineUpdatesEnabled(false);
+    QTRY_VERIFY(updateButton->property("enabled").toBool());
+    QTRY_VERIFY(longRangeUpdateButton->property("enabled").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -426,7 +428,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowInstalledStateAndClear
                 skyContextController: skyContext
                 Component.onCompleted: resetFromContext()
             }
-            PreferencesCatalogSection {
+            PreferencesEngineSection {
                 anchors.fill: parent
                 skyContextController: skyContext
                 preferencesDraft: draft
@@ -440,34 +442,26 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowInstalledStateAndClear
     QVERIFY(root != nullptr);
 
     QObject* modernStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisModernKernelStatusLabel"));
-    QObject* longRangeStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLongRangeStatusLabel"));
     QObject* eopStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
     QObject* leapSecondStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLeapSecondStatusLabel"));
     QObject* deltaTStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisDeltaTStatusLabel"));
-    QObject* lastUpdateStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLastUpdateStatusLabel"));
     QObject* updateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataUpdateButton"));
     QObject* clearButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataClearCacheButton"));
     QVERIFY(modernStatus != nullptr);
-    QVERIFY(longRangeStatus != nullptr);
     QVERIFY(eopStatus != nullptr);
     QVERIFY(leapSecondStatus != nullptr);
     QVERIFY(deltaTStatus != nullptr);
-    QVERIFY(lastUpdateStatus != nullptr);
     QVERIFY(updateButton != nullptr);
     QVERIFY(clearButton != nullptr);
 
-    QCOMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
-    QCOMPARE(longRangeStatus->property("text").toString(), QString("Installed: DE441-test"));
+    QCOMPARE(modernStatus->property("text").toString(), QString("Installed: DE441-test"));
     QCOMPARE(eopStatus->property("text").toString(), QString("Installed: EOP-test"));
     QCOMPARE(leapSecondStatus->property("text").toString(), QString("Installed: LS-test"));
     QCOMPARE(deltaTStatus->property("text").toString(), QString("Installed: DT-test"));
-    QCOMPARE(lastUpdateStatus->property("text").toString(), QString("Installed DE441"));
     QVERIFY(!updateButton->property("enabled").toBool());
 
     QVERIFY(activateControl(clearButton));
     QTRY_COMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
-    QTRY_COMPARE(longRangeStatus->property("text").toString(), QString("Not installed"));
-    QTRY_COMPARE(lastUpdateStatus->property("text").toString(), QString("Bundled fallback"));
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Bundled fallback"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }

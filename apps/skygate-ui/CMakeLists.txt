@@ -200,6 +200,7 @@ qt_add_qml_module(skygate-ui
         qml/preferences/PreferencesDraft.qml
         qml/preferences/PreferencesGeneralSection.qml
         qml/preferences/PreferencesSkySection.qml
+        qml/preferences/PreferencesEngineSection.qml
         qml/preferences/PreferencesAppearanceSection.qml
         qml/preferences/PreferencesCatalogSection.qml
         qml/preferences/PreferencesCityPicker.qml

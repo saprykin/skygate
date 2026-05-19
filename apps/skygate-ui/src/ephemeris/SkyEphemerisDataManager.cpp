@@ -201,6 +201,17 @@ void markCanceled(SkyEphemerisDataManager::StagedUpdateDownloadResult& result, Q
     addDiagnostic(result, std::move(diagnostic));
 }
 
+void reportDownloadProgress(
+    const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request,
+    const std::uint64_t stagedBytes,
+    const std::optional<std::uint64_t> totalBytes
+)
+{
+    if (request.progressHandler != nullptr) {
+        request.progressHandler(stagedBytes, totalBytes);
+    }
+}
+
 [[nodiscard]] QString sourceUrlForRequest(const SkyEphemerisDataManager::StagedUpdateDownloadRequest& request)
 {
     if (!request.sourceUrl.trimmed().isEmpty()) {
@@ -248,6 +259,10 @@ void cleanupCanceledDownload(
 )
 {
     std::array<char, kDownloadBufferBytes> buffer{};
+    const std::optional<std::uint64_t> totalBytes =
+        sourceFile.size() >= 0 ? std::optional<std::uint64_t>{static_cast<std::uint64_t>(sourceFile.size())}
+                               : std::nullopt;
+    reportDownloadProgress(request, result.stagedBytes, totalBytes);
     while (!sourceFile.atEnd()) {
         if (isCanceled()) {
             stagedFile.close();
@@ -271,6 +286,7 @@ void cleanupCanceledDownload(
             return false;
         }
         result.stagedBytes += static_cast<std::uint64_t>(bytesRead);
+        reportDownloadProgress(request, result.stagedBytes, totalBytes);
     }
     return true;
 }
@@ -357,7 +373,17 @@ void cleanupCanceledDownload(
             return;
         }
         result.stagedBytes += static_cast<std::uint64_t>(payload.size());
+        reportDownloadProgress(request, result.stagedBytes, std::nullopt);
     });
+    QObject::connect(
+        reply, &QNetworkReply::downloadProgress, &eventLoop, [&](const qint64 bytesReceived, const qint64 bytesTotal) {
+            const std::optional<std::uint64_t> totalBytes =
+                bytesTotal > 0 ? std::optional<std::uint64_t>{static_cast<std::uint64_t>(bytesTotal)} : std::nullopt;
+            reportDownloadProgress(
+                request, bytesReceived > 0 ? static_cast<std::uint64_t>(bytesReceived) : result.stagedBytes, totalBytes
+            );
+        }
+    );
     QObject::connect(&cancellationTimer, &QTimer::timeout, &eventLoop, [&] {
         if (isCanceled()) {
             reply->abort();
@@ -376,6 +402,7 @@ void cleanupCanceledDownload(
             addDiagnostic(result, QStringLiteral("Unable to write ephemeris update staging file."));
         } else {
             result.stagedBytes += static_cast<std::uint64_t>(remainingPayload.size());
+            reportDownloadProgress(request, result.stagedBytes, result.stagedBytes);
         }
     }
 
@@ -800,8 +827,7 @@ QString SkyEphemerisDataManager::datasetInfoText() const
 
 QString SkyEphemerisDataManager::modernKernelStatusText() const
 {
-    if (usingInstalledData() && !installedKernelLooksLongRange(m_activeCacheSnapshot)
-        && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
+    if (usingInstalledData() && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
         return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedKernelVersion);
     }
     if (m_activeSource == ActiveSource::MissingInstalledFallback) {

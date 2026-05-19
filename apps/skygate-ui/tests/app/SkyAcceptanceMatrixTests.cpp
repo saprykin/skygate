@@ -55,18 +55,22 @@ bool writeFile(const QString& path, const QByteArray& contents)
 ephemeris::EphemerisDateRange
 acceptanceRange(std::string id, std::string displayName, const int startYear, const int endYear)
 {
-    const auto start = ephemeris::astronomicalEpochFromCivilDateTime(ephemeris::CivilDateTime{
-        .astronomicalYear = startYear,
-        .month = 1,
-        .day = 1,
-        .timeScale = ephemeris::TimeScale::Utc,
-    });
-    const auto end = ephemeris::astronomicalEpochFromCivilDateTime(ephemeris::CivilDateTime{
-        .astronomicalYear = endYear,
-        .month = 1,
-        .day = 1,
-        .timeScale = ephemeris::TimeScale::Utc,
-    });
+    const auto start = ephemeris::astronomicalEpochFromCivilDateTime(
+        ephemeris::CivilDateTime{
+            .astronomicalYear = startYear,
+            .month = 1,
+            .day = 1,
+            .timeScale = ephemeris::TimeScale::Utc,
+        }
+    );
+    const auto end = ephemeris::astronomicalEpochFromCivilDateTime(
+        ephemeris::CivilDateTime{
+            .astronomicalYear = endYear,
+            .month = 1,
+            .day = 1,
+            .timeScale = ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(start.has_value());
     Q_ASSERT(end.has_value());
     return ephemeris::EphemerisDateRange{
@@ -123,20 +127,24 @@ ephemeris::EphemerisDataManifest acceptanceManifest()
     manifest.dataSetInfo.provenance = "acceptance test";
     manifest.dataSetInfo.dateRanges.push_back(acceptanceModernRange());
     manifest.dataSetInfo.dateRanges.push_back(acceptanceLongRange());
-    manifest.profiles.push_back(ephemeris::EphemerisDataManifestProfile{
-        .id = "modern",
-        .displayName = "Modern",
-        .bundled = true,
-        .longRange = false,
-        .assetIds = {"de440s-kernel"},
-    });
-    manifest.profiles.push_back(ephemeris::EphemerisDataManifestProfile{
-        .id = "de441-long-range",
-        .displayName = "DE441 long range",
-        .bundled = false,
-        .longRange = true,
-        .assetIds = {"de441-kernel"},
-    });
+    manifest.profiles.push_back(
+        ephemeris::EphemerisDataManifestProfile{
+            .id = "modern",
+            .displayName = "Modern",
+            .bundled = true,
+            .longRange = false,
+            .assetIds = {"de440s-kernel"},
+        }
+    );
+    manifest.profiles.push_back(
+        ephemeris::EphemerisDataManifestProfile{
+            .id = "de441-long-range",
+            .displayName = "DE441 long range",
+            .bundled = false,
+            .longRange = true,
+            .assetIds = {"de441-kernel"},
+        }
+    );
     manifest.assets.push_back(acceptanceKernelAsset(
         "de440s-kernel", "modern", "acceptance-modern-kernel", "kernels/de440s.bsp", acceptanceModernRange(), false
     ));
@@ -203,13 +211,14 @@ ephemeris::CelestialBody acceptanceMarsBody()
 
 ephemeris::AstronomicalEpoch acceptanceEpoch(const int year)
 {
-    std::optional<ephemeris::AstronomicalEpoch> epoch =
-        ephemeris::astronomicalEpochFromCivilDateTime(ephemeris::CivilDateTime{
+    std::optional<ephemeris::AstronomicalEpoch> epoch = ephemeris::astronomicalEpochFromCivilDateTime(
+        ephemeris::CivilDateTime{
             .astronomicalYear = year,
             .month = 1,
             .day = 1,
             .timeScale = ephemeris::TimeScale::Tdb,
-        });
+        }
+    );
     Q_ASSERT(epoch.has_value());
     epoch->timeScale = ephemeris::TimeScale::Tdb;
     return *epoch;
@@ -531,7 +540,7 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Ker
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
     QVERIFY(manager.usingInstalledData());
-    QCOMPARE(manager.modernKernelStatusText(), QString("Bundled fallback"));
+    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
     QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
 
     const auto snapshot = manager.activeDataSnapshot();

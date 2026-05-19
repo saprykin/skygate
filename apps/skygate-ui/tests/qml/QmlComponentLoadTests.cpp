@@ -112,6 +112,26 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
+    QTest::newRow("PreferencesEngineSection")
+        << QStringLiteral("PreferencesEngineSection")
+        << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 520
+                PreferencesDraft {
+                    id: draft
+                    skyContextController: skyContext
+                    Component.onCompleted: resetFromContext()
+                }
+                PreferencesEngineSection {
+                    anchors.fill: parent
+                    skyContextController: skyContext
+                    preferencesDraft: draft
+                }
+            }
+        )");
+
     QTest::newRow("PreferencesGeneralSection")
         << QStringLiteral("PreferencesGeneralSection")
         << QStringLiteral(R"(

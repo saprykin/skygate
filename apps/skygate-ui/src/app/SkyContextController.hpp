@@ -10,6 +10,7 @@
 #include "skygate/core/Types.hpp"
 #include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
+#include "skygate/ephemeris/EphemerisDataManifest.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/IStarCatalog.hpp"
 #include "skygate/ephemeris/Types.hpp"
@@ -23,6 +24,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <utility>
 #include <vector>
@@ -32,8 +34,6 @@ class IEarthOrientationProvider;
 class IEphemerisDataSnapshot;
 class IEphemerisDiagnosticsSink;
 class ITimeScaleService;
-struct EphemerisDataManifest;
-
 namespace highprecision {
 class ICalcephKernelRuntime;
 }
@@ -152,6 +152,11 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(
         bool ephemerisDataUpdateInProgress
         READ ephemerisDataUpdateInProgress
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        double ephemerisDataUpdateProgress
+        READ ephemerisDataUpdateProgress
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
@@ -295,6 +300,7 @@ public:
     [[nodiscard]] bool ephemerisDataOnlineUpdatesEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateInProgress() const noexcept;
+    [[nodiscard]] double ephemerisDataUpdateProgress() const noexcept;
     [[nodiscard]] QString catalogDatasetInfoText() const;
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
@@ -450,6 +456,9 @@ private:
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
     void setEphemerisDataOperationStatusText(QString statusText);
+    void setEphemerisDataUpdateProgress(double progress) noexcept;
+    [[nodiscard]] const skygate::ephemeris::EphemerisDataManifest* activeEphemerisDataManifest() const noexcept;
+    [[nodiscard]] bool refreshEphemerisDataManifest(const QString& stagedRoot);
     void rebuildEphemerisEngine();
 
 private:
@@ -476,6 +485,7 @@ private:
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
     const skygate::ephemeris::EphemerisDataSetInfo* m_ephemerisDataSetManifest = nullptr;
     const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
+    std::optional<skygate::ephemeris::EphemerisDataManifest> m_refreshedEphemerisDataManifest;
     QString m_ephemerisUpdateResourceRoot;
     QString m_ephemerisWritableCacheRoot;
     QString m_ephemerisDataOperationStatusText;
@@ -491,4 +501,5 @@ private:
     QString m_logFilePath;
     QVariantMap m_nightConditions;
     bool m_ephemerisDataUpdateInProgress = false;
+    double m_ephemerisDataUpdateProgress = 0.0;
 };

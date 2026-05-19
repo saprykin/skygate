@@ -52,11 +52,17 @@ void QmlPreferencesWindowTests::preferencesWindowShellNavigatesAppliesAndCloses(
     QTRY_VERIFY(window->isVisible());
     QCOMPARE(draft->property("latitudeText").toString(), QString("47.000000"));
 
+    QObject* engineSection = firstObjectWithObjectName(window, QStringLiteral("preferencesEngineSectionButton"));
+    QVERIFY(engineSection != nullptr);
+    QVERIFY(activateControl(engineSection));
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 2);
+    QCOMPARE(window->property("currentSectionDescription").toString(), QString("Ephemeris engine and data settings"));
+
     QObject* catalogSection = firstObjectWithObjectName(window, QStringLiteral("preferencesCatalogSectionButton"));
     QVERIFY(catalogSection != nullptr);
     QVERIFY(activateControl(catalogSection));
-    QTRY_COMPARE(window->property("selectedPage").toInt(), 3);
-    QCOMPARE(window->property("currentSectionDescription").toString(), QString("Catalog and ephemeris data settings"));
+    QTRY_COMPARE(window->property("selectedPage").toInt(), 4);
+    QCOMPARE(window->property("currentSectionDescription").toString(), QString("Star and deep-sky catalog management"));
 
     QObject* skySection = firstObjectWithObjectName(window, QStringLiteral("preferencesSkySectionButton"));
     QVERIFY(skySection != nullptr);

@@ -15,6 +15,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
 #include <QStandardPaths>
 
 #include "skygate/ephemeris/EphemerisDataManifest.hpp"
@@ -24,6 +25,7 @@
 #include "skygate/ephemeris/LeapSecondProvider.hpp"
 #include "skygate/ephemeris/TimeScaleService.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -732,14 +734,18 @@ bool SkyContextController::ephemerisDataOnlineUpdatesEnabled() const noexcept
 
 bool SkyContextController::ephemerisDataUpdateEnabled() const noexcept
 {
-    return m_ephemerisUserSettings.onlineUpdatesEnabled && !m_ephemerisDataUpdateInProgress
-           && m_ephemerisDataManifest != nullptr && !m_ephemerisUpdateResourceRoot.trimmed().isEmpty()
-           && !m_ephemerisWritableCacheRoot.trimmed().isEmpty();
+    return !m_ephemerisDataUpdateInProgress && activeEphemerisDataManifest() != nullptr
+           && !m_ephemerisUpdateResourceRoot.trimmed().isEmpty() && !m_ephemerisWritableCacheRoot.trimmed().isEmpty();
 }
 
 bool SkyContextController::ephemerisDataUpdateInProgress() const noexcept
 {
     return m_ephemerisDataUpdateInProgress;
+}
+
+double SkyContextController::ephemerisDataUpdateProgress() const noexcept
+{
+    return m_ephemerisDataUpdateProgress;
 }
 
 QString SkyContextController::catalogDatasetInfoText() const
@@ -846,8 +852,9 @@ void SkyContextController::rebuildEphemerisEngine()
     request.catalogBodies = catalogBodies();
     request.options = m_ephemerisEngineOptions;
     request.options.engineKind = m_ephemerisEngineKind;
-    request.dataSetManifest = m_ephemerisDataSetManifest;
-    request.dataManifest = m_ephemerisDataManifest;
+    const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
+    request.dataSetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDataSetManifest;
+    request.dataManifest = dataManifest;
     request.activeDataSnapshot = activeDataSnapshot;
     request.timeScaleService =
         m_ephemerisTimeScaleService != nullptr ? m_ephemerisTimeScaleService : snapshotProviders.timeScaleService;
@@ -1143,6 +1150,79 @@ void SkyContextController::setEphemerisDataOperationStatusText(QString statusTex
     emit ephemerisDataStatusTextChanged();
 }
 
+void SkyContextController::setEphemerisDataUpdateProgress(const double progress) noexcept
+{
+    const double boundedProgress = std::clamp(progress, 0.0, 1.0);
+    if (m_ephemerisDataUpdateProgress == boundedProgress) {
+        return;
+    }
+
+    m_ephemerisDataUpdateProgress = boundedProgress;
+    emit ephemerisDataStatusTextChanged();
+}
+
+const skygate::ephemeris::EphemerisDataManifest* SkyContextController::activeEphemerisDataManifest() const noexcept
+{
+    return m_refreshedEphemerisDataManifest.has_value() ? &*m_refreshedEphemerisDataManifest : m_ephemerisDataManifest;
+}
+
+bool SkyContextController::refreshEphemerisDataManifest(const QString& stagedRoot)
+{
+    const QString manifestUrl = m_ephemerisUserSettings.updateManifestUrl.trimmed();
+    if (manifestUrl.isEmpty()) {
+        return activeEphemerisDataManifest() != nullptr;
+    }
+    if (m_ephemerisDataManager == nullptr) {
+        return false;
+    }
+
+    skygate::ephemeris::EphemerisDataManifestAsset manifestAsset;
+    manifestAsset.id = "manifest";
+    manifestAsset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData;
+    manifestAsset.profileId = "manifest";
+    manifestAsset.version = "manifest";
+    manifestAsset.sourceUrl = manifestUrl.toStdString();
+    manifestAsset.relativePath = "manifest.json";
+
+    SkyEphemerisDataManager::StagedUpdateDownloadRequest request;
+    request.asset = &manifestAsset;
+    request.sourceUrl = manifestUrl;
+    request.stagedResourceRoot = stagedRoot + QStringLiteral("/manifest");
+    request.cancellationRequested = [this] {
+        return m_ephemerisDataManager != nullptr && m_ephemerisDataManager->updateCancellationRequested();
+    };
+
+    const SkyEphemerisDataManager::StagedUpdateDownloadResult downloadResult =
+        m_ephemerisDataManager->stageEphemerisUpdateAsset(request);
+    if (!downloadResult.isSuccess()) {
+        const QString diagnostic = downloadResult.diagnostics.empty() ? QStringLiteral("manifest download failed")
+                                                                      : downloadResult.diagnostics.front();
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: %1").arg(diagnostic));
+        return false;
+    }
+
+    QFile manifestFile(downloadResult.stagedPath);
+    if (!manifestFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to open update manifest"));
+        return false;
+    }
+
+    const QByteArray payload = manifestFile.readAll();
+    skygate::ephemeris::EphemerisDataManifestParseResult parseResult = skygate::ephemeris::parseEphemerisDataManifest(
+        std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
+    );
+    if (!parseResult.isSuccess()) {
+        const QString diagnostic = parseResult.diagnostics.empty()
+                                       ? QStringLiteral("manifest parse failed")
+                                       : QString::fromStdString(parseResult.diagnostics.front());
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: %1").arg(diagnostic));
+        return false;
+    }
+
+    m_refreshedEphemerisDataManifest = std::move(parseResult.manifest);
+    return true;
+}
+
 bool SkyContextController::clearEphemerisDataCache()
 {
     const bool cleared = m_ephemerisDataManager != nullptr && m_ephemerisDataManager->clearInstalledDataCache();
@@ -1167,11 +1247,7 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update already in progress"));
         return false;
     }
-    if (!m_ephemerisUserSettings.onlineUpdatesEnabled) {
-        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Online updates disabled"));
-        return false;
-    }
-    if (m_ephemerisDataManifest == nullptr) {
+    if (activeEphemerisDataManifest() == nullptr) {
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update manifest unavailable"));
         return false;
     }
@@ -1182,13 +1258,6 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
 
     const QString normalizedProfileId = profileIdText.trimmed();
     if (normalizedProfileId.isEmpty()) {
-        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update profile unavailable"));
-        return false;
-    }
-
-    const std::string profileId = normalizedProfileId.toStdString();
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = m_ephemerisDataManifest->profile(profileId);
-    if (profile == nullptr) {
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update profile unavailable"));
         return false;
     }
@@ -1206,26 +1275,52 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
     }
 
     m_ephemerisDataUpdateInProgress = true;
+    setEphemerisDataUpdateProgress(0.0);
     emit ephemerisDataStatusTextChanged();
     const auto finishUpdate = [this](const bool success, QString statusText) {
         m_ephemerisDataUpdateInProgress = false;
+        setEphemerisDataUpdateProgress(success ? 1.0 : 0.0);
         setEphemerisDataOperationStatusText(std::move(statusText));
         emit ephemerisDataStatusTextChanged();
         return success;
     };
+    setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Checking update manifest"));
+    if (!refreshEphemerisDataManifest(stagedRoot)) {
+        return finishUpdate(false, m_ephemerisDataOperationStatusText);
+    }
+
+    const skygate::ephemeris::EphemerisDataManifest* updateManifest = activeEphemerisDataManifest();
+    if (updateManifest == nullptr) {
+        return finishUpdate(false, QStringLiteral("Ephemeris data: Update manifest unavailable"));
+    }
+
+    const std::string profileId = normalizedProfileId.toStdString();
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = updateManifest->profile(profileId);
+    if (profile == nullptr) {
+        return finishUpdate(false, QStringLiteral("Ephemeris data: Update profile unavailable"));
+    }
+
+    std::uint64_t totalExpectedBytes = 0U;
+    for (const std::string& assetId : profile->assetIds) {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = updateManifest->asset(assetId);
+        if (asset != nullptr && asset->compression.uncompressedSizeBytes.has_value()) {
+            totalExpectedBytes += *asset->compression.uncompressedSizeBytes;
+        }
+    }
+    std::uint64_t completedBytes = 0U;
     setEphemerisDataOperationStatusText(
         QStringLiteral("Ephemeris data: Downloading %1")
             .arg(profile->displayName.empty() ? normalizedProfileId : QString::fromStdString(profile->displayName))
     );
 
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
-    request.manifest = m_ephemerisDataManifest;
+    request.manifest = updateManifest;
     request.profileId = normalizedProfileId;
     request.stagedResourceRoot = stagedRoot;
     request.writableCacheRoot = m_ephemerisWritableCacheRoot;
     request.revisionToken = QString::fromStdString(profile->id);
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = m_ephemerisDataManifest->asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = updateManifest->asset(assetId);
         if (asset == nullptr) {
             return finishUpdate(false, QStringLiteral("Ephemeris data: Update profile references a missing asset"));
         }
@@ -1240,6 +1335,19 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
         downloadRequest.cancellationRequested = [this] {
             return m_ephemerisDataManager != nullptr && m_ephemerisDataManager->updateCancellationRequested();
         };
+        downloadRequest.progressHandler =
+            [this,
+             completedBytes,
+             totalExpectedBytes](const std::uint64_t stagedBytes, const std::optional<std::uint64_t> totalBytes) {
+                const std::uint64_t denominator =
+                    totalExpectedBytes > 0U ? totalExpectedBytes : completedBytes + totalBytes.value_or(stagedBytes);
+                if (denominator > 0U) {
+                    setEphemerisDataUpdateProgress(
+                        static_cast<double>(std::min(completedBytes + stagedBytes, denominator))
+                        / static_cast<double>(denominator)
+                    );
+                }
+            };
 
         const SkyEphemerisDataManager::StagedUpdateDownloadResult downloadResult =
             m_ephemerisDataManager->stageEphemerisUpdateAsset(downloadRequest);
@@ -1247,6 +1355,13 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
             const QString diagnostic = downloadResult.diagnostics.empty() ? QStringLiteral("asset download failed")
                                                                           : downloadResult.diagnostics.front();
             return finishUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
+        }
+        completedBytes += asset->compression.uncompressedSizeBytes.value_or(downloadResult.stagedBytes);
+        if (totalExpectedBytes > 0U) {
+            setEphemerisDataUpdateProgress(
+                static_cast<double>(std::min(completedBytes, totalExpectedBytes))
+                / static_cast<double>(totalExpectedBytes)
+            );
         }
         request.requiredKinds.push_back(asset->kind);
         auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
