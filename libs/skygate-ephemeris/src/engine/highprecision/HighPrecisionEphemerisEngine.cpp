@@ -1,5 +1,6 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
+#include "skygate/core/UtcTimeCodec.hpp"
 #include "StringUtilities.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
@@ -7,6 +8,7 @@
 #include "skygate/ephemeris/EphemerisRequestFactory.hpp"
 
 #include <cmath>
+#include <bit>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -23,6 +25,7 @@ namespace {
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
+constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
 
 [[nodiscard]] bool hasValidEpoch(const AstronomicalEpoch& epoch) noexcept
 {
@@ -57,6 +60,43 @@ constexpr int kNaifSolarSystemBarycenter = 0;
 [[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
 {
     return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax);
+}
+
+[[nodiscard]] bool sameDoubleIdentity(const double lhs, const double rhs) noexcept
+{
+    return std::bit_cast<std::uint64_t>(lhs) == std::bit_cast<std::uint64_t>(rhs);
+}
+
+[[nodiscard]] bool sameEpoch(const AstronomicalEpoch& lhs, const AstronomicalEpoch& rhs) noexcept
+{
+    return sameDoubleIdentity(lhs.julianDatePart1, rhs.julianDatePart1)
+           && sameDoubleIdentity(lhs.julianDatePart2, rhs.julianDatePart2) && lhs.timeScale == rhs.timeScale;
+}
+
+[[nodiscard]] bool sameObserver(const core::GeoLocation& lhs, const core::GeoLocation& rhs) noexcept
+{
+    return sameDoubleIdentity(lhs.latitudeDeg, rhs.latitudeDeg)
+           && sameDoubleIdentity(lhs.longitudeDeg, rhs.longitudeDeg)
+           && sameDoubleIdentity(lhs.elevationMeters, rhs.elevationMeters);
+}
+
+[[nodiscard]] bool sameOptions(const EphemerisEngineOptions& lhs, const EphemerisEngineOptions& rhs) noexcept
+{
+    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
+           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
+           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
+           && sameDoubleIdentity(lhs.atmosphericPressureHpa, rhs.atmosphericPressureHpa)
+           && sameDoubleIdentity(lhs.atmosphericTemperatureC, rhs.atmosphericTemperatureC)
+           && sameDoubleIdentity(lhs.relativeHumidity, rhs.relativeHumidity)
+           && sameDoubleIdentity(lhs.observingWavelengthMicrometers, rhs.observingWavelengthMicrometers);
+}
+
+[[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
+{
+    return sameEpoch(lhs.epoch, rhs.epoch)
+           && core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
+                  == core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
+           && sameObserver(lhs.context.observer, rhs.context.observer) && sameOptions(lhs.options, rhs.options);
 }
 
 void mergeKernelEpochTimeScaleMetadata(
@@ -250,6 +290,9 @@ SkySnapshot HighPrecisionEphemerisEngine::computeUncached(
                 .bodyIndex = bodyIndex,
             };
             snapshot.states[bodyIndex] = builder.buildFailedState(input);
+            if (isSolarSystemBody((*m_bodies)[bodyIndex])) {
+                storeDirectBodyState(request, bodyIndex, snapshot.states[bodyIndex]);
+            }
         }
         return snapshot;
     }
@@ -283,6 +326,9 @@ SkySnapshot HighPrecisionEphemerisEngine::computeUncached(
             continue;
         }
         snapshot.states[bodyIndex] = computeStateForBody(request, bodyIndex, preparedState);
+        if (isSolarSystemBody((*m_bodies)[bodyIndex])) {
+            storeDirectBodyState(request, bodyIndex, snapshot.states[bodyIndex]);
+        }
     }
 
     return snapshot;
@@ -298,6 +344,16 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
     for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
         const CelestialBody& body = (*m_bodies)[bodyIndex];
         if (strings::equalsIgnoreAsciiCase(body.id, bodyId)) {
+            if (isSolarSystemBody(body)) {
+                if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
+                    cachedState.has_value()) {
+                    return cachedState;
+                }
+                CelestialBodyState state = computeStateForBody(request, bodyIndex, buildPreparedRequestState(request));
+                storeDirectBodyState(request, bodyIndex, state);
+                return state;
+            }
+
             if (m_dependencies.computationCache != nullptr) {
                 if (std::optional<SkySnapshot> cachedSnapshot =
                         m_dependencies.computationCache->findSnapshot(request, *m_bodies, m_dependencies.dataSetInfo);
@@ -329,6 +385,17 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
 {
     if (bodyIndex >= m_bodies->size() || bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
         return std::nullopt;
+    }
+
+    const CelestialBody& body = (*m_bodies)[bodyIndex];
+    if (isSolarSystemBody(body)) {
+        if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
+            cachedState.has_value()) {
+            return cachedState;
+        }
+        CelestialBodyState state = computeStateForBody(request, bodyIndex, buildPreparedRequestState(request));
+        storeDirectBodyState(request, bodyIndex, state);
+        return state;
     }
 
     if (m_dependencies.computationCache != nullptr) {
@@ -459,6 +526,39 @@ HighPrecisionEphemerisEngine::buildPreparedRequestState(const EphemerisRequest& 
     }
 
     return preparedState;
+}
+
+std::optional<CelestialBodyState>
+HighPrecisionEphemerisEngine::findDirectBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
+{
+    const std::scoped_lock lock(m_directBodyStateCacheMutex);
+    for (auto cacheEntry = m_directBodyStateCache.rbegin(); cacheEntry != m_directBodyStateCache.rend(); ++cacheEntry) {
+        if (cacheEntry->bodyIndex == bodyIndex && sameRequest(cacheEntry->request, request)) {
+            return cacheEntry->state;
+        }
+    }
+
+    return std::nullopt;
+}
+
+void HighPrecisionEphemerisEngine::storeDirectBodyState(
+    const EphemerisRequest& request, const std::size_t bodyIndex, const CelestialBodyState& state
+) const
+{
+    const std::scoped_lock lock(m_directBodyStateCacheMutex);
+    for (DirectBodyStateCacheEntry& cacheEntry : m_directBodyStateCache) {
+        if (cacheEntry.bodyIndex == bodyIndex && sameRequest(cacheEntry.request, request)) {
+            cacheEntry.state = state;
+            return;
+        }
+    }
+
+    m_directBodyStateCache.push_back(
+        DirectBodyStateCacheEntry{.request = request, .bodyIndex = bodyIndex, .state = state}
+    );
+    while (m_directBodyStateCache.size() > kDirectBodyStateCacheMaxEntries) {
+        m_directBodyStateCache.pop_front();
+    }
 }
 
 CelestialBodyState HighPrecisionEphemerisEngine::computeStateForBody(

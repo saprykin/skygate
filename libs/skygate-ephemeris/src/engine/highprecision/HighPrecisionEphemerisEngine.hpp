@@ -6,7 +6,9 @@
 #include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <cstddef>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -288,6 +290,12 @@ public:
     computeBodyState(const core::SkyContext& context, std::uint32_t bodyIndex) const override;
 
 private:
+    struct DirectBodyStateCacheEntry {
+        EphemerisRequest request;
+        std::size_t bodyIndex = 0U;
+        CelestialBodyState state;
+    };
+
     [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept;
     [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState>
     preparedRequestState(const EphemerisRequest& request) const;
@@ -301,11 +309,17 @@ private:
         std::size_t bodyIndex,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const;
+    [[nodiscard]] std::optional<CelestialBodyState>
+    findDirectBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const;
+    void
+    storeDirectBodyState(const EphemerisRequest& request, std::size_t bodyIndex, const CelestialBodyState& state) const;
 
     std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
     CatalogStarAstrometryArrays m_catalogStarAstrometryArrays;
     EphemerisEngineOptions m_options;
     HighPrecisionEphemerisEngineDependencies m_dependencies;
+    mutable std::mutex m_directBodyStateCacheMutex;
+    mutable std::deque<DirectBodyStateCacheEntry> m_directBodyStateCache;
 };
 
 }  // namespace skygate::ephemeris::highprecision

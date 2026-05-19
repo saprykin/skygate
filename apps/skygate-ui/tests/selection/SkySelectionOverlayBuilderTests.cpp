@@ -127,6 +127,75 @@ public:
     mutable bool sawLightTimeRequest = false;
 };
 
+class NonFixedObservationProfileEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineOptions options;
+        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        return options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = request.context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest&, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++requestSampleCount;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+            .horizontal = {.altitudeDeg = -20.0, .azimuthDeg = 180.0}
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    {
+        skygate::ephemeris::SkySnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    {
+        ++contextSampleCount;
+        return std::nullopt;
+    }
+
+    mutable int requestSampleCount = 0;
+    mutable int contextSampleCount = 0;
+};
+
 class HighPrecisionInspectorEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
@@ -276,6 +345,7 @@ private slots:
     void inspectorUsesHighPrecisionStateForSelectedObject();
     void inspectorIncludesObservationEventsAndFallbacks();
     void inspectorObservationEventsUseRequestOptions();
+    void inspectorAvoidsSynchronousHighPrecisionEventSamplingForNonFixedBodies();
     void pinnedInspectorRendersForUnprojectableBody();
     void activeTrailTargetUsesExpectedPriority();
 };
@@ -497,6 +567,55 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     QVERIFY(overlayInspectorFieldValue(inspector, "Rise").contains("UTC"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Set").contains("UTC"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Culmination").contains("deg"));
+}
+
+void SkySelectionOverlayBuilderTests::inspectorAvoidsSynchronousHighPrecisionEventSamplingForNonFixedBodies()
+{
+    const SkySelectionOverlayBuilder builder;
+    auto fixture = makeFixture();
+    auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(*fixture.snapshot.catalogBodies);
+    (*bodies)[0].id = "mars";
+    (*bodies)[0].displayName = "Mars";
+    (*bodies)[0].type = skygate::ephemeris::CelestialBodyType::Planet;
+    (*bodies)[0].ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet;
+    (*bodies)[0].fixedEquatorial.reset();
+    fixture.snapshot.catalogBodies = bodies;
+    fixture.stateIndexByBodyId.clear();
+    fixture.stateIndexByBodyId.insert(QStringLiteral("mars"), 0U);
+
+    auto engine = std::make_unique<NonFixedObservationProfileEngine>();
+    const auto* enginePtr = engine.get();
+    fixture.ephemerisEngine = std::move(engine);
+    auto input = makeInput(fixture);
+    input.selectedObjectTargetId = "mars";
+    input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
+        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+            skygate::ephemeris::CivilDateTime{
+                .astronomicalYear = 2024,
+                .month = 6,
+                .day = 1,
+                .timeScale = skygate::ephemeris::TimeScale::Utc,
+            }
+        ),
+        .context = fixture.skyContext,
+        .options = enginePtr->options(),
+    };
+
+    const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
+
+    qInfo().noquote() << QStringLiteral(
+                             "profile non-fixed inspector selection: highPrecisionRequestSamples=%1 "
+                             "highPrecisionContextSamples=%2"
+    )
+                             .arg(enginePtr->requestSampleCount)
+                             .arg(enginePtr->contextSampleCount);
+    QCOMPARE(inspector.title, QString("Mars"));
+    QCOMPARE(enginePtr->contextSampleCount, 0);
+    QVERIFY2(
+        enginePtr->requestSampleCount <= 1,
+        qPrintable(QStringLiteral("expected only the detailed inspector state lookup, got %1 selected-engine samples")
+                       .arg(enginePtr->requestSampleCount))
+    );
 }
 
 void SkySelectionOverlayBuilderTests::pinnedInspectorRendersForUnprojectableBody()

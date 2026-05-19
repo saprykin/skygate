@@ -34,6 +34,7 @@ private slots:
     void buildsLargeSceneWithinGuardrail();
     void buildsHighPrecisionLargeFixedCatalogWithinGuardrail();
     void profilesHighPrecisionLargeFixedCatalogSelection();
+    void profilesHighPrecisionMoonSearchSelection();
     void searchesLargeMixedCatalogWithinGuardrail();
     void hitTestsDenseRenderFrameWithinGuardrail();
     void buildsManyObjectTrailsWithinGuardrail();
@@ -237,6 +238,68 @@ private:
     mutable std::size_t m_lastBatchSize = 0U;
 };
 
+class GuardSolarSystemStateCalculator final : public skygate::ephemeris::highprecision::ISolarSystemStateCalculator {
+public:
+    [[nodiscard]] skygate::ephemeris::highprecision::HighPrecisionCalculatorResult
+    calculate(const skygate::ephemeris::highprecision::HighPrecisionComputationInput& input) const override
+    {
+        ++m_callCount;
+        const double offsetMinutes = static_cast<double>(
+            std::chrono::duration_cast<std::chrono::minutes>(input.request.context.utcTime.time_since_epoch()).count()
+        );
+        skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result;
+        result.equatorial = skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = std::fmod(5.0 + (offsetMinutes / 6000.0), 24.0),
+            .declinationDeg = 18.0 + std::sin(offsetMinutes / 800.0),
+        };
+        result.horizontal = skygate::core::HorizontalCoordinate{
+            .altitudeDeg = 38.0 + std::sin(offsetMinutes / 180.0) * 12.0,
+            .azimuthDeg = std::fmod(140.0 + (offsetMinutes / 4.0), 360.0),
+        };
+        result.metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+        result.metadata.dataSourceProvenance = "performance guard solar system";
+        return result;
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+private:
+    mutable int m_callCount = 0;
+};
+
+class GuardTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
+public:
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convert(
+        const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::TimeScale targetScale
+    ) const override
+    {
+        skygate::ephemeris::TimeScaleConversionResult result;
+        result.epoch = epoch;
+        result.epoch.timeScale = targetScale;
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Valid;
+        return result;
+    }
+
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convertCivilDateTime(
+        const skygate::ephemeris::CivilDateTime& dateTime, const skygate::ephemeris::TimeScale targetScale
+    ) const override
+    {
+        const std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
+            skygate::ephemeris::astronomicalEpochFromCivilDateTime(dateTime);
+        if (epoch.has_value()) {
+            return convert(*epoch, targetScale);
+        }
+
+        skygate::ephemeris::TimeScaleConversionResult result;
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Failed;
+        result.addWarning(skygate::ephemeris::TimeScaleConversionWarningCode::InvalidInput);
+        return result;
+    }
+};
+
 void verifyElapsedBelow(const qint64 elapsedMs, const qint64 budgetMs, const char* operationName)
 {
     const skygate::testsupport::PerformanceBudgetDecision decision =
@@ -389,6 +452,17 @@ skygate::ephemeris::CelestialBody makeHighPrecisionGuardBody(
     return body;
 }
 
+skygate::ephemeris::CelestialBody makeHighPrecisionMoonBody()
+{
+    skygate::ephemeris::CelestialBody body;
+    body.id = "moon";
+    body.displayName = "Moon";
+    body.type = skygate::ephemeris::CelestialBodyType::Moon;
+    body.visualMagnitude = -12.0;
+    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon;
+    return body;
+}
+
 std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionGuardCatalog()
 {
     constexpr int kHygScaleStarCount = 119626;
@@ -416,6 +490,13 @@ std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionGuardCatalog()
             -55.0 + static_cast<double>(index % 110)
         ));
     }
+    return bodies;
+}
+
+std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionMoonGuardCatalog()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
+    bodies.insert(bodies.begin(), makeHighPrecisionMoonBody());
     return bodies;
 }
 
@@ -777,6 +858,109 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
         0,
         "high precision large fixed catalog trail zoom"
     );
+}
+
+void PerformanceGuardTests::profilesHighPrecisionMoonSearchSelection()
+{
+    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionMoonGuardCatalog();
+    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    QVERIFY(catalog != nullptr);
+
+    auto solarSystemCalculator = std::make_shared<GuardSolarSystemStateCalculator>();
+    auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
+    auto apparentPlaceCalculator = std::make_shared<GuardApparentPlaceCalculator>();
+    auto computationCache = std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
+    auto timeScaleService = std::make_shared<GuardTimeScaleService>();
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Geometric;
+
+    skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
+    dependencies.solarSystemStateCalculator = solarSystemCalculator;
+    dependencies.starAstrometryCalculator = starAstrometryCalculator;
+    dependencies.timeScaleService = timeScaleService;
+    dependencies.apparentPlaceCalculator = apparentPlaceCalculator;
+    dependencies.computationCache = computationCache;
+    dependencies.dataSetInfo = makeHighPrecisionGuardDataSetInfo();
+
+    auto engine = std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
+        bodies, options, dependencies
+    );
+
+    SkyContextController::InitializationOptions initializationOptions = testInitializationOptions();
+    initializationOptions.rebuildEphemerisEngineOnStartup = false;
+    SkyContextController controller(std::move(catalog), std::move(engine), initializationOptions, nullptr);
+    controller.setLatitudeText(QStringLiteral("47.4"));
+    controller.setLongitudeText(QStringLiteral("8.5"));
+    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("2026-05-03"), QStringLiteral("21:00:00")));
+    controller.setMagnitudeCutoff(12.0);
+    controller.setViewCenter(45.0, 180.0);
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1280.0, 800.0);
+    QVERIFY(sceneModel.snapshotGeneration() > 0U);
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 1);
+
+    const int solarCallsBefore = solarSystemCalculator->callCount();
+    const int astrometryBatchCallsBefore = starAstrometryCalculator->batchCallCount();
+    const int astrometrySingleCallsBefore = starAstrometryCalculator->singleCallCount();
+    const int apparentBatchCallsBefore = apparentPlaceCalculator->batchCallCount();
+    const int apparentSingleCallsBefore = apparentPlaceCalculator->singleCallCount();
+
+    QElapsedTimer timer;
+    timer.start();
+    QVERIFY(controller.focusSearchTarget(QStringLiteral("body"), QStringLiteral("moon")));
+    const qint64 elapsedMs = timer.elapsed();
+
+    qInfo().noquote() << skygate::testsupport::performanceMetricMessage(
+        elapsedMs,
+        kHighPrecisionLargeSceneBuildBudgetMs,
+        "high precision moon search selection",
+        skygate::testsupport::isStrictPerformanceGuardMode()
+    );
+    qInfo().noquote() << QStringLiteral(
+                             "perf high precision moon search counters: solarDelta=%1 astrometryBatchDelta=%2 "
+                             "astrometrySingleDelta=%3 apparentBatchDelta=%4 apparentSingleDelta=%5"
+    )
+                             .arg(solarSystemCalculator->callCount() - solarCallsBefore)
+                             .arg(starAstrometryCalculator->batchCallCount() - astrometryBatchCallsBefore)
+                             .arg(starAstrometryCalculator->singleCallCount() - astrometrySingleCallsBefore)
+                             .arg(apparentPlaceCalculator->batchCallCount() - apparentBatchCallsBefore)
+                             .arg(apparentPlaceCalculator->singleCallCount() - apparentSingleCallsBefore);
+
+    QCOMPARE(controller.selectedSearchTargetKind(), QStringLiteral("body"));
+    QCOMPARE(controller.selectedSearchTargetId(), QStringLiteral("moon"));
+    verifyCounterDelta(
+        astrometryBatchCallsBefore,
+        starAstrometryCalculator->batchCallCount(),
+        0,
+        "astrometry batch",
+        "high precision moon search selection"
+    );
+    verifyCounterDelta(
+        astrometrySingleCallsBefore,
+        starAstrometryCalculator->singleCallCount(),
+        0,
+        "astrometry single",
+        "high precision moon search selection"
+    );
+    verifyCounterDelta(
+        apparentBatchCallsBefore,
+        apparentPlaceCalculator->batchCallCount(),
+        0,
+        "apparent batch",
+        "high precision moon search selection"
+    );
+    verifyCounterDelta(
+        apparentSingleCallsBefore,
+        apparentPlaceCalculator->singleCallCount(),
+        0,
+        "apparent single",
+        "high precision moon search selection"
+    );
+    verifyElapsedBelow(elapsedMs, kHighPrecisionLargeSceneBuildBudgetMs, "high precision moon search selection");
 }
 
 void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()

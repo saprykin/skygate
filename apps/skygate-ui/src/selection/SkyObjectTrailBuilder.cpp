@@ -1,22 +1,27 @@
 #include "SkyObjectTrailBuilder.hpp"
 
+#include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
 
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/core/math/LinePattern.hpp"
 #include "skygate/core/math/ProjectedPolylineBuilder.hpp"
 #include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 
 #include <QColor>
+#include <QElapsedTimer>
 #include <QString>
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <numbers>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace {
@@ -57,6 +62,11 @@ QColor colorWithAlpha(const QColor& color, const int alpha)
     return input.targetBody->fixedEquatorial.has_value() || input.targetBody->starAstrometry.has_value()
            || input.targetBody->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
            || input.targetBody->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::Star;
+}
+
+[[nodiscard]] bool shouldUseGuidanceTrail(const SkyObjectTrailInput& input) noexcept
+{
+    return usesHighPrecisionRequest(input) && input.targetBody != nullptr && !isFixedEquatorialTrailTarget(input);
 }
 
 [[nodiscard]] bool
@@ -181,6 +191,51 @@ struct UnitVector3d final {
     return UnitVector3d{.x = vector.x / length, .y = vector.y / length, .z = vector.z / length};
 }
 
+[[nodiscard]] double dotProduct(const UnitVector3d& lhs, const UnitVector3d& rhs) noexcept
+{
+    return (lhs.x * rhs.x) + (lhs.y * rhs.y) + (lhs.z * rhs.z);
+}
+
+[[nodiscard]] UnitVector3d crossProduct(const UnitVector3d& lhs, const UnitVector3d& rhs) noexcept
+{
+    return UnitVector3d{
+        .x = (lhs.y * rhs.z) - (lhs.z * rhs.y),
+        .y = (lhs.z * rhs.x) - (lhs.x * rhs.z),
+        .z = (lhs.x * rhs.y) - (lhs.y * rhs.x),
+    };
+}
+
+[[nodiscard]] double vectorLength(const UnitVector3d& vector) noexcept
+{
+    return std::sqrt((vector.x * vector.x) + (vector.y * vector.y) + (vector.z * vector.z));
+}
+
+[[nodiscard]] UnitVector3d perpendicularAxis(const UnitVector3d& vector) noexcept
+{
+    const UnitVector3d zAxis{.x = 0.0, .y = 0.0, .z = 1.0};
+    UnitVector3d axis = crossProduct(vector, zAxis);
+    if (vectorLength(axis) <= 1e-9) {
+        axis = crossProduct(vector, UnitVector3d{.x = 1.0, .y = 0.0, .z = 0.0});
+    }
+    return normalized(axis);
+}
+
+[[nodiscard]] UnitVector3d
+rotatedAroundAxis(const UnitVector3d& vector, const UnitVector3d& axis, const double angleRad) noexcept
+{
+    const double cosAngle = std::cos(angleRad);
+    const double sinAngle = std::sin(angleRad);
+    const UnitVector3d axisCrossVector = crossProduct(axis, vector);
+    const double axisDotVector = dotProduct(axis, vector);
+    return normalized(
+        UnitVector3d{
+            .x = (vector.x * cosAngle) + (axisCrossVector.x * sinAngle) + (axis.x * axisDotVector * (1.0 - cosAngle)),
+            .y = (vector.y * cosAngle) + (axisCrossVector.y * sinAngle) + (axis.y * axisDotVector * (1.0 - cosAngle)),
+            .z = (vector.z * cosAngle) + (axisCrossVector.z * sinAngle) + (axis.z * axisDotVector * (1.0 - cosAngle)),
+        }
+    );
+}
+
 [[nodiscard]] double angularSeparationDegrees(
     const skygate::core::HorizontalCoordinate& lhs, const skygate::core::HorizontalCoordinate& rhs
 ) noexcept
@@ -188,8 +243,7 @@ struct UnitVector3d final {
     constexpr double radiansToDegrees = 180.0 / std::numbers::pi;
     const UnitVector3d lhsVector = horizontalToUnitVector(lhs.normalizedAzimuth());
     const UnitVector3d rhsVector = horizontalToUnitVector(rhs.normalizedAzimuth());
-    const double dot =
-        std::clamp((lhsVector.x * rhsVector.x) + (lhsVector.y * rhsVector.y) + (lhsVector.z * rhsVector.z), -1.0, 1.0);
+    const double dot = std::clamp(dotProduct(lhsVector, rhsVector), -1.0, 1.0);
     return std::acos(dot) * radiansToDegrees;
 }
 
@@ -272,6 +326,50 @@ struct UnitVector3d final {
     }
 
     return samples;
+}
+
+void alignGuidanceTrailToSelectedState(
+    std::vector<skygate::ephemeris::BodyTrailSample>& samples, const SkyObjectTrailInput& input
+)
+{
+    if (input.targetState == nullptr || !input.targetState->horizontal.isFinite()) {
+        return;
+    }
+
+    auto presentSample =
+        std::find_if(samples.begin(), samples.end(), [](const skygate::ephemeris::BodyTrailSample& sample) {
+            return sample.offsetMinutes == 0 && sample.horizontal.has_value() && sample.horizontal->isFinite();
+        });
+    if (presentSample == samples.end()) {
+        return;
+    }
+
+    const skygate::core::HorizontalCoordinate selectedHorizontal = input.targetState->horizontal;
+    const UnitVector3d guidanceNow = normalized(horizontalToUnitVector(*presentSample->horizontal));
+    const UnitVector3d selectedNow = normalized(horizontalToUnitVector(selectedHorizontal));
+    const double dot = std::clamp(dotProduct(guidanceNow, selectedNow), -1.0, 1.0);
+    UnitVector3d axis = crossProduct(guidanceNow, selectedNow);
+    const double axisLength = vectorLength(axis);
+    double angleRad = 0.0;
+    if (axisLength <= 1e-9) {
+        if (dot > 0.0) {
+            presentSample->horizontal = selectedHorizontal;
+            return;
+        }
+        axis = perpendicularAxis(guidanceNow);
+        angleRad = std::numbers::pi;
+    } else {
+        axis = normalized(axis);
+        angleRad = std::atan2(axisLength, dot);
+    }
+
+    for (skygate::ephemeris::BodyTrailSample& sample : samples) {
+        if (sample.horizontal.has_value() && sample.horizontal->isFinite()) {
+            sample.horizontal =
+                unitVectorToHorizontal(rotatedAroundAxis(horizontalToUnitVector(*sample.horizontal), axis, angleRad));
+        }
+    }
+    presentSample->horizontal = selectedHorizontal;
 }
 
 [[nodiscard]] skygate::ephemeris::BodyTrailSample
@@ -369,6 +467,29 @@ void appendAdaptiveHighPrecisionAnchors(
     return interpolateTrailSamples(adaptiveAnchors, renderOptions);
 }
 
+[[nodiscard]] std::optional<std::vector<skygate::ephemeris::BodyTrailSample>> sampleGuidanceTrail(
+    const SkyObjectTrailInput& input,
+    const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
+    const skygate::ephemeris::BodyTrailOptions& renderOptions
+)
+{
+    const std::array<skygate::ephemeris::CelestialBody, 1> bodies{*input.targetBody};
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine = skygate::ephemeris::createEphemerisEngine(
+        std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
+    );
+    if (guidanceEngine == nullptr) {
+        return std::nullopt;
+    }
+
+    skygate::ephemeris::EphemerisRequest guidanceRequest = *input.ephemerisRequest;
+    guidanceRequest.options = guidanceEngine->options();
+    guidanceRequest.options.engineKind = guidanceEngine->kind();
+    std::vector<skygate::ephemeris::BodyTrailSample> samples =
+        trailCalculator.sample(*guidanceEngine, guidanceRequest, 0U, renderOptions);
+    alignGuidanceTrailToSelectedState(samples, input);
+    return samples;
+}
+
 [[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample>
 sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions)
 {
@@ -407,6 +528,14 @@ sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephe
 {
     if (isFixedEquatorialTrailTarget(input)) {
         return sampleFixedEquatorialTrail(input, renderOptions);
+    }
+
+    if (shouldUseGuidanceTrail(input)) {
+        if (std::optional<std::vector<skygate::ephemeris::BodyTrailSample>> guidanceSamples =
+                sampleGuidanceTrail(input, trailCalculator, renderOptions);
+            guidanceSamples.has_value()) {
+            return std::move(*guidanceSamples);
+        }
     }
 
     if (usesHighPrecisionRequest(input)) {
@@ -530,6 +659,9 @@ const std::vector<skygate::ephemeris::BodyTrailSample>& SkyObjectTrailBuilder::t
 
 void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTrailInput& input) const
 {
+    QElapsedTimer timer;
+    skygate::ui::startPerformanceTimer(timer);
+
     const skygate::core::SkyContext& context =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     if (input.ephemerisEngine == nullptr || input.preparedProjection == nullptr || !context.observer.isValid()) {
@@ -553,7 +685,17 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
         .sampleStepMinutes =
             usesHighPrecisionRequest(input) ? kObjectTrailHighPrecisionRenderStepMinutes : kObjectTrailSampleStepMinutes
     };
+    const TrailSampleCacheKey cacheKey = sampleCacheKeyFor(input);
+    const bool sampleCacheHit = m_sampleCacheKey.has_value() && sampleCacheKeysEqual(*m_sampleCacheKey, cacheKey);
     const auto& samples = trailSamples(input, trailCalculator, trailOptions);
+    const qint64 sampleNs = skygate::ui::performanceElapsedNanoseconds(timer);
+
+    int lineCountBefore = 0;
+    int labelCountBefore = 0;
+    if (skygate::ui::performanceLoggingEnabled()) {
+        lineCountBefore = static_cast<int>(frame.lines.size());
+        labelCountBefore = static_cast<int>(frame.labels.size());
+    }
 
     for (const auto& sample : samples) {
         if (!sample.horizontal.has_value() || !sample.horizontal->isValid()) {
@@ -589,5 +731,18 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
         previousCoordinate = *sample.horizontal;
         previousOffsetMinutes = sample.offsetMinutes;
         hasPreviousCoordinate = true;
+    }
+
+    if (skygate::ui::performanceLoggingEnabled()) {
+        qCInfo(skygate::ui::skygatePerfLog)
+            << "trail append elapsedMs=" << skygate::ui::performanceElapsedMilliseconds(timer)
+            << "sampleMs=" << skygate::ui::performanceMilliseconds(sampleNs)
+            << "renderMs=" << skygate::ui::performanceMilliseconds(timer.nsecsElapsed() - sampleNs)
+            << "samples=" << static_cast<qsizetype>(samples.size()) << "cacheHit=" << sampleCacheHit
+            << "highPrecision=" << usesHighPrecisionRequest(input) << "guidance=" << shouldUseGuidanceTrail(input)
+            << "fixedEquatorial=" << isFixedEquatorialTrailTarget(input)
+            << "bodyIndex=" << static_cast<qulonglong>(input.targetBodyIndex)
+            << "linesAdded=" << static_cast<int>(frame.lines.size()) - lineCountBefore
+            << "labelsAdded=" << static_cast<int>(frame.labels.size()) - labelCountBefore;
     }
 }
