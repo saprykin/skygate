@@ -6,6 +6,7 @@ PreferencesWindow 1.0 ../../../windows/PreferencesWindow.qml
 PreferencesDraft 1.0 ../../../preferences/PreferencesDraft.qml
 PreferencesGeneralSection 1.0 ../../../preferences/PreferencesGeneralSection.qml
 PreferencesSkySection 1.0 ../../../preferences/PreferencesSkySection.qml
+PreferencesEngineSection 1.0 ../../../preferences/PreferencesEngineSection.qml
 PreferencesAppearanceSection 1.0 ../../../preferences/PreferencesAppearanceSection.qml
 PreferencesCatalogSection 1.0 ../../../preferences/PreferencesCatalogSection.qml
 PreferencesCityPicker 1.0 ../../../preferences/PreferencesCityPicker.qml

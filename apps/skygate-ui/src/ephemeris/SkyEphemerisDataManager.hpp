@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class SkySettingsStore;
@@ -43,6 +44,7 @@ public:
         QString sourceResourceRoot;
         QString stagedResourceRoot;
         std::function<bool()> cancellationRequested;
+        std::function<void(std::uint64_t stagedBytes, std::optional<std::uint64_t> totalBytes)> progressHandler;
         bool retainPartialStagingOnCancellation = true;
     };
 

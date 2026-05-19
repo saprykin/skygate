@@ -32,6 +32,10 @@ Window {
     readonly property bool catalogBusy: skyContextController !== null
                                         && (skyContextController.downloadingCatalog
                                             || skyContextController.catalogProcessing)
+    readonly property bool ephemerisBusy: skyContextController !== null
+                                           && skyContextController.ephemerisDataUpdateInProgress
+    readonly property bool footerBusy: (selectedPage === 2 && ephemerisBusy)
+                                       || (selectedPage === 4 && catalogBusy)
     readonly property bool applyEnabled: !(selectedPage === 1
                                            && preferencesDraft.locationSourceText === "City"
                                            && preferencesDraft.selectedCityId === "")
@@ -43,9 +47,12 @@ Window {
             return "Observer location and projection"
         }
         if (selectedPage === 2) {
+            return "Ephemeris engine and data settings"
+        }
+        if (selectedPage === 3) {
             return "Theme and visual presentation"
         }
-        return "Catalog and ephemeris data settings"
+        return "Star and deep-sky catalog management"
     }
 
     PreferencesDraft {
@@ -243,17 +250,24 @@ Window {
                         }
 
                         PreferencesSectionButton {
-                            objectName: "preferencesAppearanceSectionButton"
-                            label: "Appearance"
+                            objectName: "preferencesEngineSectionButton"
+                            label: "Engine"
                             active: preferencesWindow.selectedPage === 2
                             onClicked: preferencesWindow.selectedPage = 2
                         }
 
                         PreferencesSectionButton {
-                            objectName: "preferencesCatalogSectionButton"
-                            label: "Catalog"
+                            objectName: "preferencesAppearanceSectionButton"
+                            label: "Appearance"
                             active: preferencesWindow.selectedPage === 3
                             onClicked: preferencesWindow.selectedPage = 3
+                        }
+
+                        PreferencesSectionButton {
+                            objectName: "preferencesCatalogSectionButton"
+                            label: "Catalog"
+                            active: preferencesWindow.selectedPage === 4
+                            onClicked: preferencesWindow.selectedPage = 4
                         }
 
                         Item {
@@ -298,6 +312,13 @@ Window {
                                 preferencesDraft: preferencesDraft
                             }
 
+                            PreferencesEngineSection {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                skyContextController: preferencesWindow.skyContextController
+                                preferencesDraft: preferencesDraft
+                            }
+
                             PreferencesAppearanceSection {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
@@ -336,15 +357,19 @@ Window {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 3
-                        visible: preferencesWindow.selectedPage === 3 && preferencesWindow.catalogBusy
+                        visible: preferencesWindow.footerBusy
 
                         Label {
                             Layout.fillWidth: true
                             text: {
-                                const statusText = preferencesWindow.skyContextController.catalogStatusText || ""
+                                const statusText = preferencesWindow.ephemerisBusy
+                                    ? (preferencesWindow.skyContextController.ephemerisDataStatusText || "")
+                                    : (preferencesWindow.skyContextController.catalogStatusText || "")
                                 return statusText.startsWith("Catalog: ")
                                     ? statusText.substring(9)
-                                    : statusText
+                                    : (statusText.startsWith("Ephemeris data: ")
+                                       ? statusText.substring(16)
+                                       : statusText)
                             }
                             color: preferencesWindow.textSecondary
                             font.family: "Avenir Next"
@@ -358,8 +383,10 @@ Window {
                             Layout.preferredHeight: 6
                             from: 0
                             to: 1
-                            value: 0
-                            indeterminate: true
+                            value: preferencesWindow.ephemerisBusy
+                                   ? preferencesWindow.skyContextController.ephemerisDataUpdateProgress
+                                   : 0
+                            indeterminate: !preferencesWindow.ephemerisBusy
 
                             background: Rectangle {
                                 radius: 3
@@ -373,7 +400,16 @@ Window {
                                 clip: true
 
                                 Rectangle {
+                                    visible: !footerCatalogProgressBar.indeterminate
+                                    width: footerProgressContent.width * footerCatalogProgressBar.visualPosition
+                                    height: footerProgressContent.height
+                                    radius: height * 0.5
+                                    color: skyContext.theme.progressBarSweepMid
+                                }
+
+                                Rectangle {
                                     id: footerProgressSweep
+                                    visible: footerCatalogProgressBar.indeterminate
                                     width: Math.max(48, footerProgressContent.width * 0.24)
                                     height: footerProgressContent.height
                                     radius: height * 0.5
@@ -386,6 +422,7 @@ Window {
 
                                     SequentialAnimation on x {
                                         running: footerCatalogProgressBar.visible
+                                                 && footerCatalogProgressBar.indeterminate
                                         loops: Animation.Infinite
                                         NumberAnimation {
                                             from: -footerProgressSweep.width
@@ -400,10 +437,8 @@ Window {
                     }
 
                     Item {
-                        Layout.preferredWidth: preferencesWindow.selectedPage === 3
-                                               && preferencesWindow.catalogBusy ? 0 : 1
-                        Layout.fillWidth: !(preferencesWindow.selectedPage === 3
-                                            && preferencesWindow.catalogBusy)
+                        Layout.preferredWidth: preferencesWindow.footerBusy ? 0 : 1
+                        Layout.fillWidth: !preferencesWindow.footerBusy
                     }
 
                     PreferencesActionButton {
