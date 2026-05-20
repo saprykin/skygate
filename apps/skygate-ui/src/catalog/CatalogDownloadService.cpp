@@ -61,118 +61,100 @@ void CatalogDownloadService::downloadFirstSuccessfulFromUrls(
         return;
     }
 
-    qCInfo(skygateCatalogDownloadLog).noquote()
-        << "Catalog download started: sources" << candidateUrls.size();
+    qCInfo(skygateCatalogDownloadLog).noquote() << "Catalog download started: sources" << candidateUrls.size();
     const auto lastErrorText = std::make_shared<QString>("Catalog: Download failed");
     const auto tryDownloadNextUrl = std::make_shared<std::function<void(int)>>();
-    *tryDownloadNextUrl = [
-        this,
-        candidateUrls,
-        callbackContext,
-        statusHandler,
-        completionHandler,
-        lastErrorText,
-        tryDownloadNextUrl
-    ](const int index) {
-        if (index >= candidateUrls.size()) {
-            DownloadResult result;
-            result.errorText = *lastErrorText;
-            completionHandler(std::move(result));
-            return;
-        }
-
-        const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
-        if (!url.isValid() || url.scheme().isEmpty()) {
-            *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
-            qCWarning(skygateCatalogDownloadLog).noquote()
-                << "Skipping invalid catalog source URL" << candidateUrls[index];
-            (*tryDownloadNextUrl)(index + 1);
-            return;
-        }
-
-        if (statusHandler) {
-            statusHandler(QString("Catalog: Downloading %1 (%2/%3)").arg(
-                url.toString(),
-                QString::number(index + 1),
-                QString::number(candidateUrls.size())
-            ));
-        }
-
-        QNetworkRequest request(url);
-        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-        request.setTransferTimeout(300000);
-        request.setRawHeader("User-Agent", "Skygate/1.0");
-        request.setRawHeader(
-            "Accept",
-            "text/plain,text/csv,application/gzip,application/zip,application/octet-stream,*/*"
-        );
-
-        QNetworkReply* reply = m_networkAccessManager->get(request);
-        QObject* const contextObject = callbackContext != nullptr
-            ? callbackContext
-            : static_cast<QObject*>(m_networkAccessManager);
-
-        QObject::connect(
-            reply,
-            &QNetworkReply::finished,
-            contextObject,
-            [reply, index, candidateUrls, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl]() {
-                reply->deleteLater();
-
-                if (reply->error() != QNetworkReply::NoError) {
-                    const int httpStatusCode =
-                        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                    *lastErrorText = QString("Catalog: Source %1 failed (%2, HTTP %3)").arg(
-                        candidateUrls[index],
-                        reply->errorString(),
-                        QString::number(httpStatusCode)
-                    );
-                    qCWarning(skygateCatalogDownloadLog).noquote()
-                        << "Catalog source failed" << candidateUrls[index]
-                        << reply->errorString() << "HTTP" << httpStatusCode;
-                    if (statusHandler) {
-                        statusHandler(*lastErrorText);
-                    }
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
-                const QByteArray payload = reply->readAll();
-                if (payload.isEmpty()) {
-                    *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
-                    qCWarning(skygateCatalogDownloadLog).noquote()
-                        << "Catalog source returned empty data" << candidateUrls[index];
-                    if (statusHandler) {
-                        statusHandler(*lastErrorText);
-                    }
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
-                if (static_cast<std::size_t>(payload.size()) > kMaxDownloadedCatalogBytes) {
-                    *lastErrorText = QString("Catalog: Source %1 file too large (max 128 MiB)").arg(
-                        candidateUrls[index]
-                    );
-                    qCWarning(skygateCatalogDownloadLog).noquote()
-                        << "Catalog source exceeded size limit" << candidateUrls[index]
-                        << payload.size();
-                    if (statusHandler) {
-                        statusHandler(*lastErrorText);
-                    }
-                    (*tryDownloadNextUrl)(index + 1);
-                    return;
-                }
-
+    *tryDownloadNextUrl =
+        [this, candidateUrls, callbackContext, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl](
+            const int index
+        ) {
+            if (index >= candidateUrls.size()) {
                 DownloadResult result;
-                result.payload = payload;
-                result.sourceUrl = candidateUrls[index];
-                qCInfo(skygateCatalogDownloadLog).noquote()
-                    << "Catalog download succeeded:" << candidateUrls[index]
-                    << "bytes" << payload.size();
+                result.errorText = *lastErrorText;
                 completionHandler(std::move(result));
+                return;
             }
-        );
-    };
+
+            const QUrl url = QUrl::fromUserInput(candidateUrls[index]);
+            if (!url.isValid() || url.scheme().isEmpty()) {
+                *lastErrorText = QString("Catalog: Invalid source URL %1").arg(candidateUrls[index]);
+                qCWarning(skygateCatalogDownloadLog).noquote()
+                    << "Skipping invalid catalog source URL" << candidateUrls[index];
+                (*tryDownloadNextUrl)(index + 1);
+                return;
+            }
+
+            if (statusHandler) {
+                statusHandler(QString("Catalog: Downloading %1...").arg(url.toString()));
+            }
+
+            QNetworkRequest request(url);
+            request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+            request.setTransferTimeout(300000);
+            request.setRawHeader("User-Agent", "Skygate/1.0");
+            request.setRawHeader(
+                "Accept", "text/plain,text/csv,application/gzip,application/zip,application/octet-stream,*/*"
+            );
+
+            QNetworkReply* reply = m_networkAccessManager->get(request);
+            QObject* const contextObject =
+                callbackContext != nullptr ? callbackContext : static_cast<QObject*>(m_networkAccessManager);
+
+            QObject::connect(
+                reply,
+                &QNetworkReply::finished,
+                contextObject,
+                [reply, index, candidateUrls, statusHandler, completionHandler, lastErrorText, tryDownloadNextUrl]() {
+                    reply->deleteLater();
+
+                    if (reply->error() != QNetworkReply::NoError) {
+                        const int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                        *lastErrorText =
+                            QString("Catalog: Source %1 failed (%2, HTTP %3)")
+                                .arg(candidateUrls[index], reply->errorString(), QString::number(httpStatusCode));
+                        qCWarning(skygateCatalogDownloadLog).noquote()
+                            << "Catalog source failed" << candidateUrls[index] << reply->errorString() << "HTTP"
+                            << httpStatusCode;
+                        if (statusHandler) {
+                            statusHandler(*lastErrorText);
+                        }
+                        (*tryDownloadNextUrl)(index + 1);
+                        return;
+                    }
+
+                    const QByteArray payload = reply->readAll();
+                    if (payload.isEmpty()) {
+                        *lastErrorText = QString("Catalog: Source %1 returned empty data").arg(candidateUrls[index]);
+                        qCWarning(skygateCatalogDownloadLog).noquote()
+                            << "Catalog source returned empty data" << candidateUrls[index];
+                        if (statusHandler) {
+                            statusHandler(*lastErrorText);
+                        }
+                        (*tryDownloadNextUrl)(index + 1);
+                        return;
+                    }
+
+                    if (static_cast<std::size_t>(payload.size()) > kMaxDownloadedCatalogBytes) {
+                        *lastErrorText =
+                            QString("Catalog: Source %1 file too large (max 128 MiB)").arg(candidateUrls[index]);
+                        qCWarning(skygateCatalogDownloadLog).noquote()
+                            << "Catalog source exceeded size limit" << candidateUrls[index] << payload.size();
+                        if (statusHandler) {
+                            statusHandler(*lastErrorText);
+                        }
+                        (*tryDownloadNextUrl)(index + 1);
+                        return;
+                    }
+
+                    DownloadResult result;
+                    result.payload = payload;
+                    result.sourceUrl = candidateUrls[index];
+                    qCInfo(skygateCatalogDownloadLog).noquote()
+                        << "Catalog download succeeded:" << candidateUrls[index] << "bytes" << payload.size();
+                    completionHandler(std::move(result));
+                }
+            );
+        };
 
     (*tryDownloadNextUrl)(0);
 }
