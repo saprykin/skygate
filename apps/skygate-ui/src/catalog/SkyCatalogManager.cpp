@@ -7,6 +7,7 @@
 #include "catalog/SkyCatalogText.hpp"
 
 #include <QNetworkAccessManager>
+#include <QNetworkReply>
 
 #include "skygate/ephemeris/CatalogFactory.hpp"
 
@@ -211,6 +212,26 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
     downloadDeepSkyCatalogFromUrls(QStringList{urlText}, "OpenNGC");
 }
 
+void SkyCatalogManager::cancelCatalogDownload()
+{
+    if (!m_downloadingCatalog) {
+        return;
+    }
+
+    ++m_catalogDownloadGeneration;
+    if (m_networkAccessManager != nullptr) {
+        const QList<QNetworkReply*> replies = m_networkAccessManager->findChildren<QNetworkReply*>();
+        for (QNetworkReply* reply : replies) {
+            if (reply != nullptr && reply->isRunning()) {
+                reply->abort();
+            }
+        }
+    }
+    setDownloadingCatalog(false);
+    setCatalogProcessing(false);
+    setStatusText(QStringLiteral("Catalog: Download canceled."));
+}
+
 bool SkyCatalogManager::clearCatalogCache()
 {
     if (m_downloadingCatalog || m_catalogProcessing) {
@@ -312,13 +333,21 @@ void SkyCatalogManager::downloadCatalogFromUrls(
 
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
+    const std::uint64_t downloadGeneration = ++m_catalogDownloadGeneration;
 
     m_importWorkflow->downloadCatalog(
         urlTexts,
         sourceLabel,
         this,
-        [this](const QString& statusText) { handleCatalogImportStatus(statusText); },
-        [this, constellationLineUrlTexts](SkyCatalogImportResult result) {
+        [this, downloadGeneration](const QString& statusText) {
+            if (downloadGeneration == m_catalogDownloadGeneration) {
+                handleCatalogImportStatus(statusText);
+            }
+        },
+        [this, constellationLineUrlTexts, downloadGeneration](SkyCatalogImportResult result) {
+            if (downloadGeneration != m_catalogDownloadGeneration) {
+                return;
+            }
             handleCatalogImportFinished(std::move(result), constellationLineUrlTexts);
         }
     );
@@ -337,13 +366,23 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(const QStringList& urlTex
 
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
+    const std::uint64_t downloadGeneration = ++m_catalogDownloadGeneration;
 
     m_importWorkflow->downloadDeepSkyCatalog(
         urlTexts,
         sourceLabel,
         this,
-        [this](const QString& statusText) { handleCatalogImportStatus(statusText); },
-        [this](SkyDeepSkyCatalogImportResult result) { handleDeepSkyImportFinished(std::move(result)); }
+        [this, downloadGeneration](const QString& statusText) {
+            if (downloadGeneration == m_catalogDownloadGeneration) {
+                handleCatalogImportStatus(statusText);
+            }
+        },
+        [this, downloadGeneration](SkyDeepSkyCatalogImportResult result) {
+            if (downloadGeneration != m_catalogDownloadGeneration) {
+                return;
+            }
+            handleDeepSkyImportFinished(std::move(result));
+        }
     );
 }
 
@@ -394,9 +433,11 @@ void SkyCatalogManager::handleCatalogImportFinished(
     m_cachedCatalogPayload = std::move(result.payload);
     applyCatalog(std::move(result.catalog), result.sourceLabel);
     if (result.diagnostics.truncatedBodyCount > 0U) {
-        setStatusText(SkyCatalogText::brightnessFilterSummary(
-            m_statusText, result.diagnostics.selectedBodyCount, result.diagnostics.parsedBodyCount
-        ));
+        setStatusText(
+            SkyCatalogText::brightnessFilterSummary(
+                m_statusText, result.diagnostics.selectedBodyCount, result.diagnostics.parsedBodyCount
+            )
+        );
     }
     setDownloadingCatalog(false);
 

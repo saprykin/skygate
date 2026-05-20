@@ -24,23 +24,16 @@ bool writeFile(const QString& path, const QByteArray& contents)
     return file.write(contents) == contents.size();
 }
 
-bool catalogContainsDisplayName(
-    const skygate::ephemeris::IStarCatalog* catalog,
-    const QString& displayName
-)
+bool catalogContainsDisplayName(const skygate::ephemeris::IStarCatalog* catalog, const QString& displayName)
 {
     if (catalog == nullptr) {
         return false;
     }
 
     const auto bodies = catalog->bodies();
-    return std::any_of(
-        bodies.begin(),
-        bodies.end(),
-        [&displayName](const skygate::ephemeris::CelestialBody& body) {
-            return QString::fromStdString(body.displayName) == displayName;
-        }
-    );
+    return std::any_of(bodies.begin(), bodies.end(), [&displayName](const skygate::ephemeris::CelestialBody& body) {
+        return QString::fromStdString(body.displayName) == displayName;
+    });
 }
 
 }  // namespace
@@ -57,6 +50,7 @@ private slots:
     void clearCacheReportsStatusAndSignals();
     void restoreCachePathThroughManager();
     void localCatalogDownloadTogglesBusyProcessingAndAppliesCatalog();
+    void cancelCatalogDownloadClearsBusyAndIgnoresResult();
     void failedLocalCatalogDownloadClearsBusyAndReportsStatus();
 
 private:
@@ -78,10 +72,9 @@ void SkyCatalogManagerTests::init()
 
 SkySettingsStore::CatalogCacheSnapshot SkyCatalogManagerTests::makeCacheSnapshot() const
 {
-    return skygate::ui::tests::sampleCatalogCacheSnapshot({
-        .sourceLabel = QStringLiteral("Custom"),
-        .deepSkySourceLabel = QStringLiteral("OpenNGC")
-    });
+    return skygate::ui::tests::sampleCatalogCacheSnapshot(
+        {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
+    );
 }
 
 void SkyCatalogManagerTests::unknownPresetsUpdateStatus()
@@ -169,11 +162,7 @@ void SkyCatalogManagerTests::localCatalogDownloadTogglesBusyProcessingAndApplies
     const QString catalogPath = m_settings.filePath(QStringLiteral("manager-local-stars.csv"));
     QVERIFY(writeFile(
         catalogPath,
-        skygate::ui::tests::sampleHygCsvPayload({
-            .hip = 900001,
-            .properName = "Manager Downloaded Star",
-            .mag = "1.0"
-        })
+        skygate::ui::tests::sampleHygCsvPayload({.hip = 900001, .properName = "Manager Downloaded Star", .mag = "1.0"})
     ));
 
     SkySettingsStore store;
@@ -186,10 +175,7 @@ void SkyCatalogManagerTests::localCatalogDownloadTogglesBusyProcessingAndApplies
     manager.downloadCatalogFromUrl(QUrl::fromLocalFile(catalogPath).toString());
     QVERIFY(manager.downloadingCatalog());
     QVERIFY(!manager.clearCatalogCache());
-    QCOMPARE(
-        manager.statusText(),
-        QString("Catalog: Cannot clear cache while download is in progress")
-    );
+    QCOMPARE(manager.statusText(), QString("Catalog: Cannot clear cache while download is in progress"));
 
     QTRY_VERIFY(!manager.downloadingCatalog());
     QTRY_VERIFY(!manager.catalogProcessing());
@@ -201,6 +187,36 @@ void SkyCatalogManagerTests::localCatalogDownloadTogglesBusyProcessingAndApplies
     QVERIFY(processingSpy.count() >= 2);
     QVERIFY(catalogSpy.count() >= 1);
     QVERIFY(statusSpy.count() >= 2);
+}
+
+void SkyCatalogManagerTests::cancelCatalogDownloadClearsBusyAndIgnoresResult()
+{
+    const QString catalogPath = m_settings.filePath(QStringLiteral("manager-cancel-stars.csv"));
+    QVERIFY(writeFile(
+        catalogPath,
+        skygate::ui::tests::sampleHygCsvPayload({
+            .hip = 900002,
+            .properName = "Canceled Manager Star",
+            .mag = "1.0",
+        })
+    ));
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+    QSignalSpy downloadSpy(&manager, &SkyCatalogManager::downloadingCatalogChanged);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    manager.downloadCatalogFromUrl(QUrl::fromLocalFile(catalogPath).toString());
+    QVERIFY(manager.downloadingCatalog());
+    manager.cancelCatalogDownload();
+
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(!manager.catalogProcessing());
+    QCOMPARE(manager.statusText(), QString("Catalog: Download canceled."));
+    QCoreApplication::processEvents();
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QString("Canceled Manager Star")));
+    QVERIFY(downloadSpy.count() >= 2);
+    QCOMPARE(catalogSpy.count(), 0);
 }
 
 void SkyCatalogManagerTests::failedLocalCatalogDownloadClearsBusyAndReportsStatus()
@@ -215,10 +231,7 @@ void SkyCatalogManagerTests::failedLocalCatalogDownloadClearsBusyAndReportsStatu
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
 
     QTest::ignoreMessage(
-        QtWarningMsg,
-        QRegularExpression(
-            "Catalog source failed file://.*/missing-stars\\.csv .* HTTP 0"
-        )
+        QtWarningMsg, QRegularExpression("Catalog source failed file://.*/missing-stars\\.csv .* HTTP 0")
     );
     manager.downloadCatalogFromUrl(missingCatalogUrl);
     QVERIFY(manager.downloadingCatalog());

@@ -36,6 +36,10 @@ Window {
                                            && skyContextController.ephemerisDataUpdateInProgress
     readonly property bool footerBusy: (selectedPage === 2 && ephemerisBusy)
                                        || (selectedPage === 4 && catalogBusy)
+    readonly property bool footerCancelable: (selectedPage === 2 && ephemerisBusy)
+                                             || (selectedPage === 4
+                                                 && skyContextController !== null
+                                                 && skyContextController.downloadingCatalog)
     readonly property bool applyEnabled: !(selectedPage === 1
                                            && preferencesDraft.locationSourceText === "City"
                                            && preferencesDraft.selectedCityId === "")
@@ -377,60 +381,103 @@ Window {
                             elide: Text.ElideRight
                         }
 
-                        ProgressBar {
-                            id: footerCatalogProgressBar
+                        RowLayout {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 6
-                            from: 0
-                            to: 1
-                            value: preferencesWindow.ephemerisBusy
-                                   ? preferencesWindow.skyContextController.ephemerisDataUpdateProgress
-                                   : 0
-                            indeterminate: !preferencesWindow.ephemerisBusy
+                            spacing: 6
 
-                            background: Rectangle {
-                                radius: 3
-                                color: skyContext.theme.progressBarTrack
-                                border.width: 1
-                                border.color: skyContext.theme.progressBarTrackBorder
-                            }
+                            ProgressBar {
+                                id: footerCatalogProgressBar
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 6
+                                Layout.alignment: Qt.AlignVCenter
+                                from: 0
+                                to: 1
+                                value: preferencesWindow.ephemerisBusy
+                                       ? preferencesWindow.skyContextController.ephemerisDataUpdateProgress
+                                       : 0
+                                indeterminate: !preferencesWindow.ephemerisBusy
 
-                            contentItem: Item {
-                                id: footerProgressContent
-                                clip: true
-
-                                Rectangle {
-                                    visible: !footerCatalogProgressBar.indeterminate
-                                    width: footerProgressContent.width * footerCatalogProgressBar.visualPosition
-                                    height: footerProgressContent.height
-                                    radius: height * 0.5
-                                    color: skyContext.theme.progressBarSweepMid
+                                background: Rectangle {
+                                    radius: 3
+                                    color: skyContext.theme.progressBarTrack
+                                    border.width: 1
+                                    border.color: skyContext.theme.progressBarTrackBorder
                                 }
 
-                                Rectangle {
-                                    id: footerProgressSweep
-                                    visible: footerCatalogProgressBar.indeterminate
-                                    width: Math.max(48, footerProgressContent.width * 0.24)
-                                    height: footerProgressContent.height
-                                    radius: height * 0.5
-                                    x: -width
-                                    gradient: Gradient {
-                                        GradientStop { position: 0.0; color: skyContext.theme.progressBarSweepStart }
-                                        GradientStop { position: 0.5; color: skyContext.theme.progressBarSweepMid }
-                                        GradientStop { position: 1.0; color: skyContext.theme.progressBarSweepEnd }
+                                contentItem: Item {
+                                    id: footerProgressContent
+                                    clip: true
+
+                                    Rectangle {
+                                        visible: !footerCatalogProgressBar.indeterminate
+                                        width: footerProgressContent.width * footerCatalogProgressBar.visualPosition
+                                        height: footerProgressContent.height
+                                        radius: height * 0.5
+                                        color: skyContext.theme.progressBarSweepMid
                                     }
 
-                                    SequentialAnimation on x {
-                                        running: footerCatalogProgressBar.visible
-                                                 && footerCatalogProgressBar.indeterminate
-                                        loops: Animation.Infinite
-                                        NumberAnimation {
-                                            from: -footerProgressSweep.width
-                                            to: footerProgressContent.width
-                                            duration: 1050
-                                            easing.type: Easing.InOutCubic
+                                    Rectangle {
+                                        id: footerProgressSweep
+                                        visible: footerCatalogProgressBar.indeterminate
+                                        width: Math.max(48, footerProgressContent.width * 0.24)
+                                        height: footerProgressContent.height
+                                        radius: height * 0.5
+                                        x: -width
+                                        gradient: Gradient {
+                                            GradientStop { position: 0.0; color: skyContext.theme.progressBarSweepStart }
+                                            GradientStop { position: 0.5; color: skyContext.theme.progressBarSweepMid }
+                                            GradientStop { position: 1.0; color: skyContext.theme.progressBarSweepEnd }
+                                        }
+
+                                        SequentialAnimation on x {
+                                            running: footerCatalogProgressBar.visible
+                                                     && footerCatalogProgressBar.indeterminate
+                                            loops: Animation.Infinite
+                                            NumberAnimation {
+                                                from: -footerProgressSweep.width
+                                                to: footerProgressContent.width
+                                                duration: 1050
+                                                easing.type: Easing.InOutCubic
+                                            }
                                         }
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                id: footerCancelButton
+                                objectName: "preferencesFooterCancelDownloadButton"
+                                visible: preferencesWindow.footerCancelable
+                                Layout.preferredWidth: 16
+                                Layout.preferredHeight: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                radius: width * 0.5
+                                color: footerCancelMouse.pressed
+                                       ? skyContext.theme.actionButtonSecondaryBottomPressed
+                                       : (footerCancelMouse.containsMouse
+                                          ? skyContext.theme.actionButtonSecondaryTopHover
+                                          : skyContext.theme.actionButtonSecondaryTop)
+                                border.width: 1
+                                border.color: skyContext.theme.actionButtonSecondaryBorder
+                                ToolTip.visible: footerCancelMouse.containsMouse
+                                ToolTip.text: "Cancel download"
+                                ToolTip.delay: 450
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: "x"
+                                    color: skyContext.theme.actionButtonText
+                                    font.family: "Avenir Next"
+                                    font.pixelSize: 9
+                                    font.weight: Font.DemiBold
+                                }
+
+                                MouseArea {
+                                    id: footerCancelMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: preferencesWindow.skyContextController.cancelActiveDownload()
                                 }
                             }
                         }

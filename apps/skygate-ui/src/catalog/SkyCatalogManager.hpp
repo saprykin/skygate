@@ -69,6 +69,7 @@ public:
     void downloadCatalogFromUrl(const QString& urlText);
     void loadDeepSkyCatalogPreset(const QString& presetId);
     void downloadDeepSkyCatalogFromUrl(const QString& urlText);
+    void cancelCatalogDownload();
     bool clearCatalogCache();
     bool clearDeepSkyCatalogCache();
     bool restoreCatalogCache();
@@ -129,6 +130,7 @@ private:
     QString m_deepSkyCatalogUrlText;
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
+    std::uint64_t m_catalogDownloadGeneration = 0U;
     QByteArray m_cachedCatalogPayload;
     QByteArray m_cachedDeepSkyCatalogPayload;
 };
