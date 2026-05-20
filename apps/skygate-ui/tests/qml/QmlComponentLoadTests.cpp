@@ -33,9 +33,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
     QTest::addColumn<QString>("name");
     QTest::addColumn<QString>("source");
 
-    QTest::newRow("SearchToolbar")
-        << QStringLiteral("SearchToolbar")
-        << QStringLiteral(R"(
+    QTest::newRow("SearchToolbar") << QStringLiteral("SearchToolbar") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -47,9 +45,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("SkyAppMenuButton")
-        << QStringLiteral("SkyAppMenuButton")
-        << QStringLiteral(R"(
+    QTest::newRow("SkyAppMenuButton") << QStringLiteral("SkyAppMenuButton") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 120
@@ -62,9 +58,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("TimelineToolbar")
-        << QStringLiteral("TimelineToolbar")
-        << QStringLiteral(R"(
+    QTest::newRow("TimelineToolbar") << QStringLiteral("TimelineToolbar") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -76,9 +70,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("StatusFooter")
-        << QStringLiteral("StatusFooter")
-        << QStringLiteral(R"(
+    QTest::newRow("StatusFooter") << QStringLiteral("StatusFooter") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -92,9 +84,20 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesCatalogSection")
-        << QStringLiteral("PreferencesCatalogSection")
-        << QStringLiteral(R"(
+    QTest::newRow("StatusDegradationPopup") << QStringLiteral("StatusDegradationPopup") << QStringLiteral(R"(
+            import QtQuick
+            Item {
+                width: 900
+                height: 520
+                StatusDegradationPopup {
+                    anchors.fill: parent
+                    skyContextController: skyContext
+                    sceneModel: skyScene
+                }
+            }
+        )");
+
+    QTest::newRow("PreferencesCatalogSection") << QStringLiteral("PreferencesCatalogSection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -112,9 +115,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesEngineSection")
-        << QStringLiteral("PreferencesEngineSection")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesEngineSection") << QStringLiteral("PreferencesEngineSection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -132,9 +133,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesGeneralSection")
-        << QStringLiteral("PreferencesGeneralSection")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesGeneralSection") << QStringLiteral("PreferencesGeneralSection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -151,9 +150,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesSkySection")
-        << QStringLiteral("PreferencesSkySection")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesSkySection") << QStringLiteral("PreferencesSkySection") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -170,9 +167,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("PreferencesTimeZonePicker")
-        << QStringLiteral("PreferencesTimeZonePicker")
-        << QStringLiteral(R"(
+    QTest::newRow("PreferencesTimeZonePicker") << QStringLiteral("PreferencesTimeZonePicker") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -188,9 +183,7 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             }
         )");
 
-    QTest::newRow("SkyOverlayLayer")
-        << QStringLiteral("SkyOverlayLayer")
-        << QStringLiteral(R"(
+    QTest::newRow("SkyOverlayLayer") << QStringLiteral("SkyOverlayLayer") << QStringLiteral(R"(
             import QtQuick
             Item {
                 width: 900
@@ -287,10 +280,7 @@ void QmlComponentLoadTests::aboutWindowClosesFromButtonsAndShortcuts()
     window->show();
     QVERIFY(QTest::qWaitForWindowExposed(window));
     QTRY_VERIFY(window->isVisible());
-    QObject* closeIconButton = firstObjectWithObjectName(
-        window,
-        QStringLiteral("aboutCloseIconButton")
-    );
+    QObject* closeIconButton = firstObjectWithObjectName(window, QStringLiteral("aboutCloseIconButton"));
     QVERIFY(closeIconButton != nullptr);
     QVERIFY(activateControl(closeIconButton));
     QTRY_VERIFY(!window->isVisible());
@@ -318,12 +308,16 @@ void QmlComponentLoadTests::malformedQmlEmitsCapturedWarning()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings(QmlWarningScope::Forwarding::Disabled);
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             missingProperty: true
         }
-    )"), QStringLiteral("MalformedWarningTest.qml"));
+    )"),
+        QStringLiteral("MalformedWarningTest.qml")
+    );
 
     QVERIFY(object == nullptr);
     QVERIFY(!warnings.messages().isEmpty());

@@ -75,12 +75,14 @@ makeDependencies(std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalcula
     dependencies.dataSetInfo.displayName = "Fallback validation";
     dependencies.dataSetInfo.version = "test";
     dependencies.dataSetInfo.provenance = "validation test";
-    dependencies.dataSetInfo.dateRanges.push_back(EphemerisDateRange{
-        .id = "modern",
-        .displayName = "Modern",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-    });
+    dependencies.dataSetInfo.dateRanges.push_back(
+        EphemerisDateRange{
+            .id = "modern",
+            .displayName = "Modern",
+            .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        }
+    );
     return dependencies;
 }
 
@@ -123,6 +125,7 @@ private slots:
     void missingLongRangeKernelFallbackIsDegraded();
     void staleDataWarningsRemainVisible();
     void unsupportedBodyReturnsStructuredWarning();
+    void outOfRangeSolarSystemRequestUsesSimpleFallbackWhenEnabled();
     void outOfRangeRequestWithoutFallbackStaysOutOfRange();
     void failedRequestReturnsFailedStatus();
 };
@@ -278,7 +281,9 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
     calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
-    const auto state = engine.computeBodyState(makeRequest(), std::size_t{0});
+    EphemerisRequest request = makeRequest();
+    request.options.fallbackToSimpleEngine = false;
+    const auto state = engine.computeBodyState(request, std::size_t{0});
 
     QVERIFY(state.has_value());
     QCOMPARE(
@@ -288,6 +293,32 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"kernel out of range"});
     QVERIFY(std::isnan(state->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(state->equatorial.declinationDeg));
+}
+
+void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFallbackWhenEnabled()
+{
+    HighPrecisionCalculatorResult calculatorResult;
+    calculatorResult.metadata.status = EphemerisResultStatus::OutOfRange;
+    calculatorResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
+
+    const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
+    EphemerisRequest request = makeRequest();
+    request.options.correctionFlags = EphemerisCorrectionFlags::Topocentric;
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+    );
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(state->metadata.dataSourceProvenance.find("simple solar-system fallback") != std::string::npos);
+    QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
+    QVERIFY(std::isfinite(state->equatorial.declinationDeg));
+    QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
+    QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
 }
 
 void EphemerisFallbackValidationTests::failedRequestReturnsFailedStatus()

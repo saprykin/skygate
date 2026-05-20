@@ -29,6 +29,7 @@ class SkySceneModel final : public QObject {
         NOTIFY skyContextControllerChanged
     )
     Q_PROPERTY(QVariantList overlayItems READ overlayItems NOTIFY sceneFrameChanged)
+    Q_PROPERTY(QVariantList ephemerisDegradationReasons READ ephemerisDegradationReasons NOTIFY sceneFrameChanged)
     Q_PROPERTY(QVariantMap selectionMarker READ selectionMarker NOTIFY sceneFrameChanged)
     Q_PROPERTY(
         QVariantMap selectedObjectInspector
@@ -43,6 +44,7 @@ public:
     void setSkyContextController(QObject* skyContextController);
 
     [[nodiscard]] QVariantList overlayItems() const;
+    [[nodiscard]] QVariantList ephemerisDegradationReasons() const;
     [[nodiscard]] QVariantMap selectionMarker() const;
     [[nodiscard]] QVariantMap selectedObjectInspector() const;
     [[nodiscard]] std::uint64_t snapshotGeneration() const noexcept;
@@ -85,6 +87,7 @@ private:
     SkySceneOverlayAdapter m_sceneOverlayAdapter;
     SkySceneFrameData m_sceneFrame;
     QVariantList m_overlayItems;
+    QVariantList m_ephemerisDegradationReasons;
     QVariantMap m_selectionMarker;
     QVariantMap m_selectedObjectInspector;
     QString m_selectedObjectTargetId;

@@ -5,10 +5,119 @@
 #include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
+#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "skygate/ephemeris/Types.hpp"
 
 #include <QElapsedTimer>
+#include <QStringList>
 
 #include <cmath>
+#include <optional>
+
+namespace {
+
+[[nodiscard]] double epochSortKey(const skygate::ephemeris::AstronomicalEpoch& epoch) noexcept
+{
+    return epoch.julianDatePart1 + epoch.julianDatePart2;
+}
+
+[[nodiscard]] bool epochInRange(
+    const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::EphemerisDateRange& range
+) noexcept
+{
+    const double key = epochSortKey(epoch);
+    return key >= epochSortKey(range.start) && key <= epochSortKey(range.end);
+}
+
+[[nodiscard]] QString formatEpochDate(const skygate::ephemeris::AstronomicalEpoch& epoch)
+{
+    const auto dateTime = skygate::ephemeris::civilDateTimeFromAstronomicalEpoch(epoch);
+    if (!dateTime.has_value()) {
+        return QStringLiteral("--");
+    }
+
+    const int historicalYear = skygate::ephemeris::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+    if (historicalYear < 0) {
+        return QStringLiteral("%1-%2-%3 BCE")
+            .arg(-historicalYear, 4, 10, QChar('0'))
+            .arg(dateTime->month, 2, 10, QChar('0'))
+            .arg(dateTime->day, 2, 10, QChar('0'));
+    }
+
+    return QStringLiteral("%1-%2-%3")
+        .arg(historicalYear, 4, 10, QChar('0'))
+        .arg(dateTime->month, 2, 10, QChar('0'))
+        .arg(dateTime->day, 2, 10, QChar('0'));
+}
+
+[[nodiscard]] QString rangeLabel(const skygate::ephemeris::EphemerisDateRange& range)
+{
+    const QString displayName = QString::fromStdString(range.displayName);
+    const QString dateText = QStringLiteral("%1 to %2").arg(formatEpochDate(range.start), formatEpochDate(range.end));
+    return displayName.isEmpty() ? dateText : QStringLiteral("%1: %2").arg(displayName, dateText);
+}
+
+void appendUniqueReason(QStringList& reasons, const QString& reason)
+{
+    if (!reasons.contains(reason)) {
+        reasons.push_back(reason);
+    }
+}
+
+[[nodiscard]] bool isKernelRange(const skygate::ephemeris::EphemerisDateRange& range)
+{
+    const QString id = QString::fromStdString(range.id).toLower();
+    const QString displayName = QString::fromStdString(range.displayName).toLower();
+    return id.contains(QStringLiteral("kernel")) || displayName.contains(QStringLiteral("kernel"));
+}
+
+void appendRangeWarning(
+    QStringList& reasons,
+    const skygate::ephemeris::AstronomicalEpoch& epoch,
+    const std::optional<skygate::ephemeris::EphemerisDateRange>& range,
+    const QString& label
+)
+{
+    if (!range.has_value() || epochInRange(epoch, *range)) {
+        return;
+    }
+
+    appendUniqueReason(reasons, QStringLiteral("%1 out of range. Supported range: %2.").arg(label, rangeLabel(*range)));
+}
+
+[[nodiscard]] QVariantList degradationReasonsForContext(
+    const SkyContextController::EphemerisRequestContext& context, const skygate::ephemeris::IEphemerisEngine* engine
+)
+{
+    QStringList reasons;
+    if (engine != nullptr) {
+        for (const skygate::ephemeris::EphemerisDateRange& range : engine->supportedDateRanges()) {
+            if (isKernelRange(range) && !epochInRange(context.request.epoch, range)) {
+                appendUniqueReason(
+                    reasons,
+                    QStringLiteral("Planetary kernel out of range. Supported range: %1.").arg(rangeLabel(range))
+                );
+            }
+        }
+    }
+
+    appendRangeWarning(
+        reasons, context.request.epoch, context.earthOrientationDataRange, QStringLiteral("Earth orientation data")
+    );
+    appendRangeWarning(
+        reasons, context.request.epoch, context.leapSecondTableRange, QStringLiteral("Leap-second table")
+    );
+    appendRangeWarning(reasons, context.request.epoch, context.deltaTDataRange, QStringLiteral("Delta T data"));
+
+    QVariantList result;
+    result.reserve(reasons.size());
+    for (const QString& reason : reasons) {
+        result.push_back(reason);
+    }
+    return result;
+}
+
+}  // namespace
 
 SkySceneModel::SkySceneModel(QObject* parent) : QObject(parent) {}
 
@@ -68,6 +177,11 @@ void SkySceneModel::setSkyContextController(QObject* skyContextController)
 QVariantList SkySceneModel::overlayItems() const
 {
     return m_overlayItems;
+}
+
+QVariantList SkySceneModel::ephemerisDegradationReasons() const
+{
+    return m_ephemerisDegradationReasons;
 }
 
 QVariantMap SkySceneModel::selectionMarker() const
@@ -266,11 +380,13 @@ bool SkySceneModel::clearSceneFrame()
                                || !m_sceneFrame.frame.lines.empty() || !m_sceneFrame.frame.glyphs.empty()
                                || !m_sceneFrame.overlayItems.empty() || m_sceneFrame.selectionMarker.visible
                                || m_sceneFrame.selectedObjectInspector.visible || !m_overlayItems.isEmpty()
-                               || !m_selectionMarker.isEmpty() || !m_selectedObjectInspector.isEmpty();
+                               || !m_ephemerisDegradationReasons.isEmpty() || !m_selectionMarker.isEmpty()
+                               || !m_selectedObjectInspector.isEmpty();
     m_hitTargetIndex.clear();
     m_sceneComposer.reset();
     m_sceneFrame = {};
     m_overlayItems = {};
+    m_ephemerisDegradationReasons = {};
     m_selectionMarker = {};
     m_selectedObjectInspector = {};
     return hadSceneFrame;
@@ -362,12 +478,19 @@ void SkySceneModel::rebuildSceneFrame()
         return;
     }
 
+    const auto requestContext = m_skyContextController->ephemerisRequestContext();
     m_sceneFrame.preparedProjection = *frameResult->preparedProjection;
     m_sceneFrame.snapshot = frameResult->snapshot;
+    const QVariantList ephemerisDegradationReasons =
+        degradationReasonsForContext(requestContext, input->frameInput.ephemerisEngine);
 
     const SkySceneCompositionResult compositionResult = m_sceneComposer.rebuild(m_sceneFrame, *input, *frameResult);
     const qint64 compositionNs = skygate::ui::performanceElapsedNanoseconds(timer);
     if (!compositionResult.changed) {
+        if (m_ephemerisDegradationReasons != ephemerisDegradationReasons) {
+            m_ephemerisDegradationReasons = ephemerisDegradationReasons;
+            emit sceneFrameChanged();
+        }
         return;
     }
 
@@ -376,6 +499,7 @@ void SkySceneModel::rebuildSceneFrame()
     }
     const qint64 hitIndexNs = skygate::ui::performanceElapsedNanoseconds(timer);
     m_overlayItems = m_sceneOverlayAdapter.overlayItems(m_sceneFrame.overlayItems);
+    m_ephemerisDegradationReasons = ephemerisDegradationReasons;
     m_selectionMarker = m_sceneOverlayAdapter.selectionMarker(m_sceneFrame.selectionMarker);
     m_selectedObjectInspector = m_sceneOverlayAdapter.selectedObjectInspector(m_sceneFrame.selectedObjectInspector);
     const qint64 adapterNs = skygate::ui::performanceElapsedNanoseconds(timer);

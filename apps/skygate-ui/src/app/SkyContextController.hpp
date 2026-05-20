@@ -228,6 +228,9 @@ public:
         std::uint64_t earthOrientationDataRevision = 0U;
         std::uint64_t leapSecondDataRevision = 0U;
         std::uint64_t catalogRevision = 0U;
+        std::optional<skygate::ephemeris::EphemerisDateRange> earthOrientationDataRange;
+        std::optional<skygate::ephemeris::EphemerisDateRange> leapSecondTableRange;
+        std::optional<skygate::ephemeris::EphemerisDateRange> deltaTDataRange;
     };
 
     struct InitializationOptions final {

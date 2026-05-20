@@ -2,6 +2,10 @@
 
 #include "skygate/core/UtcTimeCodec.hpp"
 #include "StringUtilities.hpp"
+#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
+#include "engine/simple/MoonEquatorialCalculator.hpp"
+#include "engine/simple/PlanetEquatorialCalculator.hpp"
+#include "engine/simple/SunEquatorialCalculator.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
 #include "engine/highprecision/ObserverGeodesy.hpp"
@@ -60,6 +64,58 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
 [[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
 {
     return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax);
+}
+
+[[nodiscard]] std::optional<core::EquatorialCoordinate>
+simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint& utcTime)
+{
+    if (body.ephemerisSource == CelestialBodyEphemerisSource::Sun || body.type == CelestialBodyType::Sun) {
+        return SunEquatorialCalculator{}.compute(utcTime);
+    }
+    if (body.ephemerisSource == CelestialBodyEphemerisSource::Moon || body.type == CelestialBodyType::Moon) {
+        return MoonEquatorialCalculator{}.compute(utcTime);
+    }
+    if (body.ephemerisSource == CelestialBodyEphemerisSource::Planet || body.type == CelestialBodyType::Planet) {
+        return PlanetEquatorialCalculator{}.compute(body.id, utcTime);
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<HighPrecisionCalculatorResult> simpleSolarSystemFallbackResult(
+    const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& originalResult
+)
+{
+    if (!input.request.options.fallbackToSimpleEngine || originalResult.equatorial.has_value()
+        || !originalResult.metadata.hasWarning(EphemerisWarningCode::DataOutOfRange)) {
+        return std::nullopt;
+    }
+
+    const std::optional<core::EquatorialCoordinate> equatorial =
+        simpleSolarSystemEquatorial(input.body, input.request.context.utcTime);
+    if (!equatorial.has_value()) {
+        return std::nullopt;
+    }
+
+    HighPrecisionCalculatorResult fallbackResult = originalResult;
+    fallbackResult.equatorial = *equatorial;
+    fallbackResult.metadata.status = EphemerisResultStatus::Degraded;
+    fallbackResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    fallbackResult.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    fallbackResult.metadata.dataSourceProvenance =
+        fallbackResult.metadata.dataSourceProvenance.empty()
+            ? "simple solar-system fallback for out-of-range high-precision kernel"
+            : fallbackResult.metadata.dataSourceProvenance
+                  + "; simple solar-system fallback for out-of-range high-precision kernel";
+    fallbackResult.metadata.appliedCorrections = EphemerisCorrectionFlags::Geometric;
+    if (requestsTopocentricState(input.request) && input.request.context.observer.isValid()) {
+        fallbackResult.horizontal = EquatorialToHorizontalCalculator::compute(
+            *equatorial, input.request.context.observer, input.request.context.utcTime
+        );
+        fallbackResult.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+    }
+
+    return fallbackResult;
 }
 
 [[nodiscard]] bool sameDoubleIdentity(const double lhs, const double rhs) noexcept
@@ -599,6 +655,11 @@ CelestialBodyState HighPrecisionEphemerisEngine::computeStateForBody(
         };
         HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(kernelInput);
         EphemerisMetadataMerger::merge(calculatorResult.metadata, kernelEpochMetadata.metadata);
+        if (std::optional<HighPrecisionCalculatorResult> fallbackResult =
+                simpleSolarSystemFallbackResult(input, calculatorResult);
+            fallbackResult.has_value()) {
+            return builder.buildState(input, *fallbackResult);
+        }
         HighPrecisionCalculatorResult apparentResult =
             applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);
         return builder.buildState(input, apparentResult);

@@ -222,6 +222,7 @@ qt_add_qml_module(skygate-ui
         qml/toolbars/SkyAppMenuButton.qml
         qml/toolbars/TimelineToolbar.qml
         qml/status/StatusDateTimePopup.qml
+        qml/status/StatusDegradationPopup.qml
         qml/status/StatusFooter.qml
         qml/status/StatusNightConditionsPopup.qml
     RESOURCES
