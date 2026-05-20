@@ -2,6 +2,7 @@
 
 #include "skygate/ephemeris/EphemerisDataManifest.hpp"
 
+#include <QFileInfo>
 #include <QSettings>
 
 #include <string>
@@ -57,6 +58,19 @@ emptyKernelAsset(std::string id, std::string profileId, std::string version, std
     return asset;
 }
 
+skygate::ephemeris::EphemerisDataManifestAsset emptyDataAsset(
+    std::string id,
+    const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
+    std::string version,
+    std::string relativePath
+)
+{
+    skygate::ephemeris::EphemerisDataManifestAsset asset =
+        emptyKernelAsset(std::move(id), "support-data", std::move(version), std::move(relativePath));
+    asset.kind = kind;
+    return asset;
+}
+
 void writeInstalledEphemerisSettings(
     const QString& kernelPath,
     const QString& earthOrientationPath,
@@ -75,14 +89,14 @@ void writeInstalledEphemerisSettings(
     settings.setValue(QStringLiteral("skyContext/ephemerisData/installedKernelVersion"), QStringLiteral("DE441-test"));
     settings.setValue(QStringLiteral("skyContext/ephemerisData/installedEarthOrientationPath"), earthOrientationPath);
     settings.setValue(
-        QStringLiteral("skyContext/ephemerisData/installedEarthOrientationVersion"), QStringLiteral("EOP-test")
+        QStringLiteral("skyContext/ephemerisData/installedEarthOrientationVersion"), QStringLiteral("2026-05-07")
     );
     settings.setValue(QStringLiteral("skyContext/ephemerisData/installedLeapSecondTablePath"), leapSecondPath);
     settings.setValue(
-        QStringLiteral("skyContext/ephemerisData/installedLeapSecondTableVersion"), QStringLiteral("LS-test")
+        QStringLiteral("skyContext/ephemerisData/installedLeapSecondTableVersion"), QStringLiteral("2026a")
     );
     settings.setValue(QStringLiteral("skyContext/ephemerisData/installedDeltaTDataPath"), deltaTPath);
-    settings.setValue(QStringLiteral("skyContext/ephemerisData/installedDeltaTDataVersion"), QStringLiteral("DT-test"));
+    settings.setValue(QStringLiteral("skyContext/ephemerisData/installedDeltaTDataVersion"), QStringLiteral("2026a"));
     settings.setValue(QStringLiteral("skyContext/ephemerisData/dataRevisionToken"), QStringLiteral("de441-test"));
     settings.setValue(QStringLiteral("skyContext/ephemerisData/lastUpdateResult"), QStringLiteral("Installed DE441"));
 }
@@ -108,10 +122,47 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
             .assetIds = {"de441-kernel"},
         }
     );
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "support-data",
+            .displayName = "Time and Earth data",
+            .bundled = false,
+            .longRange = false,
+            .assetIds = {"support-earth-orientation", "support-leap-seconds", "support-delta-t"},
+        }
+    );
     manifest.assets.push_back(emptyKernelAsset("de440s-kernel", "modern", "DE440s-test", "modern/kernels/de440s.bsp"));
     manifest.assets.push_back(
         emptyKernelAsset("de441-kernel", "de441-long-range", "DE441-test", "de441/kernels/de441.bsp")
     );
+    manifest.assets.push_back(emptyDataAsset(
+        "support-earth-orientation",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+        "2026-05-07",
+        "time/eop.txt"
+    ));
+    manifest.assets.push_back(emptyDataAsset(
+        "support-leap-seconds",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+        "2026a",
+        "time/leap-seconds.list"
+    ));
+    manifest.assets.push_back(emptyDataAsset(
+        "support-delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData, "2026a", "time/delta-t.data"
+    ));
+    return manifest;
+}
+
+skygate::ephemeris::EphemerisDataManifest supportDataUpdateManifest()
+{
+    skygate::ephemeris::EphemerisDataManifest manifest = minimalUpdateManifest();
+    for (skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+        if (asset.id == "support-earth-orientation") {
+            asset.version = "2026-06-01";
+        } else if (asset.id == "support-leap-seconds" || asset.id == "support-delta-t") {
+            asset.version = "2026b";
+        }
+    }
     return manifest;
 }
 
@@ -366,32 +417,35 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
     QObject* eopStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
     QObject* leapSecondStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLeapSecondStatusLabel"));
     QObject* deltaTStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisDeltaTStatusLabel"));
-    QObject* updateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataUpdateButton"));
-    QObject* longRangeUpdateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisLongRangeUpdateButton"));
+    QObject* kernelDownloadCombo = firstObjectWithObjectName(root, QStringLiteral("ephemerisKernelDownloadCombo"));
+    QObject* supportDownloadCombo =
+        firstObjectWithObjectName(root, QStringLiteral("ephemerisSupportDataDownloadCombo"));
     QVERIFY(modernStatus != nullptr);
     QVERIFY(eopStatus != nullptr);
     QVERIFY(leapSecondStatus != nullptr);
     QVERIFY(deltaTStatus != nullptr);
-    QVERIFY(updateButton != nullptr);
-    QVERIFY(longRangeUpdateButton != nullptr);
+    QVERIFY(kernelDownloadCombo != nullptr);
+    QVERIFY(supportDownloadCombo != nullptr);
 
-    QCOMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
-    QCOMPARE(eopStatus->property("text").toString(), QString("Bundled fallback"));
-    QCOMPARE(leapSecondStatus->property("text").toString(), QString("Bundled fallback"));
-    QCOMPARE(deltaTStatus->property("text").toString(), QString("Bundled fallback"));
-    QVERIFY(updateButton->property("enabled").toBool());
-    QVERIFY(longRangeUpdateButton->property("enabled").toBool());
+    QCOMPARE(modernStatus->property("text").toString(), QString("Bundled"));
+    QCOMPARE(eopStatus->property("text").toString(), QString("Bundled"));
+    QCOMPARE(leapSecondStatus->property("text").toString(), QString("Bundled"));
+    QCOMPARE(deltaTStatus->property("text").toString(), QString("Bundled"));
+    QCOMPARE(kernelDownloadCombo->property("displayText").toString(), QString("Select kernel..."));
+    QCOMPARE(supportDownloadCombo->property("displayText").toString(), QString("Select data..."));
+    QVERIFY(kernelDownloadCombo->property("enabled").toBool());
+    QVERIFY(supportDownloadCombo->property("enabled").toBool());
 
-    QVERIFY(activateControl(longRangeUpdateButton));
-    QTRY_COMPARE(modernStatus->property("text").toString(), QString("Installed: DE441-test"));
-    QTRY_COMPARE(eopStatus->property("text").toString(), QString("Bundled fallback"));
-    QTRY_COMPARE(leapSecondStatus->property("text").toString(), QString("Bundled fallback"));
-    QTRY_COMPARE(deltaTStatus->property("text").toString(), QString("Bundled fallback"));
+    QVERIFY(QMetaObject::invokeMethod(kernelDownloadCombo, "activated", Q_ARG(int, 2)));
+    QTRY_COMPARE(modernStatus->property("text").toString(), QString("DE441"));
+    QTRY_COMPARE(eopStatus->property("text").toString(), QString("Bundled"));
+    QTRY_COMPARE(leapSecondStatus->property("text").toString(), QString("Bundled"));
+    QTRY_COMPARE(deltaTStatus->property("text").toString(), QString("Bundled"));
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
 
     controller->setEphemerisDataOnlineUpdatesEnabled(false);
-    QTRY_VERIFY(updateButton->property("enabled").toBool());
-    QTRY_VERIFY(longRangeUpdateButton->property("enabled").toBool());
+    QTRY_VERIFY(supportDownloadCombo->property("enabled").toBool());
+    QTRY_VERIFY(kernelDownloadCombo->property("enabled").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -401,13 +455,18 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowInstalledStateAndClear
     const QString earthOrientationPath = m_settings.cachePath(QStringLiteral("eop.csv"));
     const QString leapSecondPath = m_settings.cachePath(QStringLiteral("leap-seconds.list"));
     const QString deltaTPath = m_settings.cachePath(QStringLiteral("delta-t.csv"));
-    QVERIFY(writeFile(kernelPath, QByteArray("kernel")));
-    QVERIFY(writeFile(earthOrientationPath, QByteArray("eop")));
-    QVERIFY(writeFile(leapSecondPath, QByteArray("leap")));
-    QVERIFY(writeFile(deltaTPath, QByteArray("delta")));
+    QVERIFY(writeFile(kernelPath, QByteArray(2 * 1024 * 1024, 'k')));
+    QVERIFY(writeFile(earthOrientationPath, QByteArray(1024 * 1024, 'e')));
+    QVERIFY(writeFile(leapSecondPath, QByteArray(1024 * 1024, 'l')));
+    QVERIFY(writeFile(deltaTPath, QByteArray(1024 * 1024, 'd')));
     writeInstalledEphemerisSettings(kernelPath, earthOrientationPath, leapSecondPath, deltaTPath);
 
-    auto controller = makeController();
+    const skygate::ephemeris::EphemerisDataManifest updateManifest = supportDataUpdateManifest();
+    auto controller = makeControllerWithManifest(
+        updateManifest,
+        m_settings.cachePath(QStringLiteral("ephemeris-source")),
+        m_settings.cachePath(QStringLiteral("ephemeris-cache"))
+    );
     QVERIFY(controller != nullptr);
 
     QQmlEngine engine;
@@ -445,23 +504,48 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowInstalledStateAndClear
     QObject* eopStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
     QObject* leapSecondStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLeapSecondStatusLabel"));
     QObject* deltaTStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisDeltaTStatusLabel"));
-    QObject* updateButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataUpdateButton"));
-    QObject* clearButton = firstObjectWithObjectName(root, QStringLiteral("ephemerisDataClearCacheButton"));
+    QObject* kernelCacheSize =
+        firstObjectWithObjectName(root, QStringLiteral("ephemerisPlanetaryKernelCacheSizeLabel"));
+    QObject* kernelClearButton =
+        firstObjectWithObjectName(root, QStringLiteral("ephemerisPlanetaryKernelClearCacheButton"));
+    QObject* supportCacheSize = firstObjectWithObjectName(root, QStringLiteral("ephemerisSupportDataCacheSizeLabel"));
+    QObject* supportDownloadCombo =
+        firstObjectWithObjectName(root, QStringLiteral("ephemerisSupportDataDownloadCombo"));
+    QObject* supportClearButton =
+        firstObjectWithObjectName(root, QStringLiteral("ephemerisSupportDataClearCacheButton"));
     QVERIFY(modernStatus != nullptr);
     QVERIFY(eopStatus != nullptr);
     QVERIFY(leapSecondStatus != nullptr);
     QVERIFY(deltaTStatus != nullptr);
-    QVERIFY(updateButton != nullptr);
-    QVERIFY(clearButton != nullptr);
+    QVERIFY(kernelCacheSize != nullptr);
+    QVERIFY(kernelClearButton != nullptr);
+    QVERIFY(supportCacheSize != nullptr);
+    QVERIFY(supportDownloadCombo != nullptr);
+    QVERIFY(supportClearButton != nullptr);
 
-    QCOMPARE(modernStatus->property("text").toString(), QString("Installed: DE441-test"));
-    QCOMPARE(eopStatus->property("text").toString(), QString("Installed: EOP-test"));
-    QCOMPARE(leapSecondStatus->property("text").toString(), QString("Installed: LS-test"));
-    QCOMPARE(deltaTStatus->property("text").toString(), QString("Installed: DT-test"));
-    QVERIFY(!updateButton->property("enabled").toBool());
+    QCOMPARE(modernStatus->property("text").toString(), QString("DE441"));
+    QCOMPARE(kernelCacheSize->property("text").toString(), QString("2.0 MB"));
+    QCOMPARE(supportCacheSize->property("text").toString(), QString("3.0 MB"));
+    QCOMPARE(eopStatus->property("text").toString(), QString("2026-05-07"));
+    QCOMPARE(leapSecondStatus->property("text").toString(), QString("2026a"));
+    QCOMPARE(deltaTStatus->property("text").toString(), QString("2026a"));
+    QVERIFY(supportDownloadCombo->property("enabled").toBool());
 
-    QVERIFY(activateControl(clearButton));
-    QTRY_COMPARE(modernStatus->property("text").toString(), QString("Bundled fallback"));
+    QVERIFY(QMetaObject::invokeMethod(supportDownloadCombo, "activated", Q_ARG(int, 2)));
+    QTRY_COMPARE(eopStatus->property("text").toString(), QString("2026-05-07 (available: 2026-06-01)"));
+    QTRY_COMPARE(leapSecondStatus->property("text").toString(), QString("2026a (available: 2026b)"));
+    QTRY_COMPARE(deltaTStatus->property("text").toString(), QString("2026a (available: 2026b)"));
+
+    QVERIFY(activateControl(kernelClearButton));
+    QTRY_COMPARE(modernStatus->property("text").toString(), QString("Bundled"));
+    QTRY_COMPARE(kernelCacheSize->property("text").toString(), QString("0 MB"));
+    QCOMPARE(eopStatus->property("text").toString(), QString("2026-05-07 (available: 2026-06-01)"));
+    QVERIFY(!QFileInfo::exists(kernelPath));
+    QVERIFY(QFileInfo::exists(earthOrientationPath));
+
+    QVERIFY(activateControl(supportClearButton));
+    QTRY_COMPARE(modernStatus->property("text").toString(), QString("Bundled"));
+    QTRY_COMPARE(supportCacheSize->property("text").toString(), QString("0 MB"));
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Bundled fallback"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }

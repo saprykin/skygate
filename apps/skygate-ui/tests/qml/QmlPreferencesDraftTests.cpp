@@ -73,7 +73,7 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
     object->setProperty("ephemerisRefractionEnabled", false);
     object->setProperty("ephemerisAtmosphericPressureText", QStringLiteral("802.50"));
     object->setProperty("ephemerisAtmosphericTemperatureText", QStringLiteral("-6.0"));
-    object->setProperty("ephemerisRelativeHumidityText", QStringLiteral("0.42"));
+    object->setProperty("ephemerisRelativeHumidityText", QStringLiteral("42.0"));
     object->setProperty("ephemerisWavelengthText", QStringLiteral("0.68"));
     object->setProperty("logToTerminal", true);
     object->setProperty("logToFile", false);
@@ -93,7 +93,7 @@ void QmlPreferencesDraftTests::preferencesDraftApplyAndResetRoundTrip()
     QCOMPARE(controller->ephemerisRefractionEnabled(), false);
     QCOMPARE(controller->ephemerisAtmosphericPressureText(), QString("802.50"));
     QCOMPARE(controller->ephemerisAtmosphericTemperatureText(), QString("-6.0"));
-    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("0.42"));
+    QCOMPARE(controller->ephemerisRelativeHumidityText(), QString("42.0"));
     QCOMPARE(controller->ephemerisWavelengthText(), QString("0.68"));
     QCOMPARE(controller->logToTerminal(), true);
     QCOMPARE(controller->logToFile(), false);
@@ -296,7 +296,7 @@ void QmlPreferencesDraftTests::saveAndRestoreState()
     object->setProperty("ephemerisRefractionEnabled", true);
     object->setProperty("ephemerisAtmosphericPressureText", QStringLiteral("900.00"));
     object->setProperty("ephemerisAtmosphericTemperatureText", QStringLiteral("4.5"));
-    object->setProperty("ephemerisRelativeHumidityText", QStringLiteral("0.35"));
+    object->setProperty("ephemerisRelativeHumidityText", QStringLiteral("35.0"));
     object->setProperty("ephemerisWavelengthText", QStringLiteral("0.62"));
     object->setProperty("timeZoneId", QStringLiteral("Asia/Bishkek"));
     QVERIFY(QMetaObject::invokeMethod(object.get(), "applyToContext"));
@@ -321,7 +321,7 @@ void QmlPreferencesDraftTests::saveAndRestoreState()
     QCOMPARE(restoredController->ephemerisRefractionEnabled(), true);
     QCOMPARE(restoredController->ephemerisAtmosphericPressureText(), QString("900.00"));
     QCOMPARE(restoredController->ephemerisAtmosphericTemperatureText(), QString("4.5"));
-    QCOMPARE(restoredController->ephemerisRelativeHumidityText(), QString("0.35"));
+    QCOMPARE(restoredController->ephemerisRelativeHumidityText(), QString("35.0"));
     QCOMPARE(restoredController->ephemerisWavelengthText(), QString("0.62"));
     QCOMPARE(restoredController->timeController()->timeZoneId(), QString("Asia/Bishkek"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));

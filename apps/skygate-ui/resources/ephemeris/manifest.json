@@ -26,6 +26,17 @@
       ]
     },
     {
+      "id": "support-data",
+      "displayName": "Time and Earth data",
+      "bundled": false,
+      "longRange": false,
+      "assetIds": [
+        "support-leap-seconds",
+        "support-earth-orientation",
+        "support-delta-t"
+      ]
+    },
+    {
       "id": "de441-long-range",
       "displayName": "DE441 long-range data",
       "bundled": false,
@@ -132,6 +143,72 @@
       "id": "modern-delta-t",
       "kind": "delta-t-data",
       "profileId": "modern",
+      "version": "2026a",
+      "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
+      "relativePath": "time/delta-t.data",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "9f88e53593495a09219fe956eeadea0fa9f8e3e02c310b2aa2b70852383cdf6f"
+      },
+      "compression": {
+        "format": "none",
+        "uncompressedSizeBytes": 13419
+      },
+      "validityRange": {
+        "id": "delta-t-range",
+        "displayName": "Delta T range",
+        "start": "-13200-01-01",
+        "end": "13200-12-31"
+      }
+    },
+    {
+      "id": "support-leap-seconds",
+      "kind": "leap-second-table",
+      "profileId": "support-data",
+      "version": "2026a",
+      "sourceUrl": "https://data.iana.org/time-zones/data/leap-seconds.list",
+      "relativePath": "time/leap-seconds.list",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "506e737d1a950148f0daed3c75a55ad497a0f2fa1a82661a361882dd8f4b2093"
+      },
+      "compression": {
+        "format": "none",
+        "uncompressedSizeBytes": 5069
+      },
+      "validityRange": {
+        "id": "leap-second-range",
+        "displayName": "Leap-second table range",
+        "start": "1972-01-01",
+        "end": "2027-01-01"
+      }
+    },
+    {
+      "id": "support-earth-orientation",
+      "kind": "earth-orientation-data",
+      "profileId": "support-data",
+      "version": "2026-05-07",
+      "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
+      "relativePath": "time/eop.txt",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "4842dd19493393f25d26076d4973fccc6f7e0ad9474b458b2062cf6521c4cb58"
+      },
+      "compression": {
+        "format": "none",
+        "uncompressedSizeBytes": 3743832
+      },
+      "validityRange": {
+        "id": "eop-range",
+        "displayName": "Earth orientation range",
+        "start": "1973-01-02",
+        "end": "2027-05-22"
+      }
+    },
+    {
+      "id": "support-delta-t",
+      "kind": "delta-t-data",
+      "profileId": "support-data",
       "version": "2026a",
       "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
       "relativePath": "time/delta-t.data",

@@ -12,9 +12,7 @@ QQuickItem* cityDelegate(QObject* root)
 void clickItemCenter(QWindow* window, QQuickItem* item)
 {
     QVERIFY(item != nullptr);
-    const QPoint clickPoint = item->mapToScene(
-        QPointF(item->width() * 0.5, item->height() * 0.5)
-    ).toPoint();
+    const QPoint clickPoint = item->mapToScene(QPointF(item->width() * 0.5, item->height() * 0.5)).toPoint();
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, clickPoint);
 }
 
@@ -54,7 +52,9 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabled
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -66,12 +66,15 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabled
                 id: field
                 anchors.fill: parent
                 placeholderText: "Type here"
+                suffix: "hPa"
                 onTextEdited: root.lastText = text
                 onAccepted: ++root.acceptedCount
             }
             property alias field: field
         }
-    )"), QStringLiteral("PreferencesTextFieldBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesTextFieldBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -79,6 +82,7 @@ void QmlPreferenceControlTests::preferencesTextFieldEditsAcceptsAndTracksEnabled
     ExposedQuickWindow exposed(root);
     auto* field = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("field")));
     QVERIFY(field != nullptr);
+    QCOMPARE(field->property("suffix").toString(), QString("hPa"));
 
     QVERIFY(QMetaObject::invokeMethod(field, "forceActiveFocus"));
     commitText(exposed.window(), QStringLiteral("hello"));
@@ -102,7 +106,9 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -117,7 +123,9 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
             }
             property alias combo: combo
         }
-    )"), QStringLiteral("PreferencesComboBoxBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesComboBoxBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -153,7 +161,9 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -178,7 +188,9 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
             }
             property alias picker: picker
         }
-    )"), QStringLiteral("PreferencesCityPickerBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesCityPickerBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -198,9 +210,8 @@ void QmlPreferenceControlTests::preferencesCityPickerFiltersChoosesAndClearsMode
 
     auto* zurichDelegate = cityDelegate(root);
     QVERIFY(zurichDelegate != nullptr);
-    const QPoint clickPoint = zurichDelegate->mapToScene(
-        QPointF(zurichDelegate->width() * 0.5, zurichDelegate->height() * 0.5)
-    ).toPoint();
+    const QPoint clickPoint =
+        zurichDelegate->mapToScene(QPointF(zurichDelegate->width() * 0.5, zurichDelegate->height() * 0.5)).toPoint();
     QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, clickPoint);
     QTRY_VERIFY(!root->property("chosenCityId").toString().isEmpty());
     QVERIFY(root->property("chosenDisplayText").toString().contains(QStringLiteral("Zurich")));
@@ -219,7 +230,9 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespo
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -256,21 +269,17 @@ void QmlPreferenceControlTests::preferencesButtonCheckboxAndSectionControlsRespo
             property alias checkBox: checkBox
             property alias sectionButton: sectionButton
         }
-    )"), QStringLiteral("PreferencesSmallControlBehaviorTest.qml"));
+    )"),
+        QStringLiteral("PreferencesSmallControlBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
 
     ExposedQuickWindow exposed(root);
-    auto* actionButton = qobject_cast<QQuickItem*>(
-        qvariant_cast<QObject*>(root->property("actionButton"))
-    );
-    auto* checkBox = qobject_cast<QQuickItem*>(
-        qvariant_cast<QObject*>(root->property("checkBox"))
-    );
-    auto* sectionButton = qobject_cast<QQuickItem*>(
-        qvariant_cast<QObject*>(root->property("sectionButton"))
-    );
+    auto* actionButton = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("actionButton")));
+    auto* checkBox = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("checkBox")));
+    auto* sectionButton = qobject_cast<QQuickItem*>(qvariant_cast<QObject*>(root->property("sectionButton")));
     QVERIFY(actionButton != nullptr);
     QVERIFY(checkBox != nullptr);
     QVERIFY(sectionButton != nullptr);

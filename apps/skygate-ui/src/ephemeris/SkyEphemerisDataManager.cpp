@@ -76,6 +76,15 @@ bool hasInstalledMetadata(const EphemerisDataCacheSnapshot& snapshot)
            || snapshot.dataRevisionToken != EphemerisDataCacheSnapshot{}.dataRevisionToken;
 }
 
+bool hasInstalledAssetMetadata(const EphemerisDataCacheSnapshot& snapshot)
+{
+    return !snapshot.installedKernelAssetId.isEmpty() || !snapshot.installedKernelProfileId.isEmpty()
+           || !snapshot.installedKernelPath.isEmpty() || !snapshot.installedKernelVersion.isEmpty()
+           || !snapshot.installedEarthOrientationPath.isEmpty() || !snapshot.installedEarthOrientationVersion.isEmpty()
+           || !snapshot.installedLeapSecondTablePath.isEmpty() || !snapshot.installedLeapSecondTableVersion.isEmpty()
+           || !snapshot.installedDeltaTDataPath.isEmpty() || !snapshot.installedDeltaTDataVersion.isEmpty();
+}
+
 QStringList missingInstalledPaths(const EphemerisDataCacheSnapshot& snapshot)
 {
     QStringList missingPaths;
@@ -634,10 +643,11 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
     const EphemerisDataManifest& manifest,
     const EphemerisDataManifestProfile& profile,
     const std::vector<std::pair<std::string, std::filesystem::path>>& activePaths,
+    const EphemerisDataCacheSnapshot& baseSnapshot,
     const QString& revisionToken
 )
 {
-    EphemerisDataCacheSnapshot snapshot;
+    EphemerisDataCacheSnapshot snapshot = baseSnapshot;
     snapshot.dataRevisionToken = revisionToken;
     snapshot.lastUpdateResult =
         QStringLiteral("Installed %1")
@@ -880,6 +890,31 @@ QString SkyEphemerisDataManager::deltaTStatusText() const
     return QStringLiteral("Bundled fallback");
 }
 
+std::uint64_t SkyEphemerisDataManager::planetaryKernelCacheSizeBytes() const
+{
+    const QFileInfo kernelFileInfo(m_activeCacheSnapshot.installedKernelPath);
+    if (!kernelFileInfo.exists() || !kernelFileInfo.isFile() || kernelFileInfo.size() <= 0) {
+        return 0U;
+    }
+    return static_cast<std::uint64_t>(kernelFileInfo.size());
+}
+
+std::uint64_t SkyEphemerisDataManager::supportDataCacheSizeBytes() const
+{
+    std::uint64_t totalBytes = 0U;
+    for (const QString& path : {
+             m_activeCacheSnapshot.installedEarthOrientationPath,
+             m_activeCacheSnapshot.installedLeapSecondTablePath,
+             m_activeCacheSnapshot.installedDeltaTDataPath,
+         }) {
+        const QFileInfo fileInfo(path);
+        if (fileInfo.exists() && fileInfo.isFile() && fileInfo.size() > 0) {
+            totalBytes += static_cast<std::uint64_t>(fileInfo.size());
+        }
+    }
+    return totalBytes;
+}
+
 QString SkyEphemerisDataManager::lastUpdateResultText() const
 {
     return m_activeCacheSnapshot.lastUpdateResult;
@@ -962,6 +997,75 @@ bool SkyEphemerisDataManager::clearInstalledDataCache()
 {
     if (m_settingsStore == nullptr || !m_settingsStore->clearEphemerisDataCache()) {
         return false;
+    }
+
+    return restoreFromSettings();
+}
+
+bool SkyEphemerisDataManager::clearPlanetaryKernelCache()
+{
+    if (m_settingsStore == nullptr) {
+        return false;
+    }
+
+    EphemerisDataCacheSnapshot snapshot = normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
+    const QString kernelPath = snapshot.installedKernelPath;
+    snapshot.installedKernelAssetId.clear();
+    snapshot.installedKernelProfileId.clear();
+    snapshot.installedKernelPath.clear();
+    snapshot.installedKernelVersion.clear();
+    snapshot.lastUpdateResult = QStringLiteral("Cleared planetary kernel cache");
+    if (!hasInstalledAssetMetadata(snapshot)) {
+        snapshot = EphemerisDataCacheSnapshot{};
+    }
+    if (!m_settingsStore->saveEphemerisDataCache(snapshot)) {
+        return false;
+    }
+
+    if (!kernelPath.isEmpty()) {
+        QFile kernelFile(kernelPath);
+        if (kernelFile.exists() && !kernelFile.remove()) {
+            return false;
+        }
+    }
+
+    return restoreFromSettings();
+}
+
+bool SkyEphemerisDataManager::clearSupportDataCache()
+{
+    if (m_settingsStore == nullptr) {
+        return false;
+    }
+
+    EphemerisDataCacheSnapshot snapshot = normalizedSnapshot(m_settingsStore->loadEphemerisDataCache());
+    const QStringList supportPaths{
+        snapshot.installedEarthOrientationPath,
+        snapshot.installedLeapSecondTablePath,
+        snapshot.installedDeltaTDataPath,
+    };
+    snapshot.installedEarthOrientationPath.clear();
+    snapshot.installedEarthOrientationVersion.clear();
+    snapshot.installedLeapSecondTablePath.clear();
+    snapshot.installedLeapSecondTableVersion.clear();
+    snapshot.installedDeltaTDataPath.clear();
+    snapshot.installedDeltaTDataVersion.clear();
+    snapshot.lastUpdateResult = QStringLiteral("Cleared time and Earth data cache");
+    if (!hasInstalledAssetMetadata(snapshot)) {
+        snapshot = EphemerisDataCacheSnapshot{};
+    }
+    if (!m_settingsStore->saveEphemerisDataCache(snapshot)) {
+        return false;
+    }
+
+    for (const QString& path : supportPaths) {
+        if (path.isEmpty()) {
+            continue;
+        }
+        QFile file(path);
+        if (file.exists() && !file.remove()) {
+            return false;
+        }
     }
 
     return restoreFromSettings();
@@ -1180,8 +1284,9 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
         }
     }
 
-    EphemerisDataCacheSnapshot newSnapshot =
-        cacheSnapshotForActivatedProfile(*request.manifest, *profile, activePaths, revisionToken);
+    EphemerisDataCacheSnapshot newSnapshot = cacheSnapshotForActivatedProfile(
+        *request.manifest, *profile, activePaths, m_activeCacheSnapshot, revisionToken
+    );
     newSnapshot = normalizedSnapshot(std::move(newSnapshot));
     if (m_settingsStore == nullptr || !m_settingsStore->saveEphemerisDataCache(newSnapshot)) {
         result.status = StagedUpdateActivationStatus::PersistenceFailed;
