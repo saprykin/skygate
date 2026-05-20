@@ -1389,11 +1389,17 @@ bool SkyContextController::checkEphemerisSupportDataUpdates()
         return false;
     }
 
+    if (m_ephemerisDataManager != nullptr) {
+        m_ephemerisDataManager->clearUpdateCancellation();
+    }
     m_ephemerisDataUpdateInProgress = true;
     setEphemerisDataUpdateProgress(0.0);
     setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Checking time and Earth data..."));
     const bool refreshed = refreshEphemerisDataManifest(stagedRoot);
     m_ephemerisDataUpdateInProgress = false;
+    if (m_ephemerisDataManager != nullptr) {
+        m_ephemerisDataManager->clearUpdateCancellation();
+    }
     setEphemerisDataUpdateProgress(refreshed ? 1.0 : 0.0);
     if (!refreshed) {
         emit ephemerisDataStatusTextChanged();
@@ -1417,6 +1423,17 @@ bool SkyContextController::checkEphemerisSupportDataUpdates()
     setEphemerisDataOperationStatusText({});
     emit ephemerisDataStatusTextChanged();
     return true;
+}
+
+void SkyContextController::cancelActiveDownload()
+{
+    if (m_ephemerisDataUpdateInProgress && m_ephemerisDataManager != nullptr) {
+        m_ephemerisDataManager->requestUpdateCancellation();
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Canceling download..."));
+    }
+    if (m_catalogManager != nullptr && m_catalogManager->downloadingCatalog()) {
+        m_catalogManager->cancelCatalogDownload();
+    }
 }
 
 bool SkyContextController::updateEphemerisData()
@@ -1462,10 +1479,16 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
     }
 
     m_ephemerisDataUpdateInProgress = true;
+    if (m_ephemerisDataManager != nullptr) {
+        m_ephemerisDataManager->clearUpdateCancellation();
+    }
     setEphemerisDataUpdateProgress(0.0);
     emit ephemerisDataStatusTextChanged();
     const auto finishUpdate = [this](const bool success, QString statusText) {
         m_ephemerisDataUpdateInProgress = false;
+        if (m_ephemerisDataManager != nullptr) {
+            m_ephemerisDataManager->clearUpdateCancellation();
+        }
         setEphemerisDataUpdateProgress(success ? 1.0 : 0.0);
         setEphemerisDataOperationStatusText(std::move(statusText));
         emit ephemerisDataStatusTextChanged();
