@@ -194,6 +194,43 @@ skygate::ephemeris::EphemerisDataManifest longRangeStagedManifest()
     return manifest;
 }
 
+skygate::ephemeris::EphemerisDataManifest supportDataStagedManifest()
+{
+    skygate::ephemeris::EphemerisDataManifest manifest;
+    manifest.dataSetInfo.id = "test-data";
+    manifest.dataSetInfo.displayName = "Test data";
+    manifest.dataSetInfo.version = "2026a";
+    manifest.dataSetInfo.provenance = "test";
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "support-data",
+            .displayName = "Time and Earth data",
+            .bundled = false,
+            .longRange = false,
+            .assetIds = {"support-leap-seconds", "support-earth-orientation", "support-delta-t"},
+        }
+    );
+    manifest.assets.push_back(stagedAsset(
+        "support-leap-seconds",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+        "time/leap-seconds.list",
+        "support-data"
+    ));
+    manifest.assets.push_back(stagedAsset(
+        "support-earth-orientation",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+        "time/eop.csv",
+        "support-data"
+    ));
+    manifest.assets.push_back(stagedAsset(
+        "support-delta-t",
+        skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+        "time/delta-t.csv",
+        "support-data"
+    ));
+    return manifest;
+}
+
 skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
 {
     skygate::ephemeris::EphemerisDataManifest manifest;
@@ -535,6 +572,9 @@ private slots:
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
     void activatesVerifiedStagedUpdateSetAtomically();
     void activatesFullLongRangeProfileUpdateSet();
+    void supportDataActivationPreservesInstalledKernelSelection();
+    void clearPlanetaryKernelCachePreservesSupportData();
+    void clearSupportDataCachePreservesInstalledKernel();
     void activationFailurePreservesActiveDataAndSettings();
     void sameRevisionActivationFailurePreservesActiveFilesAndSettings();
     void metadataPersistenceFailurePreservesActiveData();
@@ -807,6 +847,114 @@ void SkyEphemerisDataManagerTests::activatesFullLongRangeProfileUpdateSet()
     QVERIFY(snapshot->leapSecondTableAsset().has_value());
     QVERIFY(snapshot->earthOrientationDataAsset().has_value());
     QVERIFY(snapshot->deltaTDataAsset().has_value());
+}
+
+void SkyEphemerisDataManagerTests::supportDataActivationPreservesInstalledKernelSelection()
+{
+    const QString oldKernelPath = m_settings.filePath(QStringLiteral("old-kernel.bsp"));
+    QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
+
+    SkySettingsStore store;
+    const SkySettingsStore::EphemerisDataCacheSnapshot oldSnapshot = installedSnapshot(oldKernelPath, QString());
+    QVERIFY(store.saveEphemerisDataCache(oldSnapshot));
+    SkyEphemerisDataManager manager(&store);
+    QVERIFY(manager.restoreFromSettings());
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    const skygate::ephemeris::EphemerisDataManifest manifest = supportDataStagedManifest();
+    writeStagedAssets(stagedRoot, manifest);
+
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result = manager.activateVerifiedStagedUpdateSet(
+        stagedActivationRequest(manifest, stagedRoot, m_settings.path(), QStringLiteral("support-data"))
+    );
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QCOMPARE(result.activatedAssetIds.size(), std::size_t{3});
+
+    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    QCOMPARE(savedSnapshot.installedKernelAssetId, oldSnapshot.installedKernelAssetId);
+    QCOMPARE(savedSnapshot.installedKernelProfileId, oldSnapshot.installedKernelProfileId);
+    QCOMPARE(savedSnapshot.installedKernelPath, oldKernelPath);
+    QCOMPARE(savedSnapshot.installedKernelVersion, oldSnapshot.installedKernelVersion);
+    QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
+    QCOMPARE(savedSnapshot.installedLeapSecondTableVersion, QString("test"));
+    QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
+    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: DE-test"));
+    QCOMPARE(manager.earthOrientationStatusText(), QString("Installed: test"));
+}
+
+void SkyEphemerisDataManagerTests::clearPlanetaryKernelCachePreservesSupportData()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("kernel-cache/de440s.bsp"));
+    const QString earthOrientationPath = m_settings.filePath(QStringLiteral("support/eop.csv"));
+    const QString leapSecondPath = m_settings.filePath(QStringLiteral("support/leap-seconds.list"));
+    const QString deltaTPath = m_settings.filePath(QStringLiteral("support/delta-t.csv"));
+    QVERIFY(writeFile(kernelPath, QByteArray(2 * 1024 * 1024, 'k')));
+    QVERIFY(writeFile(earthOrientationPath, QByteArrayLiteral("eop")));
+    QVERIFY(writeFile(leapSecondPath, QByteArrayLiteral("leap")));
+    QVERIFY(writeFile(deltaTPath, QByteArrayLiteral("delta")));
+
+    SkySettingsStore store;
+    QVERIFY(
+        store.saveEphemerisDataCache(installedSnapshot(kernelPath, earthOrientationPath, leapSecondPath, deltaTPath))
+    );
+    SkyEphemerisDataManager manager(&store);
+    QVERIFY(manager.restoreFromSettings());
+    QCOMPARE(manager.planetaryKernelCacheSizeBytes(), std::uint64_t{2U * 1024U * 1024U});
+
+    QVERIFY(manager.clearPlanetaryKernelCache());
+
+    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    QVERIFY(savedSnapshot.installedKernelAssetId.isEmpty());
+    QVERIFY(savedSnapshot.installedKernelProfileId.isEmpty());
+    QVERIFY(savedSnapshot.installedKernelPath.isEmpty());
+    QVERIFY(savedSnapshot.installedKernelVersion.isEmpty());
+    QCOMPARE(savedSnapshot.installedEarthOrientationPath, earthOrientationPath);
+    QCOMPARE(savedSnapshot.installedLeapSecondTablePath, leapSecondPath);
+    QCOMPARE(savedSnapshot.installedDeltaTDataPath, deltaTPath);
+    QVERIFY(!QFileInfo::exists(kernelPath));
+    QVERIFY(QFileInfo::exists(earthOrientationPath));
+    QCOMPARE(manager.planetaryKernelCacheSizeBytes(), std::uint64_t{0U});
+    QCOMPARE(manager.modernKernelStatusText(), QString("Bundled fallback"));
+    QCOMPARE(manager.earthOrientationStatusText(), QString("Installed: EOP-test"));
+}
+
+void SkyEphemerisDataManagerTests::clearSupportDataCachePreservesInstalledKernel()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("kernel-cache/de440s.bsp"));
+    const QString earthOrientationPath = m_settings.filePath(QStringLiteral("support/eop.csv"));
+    const QString leapSecondPath = m_settings.filePath(QStringLiteral("support/leap-seconds.list"));
+    const QString deltaTPath = m_settings.filePath(QStringLiteral("support/delta-t.csv"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel")));
+    QVERIFY(writeFile(earthOrientationPath, QByteArrayLiteral("eop")));
+    QVERIFY(writeFile(leapSecondPath, QByteArrayLiteral("leap")));
+    QVERIFY(writeFile(deltaTPath, QByteArrayLiteral("delta")));
+
+    SkySettingsStore store;
+    QVERIFY(
+        store.saveEphemerisDataCache(installedSnapshot(kernelPath, earthOrientationPath, leapSecondPath, deltaTPath))
+    );
+    SkyEphemerisDataManager manager(&store);
+    QVERIFY(manager.restoreFromSettings());
+    QVERIFY(manager.supportDataCacheSizeBytes() > 0U);
+
+    QVERIFY(manager.clearSupportDataCache());
+
+    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    QCOMPARE(savedSnapshot.installedKernelPath, kernelPath);
+    QCOMPARE(savedSnapshot.installedKernelVersion, QString("DE-test"));
+    QVERIFY(savedSnapshot.installedEarthOrientationPath.isEmpty());
+    QVERIFY(savedSnapshot.installedLeapSecondTablePath.isEmpty());
+    QVERIFY(savedSnapshot.installedDeltaTDataPath.isEmpty());
+    QVERIFY(QFileInfo::exists(kernelPath));
+    QVERIFY(!QFileInfo::exists(earthOrientationPath));
+    QVERIFY(!QFileInfo::exists(leapSecondPath));
+    QVERIFY(!QFileInfo::exists(deltaTPath));
+    QCOMPARE(manager.supportDataCacheSizeBytes(), std::uint64_t{0U});
+    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: DE-test"));
+    QCOMPARE(manager.earthOrientationStatusText(), QString("Bundled fallback"));
 }
 
 void SkyEphemerisDataManagerTests::activationFailurePreservesActiveDataAndSettings()

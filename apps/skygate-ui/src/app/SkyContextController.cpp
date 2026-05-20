@@ -85,6 +85,89 @@ astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcep
     return kind == EphemerisEngineKind::HighPrecision ? 1 : 0;
 }
 
+[[nodiscard]] QString cacheSizeText(const std::uint64_t bytes)
+{
+    if (bytes == 0U) {
+        return QStringLiteral("0 MB");
+    }
+
+    constexpr double kBytesPerMegabyte = 1024.0 * 1024.0;
+    return QStringLiteral("%1 MB").arg(static_cast<double>(bytes) / kBytesPerMegabyte, 0, 'f', 1);
+}
+
+[[nodiscard]] QString sentenceFragment(QString text)
+{
+    text = text.trimmed();
+    if (!text.isEmpty() && text.front().isUpper() && (text.size() == 1 || !text.at(1).isUpper())) {
+        text.front() = text.front().toLower();
+    }
+    return text;
+}
+
+[[nodiscard]] QString displayDataStatus(QString statusText)
+{
+    statusText = statusText.trimmed();
+    constexpr QLatin1StringView kInstalledPrefix("Installed: ");
+    if (statusText.startsWith(kInstalledPrefix)) {
+        return statusText.mid(kInstalledPrefix.size());
+    }
+    if (statusText.startsWith(QStringLiteral("Bundled fallback"))) {
+        return QStringLiteral("Bundled");
+    }
+    return statusText;
+}
+
+[[nodiscard]] QString
+supportDataStatusText(const QString& rawStatusText, const QString& availableVersion, const bool updateChecked)
+{
+    const QString displayStatus = displayDataStatus(rawStatusText);
+    if (!updateChecked) {
+        return displayStatus;
+    }
+    if (displayStatus == QStringLiteral("Bundled")) {
+        return availableVersion.isEmpty() ? QStringLiteral("Bundled (latest)")
+                                          : QStringLiteral("Bundled (available: %1)").arg(availableVersion);
+    }
+    if (!availableVersion.isEmpty() && availableVersion > displayStatus) {
+        return QStringLiteral("%1 (available: %2)").arg(displayStatus, availableVersion);
+    }
+    return QStringLiteral("%1 (latest)").arg(displayStatus);
+}
+
+[[nodiscard]] QString supportDataVersion(
+    const skygate::ephemeris::EphemerisDataManifest& manifest,
+    const skygate::ephemeris::EphemerisDataManifestAssetKind kind
+)
+{
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile("support-data");
+    if (profile == nullptr) {
+        return {};
+    }
+    for (const std::string& assetId : profile->assetIds) {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        if (asset != nullptr && asset->kind == kind) {
+            return QString::fromStdString(asset->version).trimmed();
+        }
+    }
+    return {};
+}
+
+[[nodiscard]] QString profileProgressName(
+    const skygate::ephemeris::EphemerisDataManifest& manifest,
+    const skygate::ephemeris::EphemerisDataManifestProfile& profile
+)
+{
+    for (const std::string& assetId : profile.assetIds) {
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        if (asset != nullptr && asset->kind == skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel) {
+            return QString::fromStdString(asset->version).trimmed();
+        }
+    }
+    return sentenceFragment(
+        profile.displayName.empty() ? QString::fromStdString(profile.id) : QString::fromStdString(profile.displayName)
+    );
+}
+
 [[nodiscard]] EphemerisCorrectionFlags correctionPresetFlags(const int index) noexcept
 {
     switch (index) {
@@ -617,7 +700,7 @@ QString SkyContextController::ephemerisAtmosphericTemperatureText() const
 
 QString SkyContextController::ephemerisRelativeHumidityText() const
 {
-    return decimalText(m_ephemerisEngineOptions.relativeHumidity, 2);
+    return decimalText(m_ephemerisEngineOptions.relativeHumidity * 100.0, 1);
 }
 
 QString SkyContextController::ephemerisWavelengthText() const
@@ -709,22 +792,46 @@ QString SkyContextController::ephemerisLongRangeKernelStatusText() const
 
 QString SkyContextController::ephemerisEarthOrientationStatusText() const
 {
-    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->earthOrientationStatusText() : QString();
+    return supportDataStatusText(
+        m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->earthOrientationStatusText() : QString(),
+        m_availableEarthOrientationVersion,
+        m_ephemerisSupportDataUpdateChecked
+    );
 }
 
 QString SkyContextController::ephemerisLeapSecondStatusText() const
 {
-    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->leapSecondStatusText() : QString();
+    return supportDataStatusText(
+        m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->leapSecondStatusText() : QString(),
+        m_availableLeapSecondVersion,
+        m_ephemerisSupportDataUpdateChecked
+    );
 }
 
 QString SkyContextController::ephemerisDeltaTStatusText() const
 {
-    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->deltaTStatusText() : QString();
+    return supportDataStatusText(
+        m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->deltaTStatusText() : QString(),
+        m_availableDeltaTVersion,
+        m_ephemerisSupportDataUpdateChecked
+    );
 }
 
 QString SkyContextController::ephemerisDataLastUpdateResultText() const
 {
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->lastUpdateResultText() : QString();
+}
+
+QString SkyContextController::ephemerisPlanetaryKernelCacheSizeText() const
+{
+    return cacheSizeText(
+        m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->planetaryKernelCacheSizeBytes() : 0U
+    );
+}
+
+QString SkyContextController::ephemerisSupportDataCacheSizeText() const
+{
+    return cacheSizeText(m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->supportDataCacheSizeBytes() : 0U);
 }
 
 bool SkyContextController::ephemerisDataOnlineUpdatesEnabled() const noexcept
@@ -1105,14 +1212,14 @@ void SkyContextController::setEphemerisAtmosphericTemperatureText(const QString&
 
 void SkyContextController::setEphemerisRelativeHumidityText(const QString& humidityText)
 {
-    const std::optional<double> humidity = boundedDouble(humidityText, 0.0, 1.0);
-    if (!humidity.has_value()) {
+    const std::optional<double> humidityPercent = boundedDouble(humidityText, 0.0, 100.0);
+    if (!humidityPercent.has_value()) {
         emit ephemerisSettingsChanged();
         return;
     }
 
     auto settings = m_ephemerisUserSettings;
-    settings.relativeHumidity = *humidity;
+    settings.relativeHumidity = *humidityPercent / 100.0;
     applyEphemerisUserSettings(settings);
 }
 
@@ -1232,6 +1339,86 @@ bool SkyContextController::clearEphemerisDataCache()
     return cleared;
 }
 
+bool SkyContextController::clearPlanetaryKernelCache()
+{
+    const bool cleared = m_ephemerisDataManager != nullptr && m_ephemerisDataManager->clearPlanetaryKernelCache();
+    if (cleared) {
+        setEphemerisDataOperationStatusText({});
+        emit ephemerisDataStatusTextChanged();
+    }
+    return cleared;
+}
+
+bool SkyContextController::clearSupportDataCache()
+{
+    const bool cleared = m_ephemerisDataManager != nullptr && m_ephemerisDataManager->clearSupportDataCache();
+    if (cleared) {
+        m_ephemerisSupportDataUpdateChecked = false;
+        m_availableEarthOrientationVersion.clear();
+        m_availableLeapSecondVersion.clear();
+        m_availableDeltaTVersion.clear();
+        setEphemerisDataOperationStatusText({});
+        emit ephemerisDataStatusTextChanged();
+    }
+    return cleared;
+}
+
+bool SkyContextController::checkEphemerisSupportDataUpdates()
+{
+    if (m_ephemerisDataUpdateInProgress) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update already in progress"));
+        return false;
+    }
+    if (activeEphemerisDataManifest() == nullptr) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update manifest unavailable"));
+        return false;
+    }
+    if (m_ephemerisWritableCacheRoot.trimmed().isEmpty()) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Writable cache unavailable"));
+        return false;
+    }
+
+    const QString stagedRoot = m_ephemerisWritableCacheRoot + QStringLiteral("/staging/support-data-info");
+    QDir stagingDirectory(stagedRoot);
+    if (stagingDirectory.exists() && !stagingDirectory.removeRecursively()) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to clear update staging area"));
+        return false;
+    }
+    if (!QDir().mkpath(stagedRoot)) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to create update staging area"));
+        return false;
+    }
+
+    m_ephemerisDataUpdateInProgress = true;
+    setEphemerisDataUpdateProgress(0.0);
+    setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Checking time and Earth data..."));
+    const bool refreshed = refreshEphemerisDataManifest(stagedRoot);
+    m_ephemerisDataUpdateInProgress = false;
+    setEphemerisDataUpdateProgress(refreshed ? 1.0 : 0.0);
+    if (!refreshed) {
+        emit ephemerisDataStatusTextChanged();
+        return false;
+    }
+
+    const skygate::ephemeris::EphemerisDataManifest* manifest = activeEphemerisDataManifest();
+    if (manifest == nullptr) {
+        setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Update manifest unavailable"));
+        emit ephemerisDataStatusTextChanged();
+        return false;
+    }
+
+    m_availableEarthOrientationVersion =
+        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData);
+    m_availableLeapSecondVersion =
+        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable);
+    m_availableDeltaTVersion =
+        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData);
+    m_ephemerisSupportDataUpdateChecked = true;
+    setEphemerisDataOperationStatusText({});
+    emit ephemerisDataStatusTextChanged();
+    return true;
+}
+
 bool SkyContextController::updateEphemerisData()
 {
     return updateEphemerisDataProfile(m_ephemerisUserSettings.preferredDataProfileId);
@@ -1284,7 +1471,7 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
         emit ephemerisDataStatusTextChanged();
         return success;
     };
-    setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Checking update manifest"));
+    setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Checking update manifest..."));
     if (!refreshEphemerisDataManifest(stagedRoot)) {
         return finishUpdate(false, m_ephemerisDataOperationStatusText);
     }
@@ -1308,10 +1495,8 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
         }
     }
     std::uint64_t completedBytes = 0U;
-    setEphemerisDataOperationStatusText(
-        QStringLiteral("Ephemeris data: Downloading %1")
-            .arg(profile->displayName.empty() ? normalizedProfileId : QString::fromStdString(profile->displayName))
-    );
+    const QString progressName = profileProgressName(*updateManifest, *profile);
+    setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Downloading %1...").arg(progressName));
 
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
     request.manifest = updateManifest;
@@ -1369,15 +1554,18 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
         component.requiredValidityRange = asset->validityRange;
     }
 
-    setEphemerisDataOperationStatusText(
-        QStringLiteral("Ephemeris data: Verifying %1")
-            .arg(profile->displayName.empty() ? normalizedProfileId : QString::fromStdString(profile->displayName))
-    );
+    setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Verifying %1...").arg(progressName));
     const SkyEphemerisDataManager::StagedUpdateActivationResult activationResult =
         m_ephemerisDataManager->activateVerifiedStagedUpdateSet(request);
     const bool activated = activationResult.isSuccess();
     if (activated) {
         m_ephemerisUserSettings.preferredDataProfileId = normalizedProfileId;
+        if (normalizedProfileId == QStringLiteral("support-data")) {
+            m_ephemerisSupportDataUpdateChecked = false;
+            m_availableEarthOrientationVersion.clear();
+            m_availableLeapSecondVersion.clear();
+            m_availableDeltaTVersion.clear();
+        }
         return finishUpdate(true, {});
     }
 

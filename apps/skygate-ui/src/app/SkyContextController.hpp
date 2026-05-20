@@ -139,6 +139,16 @@ class SkyContextController final : public QObject {
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
+        QString ephemerisPlanetaryKernelCacheSizeText
+        READ ephemerisPlanetaryKernelCacheSizeText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
+        QString ephemerisSupportDataCacheSizeText
+        READ ephemerisSupportDataCacheSizeText
+        NOTIFY ephemerisDataStatusTextChanged
+    )
+    Q_PROPERTY(
         bool ephemerisDataOnlineUpdatesEnabled
         READ ephemerisDataOnlineUpdatesEnabled
         WRITE setEphemerisDataOnlineUpdatesEnabled
@@ -297,6 +307,8 @@ public:
     [[nodiscard]] QString ephemerisLeapSecondStatusText() const;
     [[nodiscard]] QString ephemerisDeltaTStatusText() const;
     [[nodiscard]] QString ephemerisDataLastUpdateResultText() const;
+    [[nodiscard]] QString ephemerisPlanetaryKernelCacheSizeText() const;
+    [[nodiscard]] QString ephemerisSupportDataCacheSizeText() const;
     [[nodiscard]] bool ephemerisDataOnlineUpdatesEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateEnabled() const noexcept;
     [[nodiscard]] bool ephemerisDataUpdateInProgress() const noexcept;
@@ -371,8 +383,11 @@ public:
     Q_INVOKABLE bool clearCatalogCache();
     Q_INVOKABLE bool clearDeepSkyCatalogCache();
     Q_INVOKABLE bool clearEphemerisDataCache();
+    Q_INVOKABLE bool clearPlanetaryKernelCache();
+    Q_INVOKABLE bool clearSupportDataCache();
     Q_INVOKABLE bool updateEphemerisData();
     Q_INVOKABLE bool updateEphemerisDataProfile(const QString& profileId);
+    Q_INVOKABLE bool checkEphemerisSupportDataUpdates();
     Q_INVOKABLE void setEphemerisDataOnlineUpdatesEnabled(bool enabled);
     Q_INVOKABLE void loadCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
@@ -489,6 +504,10 @@ private:
     QString m_ephemerisUpdateResourceRoot;
     QString m_ephemerisWritableCacheRoot;
     QString m_ephemerisDataOperationStatusText;
+    QString m_availableEarthOrientationVersion;
+    QString m_availableLeapSecondVersion;
+    QString m_availableDeltaTVersion;
+    bool m_ephemerisSupportDataUpdateChecked = false;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;
     std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_ephemerisEarthOrientationProvider;
     std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> m_ephemerisCalcephKernelRuntime;

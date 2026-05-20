@@ -120,7 +120,7 @@ Item {
                 Label {
                     visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: "Pressure hPa"
+                    text: "Pressure"
                     color: skyContext.theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
@@ -133,6 +133,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisAtmosphericPressureText
+                    suffix: "hPa"
                     inputMethodHints: Qt.ImhFormattedNumbersOnly
                     onEditingFinished: preferencesDraft.ephemerisAtmosphericPressureText = text
                 }
@@ -140,7 +141,7 @@ Item {
                 Label {
                     visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: "Temperature C"
+                    text: "Temperature"
                     color: skyContext.theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
@@ -153,6 +154,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisAtmosphericTemperatureText
+                    suffix: "C"
                     inputMethodHints: Qt.ImhFormattedNumbersOnly
                     onEditingFinished: preferencesDraft.ephemerisAtmosphericTemperatureText = text
                 }
@@ -173,6 +175,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisRelativeHumidityText
+                    suffix: "%"
                     inputMethodHints: Qt.ImhFormattedNumbersOnly
                     onEditingFinished: preferencesDraft.ephemerisRelativeHumidityText = text
                 }
@@ -180,7 +183,7 @@ Item {
                 Label {
                     visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: "Wavelength um"
+                    text: "Wavelength"
                     color: skyContext.theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
@@ -193,6 +196,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisWavelengthText
+                    suffix: "um"
                     inputMethodHints: Qt.ImhFormattedNumbersOnly
                     onEditingFinished: preferencesDraft.ephemerisWavelengthText = text
                 }
@@ -200,11 +204,11 @@ Item {
                 PreferencesGroupTitle {
                     columnSpan: 2
                     Layout.topMargin: 8
-                    text: "Ephemeris Data"
+                    text: "Planetary Kernels"
                 }
 
                 Label {
-                    text: "Kernel"
+                    text: "Installed"
                     color: skyContext.theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
@@ -214,12 +218,85 @@ Item {
                 Label {
                     objectName: "ephemerisModernKernelStatusLabel"
                     Layout.fillWidth: true
-                    text: skyContextController.ephemerisModernKernelStatusText
+                    readonly property string kernelStatusText: skyContextController.ephemerisLongRangeKernelStatusText === "Not installed"
+                                                               ? skyContextController.ephemerisModernKernelStatusText
+                                                               : skyContextController.ephemerisLongRangeKernelStatusText
+                    text: kernelStatusText.indexOf("DE441") >= 0
+                          ? "DE441"
+                          : (kernelStatusText.indexOf("DE440") >= 0
+                             ? "DE440s"
+                             : "Bundled")
                     color: skyContext.theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
                     elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    text: "Download"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                PreferencesComboBox {
+                    id: ephemerisKernelDownloadCombo
+                    objectName: "ephemerisKernelDownloadCombo"
+                    Layout.fillWidth: true
+                    model: ["Select kernel...", "DE440s", "DE441"]
+                    enabled: skyContextController.ephemerisDataUpdateEnabled
+
+                    Binding on currentIndex {
+                        value: 0
+                    }
+
+                    onActivated: function(index) {
+                        if (index === 1) {
+                            skyContextController.updateEphemerisDataProfile("modern");
+                        } else if (index === 2) {
+                            skyContextController.updateEphemerisDataProfile("de441-long-range");
+                        }
+                        ephemerisKernelDownloadCombo.currentIndex = 0;
+                    }
+                }
+
+                Label {
+                    text: "Cache"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 7
+
+                    Label {
+                        objectName: "ephemerisPlanetaryKernelCacheSizeLabel"
+                        Layout.fillWidth: true
+                        text: skyContextController.ephemerisPlanetaryKernelCacheSizeText
+                        color: skyContext.theme.listItemPrimaryText
+                        font.pixelSize: 11
+                        font.family: "Avenir Next"
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    PreferencesActionButton {
+                        objectName: "ephemerisPlanetaryKernelClearCacheButton"
+                        Layout.preferredWidth: 86
+                        text: "Clear"
+                        onClicked: skyContextController.clearPlanetaryKernelCache()
+                    }
+                }
+
+                PreferencesGroupTitle {
+                    columnSpan: 2
+                    Layout.topMargin: 8
+                    text: "Time and Earth Data"
                 }
 
                 Label {
@@ -280,7 +357,36 @@ Item {
                 }
 
                 Label {
-                    text: "Actions"
+                    text: "Download"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                PreferencesComboBox {
+                    id: ephemerisSupportDataDownloadCombo
+                    objectName: "ephemerisSupportDataDownloadCombo"
+                    Layout.fillWidth: true
+                    model: ["Select data...", "Latest", "Info only"]
+                    enabled: skyContextController.ephemerisDataUpdateEnabled
+
+                    Binding on currentIndex {
+                        value: 0
+                    }
+
+                    onActivated: function(index) {
+                        if (index === 1) {
+                            skyContextController.updateEphemerisDataProfile("support-data");
+                        } else if (index === 2) {
+                            skyContextController.checkEphemerisSupportDataUpdates();
+                        }
+                        ephemerisSupportDataDownloadCombo.currentIndex = 0;
+                    }
+                }
+
+                Label {
+                    text: "Cache"
                     color: skyContext.theme.formLabelText
                     font.family: "Avenir Next"
                     font.pixelSize: 10
@@ -291,27 +397,22 @@ Item {
                     Layout.fillWidth: true
                     spacing: 7
 
-                    PreferencesActionButton {
-                        objectName: "ephemerisDataUpdateButton"
-                        Layout.preferredWidth: 130
-                        text: "Update Modern"
-                        enabled: skyContextController.ephemerisDataUpdateEnabled
-                        onClicked: skyContextController.updateEphemerisDataProfile("modern")
-                    }
-
-                    PreferencesActionButton {
-                        objectName: "ephemerisLongRangeUpdateButton"
-                        Layout.preferredWidth: 130
-                        text: "Install DE441"
-                        enabled: skyContextController.ephemerisDataUpdateEnabled
-                        onClicked: skyContextController.updateEphemerisDataProfile("de441-long-range")
-                    }
-
-                    PreferencesActionButton {
-                        objectName: "ephemerisDataClearCacheButton"
+                    Label {
+                        objectName: "ephemerisSupportDataCacheSizeLabel"
                         Layout.fillWidth: true
-                        text: "Clear Cache"
-                        onClicked: skyContextController.clearEphemerisDataCache()
+                        text: skyContextController.ephemerisSupportDataCacheSizeText
+                        color: skyContext.theme.listItemPrimaryText
+                        font.pixelSize: 11
+                        font.family: "Avenir Next"
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    PreferencesActionButton {
+                        objectName: "ephemerisSupportDataClearCacheButton"
+                        Layout.preferredWidth: 86
+                        text: "Clear"
+                        onClicked: skyContextController.clearSupportDataCache()
                     }
                 }
             }

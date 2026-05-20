@@ -101,6 +101,8 @@ public:
     [[nodiscard]] QString earthOrientationStatusText() const;
     [[nodiscard]] QString leapSecondStatusText() const;
     [[nodiscard]] QString deltaTStatusText() const;
+    [[nodiscard]] std::uint64_t planetaryKernelCacheSizeBytes() const;
+    [[nodiscard]] std::uint64_t supportDataCacheSizeBytes() const;
     [[nodiscard]] QString lastUpdateResultText() const;
     [[nodiscard]] QString dataRevisionToken() const;
     [[nodiscard]] bool usingInstalledData() const noexcept;
@@ -113,6 +115,8 @@ public:
     );
     [[nodiscard]] bool restoreFromSettings();
     [[nodiscard]] bool clearInstalledDataCache();
+    [[nodiscard]] bool clearPlanetaryKernelCache();
+    [[nodiscard]] bool clearSupportDataCache();
     void requestUpdateCancellation() noexcept;
     void clearUpdateCancellation() noexcept;
     [[nodiscard]] bool updateCancellationRequested() const noexcept;
