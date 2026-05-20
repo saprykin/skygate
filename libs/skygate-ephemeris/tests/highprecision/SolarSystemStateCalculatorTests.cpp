@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -270,6 +271,7 @@ private slots:
     void mapsSupportedBodiesToNaifIds();
     void fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing();
     void prefersPlanetarySystemBarycenterWhenConfigured();
+    void usesAvailableBodyCentersWhenBarycenterPreferenceConfigured();
     void appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth();
     void computesLightTimeRaDecAgainstHorizonsFixture();
     void reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult();
@@ -412,6 +414,38 @@ void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfig
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
     QVERIFY(result.metadata.dataSourceProvenance.find("mars body center (499)") != std::string::npos);
     QVERIFY(result.metadata.dataSourceProvenance.find("planetary-system barycenter (4)") != std::string::npos);
+}
+
+void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPreferenceConfigured()
+{
+    struct Case {
+        std::string_view id;
+        int bodyCenterNaifId = 0;
+        int barycenterNaifId = 0;
+    };
+    const std::array cases{
+        Case{.id = "mercury", .bodyCenterNaifId = 199, .barycenterNaifId = 1},
+        Case{.id = "venus", .bodyCenterNaifId = 299, .barycenterNaifId = 2},
+    };
+
+    for (const Case& item : cases) {
+        const auto provider = std::make_shared<FakeCalcephKernelProvider>();
+        provider->responses[{item.bodyCenterNaifId, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+        provider->responses[{item.barycenterNaifId, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+        const SolarSystemStateCalculator calculator(provider, true);
+
+        const HighPrecisionCalculatorResult result =
+            calculator.calculate(makeInput(makePlanetBody(std::string{item.id}), makeRequest()));
+
+        QCOMPARE(provider->callCount, 1);
+        QCOMPARE(provider->lastTargetNaifId, item.bodyCenterNaifId);
+        QCOMPARE(provider->lastCenterNaifId, 399);
+        QVERIFY(result.equatorial.has_value());
+        QCOMPARE(
+            static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        );
+        QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+    }
 }
 
 void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth()

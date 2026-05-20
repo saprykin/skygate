@@ -108,6 +108,24 @@ struct TargetKernelState {
     return std::nullopt;
 }
 
+[[nodiscard]] bool de440sHasPlanetBodyCenter(const CelestialBody& body) noexcept
+{
+    return strings::equalsIgnoreAsciiCase(body.id, "mercury") || strings::equalsIgnoreAsciiCase(body.id, "venus");
+}
+
+[[nodiscard]] bool
+shouldPreferPlanetarySystemBarycenter(const CelestialBody& body, const bool preferPlanetarySystemBarycenters) noexcept
+{
+    if (!preferPlanetarySystemBarycenters) {
+        return false;
+    }
+    if (body.ephemerisSource != CelestialBodyEphemerisSource::Planet && body.type != CelestialBodyType::Planet) {
+        return false;
+    }
+
+    return !de440sHasPlanetBodyCenter(body);
+}
+
 [[nodiscard]] std::string barycenterFallbackProvenance(
     const CelestialBody& body, const int requestedTargetNaifId, const int effectiveTargetNaifId
 )
@@ -366,6 +384,8 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
 
     const std::optional<int> targetNaifId = naifIdForBody(input.body);
     const std::optional<int> fallbackTargetNaifId = planetarySystemBarycenterNaifIdForBody(input.body);
+    const bool preferPlanetarySystemBarycenter =
+        shouldPreferPlanetarySystemBarycenter(input.body, m_preferPlanetarySystemBarycenters);
     if (!targetNaifId.has_value() || *targetNaifId == kNaifEarth) {
         return makeStatusResult(EphemerisResultStatus::Unsupported, EphemerisWarningCode::UnsupportedBody);
     }
@@ -376,7 +396,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
         *targetNaifId,
         fallbackTargetNaifId,
         kNaifEarth,
-        m_preferPlanetarySystemBarycenters
+        preferPlanetarySystemBarycenter
     );
     const SolarSystemKernelStateResult& kernelResult = targetKernelResult.state;
     const int effectiveTargetNaifId = targetKernelResult.targetNaifId;
@@ -427,7 +447,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                     effectiveTargetNaifId,
                     fallbackTargetNaifId,
                     kNaifSolarSystemBarycenter,
-                    m_preferPlanetarySystemBarycenters
+                    preferPlanetarySystemBarycenter
                 );
                 const SolarSystemKernelStateResult& targetState = retardedTargetState.state;
                 if (!targetState.positionAu.has_value()) {
