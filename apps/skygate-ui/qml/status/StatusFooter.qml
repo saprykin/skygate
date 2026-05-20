@@ -9,9 +9,15 @@ Rectangle {
     required property var sceneModel
     property bool dateTimePopupOpen: false
     property bool nightConditionsPopupOpen: false
+    property bool degradationPopupOpen: false
+    readonly property bool hasEphemerisDegradation:
+        sceneModel.ephemerisDegradationReasons
+        && sceneModel.ephemerisDegradationReasons.length > 0
+    readonly property int statusButtonSpacing: 1
     property alias nightConditionsToggleItem: nightConditionsButton
     signal dateTimeClicked()
     signal nightConditionsClicked()
+    signal degradationClicked()
 
     function trackedInspectorVisible() {
         const inspector = sceneModel.selectedObjectInspector
@@ -71,16 +77,16 @@ Rectangle {
         Item {
             id: statusTimeArea
             objectName: "statusFooterTimeArea"
-            width: 280
+            width: 300
             height: footerRoot.height
 
             Item {
                 id: nightConditionsButton
                 objectName: "nightConditionsButton"
-                anchors.right: statusTimeHighlight.left
-                anchors.rightMargin: -4
+                anchors.right: ephemerisDegradationButton.left
+                anchors.rightMargin: footerRoot.statusButtonSpacing
                 anchors.verticalCenter: parent.verticalCenter
-                width: 32
+                width: 26
                 height: footerRoot.height
 
                 Rectangle {
@@ -104,6 +110,7 @@ Rectangle {
                     id: nightConditionsIcon
                     objectName: "nightConditionsIcon"
                     anchors.centerIn: nightConditionsHighlight
+                    anchors.horizontalCenterOffset: 4
                     width: 22
                     height: 22
                     antialiasing: true
@@ -143,13 +150,93 @@ Rectangle {
             }
 
             Item {
+                id: ephemerisDegradationButton
+                objectName: "ephemerisDegradationButton"
+                visible: footerRoot.hasEphemerisDegradation
+                anchors.right: statusTimeHighlight.left
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                width: visible ? 26 : 0
+                height: footerRoot.height
+                z: 3
+
+                Rectangle {
+                    id: ephemerisDegradationHighlight
+                    objectName: "ephemerisDegradationHighlight"
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
+                    radius: 8
+                    color: ephemerisDegradationMouse.containsMouse
+                        ? theme.footerTimeHoverBackground
+                        : "transparent"
+                    border.width: 1
+                    border.color: (ephemerisDegradationMouse.containsMouse
+                                   || footerRoot.degradationPopupOpen)
+                        ? theme.footerTimeHoverBorder
+                        : "transparent"
+                }
+
+                Canvas {
+                    id: ephemerisDegradationIcon
+                    objectName: "ephemerisDegradationIcon"
+                    anchors.centerIn: ephemerisDegradationHighlight
+                    width: 20
+                    height: 20
+                    antialiasing: true
+
+                    property color bodyColor: theme.errorText
+
+                    onBodyColorChanged: requestPaint()
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.lineCap = "round"
+                        ctx.lineJoin = "round"
+                        ctx.strokeStyle = bodyColor
+                        ctx.fillStyle = bodyColor
+
+                        ctx.lineWidth = 1.7
+                        ctx.beginPath()
+                        ctx.moveTo(10.0, 2.4)
+                        ctx.lineTo(18.0, 16.8)
+                        ctx.lineTo(2.0, 16.8)
+                        ctx.closePath()
+                        ctx.stroke()
+
+                        ctx.beginPath()
+                        ctx.moveTo(10.0, 7.1)
+                        ctx.lineTo(10.0, 11.5)
+                        ctx.stroke()
+
+                        ctx.beginPath()
+                        ctx.arc(10.0, 14.0, 0.9, 0, Math.PI * 2)
+                        ctx.fill()
+                    }
+                }
+
+                MouseArea {
+                    id: ephemerisDegradationMouse
+                    objectName: "ephemerisDegradationMouse"
+                    anchors.fill: ephemerisDegradationHighlight
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: footerRoot.degradationClicked()
+                }
+
+                ToolTip.visible: ephemerisDegradationMouse.containsMouse
+                ToolTip.delay: 250
+                ToolTip.text: "Ephemeris degraded"
+            }
+
+            Item {
                 id: trackingIndicator
                 objectName: "trackingIndicator"
                 visible: footerRoot.skyContextController.hasTrackedTarget
                 anchors.right: nightConditionsButton.left
-                anchors.rightMargin: -2
+                anchors.rightMargin: footerRoot.statusButtonSpacing
                 anchors.verticalCenter: parent.verticalCenter
-                width: visible ? 32 : 0
+                width: visible ? 26 : 0
                 height: footerRoot.height
 
                 Rectangle {
@@ -170,6 +257,7 @@ Rectangle {
                     id: trackingIcon
                     objectName: "trackingIcon"
                     anchors.centerIn: trackingHighlight
+                    anchors.horizontalCenterOffset: -1
                     width: 22
                     height: 22
                     antialiasing: true
@@ -252,9 +340,9 @@ Rectangle {
                 id: statusTimeHighlight
                 objectName: "statusTimeHighlight"
                 anchors.right: parent.right
-                anchors.rightMargin: -10
+                anchors.rightMargin: -6
                 anchors.verticalCenter: parent.verticalCenter
-                width: statusTimeLabel.implicitWidth + 20
+                width: statusTimeLabel.implicitWidth + 12
                 height: statusTimeLabel.implicitHeight + 8
                 radius: 8
                 color: statusTimeMouse.containsMouse ? theme.footerTimeHoverBackground : "transparent"

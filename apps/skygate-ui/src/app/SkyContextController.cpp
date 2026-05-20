@@ -292,6 +292,26 @@ void appendRevisionComponent(std::uint64_t& revision, const std::string_view val
     return revision;
 }
 
+[[nodiscard]] std::optional<skygate::ephemeris::EphemerisDateRange> activeTextAssetRange(
+    const skygate::ephemeris::EphemerisDataManifest* manifest,
+    const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
+    const QString& activeVersion
+)
+{
+    if (manifest == nullptr || activeVersion.trimmed().isEmpty()) {
+        return std::nullopt;
+    }
+
+    const std::string version = activeVersion.trimmed().toStdString();
+    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest->assets) {
+        if (asset.kind == kind && asset.version == version) {
+            return asset.validityRange;
+        }
+    }
+
+    return std::nullopt;
+}
+
 struct EphemerisProviderBundle final {
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
     std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
@@ -317,6 +337,10 @@ ephemerisProvidersFromSnapshot(const std::shared_ptr<const skygate::ephemeris::I
         skygate::ephemeris::loadDeltaTDataFromSnapshot(*snapshot);
     if (leapSecondTable.isSuccess()) {
         skygate::ephemeris::TimeScaleServiceOptions timeScaleOptions;
+        timeScaleOptions.allowDegradedLeapSecondFallback = true;
+        timeScaleOptions.allowUt1DeltaTFallback = true;
+        timeScaleOptions.earthOrientationSampleOptions.allowOutOfRangeNearestSampleFallback = true;
+        timeScaleOptions.earthOrientationSampleOptions.allowMissingDataZeroFallback = true;
         timeScaleOptions.earthOrientationSampleOptions.degradePredictedData = false;
         bundle.timeScaleService = std::make_shared<skygate::ephemeris::LeapSecondTimeScaleService>(
             leapSecondTable.provider,
@@ -931,6 +955,25 @@ SkyContextController::ephemerisRequestContextFor(const skygate::core::SkyContext
     context.leapSecondDataRevision =
         textDataAssetRevision(context.activeDataSnapshot, context.ephemerisDataRevision, false);
     context.catalogRevision = catalogRevision();
+    if (m_ephemerisDataManager != nullptr) {
+        const SkySettingsStore::EphemerisDataCacheSnapshot activeCache = m_ephemerisDataManager->activeCacheSnapshot();
+        const skygate::ephemeris::EphemerisDataManifest* manifest = activeEphemerisDataManifest();
+        context.earthOrientationDataRange = activeTextAssetRange(
+            manifest,
+            skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+            activeCache.installedEarthOrientationVersion
+        );
+        context.leapSecondTableRange = activeTextAssetRange(
+            manifest,
+            skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+            activeCache.installedLeapSecondTableVersion
+        );
+        context.deltaTDataRange = activeTextAssetRange(
+            manifest,
+            skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+            activeCache.installedDeltaTDataVersion
+        );
+    }
 
     if (const auto epoch = astronomicalEpochFromUtcTime(skyContext.utcTime); epoch.has_value()) {
         context.request.epoch = *epoch;

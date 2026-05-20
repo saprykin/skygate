@@ -31,6 +31,16 @@ public:
         return options;
     }
 
+    [[nodiscard]] std::span<const skygate::ephemeris::EphemerisDateRange> supportedDateRanges() const noexcept override
+    {
+        return m_supportedDateRanges;
+    }
+
+    void setSupportedDateRanges(std::vector<skygate::ephemeris::EphemerisDateRange> ranges)
+    {
+        m_supportedDateRanges = std::move(ranges);
+    }
+
     [[nodiscard]] skygate::ephemeris::SkySnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -105,6 +115,7 @@ private:
 
     mutable int m_requestComputeCount = 0;
     mutable std::optional<skygate::ephemeris::EphemerisRequest> m_lastRequest;
+    std::vector<skygate::ephemeris::EphemerisDateRange> m_supportedDateRanges;
 };
 
 }  // namespace
@@ -116,6 +127,7 @@ private slots:
     void buildsFrameAndSupportsHitTesting();
     void reusesSnapshotAcrossViewChanges();
     void highPrecisionSceneFrameUsesLeanRenderRequest();
+    void degradationReasonsOnlyExposeOutOfRangeKernelSupport();
     void referenceOverlayContextComesFromSelectedRequestSnapshot();
 };
 
@@ -183,6 +195,44 @@ void SkySceneModelFrameTests::highPrecisionSceneFrameUsesLeanRenderRequest()
     QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation));
     QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::EarthOrientation));
     QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax));
+}
+
+void SkySceneModelFrameTests::degradationReasonsOnlyExposeOutOfRangeKernelSupport()
+{
+    auto starCatalog = skygate::ui::tests::createTestCatalog({
+        makeFixedBody("resolved", "Resolved", skygate::ephemeris::CelestialBodyType::Star, 1.0, 0.0, 0.0),
+    });
+    QVERIFY(starCatalog != nullptr);
+
+    auto engine = std::make_unique<SnapshotContextEngine>();
+    skygate::ephemeris::EphemerisDateRange range;
+    range.id = "de440s-range";
+    range.displayName = "DE440s kernel range";
+    range.start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{.astronomicalYear = 1849, .month = 12, .day = 26}
+    );
+    range.end = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{.astronomicalYear = 2150, .month = 1, .day = 22}
+    );
+    engine->setSupportedDateRanges({range});
+
+    SkyContextController::InitializationOptions options;
+    options.loadSettings = false;
+    options.initializeLocation = false;
+    options.rebuildEphemerisEngineOnStartup = false;
+    SkyContextController controller(std::move(starCatalog), std::move(engine), options, nullptr);
+    QVERIFY(skygate::ui::tests::configureTestSkyContext(controller));
+    QVERIFY(controller.setUtcDateTimeText(QStringLiteral("10000-01-01 BCE"), QStringLiteral("00:00:00")));
+
+    SkySceneModel sceneModel;
+    sceneModel.setSkyContextController(&controller);
+    sceneModel.setViewportSize(1100.0, 760.0);
+
+    const QVariantList reasons = sceneModel.ephemerisDegradationReasons();
+    QCOMPARE(reasons.size(), 1);
+    const QString reason = reasons.front().toString();
+    QVERIFY(reason.contains(QStringLiteral("Planetary kernel out of range")));
+    QVERIFY(reason.contains(QStringLiteral("DE440s kernel range: 1849-12-26 to 2150-01-22")));
 }
 
 void SkySceneModelFrameTests::referenceOverlayContextComesFromSelectedRequestSnapshot()

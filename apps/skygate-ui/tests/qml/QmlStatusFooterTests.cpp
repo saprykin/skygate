@@ -21,6 +21,7 @@ private slots:
     void initTestCase();
     void init();
     void dateTimeClickAndTrackingIndicatorInvokeControllerActions();
+    void degradationWarningClickInvokesFooterSignal();
     void liveAndTrackingStateUpdateFooterPresentation();
     void rightFooterClusterKeepsNightTrackingAndTimeTargetsOrdered();
 
@@ -50,7 +51,9 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -62,6 +65,7 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
                 id: scene
                 property bool inspectorCleared: false
                 property var selectedObjectInspector: ({})
+                property var ephemerisDegradationReasons: []
                 function clearSelectedObjectInspector() {
                     inspectorCleared = true
                     selectedObjectInspector = ({})
@@ -76,7 +80,9 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
                 onDateTimeClicked: root.dateClicked = true
             }
         }
-    )"), QStringLiteral("StatusFooterBehaviorTest.qml"));
+    )"),
+        QStringLiteral("StatusFooterBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -86,44 +92,96 @@ void QmlStatusFooterTests::dateTimeClickAndTrackingIndicatorInvokeControllerActi
     ExposedQuickWindow exposed(root);
     QQuickItem* timeItem = firstQuickItemWithObjectName(root, QStringLiteral("statusTimeMouse"));
     QVERIFY(timeItem != nullptr);
-    QPointF timeCenter = timeItem->mapToScene(
-        QPointF(timeItem->width() / 2.0, timeItem->height() / 2.0)
-    );
+    QPointF timeCenter = timeItem->mapToScene(QPointF(timeItem->width() / 2.0, timeItem->height() / 2.0));
     QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, timeCenter.toPoint());
     QTRY_VERIFY(root->property("dateClicked").toBool());
 
     QQuickItem* trackingItem = firstQuickItemWithObjectName(root, QStringLiteral("trackingMouse"));
     QVERIFY(trackingItem != nullptr);
-    QPointF trackingCenter = trackingItem->mapToScene(
-        QPointF(trackingItem->width() / 2.0, trackingItem->height() / 2.0)
-    );
-    QTest::mouseClick(
-        exposed.window(),
-        Qt::LeftButton,
-        Qt::NoModifier,
-        trackingCenter.toPoint()
-    );
+    QPointF trackingCenter =
+        trackingItem->mapToScene(QPointF(trackingItem->width() / 2.0, trackingItem->height() / 2.0));
+    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, trackingCenter.toPoint());
     QTRY_COMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("sun"));
 
     scene->setProperty(
         "selectedObjectInspector",
-        QVariantMap {
+        QVariantMap{
             {QStringLiteral("visible"), true},
             {QStringLiteral("targetKind"), QStringLiteral("body")},
             {QStringLiteral("targetId"), QStringLiteral("sun")}
         }
     );
     QCoreApplication::processEvents();
-    QTest::mouseClick(
-        exposed.window(),
-        Qt::LeftButton,
-        Qt::NoModifier,
-        trackingCenter.toPoint()
-    );
+    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, trackingCenter.toPoint());
     QTRY_VERIFY(scene->property("inspectorCleared").toBool());
     QTRY_VERIFY(controller->selectedSearchTargetId().isEmpty());
     QVERIFY(controller->hasTrackedTarget());
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlStatusFooterTests::degradationWarningClickInvokesFooterSignal()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 420
+            height: 48
+            property bool degradationClicked: false
+            property alias scene: scene
+            QtObject {
+                id: scene
+                property var selectedObjectInspector: ({})
+                property var ephemerisDegradationReasons: [
+                    "The request is outside the effective date range of the available ephemeris data."
+                ]
+                function clearSelectedObjectInspector() {
+                    selectedObjectInspector = ({})
+                }
+            }
+            StatusFooter {
+                anchors.fill: parent
+                skyContextController: skyContext
+                sceneModel: scene
+                dateTimePopupOpen: false
+                nightConditionsPopupOpen: false
+                degradationPopupOpen: false
+                onDegradationClicked: root.degradationClicked = true
+            }
+        }
+    )"),
+        QStringLiteral("StatusFooterDegradationWarningTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    QObject* scene = qvariant_cast<QObject*>(root->property("scene"));
+    QVERIFY(scene != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    QQuickItem* warningItem = firstQuickItemWithObjectName(root, QStringLiteral("ephemerisDegradationButton"));
+    QQuickItem* warningMouse = firstQuickItemWithObjectName(root, QStringLiteral("ephemerisDegradationMouse"));
+    QVERIFY(warningItem != nullptr);
+    QVERIFY(warningMouse != nullptr);
+    QTRY_VERIFY(warningItem->isVisible());
+
+    const QPointF warningCenter =
+        warningMouse->mapToScene(QPointF(warningMouse->width() / 2.0, warningMouse->height() / 2.0));
+    QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, warningCenter.toPoint());
+    QTRY_VERIFY(root->property("degradationClicked").toBool());
+
+    scene->setProperty("ephemerisDegradationReasons", QVariantList{});
+    QTRY_VERIFY(!warningItem->isVisible());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
@@ -132,17 +190,16 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
     auto controller = makeController();
     QVERIFY(controller != nullptr);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
-    QVERIFY(controller->setUtcDateTimeText(
-        QStringLiteral("2026-05-06"),
-        QStringLiteral("09:30:30")
-    ));
+    QVERIFY(controller->setUtcDateTimeText(QStringLiteral("2026-05-06"), QStringLiteral("09:30:30")));
     controller->setLive(false);
 
     QQmlEngine engine;
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -153,6 +210,7 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
             QtObject {
                 id: scene
                 property var selectedObjectInspector: ({})
+                property var ephemerisDegradationReasons: []
                 function clearSelectedObjectInspector() {
                     selectedObjectInspector = ({})
                 }
@@ -165,7 +223,9 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
                 nightConditionsPopupOpen: false
             }
         }
-    )"), QStringLiteral("StatusFooterStateBehaviorTest.qml"));
+    )"),
+        QStringLiteral("StatusFooterStateBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -173,23 +233,10 @@ void QmlStatusFooterTests::liveAndTrackingStateUpdateFooterPresentation()
     ExposedQuickWindow exposed(root);
     (void)exposed;
     QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("Live: Off")) != nullptr);
-    QTRY_VERIFY(
-        firstVisibleItemWithText(
-            root,
-            QStringLiteral("2026-05-06 15:30:30 UTC+06:00")
-        ) != nullptr
-    );
+    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("2026-05-06 15:30:30 UTC+06:00")) != nullptr);
     QVERIFY(controller->timeController()->setTimeZoneId(QStringLiteral("UTC")));
-    QTRY_VERIFY(
-        firstVisibleItemWithText(
-            root,
-            QStringLiteral("2026-05-06 09:30:30 UTC")
-        ) != nullptr
-    );
-    auto* trackingIndicator = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("trackingIndicator")
-    );
+    QTRY_VERIFY(firstVisibleItemWithText(root, QStringLiteral("2026-05-06 09:30:30 UTC")) != nullptr);
+    auto* trackingIndicator = firstQuickItemWithObjectName(root, QStringLiteral("trackingIndicator"));
     QVERIFY(trackingIndicator != nullptr);
     QVERIFY(!trackingIndicator->isVisible());
 
@@ -215,7 +262,9 @@ void QmlStatusFooterTests::rightFooterClusterKeepsNightTrackingAndTimeTargetsOrd
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -226,6 +275,9 @@ void QmlStatusFooterTests::rightFooterClusterKeepsNightTrackingAndTimeTargetsOrd
             QtObject {
                 id: scene
                 property var selectedObjectInspector: ({})
+                property var ephemerisDegradationReasons: [
+                    "Required time-scale data is unavailable."
+                ]
                 function clearSelectedObjectInspector() {
                     selectedObjectInspector = ({})
                 }
@@ -239,7 +291,9 @@ void QmlStatusFooterTests::rightFooterClusterKeepsNightTrackingAndTimeTargetsOrd
                 onNightConditionsClicked: root.nightClicked = true
             }
         }
-    )"), QStringLiteral("StatusFooterRightClusterTest.qml"));
+    )"),
+        QStringLiteral("StatusFooterRightClusterTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -247,23 +301,19 @@ void QmlStatusFooterTests::rightFooterClusterKeepsNightTrackingAndTimeTargetsOrd
     ExposedQuickWindow exposed(root);
     QQuickItem* tracking = firstQuickItemWithObjectName(root, QStringLiteral("trackingMouse"));
     QQuickItem* night = firstQuickItemWithObjectName(root, QStringLiteral("nightConditionsMouse"));
+    QQuickItem* warning = firstQuickItemWithObjectName(root, QStringLiteral("ephemerisDegradationMouse"));
     QQuickItem* time = firstQuickItemWithObjectName(root, QStringLiteral("statusTimeMouse"));
     QVERIFY(tracking != nullptr);
     QVERIFY(night != nullptr);
+    QVERIFY(warning != nullptr);
     QVERIFY(time != nullptr);
-    QVERIFY(
-        tracking->mapToScene(QPointF(0.0, 0.0)).x()
-        < night->mapToScene(QPointF(0.0, 0.0)).x()
-    );
-    QVERIFY(
-        night->mapToScene(QPointF(0.0, 0.0)).x()
-        < time->mapToScene(QPointF(0.0, 0.0)).x()
-    );
+    QVERIFY(tracking->mapToScene(QPointF(0.0, 0.0)).x() < night->mapToScene(QPointF(0.0, 0.0)).x());
+    QVERIFY(night->mapToScene(QPointF(0.0, 0.0)).x() < warning->mapToScene(QPointF(0.0, 0.0)).x());
+    QVERIFY(warning->mapToScene(QPointF(0.0, 0.0)).x() < time->mapToScene(QPointF(0.0, 0.0)).x());
     QVERIFY(!horizontallyOverlaps(*tracking, *night));
+    QVERIFY(!horizontallyOverlaps(*night, *warning));
 
-    const QPointF nightCenter = night->mapToScene(
-        QPointF(night->width() / 2.0, night->height() / 2.0)
-    );
+    const QPointF nightCenter = night->mapToScene(QPointF(night->width() / 2.0, night->height() / 2.0));
     QTest::mouseClick(exposed.window(), Qt::LeftButton, Qt::NoModifier, nightCenter.toPoint());
     QTRY_VERIFY(root->property("nightClicked").toBool());
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));

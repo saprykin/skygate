@@ -28,5 +28,6 @@ SearchToolbar 1.0 ../../../toolbars/SearchToolbar.qml
 SkyAppMenuButton 1.0 ../../../toolbars/SkyAppMenuButton.qml
 TimelineToolbar 1.0 ../../../toolbars/TimelineToolbar.qml
 StatusDateTimePopup 1.0 ../../../status/StatusDateTimePopup.qml
+StatusDegradationPopup 1.0 ../../../status/StatusDegradationPopup.qml
 StatusFooter 1.0 ../../../status/StatusFooter.qml
 StatusNightConditionsPopup 1.0 ../../../status/StatusNightConditionsPopup.qml
