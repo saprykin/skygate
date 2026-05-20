@@ -149,9 +149,7 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
         return false;
     }
 
-    const QDateTime currentUtc = currentUtcDateTime();
     skygate::core::SkyContext trackingContext = m_location.context();
-    trackingContext.utcTime = skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(currentUtc.toUTC());
     const auto requestContext = ephemerisRequestContextFor(trackingContext);
     const auto snapshot = engine->compute(requestContext.request);
     const auto* bodyState = findBodyStateById(snapshot, targetId);
@@ -162,18 +160,11 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
     const auto& body = snapshot.bodyAt(bodyState->bodyIndex);
     const QString displayText =
         !body.displayName.empty() ? QString::fromStdString(body.displayName) : targetId.trimmed();
-    const auto nextUtc = skygate::ui::internal::SkyContextTimeCodec::toUtcTimePoint(currentUtc.toUTC());
-    const bool utcChanged = m_location.utcTime() != nextUtc;
     const bool shouldEmitLiveChanged = !m_timeline.live();
 
-    m_location.setUtcTime(nextUtc);
-    m_timeController->setUtcDateTime(currentUtc.toUTC());
     m_timeline.startLiveAtCurrentUtc();
-
-    if (utcChanged) {
-        emit utcDateTextChanged();
-        emit utcTimeTextChanged();
-    }
+    m_timeline.setCatchingUpToCurrentUtc(m_location.utcTime() < currentUtcTime());
+    m_liveClock.start(m_location.utcTime());
     if (shouldEmitLiveChanged) {
         emit liveChanged();
     }
@@ -181,7 +172,7 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
     setTrackedTarget("body", targetId, displayText);
     setSelectedSearchTarget("body", targetId);
     const bool viewChanged = setViewCenterInternal(bodyState->horizontal.altitudeDeg, bodyState->horizontal.azimuthDeg);
-    if (utcChanged && !viewChanged) {
+    if (!viewChanged) {
         emit skyContextChanged();
     }
 
