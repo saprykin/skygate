@@ -311,7 +311,9 @@ private slots:
     void focusSearchTargetUsesSingleBodyLookupForMoon();
     void focusSearchTargetCentersConstellationLabelResult();
     void focusSearchTargetIgnoresInvalidTargets();
-    void trackSearchTargetSetsLiveCurrentTimeAndCentersBody();
+    void trackSearchTargetStartsLiveAtTimelineTimeAndCentersBody();
+    void trackSearchTargetPreservesBceTimelineAnchor();
+    void trackedBceTargetPlaybackUsesConfiguredStepWhileCatchingUp();
     void trackSearchTargetUsesSelectedEngineRequest();
     void searchModelRemainsCatalogAndLabelOnly();
     void trackSearchTargetRejectsInvalidTargetsWithoutMutation();
@@ -447,7 +449,7 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetIgnoresInvalidTar
     QCOMPARE(controller->viewCenterAzimuthDeg(), 123.0);
 }
 
-void SkyContextControllerSearchTrackingTests::trackSearchTargetSetsLiveCurrentTimeAndCentersBody()
+void SkyContextControllerSearchTrackingTests::trackSearchTargetStartsLiveAtTimelineTimeAndCentersBody()
 {
     FakeTimeSource timeSource;
     const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
@@ -465,14 +467,55 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetSetsLiveCurrentTi
     QCOMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("demo_target"));
 
-    const qint64 timelineSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
-    QCOMPARE(timelineSeconds, fixedNowUtc().toSecsSinceEpoch());
+    const QDateTime timelineUtc = controllerUtcTime(*controller);
+    QCOMPARE(timelineUtc, QDateTime(QDate(2000, 1, 1), QTime(0, 0, 0), QTimeZone::UTC));
 
     const auto snapshot = controller->ephemerisEngine()->compute(controller->skyContext());
     const auto* targetState = findStateById(snapshot, "demo_target");
     QVERIFY(targetState != nullptr);
     QVERIFY(std::abs(controller->viewCenterAltitudeDeg() - targetState->horizontal.altitudeDeg) < 1e-6);
     QVERIFY(azimuthDifferenceDeg(controller->viewCenterAzimuthDeg(), targetState->horizontal.azimuthDeg) < 1e-6);
+}
+
+void SkyContextControllerSearchTrackingTests::trackSearchTargetPreservesBceTimelineAnchor()
+{
+    FakeTimeSource timeSource;
+    const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
+    controller->setLive(false);
+    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+
+    QVERIFY(controller->trackSearchTarget("body", "demo_target"));
+
+    QVERIFY(controller->live());
+    QVERIFY(controller->hasTrackedTarget());
+    QCOMPARE(controller->utcDateText(), QString("0044-03-15 BCE"));
+    QCOMPARE(controller->utcTimeText(), QString("12:00:00"));
+    QCOMPARE(controllerUtcTime(*controller).date(), QDate(-44, 3, 15));
+    QCOMPARE(controllerUtcTime(*controller).time(), QTime(12, 0, 0));
+}
+
+void SkyContextControllerSearchTrackingTests::trackedBceTargetPlaybackUsesConfiguredStepWhileCatchingUp()
+{
+    FakeTimeSource timeSource;
+    const auto controller = createSingleBodyController("demo_target", "Demo Target", &timeSource);
+    controller->setLive(false);
+    controller->setStepSeconds(3600);
+    QVERIFY(controller->setUtcDateTimeText("0044-03-15 BCE", "12:00:00"));
+
+    QSignalSpy skyContextChangedSpy(controller.get(), &SkyContextController::skyContextChanged);
+    skyContextChangedSpy.clear();
+
+    const qint64 beforeSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QVERIFY(controller->trackSearchTarget("body", "demo_target"));
+
+    skyContextChangedSpy.clear();
+    QTRY_VERIFY_WITH_TIMEOUT(skyContextChangedSpy.count() >= 1, 1500);
+
+    const qint64 afterSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();
+    QVERIFY(afterSeconds - beforeSeconds >= 3600);
+    QVERIFY(afterSeconds <= fixedNowUtc().toSecsSinceEpoch());
+
+    controller->setLive(false);
 }
 
 void SkyContextControllerSearchTrackingTests::trackSearchTargetUsesSelectedEngineRequest()
@@ -493,7 +536,7 @@ void SkyContextControllerSearchTrackingTests::trackSearchTargetUsesSelectedEngin
     QCOMPARE(controller->trackedTargetDisplayText(), QString("Demo Target"));
     QCOMPARE(controller->viewCenterAltitudeDeg(), 64.0);
     QCOMPARE(controller->viewCenterAzimuthDeg(), 222.0);
-    QCOMPARE(controllerUtcTime(*controller), fixedNowUtc());
+    QCOMPARE(controllerUtcTime(*controller), QDateTime(QDate(2000, 1, 1), QTime(0, 0, 0), QTimeZone::UTC));
 }
 
 void SkyContextControllerSearchTrackingTests::searchModelRemainsCatalogAndLabelOnly()
