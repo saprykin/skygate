@@ -74,6 +74,23 @@ function(add_skygate_disabled_highprecision_test target_name reason)
     )
 endfunction()
 
+set(SKYGATE_SIMPLE_ENGINE_ISOLATION_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/simple/SimpleEphemerisEngine.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/simple/SimpleEphemerisEngine.cpp"
+)
+add_test(
+    NAME skygate-ephemeris-simple-engine-isolation-test
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DSIMPLE_ENGINE_FILES=${SKYGATE_SIMPLE_ENGINE_ISOLATION_FILES}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/SimpleEngineIsolationTest.cmake"
+)
+set_tests_properties(skygate-ephemeris-simple-engine-isolation-test
+    PROPERTIES
+        LABELS "unit;architecture"
+        TIMEOUT 30
+)
+
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_executable(skygate-ephemeris-highprecision-dependency-smoke-tests
         highprecision/HighPrecisionDependencySmokeTests.cpp
