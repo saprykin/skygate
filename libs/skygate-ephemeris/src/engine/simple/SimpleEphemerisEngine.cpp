@@ -172,9 +172,14 @@ void appendKernelDateRangeIfMissing(
 prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& kernelProvider) noexcept
 {
     const std::optional<highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
-    return kernelInfo.has_value()
-           && (strings::equalsIgnoreAsciiCase(kernelInfo->id, "de440s-kernel")
-               || strings::equalsIgnoreAsciiCase(kernelInfo->version, "DE440s"));
+    if (!kernelInfo.has_value()) {
+        return false;
+    }
+
+    return strings::containsIgnoreAsciiCase(kernelInfo->id, "de440")
+           || strings::containsIgnoreAsciiCase(kernelInfo->version, "de440")
+           || strings::containsIgnoreAsciiCase(kernelInfo->id, "de441")
+           || strings::containsIgnoreAsciiCase(kernelInfo->version, "de441");
 }
 
 void publishDiagnostics(

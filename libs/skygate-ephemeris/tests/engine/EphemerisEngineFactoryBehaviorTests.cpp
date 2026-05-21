@@ -50,6 +50,16 @@ namespace {
     };
 }
 
+[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryBehaviorMars()
+{
+    return {
+        .id = "mars",
+        .displayName = "Mars",
+        .type = skygate::ephemeris::CelestialBodyType::Planet,
+        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet,
+    };
+}
+
 [[nodiscard]] skygate::core::SkyContext makeContext()
 {
     skygate::core::SkyContext context;
@@ -257,6 +267,48 @@ private:
     mutable std::string m_openedPath;
 };
 
+class RecordingCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
+public:
+    using CallLog = std::vector<std::pair<int, int>>;
+
+    explicit RecordingCalcephKernelHandle(std::shared_ptr<CallLog> calls) : m_calls(std::move(calls)) {}
+
+    [[nodiscard]] std::optional<skygate::ephemeris::highprecision::SolarSystemKernelVector> computeGeometricState(
+        const skygate::ephemeris::AstronomicalEpoch&, const int targetNaifId, const int centerNaifId
+    ) const override
+    {
+        m_calls->emplace_back(targetNaifId, centerNaifId);
+        return skygate::ephemeris::highprecision::SolarSystemKernelVector{.xAu = 1.0, .yAu = 0.0, .zAu = 0.0};
+    }
+
+private:
+    std::shared_ptr<CallLog> m_calls;
+};
+
+class RecordingCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
+public:
+    using CallLog = RecordingCalcephKernelHandle::CallLog;
+
+    [[nodiscard]] bool isAvailable() const noexcept override
+    {
+        return true;
+    }
+
+    [[nodiscard]] skygate::ephemeris::highprecision::CalcephKernelOpenResult
+    openKernel(const std::filesystem::path&) const override
+    {
+        return {.handle = std::make_unique<RecordingCalcephKernelHandle>(m_calls)};
+    }
+
+    [[nodiscard]] const CallLog& calls() const noexcept
+    {
+        return *m_calls;
+    }
+
+private:
+    std::shared_ptr<CallLog> m_calls = std::make_shared<CallLog>();
+};
+
 [[nodiscard]] std::string writeKernelFixture(QTemporaryDir& directory, const QByteArray& payload)
 {
     const QString path = directory.filePath(QStringLiteral("de440s.bsp"));
@@ -337,6 +389,7 @@ private slots:
     void simpleRequestCreatesRequestedEngineWithOptions();
     void highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable();
     void highPrecisionRequestOpensActiveKernelWithoutRehashingIt();
+    void highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally();
     void highPrecisionRequestWiresApparentTopocentricCorrectionPath();
     void highPrecisionRequestFallsBackOnlyWhenAllowed();
     void invalidEngineKindReturnsStructuredInvalidRequest();
@@ -598,6 +651,70 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelW
     QVERIFY(result.engine != nullptr);
     QVERIFY(!result.hasDiagnostics());
     QCOMPARE(runtime->openedPath(), kernelPath);
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally()
+{
+    const QByteArray kernelPayload("fake de441 kernel payload");
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const std::string kernelPath = writeKernelFixture(directory, kernelPayload);
+    QVERIFY(!kernelPath.empty());
+
+    skygate::ephemeris::EphemerisDataManifest manifest =
+        makeFactoryManifest(kernelPayload, static_cast<std::uint64_t>(kernelPayload.size()));
+    manifest.profiles.front().id = "de441-long-range";
+    manifest.profiles.front().displayName = "DE441 long range";
+    manifest.profiles.front().bundled = false;
+    manifest.profiles.front().longRange = true;
+    manifest.profiles.front().assetIds = {"de441-kernel"};
+    manifest.assets.front().id = "de441-kernel";
+    manifest.assets.front().profileId = "de441-long-range";
+    manifest.assets.front().version = "DE441";
+    manifest.assets.front().sourceUrl = "https://example.test/de441.bsp";
+
+    const std::array bodies{makeFactoryBehaviorMars()};
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.catalogBodies = bodies;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Geometric;
+    request.dataManifest = &manifest;
+    request.activeDataSnapshot =
+        std::make_shared<TestEphemerisDataSnapshot>(skygate::ephemeris::EphemerisKernelDataAsset{
+            .id = "de441-kernel",
+            .profileId = "de441-long-range",
+            .version = "DE441",
+            .provenance = "DE441 test snapshot",
+            .activePath = kernelPath,
+        });
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+    auto runtime = std::make_shared<RecordingCalcephKernelRuntime>();
+    request.calcephKernelRuntime = runtime;
+
+    auto result = skygate::ephemeris::createEphemerisEngine(request);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.engine != nullptr);
+    const skygate::ephemeris::EphemerisRequest computeRequest{
+        .epoch =
+            {.julianDatePart1 = 2'460'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb},
+        .context = makeContext(),
+        .options = request.options,
+    };
+
+    const auto state = result.engine->computeBodyState(computeRequest, "mars");
+
+    QVERIFY(state.has_value());
+    QVERIFY(!runtime->calls().empty());
+    QCOMPARE(runtime->calls().front().first, 4);
+    QCOMPARE(runtime->calls().front().second, 399);
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
+    );
+    QVERIFY(!state->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::BarycenterFallback));
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopocentricCorrectionPath()
