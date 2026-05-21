@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QAbstractItemModel>
-#include <QElapsedTimer>
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
@@ -449,8 +448,8 @@ private:
     [[nodiscard]] QDateTime currentUtcDateTime() const;
     [[nodiscard]] skygate::core::UtcTimePoint currentUtcTime() const;
     [[nodiscard]] bool liveRecomputeThrottleApplies() const;
-    [[nodiscard]] bool liveRecomputeThrottled() const;
-    void markLiveRecomputeTick();
+    [[nodiscard]] bool liveRecomputeThrottled(const skygate::core::UtcTimePoint& nextUtc) const;
+    void markLiveRecomputeTick(const skygate::core::UtcTimePoint& nextUtc);
     void tickUtcTime();
     void stepBySeconds(int stepSeconds);
     void setCurrentUtc(const QDateTime& utcTime);
@@ -488,7 +487,7 @@ private:
     skygate::ui::internal::SkyLocationController m_location;
     skygate::ui::internal::SkySearchController m_search;
     QTimer m_timer;
-    QElapsedTimer m_liveRecomputeThrottleTimer;
+    std::optional<skygate::core::UtcTimePoint> m_lastLiveRecomputeUtc;
     SkyLiveClock m_liveClock;
     std::unique_ptr<LocationCatalogModel> m_locationCatalogModel;
     std::unique_ptr<skygate::ui::internal::SkyThemePalette> m_themePalette;
