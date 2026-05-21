@@ -297,7 +297,7 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
             return TargetKernelState{
                 .state = preferredState,
                 .targetNaifId = *fallbackTargetNaifId,
-                .requestedTargetNaifId = targetNaifId,
+                .requestedTargetNaifId = *fallbackTargetNaifId,
             };
         }
     }

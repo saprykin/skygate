@@ -409,11 +409,10 @@ void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfig
     QVERIFY(result.equatorial.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
-    QVERIFY(result.metadata.dataSourceProvenance.find("mars body center (499)") != std::string::npos);
-    QVERIFY(result.metadata.dataSourceProvenance.find("planetary-system barycenter (4)") != std::string::npos);
+    QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+    QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
 }
 
 void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPreferenceConfigured()
