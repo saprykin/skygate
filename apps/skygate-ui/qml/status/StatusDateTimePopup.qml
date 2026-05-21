@@ -146,6 +146,8 @@ FocusScope {
                     dateTimePopup.stagedDateText = text
                     dateTimePopup.errorText = ""
                 }
+
+                onAccepted: dateTimePopup.applyChanges()
             }
 
             Label {
@@ -173,8 +175,7 @@ FocusScope {
                     dateTimePopup.errorText = ""
                 }
 
-                Keys.onReturnPressed: dateTimePopup.applyChanges()
-                Keys.onEnterPressed: dateTimePopup.applyChanges()
+                onAccepted: dateTimePopup.applyChanges()
             }
 
             Label {

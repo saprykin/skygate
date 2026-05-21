@@ -36,7 +36,9 @@ void QmlDateTimePopupTests::dateTimePopupValidatesAppliesAndCancels()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             width: 920
@@ -50,7 +52,9 @@ void QmlDateTimePopupTests::dateTimePopupValidatesAppliesAndCancels()
             }
             property alias popup: dateTimePopup
         }
-    )"), QStringLiteral("DateTimePopupBehaviorTest.qml"));
+    )"),
+        QStringLiteral("DateTimePopupBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -96,7 +100,9 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             width: 920
@@ -110,7 +116,9 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
             }
             property alias popup: dateTimePopup
         }
-    )"), QStringLiteral("DateTimePopupEdgeBehaviorTest.qml"));
+    )"),
+        QStringLiteral("DateTimePopupEdgeBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -123,10 +131,7 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
     QTRY_VERIFY(popup->property("opened").toBool());
     QCOMPARE(popup->property("stagedDateText").toString(), QString("2024-01-02"));
     QCOMPARE(popup->property("stagedTimeText").toString(), QString("03:04:05"));
-    QObject* applyButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("dateTimePopupApplyButton")
-    );
+    QObject* applyButton = firstObjectWithObjectName(root, QStringLiteral("dateTimePopupApplyButton"));
     QVERIFY(applyButton != nullptr);
     QVERIFY(applyButton->property("enabled").toBool());
     popup->setProperty("stagedDateText", QString());
@@ -135,13 +140,10 @@ void QmlDateTimePopupTests::dateTimePopupNowOutsideClickAndEnterKeyWork()
 
     popup->setProperty("stagedDateText", QStringLiteral("2025-05-06"));
     popup->setProperty("stagedTimeText", QStringLiteral("07:08:09"));
-    auto* timeInput = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("dateTimePopupTimeField")
-    );
-    QVERIFY(timeInput != nullptr);
-    QVERIFY(QMetaObject::invokeMethod(timeInput, "forceActiveFocus"));
-    QTest::keyClick(exposed.window(), Qt::Key_Return);
+    auto* dateInput = firstQuickItemWithObjectName(root, QStringLiteral("dateTimePopupDateField"));
+    QVERIFY(dateInput != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(dateInput, "forceActiveFocus"));
+    QTest::keyClick(exposed.window(), Qt::Key_Enter);
     QTRY_VERIFY(!popup->property("opened").toBool());
     QCOMPARE(controller->timeController()->dateText(), QString("2025-05-06"));
     QCOMPARE(controller->timeController()->timeText(), QString("07:08:09"));
