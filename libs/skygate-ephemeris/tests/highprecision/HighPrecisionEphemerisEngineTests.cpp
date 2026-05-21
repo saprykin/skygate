@@ -1687,11 +1687,14 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesOutOfRangeW
     calculatorResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
     calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
 
+    EphemerisRequest request = makeRequest();
+    request.options.fallbackToSimpleEngine = false;
+
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
-    const HighPrecisionEphemerisEngine engine(bodies, makeRequest().options, makeDependencies(solarSystemCalculator));
+    const HighPrecisionEphemerisEngine engine(bodies, request.options, makeDependencies(solarSystemCalculator));
 
-    const auto state = engine.computeBodyState(makeRequest(), std::size_t{0});
+    const auto state = engine.computeBodyState(request, std::size_t{0});
 
     QVERIFY(state.has_value());
     QCOMPARE(

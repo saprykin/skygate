@@ -1,0 +1,6 @@
+foreach(file IN LISTS SIMPLE_ENGINE_FILES)
+    file(READ "${file}" contents)
+    if(contents MATCHES "engine/highprecision|highprecision::|HighPrecision")
+        message(FATAL_ERROR "Simple engine file depends on high-precision code: ${file}")
+    endif()
+endforeach()

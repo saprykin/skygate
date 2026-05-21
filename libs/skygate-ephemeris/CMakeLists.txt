@@ -21,6 +21,7 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
     src/engine/simple/MoonEquatorialCalculator.hpp
     src/engine/simple/PlanetEquatorialCalculator.hpp
     src/engine/simple/SunEquatorialCalculator.hpp
+    src/engine/simple/SimpleEphemerisEngine.hpp
     src/engine/simple/SimpleEphemerisEngine.cpp
     src/engine/simple/AstronomicalTime.cpp
     src/engine/simple/EclipticToEquatorialCalculator.cpp
@@ -161,6 +162,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
+    src/EphemerisEngineFactory.cpp
     src/EphemerisEngineQueries.cpp
     src/EphemerisRequestFactory.cpp
     src/NightConditionsCalculator.cpp
