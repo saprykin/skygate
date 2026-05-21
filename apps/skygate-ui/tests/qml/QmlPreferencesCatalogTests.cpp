@@ -106,8 +106,8 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
     skygate::ephemeris::EphemerisDataManifest manifest;
     manifest.profiles.push_back(
         skygate::ephemeris::EphemerisDataManifestProfile{
-            .id = "modern",
-            .displayName = "Modern",
+            .id = "de440s-short-range",
+            .displayName = "DE440sShortRange",
             .bundled = true,
             .longRange = false,
             .assetIds = {"de440s-kernel"},
@@ -131,7 +131,9 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
             .assetIds = {"support-earth-orientation", "support-leap-seconds", "support-delta-t"},
         }
     );
-    manifest.assets.push_back(emptyKernelAsset("de440s-kernel", "modern", "DE440s-test", "modern/kernels/de440s.bsp"));
+    manifest.assets.push_back(
+        emptyKernelAsset("de440s-kernel", "de440s-short-range", "DE440s-test", "de440s-short-range/kernels/de440s.bsp")
+    );
     manifest.assets.push_back(
         emptyKernelAsset("de441-kernel", "de441-long-range", "DE441-test", "de441/kernels/de441.bsp")
     );
@@ -413,7 +415,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowFallbackAndUpdateMode(
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
 
-    QObject* modernStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisModernKernelStatusLabel"));
+    QObject* modernStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisShortRangeKernelStatusLabel"));
     QObject* eopStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
     QObject* leapSecondStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLeapSecondStatusLabel"));
     QObject* deltaTStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisDeltaTStatusLabel"));
@@ -500,7 +502,7 @@ void QmlPreferencesCatalogTests::ephemerisDataControlsShowInstalledStateAndClear
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
 
-    QObject* modernStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisModernKernelStatusLabel"));
+    QObject* modernStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisShortRangeKernelStatusLabel"));
     QObject* eopStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisEarthOrientationStatusLabel"));
     QObject* leapSecondStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisLeapSecondStatusLabel"));
     QObject* deltaTStatus = firstObjectWithObjectName(root, QStringLiteral("ephemerisDeltaTStatusLabel"));

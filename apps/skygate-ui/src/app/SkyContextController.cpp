@@ -16,6 +16,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
+#include <QLoggingCategory>
 #include <QStandardPaths>
 
 #include "skygate/ephemeris/EphemerisDataManifest.hpp"
@@ -34,6 +35,8 @@
 using namespace skygate::ui::internal;
 
 namespace {
+
+Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
 
 using skygate::ephemeris::EphemerisCorrectionFlags;
 using skygate::ephemeris::EphemerisEngineKind;
@@ -804,9 +807,9 @@ QString SkyContextController::ephemerisDataStatusText() const
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->statusText() : QString();
 }
 
-QString SkyContextController::ephemerisModernKernelStatusText() const
+QString SkyContextController::ephemerisShortRangeKernelStatusText() const
 {
-    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->modernKernelStatusText() : QString();
+    return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->shortRangeKernelStatusText() : QString();
 }
 
 QString SkyContextController::ephemerisLongRangeKernelStatusText() const
@@ -1353,6 +1356,8 @@ bool SkyContextController::refreshEphemerisDataManifest(const QString& stagedRoo
 
     QFile manifestFile(downloadResult.stagedPath);
     if (!manifestFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qCWarning(skygateEphemerisUpdateLog).noquote() << "Unable to open staged ephemeris update manifest"
+                                                       << downloadResult.stagedPath << manifestFile.errorString();
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to open update manifest"));
         return false;
     }
@@ -1365,6 +1370,7 @@ bool SkyContextController::refreshEphemerisDataManifest(const QString& stagedRoo
         const QString diagnostic = parseResult.diagnostics.empty()
                                        ? QStringLiteral("manifest parse failed")
                                        : QString::fromStdString(parseResult.diagnostics.front());
+        qCWarning(skygateEphemerisUpdateLog).noquote() << "Unable to parse ephemeris update manifest:" << diagnostic;
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: %1").arg(diagnostic));
         return false;
     }
@@ -1424,10 +1430,14 @@ bool SkyContextController::checkEphemerisSupportDataUpdates()
     const QString stagedRoot = m_ephemerisWritableCacheRoot + QStringLiteral("/staging/support-data-info");
     QDir stagingDirectory(stagedRoot);
     if (stagingDirectory.exists() && !stagingDirectory.removeRecursively()) {
+        qCWarning(skygateEphemerisUpdateLog).noquote()
+            << "Unable to clear ephemeris support-data staging directory" << stagedRoot;
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to clear update staging area"));
         return false;
     }
     if (!QDir().mkpath(stagedRoot)) {
+        qCWarning(skygateEphemerisUpdateLog).noquote()
+            << "Unable to create ephemeris support-data staging directory" << stagedRoot;
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to create update staging area"));
         return false;
     }
@@ -1513,10 +1523,14 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
         m_ephemerisWritableCacheRoot + QStringLiteral("/staging/") + safeEphemerisPathSegment(normalizedProfileId);
     QDir stagingDirectory(stagedRoot);
     if (stagingDirectory.exists() && !stagingDirectory.removeRecursively()) {
+        qCWarning(skygateEphemerisUpdateLog).noquote()
+            << "Unable to clear ephemeris profile staging directory" << stagedRoot;
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to clear update staging area"));
         return false;
     }
     if (!QDir().mkpath(stagedRoot)) {
+        qCWarning(skygateEphemerisUpdateLog).noquote()
+            << "Unable to create ephemeris profile staging directory" << stagedRoot;
         setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: Unable to create update staging area"));
         return false;
     }
@@ -1528,6 +1542,9 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
     setEphemerisDataUpdateProgress(0.0);
     emit ephemerisDataStatusTextChanged();
     const auto finishUpdate = [this](const bool success, QString statusText) {
+        if (!success && !statusText.trimmed().isEmpty()) {
+            qCWarning(skygateEphemerisUpdateLog).noquote() << statusText;
+        }
         m_ephemerisDataUpdateInProgress = false;
         if (m_ephemerisDataManager != nullptr) {
             m_ephemerisDataManager->clearUpdateCancellation();

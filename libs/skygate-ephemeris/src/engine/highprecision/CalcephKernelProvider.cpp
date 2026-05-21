@@ -80,11 +80,12 @@ selectProfile(const EphemerisDataManifest& manifest, const CalcephKernelSelectio
         }
     }
 
-    const auto bundledModern = std::ranges::find_if(manifest.profiles, [](const EphemerisDataManifestProfile& profile) {
-        return profile.bundled && !profile.longRange;
-    });
-    if (bundledModern != manifest.profiles.end()) {
-        return &*bundledModern;
+    const auto bundledShortRange =
+        std::ranges::find_if(manifest.profiles, [](const EphemerisDataManifestProfile& profile) {
+            return profile.bundled && !profile.longRange;
+        });
+    if (bundledShortRange != manifest.profiles.end()) {
+        return &*bundledShortRange;
     }
 
     return manifest.profiles.empty() ? nullptr : &manifest.profiles.front();

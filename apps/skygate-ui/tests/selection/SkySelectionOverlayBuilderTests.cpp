@@ -422,7 +422,7 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::DataOutOfRange);
     metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
     metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
-        .displayName = "Modern kernel",
+        .displayName = "DE440s short-range kernel",
         .start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
             skygate::ephemeris::CivilDateTime{
                 .astronomicalYear = 1849,
@@ -465,7 +465,7 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     QCOMPARE(overlayInspectorFieldValue(inspector, "Ephemeris"), QString("Degraded"));
     QCOMPARE(overlayInspectorFieldTooltip(inspector, "Ephemeris"), inspector.ephemerisWarningText);
     QCOMPARE(overlayInspectorFieldValue(inspector, "Provenance"), QString("JPL DE440s smoke fixture"));
-    QVERIFY(overlayInspectorFieldValue(inspector, "Data range").contains("Modern kernel"));
+    QVERIFY(overlayInspectorFieldValue(inspector, "Data range").contains("DE440s short-range kernel"));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Uncertainty"), QString("0.42 arcsec"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Applied: light-time"));
     QVERIFY(overlayInspectorFieldValue(inspector, "Corrections").contains("Unavailable: atmospheric refraction"));

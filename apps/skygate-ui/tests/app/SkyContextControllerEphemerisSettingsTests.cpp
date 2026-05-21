@@ -122,8 +122,8 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
     Q_ASSERT(start.has_value());
     Q_ASSERT(end.has_value());
     return skygate::ephemeris::EphemerisDateRange{
-        .id = "modern",
-        .displayName = "Modern kernel",
+        .id = "de440s-short-range",
+        .displayName = "DE440sShortRange kernel",
         .start = *start,
         .end = *end,
     };
@@ -132,14 +132,14 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
 skygate::ephemeris::EphemerisDataManifest makeInstalledEphemerisManifest(const QByteArray& kernelPayload)
 {
     skygate::ephemeris::EphemerisDataManifest manifest;
-    manifest.dataSetInfo.id = "test-modern-data";
-    manifest.dataSetInfo.displayName = "Test modern data";
+    manifest.dataSetInfo.id = "test-de440s-short-range-data";
+    manifest.dataSetInfo.displayName = "Test DE440s short-range data";
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
         skygate::ephemeris::EphemerisDataManifestProfile{
-            .id = "modern",
-            .displayName = "Modern",
+            .id = "de440s-short-range",
+            .displayName = "DE440sShortRange",
             .bundled = false,
             .longRange = false,
             .assetIds = {"de440s-kernel"},
@@ -149,7 +149,7 @@ skygate::ephemeris::EphemerisDataManifest makeInstalledEphemerisManifest(const Q
         skygate::ephemeris::EphemerisDataManifestAsset{
             .id = "de440s-kernel",
             .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
-            .profileId = "modern",
+            .profileId = "de440s-short-range",
             .version = "DE-test",
             .relativePath = "kernels/de440s.bsp",
             .checksum =
@@ -177,7 +177,7 @@ SkySettingsStore::EphemerisDataCacheSnapshot installedEphemerisDataSnapshot(
 {
     SkySettingsStore::EphemerisDataCacheSnapshot snapshot;
     snapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
-    snapshot.installedKernelProfileId = QStringLiteral("modern");
+    snapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
     snapshot.installedKernelPath = kernelPath;
     snapshot.installedKernelVersion = QStringLiteral("DE-test");
     snapshot.installedLeapSecondTablePath = leapSecondPath;

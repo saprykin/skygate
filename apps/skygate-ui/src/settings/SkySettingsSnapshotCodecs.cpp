@@ -271,6 +271,9 @@ SkySettingsStore::EphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSetti
     snapshot.preferredDataProfileId = normalizedNonBlankSetting(
         settings, settingsKey("ephemeris/preferredDataProfileId"), snapshot.preferredDataProfileId
     );
+    if (snapshot.preferredDataProfileId == QStringLiteral("modern")) {
+        snapshot.preferredDataProfileId = QStringLiteral("de440s-short-range");
+    }
     snapshot.onlineUpdatesEnabled =
         readBoolSetting(settings, settingsKey("ephemeris/onlineUpdatesEnabled"), snapshot.onlineUpdatesEnabled);
     snapshot.updatePresetId =

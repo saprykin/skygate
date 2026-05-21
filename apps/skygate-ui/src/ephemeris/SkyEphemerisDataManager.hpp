@@ -96,7 +96,7 @@ public:
 
     [[nodiscard]] QString statusText() const;
     [[nodiscard]] QString datasetInfoText() const;
-    [[nodiscard]] QString modernKernelStatusText() const;
+    [[nodiscard]] QString shortRangeKernelStatusText() const;
     [[nodiscard]] QString longRangeKernelStatusText() const;
     [[nodiscard]] QString earthOrientationStatusText() const;
     [[nodiscard]] QString leapSecondStatusText() const;

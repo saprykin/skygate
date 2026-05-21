@@ -81,9 +81,9 @@ acceptanceRange(std::string id, std::string displayName, const int startYear, co
     };
 }
 
-ephemeris::EphemerisDateRange acceptanceModernRange()
+ephemeris::EphemerisDateRange acceptanceDE440sShortRangeRange()
 {
-    return acceptanceRange("acceptance-modern", "Acceptance modern range", 2000, 2050);
+    return acceptanceRange("acceptance-de440s-short-range", "Acceptance DE440s short range", 2000, 2050);
 }
 
 ephemeris::EphemerisDateRange acceptanceLongRange()
@@ -125,12 +125,12 @@ ephemeris::EphemerisDataManifest acceptanceManifest()
     manifest.dataSetInfo.displayName = "Acceptance data";
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "acceptance test";
-    manifest.dataSetInfo.dateRanges.push_back(acceptanceModernRange());
+    manifest.dataSetInfo.dateRanges.push_back(acceptanceDE440sShortRangeRange());
     manifest.dataSetInfo.dateRanges.push_back(acceptanceLongRange());
     manifest.profiles.push_back(
         ephemeris::EphemerisDataManifestProfile{
-            .id = "modern",
-            .displayName = "Modern",
+            .id = "de440s-short-range",
+            .displayName = "DE440sShortRange",
             .bundled = true,
             .longRange = false,
             .assetIds = {"de440s-kernel"},
@@ -146,7 +146,12 @@ ephemeris::EphemerisDataManifest acceptanceManifest()
         }
     );
     manifest.assets.push_back(acceptanceKernelAsset(
-        "de440s-kernel", "modern", "acceptance-modern-kernel", "kernels/de440s.bsp", acceptanceModernRange(), false
+        "de440s-kernel",
+        "de440s-short-range",
+        "acceptance-de440s-short-range-kernel",
+        "kernels/de440s.bsp",
+        acceptanceDE440sShortRangeRange(),
+        false
     ));
     manifest.assets.push_back(acceptanceKernelAsset(
         "de441-kernel", "de441-long-range", "acceptance-de441-kernel", "kernels/de441.bsp", acceptanceLongRange(), true
@@ -177,7 +182,7 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
     const ephemeris::EphemerisDataManifest& manifest,
     const QTemporaryDir& stagedRoot,
     const QString& writableCacheRoot,
-    const QString& profileId = QStringLiteral("modern")
+    const QString& profileId = QStringLiteral("de440s-short-range")
 )
 {
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
@@ -369,7 +374,7 @@ ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEngine(
     return ephemeris::createEphemerisEngine(request);
 }
 
-void verifyModernBodyState(const ephemeris::IEphemerisEngine& engine)
+void verifyDE440sShortRangeBodyState(const ephemeris::IEphemerisEngine& engine)
 {
     const auto state = engine.computeBodyState(acceptanceRequest(2024), "mars");
     QVERIFY(state.has_value());
@@ -404,7 +409,7 @@ private slots:
     void initTestCase();
     void init();
     void engineSelectionPersistsAcrossRestart();
-    void cleanInstallOfflineModernDataActivatesAndClearReturnsToBundled();
+    void cleanInstallOfflineDE440sShortRangeDataActivatesAndClearReturnsToBundled();
     void optionalLongRangeProfileActivationSelectsDe441Kernel();
     void ephemerisDataUpdateLeavesCatalogStateUnchanged();
 
@@ -450,7 +455,7 @@ void SkyAcceptanceMatrixTests::engineSelectionPersistsAcrossRestart()
     QCOMPARE(restoredSnapshot->ephemeris.preferredDataProfileId, QString("de441-long-range"));
 }
 
-void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearReturnsToBundled()
+void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesAndClearReturnsToBundled()
 {
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
@@ -460,9 +465,9 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearRet
     const ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir bundledResourceRoot;
     QVERIFY(bundledResourceRoot.isValid());
-    writeStagedAssetsForProfile(bundledResourceRoot, manifest, "modern");
+    writeStagedAssetsForProfile(bundledResourceRoot, manifest, "de440s-short-range");
     QVERIFY(!QFileInfo::exists(bundledResourceRoot.path() + QStringLiteral("/kernels/de441.bsp")));
-    manager.setBundledFallbackData(&manifest, bundledResourceRoot.path(), QStringLiteral("modern"));
+    manager.setBundledFallbackData(&manifest, bundledResourceRoot.path(), QStringLiteral("de440s-short-range"));
 
     const auto cleanInstallSnapshot = manager.activeDataSnapshot();
     QVERIFY(cleanInstallSnapshot != nullptr);
@@ -477,7 +482,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearRet
         static_cast<std::uint8_t>(cleanInstallEngineResult.engine->kind()),
         static_cast<std::uint8_t>(ephemeris::EphemerisEngineKind::HighPrecision)
     );
-    verifyModernBodyState(*cleanInstallEngineResult.engine);
+    verifyDE440sShortRangeBodyState(*cleanInstallEngineResult.engine);
 
     const auto outOfRangeState = cleanInstallEngineResult.engine->computeBodyState(acceptanceRequest(1900), "mars");
     QVERIFY(outOfRangeState.has_value());
@@ -494,7 +499,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearRet
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
     QVERIFY(manager.usingInstalledData());
-    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: acceptance-modern-kernel"));
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: acceptance-de440s-short-range-kernel"));
     QCOMPARE(manager.longRangeKernelStatusText(), QString("Not installed"));
 
     const auto installedSnapshot = manager.activeDataSnapshot();
@@ -506,7 +511,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearRet
         createAcceptanceHighPrecisionEngine(installedSnapshot, manifest);
     QVERIFY2(installedEngineResult.isSuccess(), factoryDiagnostics(installedEngineResult).constData());
     QVERIFY(installedEngineResult.engine != nullptr);
-    verifyModernBodyState(*installedEngineResult.engine);
+    verifyDE440sShortRangeBodyState(*installedEngineResult.engine);
 
     QVERIFY(manager.clearInstalledDataCache());
     QVERIFY(!manager.usingInstalledData());
@@ -520,7 +525,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineModernDataActivatesAndClearRet
         createAcceptanceHighPrecisionEngine(bundledFallbackSnapshot, manifest);
     QVERIFY2(bundledFallbackEngineResult.isSuccess(), factoryDiagnostics(bundledFallbackEngineResult).constData());
     QVERIFY(bundledFallbackEngineResult.engine != nullptr);
-    verifyModernBodyState(*bundledFallbackEngineResult.engine);
+    verifyDE440sShortRangeBodyState(*bundledFallbackEngineResult.engine);
 }
 
 void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Kernel()
@@ -540,7 +545,7 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Ker
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
     QVERIFY(manager.usingInstalledData());
-    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
     QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: acceptance-de441-kernel"));
 
     const auto snapshot = manager.activeDataSnapshot();
@@ -581,7 +586,7 @@ void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
     const ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir stagedRoot;
     QVERIFY(stagedRoot.isValid());
-    writeStagedAssetsForProfile(stagedRoot, manifest, "modern");
+    writeStagedAssetsForProfile(stagedRoot, manifest, "de440s-short-range");
 
     SkyEphemerisDataManager manager(&store);
     const SkyEphemerisDataManager::StagedUpdateActivationResult result =
@@ -589,7 +594,7 @@ void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
 
     const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
     QVERIFY2(result.isSuccess(), failureMessage.constData());
-    QCOMPARE(manager.dataRevisionToken(), QString("acceptance-modern-rev"));
+    QCOMPARE(manager.dataRevisionToken(), QString("acceptance-de440s-short-range-rev"));
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{1});
 
     const auto loadedCatalogSnapshot = store.loadCatalogCache();

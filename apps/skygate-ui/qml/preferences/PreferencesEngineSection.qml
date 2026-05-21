@@ -216,10 +216,10 @@ Item {
                 }
 
                 Label {
-                    objectName: "ephemerisModernKernelStatusLabel"
+                    objectName: "ephemerisShortRangeKernelStatusLabel"
                     Layout.fillWidth: true
                     readonly property string kernelStatusText: skyContextController.ephemerisLongRangeKernelStatusText === "Not installed"
-                                                               ? skyContextController.ephemerisModernKernelStatusText
+                                                               ? skyContextController.ephemerisShortRangeKernelStatusText
                                                                : skyContextController.ephemerisLongRangeKernelStatusText
                     text: kernelStatusText.indexOf("DE441") >= 0
                           ? "DE441"
@@ -254,7 +254,7 @@ Item {
 
                     onActivated: function(index) {
                         if (index === 1) {
-                            skyContextController.updateEphemerisDataProfile("modern");
+                            skyContextController.updateEphemerisDataProfile("de440s-short-range");
                         } else if (index === 2) {
                             skyContextController.updateEphemerisDataProfile("de441-long-range");
                         }

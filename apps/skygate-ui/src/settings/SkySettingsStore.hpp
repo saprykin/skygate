@@ -24,7 +24,7 @@ public:
         double atmosphericTemperatureC = 10.0;
         double relativeHumidity = 0.0;
         double observingWavelengthMicrometers = 0.55;
-        QString preferredDataProfileId = QStringLiteral("modern");
+        QString preferredDataProfileId = QStringLiteral("de440s-short-range");
         bool onlineUpdatesEnabled = true;
         QString updatePresetId = QStringLiteral("bundled");
         QString updateManifestUrl;

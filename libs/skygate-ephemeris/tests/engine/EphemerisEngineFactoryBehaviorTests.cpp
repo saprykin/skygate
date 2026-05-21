@@ -33,11 +33,10 @@ namespace {
         .id = "factory-behavior-target",
         .displayName = "Factory Behavior Target",
         .type = skygate::ephemeris::CelestialBodyType::Star,
-        .fixedEquatorial =
-            skygate::core::EquatorialCoordinate{
-                .rightAscensionHours = 5.25,
-                .declinationDeg = -12.75,
-            },
+        .fixedEquatorial = skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = 5.25,
+            .declinationDeg = -12.75,
+        },
     };
 }
 
@@ -153,29 +152,30 @@ private:
 class TestEarthOrientationProvider final : public skygate::ephemeris::IEarthOrientationProvider {
 public:
     explicit TestEarthOrientationProvider(
-        const skygate::ephemeris::AstronomicalEpoch& effectiveUtcEpoch =
-            skygate::ephemeris::AstronomicalEpoch{
-                .julianDatePart1 = 2'400'000.5,
-                .julianDatePart2 = 53'736.0,
-                .timeScale = skygate::ephemeris::TimeScale::Utc,
-            }
+        const skygate::ephemeris::AstronomicalEpoch& effectiveUtcEpoch = skygate::ephemeris::AstronomicalEpoch{
+            .julianDatePart1 = 2'400'000.5,
+            .julianDatePart2 = 53'736.0,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
     )
     {
         m_dataInfo.status = skygate::ephemeris::EarthOrientationDataStatus::Available;
         m_dataInfo.provenance = "factory behavior EOP";
-        m_entries.push_back(skygate::ephemeris::EarthOrientationTableEntry{
-            .effectiveUtcDate =
-                skygate::ephemeris::CivilDateTime{
-                    .astronomicalYear = 2023,
-                    .month = 2,
-                    .day = 25,
-                    .timeScale = skygate::ephemeris::TimeScale::Utc,
-                },
-            .effectiveUtcEpoch = effectiveUtcEpoch,
-            .ut1MinusUtcSeconds = 0.0,
-            .polarMotionXArcseconds = 0.0,
-            .polarMotionYArcseconds = 0.0,
-        });
+        m_entries.push_back(
+            skygate::ephemeris::EarthOrientationTableEntry{
+                .effectiveUtcDate =
+                    skygate::ephemeris::CivilDateTime{
+                        .astronomicalYear = 2023,
+                        .month = 2,
+                        .day = 25,
+                        .timeScale = skygate::ephemeris::TimeScale::Utc,
+                    },
+                .effectiveUtcEpoch = effectiveUtcEpoch,
+                .ut1MinusUtcSeconds = 0.0,
+                .polarMotionXArcseconds = 0.0,
+                .polarMotionYArcseconds = 0.0,
+            }
+        );
     }
 
     [[nodiscard]] const skygate::ephemeris::EarthOrientationDataInfo& dataInfo() const noexcept override
@@ -209,8 +209,8 @@ private:
 
 class RecordingEphemerisDiagnosticsSink final : public skygate::ephemeris::IEphemerisDiagnosticsSink {
 public:
-    void recordFactoryCreationDiagnostic(const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic
-    ) override
+    void
+    recordFactoryCreationDiagnostic(const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic) override
     {
         m_diagnostics.push_back(diagnostic);
     }
@@ -278,8 +278,9 @@ private:
         .displayName = "Modern",
         .start =
             {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb},
-        .end =
-            {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb},
+        .end = {
+            .julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
+        },
     };
 }
 
@@ -291,32 +292,36 @@ makeFactoryManifest(const QByteArray& payload, const std::uint64_t payloadSize)
     manifest.dataSetInfo.displayName = "Factory Fixture";
     manifest.dataSetInfo.version = "test";
     manifest.dataSetInfo.provenance = "factory test";
-    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
-        .id = "modern",
-        .displayName = "Modern",
-        .bundled = true,
-        .longRange = false,
-        .assetIds = {"kernel"},
-    });
-    manifest.assets.push_back(skygate::ephemeris::EphemerisDataManifestAsset{
-        .id = "kernel",
-        .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
-        .profileId = "modern",
-        .version = "de440s-test",
-        .sourceUrl = "https://example.test/de440s.bsp",
-        .relativePath = "de440s.bsp",
-        .checksum =
-            skygate::ephemeris::EphemerisDataManifestChecksum{
-                .algorithm = "sha256",
-                .value = QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex().toStdString(),
-            },
-        .compression =
-            skygate::ephemeris::EphemerisDataManifestCompression{
-                .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
-                .uncompressedSizeBytes = payloadSize,
-            },
-        .validityRange = makeKernelRange(),
-    });
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "modern",
+            .displayName = "Modern",
+            .bundled = true,
+            .longRange = false,
+            .assetIds = {"kernel"},
+        }
+    );
+    manifest.assets.push_back(
+        skygate::ephemeris::EphemerisDataManifestAsset{
+            .id = "kernel",
+            .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+            .profileId = "modern",
+            .version = "de440s-test",
+            .sourceUrl = "https://example.test/de440s.bsp",
+            .relativePath = "de440s.bsp",
+            .checksum =
+                skygate::ephemeris::EphemerisDataManifestChecksum{
+                    .algorithm = "sha256",
+                    .value = QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex().toStdString(),
+                },
+            .compression =
+                skygate::ephemeris::EphemerisDataManifestCompression{
+                    .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
+                    .uncompressedSizeBytes = payloadSize,
+                },
+            .validityRange = makeKernelRange(),
+        }
+    );
     return manifest;
 }
 
@@ -331,6 +336,7 @@ private slots:
     void compatibilityOverloadsCreateSimpleEngines();
     void simpleRequestCreatesRequestedEngineWithOptions();
     void highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable();
+    void highPrecisionRequestOpensActiveKernelWithoutRehashingIt();
     void highPrecisionRequestWiresApparentTopocentricCorrectionPath();
     void highPrecisionRequestFallsBackOnlyWhenAllowed();
     void invalidEngineKindReturnsStructuredInvalidRequest();
@@ -551,6 +557,47 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     QCOMPARE(state->equatorial.rightAscensionHours, 0.0);
     QCOMPARE(state->equatorial.declinationDeg, 0.0);
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"snapshot provenance"});
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelWithoutRehashingIt()
+{
+    const QByteArray activatedKernelPayload("active kernel bytes");
+    const QByteArray manifestChecksumPayload("other kernel bytes ");
+    QCOMPARE(activatedKernelPayload.size(), manifestChecksumPayload.size());
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const std::string kernelPath = writeKernelFixture(directory, activatedKernelPayload);
+    QVERIFY(!kernelPath.empty());
+
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.catalogBodies = bodies;
+    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Geometric;
+    const skygate::ephemeris::EphemerisDataManifest manifest =
+        makeFactoryManifest(manifestChecksumPayload, static_cast<std::uint64_t>(activatedKernelPayload.size()));
+    request.dataManifest = &manifest;
+    request.activeDataSnapshot =
+        std::make_shared<TestEphemerisDataSnapshot>(skygate::ephemeris::EphemerisKernelDataAsset{
+            .id = "kernel",
+            .profileId = "modern",
+            .version = "snapshot-version",
+            .provenance = "snapshot provenance",
+            .activePath = kernelPath,
+        });
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+    auto runtime = std::make_shared<TestCalcephKernelRuntime>();
+    request.calcephKernelRuntime = runtime;
+
+    const auto result = skygate::ephemeris::createEphemerisEngine(request);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.engine != nullptr);
+    QVERIFY(!result.hasDiagnostics());
+    QCOMPARE(runtime->openedPath(), kernelPath);
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopocentricCorrectionPath()
