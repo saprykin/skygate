@@ -36,7 +36,7 @@ void SkyContextController::setLive(bool live)
         return;
     }
 
-    m_liveRecomputeThrottleTimer.invalidate();
+    m_lastLiveRecomputeUtc.reset();
     if (m_timeline.live()) {
         m_liveClock.start(m_location.utcTime());
         const skygate::core::UtcTimePoint currentUtc = currentUtcTime();
@@ -54,19 +54,21 @@ bool SkyContextController::liveRecomputeThrottleApplies() const
     return activeEphemerisEngineKind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
 }
 
-bool SkyContextController::liveRecomputeThrottled() const
+bool SkyContextController::liveRecomputeThrottled(const skygate::core::UtcTimePoint& nextUtc) const
 {
-    if (!liveRecomputeThrottleApplies() || !m_liveRecomputeThrottleTimer.isValid()) {
+    if (!liveRecomputeThrottleApplies() || !m_lastLiveRecomputeUtc.has_value()) {
         return false;
     }
 
-    return m_liveRecomputeThrottleTimer.elapsed() < SkyContextControllerConstants::kThrottledLiveRecomputeIntervalMs;
+    const auto elapsedTimelineTime = nextUtc - m_lastLiveRecomputeUtc.value();
+    return std::abs(std::chrono::duration_cast<std::chrono::milliseconds>(elapsedTimelineTime).count())
+           < SkyContextControllerConstants::kThrottledLiveRecomputeIntervalMs;
 }
 
-void SkyContextController::markLiveRecomputeTick()
+void SkyContextController::markLiveRecomputeTick(const skygate::core::UtcTimePoint& nextUtc)
 {
     if (liveRecomputeThrottleApplies()) {
-        m_liveRecomputeThrottleTimer.restart();
+        m_lastLiveRecomputeUtc = nextUtc;
     }
 }
 
@@ -332,7 +334,7 @@ void SkyContextController::tickUtcTime()
     }
 
     m_timeController->setUtcTimePoint(nextUtc);
-    if (liveRecomputeThrottled()) {
+    if (liveRecomputeThrottled(nextUtc)) {
         return;
     }
 
@@ -344,14 +346,14 @@ void SkyContextController::tickUtcTime()
 
         setCurrentUtcTime(nextUtc);
         m_liveClock.resetAnchor(nextUtc);
-        markLiveRecomputeTick();
+        markLiveRecomputeTick(nextUtc);
         return;
     }
 
     m_timeline.setCatchingUpToCurrentUtc(false);
     m_timeline.resetSpeedProgress();
     setCurrentUtcTime(nextUtc);
-    markLiveRecomputeTick();
+    markLiveRecomputeTick(nextUtc);
 }
 
 void SkyContextController::stepBySeconds(const int stepSeconds)
