@@ -393,7 +393,7 @@ void SkySettingsStoreTests::savesLoadsAndClearsEphemerisDataCacheMetadata()
 
     SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot;
     savedSnapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
-    savedSnapshot.installedKernelProfileId = QStringLiteral("modern");
+    savedSnapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
     savedSnapshot.installedKernelPath = m_settings.filePath(QStringLiteral("de440s.bsp"));
     savedSnapshot.installedKernelVersion = QStringLiteral("DE440s-2026a");
     savedSnapshot.installedEarthOrientationPath = m_settings.filePath(QStringLiteral("eop.csv"));

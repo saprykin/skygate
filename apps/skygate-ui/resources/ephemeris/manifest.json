@@ -14,15 +14,12 @@
   ],
   "profiles": [
     {
-      "id": "modern",
-      "displayName": "Modern high-precision data",
+      "id": "de440s-short-range",
+      "displayName": "DE440s short-range data",
       "bundled": false,
       "longRange": false,
       "assetIds": [
-        "de440s-kernel",
-        "modern-leap-seconds",
-        "modern-earth-orientation",
-        "modern-delta-t"
+        "de440s-kernel"
       ]
     },
     {
@@ -42,10 +39,7 @@
       "bundled": false,
       "longRange": true,
       "assetIds": [
-        "de441-kernel",
-        "de441-leap-seconds",
-        "de441-earth-orientation",
-        "de441-delta-t"
+        "de441-kernel"
       ]
     }
   ],
@@ -53,7 +47,7 @@
     {
       "id": "de440s-kernel",
       "kind": "solar-system-kernel",
-      "profileId": "modern",
+      "profileId": "de440s-short-range",
       "version": "DE440s",
       "sourceUrl": "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp",
       "relativePath": "kernels/de440s.bsp",
@@ -96,72 +90,6 @@
       }
     },
     {
-      "id": "modern-leap-seconds",
-      "kind": "leap-second-table",
-      "profileId": "modern",
-      "version": "2026a",
-      "sourceUrl": "https://data.iana.org/time-zones/data/leap-seconds.list",
-      "relativePath": "time/leap-seconds.list",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "506e737d1a950148f0daed3c75a55ad497a0f2fa1a82661a361882dd8f4b2093"
-      },
-      "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 5069
-      },
-      "validityRange": {
-        "id": "leap-second-range",
-        "displayName": "Leap-second table range",
-        "start": "1972-01-01",
-        "end": "2027-01-01"
-      }
-    },
-    {
-      "id": "modern-earth-orientation",
-      "kind": "earth-orientation-data",
-      "profileId": "modern",
-      "version": "2026-05-07",
-      "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
-      "relativePath": "time/eop.txt",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "4842dd19493393f25d26076d4973fccc6f7e0ad9474b458b2062cf6521c4cb58"
-      },
-      "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 3743832
-      },
-      "validityRange": {
-        "id": "eop-range",
-        "displayName": "Earth orientation range",
-        "start": "1973-01-02",
-        "end": "2027-05-22"
-      }
-    },
-    {
-      "id": "modern-delta-t",
-      "kind": "delta-t-data",
-      "profileId": "modern",
-      "version": "2026a",
-      "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
-      "relativePath": "time/delta-t.data",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "9f88e53593495a09219fe956eeadea0fa9f8e3e02c310b2aa2b70852383cdf6f"
-      },
-      "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 13419
-      },
-      "validityRange": {
-        "id": "delta-t-range",
-        "displayName": "Delta T range",
-        "start": "-13200-01-01",
-        "end": "13200-12-31"
-      }
-    },
-    {
       "id": "support-leap-seconds",
       "kind": "leap-second-table",
       "profileId": "support-data",
@@ -187,22 +115,22 @@
       "id": "support-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "support-data",
-      "version": "2026-05-07",
+      "version": "2026-05-21",
       "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
       "relativePath": "time/eop.txt",
       "checksum": {
         "algorithm": "sha256",
-        "value": "4842dd19493393f25d26076d4973fccc6f7e0ad9474b458b2062cf6521c4cb58"
+        "value": "14af3d1772a078c04c031fdd52597a8df1247ce05e3ee1cf9182eeb5116e4242"
       },
       "compression": {
         "format": "none",
-        "uncompressedSizeBytes": 3743832
+        "uncompressedSizeBytes": 3745148
       },
       "validityRange": {
         "id": "eop-range",
         "displayName": "Earth orientation range",
         "start": "1973-01-02",
-        "end": "2027-05-22"
+        "end": "2027-07-18"
       }
     },
     {
@@ -253,22 +181,22 @@
       "id": "de441-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "de441-long-range",
-      "version": "2026-05-07",
+      "version": "2026-05-21",
       "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
       "relativePath": "time/eop.txt",
       "checksum": {
         "algorithm": "sha256",
-        "value": "4842dd19493393f25d26076d4973fccc6f7e0ad9474b458b2062cf6521c4cb58"
+        "value": "14af3d1772a078c04c031fdd52597a8df1247ce05e3ee1cf9182eeb5116e4242"
       },
       "compression": {
         "format": "none",
-        "uncompressedSizeBytes": 3743832
+        "uncompressedSizeBytes": 3745148
       },
       "validityRange": {
         "id": "eop-range",
         "displayName": "Earth orientation range",
         "start": "1973-01-02",
-        "end": "2027-05-22"
+        "end": "2027-07-18"
       }
     },
     {

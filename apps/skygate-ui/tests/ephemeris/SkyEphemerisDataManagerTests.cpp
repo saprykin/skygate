@@ -57,7 +57,7 @@ SkySettingsStore::EphemerisDataCacheSnapshot installedSnapshot(
 {
     SkySettingsStore::EphemerisDataCacheSnapshot snapshot;
     snapshot.installedKernelAssetId = QStringLiteral("de440s-kernel");
-    snapshot.installedKernelProfileId = QStringLiteral("modern");
+    snapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
     snapshot.installedKernelPath = kernelPath;
     snapshot.installedKernelVersion = QStringLiteral("DE-test");
     snapshot.installedEarthOrientationPath = earthOrientationPath;
@@ -103,7 +103,7 @@ skygate::ephemeris::EphemerisDataManifestAsset stagedAsset(
     std::string id,
     const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
     std::string relativePath,
-    std::string profileId = "modern"
+    std::string profileId = "de440s-short-range"
 )
 {
     skygate::ephemeris::EphemerisDataManifestAsset asset;
@@ -129,8 +129,8 @@ skygate::ephemeris::EphemerisDataManifest stagedManifest()
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
         skygate::ephemeris::EphemerisDataManifestProfile{
-            .id = "modern",
-            .displayName = "Modern",
+            .id = "de440s-short-range",
+            .displayName = "DE440sShortRange",
             .bundled = false,
             .longRange = false,
             .assetIds = {"de440s-kernel", "leap-seconds", "earth-orientation", "delta-t"},
@@ -240,8 +240,8 @@ skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
         skygate::ephemeris::EphemerisDataManifestProfile{
-            .id = "modern",
-            .displayName = "Modern",
+            .id = "de440s-short-range",
+            .displayName = "DE440sShortRange",
             .bundled = false,
             .longRange = false,
             .assetIds = {"de440s-kernel"},
@@ -275,8 +275,8 @@ QString singleAssetManifestJson(const QString& sourceUrl, const QString& version
   ],
   "profiles": [
     {
-      "id": "modern",
-      "displayName": "Modern",
+      "id": "de440s-short-range",
+      "displayName": "DE440sShortRange",
       "bundled": false,
       "longRange": false,
       "assetIds": ["de440s-kernel"]
@@ -286,7 +286,7 @@ QString singleAssetManifestJson(const QString& sourceUrl, const QString& version
     {
       "id": "de440s-kernel",
       "kind": "solar-system-kernel",
-      "profileId": "modern",
+      "profileId": "de440s-short-range",
       "version": "%1",
       "sourceUrl": "%2",
       "relativePath": "kernels/de440s.bsp",
@@ -338,7 +338,7 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest stagedActivationRequest(
     const skygate::ephemeris::EphemerisDataManifest& manifest,
     const QTemporaryDir& stagedRoot,
     const QString& writableCacheRoot,
-    const QString& profileId = QStringLiteral("modern")
+    const QString& profileId = QStringLiteral("de440s-short-range")
 )
 {
     SkyEphemerisDataManager::StagedUpdateActivationRequest request;
@@ -567,6 +567,7 @@ private slots:
     void initialBundledStatus();
     void productionManifestMetadataIsVerifiable();
     void installedDataStatusAndSnapshot();
+    void legacyShortRangeProfileIdRestoresAsDe440sProfile();
     void missingInstalledDataFallsBackToBundled();
     void unbundledProductionManifestDoesNotExposeMissingFallbackFiles();
     void revisionSignalEmitsOnlyWhenActiveDataChanges();
@@ -644,6 +645,20 @@ void SkyEphemerisDataManagerTests::productionManifestMetadataIsVerifiable()
             QCOMPARE(QString::fromStdString(asset->profileId), QString::fromStdString(profile.id));
         }
     }
+
+    for (const std::string_view profileId :
+         {std::string_view{"de440s-short-range"}, std::string_view{"de441-long-range"}}) {
+        const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId);
+        QVERIFY2(profile != nullptr, profileId.data());
+        QCOMPARE(profile->assetIds.size(), std::size_t{1});
+
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(profile->assetIds.front());
+        QVERIFY2(asset != nullptr, profileId.data());
+        QCOMPARE(
+            static_cast<std::uint8_t>(asset->kind),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel)
+        );
+    }
 }
 
 void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
@@ -674,7 +689,7 @@ void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
     const auto kernelAsset = snapshot->solarSystemKernelAsset("de440s-kernel");
     QVERIFY(kernelAsset.has_value());
     QCOMPARE(QString::fromStdString(kernelAsset->id), QString("de440s-kernel"));
-    QCOMPARE(QString::fromStdString(kernelAsset->profileId), QString("modern"));
+    QCOMPARE(QString::fromStdString(kernelAsset->profileId), QString("de440s-short-range"));
     QCOMPARE(QString::fromStdString(kernelAsset->activePath), kernelPath);
     QVERIFY(!snapshot->solarSystemKernelAsset("de441-kernel").has_value());
 
@@ -687,6 +702,28 @@ void SkyEphemerisDataManagerTests::installedDataStatusAndSnapshot()
     const auto deltaTAsset = snapshot->deltaTDataAsset();
     QVERIFY(deltaTAsset.has_value());
     QCOMPARE(QString::fromStdString(deltaTAsset->content), QString("delta t payload"));
+}
+
+void SkyEphemerisDataManagerTests::legacyShortRangeProfileIdRestoresAsDe440sProfile()
+{
+    const QString kernelPath = m_settings.filePath(QStringLiteral("legacy-de440s.bsp"));
+    QVERIFY(writeFile(kernelPath, QByteArrayLiteral("kernel placeholder")));
+
+    SkySettingsStore::EphemerisDataCacheSnapshot snapshot = installedSnapshot(kernelPath, QString());
+    snapshot.installedKernelProfileId = QStringLiteral("modern");
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(snapshot));
+
+    SkyEphemerisDataManager manager(&store);
+    QVERIFY(manager.usingInstalledData());
+    QCOMPARE(manager.activeCacheSnapshot().installedKernelProfileId, QString("de440s-short-range"));
+
+    const auto activeSnapshot = manager.activeDataSnapshot();
+    QVERIFY(activeSnapshot != nullptr);
+    const auto kernelAsset = activeSnapshot->solarSystemKernelAsset("de440s-kernel");
+    QVERIFY(kernelAsset.has_value());
+    QCOMPARE(QString::fromStdString(kernelAsset->profileId), QString("de440s-short-range"));
 }
 
 void SkyEphemerisDataManagerTests::missingInstalledDataFallsBackToBundled()
@@ -710,7 +747,7 @@ void SkyEphemerisDataManagerTests::unbundledProductionManifestDoesNotExposeMissi
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
 
-    manager.setBundledFallbackData(&manifest, QStringLiteral(":/ephemeris"), QStringLiteral("modern"));
+    manager.setBundledFallbackData(&manifest, QStringLiteral(":/ephemeris"), QStringLiteral("de440s-short-range"));
 
     const auto snapshot = manager.activeDataSnapshot();
     QVERIFY(snapshot != nullptr);
@@ -772,20 +809,25 @@ void SkyEphemerisDataManagerTests::activatesVerifiedStagedUpdateSetAtomically()
     const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
     QCOMPARE(savedSnapshot.dataRevisionToken, QString("installed-rev-2"));
     QCOMPARE(savedSnapshot.installedKernelAssetId, QString("de440s-kernel"));
-    QCOMPARE(savedSnapshot.installedKernelProfileId, QString("modern"));
+    QCOMPARE(savedSnapshot.installedKernelProfileId, QString("de440s-short-range"));
     QCOMPARE(savedSnapshot.installedKernelVersion, QString("test"));
     QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
     QCOMPARE(
-        savedSnapshot.installedLeapSecondTablePath.contains(QStringLiteral("/updates/installed-rev-2/modern/time/")),
+        savedSnapshot.installedLeapSecondTablePath.contains(
+            QStringLiteral("/updates/installed-rev-2/de440s-short-range/time/")
+        ),
         true
     );
     QCOMPARE(savedSnapshot.installedLeapSecondTableVersion, QString("test"));
     QCOMPARE(
-        savedSnapshot.installedDeltaTDataPath.contains(QStringLiteral("/updates/installed-rev-2/modern/time/")), true
+        savedSnapshot.installedDeltaTDataPath.contains(
+            QStringLiteral("/updates/installed-rev-2/de440s-short-range/time/")
+        ),
+        true
     );
     QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
-    const QString expectedKernelPathFragment = QStringLiteral("/updates/installed-rev-2/modern/kernels/");
-    const QString expectedEopPathFragment = QStringLiteral("/updates/installed-rev-2/modern/time/");
+    const QString expectedKernelPathFragment = QStringLiteral("/updates/installed-rev-2/de440s-short-range/kernels/");
+    const QString expectedEopPathFragment = QStringLiteral("/updates/installed-rev-2/de440s-short-range/time/");
     QVERIFY(savedSnapshot.installedKernelPath.contains(expectedKernelPathFragment));
     QVERIFY(savedSnapshot.installedEarthOrientationPath.contains(expectedEopPathFragment));
 
@@ -835,7 +877,7 @@ void SkyEphemerisDataManagerTests::activatesFullLongRangeProfileUpdateSet()
     );
     QCOMPARE(result.activatedAssetIds.size(), std::size_t{4});
     QVERIFY(manager.usingInstalledData());
-    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: test"));
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: test"));
     QCOMPARE(manager.longRangeKernelStatusText(), QString("Installed: test"));
 
     const auto snapshot = manager.activeDataSnapshot();
@@ -881,7 +923,7 @@ void SkyEphemerisDataManagerTests::supportDataActivationPreservesInstalledKernel
     QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
     QCOMPARE(savedSnapshot.installedLeapSecondTableVersion, QString("test"));
     QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
-    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: DE-test"));
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: DE-test"));
     QCOMPARE(manager.earthOrientationStatusText(), QString("Installed: test"));
 }
 
@@ -917,7 +959,7 @@ void SkyEphemerisDataManagerTests::clearPlanetaryKernelCachePreservesSupportData
     QVERIFY(!QFileInfo::exists(kernelPath));
     QVERIFY(QFileInfo::exists(earthOrientationPath));
     QCOMPARE(manager.planetaryKernelCacheSizeBytes(), std::uint64_t{0U});
-    QCOMPARE(manager.modernKernelStatusText(), QString("Bundled fallback"));
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Bundled fallback"));
     QCOMPARE(manager.earthOrientationStatusText(), QString("Installed: EOP-test"));
 }
 
@@ -953,7 +995,7 @@ void SkyEphemerisDataManagerTests::clearSupportDataCachePreservesInstalledKernel
     QVERIFY(!QFileInfo::exists(leapSecondPath));
     QVERIFY(!QFileInfo::exists(deltaTPath));
     QCOMPARE(manager.supportDataCacheSizeBytes(), std::uint64_t{0U});
-    QCOMPARE(manager.modernKernelStatusText(), QString("Installed: DE-test"));
+    QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: DE-test"));
     QCOMPARE(manager.earthOrientationStatusText(), QString("Bundled fallback"));
 }
 
@@ -991,8 +1033,8 @@ void SkyEphemerisDataManagerTests::activationFailurePreservesActiveDataAndSettin
 void SkyEphemerisDataManagerTests::sameRevisionActivationFailurePreservesActiveFilesAndSettings()
 {
     const QString activeRoot = m_settings.filePath(QStringLiteral("updates/installed-rev"));
-    const QString oldKernelPath = activeRoot + QStringLiteral("/modern/kernels/de440s.bsp");
-    const QString oldLeapSecondPath = activeRoot + QStringLiteral("/modern/time/leap-seconds.list");
+    const QString oldKernelPath = activeRoot + QStringLiteral("/de440s-short-range/kernels/de440s.bsp");
+    const QString oldLeapSecondPath = activeRoot + QStringLiteral("/de440s-short-range/time/leap-seconds.list");
     QVERIFY(writeFile(oldKernelPath, QByteArrayLiteral("old kernel")));
     QVERIFY(writeFile(oldLeapSecondPath, QByteArrayLiteral("old leap seconds")));
 
@@ -1009,7 +1051,7 @@ void SkyEphemerisDataManagerTests::sameRevisionActivationFailurePreservesActiveF
     writeStagedAssets(stagedRoot, manifest);
 
     const QString blockingTimePath =
-        m_settings.filePath(QStringLiteral("updates/installed-rev-activation/modern/time"));
+        m_settings.filePath(QStringLiteral("updates/installed-rev-activation/de440s-short-range/time"));
     QVERIFY(writeFile(blockingTimePath, QByteArrayLiteral("not a directory")));
 
     SkyEphemerisDataManager::StagedUpdateActivationRequest request =
@@ -1294,7 +1336,8 @@ void SkyEphemerisDataManagerTests::cancellationDuringActivationCleansPartialCach
     writeStagedAssets(stagedRoot, manifest);
 
     const QString partialActivationRoot = m_settings.filePath(QStringLiteral("updates/installed-rev-2"));
-    const QString firstActivatedAsset = partialActivationRoot + QStringLiteral("/modern/kernels/de440s.bsp");
+    const QString firstActivatedAsset =
+        partialActivationRoot + QStringLiteral("/de440s-short-range/kernels/de440s.bsp");
 
     SkyEphemerisDataManager::StagedUpdateActivationRequest request =
         stagedActivationRequest(manifest, stagedRoot, m_settings.path());
@@ -1402,7 +1445,7 @@ void SkyEphemerisDataManagerTests::updateFlowHarnessInjectsActivationFailureAndP
     harness.writeCompleteStagingSet();
 
     const QString failedActivationRoot = m_settings.filePath(QStringLiteral("updates/installed-rev-failure"));
-    const QString blockingTimePath = failedActivationRoot + QStringLiteral("/modern/time");
+    const QString blockingTimePath = failedActivationRoot + QStringLiteral("/de440s-short-range/time");
     QVERIFY(writeFile(blockingTimePath, QByteArrayLiteral("not a directory")));
 
     SkyEphemerisDataManager::StagedUpdateActivationRequest request = harness.activationRequest();
@@ -1435,7 +1478,8 @@ void SkyEphemerisDataManagerTests::updateFlowHarnessInjectsActivationCancellatio
     harness.writeCompleteStagingSet();
 
     const QString partialActivationRoot = m_settings.filePath(QStringLiteral("updates/installed-rev-cancel"));
-    const QString firstActivatedAsset = partialActivationRoot + QStringLiteral("/modern/kernels/de440s.bsp");
+    const QString firstActivatedAsset =
+        partialActivationRoot + QStringLiteral("/de440s-short-range/kernels/de440s.bsp");
     SkyEphemerisDataManager::StagedUpdateActivationRequest request = harness.activationRequest();
     request.revisionToken = QStringLiteral("installed-rev-cancel");
     request.cancellationRequested = [&firstActivatedAsset] { return QFileInfo::exists(firstActivatedAsset); };
@@ -1503,17 +1547,20 @@ void SkyEphemerisDataManagerTests::controllerUpdateRefreshesRemoteManifestAndRep
 
     QSignalSpy statusSpy(&controller, &SkyContextController::ephemerisDataStatusTextChanged);
     QVERIFY(controller.ephemerisDataUpdateEnabled());
-    QVERIFY(controller.updateEphemerisDataProfile(QStringLiteral("modern")));
+    QVERIFY(controller.updateEphemerisDataProfile(QStringLiteral("de440s-short-range")));
     QVERIFY(statusSpy.count() > 0);
     QCOMPARE(controller.ephemerisDataUpdateProgress(), 1.0);
-    QCOMPARE(controller.ephemerisModernKernelStatusText(), QString("Installed: fresh"));
-    QCOMPARE(controller.ephemerisDataLastUpdateResultText(), QString("Installed Modern"));
+    QCOMPARE(controller.ephemerisShortRangeKernelStatusText(), QString("Installed: fresh"));
+    QCOMPARE(controller.ephemerisDataLastUpdateResultText(), QString("Installed DE440sShortRange"));
 
     const auto snapshot = controller.activeEphemerisDataSnapshot();
     QVERIFY(snapshot != nullptr);
     const auto kernel = snapshot->solarSystemKernelAsset("de440s-kernel");
     QVERIFY(kernel.has_value());
-    QCOMPARE(QString::fromStdString(kernel->activePath).endsWith(QStringLiteral("/modern/kernels/de440s.bsp")), true);
+    QCOMPARE(
+        QString::fromStdString(kernel->activePath).endsWith(QStringLiteral("/de440s-short-range/kernels/de440s.bsp")),
+        true
+    );
 }
 
 void SkyEphemerisDataManagerTests::controllerCatalogChangePreservesEphemerisDataSelection()

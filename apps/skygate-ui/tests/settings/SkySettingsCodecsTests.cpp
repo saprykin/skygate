@@ -35,6 +35,7 @@ private slots:
     void primitiveReadersUseFallbacksForMissingMalformedAndNonFiniteValues();
     void splitAndMergeStateSnapshotPreservesTypedDomains();
     void stateSnapshotLoadRequiresVersionAndAppliesDefaults();
+    void stateSnapshotLoadMigratesLegacyShortRangeProfileId();
     void savingBlankLogPathStoresDefaultPath();
 };
 
@@ -182,8 +183,21 @@ void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAndAppliesDefaults(
         static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
     );
-    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("modern"));
+    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
     QCOMPARE(loaded->ephemerisSettingsPresent, false);
+}
+
+void SkySettingsCodecsTests::stateSnapshotLoadMigratesLegacyShortRangeProfileId()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings settings = makeSettings(dir);
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/ephemeris/preferredDataProfileId", "modern");
+
+    const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    QVERIFY(loaded.has_value());
+    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
 }
 
 void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
@@ -206,7 +220,7 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     QCOMPARE(loaded->logToFile, true);
     QCOMPARE(loaded->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
     QCOMPARE(loaded->ephemeris.correctionPresetId, QString("apparent-topocentric"));
-    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("modern"));
+    QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
     QCOMPARE(loaded->ephemerisSettingsPresent, true);
 }
 

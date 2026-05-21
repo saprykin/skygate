@@ -435,10 +435,14 @@ createHighPrecisionEphemerisEngine(const EphemerisEngineFactoryRequest& request)
     }
 
     if (diagnostics.empty()) {
+        highprecision::CalcephKernelSelectionOptions kernelSelectionOptions;
+        // Active kernels are verified during activation. Rehashing DE441 here
+        // makes every high-precision engine rebuild scan gigabytes on startup.
+        kernelSelectionOptions.verifyChecksum = false;
         auto kernelProvider = std::make_shared<highprecision::CalcephKernelProvider>(
             *request.activeDataSnapshot,
             *request.dataManifest,
-            highprecision::CalcephKernelSelectionOptions{},
+            std::move(kernelSelectionOptions),
             request.calcephKernelRuntime
         );
         if (!kernelProvider->isReady()) {

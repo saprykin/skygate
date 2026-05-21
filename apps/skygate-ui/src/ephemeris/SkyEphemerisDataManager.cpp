@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QEventLoop>
+#include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -22,6 +23,8 @@
 #include <utility>
 
 namespace {
+
+Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 
 using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
 using skygate::ephemeris::EphemerisDataActivationRequest;
@@ -47,6 +50,9 @@ EphemerisDataCacheSnapshot normalizedSnapshot(EphemerisDataCacheSnapshot snapsho
 {
     snapshot.installedKernelAssetId = trimmed(snapshot.installedKernelAssetId);
     snapshot.installedKernelProfileId = trimmed(snapshot.installedKernelProfileId);
+    if (snapshot.installedKernelProfileId == QStringLiteral("modern")) {
+        snapshot.installedKernelProfileId = QStringLiteral("de440s-short-range");
+    }
     snapshot.installedKernelPath = trimmed(snapshot.installedKernelPath);
     snapshot.installedKernelVersion = trimmed(snapshot.installedKernelVersion);
     snapshot.installedEarthOrientationPath = trimmed(snapshot.installedEarthOrientationPath);
@@ -172,6 +178,7 @@ QString defaultRevisionToken(const EphemerisDataManifest& manifest, const Epheme
 void addDiagnostic(SkyEphemerisDataManager::StagedUpdateActivationResult& result, QString diagnostic)
 {
     if (!diagnostic.trimmed().isEmpty()) {
+        qCWarning(skygateEphemerisDataLog).noquote() << diagnostic;
         result.diagnostics.push_back(std::move(diagnostic));
     }
 }
@@ -179,6 +186,7 @@ void addDiagnostic(SkyEphemerisDataManager::StagedUpdateActivationResult& result
 void addDiagnostic(SkyEphemerisDataManager::StagedUpdateDownloadResult& result, QString diagnostic)
 {
     if (!diagnostic.trimmed().isEmpty()) {
+        qCWarning(skygateEphemerisDataLog).noquote() << diagnostic;
         result.diagnostics.push_back(std::move(diagnostic));
     }
 }
@@ -543,12 +551,12 @@ bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& pro
         return profile != nullptr && profile->bundled ? profile : nullptr;
     }
 
-    const auto bundledModern =
+    const auto bundledShortRange =
         std::ranges::find_if(manifest->profiles, [](const EphemerisDataManifestProfile& profile) {
             return profile.bundled && !profile.longRange;
         });
-    if (bundledModern != manifest->profiles.end()) {
-        return &*bundledModern;
+    if (bundledShortRange != manifest->profiles.end()) {
+        return &*bundledShortRange;
     }
 
     return nullptr;
@@ -563,6 +571,8 @@ loadTextAsset(const QString& path, const QString& id, const QString& version, co
 
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qCWarning(skygateEphemerisDataLog).noquote()
+            << "Unable to open installed ephemeris text data asset" << path << file.errorString();
         return std::nullopt;
     }
 
@@ -835,7 +845,7 @@ QString SkyEphemerisDataManager::datasetInfoText() const
     return m_datasetInfoText;
 }
 
-QString SkyEphemerisDataManager::modernKernelStatusText() const
+QString SkyEphemerisDataManager::shortRangeKernelStatusText() const
 {
     if (usingInstalledData() && !m_activeCacheSnapshot.installedKernelVersion.isEmpty()) {
         return QStringLiteral("Installed: %1").arg(m_activeCacheSnapshot.installedKernelVersion);
@@ -978,6 +988,8 @@ bool SkyEphemerisDataManager::restoreFromSettings()
 
     const QStringList missingPaths = missingInstalledPaths(configuredSnapshot);
     if (!missingPaths.isEmpty()) {
+        qCWarning(skygateEphemerisDataLog).noquote()
+            << "Installed ephemeris data paths are missing; falling back to bundled data:" << missingPaths.join(", ");
         applyCacheSnapshot(
             EphemerisDataCacheSnapshot{},
             ActiveSource::MissingInstalledFallback,
@@ -996,6 +1008,7 @@ bool SkyEphemerisDataManager::restoreFromSettings()
 bool SkyEphemerisDataManager::clearInstalledDataCache()
 {
     if (m_settingsStore == nullptr || !m_settingsStore->clearEphemerisDataCache()) {
+        qCWarning(skygateEphemerisDataLog) << "Unable to clear installed ephemeris data cache metadata";
         return false;
     }
 
@@ -1005,6 +1018,7 @@ bool SkyEphemerisDataManager::clearInstalledDataCache()
 bool SkyEphemerisDataManager::clearPlanetaryKernelCache()
 {
     if (m_settingsStore == nullptr) {
+        qCWarning(skygateEphemerisDataLog) << "Unable to clear planetary kernel cache without settings storage";
         return false;
     }
 
@@ -1019,12 +1033,15 @@ bool SkyEphemerisDataManager::clearPlanetaryKernelCache()
         snapshot = EphemerisDataCacheSnapshot{};
     }
     if (!m_settingsStore->saveEphemerisDataCache(snapshot)) {
+        qCWarning(skygateEphemerisDataLog) << "Unable to persist cleared planetary kernel cache metadata";
         return false;
     }
 
     if (!kernelPath.isEmpty()) {
         QFile kernelFile(kernelPath);
         if (kernelFile.exists() && !kernelFile.remove()) {
+            qCWarning(skygateEphemerisDataLog).noquote()
+                << "Unable to remove planetary kernel cache file" << kernelPath << kernelFile.errorString();
             return false;
         }
     }
@@ -1035,6 +1052,7 @@ bool SkyEphemerisDataManager::clearPlanetaryKernelCache()
 bool SkyEphemerisDataManager::clearSupportDataCache()
 {
     if (m_settingsStore == nullptr) {
+        qCWarning(skygateEphemerisDataLog) << "Unable to clear time and Earth data cache without settings storage";
         return false;
     }
 
@@ -1055,6 +1073,7 @@ bool SkyEphemerisDataManager::clearSupportDataCache()
         snapshot = EphemerisDataCacheSnapshot{};
     }
     if (!m_settingsStore->saveEphemerisDataCache(snapshot)) {
+        qCWarning(skygateEphemerisDataLog) << "Unable to persist cleared time and Earth data cache metadata";
         return false;
     }
 
@@ -1064,6 +1083,8 @@ bool SkyEphemerisDataManager::clearSupportDataCache()
         }
         QFile file(path);
         if (file.exists() && !file.remove()) {
+            qCWarning(skygateEphemerisDataLog).noquote()
+                << "Unable to remove time and Earth data cache file" << path << file.errorString();
             return false;
         }
     }

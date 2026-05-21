@@ -74,7 +74,7 @@ void SkySceneOverlayAdapterTests::selectedObjectInspectorMapsFieldsAndAliases()
         .ephemerisStatus = QStringLiteral("Degraded"),
         .ephemerisWarningText = QStringLiteral("Required ephemeris data is unavailable."),
         .ephemerisProvenance = QStringLiteral("JPL DE440s"),
-        .ephemerisDataRange = QStringLiteral("Modern kernel: 1849-12-26 to 2150-01-22"),
+        .ephemerisDataRange = QStringLiteral("DE440s short-range kernel: 1849-12-26 to 2150-01-22"),
         .ephemerisUncertainty = QStringLiteral("0.40 arcsec"),
         .ephemerisCorrections = QStringLiteral("Applied: light-time")
     };
