@@ -5,7 +5,8 @@
 #include "SkyTheme.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/GeoLocation.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 
 #include <QColor>
 
@@ -30,13 +31,11 @@ struct SkyViewportGeometryInput final {
     const SkyThemeRenderPalette& renderTheme;
     const SkyOverlayLayerVisibility& overlayLayers;
     skygate::core::GeoLocation observer;
-    skygate::core::UtcTimePoint utcTime {};
+    skygate::core::UtcTimePoint utcTime{};
     std::span<const SkyRenderLine> renderLines;
     std::span<const SkyRenderGlyph> renderGlyphs;
 };
 
-[[nodiscard]] std::vector<SkyViewportLineSegment> buildSkyViewportLineSegments(
-    const SkyViewportGeometryInput& input
-);
+[[nodiscard]] std::vector<SkyViewportLineSegment> buildSkyViewportLineSegments(const SkyViewportGeometryInput& input);
 
 }  // namespace skygate::ui::internal

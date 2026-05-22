@@ -7,7 +7,7 @@
 #include "SkySceneOverlayData.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/SkyContext.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
 #include "skygate/ephemeris/Types.hpp"
@@ -42,8 +42,8 @@ struct SkySelectionOverlayInput final {
 class SkySelectionOverlayBuilder final {
 public:
     [[nodiscard]] SkySelectionMarker buildSelectionMarkerData(const SkySelectionOverlayInput& input) const;
-    [[nodiscard]] SkySelectedObjectInspector buildSelectedObjectInspectorData(const SkySelectionOverlayInput& input
-    ) const;
+    [[nodiscard]] SkySelectedObjectInspector
+    buildSelectedObjectInspectorData(const SkySelectionOverlayInput& input) const;
     [[nodiscard]] QString activeTrailTargetBodyId(const SkySelectionOverlayInput& input) const;
     [[nodiscard]] std::optional<std::uint32_t> activeTrailTargetBodyIndex(const SkySelectionOverlayInput& input) const;
 };

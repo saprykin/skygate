@@ -1,4 +1,4 @@
-#include "skygate/core/Types.hpp"
+#include "skygate/core/GeoLocation.hpp"
 
 #include <QtTest/QtTest>
 
@@ -17,7 +17,7 @@ private slots:
 
 void GeoLocationTests::originIsValid()
 {
-    const skygate::core::GeoLocation location {
+    const skygate::core::GeoLocation location{
         .latitudeDeg = 0.0,
         .longitudeDeg = 0.0,
         .elevationMeters = 0.0,
@@ -28,7 +28,7 @@ void GeoLocationTests::originIsValid()
 
 void GeoLocationTests::boundaryCoordinatesAreValid()
 {
-    const skygate::core::GeoLocation location {
+    const skygate::core::GeoLocation location{
         .latitudeDeg = -90.0,
         .longitudeDeg = 180.0,
         .elevationMeters = -430.0,

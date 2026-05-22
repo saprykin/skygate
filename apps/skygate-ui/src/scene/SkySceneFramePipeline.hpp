@@ -7,7 +7,10 @@
 #include "SkyRenderBuilders.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/GeoLocation.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 

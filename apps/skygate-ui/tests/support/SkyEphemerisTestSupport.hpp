@@ -3,7 +3,8 @@
 #include "SkyContextController.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/EquatorialCoordinate.hpp"
+#include "skygate/core/SkyContext.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
@@ -62,27 +63,17 @@ struct TestSkyContextConfig {
         std::move(displayName),
         type,
         visualMagnitude,
-        core::EquatorialCoordinate {
-            .rightAscensionHours = rightAscensionHours,
-            .declinationDeg = declinationDeg
-        }
+        core::EquatorialCoordinate{.rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg}
     );
 }
 
 [[nodiscard]] inline ephemeris::CelestialBody makeDeepSkyBody(
-    std::string id,
-    std::string displayName,
-    const double visualMagnitude,
-    std::vector<std::string> aliases = {}
+    std::string id, std::string displayName, const double visualMagnitude, std::vector<std::string> aliases = {}
 )
 {
-    ephemeris::CelestialBody body = makeBody(
-        std::move(id),
-        std::move(displayName),
-        ephemeris::CelestialBodyType::DeepSkyObject,
-        visualMagnitude
-    );
-    body.deepSkyObject = ephemeris::DeepSkyObjectInfo {
+    ephemeris::CelestialBody body =
+        makeBody(std::move(id), std::move(displayName), ephemeris::CelestialBodyType::DeepSkyObject, visualMagnitude);
+    body.deepSkyObject = ephemeris::DeepSkyObjectInfo{
         .kind = ephemeris::DeepSkyObjectKind::Galaxy,
         .aliases = std::move(aliases),
         .majorAxisArcmin = 8.0,
@@ -92,9 +83,7 @@ struct TestSkyContextConfig {
     return body;
 }
 
-[[nodiscard]] inline SkyContextController::InitializationOptions testControllerOptions(
-    const bool loadSettings = false
-)
+[[nodiscard]] inline SkyContextController::InitializationOptions testControllerOptions(const bool loadSettings = false)
 {
     SkyContextController::InitializationOptions initializationOptions;
     initializationOptions.loadSettings = loadSettings;
@@ -102,16 +91,14 @@ struct TestSkyContextConfig {
     return initializationOptions;
 }
 
-[[nodiscard]] inline std::unique_ptr<ephemeris::IStarCatalog> createTestCatalog(
-    std::vector<ephemeris::CelestialBody> bodies
-)
+[[nodiscard]] inline std::unique_ptr<ephemeris::IStarCatalog>
+createTestCatalog(std::vector<ephemeris::CelestialBody> bodies)
 {
     return ephemeris::createStarCatalogFromBodies(std::move(bodies));
 }
 
-[[nodiscard]] inline std::unique_ptr<ephemeris::IEphemerisEngine> createTestEphemerisEngine(
-    const ephemeris::IStarCatalog& starCatalog
-)
+[[nodiscard]] inline std::unique_ptr<ephemeris::IEphemerisEngine>
+createTestEphemerisEngine(const ephemeris::IStarCatalog& starCatalog)
 {
     return ephemeris::createEphemerisEngine(starCatalog);
 }
@@ -123,17 +110,12 @@ struct TestSkyContextConfig {
 )
 {
     return std::make_unique<SkyContextController>(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        testControllerOptions(loadSettings),
-        nullptr
+        std::move(starCatalog), std::move(ephemerisEngine), testControllerOptions(loadSettings), nullptr
     );
 }
 
-[[nodiscard]] inline std::unique_ptr<SkyContextController> createTestController(
-    std::vector<ephemeris::CelestialBody> bodies,
-    const bool loadSettings = false
-)
+[[nodiscard]] inline std::unique_ptr<SkyContextController>
+createTestController(std::vector<ephemeris::CelestialBody> bodies, const bool loadSettings = false)
 {
     auto starCatalog = createTestCatalog(std::move(bodies));
     if (starCatalog == nullptr) {
@@ -148,10 +130,7 @@ struct TestSkyContextConfig {
     return createTestController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
 }
 
-inline bool configureTestSkyContext(
-    SkyContextController& controller,
-    const TestSkyContextConfig& config = {}
-)
+inline bool configureTestSkyContext(SkyContextController& controller, const TestSkyContextConfig& config = {})
 {
     if (config.applyTimeZone && !controller.timeController()->setTimeZoneId(config.timeZoneId)) {
         return false;
@@ -168,10 +147,8 @@ inline bool configureTestSkyContext(
     return true;
 }
 
-[[nodiscard]] inline std::optional<ephemeris::CelestialBodyState> findBodyStateById(
-    const ephemeris::SkySnapshot& snapshot,
-    const std::string& bodyId
-)
+[[nodiscard]] inline std::optional<ephemeris::CelestialBodyState>
+findBodyStateById(const ephemeris::SkySnapshot& snapshot, const std::string& bodyId)
 {
     for (const ephemeris::CelestialBodyState& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {

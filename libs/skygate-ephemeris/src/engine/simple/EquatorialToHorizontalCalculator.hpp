@@ -1,6 +1,9 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/EquatorialCoordinate.hpp"
+#include "skygate/core/GeoLocation.hpp"
+#include "skygate/core/HorizontalCoordinate.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 
 namespace skygate::ephemeris {
 

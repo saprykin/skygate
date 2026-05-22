@@ -7,7 +7,9 @@
 #include <QStringList>
 
 #include "SkyTheme.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <optional>

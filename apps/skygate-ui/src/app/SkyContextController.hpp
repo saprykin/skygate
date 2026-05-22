@@ -6,7 +6,10 @@
 #include <QTimer>
 #include <QVariantMap>
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/GeoLocation.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 #include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/EphemerisDataManifest.hpp"

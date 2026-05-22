@@ -1,6 +1,7 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 namespace skygate::ephemeris {
