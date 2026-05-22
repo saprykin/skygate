@@ -8,6 +8,16 @@ Item {
     required property var skyContextController
     required property var preferencesDraft
 
+    function controllerText(propertyName, fallback) {
+        const value = skyContextController[propertyName];
+        return value === undefined || value === null ? fallback : value;
+    }
+
+    function controllerBool(propertyName, fallback) {
+        const value = skyContextController[propertyName];
+        return value === undefined || value === null ? fallback : value;
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -218,9 +228,9 @@ Item {
                 Label {
                     objectName: "ephemerisShortRangeKernelStatusLabel"
                     Layout.fillWidth: true
-                    readonly property string kernelStatusText: skyContextController.ephemerisLongRangeKernelStatusText === "Not installed"
-                                                               ? skyContextController.ephemerisShortRangeKernelStatusText
-                                                               : skyContextController.ephemerisLongRangeKernelStatusText
+                    readonly property string kernelStatusText: engineSection.controllerText("ephemerisLongRangeKernelStatusText", "Not installed") === "Not installed"
+                                                               ? engineSection.controllerText("ephemerisShortRangeKernelStatusText", "Bundled fallback")
+                                                               : engineSection.controllerText("ephemerisLongRangeKernelStatusText", "Not installed")
                     text: kernelStatusText.indexOf("DE441") >= 0
                           ? "DE441"
                           : (kernelStatusText.indexOf("DE440") >= 0
@@ -246,7 +256,7 @@ Item {
                     objectName: "ephemerisKernelDownloadCombo"
                     Layout.fillWidth: true
                     model: ["Select kernel...", "DE440s", "DE441"]
-                    enabled: skyContextController.ephemerisDataUpdateEnabled
+                    enabled: engineSection.controllerBool("ephemerisDataUpdateEnabled", false)
 
                     Binding on currentIndex {
                         value: 0
@@ -277,7 +287,7 @@ Item {
                     Label {
                         objectName: "ephemerisPlanetaryKernelCacheSizeLabel"
                         Layout.fillWidth: true
-                        text: skyContextController.ephemerisPlanetaryKernelCacheSizeText
+                        text: engineSection.controllerText("ephemerisPlanetaryKernelCacheSizeText", "0 B")
                         color: skyContext.theme.listItemPrimaryText
                         font.pixelSize: 11
                         font.family: "Avenir Next"
@@ -310,7 +320,7 @@ Item {
                 Label {
                     objectName: "ephemerisEarthOrientationStatusLabel"
                     Layout.fillWidth: true
-                    text: skyContextController.ephemerisEarthOrientationStatusText
+                    text: engineSection.controllerText("ephemerisEarthOrientationStatusText", "Not installed")
                     color: skyContext.theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
@@ -329,7 +339,7 @@ Item {
                 Label {
                     objectName: "ephemerisLeapSecondStatusLabel"
                     Layout.fillWidth: true
-                    text: skyContextController.ephemerisLeapSecondStatusText
+                    text: engineSection.controllerText("ephemerisLeapSecondStatusText", "Not installed")
                     color: skyContext.theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
@@ -348,7 +358,7 @@ Item {
                 Label {
                     objectName: "ephemerisDeltaTStatusLabel"
                     Layout.fillWidth: true
-                    text: skyContextController.ephemerisDeltaTStatusText
+                    text: engineSection.controllerText("ephemerisDeltaTStatusText", "Not installed")
                     color: skyContext.theme.listItemPrimaryText
                     font.pixelSize: 11
                     font.family: "Avenir Next"
@@ -369,7 +379,7 @@ Item {
                     objectName: "ephemerisSupportDataDownloadCombo"
                     Layout.fillWidth: true
                     model: ["Select data...", "Latest", "Info only"]
-                    enabled: skyContextController.ephemerisDataUpdateEnabled
+                    enabled: engineSection.controllerBool("ephemerisDataUpdateEnabled", false)
 
                     Binding on currentIndex {
                         value: 0
@@ -400,7 +410,7 @@ Item {
                     Label {
                         objectName: "ephemerisSupportDataCacheSizeLabel"
                         Layout.fillWidth: true
-                        text: skyContextController.ephemerisSupportDataCacheSizeText
+                        text: engineSection.controllerText("ephemerisSupportDataCacheSizeText", "0 B")
                         color: skyContext.theme.listItemPrimaryText
                         font.pixelSize: 11
                         font.family: "Avenir Next"

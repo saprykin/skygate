@@ -355,7 +355,7 @@ void QmlMainWindowTests::mainWindowPreferenceSearchAndTrackingJourney()
         firstObjectWithObjectName(preferencesWindow, QStringLiteral("preferencesAppearanceSectionButton"));
     QVERIFY(appearanceButton != nullptr);
     QVERIFY(activateControl(appearanceButton));
-    QTRY_COMPARE(preferencesWindow->property("selectedPage").toInt(), 2);
+    QTRY_COMPARE(preferencesWindow->property("selectedPage").toInt(), 3);
 
     const QVariantList themeOptions = controller->themeOptions();
     QVERIFY(themeOptions.size() >= 2);

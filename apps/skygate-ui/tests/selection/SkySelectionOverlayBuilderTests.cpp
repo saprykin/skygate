@@ -536,6 +536,10 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     auto engine = std::make_unique<RequestOnlyObservationEngine>();
     const auto* enginePtr = engine.get();
     fixture.ephemerisEngine = std::move(engine);
+    auto mutableBodies =
+        std::const_pointer_cast<std::vector<skygate::ephemeris::CelestialBody>>(fixture.snapshot.catalogBodies);
+    QVERIFY(mutableBodies != nullptr);
+    mutableBodies->at(0).fixedEquatorial.reset();
     fixture.skyContext.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";

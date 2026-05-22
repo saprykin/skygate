@@ -11,7 +11,8 @@ Rectangle {
     property bool nightConditionsPopupOpen: false
     property bool degradationPopupOpen: false
     readonly property bool hasEphemerisDegradation:
-        sceneModel.ephemerisDegradationReasons
+        sceneModel.ephemerisDegradationReasons !== undefined
+        && sceneModel.ephemerisDegradationReasons !== null
         && sceneModel.ephemerisDegradationReasons.length > 0
     readonly property int statusButtonSpacing: 1
     property alias nightConditionsToggleItem: nightConditionsButton
