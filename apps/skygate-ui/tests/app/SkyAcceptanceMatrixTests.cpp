@@ -239,6 +239,13 @@ ephemeris::EphemerisRequest acceptanceRequest(const int year)
     return request;
 }
 
+ephemeris::EphemerisRequest acceptanceRequestWithoutSimpleFallback(const int year)
+{
+    ephemeris::EphemerisRequest request = acceptanceRequest(year);
+    request.options.fallbackToSimpleEngine = false;
+    return request;
+}
+
 QString displayText(ephemeris::EphemerisWarningCode code)
 {
     const std::string_view text = ephemeris::ephemerisWarningText(code);
@@ -484,7 +491,8 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     );
     verifyDE440sShortRangeBodyState(*cleanInstallEngineResult.engine);
 
-    const auto outOfRangeState = cleanInstallEngineResult.engine->computeBodyState(acceptanceRequest(1900), "mars");
+    const auto outOfRangeState =
+        cleanInstallEngineResult.engine->computeBodyState(acceptanceRequestWithoutSimpleFallback(1900), "mars");
     QVERIFY(outOfRangeState.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(outOfRangeState->metadata.status),
