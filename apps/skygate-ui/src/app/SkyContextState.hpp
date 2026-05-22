@@ -3,8 +3,10 @@
 #include "SkyContextControllerSupport.hpp"
 
 #include "skygate/core/IProjection.hpp"
-#include "skygate/core/Types.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
 #include "skygate/core/math/ViewportMath.hpp"
 
 #include <QString>

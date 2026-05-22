@@ -2,8 +2,14 @@
 
 #include "SkyContextState.hpp"
 
-#include "skygate/core/Types.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/GeoLocation.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
+#include "skygate/core/GeoLocation.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/SkyContext.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 
 #include <QString>
 
@@ -78,10 +84,7 @@ public:
     [[nodiscard]] bool setSource(SkyContextLocationSource source) noexcept;
     [[nodiscard]] bool setStatusText(const QString& statusText);
     [[nodiscard]] SkySelectedCityChange clearSelectedCity();
-    [[nodiscard]] SkySelectedCityChange setSelectedCity(
-        const QString& cityId,
-        const QString& displayText
-    );
+    [[nodiscard]] SkySelectedCityChange setSelectedCity(const QString& cityId, const QString& displayText);
 
 private:
     SkyLocationState m_state;
@@ -99,11 +102,7 @@ public:
 
     [[nodiscard]] bool setToolbarCollapsed(bool toolbarCollapsed) noexcept;
     [[nodiscard]] bool setSelectedTarget(const QString& targetKind, const QString& targetId);
-    [[nodiscard]] bool setTrackedTarget(
-        const QString& targetKind,
-        const QString& targetId,
-        const QString& displayText
-    );
+    [[nodiscard]] bool setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
 
 private:
     SkySearchState m_state;

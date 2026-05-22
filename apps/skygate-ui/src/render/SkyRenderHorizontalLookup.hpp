@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/HorizontalCoordinate.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
@@ -19,14 +19,9 @@ public:
         std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
     );
 
-    void capture(
-        const skygate::ephemeris::CelestialBody& body,
-        const skygate::core::HorizontalCoordinate& horizontal
-    );
+    void capture(const skygate::ephemeris::CelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal);
 
-    [[nodiscard]] const skygate::core::HorizontalCoordinate* findHorizontal(
-        std::string_view bodyId
-    ) const;
+    [[nodiscard]] const skygate::core::HorizontalCoordinate* findHorizontal(std::string_view bodyId) const;
 
 private:
     void trackBodyId(std::string_view bodyId);

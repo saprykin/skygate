@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/HorizontalCoordinate.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
@@ -12,11 +12,8 @@ namespace skygate::ephemeris {
 
 class ConstellationReferenceCalculator final {
 public:
-    [[nodiscard]] static std::optional<core::HorizontalCoordinate> labelCenter(
-        const SkySnapshot& snapshot,
-        std::span<const ConstellationLabelRef> labelRefs,
-        std::string_view label
-    );
+    [[nodiscard]] static std::optional<core::HorizontalCoordinate>
+    labelCenter(const SkySnapshot& snapshot, std::span<const ConstellationLabelRef> labelRefs, std::string_view label);
 };
 
 }  // namespace skygate::ephemeris

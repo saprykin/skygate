@@ -12,7 +12,7 @@
 #include "SkySceneOverlayAdapter.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/SkyContext.hpp"
 
 #include <cstdint>
 #include <optional>

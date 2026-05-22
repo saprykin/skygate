@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/SkyContext.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <cstddef>

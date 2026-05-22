@@ -3,7 +3,8 @@
 #include "SkyRenderBuilders.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/Types.hpp"
+#include "skygate/core/EquatorialCoordinate.hpp"
+#include "skygate/core/SkyContext.hpp"
 #include "skygate/ephemeris/BodyTrailCalculator.hpp"
 #include "skygate/ephemeris/Types.hpp"
 

@@ -1,6 +1,8 @@
 #pragma once
 
-#include "skygate/core/Types.hpp"
+#include "skygate/core/EquatorialCoordinate.hpp"
+#include "skygate/core/HorizontalCoordinate.hpp"
+#include "skygate/core/SkyContext.hpp"
 
 #include <bit>
 #include <cmath>
@@ -199,11 +201,13 @@ daysFromCivilDate(const int astronomicalYear, const int month, const int day) no
     const double dayFraction =
         static_cast<double>(nanosecondsSinceMidnight) / static_cast<double>(detail::kNanosecondsPerDay);
 
-    return normalizedAstronomicalEpoch(AstronomicalEpoch{
-        .julianDatePart1 = detail::kJulianDateUnixEpoch + static_cast<double>(daysSinceUnixEpoch),
-        .julianDatePart2 = dayFraction,
-        .timeScale = dateTime.timeScale,
-    });
+    return normalizedAstronomicalEpoch(
+        AstronomicalEpoch{
+            .julianDatePart1 = detail::kJulianDateUnixEpoch + static_cast<double>(daysSinceUnixEpoch),
+            .julianDatePart2 = dayFraction,
+            .timeScale = dateTime.timeScale,
+        }
+    );
 }
 
 [[nodiscard]] inline CivilDateTimeResult civilDateTimeFromAstronomicalEpoch(const AstronomicalEpoch& epoch) noexcept

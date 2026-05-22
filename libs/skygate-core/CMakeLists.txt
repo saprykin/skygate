@@ -12,7 +12,6 @@ add_library(skygate-core STATIC
     include/skygate/core/ScreenPoint.hpp
     include/skygate/core/SkyContext.hpp
     include/skygate/core/SystemTimeSource.hpp
-    include/skygate/core/Types.hpp
     include/skygate/core/UtcTimeCodec.hpp
     include/skygate/core/UtcTimePoint.hpp
     include/skygate/core/math/AngleMath.hpp
