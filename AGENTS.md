@@ -7,7 +7,7 @@ repository.
 ## C++ Conventions
 - Use UTF-8 and prefer ASCII in source unless non-ASCII is required.
 - Prefer `.hpp` headers and `#pragma once`.
-- Prefer one class per header/source pair where practical.
+- Use one class or structure per header/source pair.
 - Keep functions short and focused.
 - Use `const` correctness consistently.
 - Use `override` for overridden virtual functions.
