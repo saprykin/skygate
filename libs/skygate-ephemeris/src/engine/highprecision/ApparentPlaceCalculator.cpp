@@ -4,6 +4,7 @@
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/ObserverGeodesy.hpp"
 #include "skygate/core/math/AngleMath.hpp"
+#include "skygate/core/math/MathConstants.hpp"
 #include "skygate/ephemeris/EarthOrientationProvider.hpp"
 
 #include <algorithm>
@@ -16,8 +17,9 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr double kRadiansPerHour = 3.141592653589793238462643383279502884 / 12.0;
-constexpr double kHoursPerRadian = 12.0 / 3.141592653589793238462643383279502884;
+namespace core = skygate::core;
+
+using core::MathConstants;
 constexpr EphemerisMetadataMergeOptions kTransformMetadataMergeOptions{
     .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
     .mergeCorrections = true,
@@ -70,7 +72,7 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
 
 [[nodiscard]] CelestialFrameVector vectorFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
-    const double rightAscensionRad = coordinate.rightAscensionHours * kRadiansPerHour;
+    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
     const double declinationRad = core::AngleMath::toRadians(coordinate.declinationDeg);
     const double cosDeclination = std::cos(declinationRad);
     return {
@@ -126,7 +128,7 @@ equatorialFromVector(const CelestialFrameVector& vector) noexcept
         return std::nullopt;
     }
 
-    double rightAscensionHours = std::atan2(vector.y, vector.x) * kHoursPerRadian;
+    double rightAscensionHours = std::atan2(vector.y, vector.x) * MathConstants::kHoursPerRadian;
     if (rightAscensionHours < 0.0) {
         rightAscensionHours += 24.0;
     }

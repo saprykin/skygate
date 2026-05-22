@@ -2,6 +2,8 @@
 
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/ErfaAstrometry.hpp"
+#include "skygate/core/math/MathConstants.hpp"
+#include "skygate/core/math/TimeConstants.hpp"
 
 #include <array>
 #include <cmath>
@@ -13,9 +15,12 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
+namespace core = skygate::core;
+
+using core::MathConstants;
+using core::TimeConstants;
+
 constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial and terrestrial frame transform";
-constexpr double kArcsecondsToRadians = 4.8481368110953599359e-6;
-constexpr double kSecondsPerDay = 86'400.0;
 
 [[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
 {
@@ -115,7 +120,7 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
     return normalizedAstronomicalEpoch(
         AstronomicalEpoch{
             .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2 + seconds / kSecondsPerDay,
+            .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
             .timeScale = targetScale,
         }
     );
@@ -389,8 +394,8 @@ terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context,
             );
             if (tioLocator.has_value()) {
                 context.polarMotionMatrixValue = polarMotionMatrix00(
-                    earthOrientationSample->polarMotionXArcseconds * kArcsecondsToRadians,
-                    earthOrientationSample->polarMotionYArcseconds * kArcsecondsToRadians,
+                    earthOrientationSample->polarMotionXArcseconds * MathConstants::kArcsecondsToRadians,
+                    earthOrientationSample->polarMotionYArcseconds * MathConstants::kArcsecondsToRadians,
                     *tioLocator
                 );
                 if (!context.polarMotionMatrixValue.has_value()) {

@@ -3,6 +3,8 @@
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "engine/highprecision/ErfaAstrometry.hpp"
 #endif
+#include "skygate/core/math/MathConstants.hpp"
+#include "skygate/core/math/TimeConstants.hpp"
 
 #include <array>
 #include <cmath>
@@ -16,10 +18,10 @@ namespace skygate::ephemeris {
 
 namespace {
 
-constexpr double kSecondsPerDay = 86'400.0;
-constexpr double kTtMinusTaiSeconds = 32.184;
-constexpr double kJulianDateJ2000 = 2'451'545.0;
-constexpr double kDegreesToRadians = 0.017453292519943295769;
+namespace core = skygate::core;
+
+using core::MathConstants;
+using core::TimeConstants;
 
 struct OffsetLookupResult {
     std::optional<int> offsetSeconds;
@@ -64,11 +66,13 @@ struct Ut1OffsetLookupResult {
 [[nodiscard]] AstronomicalEpoch
 addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
 {
-    return normalizedAstronomicalEpoch(AstronomicalEpoch{
-        .julianDatePart1 = epoch.julianDatePart1,
-        .julianDatePart2 = epoch.julianDatePart2 + seconds / kSecondsPerDay,
-        .timeScale = targetScale,
-    });
+    return normalizedAstronomicalEpoch(
+        AstronomicalEpoch{
+            .julianDatePart1 = epoch.julianDatePart1,
+            .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
+            .timeScale = targetScale,
+        }
+    );
 }
 
 [[nodiscard]] double epochJulianDate(const AstronomicalEpoch& epoch) noexcept
@@ -84,8 +88,9 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
 
 [[nodiscard]] double approximateTdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
 {
-    const double daysSinceJ2000 = epochJulianDate(terrestrialTime) - kJulianDateJ2000;
-    const double meanAnomalyRadians = std::fmod(357.53 + 0.9856003 * daysSinceJ2000, 360.0) * kDegreesToRadians;
+    const double daysSinceJ2000 = epochJulianDate(terrestrialTime) - TimeConstants::kJulianDateJ2000;
+    const double meanAnomalyRadians =
+        std::fmod(357.53 + 0.9856003 * daysSinceJ2000, 360.0) * MathConstants::kDegreesToRadians;
     return 0.001657 * std::sin(meanAnomalyRadians) + 0.00001385 * std::sin(2.0 * meanAnomalyRadians);
 }
 
@@ -441,7 +446,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
     }
 
     result.ut1MinusUtcSeconds =
-        static_cast<double>(*utcOffset.offsetSeconds) + kTtMinusTaiSeconds - *estimate.deltaTSeconds;
+        static_cast<double>(*utcOffset.offsetSeconds) + TimeConstants::kTtMinusTaiSeconds - *estimate.deltaTSeconds;
     result.status = TimeScaleConversionStatus::Degraded;
     result.warningCodeMask |= utcOffset.warningCodeMask;
     result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
@@ -503,7 +508,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
     }
 
     const AstronomicalEpoch ttEpoch = addSeconds(ut1Epoch, *estimate.deltaTSeconds, TimeScale::Tt);
-    const AstronomicalEpoch taiEpoch = addSeconds(ttEpoch, -kTtMinusTaiSeconds, TimeScale::Tai);
+    const AstronomicalEpoch taiEpoch = addSeconds(ttEpoch, -TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai);
     const OffsetLookupResult taiOffset = lookupTaiOffset(leapSecondProvider, options, taiEpoch);
     if (!taiOffset.offsetSeconds.has_value()) {
         TimeScaleConversionResult result = failureResult(taiEpoch, TimeScale::Utc, taiOffset.diagnosticText);
@@ -622,7 +627,8 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
         }
 
         const double taiOffset = static_cast<double>(*lookup.offsetSeconds);
-        const double targetOffset = targetScale == TimeScale::Tt ? taiOffset + kTtMinusTaiSeconds : taiOffset;
+        const double targetOffset =
+            targetScale == TimeScale::Tt ? taiOffset + TimeConstants::kTtMinusTaiSeconds : taiOffset;
         TimeScaleConversionResult result =
             successResult(addSeconds(epoch, targetOffset, targetScale), lookup.status, lookup.warningCodeMask);
         if (!lookup.diagnosticText.empty()) {
@@ -644,7 +650,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             return tdb;
         }
         if (targetScale == TimeScale::Tt) {
-            return successResult(addSeconds(epoch, kTtMinusTaiSeconds, TimeScale::Tt));
+            return successResult(addSeconds(epoch, TimeConstants::kTtMinusTaiSeconds, TimeScale::Tt));
         }
         if (targetScale == TimeScale::Utc) {
             const OffsetLookupResult lookup = lookupTaiOffset(m_leapSecondProvider, m_options, epoch);
@@ -705,10 +711,10 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             return result;
         }
         if (targetScale == TimeScale::Tai) {
-            return successResult(addSeconds(epoch, -kTtMinusTaiSeconds, TimeScale::Tai));
+            return successResult(addSeconds(epoch, -TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai));
         }
         if (targetScale == TimeScale::Utc) {
-            return convert(addSeconds(epoch, -kTtMinusTaiSeconds, TimeScale::Tai), TimeScale::Utc);
+            return convert(addSeconds(epoch, -TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai), TimeScale::Utc);
         }
         break;
     case TimeScale::Tdb: {
@@ -832,7 +838,8 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
     }
 
     const double taiOffset = static_cast<double>(*precedingLookup.offsetSeconds);
-    const double targetOffset = targetScale == TimeScale::Tai ? taiOffset : taiOffset + kTtMinusTaiSeconds;
+    const double targetOffset =
+        targetScale == TimeScale::Tai ? taiOffset : taiOffset + TimeConstants::kTtMinusTaiSeconds;
     TimeScaleConversionResult result =
         successResult(addSeconds(*epoch, targetOffset, targetScale == TimeScale::Tdb ? TimeScale::Tt : targetScale));
     mergeOffsetWarnings(result, precedingLookup);

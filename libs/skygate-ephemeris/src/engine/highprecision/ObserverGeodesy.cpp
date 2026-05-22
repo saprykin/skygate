@@ -1,13 +1,14 @@
 #include "engine/highprecision/ObserverGeodesy.hpp"
 
 #include "skygate/core/math/AngleMath.hpp"
+#include "skygate/core/math/PhysicalConstants.hpp"
 
 #include <cmath>
 
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
+using core::PhysicalConstants;
 constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
 constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 
@@ -35,9 +36,9 @@ std::optional<SolarSystemKernelVector> observerItrsPositionAu(const core::GeoLoc
         (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
 
     return SolarSystemKernelVector{
-        .xAu = xMeters / kAstronomicalUnitMeters,
-        .yAu = yMeters / kAstronomicalUnitMeters,
-        .zAu = zMeters / kAstronomicalUnitMeters,
+        .xAu = xMeters / PhysicalConstants::kAstronomicalUnitMeters,
+        .yAu = yMeters / PhysicalConstants::kAstronomicalUnitMeters,
+        .zAu = zMeters / PhysicalConstants::kAstronomicalUnitMeters,
     };
 }
 
