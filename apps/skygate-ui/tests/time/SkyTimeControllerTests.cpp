@@ -46,6 +46,7 @@ private slots:
     void formatsSeasonalDstLabels();
     void parsesSelectedZoneWallTimeToUtc();
     void validatesBceInput();
+    void formatsBceDateTimesWithSuffix();
     void emitsSignalsOnlyWhenValuesChange();
 };
 
@@ -175,6 +176,24 @@ void SkyTimeControllerTests::validatesBceInput()
 
     QVERIFY(controller.setDateTimeText(QStringLiteral("0044-03-15 BC"), QStringLiteral("12:00:00")));
     QCOMPARE(controller.dateText(), QStringLiteral("0044-03-15 BCE"));
+}
+
+void SkyTimeControllerTests::formatsBceDateTimesWithSuffix()
+{
+    SkyTimeController controller;
+    QVERIFY(controller.setTimeZoneId(QStringLiteral("UTC")));
+    controller.setUtcDateTime(QDateTime(QDate(-44, 3, 15), QTime(12, 0, 0), QTimeZone::UTC));
+
+    QCOMPARE(controller.dateText(), QStringLiteral("0044-03-15 BCE"));
+    QCOMPARE(controller.timeText(), QStringLiteral("12:00:00"));
+    QCOMPARE(controller.formatUtcTime(controller.utcTimePoint()), QStringLiteral("0044-03-15 BCE 12:00:00 UTC"));
+
+    const auto oneHourLater =
+        SkyQtTimeCodec::toUtcTimePoint(QDateTime(QDate(-44, 3, 15), QTime(13, 0, 0), QTimeZone::UTC));
+    QCOMPARE(
+        controller.formatUtcTimeRange(controller.utcTimePoint(), oneHourLater),
+        QStringLiteral("0044-03-15 BCE 12:00:00 / 13:00:00 UTC")
+    );
 }
 
 void SkyTimeControllerTests::emitsSignalsOnlyWhenValuesChange()

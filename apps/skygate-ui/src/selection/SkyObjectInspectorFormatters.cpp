@@ -221,10 +221,8 @@ QString formatDate(const ephemeris::AstronomicalEpoch& epoch)
         return "--";
     }
 
-    return QString("%1-%2-%3")
-        .arg(dateTime->astronomicalYear, 4, 10, QChar('0'))
-        .arg(dateTime->month, 2, 10, QChar('0'))
-        .arg(dateTime->day, 2, 10, QChar('0'));
+    const int historicalYear = ephemeris::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+    return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 
 }  // namespace
@@ -238,7 +236,7 @@ QString formatEquatorialCoordinate(const core::EquatorialCoordinate& equatorial)
 
 QString formatUtcTime(const core::UtcTimePoint& utcTime)
 {
-    return SkyQtTimeCodec::toQDateTimeUtc(utcTime).toString("yyyy-MM-dd HH:mm:ss 'UTC'");
+    return QString("%1 UTC").arg(SkyQtTimeCodec::formatDateTimeText(SkyQtTimeCodec::toQDateTimeUtc(utcTime)));
 }
 
 QString formatObservationEvent(const ephemeris::ObservationEvent& event)

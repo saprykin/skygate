@@ -25,18 +25,6 @@ const QRegularExpression& dateInputPattern()
     return pattern;
 }
 
-QString formatDateText(const QDate& date)
-{
-    const int year = date.year();
-    const qint64 displayYear = year < 0 ? -static_cast<qint64>(year) : static_cast<qint64>(year);
-    const QString yearText = QString::number(displayYear).rightJustified(4, '0');
-    const QString dateText = QString("%1-%2-%3")
-                                 .arg(yearText)
-                                 .arg(date.month(), 2, 10, QLatin1Char('0'))
-                                 .arg(date.day(), 2, 10, QLatin1Char('0'));
-    return year < 0 ? QString("%1 BCE").arg(dateText) : dateText;
-}
-
 QString formatUtcOffset(const int offsetSeconds)
 {
     const QChar sign = offsetSeconds < 0 ? QLatin1Char('-') : QLatin1Char('+');
@@ -233,7 +221,7 @@ QString SkyTimeController::formatUtcTime(const skygate::core::UtcTimePoint& utcT
     const QDateTime zonedDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime).toTimeZone(m_timeZone);
     return includeSeconds
                ? QString("%1 %2").arg(
-                     zonedDateTime.toString("yyyy-MM-dd HH:mm:ss"), ::timeZoneLabel(m_timeZone, zonedDateTime)
+                     SkyQtTimeCodec::formatDateTimeText(zonedDateTime), ::timeZoneLabel(m_timeZone, zonedDateTime)
                  )
                : QString("%1 %2").arg(zonedDateTime.toString("HH:mm"), ::timeZoneLabel(m_timeZone, zonedDateTime));
 }
@@ -248,7 +236,7 @@ QString SkyTimeController::formatUtcTimeRange(
     if (startDateTime.date() == endDateTime.date() && ::timeZoneLabel(m_timeZone, endDateTime) == label) {
         return QString("%1 %2 / %3 %4")
             .arg(
-                startDateTime.toString("yyyy-MM-dd"),
+                SkyQtTimeCodec::formatDateText(startDateTime.date()),
                 startDateTime.toString("HH:mm:ss"),
                 endDateTime.toString("HH:mm:ss"),
                 label
@@ -312,7 +300,7 @@ SkyTimeController::parseDisplayDateTime(const QString& dateText, const QString& 
 
 QString SkyTimeController::formattedDateText() const
 {
-    return formatDateText(displayDateTime().date());
+    return SkyQtTimeCodec::formatDateText(displayDateTime().date());
 }
 
 QString SkyTimeController::formattedTimeText() const

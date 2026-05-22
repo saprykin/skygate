@@ -2,6 +2,7 @@
 
 #include "SkyContextController.hpp"
 #include "SkyPerformanceLogging.hpp"
+#include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 
 #include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
@@ -37,17 +38,7 @@ namespace {
     }
 
     const int historicalYear = skygate::ephemeris::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
-    if (historicalYear < 0) {
-        return QStringLiteral("%1-%2-%3 BCE")
-            .arg(-historicalYear, 4, 10, QChar('0'))
-            .arg(dateTime->month, 2, 10, QChar('0'))
-            .arg(dateTime->day, 2, 10, QChar('0'));
-    }
-
-    return QStringLiteral("%1-%2-%3")
-        .arg(historicalYear, 4, 10, QChar('0'))
-        .arg(dateTime->month, 2, 10, QChar('0'))
-        .arg(dateTime->day, 2, 10, QChar('0'));
+    return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 
 [[nodiscard]] QString rangeLabel(const skygate::ephemeris::EphemerisDateRange& range)
