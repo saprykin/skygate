@@ -14,6 +14,7 @@ private slots:
     void showsSearchSelectionMarkerForFocusedBody();
     void clickSelectionBuildsInspectorAndClearsOnEmptyClick();
     void searchSelectionBuildsInspectorNearMarker();
+    void bceSelectionInspectorFormatsEventDatesWithSuffix();
     void circumpolarInspectorShowsObservationFallbacks();
     void inspectorFollowsObjectUnlessPinned();
     void trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector();
@@ -22,14 +23,7 @@ private slots:
 void SkySceneModelSelectionInspectorTests::showsSearchSelectionMarkerForFocusedBody()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_target",
-            "Demo Target",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_target", "Demo Target", skygate::ephemeris::CelestialBodyType::Star, 1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
@@ -46,14 +40,7 @@ void SkySceneModelSelectionInspectorTests::showsSearchSelectionMarkerForFocusedB
 void SkySceneModelSelectionInspectorTests::clickSelectionBuildsInspectorAndClearsOnEmptyClick()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_star",
-            "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.3,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_star", "Demo Star", skygate::ephemeris::CelestialBodyType::Star, 2.3, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     QVERIFY(harness.centerOnBody("demo_star"));
@@ -83,14 +70,7 @@ void SkySceneModelSelectionInspectorTests::clickSelectionBuildsInspectorAndClear
 void SkySceneModelSelectionInspectorTests::searchSelectionBuildsInspectorNearMarker()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_target",
-            "Demo Target",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_target", "Demo Target", skygate::ephemeris::CelestialBodyType::Star, 1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
@@ -110,16 +90,37 @@ void SkySceneModelSelectionInspectorTests::searchSelectionBuildsInspectorNearMar
     QVERIFY(inspector.value("y").toDouble() > selectionMarker.value("y").toDouble());
 }
 
+void SkySceneModelSelectionInspectorTests::bceSelectionInspectorFormatsEventDatesWithSuffix()
+{
+    SkySceneModelTestHarness harness(
+        {
+            makeFixedBody("demo_target", "Demo Target", skygate::ephemeris::CelestialBodyType::Star, 1.0, 1.5, 2.5),
+        },
+        {.utcDate = QStringLiteral("0044-03-15 BCE"), .utcTime = QStringLiteral("12:00:00")}
+    );
+    QVERIFY(harness.isValid());
+    SkyContextController& controller = harness.controller();
+    const SkySceneModel& sceneModel = harness.sceneModel();
+
+    QVERIFY(controller.focusSearchTarget("body", "demo_target"));
+
+    const QVariantMap inspector = sceneModel.selectedObjectInspector();
+    const QString riseText = inspectorFieldValue(inspector, "Rise");
+    const QString setText = inspectorFieldValue(inspector, "Set");
+    const QString culminationText = inspectorFieldValue(inspector, "Culmination");
+    QVERIFY(riseText.contains(QStringLiteral("BCE")));
+    QVERIFY(setText.contains(QStringLiteral("BCE")));
+    QVERIFY(culminationText.contains(QStringLiteral("BCE")));
+    QVERIFY(!riseText.contains(QStringLiteral("-0044")));
+    QVERIFY(!setText.contains(QStringLiteral("-0044")));
+    QVERIFY(!culminationText.contains(QStringLiteral("-0044")));
+}
+
 void SkySceneModelSelectionInspectorTests::circumpolarInspectorShowsObservationFallbacks()
 {
     SkySceneModelTestHarness harness({
         makeFixedBody(
-            "demo_circumpolar",
-            "Demo Circumpolar",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            3.0,
-            80.0
+            "demo_circumpolar", "Demo Circumpolar", skygate::ephemeris::CelestialBodyType::Star, 1.0, 3.0, 80.0
         ),
     });
     QVERIFY(harness.isValid());
@@ -138,14 +139,7 @@ void SkySceneModelSelectionInspectorTests::circumpolarInspectorShowsObservationF
 void SkySceneModelSelectionInspectorTests::inspectorFollowsObjectUnlessPinned()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_target",
-            "Demo Target",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_target", "Demo Target", skygate::ephemeris::CelestialBodyType::Star, 1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
@@ -162,12 +156,7 @@ void SkySceneModelSelectionInspectorTests::inspectorFollowsObjectUnlessPinned()
     QVERIFY(inspectorFieldValue(initialInspector, "Set").contains("UTC"));
     QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("Asia/Bishkek")));
     QCOMPARE(sceneModel.snapshotGeneration(), snapshotBeforeTimeZoneChange);
-    QVERIFY(
-        inspectorFieldValue(
-            sceneModel.selectedObjectInspector(),
-            "Rise"
-        ).contains("UTC+06:00")
-    );
+    QVERIFY(inspectorFieldValue(sceneModel.selectedObjectInspector(), "Rise").contains("UTC+06:00"));
     QVERIFY(controller.timeController()->setTimeZoneId(QStringLiteral("UTC")));
     QCOMPARE(sceneModel.snapshotGeneration(), snapshotBeforeTimeZoneChange);
 
@@ -212,14 +201,7 @@ void SkySceneModelSelectionInspectorTests::inspectorFollowsObjectUnlessPinned()
 void SkySceneModelSelectionInspectorTests::trackedBodyMarkerSurvivesClearedSearchSelectionAndRestoresInspector()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_target",
-            "Demo Target",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_target", "Demo Target", skygate::ephemeris::CelestialBodyType::Star, 1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
