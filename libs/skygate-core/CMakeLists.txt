@@ -16,11 +16,14 @@ add_library(skygate-core STATIC
     include/skygate/core/UtcTimePoint.hpp
     include/skygate/core/math/AngleMath.hpp
     include/skygate/core/math/Geometry2d.hpp
+    include/skygate/core/math/LineSegment2d.hpp
     include/skygate/core/math/LinePattern.hpp
     include/skygate/core/math/MathConstants.hpp
     include/skygate/core/math/ProjectedPolylineBuilder.hpp
+    include/skygate/core/math/Rect2d.hpp
     include/skygate/core/math/SpatialIndex2d.hpp
     include/skygate/core/math/SphericalGeometry.hpp
+    include/skygate/core/math/Vector2d.hpp
     include/skygate/core/math/ViewportMath.hpp
     include/skygate/core/projections/AzimuthalEquidistantProjection.hpp
     include/skygate/core/projections/PerspectiveProjection.hpp
@@ -36,10 +39,13 @@ add_library(skygate-core STATIC
     src/UtcTimeCodec.cpp
     src/math/AngleMath.cpp
     src/math/Geometry2d.cpp
+    src/math/LineSegment2d.cpp
     src/math/LinePattern.cpp
     src/math/ProjectedPolylineBuilder.cpp
+    src/math/Rect2d.cpp
     src/math/SpatialIndex2d.cpp
     src/math/SphericalGeometry.cpp
+    src/math/Vector2d.cpp
     src/math/ViewportMath.cpp
     src/ProjectionFactory.cpp
     src/projections/ProjectionAlgorithms.cpp

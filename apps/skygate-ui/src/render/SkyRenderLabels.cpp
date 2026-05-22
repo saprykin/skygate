@@ -14,24 +14,20 @@ struct DeepSkyLabelCandidate final {
     skygate::core::Rect2d bounds;
 };
 
-[[nodiscard]] bool startsWithCatalogPrefix(
-    const std::string_view text,
-    const std::string_view prefix
-)
+[[nodiscard]] bool startsWithCatalogPrefix(const std::string_view text, const std::string_view prefix)
 {
     return text.size() > prefix.size()
-        && std::equal(
-            prefix.begin(),
-            prefix.end(),
-            text.begin(),
-            text.begin() + static_cast<std::ptrdiff_t>(prefix.size()),
-            [](const char lhs, const char rhs) {
-                return std::tolower(
-                    static_cast<unsigned char>(lhs)
-                ) == std::tolower(static_cast<unsigned char>(rhs));
-            }
-        )
-        && text.at(prefix.size()) == ' ';
+           && std::equal(
+               prefix.begin(),
+               prefix.end(),
+               text.begin(),
+               text.begin() + static_cast<std::ptrdiff_t>(prefix.size()),
+               [](const char lhs, const char rhs) {
+                   return std::tolower(static_cast<unsigned char>(lhs))
+                          == std::tolower(static_cast<unsigned char>(rhs));
+               }
+           )
+           && text.at(prefix.size()) == ' ';
 }
 
 [[nodiscard]] bool isMessierObject(const skygate::ephemeris::CelestialBody& body)
@@ -44,28 +40,19 @@ struct DeepSkyLabelCandidate final {
         return false;
     }
 
-    return std::all_of(
-        body.displayName.begin() + 1,
-        body.displayName.end(),
-        [](const char value) {
-            return std::isdigit(static_cast<unsigned char>(value));
-        }
-    );
+    return std::all_of(body.displayName.begin() + 1, body.displayName.end(), [](const char value) {
+        return std::isdigit(static_cast<unsigned char>(value));
+    });
 }
 
 [[nodiscard]] bool isGenericCatalogAlias(const std::string_view alias)
 {
-    return startsWithCatalogPrefix(alias, "M")
-        || startsWithCatalogPrefix(alias, "NGC")
-        || startsWithCatalogPrefix(alias, "IC")
-        || startsWithCatalogPrefix(alias, "PGC")
-        || startsWithCatalogPrefix(alias, "UGC")
-        || startsWithCatalogPrefix(alias, "ESO")
-        || startsWithCatalogPrefix(alias, "MCG")
-        || startsWithCatalogPrefix(alias, "CGCG")
-        || startsWithCatalogPrefix(alias, "2MASX")
-        || startsWithCatalogPrefix(alias, "IRAS")
-        || startsWithCatalogPrefix(alias, "PK");
+    return startsWithCatalogPrefix(alias, "M") || startsWithCatalogPrefix(alias, "NGC")
+           || startsWithCatalogPrefix(alias, "IC") || startsWithCatalogPrefix(alias, "PGC")
+           || startsWithCatalogPrefix(alias, "UGC") || startsWithCatalogPrefix(alias, "ESO")
+           || startsWithCatalogPrefix(alias, "MCG") || startsWithCatalogPrefix(alias, "CGCG")
+           || startsWithCatalogPrefix(alias, "2MASX") || startsWithCatalogPrefix(alias, "IRAS")
+           || startsWithCatalogPrefix(alias, "PK");
 }
 
 [[nodiscard]] bool hasCommonNameAlias(const skygate::ephemeris::CelestialBody& body)
@@ -75,18 +62,13 @@ struct DeepSkyLabelCandidate final {
     }
 
     return std::any_of(
-        body.deepSkyObject->aliases.begin(),
-        body.deepSkyObject->aliases.end(),
-        [](const std::string& alias) {
+        body.deepSkyObject->aliases.begin(), body.deepSkyObject->aliases.end(), [](const std::string& alias) {
             return !alias.empty() && !isGenericCatalogAlias(alias);
         }
     );
 }
 
-[[nodiscard]] bool shouldConsiderDeepSkyLabel(
-    const skygate::ephemeris::CelestialBody& body,
-    const double fovDeg
-)
+[[nodiscard]] bool shouldConsiderDeepSkyLabel(const skygate::ephemeris::CelestialBody& body, const double fovDeg)
 {
     if (isMessierObject(body) || hasCommonNameAlias(body)) {
         return true;
@@ -95,11 +77,8 @@ struct DeepSkyLabelCandidate final {
     return fovDeg <= 20.0;
 }
 
-[[nodiscard]] std::size_t deepSkyLabelBudget(
-    const double fovDeg,
-    const double viewportWidth,
-    const double viewportHeight
-)
+[[nodiscard]] std::size_t
+deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double viewportHeight)
 {
     if (fovDeg > 60.0) {
         return 0U;
@@ -119,15 +98,9 @@ struct DeepSkyLabelCandidate final {
         baseBudget = 100U;
     }
 
-    const double viewportScale = std::clamp(
-        skygate::core::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0),
-        0.70,
-        1.35
-    );
-    return static_cast<std::size_t>(std::max(
-        1.0,
-        static_cast<double>(baseBudget) * viewportScale
-    ));
+    const double viewportScale =
+        std::clamp(skygate::core::Geometry2d::areaScale(viewportWidth, viewportHeight, 1100.0, 760.0), 0.70, 1.35);
+    return static_cast<std::size_t>(std::max(1.0, static_cast<double>(baseBudget) * viewportScale));
 }
 
 [[nodiscard]] double deepSkyLabelScore(
@@ -149,22 +122,14 @@ struct DeepSkyLabelCandidate final {
     }
 
     if (body.deepSkyObject.has_value()) {
-        score += std::clamp(
-            body.deepSkyObject->majorAxisArcmin.value_or(0.0),
-            0.0,
-            120.0
-        ) * 0.75;
+        score += std::clamp(body.deepSkyObject->majorAxisArcmin.value_or(0.0), 0.0, 120.0) * 0.75;
     }
 
     const double centerX = viewportWidth * 0.5;
     const double centerY = viewportHeight * 0.5;
     const double normalizedDistanceSquared =
-        skygate::core::squaredDistance2d(
-            glyph.x,
-            glyph.y,
-            centerX,
-            centerY
-        ) / std::max(1.0, viewportWidth * viewportWidth + viewportHeight * viewportHeight);
+        skygate::core::Geometry2d::squaredDistance2d(glyph.x, glyph.y, centerX, centerY)
+        / std::max(1.0, viewportWidth * viewportWidth + viewportHeight * viewportHeight);
 
     return score - (normalizedDistanceSquared * 120.0);
 }
@@ -174,8 +139,7 @@ struct DeepSkyLabelCandidate final {
 namespace skygate::ui::internal {
 
 QColor skyRenderLabelColorForBodyType(
-    const skygate::ephemeris::CelestialBodyType type,
-    const SkyThemeRenderPalette& renderTheme
+    const skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderTheme
 )
 {
     switch (type) {
@@ -196,29 +160,17 @@ QColor skyRenderLabelColorForBodyType(
     return renderTheme.labelDefault;
 }
 
-skygate::core::Rect2d skyRenderLabelBounds(
-    const double anchorX,
-    const double anchorY,
-    const std::string_view text
-)
+skygate::core::Rect2d skyRenderLabelBounds(const double anchorX, const double anchorY, const std::string_view text)
 {
     constexpr double kLabelPaddingX = 12.0;
     constexpr double kLabelHeightPx = 20.0;
     constexpr double kLabelOffsetYPx = 8.0;
     constexpr double kApproximateGlyphWidthPx = 6.8;
 
-    const double width = std::max(
-        24.0,
-        (static_cast<double>(text.size()) * kApproximateGlyphWidthPx) + kLabelPaddingX
-    );
+    const double width = std::max(24.0, (static_cast<double>(text.size()) * kApproximateGlyphWidthPx) + kLabelPaddingX);
     const double left = anchorX - (width * 0.5);
     const double top = anchorY - kLabelHeightPx - kLabelOffsetYPx;
-    return skygate::core::Rect2d {
-        .left = left,
-        .top = top,
-        .right = left + width,
-        .bottom = top + kLabelHeightPx
-    };
+    return skygate::core::Rect2d{.left = left, .top = top, .right = left + width, .bottom = top + kLabelHeightPx};
 }
 
 bool skyRenderLabelFitsViewport(
@@ -228,25 +180,14 @@ bool skyRenderLabelFitsViewport(
     const double edgeMarginPx
 )
 {
-    return skygate::core::fitsWithin(bounds, viewportWidth, viewportHeight, edgeMarginPx);
+    return skygate::core::Geometry2d::fitsWithin(bounds, viewportWidth, viewportHeight, edgeMarginPx);
 }
 
 void appendSkyRenderLabel(
-    std::vector<SkyRenderLabel>& labels,
-    QString kind,
-    const double x,
-    const double y,
-    QString text,
-    const QColor& color
+    std::vector<SkyRenderLabel>& labels, QString kind, const double x, const double y, QString text, const QColor& color
 )
 {
-    labels.push_back(SkyRenderLabel {
-        .kind = std::move(kind),
-        .x = x,
-        .y = y,
-        .text = std::move(text),
-        .color = color
-    });
+    labels.push_back(SkyRenderLabel{.kind = std::move(kind), .x = x, .y = y, .text = std::move(text), .color = color});
 }
 
 void appendSkyRenderLabel(
@@ -257,14 +198,7 @@ void appendSkyRenderLabel(
     const QColor& color
 )
 {
-    appendSkyRenderLabel(
-        labels,
-        {},
-        x,
-        y,
-        QString::fromStdString(std::string(text)),
-        color
-    );
+    appendSkyRenderLabel(labels, {}, x, y, QString::fromStdString(std::string(text)), color);
 }
 
 double skyRenderDeepSkyHitRadius(const SkyRenderGlyph& glyph)
@@ -286,16 +220,12 @@ void appendBodyPointLabels(
 {
     for (const auto& point : frame.points) {
         const auto& body = snapshot.bodyAt(point.bodyIndex);
-        const bool isConstellationLabel =
-            body.type == skygate::ephemeris::CelestialBodyType::Constellation;
-        const bool isSolarSystemLabel =
-            body.type == skygate::ephemeris::CelestialBodyType::Planet
-            || body.type == skygate::ephemeris::CelestialBodyType::Sun
-            || body.type == skygate::ephemeris::CelestialBodyType::Moon;
-        if (
-            (!isConstellationLabel || !overlayLayers.constellationLabels)
-            && (!isSolarSystemLabel || !overlayLayers.solarSystemLabels)
-        ) {
+        const bool isConstellationLabel = body.type == skygate::ephemeris::CelestialBodyType::Constellation;
+        const bool isSolarSystemLabel = body.type == skygate::ephemeris::CelestialBodyType::Planet
+                                        || body.type == skygate::ephemeris::CelestialBodyType::Sun
+                                        || body.type == skygate::ephemeris::CelestialBodyType::Moon;
+        if ((!isConstellationLabel || !overlayLayers.constellationLabels)
+            && (!isSolarSystemLabel || !overlayLayers.solarSystemLabels)) {
             continue;
         }
 
@@ -303,26 +233,14 @@ void appendBodyPointLabels(
             continue;
         }
 
-        if (
-            point.x < edgeMarginPx
-            || point.x > (viewportWidth - edgeMarginPx)
-            || point.y < edgeMarginPx
-            || point.y > (viewportHeight - edgeMarginPx)
-        ) {
+        if (point.x < edgeMarginPx || point.x > (viewportWidth - edgeMarginPx) || point.y < edgeMarginPx
+            || point.y > (viewportHeight - edgeMarginPx)) {
             continue;
         }
 
-        const skygate::core::Rect2d bounds = skyRenderLabelBounds(
-            point.x,
-            point.y,
-            body.displayName
-        );
+        const skygate::core::Rect2d bounds = skyRenderLabelBounds(point.x, point.y, body.displayName);
         appendSkyRenderLabel(
-            frame.labels,
-            point.x,
-            point.y,
-            body.displayName,
-            skyRenderLabelColorForBodyType(body.type, renderTheme)
+            frame.labels, point.x, point.y, body.displayName, skyRenderLabelColorForBodyType(body.type, renderTheme)
         );
         labelGrid.add(bounds);
     }
@@ -340,11 +258,7 @@ void appendDeepSkyLabels(
     skygate::core::RectOccupancyGrid& labelGrid
 )
 {
-    const std::size_t labelBudget = deepSkyLabelBudget(
-        projectionParams.fovDeg,
-        viewportWidth,
-        viewportHeight
-    );
+    const std::size_t labelBudget = deepSkyLabelBudget(projectionParams.fovDeg, viewportWidth, viewportHeight);
     if (labelBudget == 0U) {
         return;
     }
@@ -354,11 +268,8 @@ void appendDeepSkyLabels(
     for (std::size_t glyphIndex = 0; glyphIndex < frame.glyphs.size(); ++glyphIndex) {
         const auto& glyph = frame.glyphs[glyphIndex];
         const auto& body = snapshot.bodyAt(glyph.bodyIndex);
-        if (
-            body.displayName.empty()
-            || seenLabels.contains(body.displayName)
-            || !shouldConsiderDeepSkyLabel(body, projectionParams.fovDeg)
-        ) {
+        if (body.displayName.empty() || seenLabels.contains(body.displayName)
+            || !shouldConsiderDeepSkyLabel(body, projectionParams.fovDeg)) {
             continue;
         }
 
@@ -368,20 +279,19 @@ void appendDeepSkyLabels(
             continue;
         }
 
-        candidates.push_back(DeepSkyLabelCandidate {
-            .glyphIndex = glyphIndex,
-            .score = deepSkyLabelScore(body, glyph, viewportWidth, viewportHeight),
-            .bounds = bounds
-        });
+        candidates.push_back(
+            DeepSkyLabelCandidate{
+                .glyphIndex = glyphIndex,
+                .score = deepSkyLabelScore(body, glyph, viewportWidth, viewportHeight),
+                .bounds = bounds
+            }
+        );
     }
 
     std::sort(
         candidates.begin(),
         candidates.end(),
-        [&frame, &snapshot](
-            const DeepSkyLabelCandidate& lhs,
-            const DeepSkyLabelCandidate& rhs
-        ) {
+        [&frame, &snapshot](const DeepSkyLabelCandidate& lhs, const DeepSkyLabelCandidate& rhs) {
             if (std::abs(lhs.score - rhs.score) > 1e-9) {
                 return lhs.score > rhs.score;
             }

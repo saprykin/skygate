@@ -8,11 +8,7 @@
 
 namespace {
 
-[[nodiscard]] bool isNear(
-    const double actual,
-    const double expected,
-    const double tolerance = 1e-8
-)
+[[nodiscard]] bool isNear(const double actual, const double expected, const double tolerance = 1e-8)
 {
     return std::abs(actual - expected) <= tolerance;
 }
@@ -41,12 +37,12 @@ void GeometryPropertyTests::generatedDistancesStaySymmetricAndNonNegative()
         const double x2 = rng.realInRange(-10000.0, 10000.0);
         const double y2 = rng.realInRange(-10000.0, 10000.0);
 
-        const double forward = skygate::core::squaredDistance2d(x1, y1, x2, y2);
-        const double reverse = skygate::core::squaredDistance2d(x2, y2, x1, y1);
+        const double forward = skygate::core::Geometry2d::squaredDistance2d(x1, y1, x2, y2);
+        const double reverse = skygate::core::Geometry2d::squaredDistance2d(x2, y2, x1, y1);
         QVERIFY(std::isfinite(forward));
         QVERIFY(forward >= 0.0);
         QVERIFY(isNear(forward, reverse));
-        QVERIFY(isNear(skygate::core::length2d(x1 - x2, y1 - y2), std::sqrt(forward), 1e-7));
+        QVERIFY(isNear(skygate::core::Geometry2d::length2d(x1 - x2, y1 - y2), std::sqrt(forward), 1e-7));
     }
 }
 
@@ -61,18 +57,10 @@ void GeometryPropertyTests::generatedRotationsPreserveOffsetLength()
         const double offsetY = rng.realInRange(-250.0, 250.0);
         const double rotationDeg = rng.realInRange(-1440.0, 1440.0);
 
-        const auto rotated = skygate::core::rotatedOffsetPoint2d(
-            originX,
-            originY,
-            offsetX,
-            offsetY,
-            rotationDeg
-        );
-        const double originalLength = skygate::core::length2d(offsetX, offsetY);
-        const double rotatedLength = skygate::core::length2d(
-            rotated.x - originX,
-            rotated.y - originY
-        );
+        const auto rotated =
+            skygate::core::Geometry2d::rotatedOffsetPoint2d(originX, originY, offsetX, offsetY, rotationDeg);
+        const double originalLength = skygate::core::Geometry2d::length2d(offsetX, offsetY);
+        const double rotatedLength = skygate::core::Geometry2d::length2d(rotated.x - originX, rotated.y - originY);
 
         QVERIFY(std::isfinite(rotated.x));
         QVERIFY(std::isfinite(rotated.y));
@@ -90,15 +78,9 @@ void GeometryPropertyTests::generatedEllipseSamplesStayOnParametricEllipse()
         const int sampleCount = rng.intInRange(3, 720);
         const int sampleIndex = rng.intInRange(-sampleCount * 2, sampleCount * 2);
 
-        const auto point = skygate::core::ellipseOffsetPoint2d(
-            radiusX,
-            radiusY,
-            sampleIndex,
-            sampleCount
-        );
+        const auto point = skygate::core::Geometry2d::ellipseOffsetPoint2d(radiusX, radiusY, sampleIndex, sampleCount);
         const double ellipseEquation =
-            ((point.x * point.x) / (radiusX * radiusX))
-            + ((point.y * point.y) / (radiusY * radiusY));
+            ((point.x * point.x) / (radiusX * radiusX)) + ((point.y * point.y) / (radiusY * radiusY));
 
         QVERIFY(std::isfinite(point.x));
         QVERIFY(std::isfinite(point.y));
@@ -116,15 +98,9 @@ void GeometryPropertyTests::generatedPerpendicularOffsetsStayNormalToSourceSegme
         const double endX = startX + rng.realInRange(-200.0, 200.0);
         const double endY = startY + rng.realInRange(-200.0, 200.0);
         const double halfWidth = rng.realInRange(0.0, 50.0);
-        const auto offset = skygate::core::perpendicularOffset2d(
-            startX,
-            startY,
-            endX,
-            endY,
-            halfWidth
-        );
+        const auto offset = skygate::core::Geometry2d::perpendicularOffset2d(startX, startY, endX, endY, halfWidth);
 
-        if (skygate::core::length2d(endX - startX, endY - startY) <= 0.0) {
+        if (skygate::core::Geometry2d::length2d(endX - startX, endY - startY) <= 0.0) {
             QVERIFY(!offset.has_value());
             continue;
         }
@@ -132,7 +108,7 @@ void GeometryPropertyTests::generatedPerpendicularOffsetsStayNormalToSourceSegme
         QVERIFY(offset.has_value());
         const double dot = (endX - startX) * offset->x + (endY - startY) * offset->y;
         QVERIFY(isNear(dot, 0.0, 1e-7));
-        QVERIFY(isNear(skygate::core::length2d(offset->x, offset->y), halfWidth, 1e-8));
+        QVERIFY(isNear(skygate::core::Geometry2d::length2d(offset->x, offset->y), halfWidth, 1e-8));
     }
 }
 
@@ -144,9 +120,9 @@ void GeometryPropertyTests::generatedGridCentersContainOriginalCoordinates()
         const double x = rng.realInRange(-10000.0, 10000.0);
         const double y = rng.realInRange(-10000.0, 10000.0);
         const double cellSize = rng.realInRange(0.1, 400.0);
-        const auto center = skygate::core::gridCellCenter(x, y, cellSize);
-        const std::int32_t cellX = skygate::core::gridCellIndex(x, cellSize);
-        const std::int32_t cellY = skygate::core::gridCellIndex(y, cellSize);
+        const auto center = skygate::core::Geometry2d::gridCellCenter(x, y, cellSize);
+        const std::int32_t cellX = skygate::core::Geometry2d::gridCellIndex(x, cellSize);
+        const std::int32_t cellY = skygate::core::Geometry2d::gridCellIndex(y, cellSize);
 
         QVERIFY(x >= static_cast<double>(cellX) * cellSize);
         QVERIFY(x < static_cast<double>(cellX + 1) * cellSize);
@@ -155,8 +131,8 @@ void GeometryPropertyTests::generatedGridCentersContainOriginalCoordinates()
         QVERIFY(isNear(center.x, (static_cast<double>(cellX) + 0.5) * cellSize, 1e-8));
         QVERIFY(isNear(center.y, (static_cast<double>(cellY) + 0.5) * cellSize, 1e-8));
         QCOMPARE(
-            skygate::core::packedGridCellKey(x, y, cellSize),
-            skygate::core::packedGridCellKey(cellX, cellY)
+            skygate::core::Geometry2d::packedGridCellKey(x, y, cellSize),
+            skygate::core::Geometry2d::packedGridCellKey(cellX, cellY)
         );
     }
 }
@@ -170,13 +146,13 @@ void GeometryPropertyTests::generatedRectIntersectionIsSymmetric()
         const double ay1 = rng.realInRange(-500.0, 500.0);
         const double bx1 = rng.realInRange(-500.0, 500.0);
         const double by1 = rng.realInRange(-500.0, 500.0);
-        const skygate::core::Rect2d first {
+        const skygate::core::Rect2d first{
             .left = ax1,
             .top = ay1,
             .right = ax1 + rng.realInRange(0.1, 200.0),
             .bottom = ay1 + rng.realInRange(0.1, 200.0)
         };
-        const skygate::core::Rect2d second {
+        const skygate::core::Rect2d second{
             .left = bx1,
             .top = by1,
             .right = bx1 + rng.realInRange(0.1, 200.0),
@@ -184,11 +160,10 @@ void GeometryPropertyTests::generatedRectIntersectionIsSymmetric()
         };
 
         QCOMPARE(
-            skygate::core::intersects(first, second),
-            skygate::core::intersects(second, first)
+            skygate::core::Geometry2d::intersects(first, second), skygate::core::Geometry2d::intersects(second, first)
         );
-        QVERIFY(skygate::core::intersects(first, first));
-        QVERIFY(skygate::core::intersects(second, second));
+        QVERIFY(skygate::core::Geometry2d::intersects(first, first));
+        QVERIFY(skygate::core::Geometry2d::intersects(second, second));
     }
 }
 

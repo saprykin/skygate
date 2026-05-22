@@ -1,6 +1,7 @@
 #include "skygate/core/math/ProjectedPolylineBuilder.hpp"
 
 #include "skygate/core/math/AngleMath.hpp"
+#include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/core/math/SphericalGeometry.hpp"
 
@@ -14,34 +15,21 @@ constexpr int kMaxAdaptiveSubsegments = 512;
 constexpr double kMinAngularStepDeg = 0.05;
 constexpr double kMaxAngularStepDeg = 5.0;
 
-[[nodiscard]] double angularDistanceRad(
-    const SphericalGeometry::Vector3d& start,
-    const SphericalGeometry::Vector3d& end
-) noexcept
+[[nodiscard]] double
+angularDistanceRad(const SphericalGeometry::Vector3d& start, const SphericalGeometry::Vector3d& end) noexcept
 {
     return std::acos(std::clamp(SphericalGeometry::dot(start, end), -1.0, 1.0));
 }
 
-[[nodiscard]] int adaptiveSubsegmentCount(
-    const ProjectionParams& params,
-    const double angularDistance
-) noexcept
+[[nodiscard]] int adaptiveSubsegmentCount(const ProjectionParams& params, const double angularDistance) noexcept
 {
     if (!std::isfinite(angularDistance) || angularDistance <= MathConstants::kEpsilon) {
         return 1;
     }
 
-    const double angularStepDeg = std::clamp(
-        params.fovDeg / 8.0,
-        kMinAngularStepDeg,
-        kMaxAngularStepDeg
-    );
+    const double angularStepDeg = std::clamp(params.fovDeg / 8.0, kMinAngularStepDeg, kMaxAngularStepDeg);
     const double angularDistanceDeg = AngleMath::toDegrees(angularDistance);
-    return std::clamp(
-        static_cast<int>(std::ceil(angularDistanceDeg / angularStepDeg)),
-        1,
-        kMaxAdaptiveSubsegments
-    );
+    return std::clamp(static_cast<int>(std::ceil(angularDistanceDeg / angularStepDeg)), 1, kMaxAdaptiveSubsegments);
 }
 
 [[nodiscard]] SphericalGeometry::Vector3d interpolateUnitVector(
@@ -52,29 +40,24 @@ constexpr double kMaxAngularStepDeg = 5.0;
 ) noexcept
 {
     const double sinAngularDistance = std::sin(angularDistance);
-    if (
-        !std::isfinite(sinAngularDistance)
-        || std::abs(sinAngularDistance) <= MathConstants::kEpsilon
-    ) {
-        return SphericalGeometry::normalize({
-            start[0] + ((end[0] - start[0]) * t),
-            start[1] + ((end[1] - start[1]) * t),
-            start[2] + ((end[2] - start[2]) * t)
-        });
+    if (!std::isfinite(sinAngularDistance) || std::abs(sinAngularDistance) <= MathConstants::kEpsilon) {
+        return SphericalGeometry::normalize(
+            {start[0] + ((end[0] - start[0]) * t),
+             start[1] + ((end[1] - start[1]) * t),
+             start[2] + ((end[2] - start[2]) * t)}
+        );
     }
 
     const double startWeight = std::sin((1.0 - t) * angularDistance) / sinAngularDistance;
     const double endWeight = std::sin(t * angularDistance) / sinAngularDistance;
-    return SphericalGeometry::normalize({
-        (start[0] * startWeight) + (end[0] * endWeight),
-        (start[1] * startWeight) + (end[1] * endWeight),
-        (start[2] * startWeight) + (end[2] * endWeight)
-    });
+    return SphericalGeometry::normalize(
+        {(start[0] * startWeight) + (end[0] * endWeight),
+         (start[1] * startWeight) + (end[1] * endWeight),
+         (start[2] * startWeight) + (end[2] * endWeight)}
+    );
 }
 
-[[nodiscard]] HorizontalCoordinate horizontalFromUnitVector(
-    const SphericalGeometry::Vector3d& vector
-) noexcept
+[[nodiscard]] HorizontalCoordinate horizontalFromUnitVector(const SphericalGeometry::Vector3d& vector) noexcept
 {
     const SphericalGeometry::Vector3d unit = SphericalGeometry::normalize(vector);
     return {
@@ -90,22 +73,12 @@ void appendProjectedSegment(
     const double maxSegmentLengthSquared
 )
 {
-    const double segmentLengthSquared = squaredDistance2d(
-        end.x,
-        end.y,
-        start.x,
-        start.y
-    );
+    const double segmentLengthSquared = Geometry2d::squaredDistance2d(end.x, end.y, start.x, start.y);
     if (segmentLengthSquared > maxSegmentLengthSquared) {
         return;
     }
 
-    segments.push_back(LineSegment2d {
-        .x1 = start.x,
-        .y1 = start.y,
-        .x2 = end.x,
-        .y2 = end.y
-    });
+    segments.push_back(LineSegment2d{.x1 = start.x, .y1 = start.y, .x2 = end.x, .y2 = end.y});
 }
 
 void appendAdaptiveProjectedSegment(
@@ -127,14 +100,10 @@ void appendAdaptiveProjectedSegment(
     bool hasPreviousPoint = previousPoint.isVisible && previousPoint.isFinite();
     for (int subsegmentIndex = 1; subsegmentIndex <= subsegmentCount; ++subsegmentIndex) {
         const double t = static_cast<double>(subsegmentIndex) / static_cast<double>(subsegmentCount);
-        const HorizontalCoordinate coordinate = subsegmentIndex == subsegmentCount
-            ? endCoordinate
-            : horizontalFromUnitVector(interpolateUnitVector(
-                startVector,
-                endVector,
-                angularDistance,
-                t
-            ));
+        const HorizontalCoordinate coordinate =
+            subsegmentIndex == subsegmentCount
+                ? endCoordinate
+                : horizontalFromUnitVector(interpolateUnitVector(startVector, endVector, angularDistance, t));
         const ScreenPoint point = projection.project(coordinate);
         const bool hasPoint = point.isVisible && point.isFinite();
         if (hasPreviousPoint && hasPoint) {
@@ -173,11 +142,7 @@ std::vector<LineSegment2d> ProjectedPolylineBuilder::build(
 
         if (hasPreviousCoordinate) {
             appendAdaptiveProjectedSegment(
-                segments,
-                projection,
-                previousCoordinate,
-                coordinate,
-                maxSegmentLengthSquared
+                segments, projection, previousCoordinate, coordinate, maxSegmentLengthSquared
             );
         }
 

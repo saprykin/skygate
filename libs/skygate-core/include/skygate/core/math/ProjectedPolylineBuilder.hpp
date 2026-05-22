@@ -1,7 +1,7 @@
 #pragma once
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/math/Geometry2d.hpp"
+#include "skygate/core/math/LineSegment2d.hpp"
 
 #include <span>
 #include <vector>

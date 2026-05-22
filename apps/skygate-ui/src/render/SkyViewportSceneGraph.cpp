@@ -19,10 +19,7 @@ struct VertexBucket final {
     std::vector<float> coordinates;
 };
 
-void appendBucketNode(
-    QSGNode* rootNode,
-    const VertexBucket& bucket
-)
+void appendBucketNode(QSGNode* rootNode, const VertexBucket& bucket)
 {
     const int vertexCount = static_cast<int>(bucket.coordinates.size() / 2U);
     if (vertexCount <= 0) {
@@ -30,19 +27,13 @@ void appendBucketNode(
     }
 
     QSGGeometryNode* node = new QSGGeometryNode();
-    QSGGeometry* geometry = new QSGGeometry(
-        QSGGeometry::defaultAttributes_Point2D(),
-        vertexCount
-    );
+    QSGGeometry* geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), vertexCount);
     geometry->setDrawingMode(QSGGeometry::DrawTriangles);
 
     auto* vertices = geometry->vertexDataAsPoint2D();
     for (int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
         const std::size_t coordinateOffset = static_cast<std::size_t>(vertexIndex) * 2U;
-        vertices[vertexIndex].set(
-            bucket.coordinates[coordinateOffset],
-            bucket.coordinates[coordinateOffset + 1U]
-        );
+        vertices[vertexIndex].set(bucket.coordinates[coordinateOffset], bucket.coordinates[coordinateOffset + 1U]);
     }
 
     QSGFlatColorMaterial* material = new QSGFlatColorMaterial();
@@ -92,10 +83,7 @@ void clearSkyViewportChildNodes(QSGNode* rootNode)
     }
 }
 
-void syncSkyViewportLineNodes(
-    QSGNode* rootNode,
-    const std::span<const SkyViewportLineSegment> lineSegments
-)
+void syncSkyViewportLineNodes(QSGNode* rootNode, const std::span<const SkyViewportLineSegment> lineSegments)
 {
     if (rootNode == nullptr) {
         return;
@@ -110,14 +98,9 @@ void syncSkyViewportLineNodes(
         bucket.color = lineSegment.color;
         bucket.widthPx = lineSegment.widthPx;
 
-        const std::optional<skygate::core::Vector2d> offset =
-            skygate::core::perpendicularOffset2d(
-                lineSegment.x1,
-                lineSegment.y1,
-                lineSegment.x2,
-                lineSegment.y2,
-                lineSegment.widthPx * 0.5F
-            );
+        const std::optional<skygate::core::Vector2d> offset = skygate::core::Geometry2d::perpendicularOffset2d(
+            lineSegment.x1, lineSegment.y1, lineSegment.x2, lineSegment.y2, lineSegment.widthPx * 0.5F
+        );
         if (!offset.has_value()) {
             continue;
         }
@@ -150,15 +133,12 @@ void syncSkyViewportLineNodes(
     }
 
     for (const auto& [bucketKey, bucket] : buckets) {
-        (void) bucketKey;
+        (void)bucketKey;
         appendBucketNode(rootNode, bucket);
     }
 }
 
-void syncSkyViewportPointNodes(
-    QSGNode* rootNode,
-    const std::span<const SkyRenderPoint> points
-)
+void syncSkyViewportPointNodes(QSGNode* rootNode, const std::span<const SkyRenderPoint> points)
 {
     if (rootNode == nullptr) {
         return;
@@ -192,7 +172,7 @@ void syncSkyViewportPointNodes(
     }
 
     for (const auto& [colorKey, bucket] : buckets) {
-        (void) colorKey;
+        (void)colorKey;
         appendBucketNode(rootNode, bucket);
     }
 }

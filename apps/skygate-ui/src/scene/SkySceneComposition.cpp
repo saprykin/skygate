@@ -92,7 +92,7 @@ void appendReferenceLayerLabel(
             continue;
         }
 
-        const double score = skygate::core::squaredDistance2d(projected.x, projected.y, targetX, targetY);
+        const double score = skygate::core::Geometry2d::squaredDistance2d(projected.x, projected.y, targetX, targetY);
         if (score < fallbackScore) {
             fallbackPoint = QPointF(projected.x, projected.y);
             fallbackScore = score;
