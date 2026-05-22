@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/math/Geometry2d.hpp"
+#include "skygate/core/math/Rect2d.hpp"
 
 #include <cstdint>
 #include <optional>

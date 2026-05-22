@@ -23,10 +23,8 @@ constexpr float kHorizonLineWidthPx = 2.2F;
 constexpr float kReferenceLineWidthPx = 1.4F;
 constexpr int kGlyphEllipseSampleCount = 32;
 
-[[nodiscard]] QColor cardinalAzimuthLineColor(
-    const int azimuthDeg,
-    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
-)
+[[nodiscard]] QColor
+cardinalAzimuthLineColor(const int azimuthDeg, const skygate::ui::internal::SkyThemeRenderPalette& renderTheme)
 {
     switch (azimuthDeg) {
     case 0:
@@ -52,14 +50,11 @@ void appendLineSegment(
     const QColor& color
 )
 {
-    lineSegments.push_back(skygate::ui::internal::SkyViewportLineSegment {
-        .x1 = x1,
-        .y1 = y1,
-        .x2 = x2,
-        .y2 = y2,
-        .widthPx = widthPx,
-        .color = color
-    });
+    lineSegments.push_back(
+        skygate::ui::internal::SkyViewportLineSegment{
+            .x1 = x1, .y1 = y1, .x2 = x2, .y2 = y2, .widthPx = widthPx, .color = color
+        }
+    );
 }
 
 template <typename CoordinateFn>
@@ -97,23 +92,10 @@ void appendProjectedPolyline(
     }
 }
 
-[[nodiscard]] std::pair<float, float> rotatedGlyphPoint(
-    const SkyRenderGlyph& glyph,
-    const double x,
-    const double y
-)
+[[nodiscard]] std::pair<float, float> rotatedGlyphPoint(const SkyRenderGlyph& glyph, const double x, const double y)
 {
-    const auto point = skygate::core::rotatedOffsetPoint2d(
-        glyph.x,
-        glyph.y,
-        x,
-        y,
-        glyph.rotationDeg
-    );
-    return {
-        static_cast<float>(point.x),
-        static_cast<float>(point.y)
-    };
+    const auto point = skygate::core::Geometry2d::rotatedOffsetPoint2d(glyph.x, glyph.y, x, y, glyph.rotationDeg);
+    return {static_cast<float>(point.x), static_cast<float>(point.y)};
 }
 
 void appendGlyphCircle(
@@ -123,29 +105,15 @@ void appendGlyphCircle(
     const double radiusYScale
 )
 {
-    const auto previousOffset = skygate::core::ellipseOffsetPoint2d(
-        glyph.radiusXPx * radiusXScale,
-        glyph.radiusYPx * radiusYScale,
-        0,
-        kGlyphEllipseSampleCount
+    const auto previousOffset = skygate::core::Geometry2d::ellipseOffsetPoint2d(
+        glyph.radiusXPx * radiusXScale, glyph.radiusYPx * radiusYScale, 0, kGlyphEllipseSampleCount
     );
-    auto previous = rotatedGlyphPoint(
-        glyph,
-        previousOffset.x,
-        previousOffset.y
-    );
+    auto previous = rotatedGlyphPoint(glyph, previousOffset.x, previousOffset.y);
     for (int index = 1; index <= kGlyphEllipseSampleCount; ++index) {
-        const auto nextOffset = skygate::core::ellipseOffsetPoint2d(
-            glyph.radiusXPx * radiusXScale,
-            glyph.radiusYPx * radiusYScale,
-            index,
-            kGlyphEllipseSampleCount
+        const auto nextOffset = skygate::core::Geometry2d::ellipseOffsetPoint2d(
+            glyph.radiusXPx * radiusXScale, glyph.radiusYPx * radiusYScale, index, kGlyphEllipseSampleCount
         );
-        const auto next = rotatedGlyphPoint(
-            glyph,
-            nextOffset.x,
-            nextOffset.y
-        );
+        const auto next = rotatedGlyphPoint(glyph, nextOffset.x, nextOffset.y);
         appendLineSegment(
             lineSegments,
             previous.first,
@@ -170,31 +138,18 @@ void appendGlyphCross(
     const auto top = rotatedGlyphPoint(glyph, 0.0, -glyph.radiusYPx * scale);
     const auto bottom = rotatedGlyphPoint(glyph, 0.0, glyph.radiusYPx * scale);
     appendLineSegment(
-        lineSegments,
-        left.first,
-        left.second,
-        right.first,
-        right.second,
-        static_cast<float>(glyph.widthPx),
-        glyph.color
+        lineSegments, left.first, left.second, right.first, right.second, static_cast<float>(glyph.widthPx), glyph.color
     );
     appendLineSegment(
-        lineSegments,
-        top.first,
-        top.second,
-        bottom.first,
-        bottom.second,
-        static_cast<float>(glyph.widthPx),
-        glyph.color
+        lineSegments, top.first, top.second, bottom.first, bottom.second, static_cast<float>(glyph.widthPx), glyph.color
     );
 }
 
 void appendGlyphDiamond(
-    std::vector<skygate::ui::internal::SkyViewportLineSegment>& lineSegments,
-    const SkyRenderGlyph& glyph
+    std::vector<skygate::ui::internal::SkyViewportLineSegment>& lineSegments, const SkyRenderGlyph& glyph
 )
 {
-    const std::array<std::pair<float, float>, 4> points {{
+    const std::array<std::pair<float, float>, 4> points{{
         rotatedGlyphPoint(glyph, 0.0, -glyph.radiusYPx),
         rotatedGlyphPoint(glyph, glyph.radiusXPx, 0.0),
         rotatedGlyphPoint(glyph, 0.0, glyph.radiusYPx),
@@ -216,8 +171,7 @@ void appendGlyphDiamond(
 }
 
 void appendDeepSkyGlyph(
-    std::vector<skygate::ui::internal::SkyViewportLineSegment>& lineSegments,
-    const SkyRenderGlyph& glyph
+    std::vector<skygate::ui::internal::SkyViewportLineSegment>& lineSegments, const SkyRenderGlyph& glyph
 )
 {
     switch (glyph.kind) {
@@ -266,11 +220,10 @@ void appendAltAzGridLines(
             input.renderTheme.gridAltitudeLine,
             kGridLineWidthPx,
             [altitudeDeg](const int index) {
-                const double azimuthDeg = (360.0 * static_cast<double>(index))
-                                          / static_cast<double>(kGridAltitudeSampleCount);
-                return skygate::core::HorizontalCoordinate {
-                    .altitudeDeg = static_cast<double>(altitudeDeg),
-                    .azimuthDeg = azimuthDeg
+                const double azimuthDeg =
+                    (360.0 * static_cast<double>(index)) / static_cast<double>(kGridAltitudeSampleCount);
+                return skygate::core::HorizontalCoordinate{
+                    .altitudeDeg = static_cast<double>(altitudeDeg), .azimuthDeg = azimuthDeg
                 };
             }
         );
@@ -289,11 +242,10 @@ void appendAltAzGridLines(
             input.renderTheme.gridAzimuthLine,
             kGridLineWidthPx,
             [azimuthDeg](const int index) {
-                const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
-                                                       / static_cast<double>(kGridAzimuthSampleCount);
-                return skygate::core::HorizontalCoordinate {
-                    .altitudeDeg = altitudeDeg,
-                    .azimuthDeg = static_cast<double>(azimuthDeg)
+                const double altitudeDeg =
+                    -85.0 + (170.0 * static_cast<double>(index)) / static_cast<double>(kGridAzimuthSampleCount);
+                return skygate::core::HorizontalCoordinate{
+                    .altitudeDeg = altitudeDeg, .azimuthDeg = static_cast<double>(azimuthDeg)
                 };
             }
         );
@@ -306,7 +258,7 @@ void appendCardinalGridLines(
     const double maxSegmentLengthSquared
 )
 {
-    constexpr std::array<int, 4> kCardinalAzimuths {0, 90, 180, 270};
+    constexpr std::array<int, 4> kCardinalAzimuths{0, 90, 180, 270};
     for (const int cardinalAzimuthDeg : kCardinalAzimuths) {
         appendProjectedPolyline(
             lineSegments,
@@ -316,11 +268,10 @@ void appendCardinalGridLines(
             cardinalAzimuthLineColor(cardinalAzimuthDeg, input.renderTheme),
             kCardinalLineWidthPx,
             [cardinalAzimuthDeg](const int index) {
-                const double altitudeDeg = -85.0 + (170.0 * static_cast<double>(index))
-                                                       / static_cast<double>(kGridAzimuthSampleCount);
-                return skygate::core::HorizontalCoordinate {
-                    .altitudeDeg = altitudeDeg,
-                    .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
+                const double altitudeDeg =
+                    -85.0 + (170.0 * static_cast<double>(index)) / static_cast<double>(kGridAzimuthSampleCount);
+                return skygate::core::HorizontalCoordinate{
+                    .altitudeDeg = altitudeDeg, .azimuthDeg = static_cast<double>(cardinalAzimuthDeg)
                 };
             }
         );
@@ -341,9 +292,8 @@ void appendHorizonLine(
         input.renderTheme.horizonLine,
         kHorizonLineWidthPx,
         [](const int index) {
-            const double azimuthDeg = (360.0 * static_cast<double>(index))
-                                      / static_cast<double>(kHorizonSampleCount);
-            return skygate::core::HorizontalCoordinate {.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg};
+            const double azimuthDeg = (360.0 * static_cast<double>(index)) / static_cast<double>(kHorizonSampleCount);
+            return skygate::core::HorizontalCoordinate{.altitudeDeg = 0.0, .azimuthDeg = azimuthDeg};
         }
     );
 }
@@ -363,12 +313,10 @@ void appendReferenceLines(
             input.renderTheme.eclipticLine,
             kReferenceLineWidthPx,
             [&input](const int index) {
-                const double eclipticLongitudeDeg = 360.0 * static_cast<double>(index)
-                    / static_cast<double>(kReferenceCircleSampleCount);
+                const double eclipticLongitudeDeg =
+                    360.0 * static_cast<double>(index) / static_cast<double>(kReferenceCircleSampleCount);
                 return skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-                    eclipticLongitudeDeg,
-                    input.observer,
-                    input.utcTime
+                    eclipticLongitudeDeg, input.observer, input.utcTime
                 );
             }
         );
@@ -384,24 +332,15 @@ void appendReferenceLines(
             kReferenceLineWidthPx,
             [&input](const int index) {
                 return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index,
-                    kReferenceCircleSampleCount,
-                    0.0,
-                    input.observer,
-                    input.utcTime
+                    index, kReferenceCircleSampleCount, 0.0, input.observer, input.utcTime
                 );
             }
         );
     }
 
-    if (
-        input.overlayLayers.circumpolarBoundary
-        && input.observer.isValid()
-    ) {
+    if (input.overlayLayers.circumpolarBoundary && input.observer.isValid()) {
         const double boundaryDeclinationDeg =
-            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
-                input.observer
-            );
+            skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(input.observer);
         appendProjectedPolyline(
             lineSegments,
             input.projection,
@@ -411,11 +350,7 @@ void appendReferenceLines(
             kReferenceLineWidthPx,
             [boundaryDeclinationDeg, &input](const int index) {
                 return skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-                    index,
-                    kReferenceCircleSampleCount,
-                    boundaryDeclinationDeg,
-                    input.observer,
-                    input.utcTime
+                    index, kReferenceCircleSampleCount, boundaryDeclinationDeg, input.observer, input.utcTime
                 );
             }
         );
@@ -454,9 +389,7 @@ void appendFrameGlyphs(
 
 namespace skygate::ui::internal {
 
-std::vector<SkyViewportLineSegment> buildSkyViewportLineSegments(
-    const SkyViewportGeometryInput& input
-)
+std::vector<SkyViewportLineSegment> buildSkyViewportLineSegments(const SkyViewportGeometryInput& input)
 {
     const double maxSegmentLength = std::max(input.viewportWidth, input.viewportHeight) * 0.30;
     const double maxSegmentLengthSquared = maxSegmentLength * maxSegmentLength;

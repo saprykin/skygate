@@ -41,54 +41,30 @@ private slots:
 
 void GeometryHelpersTests::rectIntersectionAndViewportFit()
 {
-    const skygate::core::Rect2d rect {
-        .left = 10.0,
-        .top = 20.0,
-        .right = 40.0,
-        .bottom = 60.0
-    };
+    const skygate::core::Rect2d rect{.left = 10.0, .top = 20.0, .right = 40.0, .bottom = 60.0};
 
-    QVERIFY(skygate::core::intersects(rect, skygate::core::Rect2d {
-        .left = 35.0,
-        .top = 50.0,
-        .right = 80.0,
-        .bottom = 90.0
-    }));
-    QVERIFY(!skygate::core::intersects(rect, skygate::core::Rect2d {
-        .left = 40.0,
-        .top = 50.0,
-        .right = 80.0,
-        .bottom = 90.0
-    }));
+    QVERIFY(
+        skygate::core::Geometry2d::intersects(
+            rect, skygate::core::Rect2d{.left = 35.0, .top = 50.0, .right = 80.0, .bottom = 90.0}
+        )
+    );
+    QVERIFY(!skygate::core::Geometry2d::intersects(
+        rect, skygate::core::Rect2d{.left = 40.0, .top = 50.0, .right = 80.0, .bottom = 90.0}
+    ));
 
-    QVERIFY(skygate::core::fitsWithin(rect, 100.0, 100.0, 5.0));
-    QVERIFY(!skygate::core::fitsWithin(rect, 100.0, 100.0, 25.0));
+    QVERIFY(skygate::core::Geometry2d::fitsWithin(rect, 100.0, 100.0, 5.0));
+    QVERIFY(!skygate::core::Geometry2d::fitsWithin(rect, 100.0, 100.0, 25.0));
 }
 
 void GeometryHelpersTests::rectOccupancyGridDetectsCollisions()
 {
     skygate::core::RectOccupancyGrid grid(16.0);
-    const skygate::core::Rect2d occupied {
-        .left = 10.0,
-        .top = 10.0,
-        .right = 30.0,
-        .bottom = 30.0
-    };
+    const skygate::core::Rect2d occupied{.left = 10.0, .top = 10.0, .right = 30.0, .bottom = 30.0};
 
     QVERIFY(!grid.collides(occupied));
     grid.add(occupied);
-    QVERIFY(grid.collides(skygate::core::Rect2d {
-        .left = 29.0,
-        .top = 12.0,
-        .right = 50.0,
-        .bottom = 20.0
-    }));
-    QVERIFY(!grid.collides(skygate::core::Rect2d {
-        .left = 40.0,
-        .top = 40.0,
-        .right = 60.0,
-        .bottom = 60.0
-    }));
+    QVERIFY(grid.collides(skygate::core::Rect2d{.left = 29.0, .top = 12.0, .right = 50.0, .bottom = 20.0}));
+    QVERIFY(!grid.collides(skygate::core::Rect2d{.left = 40.0, .top = 40.0, .right = 60.0, .bottom = 60.0}));
 
     grid.clear();
     QVERIFY(!grid.collides(occupied));
@@ -97,46 +73,16 @@ void GeometryHelpersTests::rectOccupancyGridDetectsCollisions()
 void GeometryHelpersTests::rectOccupancyGridHandlesEdgesAndNegativeCoordinates()
 {
     skygate::core::RectOccupancyGrid grid(10.0);
-    grid.add(skygate::core::Rect2d {
-        .left = -20.0,
-        .top = -20.0,
-        .right = -10.0,
-        .bottom = -10.0
-    });
+    grid.add(skygate::core::Rect2d{.left = -20.0, .top = -20.0, .right = -10.0, .bottom = -10.0});
 
-    QVERIFY(grid.collides(skygate::core::Rect2d {
-        .left = -15.0,
-        .top = -15.0,
-        .right = -5.0,
-        .bottom = -5.0
-    }));
-    QVERIFY(!grid.collides(skygate::core::Rect2d {
-        .left = -10.0,
-        .top = -15.0,
-        .right = 0.0,
-        .bottom = -5.0
-    }));
+    QVERIFY(grid.collides(skygate::core::Rect2d{.left = -15.0, .top = -15.0, .right = -5.0, .bottom = -5.0}));
+    QVERIFY(!grid.collides(skygate::core::Rect2d{.left = -10.0, .top = -15.0, .right = 0.0, .bottom = -5.0}));
 
-    grid.add(skygate::core::Rect2d {
-        .left = 0.0,
-        .top = 0.0,
-        .right = 10.0,
-        .bottom = 10.0
-    });
-    grid.add(skygate::core::Rect2d {
-        .left = 20.0,
-        .top = 20.0,
-        .right = 30.0,
-        .bottom = 30.0
-    });
+    grid.add(skygate::core::Rect2d{.left = 0.0, .top = 0.0, .right = 10.0, .bottom = 10.0});
+    grid.add(skygate::core::Rect2d{.left = 20.0, .top = 20.0, .right = 30.0, .bottom = 30.0});
     grid.clear();
 
-    QVERIFY(!grid.collides(skygate::core::Rect2d {
-        .left = 5.0,
-        .top = 5.0,
-        .right = 8.0,
-        .bottom = 8.0
-    }));
+    QVERIFY(!grid.collides(skygate::core::Rect2d{.left = 5.0, .top = 5.0, .right = 8.0, .bottom = 8.0}));
 }
 
 void GeometryHelpersTests::circleHitIndexReturnsNearestPayload()
@@ -144,7 +90,7 @@ void GeometryHelpersTests::circleHitIndexReturnsNearestPayload()
     skygate::core::CircleHitIndex index(10.0);
     QVERIFY(!index.nearestPayloadAt(0.0, 0.0).has_value());
 
-    const std::array<skygate::core::CircleHitTarget, 3> targets {{
+    const std::array<skygate::core::CircleHitTarget, 3> targets{{
         {.x = 50.0, .y = 50.0, .radius = 5.0, .payloadId = 1U},
         {.x = 55.0, .y = 50.0, .radius = 10.0, .payloadId = 2U},
         {.x = 100.0, .y = 100.0, .radius = 20.0, .payloadId = 3U},
@@ -159,15 +105,10 @@ void GeometryHelpersTests::circleHitIndexReturnsNearestPayload()
 void GeometryHelpersTests::circleHitIndexFiltersTargetsAndSupportsRebuild()
 {
     skygate::core::CircleHitIndex index(10.0);
-    const std::array<skygate::core::CircleHitTarget, 5> targets {{
+    const std::array<skygate::core::CircleHitTarget, 5> targets{{
         {.x = 0.0, .y = 0.0, .radius = 0.0, .payloadId = 1U},
         {.x = 0.0, .y = 0.0, .radius = -1.0, .payloadId = 2U},
-        {
-            .x = std::numeric_limits<double>::quiet_NaN(),
-            .y = 0.0,
-            .radius = 5.0,
-            .payloadId = 3U
-        },
+        {.x = std::numeric_limits<double>::quiet_NaN(), .y = 0.0, .radius = 5.0, .payloadId = 3U},
         {.x = -10.0, .y = -10.0, .radius = 5.0, .payloadId = 4U},
         {.x = -8.0, .y = -10.0, .radius = 5.0, .payloadId = 5U},
     }};
@@ -177,7 +118,7 @@ void GeometryHelpersTests::circleHitIndexFiltersTargetsAndSupportsRebuild()
     QCOMPARE(index.nearestPayloadAt(-15.0, -10.0).value_or(0U), 4U);
     QVERIFY(!index.nearestPayloadAt(0.0, 0.0).has_value());
 
-    const std::array<skygate::core::CircleHitTarget, 1> rebuiltTargets {{
+    const std::array<skygate::core::CircleHitTarget, 1> rebuiltTargets{{
         {.x = 50.0, .y = 50.0, .radius = 10.0, .payloadId = 9U},
     }};
     index.rebuild(rebuiltTargets);
@@ -192,7 +133,7 @@ void GeometryHelpersTests::projectedPolylineSplitsGapsAndDropsLongJumps()
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
-        skygate::core::ProjectionParams {
+        skygate::core::ProjectionParams{
             .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
             .fovDeg = 100.0,
             .rollDeg = 0.0,
@@ -202,7 +143,7 @@ void GeometryHelpersTests::projectedPolylineSplitsGapsAndDropsLongJumps()
     );
     QVERIFY(projection.has_value());
 
-    const std::vector<skygate::core::HorizontalCoordinate> coordinates {
+    const std::vector<skygate::core::HorizontalCoordinate> coordinates{
         {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         {.altitudeDeg = 46.0, .azimuthDeg = 181.0},
         {.altitudeDeg = std::numeric_limits<double>::quiet_NaN(), .azimuthDeg = 181.0},
@@ -222,7 +163,7 @@ void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerateInputs()
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
-        skygate::core::ProjectionParams {
+        skygate::core::ProjectionParams{
             .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
             .fovDeg = 100.0,
             .rollDeg = 0.0,
@@ -233,12 +174,12 @@ void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerateInputs()
     QVERIFY(projection.has_value());
 
     const skygate::core::ProjectedPolylineBuilder builder;
-    const std::vector<skygate::core::HorizontalCoordinate> oneCoordinate {
+    const std::vector<skygate::core::HorizontalCoordinate> oneCoordinate{
         {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
     };
     QVERIFY(builder.build(*projection, oneCoordinate, 1'000'000.0).empty());
 
-    const std::vector<skygate::core::HorizontalCoordinate> twoCoordinates {
+    const std::vector<skygate::core::HorizontalCoordinate> twoCoordinates{
         {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         {.altitudeDeg = 46.0, .azimuthDeg = 181.0},
     };
@@ -247,16 +188,12 @@ void GeometryHelpersTests::projectedPolylineHandlesBoundaryAndDegenerateInputs()
     QVERIFY(firstPoint.isVisible);
     QVERIFY(secondPoint.isVisible);
 
-    const double segmentLengthSquared = skygate::core::squaredDistance2d(
-        firstPoint.x,
-        firstPoint.y,
-        secondPoint.x,
-        secondPoint.y
-    );
+    const double segmentLengthSquared =
+        skygate::core::Geometry2d::squaredDistance2d(firstPoint.x, firstPoint.y, secondPoint.x, secondPoint.y);
     QCOMPARE(builder.build(*projection, twoCoordinates, segmentLengthSquared).size(), 1U);
     QVERIFY(builder.build(*projection, twoCoordinates, -1.0).empty());
 
-    const std::vector<skygate::core::HorizontalCoordinate> coordinatesWithGaps {
+    const std::vector<skygate::core::HorizontalCoordinate> coordinatesWithGaps{
         {.altitudeDeg = std::numeric_limits<double>::quiet_NaN(), .azimuthDeg = 180.0},
         {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         {.altitudeDeg = std::numeric_limits<double>::quiet_NaN(), .azimuthDeg = 180.0},
@@ -269,7 +206,7 @@ void GeometryHelpersTests::projectedPolylineSamplesInteriorOfOffscreenSegment()
 {
     const auto projection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
-        skygate::core::ProjectionParams {
+        skygate::core::ProjectionParams{
             .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
             .fovDeg = 1.0,
             .rollDeg = 0.0,
@@ -279,7 +216,7 @@ void GeometryHelpersTests::projectedPolylineSamplesInteriorOfOffscreenSegment()
     );
     QVERIFY(projection.has_value());
 
-    const std::vector<skygate::core::HorizontalCoordinate> coordinates {
+    const std::vector<skygate::core::HorizontalCoordinate> coordinates{
         {.altitudeDeg = 45.0, .azimuthDeg = 179.0},
         {.altitudeDeg = 45.0, .azimuthDeg = 181.0},
     };
@@ -291,21 +228,16 @@ void GeometryHelpersTests::projectedPolylineSamplesInteriorOfOffscreenSegment()
 
     QVERIFY(!segments.empty());
     QVERIFY(std::any_of(segments.begin(), segments.end(), [](const skygate::core::LineSegment2d& segment) {
-        return segment.x1 >= 0.0 && segment.x1 <= 1000.0
-            && segment.y1 >= 0.0 && segment.y1 <= 800.0
-            && segment.x2 >= 0.0 && segment.x2 <= 1000.0
-            && segment.y2 >= 0.0 && segment.y2 <= 800.0;
+        return segment.x1 >= 0.0 && segment.x1 <= 1000.0 && segment.y1 >= 0.0 && segment.y1 <= 800.0
+               && segment.x2 >= 0.0 && segment.x2 <= 1000.0 && segment.y2 >= 0.0 && segment.y2 <= 800.0;
     }));
 }
 
 void GeometryHelpersTests::dashedLineBuilderCreatesDashSegments()
 {
     const skygate::core::DashedLineBuilder builder;
-    const auto segments = builder.build(
-        skygate::core::LineSegment2d {.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0},
-        3.0,
-        2.0
-    );
+    const auto segments =
+        builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0}, 3.0, 2.0);
 
     QCOMPARE(segments.size(), 2U);
     QCOMPARE(segments.front().x1, 0.0);
@@ -313,41 +245,25 @@ void GeometryHelpersTests::dashedLineBuilderCreatesDashSegments()
     QCOMPARE(segments.back().x1, 5.0);
     QCOMPARE(segments.back().x2, 8.0);
 
-    QVERIFY(builder.build(
-        skygate::core::LineSegment2d {.x1 = 0.0, .y1 = 0.0, .x2 = 0.0, .y2 = 0.0},
-        3.0,
-        2.0
-    ).empty());
+    QVERIFY(builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 0.0, .y2 = 0.0}, 3.0, 2.0).empty());
 }
 
 void GeometryHelpersTests::dashedLineBuilderHandlesDegeneratePatternsAndDiagonals()
 {
     const skygate::core::DashedLineBuilder builder;
-    const auto contiguousSegments = builder.build(
-        skygate::core::LineSegment2d {.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0},
-        3.0,
-        0.0
-    );
+    const auto contiguousSegments =
+        builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0}, 3.0, 0.0);
     QCOMPARE(contiguousSegments.size(), 4U);
     QCOMPARE(contiguousSegments.back().x1, 9.0);
     QCOMPARE(contiguousSegments.back().x2, 10.0);
 
-    QVERIFY(builder.build(
-        skygate::core::LineSegment2d {.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0},
-        0.0,
-        1.0
-    ).empty());
-    QVERIFY(builder.build(
-        skygate::core::LineSegment2d {.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0},
-        3.0,
-        -1.0
-    ).empty());
-
-    const auto diagonalSegments = builder.build(
-        skygate::core::LineSegment2d {.x1 = 0.0, .y1 = 0.0, .x2 = 3.0, .y2 = 4.0},
-        2.0,
-        1.0
+    QVERIFY(builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0}, 0.0, 1.0).empty());
+    QVERIFY(
+        builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 10.0, .y2 = 0.0}, 3.0, -1.0).empty()
     );
+
+    const auto diagonalSegments =
+        builder.build(skygate::core::LineSegment2d{.x1 = 0.0, .y1 = 0.0, .x2 = 3.0, .y2 = 4.0}, 2.0, 1.0);
     QCOMPARE(diagonalSegments.size(), 2U);
     QVERIFY(isNear(diagonalSegments.front().x2, 1.2));
     QVERIFY(isNear(diagonalSegments.front().y2, 1.6));
@@ -361,36 +277,21 @@ void GeometryHelpersTests::coordinateFiniteQueriesDoNotChangeValidity()
 {
     const double nan = std::numeric_limits<double>::quiet_NaN();
 
-    QVERIFY((skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = 1.0,
-        .declinationDeg = 2.0
-    }).isFinite());
-    QVERIFY(!(skygate::core::EquatorialCoordinate {
-        .rightAscensionHours = nan,
-        .declinationDeg = 2.0
-    }).isFinite());
+    QVERIFY((skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0}).isFinite());
+    QVERIFY(!(skygate::core::EquatorialCoordinate{.rightAscensionHours = nan, .declinationDeg = 2.0}).isFinite());
 
-    const skygate::core::HorizontalCoordinate validHorizontal {
-        .altitudeDeg = 10.0,
-        .azimuthDeg = 20.0
-    };
+    const skygate::core::HorizontalCoordinate validHorizontal{.altitudeDeg = 10.0, .azimuthDeg = 20.0};
     QVERIFY(validHorizontal.isFinite());
     QVERIFY(validHorizontal.isValid());
 
-    const skygate::core::HorizontalCoordinate outOfRangeHorizontal {
-        .altitudeDeg = 120.0,
-        .azimuthDeg = 20.0
-    };
+    const skygate::core::HorizontalCoordinate outOfRangeHorizontal{.altitudeDeg = 120.0, .azimuthDeg = 20.0};
     QVERIFY(outOfRangeHorizontal.isFinite());
     QVERIFY(!outOfRangeHorizontal.isValid());
 
-    QVERIFY(!(skygate::core::HorizontalCoordinate {
-        .altitudeDeg = nan,
-        .azimuthDeg = 20.0
-    }).isFinite());
+    QVERIFY(!(skygate::core::HorizontalCoordinate{.altitudeDeg = nan, .azimuthDeg = 20.0}).isFinite());
 
-    QVERIFY((skygate::core::ScreenPoint {.x = 1.0, .y = 2.0}).isFinite());
-    QVERIFY(!(skygate::core::ScreenPoint {.x = nan, .y = 2.0}).isFinite());
+    QVERIFY((skygate::core::ScreenPoint{.x = 1.0, .y = 2.0}).isFinite());
+    QVERIFY(!(skygate::core::ScreenPoint{.x = nan, .y = 2.0}).isFinite());
 }
 
 QTEST_APPLESS_MAIN(GeometryHelpersTests)
