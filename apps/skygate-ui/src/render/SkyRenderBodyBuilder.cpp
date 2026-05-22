@@ -3,7 +3,6 @@
 #include "SkyContextControllerSupport.hpp"
 
 #include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/SpatialIndex2d.hpp"
 
 #include <algorithm>
 #include <cmath>
