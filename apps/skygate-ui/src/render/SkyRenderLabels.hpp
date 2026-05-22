@@ -6,7 +6,7 @@
 
 #include "skygate/core/PreparedProjection.hpp"
 #include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/SpatialIndex2d.hpp"
+#include "skygate/core/math/RectOccupancyGrid.hpp"
 #include "skygate/ephemeris/Types.hpp"
 
 #include <QColor>
@@ -17,39 +17,21 @@
 
 namespace skygate::ui::internal {
 
-[[nodiscard]] QColor skyRenderLabelColorForBodyType(
-    skygate::ephemeris::CelestialBodyType type,
-    const SkyThemeRenderPalette& renderTheme
-);
+[[nodiscard]] QColor
+skyRenderLabelColorForBodyType(skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderTheme);
 
-[[nodiscard]] skygate::core::Rect2d skyRenderLabelBounds(
-    double anchorX,
-    double anchorY,
-    std::string_view text
-);
+[[nodiscard]] skygate::core::Rect2d skyRenderLabelBounds(double anchorX, double anchorY, std::string_view text);
 
 [[nodiscard]] bool skyRenderLabelFitsViewport(
-    const skygate::core::Rect2d& bounds,
-    double viewportWidth,
-    double viewportHeight,
-    double edgeMarginPx
+    const skygate::core::Rect2d& bounds, double viewportWidth, double viewportHeight, double edgeMarginPx
 );
 
 void appendSkyRenderLabel(
-    std::vector<SkyRenderLabel>& labels,
-    QString kind,
-    double x,
-    double y,
-    QString text,
-    const QColor& color
+    std::vector<SkyRenderLabel>& labels, QString kind, double x, double y, QString text, const QColor& color
 );
 
 void appendSkyRenderLabel(
-    std::vector<SkyRenderLabel>& labels,
-    double x,
-    double y,
-    std::string_view text,
-    const QColor& color
+    std::vector<SkyRenderLabel>& labels, double x, double y, std::string_view text, const QColor& color
 );
 
 [[nodiscard]] double skyRenderDeepSkyHitRadius(const SkyRenderGlyph& glyph);

@@ -193,7 +193,7 @@ module boundaries.
     `ScreenPoint` status and viewport coordinates.
 - Focused geometry helpers
   - `Geometry2d` for primitive 2D math, rectangles, and line segments.
-  - `SpatialIndex2d` for screen-space rectangle/circle indexes.
+  - `RectOccupancyGrid` and `CircleHitIndex` for screen-space indexes.
   - `LinePattern` for dash generation.
   - `ProjectedPolylineBuilder` for projection-aware polyline splitting.
 - `SphericalGeometry`

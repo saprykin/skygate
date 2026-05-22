@@ -5,7 +5,7 @@
 #include "SkyTheme.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/math/SpatialIndex2d.hpp"
+#include "skygate/core/math/RectOccupancyGrid.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 
 #include <span>
