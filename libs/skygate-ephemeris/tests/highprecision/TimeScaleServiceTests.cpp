@@ -1,6 +1,7 @@
 #include "skygate/ephemeris/DeltaTProvider.hpp"
 #include "skygate/ephemeris/EarthOrientationProvider.hpp"
 #include "skygate/ephemeris/TimeScaleService.hpp"
+#include "skygate/core/math/TimeConstants.hpp"
 
 #include <QtTest/QtTest>
 
@@ -106,16 +107,18 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
     const std::uint32_t nanosecond = 0U
 )
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = year,
-        .month = month,
-        .day = day,
-        .hour = hour,
-        .minute = minute,
-        .second = second,
-        .nanosecond = nanosecond,
-        .timeScale = timeScale,
-    });
+    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = year,
+            .month = month,
+            .day = day,
+            .hour = hour,
+            .minute = minute,
+            .second = second,
+            .nanosecond = nanosecond,
+            .timeScale = timeScale,
+        }
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -131,8 +134,8 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
     const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::ephemeris::AstronomicalEpoch& rhs
 ) noexcept
 {
-    constexpr double kSecondsPerDay = 86'400.0;
-    return ((lhs.julianDatePart1 - rhs.julianDatePart1) + (lhs.julianDatePart2 - rhs.julianDatePart2)) * kSecondsPerDay;
+    return ((lhs.julianDatePart1 - rhs.julianDatePart1) + (lhs.julianDatePart2 - rhs.julianDatePart2))
+           * skygate::core::TimeConstants::kSecondsPerDay;
 }
 
 void compareSecondsBetween(

@@ -3,6 +3,8 @@
 #include <QFile>
 #include <QStringList>
 #include <QtTest/QtTest>
+#include "skygate/core/math/MathConstants.hpp"
+#include "skygate/core/math/PhysicalConstants.hpp"
 
 #include <array>
 #include <cmath>
@@ -20,8 +22,8 @@ namespace {
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 
-constexpr double kSpeedOfLightAuPerDay = 173.144632674240;
-constexpr double kPi = 3.141592653589793238462643383279502884;
+using skygate::core::MathConstants;
+using skygate::core::PhysicalConstants;
 
 [[nodiscard]] EphemerisRequest makeRequest()
 {
@@ -552,7 +554,7 @@ void SolarSystemStateCalculatorTests::appliesStellarAberrationFromEarthVelocity(
     provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
     provider->responses[{399, 0}] = makeKernelVector(
         {.xAu = 0.0, .yAu = 0.0, .zAu = 0.0},
-        SolarSystemKernelVector{.xAu = 0.0, .yAu = kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
+        SolarSystemKernelVector{.xAu = 0.0, .yAu = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
     );
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
@@ -576,7 +578,7 @@ void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
     provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
     provider->responses[{399, 0}] = makeKernelVector(
         {.xAu = 0.0, .yAu = 0.0, .zAu = 0.0},
-        SolarSystemKernelVector{.xAu = 0.0, .yAu = kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
+        SolarSystemKernelVector{.xAu = 0.0, .yAu = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
     );
     const SolarSystemStateCalculator calculator(provider);
 
@@ -622,7 +624,7 @@ void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
 
     QVERIFY(result.equatorial.has_value());
-    QVERIFY(result.equatorial->rightAscensionHours > (0.1 * 12.0 / kPi));
+    QVERIFY(result.equatorial->rightAscensionHours > (0.1 * 12.0 / MathConstants::kPi));
     QVERIFY(std::abs(result.equatorial->declinationDeg) < 1.0e-12);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
@@ -642,7 +644,7 @@ void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhen
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
 
     QVERIFY(result.equatorial.has_value());
-    QVERIFY(std::abs(result.equatorial->rightAscensionHours - (0.1 * 12.0 / kPi)) < 1.0e-12);
+    QVERIFY(std::abs(result.equatorial->rightAscensionHours - (0.1 * 12.0 / MathConstants::kPi)) < 1.0e-12);
     QVERIFY(
         !hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection)
     );

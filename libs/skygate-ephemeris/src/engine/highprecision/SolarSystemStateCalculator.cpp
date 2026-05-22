@@ -2,6 +2,8 @@
 
 #include "StringUtilities.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
+#include "skygate/core/math/MathConstants.hpp"
+#include "skygate/core/math/PhysicalConstants.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -17,10 +19,10 @@ namespace {
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 constexpr int kNaifSun = 10;
-constexpr double kHoursPerRadian = 12.0 / 3.141592653589793238462643383279502884;
-constexpr double kDegreesPerRadian = 180.0 / 3.141592653589793238462643383279502884;
-constexpr double kSpeedOfLightAuPerDay = 173.144632674240;
-constexpr double kSolarSchwarzschildRadiusAu = 1.97412574336e-8;
+namespace core = skygate::core;
+
+using core::MathConstants;
+using core::PhysicalConstants;
 constexpr int kLightTimeIterationCount = 3;
 
 struct TargetKernelState {
@@ -196,14 +198,14 @@ equatorialFromVector(const SolarSystemKernelVector& vector) noexcept
         return std::nullopt;
     }
 
-    double rightAscensionHours = std::atan2(vector.yAu, vector.xAu) * kHoursPerRadian;
+    double rightAscensionHours = std::atan2(vector.yAu, vector.xAu) * MathConstants::kHoursPerRadian;
     if (rightAscensionHours < 0.0) {
         rightAscensionHours += 24.0;
     }
 
     return core::EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = std::atan2(vector.zAu, xyDistance) * kDegreesPerRadian,
+        .declinationDeg = std::atan2(vector.zAu, xyDistance) * MathConstants::kRadiansToDegrees,
     };
 }
 
@@ -334,7 +336,8 @@ applyStellarAberration(const SolarSystemKernelVector& vector, const SolarSystemK
         return std::nullopt;
     }
 
-    const SolarSystemKernelVector beta = scaleVector(observerVelocityAuPerDay, 1.0 / kSpeedOfLightAuPerDay);
+    const SolarSystemKernelVector beta =
+        scaleVector(observerVelocityAuPerDay, 1.0 / PhysicalConstants::kSpeedOfLightAuPerDay);
     const double directionDotBeta = dotProduct(*direction, beta);
     const SolarSystemKernelVector transverseBeta = relativeVector(beta, scaleVector(*direction, directionDotBeta));
     return withDirectionPreservingDistance(vector, addVectors(*direction, transverseBeta));
@@ -353,7 +356,7 @@ applySolarGravitationalDeflection(const SolarSystemKernelVector& vector, const S
 
     const double cosineElongation = std::clamp(dotProduct(*targetDirection, *sunDirection), -1.0, 1.0);
     const double denominator = std::max(1.0 - cosineElongation, 1.0e-12);
-    const double deflectionScale = kSolarSchwarzschildRadiusAu / observerSunDistanceAu / denominator;
+    const double deflectionScale = PhysicalConstants::kSolarSchwarzschildRadiusAu / observerSunDistanceAu / denominator;
     const SolarSystemKernelVector awayFromSun =
         relativeVector(scaleVector(*targetDirection, cosineElongation), *sunDirection);
     return withDirectionPreservingDistance(
@@ -437,7 +440,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             EphemerisMetadataMerger::merge(
                 result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
             );
-            double lightTimeDays = vectorDistanceAu(outputVector) / kSpeedOfLightAuPerDay;
+            double lightTimeDays = vectorDistanceAu(outputVector) / PhysicalConstants::kSpeedOfLightAuPerDay;
             std::optional<SolarSystemKernelVector> correctedVector;
             for (int iteration = 0; iteration < kLightTimeIterationCount; ++iteration) {
                 const AstronomicalEpoch targetEpoch = retardedEpoch(input.request.epoch, lightTimeDays);
@@ -466,7 +469,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                     retardedTargetState.targetNaifId
                 );
                 correctedVector = relativeVector(*targetState.positionAu, *earthState.positionAu);
-                lightTimeDays = vectorDistanceAu(*correctedVector) / kSpeedOfLightAuPerDay;
+                lightTimeDays = vectorDistanceAu(*correctedVector) / PhysicalConstants::kSpeedOfLightAuPerDay;
             }
 
             if (correctedVector.has_value()

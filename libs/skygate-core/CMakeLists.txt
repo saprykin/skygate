@@ -21,6 +21,8 @@ add_library(skygate-core STATIC
     include/skygate/core/math/LineSegment2d.hpp
     include/skygate/core/math/LinePattern.hpp
     include/skygate/core/math/MathConstants.hpp
+    include/skygate/core/math/TimeConstants.hpp
+    include/skygate/core/math/PhysicalConstants.hpp
     include/skygate/core/math/ProjectedPolylineBuilder.hpp
     include/skygate/core/math/Rect2d.hpp
     include/skygate/core/math/RectOccupancyGrid.hpp

@@ -4,6 +4,7 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
+#include "skygate/core/math/PhysicalConstants.hpp"
 
 #include <algorithm>
 #include <array>
@@ -21,7 +22,8 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 constexpr std::size_t kIoBufferBytes = 1U << 16U;
-constexpr double kAstronomicalUnitKilometers = 149'597'870.7;
+
+using core::PhysicalConstants;
 
 [[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
 {
@@ -168,14 +170,14 @@ public:
         }
 
         state.positionAu = SolarSystemKernelVector{
-            .xAu = positionVelocity[0] / kAstronomicalUnitKilometers,
-            .yAu = positionVelocity[1] / kAstronomicalUnitKilometers,
-            .zAu = positionVelocity[2] / kAstronomicalUnitKilometers,
+            .xAu = positionVelocity[0] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .yAu = positionVelocity[1] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .zAu = positionVelocity[2] / PhysicalConstants::kAstronomicalUnitKilometers,
         };
         state.velocityAuPerDay = SolarSystemKernelVector{
-            .xAu = positionVelocity[3] / kAstronomicalUnitKilometers,
-            .yAu = positionVelocity[4] / kAstronomicalUnitKilometers,
-            .zAu = positionVelocity[5] / kAstronomicalUnitKilometers,
+            .xAu = positionVelocity[3] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .yAu = positionVelocity[4] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .zAu = positionVelocity[5] / PhysicalConstants::kAstronomicalUnitKilometers,
         };
         return state;
     }

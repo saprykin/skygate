@@ -10,6 +10,10 @@ public:
     static constexpr double kTwoPi = 2.0 * kPi;
     static constexpr double kDegreesToRadians = kPi / 180.0;
     static constexpr double kRadiansToDegrees = 180.0 / kPi;
+    static constexpr double kRadiansPerHour = kPi / 12.0;
+    static constexpr double kHoursPerRadian = 12.0 / kPi;
+    static constexpr double kArcsecondsToRadians = kPi / (180.0 * 3600.0);
+    static constexpr double kMilliarcsecondsToRadians = kPi / (180.0 * 3'600'000.0);
     static constexpr double kEpsilon = 1e-12;
 };
 

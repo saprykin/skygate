@@ -1,6 +1,7 @@
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 
 #include <QtTest/QtTest>
+#include "skygate/core/math/MathConstants.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -14,7 +15,7 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 namespace core = skygate::core;
 
-constexpr double kPi = 3.141592653589793238462643383279502884;
+using core::MathConstants;
 
 [[nodiscard]] AstronomicalEpoch epochForYearOffset(const double years) noexcept
 {
@@ -135,13 +136,13 @@ void compareCoordinates(
 [[nodiscard]] double
 angularSeparationDegrees(const core::EquatorialCoordinate& lhs, const core::EquatorialCoordinate& rhs) noexcept
 {
-    const double lhsRaRad = lhs.rightAscensionHours * 15.0 * kPi / 180.0;
-    const double rhsRaRad = rhs.rightAscensionHours * 15.0 * kPi / 180.0;
-    const double lhsDecRad = lhs.declinationDeg * kPi / 180.0;
-    const double rhsDecRad = rhs.declinationDeg * kPi / 180.0;
+    const double lhsRaRad = lhs.rightAscensionHours * 15.0 * MathConstants::kPi / 180.0;
+    const double rhsRaRad = rhs.rightAscensionHours * 15.0 * MathConstants::kPi / 180.0;
+    const double lhsDecRad = lhs.declinationDeg * MathConstants::kPi / 180.0;
+    const double rhsDecRad = rhs.declinationDeg * MathConstants::kPi / 180.0;
     const double cosine = std::sin(lhsDecRad) * std::sin(rhsDecRad)
                           + std::cos(lhsDecRad) * std::cos(rhsDecRad) * std::cos(lhsRaRad - rhsRaRad);
-    return std::acos(std::clamp(cosine, -1.0, 1.0)) * 180.0 / kPi;
+    return std::acos(std::clamp(cosine, -1.0, 1.0)) * 180.0 / MathConstants::kPi;
 }
 
 void compareCalculatorResults(

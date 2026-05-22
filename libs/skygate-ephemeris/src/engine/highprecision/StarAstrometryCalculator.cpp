@@ -2,6 +2,9 @@
 
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "skygate/core/math/AngleMath.hpp"
+#include "skygate/core/math/MathConstants.hpp"
+#include "skygate/core/math/PhysicalConstants.hpp"
+#include "skygate/core/math/TimeConstants.hpp"
 
 #include <cmath>
 #include <limits>
@@ -12,14 +15,11 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-constexpr double kPi = 3.141592653589793238462643383279502884;
-constexpr double kRadiansPerHour = kPi / 12.0;
-constexpr double kHoursPerRadian = 12.0 / kPi;
-constexpr double kMasToRadians = kPi / (180.0 * 3'600'000.0);
-constexpr double kJulianDaysPerYear = 365.25;
-constexpr double kAuPerParsec = 206'264.80624709636;
-constexpr double kAuKilometers = 149'597'870.7;
-constexpr double kSecondsPerJulianYear = 31'557'600.0;
+namespace core = skygate::core;
+
+using core::MathConstants;
+using core::PhysicalConstants;
+using core::TimeConstants;
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 
@@ -48,7 +48,7 @@ struct CartesianVector {
 
 [[nodiscard]] double yearsBetween(const AstronomicalEpoch& start, const AstronomicalEpoch& end) noexcept
 {
-    return (epochSortKey(end) - epochSortKey(start)) / kJulianDaysPerYear;
+    return (epochSortKey(end) - epochSortKey(start)) / TimeConstants::kJulianDaysPerYear;
 }
 
 [[nodiscard]] bool hasPositiveParallax(const CatalogStarAstrometry& astrometry) noexcept
@@ -115,7 +115,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 
 [[nodiscard]] CartesianVector unitVectorFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
-    const double rightAscensionRad = coordinate.rightAscensionHours * kRadiansPerHour;
+    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
     const double declinationRad = core::AngleMath::toRadians(coordinate.declinationDeg);
     const double cosDeclination = std::cos(declinationRad);
     return {
@@ -127,7 +127,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 
 [[nodiscard]] CartesianVector eastBasisFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
-    const double rightAscensionRad = coordinate.rightAscensionHours * kRadiansPerHour;
+    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
     return {
         .x = -std::sin(rightAscensionRad),
         .y = std::cos(rightAscensionRad),
@@ -137,7 +137,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 
 [[nodiscard]] CartesianVector northBasisFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
-    const double rightAscensionRad = coordinate.rightAscensionHours * kRadiansPerHour;
+    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
     const double declinationRad = core::AngleMath::toRadians(coordinate.declinationDeg);
     return {
         .x = -std::sin(declinationRad) * std::cos(rightAscensionRad),
@@ -158,7 +158,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
         return std::nullopt;
     }
 
-    double rightAscensionHours = std::atan2(vector.y, vector.x) * kHoursPerRadian;
+    double rightAscensionHours = std::atan2(vector.y, vector.x) * MathConstants::kHoursPerRadian;
     if (rightAscensionHours < 0.0) {
         rightAscensionHours += 24.0;
     }
@@ -197,8 +197,8 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     const CartesianVector referenceUnit = unitVectorFromEquatorial(reference);
     const CartesianVector east = eastBasisFromEquatorial(reference);
     const CartesianVector north = northBasisFromEquatorial(reference);
-    const double tangentialRaRadiansPerYear = properMotionRaMasPerYear * kMasToRadians;
-    const double tangentialDecRadiansPerYear = properMotionDecMasPerYear * kMasToRadians;
+    const double tangentialRaRadiansPerYear = properMotionRaMasPerYear * MathConstants::kMilliarcsecondsToRadians;
+    const double tangentialDecRadiansPerYear = properMotionDecMasPerYear * MathConstants::kMilliarcsecondsToRadians;
     const bool needsDistance =
         hasEnabledPositiveParallax(astrometry, flags) || hasAnnualParallaxInput(astrometry, flags);
 
@@ -212,9 +212,10 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
         );
     }
 
-    const double distanceAu = kAuPerParsec * (1'000.0 / *astrometry.stellarParallaxMas);
+    const double distanceAu = PhysicalConstants::kAuPerParsec * (1'000.0 / *astrometry.stellarParallaxMas);
     const double radialVelocityAuPerYear = hasEnabledPositiveParallax(astrometry, flags)
-                                               ? radialVelocityKmPerSecond * kSecondsPerJulianYear / kAuKilometers
+                                               ? radialVelocityKmPerSecond * TimeConstants::kSecondsPerJulianYear
+                                                     / PhysicalConstants::kAstronomicalUnitKilometers
                                                : 0.0;
     const CartesianVector referencePosition = scaleVector(referenceUnit, distanceAu);
     const CartesianVector velocity = addVectors(

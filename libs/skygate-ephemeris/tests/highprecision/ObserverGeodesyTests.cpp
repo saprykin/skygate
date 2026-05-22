@@ -1,6 +1,7 @@
 #include "engine/highprecision/ObserverGeodesy.hpp"
 
 #include <QtTest/QtTest>
+#include "skygate/core/math/PhysicalConstants.hpp"
 
 #include <cmath>
 
@@ -9,7 +10,7 @@ namespace {
 using namespace skygate::ephemeris::highprecision;
 namespace core = skygate::core;
 
-constexpr double kAstronomicalUnitMeters = 149'597'870'700.0;
+using core::PhysicalConstants;
 constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
 constexpr double kWgs84PolarRadiusMeters = 6'356'752.314245179;
 
@@ -34,7 +35,7 @@ void ObserverGeodesyTests::convertsEquatorPrimeMeridianToWgs84EquatorialRadius()
     );
 
     QVERIFY(position.has_value());
-    QCOMPARE(position->xAu, kWgs84EquatorialRadiusMeters / kAstronomicalUnitMeters);
+    QCOMPARE(position->xAu, kWgs84EquatorialRadiusMeters / PhysicalConstants::kAstronomicalUnitMeters);
     QCOMPARE(position->yAu, 0.0);
     QCOMPARE(position->zAu, 0.0);
 }
@@ -52,7 +53,7 @@ void ObserverGeodesyTests::convertsNorthPoleToWgs84PolarRadius()
     QVERIFY(position.has_value());
     QVERIFY(std::abs(position->xAu) < 1.0e-20);
     QCOMPARE(position->yAu, 0.0);
-    QVERIFY(std::abs(position->zAu - kWgs84PolarRadiusMeters / kAstronomicalUnitMeters) < 1.0e-16);
+    QVERIFY(std::abs(position->zAu - kWgs84PolarRadiusMeters / PhysicalConstants::kAstronomicalUnitMeters) < 1.0e-16);
 }
 
 void ObserverGeodesyTests::includesElevationAlongLocalUp()
@@ -74,7 +75,7 @@ void ObserverGeodesyTests::includesElevationAlongLocalUp()
 
     QVERIFY(seaLevel.has_value());
     QVERIFY(elevated.has_value());
-    QCOMPARE(elevated->xAu - seaLevel->xAu, 4'200.0 / kAstronomicalUnitMeters);
+    QCOMPARE(elevated->xAu - seaLevel->xAu, 4'200.0 / PhysicalConstants::kAstronomicalUnitMeters);
     QCOMPARE(elevated->yAu, seaLevel->yAu);
     QCOMPARE(elevated->zAu, seaLevel->zAu);
 }
