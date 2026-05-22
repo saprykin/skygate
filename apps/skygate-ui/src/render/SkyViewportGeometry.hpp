@@ -5,7 +5,7 @@
 #include "SkyTheme.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/SkyTypes.hpp"
+#include "skygate/core/Types.hpp"
 
 #include <QColor>
 

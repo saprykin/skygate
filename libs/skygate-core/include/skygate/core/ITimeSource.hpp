@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/SkyTypes.hpp"
+#include "skygate/core/UtcTimePoint.hpp"
 
 namespace skygate::core {
 

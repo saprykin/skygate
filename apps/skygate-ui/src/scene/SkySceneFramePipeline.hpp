@@ -7,7 +7,7 @@
 #include "SkyRenderBuilders.hpp"
 
 #include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/ProjectionTypes.hpp"
+#include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/ConstellationData.hpp"
 #include "skygate/ephemeris/Types.hpp"
 

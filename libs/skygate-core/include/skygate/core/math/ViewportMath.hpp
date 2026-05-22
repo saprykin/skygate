@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/ProjectionTypes.hpp"
+#include "skygate/core/ProjectionParams.hpp"
 
 namespace skygate::core {
 

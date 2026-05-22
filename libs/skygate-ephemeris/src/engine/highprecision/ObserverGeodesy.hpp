@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
-#include "skygate/core/SkyTypes.hpp"
+#include "skygate/core/Types.hpp"
 
 #include <optional>
 

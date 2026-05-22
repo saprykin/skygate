@@ -1,5 +1,8 @@
 #pragma once
 
+#include "skygate/core/ProjectionParams.hpp"
+#include "skygate/core/ProjectionType.hpp"
+#include "skygate/core/ScreenPoint.hpp"
 #include "skygate/core/math/SphericalGeometry.hpp"
 
 #include <optional>

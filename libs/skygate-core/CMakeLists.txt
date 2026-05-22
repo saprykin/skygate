@@ -3,11 +3,18 @@ add_library(skygate-core STATIC
     include/skygate/core/PreparedProjection.hpp
     include/skygate/core/ITimeSource.hpp
     include/skygate/core/ProjectionFactory.hpp
-    include/skygate/core/ProjectionTypes.hpp
-    include/skygate/core/SkyTypes.hpp
+    include/skygate/core/EquatorialCoordinate.hpp
+    include/skygate/core/GeoLocation.hpp
+    include/skygate/core/HorizontalCoordinate.hpp
+    include/skygate/core/ProjectionParams.hpp
+    include/skygate/core/ProjectionStatus.hpp
+    include/skygate/core/ProjectionType.hpp
+    include/skygate/core/ScreenPoint.hpp
+    include/skygate/core/SkyContext.hpp
     include/skygate/core/SystemTimeSource.hpp
     include/skygate/core/Types.hpp
     include/skygate/core/UtcTimeCodec.hpp
+    include/skygate/core/UtcTimePoint.hpp
     include/skygate/core/math/AngleMath.hpp
     include/skygate/core/math/Geometry2d.hpp
     include/skygate/core/math/LinePattern.hpp
@@ -19,9 +26,13 @@ add_library(skygate-core STATIC
     include/skygate/core/projections/AzimuthalEquidistantProjection.hpp
     include/skygate/core/projections/PerspectiveProjection.hpp
     include/skygate/core/projections/StereographicProjection.hpp
-    src/SkyTypes.cpp
+    src/EquatorialCoordinate.cpp
+    src/GeoLocation.cpp
+    src/HorizontalCoordinate.cpp
     src/PreparedProjection.cpp
-    src/ProjectionTypes.cpp
+    src/ProjectionParams.cpp
+    src/ScreenPoint.cpp
+    src/SkyContext.cpp
     src/SystemTimeSource.cpp
     src/UtcTimeCodec.cpp
     src/math/AngleMath.cpp
