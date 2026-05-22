@@ -1,5 +1,6 @@
-#include "skygate/core/ProjectionTypes.hpp"
-#include "skygate/core/SkyTypes.hpp"
+#include "skygate/core/HorizontalCoordinate.hpp"
+#include "skygate/core/ProjectionParams.hpp"
+#include "skygate/core/SkyContext.hpp"
 #include "skygate/core/SystemTimeSource.hpp"
 #include "skygate/core/UtcTimeCodec.hpp"
 

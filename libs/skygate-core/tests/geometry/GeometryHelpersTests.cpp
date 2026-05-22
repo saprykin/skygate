@@ -1,4 +1,5 @@
 #include "skygate/core/PreparedProjection.hpp"
+#include "skygate/core/EquatorialCoordinate.hpp"
 #include "skygate/core/math/Geometry2d.hpp"
 #include "skygate/core/math/LinePattern.hpp"
 #include "skygate/core/math/ProjectedPolylineBuilder.hpp"

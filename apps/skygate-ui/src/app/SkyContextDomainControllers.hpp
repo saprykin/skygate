@@ -2,7 +2,7 @@
 
 #include "SkyContextState.hpp"
 
-#include "skygate/core/ProjectionTypes.hpp"
+#include "skygate/core/Types.hpp"
 #include "skygate/core/Types.hpp"
 
 #include <QString>

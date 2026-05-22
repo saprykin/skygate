@@ -3,7 +3,7 @@
 #include "SkyContextController.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/core/SkyTypes.hpp"
+#include "skygate/core/Types.hpp"
 #include "skygate/ephemeris/CatalogFactory.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
 #include "skygate/ephemeris/IEphemerisEngine.hpp"
