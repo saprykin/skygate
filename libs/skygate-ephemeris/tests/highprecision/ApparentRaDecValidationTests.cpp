@@ -1,7 +1,9 @@
 #include "EphemerisFixtureSupport.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <QFile>
 #include <QJsonArray>
@@ -98,11 +100,13 @@ public:
     convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
-        result.epoch = normalizedAstronomicalEpoch(AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2,
-            .timeScale = targetScale,
-        });
+        result.epoch = normalizedAstronomicalEpoch(
+            AstronomicalEpoch{
+                .julianDatePart1 = epoch.julianDatePart1,
+                .julianDatePart2 = epoch.julianDatePart2,
+                .timeScale = targetScale,
+            }
+        );
         result.status = TimeScaleConversionStatus::Valid;
         return result;
     }
@@ -234,13 +238,14 @@ void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizon
     const SolarSystemStateCalculator solarSystemCalculator(fixture.provider);
     const auto timeScaleService = std::make_shared<SameInstantTimeScaleService>();
     const auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService);
-    const CelestialFrameTransformResult availabilityResult =
-        frameTransformer->transformCelestialVector(CelestialFrameTransformRequest{
+    const CelestialFrameTransformResult availabilityResult = frameTransformer->transformCelestialVector(
+        CelestialFrameTransformRequest{
             .sourceFrame = CelestialReferenceFrame::Gcrs,
             .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
             .epoch = fixture.requestEpoch,
             .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        });
+        }
+    );
     if (!availabilityResult.vector.has_value()) {
         QSKIP("ERFA-backed apparent RA/Dec validation is not available in this build.");
     }
@@ -271,7 +276,8 @@ void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizon
     QVERIFY(hasCorrectionFlag(
         apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection
     ));
-    QVERIFY(hasCorrectionFlag(apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation)
+    QVERIFY(
+        hasCorrectionFlag(apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation)
     );
 }
 

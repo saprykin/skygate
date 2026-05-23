@@ -1,6 +1,7 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IApparentPlaceCalculator.hpp"
+#include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
 
 #include <memory>
 

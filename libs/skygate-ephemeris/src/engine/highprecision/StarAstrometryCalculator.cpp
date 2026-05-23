@@ -1,6 +1,7 @@
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
+#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "skygate/core/math/AngleMath.hpp"
 #include "skygate/core/math/MathConstants.hpp"
 #include "skygate/core/math/PhysicalConstants.hpp"

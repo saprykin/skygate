@@ -1,11 +1,13 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "EphemerisFixtureSupport.hpp"
 #include "skygate/ephemeris/EphemerisDataManifest.hpp"
 #include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
 #include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

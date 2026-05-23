@@ -43,6 +43,17 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CalcephKernelProvider.cpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
+    src/engine/highprecision/HighPrecisionTypes.hpp
+    src/engine/highprecision/IApparentPlaceCalculator.hpp
+    src/engine/highprecision/IApparentPlaceCalculator.cpp
+    src/engine/highprecision/IAtmosphericRefractionCalculator.hpp
+    src/engine/highprecision/IAtmosphericRefractionCalculator.cpp
+    src/engine/highprecision/ICalcephKernelProvider.hpp
+    src/engine/highprecision/IEphemerisComputationCache.hpp
+    src/engine/highprecision/IEphemerisResultBuilder.hpp
+    src/engine/highprecision/IStarAstrometryCalculator.hpp
+    src/engine/highprecision/IStarAstrometryCalculator.cpp
+    src/engine/highprecision/ISolarSystemStateCalculator.hpp
     src/engine/highprecision/DeltaTProvider.cpp
     src/engine/highprecision/EarthOrientationProvider.cpp
     src/engine/highprecision/EphemerisDataActivation.cpp

@@ -1,0 +1,15 @@
+#pragma once
+
+#include "engine/highprecision/HighPrecisionTypes.hpp"
+
+namespace skygate::ephemeris::highprecision {
+
+class IAtmosphericRefractionCalculator {
+public:
+    virtual ~IAtmosphericRefractionCalculator() = default;
+
+    [[nodiscard]] virtual HighPrecisionCalculatorResult
+    apply(const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult) const;
+};
+
+}  // namespace skygate::ephemeris::highprecision

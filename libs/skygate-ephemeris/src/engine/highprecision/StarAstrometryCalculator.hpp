@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
-#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IStarAstrometryCalculator.hpp"
 
 #include <cstddef>
 #include <vector>

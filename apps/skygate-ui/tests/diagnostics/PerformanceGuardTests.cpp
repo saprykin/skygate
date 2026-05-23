@@ -13,6 +13,11 @@
 
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IApparentPlaceCalculator.hpp"
+#include "engine/highprecision/ICalcephKernelProvider.hpp"
+#include "engine/highprecision/ISolarSystemStateCalculator.hpp"
+#include "engine/highprecision/IStarAstrometryCalculator.hpp"
+#include "skygate/ephemeris/TimeScaleService.hpp"
 
 #include "skygate/testsupport/PerformanceBudget.hpp"
 
