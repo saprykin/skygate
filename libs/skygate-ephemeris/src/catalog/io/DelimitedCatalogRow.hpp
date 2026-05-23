@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/model/CatalogBodyParseResult.hpp"
+#include "catalog/CatalogBodyParseResult.hpp"
 
 #include <QHash>
 #include <QString>

@@ -15,10 +15,7 @@ struct CatalogBodyParseResult {
     std::string errorDetail;
     CatalogLoadDiagnostics diagnostics;
 
-    [[nodiscard]] bool isSuccess() const noexcept
-    {
-        return errorCode == CatalogLoadResult::ErrorCode::NoError;
-    }
+    [[nodiscard]] bool isSuccess() const noexcept;
 };
 
 }  // namespace skygate::ephemeris
