@@ -7,6 +7,25 @@
 namespace skygate::ephemeris {
 namespace {
 
+std::vector<std::string_view> splitView(const std::string_view text, const char delimiter)
+{
+    std::vector<std::string_view> tokens;
+    std::size_t cursor = 0;
+    while (cursor < text.size()) {
+        const std::size_t next = text.find(delimiter, cursor);
+        const std::size_t end = (next == std::string_view::npos) ? text.size() : next;
+        const std::string_view token = text.substr(cursor, end - cursor);
+        if (!token.empty()) {
+            tokens.push_back(token);
+        }
+        if (next == std::string_view::npos) {
+            break;
+        }
+        cursor = next + 1U;
+    }
+    return tokens;
+}
+
 void sanitizeLabel(std::string& label)
 {
     std::replace(label.begin(), label.end(), '|', '/');
@@ -51,27 +70,19 @@ std::string ConstellationDataCodec::serializeLineRows(const std::span<const Cons
 std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const std::string_view rows)
 {
     std::vector<ConstellationLineRef> lineRefs;
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        if (!line.empty()) {
-            const std::size_t delimiter = line.find('|');
-            if (delimiter != std::string_view::npos) {
-                const std::string_view startId = line.substr(0, delimiter);
-                const std::string_view endId = line.substr(delimiter + 1);
-                if (!startId.empty() && !endId.empty()) {
-                    lineRefs.emplace_back(std::string(startId), std::string(endId));
-                }
-            }
+    for (const std::string_view line : splitView(rows, '\n')) {
+        const std::size_t delimiter = line.find('|');
+        if (delimiter == std::string_view::npos) {
+            continue;
         }
 
-        if (newline == std::string_view::npos) {
-            break;
+        const std::string_view startId = line.substr(0, delimiter);
+        const std::string_view endId = line.substr(delimiter + 1);
+        if (startId.empty() || endId.empty()) {
+            continue;
         }
-        cursor = newline + 1U;
+
+        lineRefs.emplace_back(std::string(startId), std::string(endId));
     }
 
     return lineRefs;
@@ -120,44 +131,25 @@ std::string ConstellationDataCodec::serializeLabelRows(const std::span<const Con
 std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const std::string_view rows)
 {
     std::vector<ConstellationLabelRef> labelRefs;
-    std::size_t cursor = 0;
-    while (cursor < rows.size()) {
-        const std::size_t newline = rows.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? rows.size() : newline;
-        const std::string_view line = rows.substr(cursor, lineEnd - cursor);
-
-        if (!line.empty()) {
-            const std::size_t delimiter = line.find('|');
-            if (delimiter != std::string_view::npos) {
-                const std::string_view label = line.substr(0, delimiter);
-                const std::string_view hipList = line.substr(delimiter + 1);
-                if (!label.empty() && !hipList.empty()) {
-                    std::vector<std::string> hipIds;
-                    std::size_t hipCursor = 0;
-                    while (hipCursor < hipList.size()) {
-                        const std::size_t comma = hipList.find(',', hipCursor);
-                        const std::size_t hipEnd = comma == std::string_view::npos ? hipList.size() : comma;
-                        const std::string_view hipId = hipList.substr(hipCursor, hipEnd - hipCursor);
-                        if (!hipId.empty()) {
-                            hipIds.emplace_back(hipId);
-                        }
-                        if (comma == std::string_view::npos) {
-                            break;
-                        }
-                        hipCursor = comma + 1U;
-                    }
-
-                    if (!hipIds.empty()) {
-                        labelRefs.emplace_back(std::string(label), std::move(hipIds));
-                    }
-                }
-            }
+    for (const std::string_view line : splitView(rows, '\n')) {
+        const std::size_t delimiter = line.find('|');
+        if (delimiter == std::string_view::npos) {
+            continue;
         }
 
-        if (newline == std::string_view::npos) {
-            break;
+        const std::string_view label = line.substr(0, delimiter);
+        const std::string_view hipList = line.substr(delimiter + 1);
+        if (label.empty() || hipList.empty()) {
+            continue;
         }
-        cursor = newline + 1U;
+
+        std::vector<std::string> hipIds;
+        for (const std::string_view hipId : splitView(hipList, ',')) {
+            hipIds.emplace_back(hipId);
+        }
+        if (!hipIds.empty()) {
+            labelRefs.emplace_back(std::string(label), std::move(hipIds));
+        }
     }
 
     return labelRefs;
