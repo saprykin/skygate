@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/EphemerisDataActivation.hpp"
+#include "engine/highprecision/EphemerisDataActivation.hpp"
 
 #include <QDir>
 #include <QDirIterator>

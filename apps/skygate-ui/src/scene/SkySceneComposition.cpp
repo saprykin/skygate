@@ -2,9 +2,9 @@
 
 #include "SkyPerformanceLogging.hpp"
 
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
-#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
+#include "math/Geometry2d.hpp"
+#include "CelestialReferenceCalculator.hpp"
+#include "EphemerisPrecisionPolicy.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>

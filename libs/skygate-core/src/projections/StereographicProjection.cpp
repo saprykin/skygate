@@ -1,4 +1,4 @@
-#include "skygate/core/projections/StereographicProjection.hpp"
+#include "projections/StereographicProjection.hpp"
 
 #include "ProjectionAlgorithms.hpp"
 

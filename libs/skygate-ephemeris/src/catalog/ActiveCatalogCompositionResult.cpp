@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/ActiveCatalogCompositionResult.hpp"
+#include "catalog/ActiveCatalogCompositionResult.hpp"
 
 namespace skygate::ephemeris {
 

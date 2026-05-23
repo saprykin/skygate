@@ -10,7 +10,7 @@
 #include "SkyTimeController.hpp"
 
 #include "SkyQtTimeCodec.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QDateTime>
 #include <QDir>
@@ -19,12 +19,12 @@
 #include <QLoggingCategory>
 #include <QStandardPaths>
 
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/DeltaTProvider.hpp"
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
-#include "skygate/ephemeris/LeapSecondProvider.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <algorithm>
 #include <memory>

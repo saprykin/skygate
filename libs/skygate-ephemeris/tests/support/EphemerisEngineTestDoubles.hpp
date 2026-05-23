@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <cstdint>
 #include <memory>

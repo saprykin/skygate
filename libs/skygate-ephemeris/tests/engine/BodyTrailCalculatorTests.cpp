@@ -1,5 +1,5 @@
-#include "skygate/ephemeris/BodyTrailCalculator.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "BodyTrailCalculator.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 

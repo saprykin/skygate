@@ -1,5 +1,5 @@
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
+#include "catalog/CatalogLoader.hpp"
 
 #include <QtTest/QtTest>
 

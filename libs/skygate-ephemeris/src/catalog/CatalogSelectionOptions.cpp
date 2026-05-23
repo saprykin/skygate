@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/CatalogSelectionOptions.hpp"
+#include "catalog/CatalogSelectionOptions.hpp"
 
 namespace skygate::ephemeris {
 

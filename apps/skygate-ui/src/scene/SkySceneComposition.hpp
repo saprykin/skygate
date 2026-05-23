@@ -8,8 +8,8 @@
 #include "SkySceneOverlayData.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "Types.hpp"
 
 #include <cstdint>
 #include <optional>

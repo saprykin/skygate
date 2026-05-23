@@ -1,9 +1,9 @@
 #pragma once
 
 #include "SkyRenderBuilders.hpp"
-#include "skygate/core/math/CircleHitIndex.hpp"
-#include "skygate/core/math/CircleHitTarget.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "math/CircleHitIndex.hpp"
+#include "math/CircleHitTarget.hpp"
+#include "Types.hpp"
 
 #include <cstdint>
 #include <optional>

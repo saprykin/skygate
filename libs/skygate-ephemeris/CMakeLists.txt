@@ -96,42 +96,42 @@ endif()
 add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}
     ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
-    include/skygate/ephemeris/ActiveCatalogCompositionRequest.hpp
-    include/skygate/ephemeris/ActiveCatalogCompositionResult.hpp
-    include/skygate/ephemeris/CatalogCompositionSource.hpp
-    include/skygate/ephemeris/CatalogLoadResult.hpp
-    include/skygate/ephemeris/CatalogSelectionMode.hpp
-    include/skygate/ephemeris/CatalogSelectionOptions.hpp
-    include/skygate/ephemeris/CatalogSourceRequest.hpp
-    include/skygate/ephemeris/CatalogSourceType.hpp
-    include/skygate/ephemeris/BodyTrailCalculator.hpp
-    include/skygate/ephemeris/BodyTrailOptions.hpp
-    include/skygate/ephemeris/BodyTrailSample.hpp
-    include/skygate/ephemeris/CatalogComposer.hpp
-    include/skygate/ephemeris/CatalogFactory.hpp
-    include/skygate/ephemeris/CatalogLoader.hpp
-    include/skygate/ephemeris/CatalogPayloadParser.hpp
-    include/skygate/ephemeris/CelestialReferenceCalculator.hpp
-    include/skygate/ephemeris/ConstellationData.hpp
-    include/skygate/ephemeris/ConstellationDataCodec.hpp
-    include/skygate/ephemeris/ConstellationReferenceCalculator.hpp
-    include/skygate/ephemeris/DeltaTProvider.hpp
-    include/skygate/ephemeris/EarthOrientationProvider.hpp
-    include/skygate/ephemeris/EphemerisDataActivation.hpp
-    include/skygate/ephemeris/EphemerisDataManifest.hpp
-    include/skygate/ephemeris/EphemerisDataSnapshot.hpp
-    include/skygate/ephemeris/EphemerisEngineFactory.hpp
-    include/skygate/ephemeris/EphemerisEngineQueries.hpp
-    include/skygate/ephemeris/EphemerisPrecisionPolicy.hpp
-    include/skygate/ephemeris/EphemerisRequestFactory.hpp
-    include/skygate/ephemeris/IEphemerisEngine.hpp
-    include/skygate/ephemeris/LeapSecondProvider.hpp
-    include/skygate/ephemeris/NightConditionsCalculator.hpp
-    include/skygate/ephemeris/IStarCatalog.hpp
-    include/skygate/ephemeris/ObservationEventCalculator.hpp
-    include/skygate/ephemeris/StellariumConstellationParser.hpp
-    include/skygate/ephemeris/TimeScaleService.hpp
-    include/skygate/ephemeris/Types.hpp
+    src/catalog/ActiveCatalogCompositionRequest.hpp
+    src/catalog/ActiveCatalogCompositionResult.hpp
+    src/catalog/CatalogCompositionSource.hpp
+    src/catalog/CatalogLoadResult.hpp
+    src/catalog/CatalogSelectionMode.hpp
+    src/catalog/CatalogSelectionOptions.hpp
+    src/catalog/CatalogSourceRequest.hpp
+    src/catalog/CatalogSourceType.hpp
+    src/BodyTrailCalculator.hpp
+    src/BodyTrailOptions.hpp
+    src/BodyTrailSample.hpp
+    src/catalog/CatalogComposer.hpp
+    src/catalog/CatalogFactory.hpp
+    src/catalog/CatalogLoader.hpp
+    src/catalog/CatalogPayloadParser.hpp
+    src/CelestialReferenceCalculator.hpp
+    src/catalog/constellation/ConstellationData.hpp
+    src/catalog/constellation/ConstellationDataCodec.hpp
+    src/ConstellationReferenceCalculator.hpp
+    src/engine/highprecision/DeltaTProvider.hpp
+    src/engine/highprecision/EarthOrientationProvider.hpp
+    src/engine/highprecision/EphemerisDataActivation.hpp
+    src/engine/highprecision/EphemerisDataManifest.hpp
+    src/engine/highprecision/EphemerisDataSnapshot.hpp
+    src/EphemerisEngineFactory.hpp
+    src/EphemerisEngineQueries.hpp
+    src/EphemerisPrecisionPolicy.hpp
+    src/EphemerisRequestFactory.hpp
+    src/IEphemerisEngine.hpp
+    src/engine/highprecision/LeapSecondProvider.hpp
+    src/NightConditionsCalculator.hpp
+    src/catalog/IStarCatalog.hpp
+    src/ObservationEventCalculator.hpp
+    src/catalog/stellarium/StellariumConstellationParser.hpp
+    src/engine/highprecision/TimeScaleService.hpp
+    src/Types.hpp
     src/StringUtilities.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
     src/catalog/model/CatalogBodyParseResult.hpp
@@ -207,8 +207,6 @@ add_library(skygate-ephemeris STATIC
 
 target_include_directories(skygate-ephemeris
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

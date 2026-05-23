@@ -1,4 +1,4 @@
-#include "skygate/core/math/SphericalGeometry.hpp"
+#include "math/SphericalGeometry.hpp"
 
 #include <QtTest/QtTest>
 

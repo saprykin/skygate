@@ -1,7 +1,7 @@
 #pragma once
 
-#include "skygate/core/EquatorialCoordinate.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "UtcTimePoint.hpp"
 
 #include <optional>
 #include <string_view>

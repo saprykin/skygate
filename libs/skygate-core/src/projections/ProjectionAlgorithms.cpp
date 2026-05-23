@@ -1,8 +1,8 @@
 #include "ProjectionAlgorithms.hpp"
 
 #include "ProjectionPipeline.hpp"
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/MathConstants.hpp"
+#include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 
 #include <algorithm>
 #include <cmath>

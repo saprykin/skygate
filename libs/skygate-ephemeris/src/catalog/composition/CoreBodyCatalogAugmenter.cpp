@@ -1,7 +1,7 @@
 #include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
 
 #include "catalog/model/CatalogIdentity.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <algorithm>
 #include <array>

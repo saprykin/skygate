@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
+#include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QtTest/QtTest>
 

@@ -2,9 +2,9 @@
 
 #include <QtTest/QtTest>
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "math/ViewportMath.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <algorithm>
 #include <chrono>

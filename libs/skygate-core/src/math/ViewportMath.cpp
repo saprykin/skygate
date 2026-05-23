@@ -1,6 +1,6 @@
-#include "skygate/core/math/ViewportMath.hpp"
+#include "math/ViewportMath.hpp"
 
-#include "skygate/core/math/AngleMath.hpp"
+#include "math/AngleMath.hpp"
 
 #include <algorithm>
 

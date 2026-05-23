@@ -1,5 +1,5 @@
 #include "TestHelpers.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "catalog/CatalogLoader.hpp"
 
 #include <QtTest/QtTest>
 

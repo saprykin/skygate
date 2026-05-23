@@ -1,6 +1,6 @@
 #include "ProjectionPipeline.hpp"
 
-#include "skygate/core/math/MathConstants.hpp"
+#include "math/MathConstants.hpp"
 
 #include <algorithm>
 #include <cmath>

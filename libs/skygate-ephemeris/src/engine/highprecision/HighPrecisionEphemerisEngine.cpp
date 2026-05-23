@@ -17,8 +17,8 @@
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
 #include "engine/simple/SunEquatorialCalculator.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
+#include "UtcTimeCodec.hpp"
+#include "EphemerisRequestFactory.hpp"
 
 #include <bit>
 #include <cmath>

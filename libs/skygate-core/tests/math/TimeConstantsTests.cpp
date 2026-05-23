@@ -1,4 +1,4 @@
-#include "skygate/core/math/TimeConstants.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <QtTest/QtTest>
 

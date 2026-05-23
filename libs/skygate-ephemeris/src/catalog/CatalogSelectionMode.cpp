@@ -1,1 +1,1 @@
-#include "skygate/ephemeris/CatalogSelectionMode.hpp"
+#include "catalog/CatalogSelectionMode.hpp"

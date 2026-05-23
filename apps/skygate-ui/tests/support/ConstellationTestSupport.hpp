@@ -5,7 +5,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 
-#include "skygate/ephemeris/ConstellationData.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
 

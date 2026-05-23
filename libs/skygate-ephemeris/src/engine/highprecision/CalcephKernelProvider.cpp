@@ -4,7 +4,7 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
-#include "skygate/core/math/PhysicalConstants.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <algorithm>
 #include <array>

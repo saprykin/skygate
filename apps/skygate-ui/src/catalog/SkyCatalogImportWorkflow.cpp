@@ -2,7 +2,7 @@
 
 #include "CatalogCoordinator.hpp"
 
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
+#include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QLoggingCategory>
 

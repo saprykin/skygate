@@ -7,7 +7,7 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QDateTime>
 #include <QTimeZone>

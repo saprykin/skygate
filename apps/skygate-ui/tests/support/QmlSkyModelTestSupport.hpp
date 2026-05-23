@@ -4,8 +4,8 @@
 #include "SkyObjectSearchModel.hpp"
 #include "SkySceneModel.hpp"
 
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
 
 #include <QString>
 

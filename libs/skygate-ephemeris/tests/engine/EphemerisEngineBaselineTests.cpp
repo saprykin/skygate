@@ -1,8 +1,8 @@
 #include "TestHelpers.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
-#include "skygate/ephemeris/CatalogComposer.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "UtcTimeCodec.hpp"
+#include "catalog/CatalogComposer.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 

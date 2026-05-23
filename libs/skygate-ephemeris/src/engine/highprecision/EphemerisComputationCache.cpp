@@ -1,6 +1,6 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <array>
 #include <bit>

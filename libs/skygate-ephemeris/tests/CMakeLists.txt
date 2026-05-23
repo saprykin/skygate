@@ -26,7 +26,6 @@ function(add_skygate_ephemeris_qtest target_name source_file)
 
     target_include_directories(${target_name}
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src
             ${CMAKE_CURRENT_SOURCE_DIR}/support
     )
 

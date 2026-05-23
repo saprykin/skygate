@@ -2,8 +2,8 @@
 
 #include "SkySceneShared.hpp"
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "math/ViewportMath.hpp"
+#include "IEphemerisEngine.hpp"
 
 namespace {
 

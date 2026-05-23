@@ -1,6 +1,6 @@
-#include "skygate/core/HorizontalCoordinate.hpp"
+#include "HorizontalCoordinate.hpp"
 
-#include "skygate/core/math/AngleMath.hpp"
+#include "math/AngleMath.hpp"
 
 #include <cmath>
 

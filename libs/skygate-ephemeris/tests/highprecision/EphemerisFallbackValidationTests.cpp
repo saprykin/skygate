@@ -1,7 +1,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
 
 #include <QtTest/QtTest>
 

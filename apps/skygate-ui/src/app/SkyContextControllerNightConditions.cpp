@@ -3,7 +3,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkyNightConditionsAdapter.hpp"
 #include "SkyTimeController.hpp"
-#include "skygate/ephemeris/NightConditionsCalculator.hpp"
+#include "NightConditionsCalculator.hpp"
 
 #include <QDateTime>
 

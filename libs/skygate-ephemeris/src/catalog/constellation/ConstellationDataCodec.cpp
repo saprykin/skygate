@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/ConstellationDataCodec.hpp"
+#include "catalog/constellation/ConstellationDataCodec.hpp"
 
 #include <algorithm>
 #include <cctype>

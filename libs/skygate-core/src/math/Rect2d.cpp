@@ -1,1 +1,1 @@
-#include "skygate/core/math/Rect2d.hpp"
+#include "math/Rect2d.hpp"

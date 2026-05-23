@@ -3,7 +3,7 @@
 #include "SkyPerformanceLogging.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
+#include "ConstellationReferenceCalculator.hpp"
 
 #include <QElapsedTimer>
 

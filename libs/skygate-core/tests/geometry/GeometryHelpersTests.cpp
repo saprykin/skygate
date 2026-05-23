@@ -1,11 +1,11 @@
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/EquatorialCoordinate.hpp"
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/LinePattern.hpp"
-#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
-#include "skygate/core/math/CircleHitIndex.hpp"
-#include "skygate/core/math/CircleHitTarget.hpp"
-#include "skygate/core/math/RectOccupancyGrid.hpp"
+#include "PreparedProjection.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "math/Geometry2d.hpp"
+#include "math/LinePattern.hpp"
+#include "math/ProjectedPolylineBuilder.hpp"
+#include "math/CircleHitIndex.hpp"
+#include "math/CircleHitTarget.hpp"
+#include "math/RectOccupancyGrid.hpp"
 
 #include <QtTest/QtTest>
 

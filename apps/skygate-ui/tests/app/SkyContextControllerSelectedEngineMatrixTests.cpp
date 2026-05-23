@@ -7,8 +7,8 @@
 #include "SkySceneModel.hpp"
 #include "SkySceneModelTestSupport.hpp"
 
-#include "skygate/core/ITimeSource.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "ITimeSource.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <chrono>
 #include <cmath>

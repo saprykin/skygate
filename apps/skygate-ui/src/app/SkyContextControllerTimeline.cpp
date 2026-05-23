@@ -5,7 +5,7 @@
 
 #include <QCoreApplication>
 
-#include "skygate/core/math/ViewportMath.hpp"
+#include "math/ViewportMath.hpp"
 
 #include <algorithm>
 #include <chrono>

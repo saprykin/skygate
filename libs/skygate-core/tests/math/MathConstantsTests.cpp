@@ -1,4 +1,4 @@
-#include "skygate/core/math/MathConstants.hpp"
+#include "math/MathConstants.hpp"
 
 #include <QtTest/QtTest>
 

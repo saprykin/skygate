@@ -3,9 +3,9 @@
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/ObserverGeodesy.hpp"
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
+#include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
 
 #include <algorithm>
 #include <cmath>

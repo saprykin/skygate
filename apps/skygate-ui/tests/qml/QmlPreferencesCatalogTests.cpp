@@ -1,6 +1,6 @@
 #include "QmlPreferencesTestSupport.hpp"
 
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
 
 #include <QFileInfo>
 #include <QSettings>

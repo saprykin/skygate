@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/UtcTimePoint.hpp"
+#include "UtcTimePoint.hpp"
 
 namespace skygate::ephemeris {
 

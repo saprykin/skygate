@@ -4,10 +4,10 @@
 #include "SkyRenderFrame.hpp"
 #include "SkyTheme.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/RectOccupancyGrid.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "math/Geometry2d.hpp"
+#include "math/RectOccupancyGrid.hpp"
+#include "Types.hpp"
 
 #include <QColor>
 

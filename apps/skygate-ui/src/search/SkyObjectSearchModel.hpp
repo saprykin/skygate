@@ -7,8 +7,8 @@
 #include <QVariant>
 #include <QVector>
 
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "Types.hpp"
 
 #include <span>
 

@@ -4,7 +4,7 @@
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkySceneShared.hpp"
 
-#include "skygate/ephemeris/ObservationEventCalculator.hpp"
+#include "ObservationEventCalculator.hpp"
 
 #include <QElapsedTimer>
 

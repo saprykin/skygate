@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
+#include "EphemerisPrecisionPolicy.hpp"
 
 #include <QtTest/QtTest>
 

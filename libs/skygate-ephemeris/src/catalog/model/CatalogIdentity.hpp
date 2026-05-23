@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/ephemeris/Types.hpp"
+#include "Types.hpp"
 
 #include <cstddef>
 #include <span>

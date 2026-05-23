@@ -2,8 +2,8 @@
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 
 #include <QtTest/QtTest>
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "math/MathConstants.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <algorithm>
 #include <cmath>

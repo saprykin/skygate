@@ -5,8 +5,8 @@
 #include "SkyRenderHorizontalLookup.hpp"
 #include "SkyTheme.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "Types.hpp"
 
 namespace skygate::ui::internal {
 

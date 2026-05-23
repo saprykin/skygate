@@ -5,10 +5,10 @@
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "EphemerisFixtureSupport.hpp"
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
-#include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

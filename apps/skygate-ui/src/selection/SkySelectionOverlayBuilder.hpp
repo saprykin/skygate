@@ -6,11 +6,11 @@
 
 #include "SkySceneOverlayData.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "SkyContext.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "IEphemerisEngine.hpp"
+#include "Types.hpp"
 
 #include <cstdint>
 #include <optional>

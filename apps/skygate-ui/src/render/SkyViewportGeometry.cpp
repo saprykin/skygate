@@ -1,8 +1,8 @@
 #include "SkyViewportGeometry.hpp"
 
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include "math/Geometry2d.hpp"
+#include "math/ProjectedPolylineBuilder.hpp"
+#include "CelestialReferenceCalculator.hpp"
 
 #include <algorithm>
 #include <array>

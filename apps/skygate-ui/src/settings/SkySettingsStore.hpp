@@ -6,7 +6,7 @@
 #include <QtGlobal>
 
 #include "SkyOverlayLayerVisibility.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "Types.hpp"
 
 #include <cstddef>
 #include <optional>

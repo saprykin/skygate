@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/ephemeris/CatalogLoadResult.hpp"
+#include "catalog/CatalogLoadResult.hpp"
 
 #include <string_view>
 

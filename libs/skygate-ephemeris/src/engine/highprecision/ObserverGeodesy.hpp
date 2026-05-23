@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/highprecision/HighPrecisionTypes.hpp"
-#include "skygate/core/GeoLocation.hpp"
+#include "GeoLocation.hpp"
 
 #include <optional>
 

@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/BodyTrailCalculator.hpp"
+#include "BodyTrailCalculator.hpp"
 
 #include <chrono>
 #include <cstddef>

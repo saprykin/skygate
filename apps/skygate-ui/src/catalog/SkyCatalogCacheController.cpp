@@ -2,7 +2,7 @@
 
 #include "SkyContextControllerSupport.hpp"
 
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 
 #include <QLoggingCategory>
 

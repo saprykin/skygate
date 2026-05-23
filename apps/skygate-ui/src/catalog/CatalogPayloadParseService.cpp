@@ -5,7 +5,7 @@
 #include <QPointer>
 #include <QThreadPool>
 
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 
 #include <memory>
 #include <string_view>

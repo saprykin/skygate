@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
 
 #include "StringUtilities.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"

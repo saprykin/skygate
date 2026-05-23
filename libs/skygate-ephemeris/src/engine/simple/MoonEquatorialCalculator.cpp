@@ -2,7 +2,7 @@
 
 #include "engine/simple/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
-#include "skygate/core/math/AngleMath.hpp"
+#include "math/AngleMath.hpp"
 
 #include <cmath>
 

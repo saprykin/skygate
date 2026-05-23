@@ -1,10 +1,10 @@
 #include "engine/simple/AstronomicalTime.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/ObservationEventCalculator.hpp"
+#include "UtcTimeCodec.hpp"
+#include "math/AngleMath.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "ObservationEventCalculator.hpp"
 
 #include <QtTest/QtTest>
 

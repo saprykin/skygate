@@ -5,9 +5,9 @@
 
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

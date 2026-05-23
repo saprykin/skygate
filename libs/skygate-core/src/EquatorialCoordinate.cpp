@@ -1,4 +1,4 @@
-#include "skygate/core/EquatorialCoordinate.hpp"
+#include "EquatorialCoordinate.hpp"
 
 #include <cmath>
 

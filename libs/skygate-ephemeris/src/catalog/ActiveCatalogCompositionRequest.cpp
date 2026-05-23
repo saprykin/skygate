@@ -1,1 +1,1 @@
-#include "skygate/ephemeris/ActiveCatalogCompositionRequest.hpp"
+#include "catalog/ActiveCatalogCompositionRequest.hpp"

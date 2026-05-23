@@ -1,5 +1,5 @@
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
+#include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QtTest/QtTest>
 

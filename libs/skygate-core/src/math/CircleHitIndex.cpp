@@ -1,6 +1,6 @@
-#include "skygate/core/math/CircleHitIndex.hpp"
+#include "math/CircleHitIndex.hpp"
 
-#include "skygate/core/math/Geometry2d.hpp"
+#include "math/Geometry2d.hpp"
 
 #include <cmath>
 #include <limits>

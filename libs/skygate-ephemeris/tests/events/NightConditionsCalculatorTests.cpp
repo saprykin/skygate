@@ -1,8 +1,8 @@
 #include "EphemerisEngineTestDoubles.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
-#include "skygate/ephemeris/NightConditionsCalculator.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "EphemerisRequestFactory.hpp"
+#include "NightConditionsCalculator.hpp"
 
 #include <QtTest/QtTest>
 

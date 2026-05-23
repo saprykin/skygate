@@ -1,1 +1,1 @@
-#include "skygate/ephemeris/BodyTrailOptions.hpp"
+#include "BodyTrailOptions.hpp"

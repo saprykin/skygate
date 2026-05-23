@@ -3,7 +3,7 @@
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QFile>
 #include <QJsonArray>

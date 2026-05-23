@@ -1,9 +1,9 @@
-#include "skygate/ephemeris/CatalogComposer.hpp"
+#include "catalog/CatalogComposer.hpp"
 
 #include "catalog/model/CatalogIdentity.hpp"
 #include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
 #include "catalog/composition/DeepSkyCatalogMerger.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <algorithm>
 #include <cstddef>

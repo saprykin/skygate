@@ -3,8 +3,8 @@
 #include "SkyViewportItem.hpp"
 #include "QmlObjectTreeTestSupport.hpp"
 
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 

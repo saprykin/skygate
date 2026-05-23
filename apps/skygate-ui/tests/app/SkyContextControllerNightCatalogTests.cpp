@@ -1,5 +1,5 @@
 #include "SkyContextControllerTestSupport.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <cmath>
 #include <memory>

@@ -1,7 +1,7 @@
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
-#include "skygate/ephemeris/Types.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "EphemerisRequestFactory.hpp"
+#include "Types.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 

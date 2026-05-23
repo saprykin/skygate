@@ -7,8 +7,8 @@
 #include <QString>
 #include <QStringList>
 
-#include "skygate/ephemeris/IStarCatalog.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
+#include "catalog/IStarCatalog.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <cstddef>
 #include <cstdint>

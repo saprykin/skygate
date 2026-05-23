@@ -1,5 +1,5 @@
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/ProjectionFactory.hpp"
+#include "PreparedProjection.hpp"
+#include "ProjectionFactory.hpp"
 
 #include <QtTest/QtTest>
 

@@ -1,4 +1,4 @@
-#include "skygate/core/PreparedProjection.hpp"
+#include "PreparedProjection.hpp"
 
 #include "projections/ProjectionAlgorithms.hpp"
 

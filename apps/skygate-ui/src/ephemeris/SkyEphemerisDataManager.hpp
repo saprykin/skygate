@@ -2,8 +2,8 @@
 
 #include "SkySettingsStore.hpp"
 
-#include "skygate/ephemeris/EphemerisDataActivation.hpp"
-#include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/EphemerisDataActivation.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 
 #include <QObject>
 #include <QString>

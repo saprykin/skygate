@@ -1,7 +1,7 @@
-#include "skygate/ephemeris/DeltaTProvider.hpp"
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
-#include "skygate/core/math/TimeConstants.hpp"
+#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <QtTest/QtTest>
 

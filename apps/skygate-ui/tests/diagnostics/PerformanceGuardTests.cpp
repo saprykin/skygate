@@ -6,10 +6,10 @@
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneModel.hpp"
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "math/ViewportMath.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
@@ -17,7 +17,7 @@
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/highprecision/IStarAstrometryCalculator.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include "skygate/testsupport/PerformanceBudget.hpp"
 

@@ -2,7 +2,7 @@
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QFile>
 #include <QJsonArray>

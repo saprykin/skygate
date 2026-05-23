@@ -2,14 +2,14 @@
 
 #include "SkyContextState.hpp"
 
-#include "skygate/core/GeoLocation.hpp"
-#include "skygate/core/ProjectionType.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
-#include "skygate/core/GeoLocation.hpp"
-#include "skygate/core/ProjectionType.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
+#include "GeoLocation.hpp"
+#include "ProjectionType.hpp"
+#include "SkyContext.hpp"
+#include "UtcTimePoint.hpp"
+#include "GeoLocation.hpp"
+#include "ProjectionType.hpp"
+#include "SkyContext.hpp"
+#include "UtcTimePoint.hpp"
 
 #include <QString>
 
