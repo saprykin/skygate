@@ -181,7 +181,7 @@ void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates(
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto activeCatalog = skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog});
+    auto activeCatalog = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *sourceCatalog});
     QVERIFY(activeCatalog.isSuccess());
 
     using namespace skygate::ephemeris::tests;
