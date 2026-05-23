@@ -49,28 +49,28 @@ struct TargetKernelState {
         return std::nullopt;
     }
 
-    if (strings::equalsIgnoreAsciiCase(body.id, "mercury")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")) {
         return 199;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "venus")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "venus")) {
         return 299;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "mars")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mars")) {
         return 499;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "jupiter")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "jupiter")) {
         return 599;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "saturn")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "saturn")) {
         return 699;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "uranus")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "uranus")) {
         return 799;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "neptune")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "neptune")) {
         return 899;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "pluto")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "pluto")) {
         return 999;
     }
 
@@ -83,28 +83,28 @@ struct TargetKernelState {
         return std::nullopt;
     }
 
-    if (strings::equalsIgnoreAsciiCase(body.id, "mercury")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")) {
         return 1;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "venus")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "venus")) {
         return 2;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "mars")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "mars")) {
         return 4;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "jupiter")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "jupiter")) {
         return 5;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "saturn")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "saturn")) {
         return 6;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "uranus")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "uranus")) {
         return 7;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "neptune")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "neptune")) {
         return 8;
     }
-    if (strings::equalsIgnoreAsciiCase(body.id, "pluto")) {
+    if (StringUtilities::equalsIgnoreAsciiCase(body.id, "pluto")) {
         return 9;
     }
 
@@ -113,7 +113,8 @@ struct TargetKernelState {
 
 [[nodiscard]] bool de440sHasPlanetBodyCenter(const CelestialBody& body) noexcept
 {
-    return strings::equalsIgnoreAsciiCase(body.id, "mercury") || strings::equalsIgnoreAsciiCase(body.id, "venus");
+    return StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")
+           || StringUtilities::equalsIgnoreAsciiCase(body.id, "venus");
 }
 
 [[nodiscard]] bool

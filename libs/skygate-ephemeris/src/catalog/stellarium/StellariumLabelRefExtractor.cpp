@@ -127,7 +127,7 @@ std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(const QJ
         }
         std::sort(uniqueHips.begin(), uniqueHips.end());
 
-        const std::string labelKey = strings::normalizedLookupKey(labelText.toStdString());
+        const std::string labelKey = StringUtilities::normalizedLookupKey(labelText.toStdString());
         auto indexIt = indexByLabelKey.find(labelKey);
         if (indexIt == indexByLabelKey.end()) {
             std::vector<std::string> hipIds;

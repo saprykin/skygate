@@ -63,7 +63,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
     bool hasHeader = false;
     QHash<QString, qsizetype> headerIndex;
 
-    for (const std::string_view rawLine : strings::splitView(payload, '\n')) {
+    for (const std::string_view rawLine : StringUtilities::splitView(payload, '\n')) {
         const QString line = QString::fromUtf8(rawLine.data(), static_cast<qsizetype>(rawLine.size())).trimmed();
         if (line.isEmpty()) {
             continue;

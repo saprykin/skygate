@@ -197,7 +197,7 @@ SimpleEphemerisEngine::computeBodyStateById(const core::SkyContext& context, con
 
     for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
         const CelestialBody& body = (*m_bodies)[bodyIndex];
-        if (strings::equalsIgnoreAsciiCase(body.id, bodyId)) {
+        if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
             return computeStateForBody(body, bodyIndex, context);
         }
     }

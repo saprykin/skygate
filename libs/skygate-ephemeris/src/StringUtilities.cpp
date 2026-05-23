@@ -3,14 +3,14 @@
 #include <algorithm>
 #include <cctype>
 
-namespace skygate::ephemeris::strings {
+namespace skygate::ephemeris {
 
-char toLowerAscii(const char character) noexcept
+char StringUtilities::toLowerAscii(const char character) noexcept
 {
     return character >= 'A' && character <= 'Z' ? static_cast<char>(character - 'A' + 'a') : character;
 }
 
-std::string toLowerAscii(const std::string_view value)
+std::string StringUtilities::toLowerAscii(const std::string_view value)
 {
     std::string lowered(value);
     std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](const char character) {
@@ -19,7 +19,7 @@ std::string toLowerAscii(const std::string_view value)
     return lowered;
 }
 
-std::string_view trimAsciiWhitespace(std::string_view value) noexcept
+std::string_view StringUtilities::trimAsciiWhitespace(std::string_view value) noexcept
 {
     while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())) != 0) {
         value.remove_prefix(1);
@@ -32,7 +32,7 @@ std::string_view trimAsciiWhitespace(std::string_view value) noexcept
     return value;
 }
 
-bool equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept
+bool StringUtilities::equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept
 {
     if (lhs.size() != rhs.size()) {
         return false;
@@ -47,17 +47,17 @@ bool equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rh
     return true;
 }
 
-bool containsIgnoreAsciiCase(const std::string_view value, const std::string_view token)
+bool StringUtilities::containsIgnoreAsciiCase(const std::string_view value, const std::string_view token)
 {
     return toLowerAscii(value).find(toLowerAscii(token)) != std::string::npos;
 }
 
-std::string normalizedLookupKey(const std::string_view value)
+std::string StringUtilities::normalizedLookupKey(const std::string_view value)
 {
     return toLowerAscii(trimAsciiWhitespace(value));
 }
 
-std::string normalizedAlnumKey(const std::string_view value)
+std::string StringUtilities::normalizedAlnumKey(const std::string_view value)
 {
     std::string key;
     key.reserve(value.size());
@@ -69,7 +69,7 @@ std::string normalizedAlnumKey(const std::string_view value)
     return key;
 }
 
-std::vector<std::string_view> splitView(const std::string_view text, const char delimiter)
+std::vector<std::string_view> StringUtilities::splitView(const std::string_view text, const char delimiter)
 {
     std::vector<std::string_view> tokens;
     std::size_t cursor = 0;
@@ -88,7 +88,7 @@ std::vector<std::string_view> splitView(const std::string_view text, const char 
     return tokens;
 }
 
-bool appendUnique(std::vector<std::string>& values, std::string value)
+bool StringUtilities::appendUnique(std::vector<std::string>& values, std::string value)
 {
     if (value.empty() || std::find(values.begin(), values.end(), value) != values.end()) {
         return false;
@@ -98,7 +98,7 @@ bool appendUnique(std::vector<std::string>& values, std::string value)
     return true;
 }
 
-bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value)
+bool StringUtilities::appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value)
 {
     if (value.empty()) {
         return false;
@@ -115,4 +115,4 @@ bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string v
     return true;
 }
 
-}  // namespace skygate::ephemeris::strings
+}  // namespace skygate::ephemeris

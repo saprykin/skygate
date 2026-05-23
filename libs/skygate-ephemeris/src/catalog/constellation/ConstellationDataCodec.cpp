@@ -52,7 +52,7 @@ std::string ConstellationDataCodec::serializeLineRows(const std::span<const Cons
 std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const std::string_view rows)
 {
     std::vector<ConstellationLineRef> lineRefs;
-    for (const std::string_view line : strings::splitView(rows, '\n')) {
+    for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
         const std::size_t delimiter = line.find('|');
         if (delimiter == std::string_view::npos) {
             continue;
@@ -113,7 +113,7 @@ std::string ConstellationDataCodec::serializeLabelRows(const std::span<const Con
 std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const std::string_view rows)
 {
     std::vector<ConstellationLabelRef> labelRefs;
-    for (const std::string_view line : strings::splitView(rows, '\n')) {
+    for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
         const std::size_t delimiter = line.find('|');
         if (delimiter == std::string_view::npos) {
             continue;
@@ -126,7 +126,7 @@ std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const 
         }
 
         std::vector<std::string> hipIds;
-        for (const std::string_view hipId : strings::splitView(hipList, ',')) {
+        for (const std::string_view hipId : StringUtilities::splitView(hipList, ',')) {
             hipIds.emplace_back(hipId);
         }
         if (!hipIds.empty()) {

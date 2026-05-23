@@ -13,7 +13,7 @@ std::string_view firstNonEmptyLine(std::string_view payload)
     while (cursor < payload.size()) {
         const std::size_t newline = payload.find('\n', cursor);
         const std::size_t lineEnd = newline == std::string_view::npos ? payload.size() : newline;
-        const std::string_view line = strings::trimAsciiWhitespace(payload.substr(cursor, lineEnd - cursor));
+        const std::string_view line = StringUtilities::trimAsciiWhitespace(payload.substr(cursor, lineEnd - cursor));
         if (!line.empty() && line.front() != '#') {
             return line;
         }
@@ -70,14 +70,16 @@ CatalogLoadResult::PayloadFormat CatalogPayloadFormatDetector::detect(const std:
         return CatalogLoadResult::PayloadFormat::Unknown;
     }
 
-    if (headerLine.find(',') != std::string_view::npos && strings::containsIgnoreAsciiCase(headerLine, "ra")
-        && strings::containsIgnoreAsciiCase(headerLine, "dec") && strings::containsIgnoreAsciiCase(headerLine, "mag")) {
+    if (headerLine.find(',') != std::string_view::npos && StringUtilities::containsIgnoreAsciiCase(headerLine, "ra")
+        && StringUtilities::containsIgnoreAsciiCase(headerLine, "dec")
+        && StringUtilities::containsIgnoreAsciiCase(headerLine, "mag")) {
         return CatalogLoadResult::PayloadFormat::HygCsv;
     }
 
-    if (headerLine.find(';') != std::string_view::npos && strings::containsIgnoreAsciiCase(headerLine, "Name")
-        && strings::containsIgnoreAsciiCase(headerLine, "Type") && strings::containsIgnoreAsciiCase(headerLine, "RA")
-        && strings::containsIgnoreAsciiCase(headerLine, "Dec")) {
+    if (headerLine.find(';') != std::string_view::npos && StringUtilities::containsIgnoreAsciiCase(headerLine, "Name")
+        && StringUtilities::containsIgnoreAsciiCase(headerLine, "Type")
+        && StringUtilities::containsIgnoreAsciiCase(headerLine, "RA")
+        && StringUtilities::containsIgnoreAsciiCase(headerLine, "Dec")) {
         return CatalogLoadResult::PayloadFormat::OpenNgcCsv;
     }
 

@@ -4,18 +4,23 @@
 #include <string_view>
 #include <vector>
 
-namespace skygate::ephemeris::strings {
+namespace skygate::ephemeris {
 
-[[nodiscard]] char toLowerAscii(char character) noexcept;
-[[nodiscard]] std::string toLowerAscii(std::string_view value);
-[[nodiscard]] std::string_view trimAsciiWhitespace(std::string_view value) noexcept;
-[[nodiscard]] bool equalsIgnoreAsciiCase(std::string_view lhs, std::string_view rhs) noexcept;
-[[nodiscard]] bool containsIgnoreAsciiCase(std::string_view value, std::string_view token);
-[[nodiscard]] std::string normalizedLookupKey(std::string_view value);
-[[nodiscard]] std::string normalizedAlnumKey(std::string_view value);
-[[nodiscard]] std::vector<std::string_view> splitView(std::string_view text, char delimiter);
+class StringUtilities {
+public:
+    StringUtilities() = delete;
 
-bool appendUnique(std::vector<std::string>& values, std::string value);
-bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value);
+    [[nodiscard]] static char toLowerAscii(char character) noexcept;
+    [[nodiscard]] static std::string toLowerAscii(std::string_view value);
+    [[nodiscard]] static std::string_view trimAsciiWhitespace(std::string_view value) noexcept;
+    [[nodiscard]] static bool equalsIgnoreAsciiCase(std::string_view lhs, std::string_view rhs) noexcept;
+    [[nodiscard]] static bool containsIgnoreAsciiCase(std::string_view value, std::string_view token);
+    [[nodiscard]] static std::string normalizedLookupKey(std::string_view value);
+    [[nodiscard]] static std::string normalizedAlnumKey(std::string_view value);
+    [[nodiscard]] static std::vector<std::string_view> splitView(std::string_view text, char delimiter);
 
-}  // namespace skygate::ephemeris::strings
+    static bool appendUnique(std::vector<std::string>& values, std::string value);
+    static bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value);
+};
+
+}  // namespace skygate::ephemeris

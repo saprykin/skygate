@@ -112,10 +112,10 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
         return false;
     }
 
-    return strings::containsIgnoreAsciiCase(kernelInfo->id, "de440")
-           || strings::containsIgnoreAsciiCase(kernelInfo->version, "de440")
-           || strings::containsIgnoreAsciiCase(kernelInfo->id, "de441")
-           || strings::containsIgnoreAsciiCase(kernelInfo->version, "de441");
+    return StringUtilities::containsIgnoreAsciiCase(kernelInfo->id, "de440")
+           || StringUtilities::containsIgnoreAsciiCase(kernelInfo->version, "de440")
+           || StringUtilities::containsIgnoreAsciiCase(kernelInfo->id, "de441")
+           || StringUtilities::containsIgnoreAsciiCase(kernelInfo->version, "de441");
 }
 
 [[nodiscard]] EphemerisEngineFactoryResult createHighPrecisionEngine(const EphemerisEngineFactoryRequest& request)

@@ -25,7 +25,7 @@ namespace {
         return false;
     }
 
-    return strings::equalsIgnoreAsciiCase(leafName.substr(leafName.size() - 4U), ".csv");
+    return StringUtilities::equalsIgnoreAsciiCase(leafName.substr(leafName.size() - 4U), ".csv");
 }
 
 [[nodiscard]] bool isUsableEntry(const ZipEntryMetadata& entry)

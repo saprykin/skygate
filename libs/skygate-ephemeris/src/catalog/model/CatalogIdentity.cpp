@@ -12,7 +12,7 @@ namespace {
 void appendDeepSkyAliasKeys(std::vector<std::string>& keys, const CelestialBody& body)
 {
     const auto appendKey = [&keys](const std::string_view value) {
-        strings::appendUnique(keys, strings::normalizedAlnumKey(value));
+        StringUtilities::appendUnique(keys, StringUtilities::normalizedAlnumKey(value));
     };
 
     appendKey(body.id);
@@ -31,7 +31,7 @@ void appendDeepSkyAliasKeys(std::vector<std::string>& keys, const CelestialBody&
 bool CatalogIdentity::containsBodyId(const std::span<const CelestialBody> bodies, const std::string_view id)
 {
     return std::any_of(bodies.begin(), bodies.end(), [id](const CelestialBody& body) {
-        return strings::equalsIgnoreAsciiCase(body.id, id);
+        return StringUtilities::equalsIgnoreAsciiCase(body.id, id);
     });
 }
 

@@ -15,14 +15,14 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
     const SkySnapshot& snapshot, const std::span<const ConstellationLabelRef> labelRefs, const std::string_view label
 )
 {
-    const std::string normalizedLabel = strings::normalizedLookupKey(label);
+    const std::string normalizedLabel = StringUtilities::normalizedLookupKey(label);
     if (normalizedLabel.empty()) {
         return std::nullopt;
     }
 
     const auto labelRefIt =
         std::find_if(labelRefs.begin(), labelRefs.end(), [&normalizedLabel](const ConstellationLabelRef& labelRef) {
-            return strings::normalizedLookupKey(labelRef.first) == normalizedLabel;
+            return StringUtilities::normalizedLookupKey(labelRef.first) == normalizedLabel;
         });
     if (labelRefIt == labelRefs.end()) {
         return std::nullopt;
@@ -32,13 +32,13 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
     horizontalByBodyId.reserve(snapshot.states.size());
     for (const auto& state : snapshot.states) {
         const auto& body = snapshot.bodyAt(state.bodyIndex);
-        horizontalByBodyId.insert({strings::normalizedLookupKey(body.id), state.horizontal});
+        horizontalByBodyId.insert({StringUtilities::normalizedLookupKey(body.id), state.horizontal});
     }
 
     core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
     int validAnchorCount = 0;
     for (const std::string& hipId : labelRefIt->second) {
-        const auto horizontalIt = horizontalByBodyId.find(strings::normalizedLookupKey(hipId));
+        const auto horizontalIt = horizontalByBodyId.find(StringUtilities::normalizedLookupKey(hipId));
         if (horizontalIt == horizontalByBodyId.end() || !horizontalIt->second.isFinite()) {
             continue;
         }
