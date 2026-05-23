@@ -22,11 +22,6 @@ using core::TimeConstants;
 
 constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial and terrestrial frame transform";
 
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
 [[nodiscard]] bool isFiniteVector(const CelestialFrameVector& vector) noexcept
 {
     return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z);

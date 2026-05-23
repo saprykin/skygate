@@ -1,6 +1,7 @@
 #include "engine/highprecision/LeapSecondProvider.hpp"
-
 #include "engine/highprecision/HighPrecisionTextParser.hpp"
+#include "math/TimeConstants.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -85,16 +86,11 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     dateTime.month = *month;
     dateTime.day = day;
     dateTime.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(dateTime)) {
+    if (!CalendarTime::isValidCivilDateTime(dateTime)) {
         return std::nullopt;
     }
 
     return dateTime;
-}
-
-[[nodiscard]] std::optional<AstronomicalEpoch> epochFromUtcDate(const CivilDateTime& dateTime) noexcept
-{
-    return astronomicalEpochFromCivilDateTime(dateTime);
 }
 
 [[nodiscard]] AstronomicalEpoch epochFromNtpTimestamp(const std::uint64_t ntpTimestamp) noexcept
@@ -104,22 +100,10 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
     return normalizedAstronomicalEpoch(
         AstronomicalEpoch{
             .julianDatePart1 = kModifiedJulianDateEpoch + kModifiedJulianDateAtNtpEpoch,
-            .julianDatePart2 = static_cast<double>(ntpTimestamp) / static_cast<double>(detail::kSecondsPerDay),
+            .julianDatePart2 = static_cast<double>(ntpTimestamp) / skygate::core::TimeConstants::kSecondsPerDay,
             .timeScale = TimeScale::Utc,
         }
     );
-}
-
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
-}
-
-[[nodiscard]] bool isFiniteUtcEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return epoch.timeScale == TimeScale::Utc && std::isfinite(epoch.julianDatePart1)
-           && std::isfinite(epoch.julianDatePart2);
 }
 
 [[nodiscard]] std::optional<std::string>
@@ -144,7 +128,8 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
                    + ".";
         }
 
-        const std::optional<AstronomicalEpoch> expiresEpoch = epochFromUtcDate(*expiresDate);
+        const std::optional<AstronomicalEpoch> expiresEpoch =
+            CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate);
         if (!expiresEpoch.has_value()) {
             return "Leap-second table contains unusable expiration metadata at line " + std::to_string(lineNumber)
                    + ".";
@@ -179,7 +164,8 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
         return false;
     }
 
-    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(*effectiveDate);
+    const std::optional<AstronomicalEpoch> effectiveEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -213,7 +199,7 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
         effectiveDate = parseIanaCommentDate(line.substr(commentOffset + 1U));
     }
     if (!effectiveDate.has_value()) {
-        effectiveDate = civilDateTimeFromAstronomicalEpoch(epoch);
+        effectiveDate = CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
     }
     if (!effectiveDate.has_value()) {
         return false;

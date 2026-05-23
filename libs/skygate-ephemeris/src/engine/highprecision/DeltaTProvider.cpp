@@ -1,5 +1,5 @@
 #include "engine/highprecision/DeltaTProvider.hpp"
-
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/HighPrecisionTextParser.hpp"
 
 #include <algorithm>
@@ -25,35 +25,6 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return parser;
 }
 
-[[nodiscard]] CivilDateTime civilDateFromDecimalYear(const double decimalYear) noexcept
-{
-    const int year = static_cast<int>(std::floor(decimalYear));
-    const double fraction = decimalYear - static_cast<double>(year);
-    const int daysInYear = detail::isGregorianLeapYear(year) ? 366 : 365;
-    int dayOffset = static_cast<int>(std::floor(fraction * static_cast<double>(daysInYear) + 0.5));
-    dayOffset = std::clamp(dayOffset, 0, daysInYear - 1);
-
-    CivilDateTime date = detail::civilDateFromDays(detail::daysFromCivilDate(year, 1, 1) + dayOffset);
-    date.timeScale = TimeScale::Utc;
-    return date;
-}
-
-[[nodiscard]] std::optional<AstronomicalEpoch> epochFromUtcDate(const CivilDateTime& dateTime) noexcept
-{
-    return astronomicalEpochFromCivilDateTime(dateTime);
-}
-
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
-}
-
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
 [[nodiscard]] EphemerisDateRange makeRange(
     const std::string_view id,
     const std::string_view displayName,
@@ -73,7 +44,8 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
 setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackStart)
 {
     const std::optional<CivilDateTime> date = textParser().parseUtcDate(value);
-    const std::optional<AstronomicalEpoch> epoch = date.has_value() ? epochFromUtcDate(*date) : std::nullopt;
+    const std::optional<AstronomicalEpoch> epoch =
+        date.has_value() ? CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
     if (!epoch.has_value()) {
         return "Delta T data contains malformed ancient fallback start metadata at line " + std::to_string(lineNumber)
                + ".";
@@ -92,7 +64,8 @@ setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size
 setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackEnd)
 {
     const std::optional<CivilDateTime> date = textParser().parseUtcDate(value);
-    const std::optional<AstronomicalEpoch> epoch = date.has_value() ? epochFromUtcDate(*date) : std::nullopt;
+    const std::optional<AstronomicalEpoch> epoch =
+        date.has_value() ? CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
     if (!epoch.has_value()) {
         return "Delta T data contains malformed ancient fallback end metadata at line " + std::to_string(lineNumber)
                + ".";
@@ -130,7 +103,7 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     if (std::optional<std::string> value = textParser().metadataValue(line, "expires"); value.has_value()) {
         const std::optional<CivilDateTime> expiresDate = textParser().parseUtcDate(*value);
         const std::optional<AstronomicalEpoch> expiresEpoch =
-            expiresDate.has_value() ? epochFromUtcDate(*expiresDate) : std::nullopt;
+            expiresDate.has_value() ? CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate) : std::nullopt;
         if (!expiresEpoch.has_value()) {
             return "Delta T data contains malformed expiration metadata at line " + std::to_string(lineNumber) + ".";
         }
@@ -216,14 +189,15 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
             || !textParser().parseFiniteDouble(columns[1], deltaTSeconds)) {
             return false;
         }
-        effectiveDate = civilDateFromDecimalYear(decimalYear);
+        effectiveDate = CalendarTime::civilDateFromDecimalYear(decimalYear);
     }
 
-    if (!isValidCivilDateTime(effectiveDate)) {
+    if (!CalendarTime::isValidCivilDateTime(effectiveDate)) {
         return false;
     }
 
-    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(effectiveDate);
+    const std::optional<AstronomicalEpoch> effectiveEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -247,7 +221,8 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
         return false;
     }
 
-    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(*effectiveDate);
+    const std::optional<AstronomicalEpoch> effectiveEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }

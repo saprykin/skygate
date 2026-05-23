@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "SkyContextControllerTestSupport.hpp"
 
 #include "engine/highprecision/CalcephKernelProvider.hpp"
@@ -25,7 +26,7 @@ skygate::ephemeris::AstronomicalEpoch expectedUtcEpoch(
     const int astronomicalYear, const int month, const int day, const int hour, const int minute, const int second
 )
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = astronomicalYear,
             .month = month,
@@ -103,7 +104,7 @@ public:
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 2000,
             .month = 1,
@@ -111,7 +112,7 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
             .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 2100,
             .month = 1,

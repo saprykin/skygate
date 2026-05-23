@@ -1,8 +1,8 @@
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
-
-#include "engine/simple/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
 #include "math/AngleMath.hpp"
+#include "time/AstronomicalTime.hpp"
+#include "time/EpochCodec.hpp"
 
 #include <array>
 #include <cmath>
@@ -61,7 +61,7 @@ constexpr std::array<PlanetApproximateOrbit, 7> kPlanetApproximateOrbits = {{
 std::optional<core::EquatorialCoordinate>
 PlanetEquatorialCalculator::compute(const std::string_view bodyId, const core::UtcTimePoint& utcTime) const noexcept
 {
-    const double daysSinceJ2000 = AstronomicalTime::daysSinceJ2000(utcTime);
+    const double daysSinceJ2000 = EpochCodec::daysSinceJ2000(utcTime);
     const double obliquityDeg = AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
 
     for (const PlanetApproximateOrbit& planet : kPlanetApproximateOrbits) {

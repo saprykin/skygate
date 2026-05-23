@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "CatalogCacheTestSupport.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyEphemerisDataManager.hpp"
@@ -55,7 +56,7 @@ bool writeFile(const QString& path, const QByteArray& contents)
 ephemeris::EphemerisDateRange
 acceptanceRange(std::string id, std::string displayName, const int startYear, const int endYear)
 {
-    const auto start = ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto start = ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         ephemeris::CivilDateTime{
             .astronomicalYear = startYear,
             .month = 1,
@@ -63,7 +64,7 @@ acceptanceRange(std::string id, std::string displayName, const int startYear, co
             .timeScale = ephemeris::TimeScale::Utc,
         }
     );
-    const auto end = ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto end = ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         ephemeris::CivilDateTime{
             .astronomicalYear = endYear,
             .month = 1,
@@ -216,7 +217,7 @@ ephemeris::CelestialBody acceptanceMarsBody()
 
 ephemeris::AstronomicalEpoch acceptanceEpoch(const int year)
 {
-    std::optional<ephemeris::AstronomicalEpoch> epoch = ephemeris::astronomicalEpochFromCivilDateTime(
+    std::optional<ephemeris::AstronomicalEpoch> epoch = ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         ephemeris::CivilDateTime{
             .astronomicalYear = year,
             .month = 1,
@@ -328,7 +329,7 @@ public:
     {
         ephemeris::TimeScaleConversionResult result;
         const std::optional<ephemeris::AstronomicalEpoch> epoch =
-            ephemeris::astronomicalEpochFromCivilDateTime(dateTime);
+            ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         result.epoch = epoch.value_or(ephemeris::AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
         result.status = epoch.has_value() ? ephemeris::TimeScaleConversionStatus::Valid

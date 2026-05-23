@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "SkyContextController.hpp"
 
 #include "LocationCatalogModel.hpp"
@@ -56,12 +57,12 @@ astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcep
     const QDateTime normalizedUtcDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime);
     const QDate date = normalizedUtcDateTime.date();
     const QTime time = normalizedUtcDateTime.time();
-    const auto astronomicalYear = skygate::ephemeris::astronomicalYearFromHistoricalYear(date.year());
+    const auto astronomicalYear = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(date.year());
     if (!astronomicalYear.has_value()) {
         return std::nullopt;
     }
 
-    return skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    return skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = *astronomicalYear,
             .month = date.month(),

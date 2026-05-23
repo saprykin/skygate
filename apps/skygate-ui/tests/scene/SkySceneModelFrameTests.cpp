@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include <QtTest>
 
 #include "SkySceneModelTestSupport.hpp"
@@ -208,10 +209,10 @@ void SkySceneModelFrameTests::degradationReasonsOnlyExposeOutOfRangeKernelSuppor
     skygate::ephemeris::EphemerisDateRange range;
     range.id = "de440s-range";
     range.displayName = "DE440s kernel range";
-    range.start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    range.start = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{.astronomicalYear = 1849, .month = 12, .day = 26}
     );
-    range.end = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    range.end = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{.astronomicalYear = 2150, .month = 1, .day = 22}
     );
     engine->setSupportedDateRanges({range});

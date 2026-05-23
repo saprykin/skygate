@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "QmlPreferencesTestSupport.hpp"
 
 #include "engine/highprecision/EphemerisDataManifest.hpp"
@@ -15,7 +16,7 @@ constexpr std::string_view kEmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae4
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 1900,
             .month = 1,
@@ -23,7 +24,7 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
             .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 2100,
             .month = 1,

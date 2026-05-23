@@ -30,21 +30,10 @@ struct CartesianVector {
     double z = 0.0;
 };
 
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
 [[nodiscard]] bool isFiniteEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
 {
     return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg)
            && coordinate.declinationDeg >= -90.0 && coordinate.declinationDeg <= 90.0;
-}
-
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
 }
 
 [[nodiscard]] double yearsBetween(const AstronomicalEpoch& start, const AstronomicalEpoch& end) noexcept

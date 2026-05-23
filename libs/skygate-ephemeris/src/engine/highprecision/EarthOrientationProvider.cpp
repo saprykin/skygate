@@ -1,4 +1,5 @@
 #include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -128,28 +129,11 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     dateTime.month = month;
     dateTime.day = day;
     dateTime.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(dateTime)) {
+    if (!CalendarTime::isValidCivilDateTime(dateTime)) {
         return std::nullopt;
     }
 
     return dateTime;
-}
-
-[[nodiscard]] std::optional<AstronomicalEpoch> epochFromUtcDate(const CivilDateTime& dateTime) noexcept
-{
-    return astronomicalEpochFromCivilDateTime(dateTime);
-}
-
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
-}
-
-[[nodiscard]] bool isFiniteUtcEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return epoch.timeScale == TimeScale::Utc && std::isfinite(epoch.julianDatePart1)
-           && std::isfinite(epoch.julianDatePart2);
 }
 
 [[nodiscard]] std::optional<std::string> metadataValue(const std::string_view line, const std::string_view key)
@@ -185,7 +169,8 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 )
 {
     const std::optional<CivilDateTime> date = parseUtcDate(value);
-    const std::optional<AstronomicalEpoch> epoch = date.has_value() ? epochFromUtcDate(*date) : std::nullopt;
+    const std::optional<AstronomicalEpoch> epoch =
+        date.has_value() ? CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
     if (!epoch.has_value()) {
         return "Earth-orientation data contains malformed prediction start metadata at line "
                + std::to_string(lineNumber) + ".";
@@ -205,7 +190,8 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
 )
 {
     const std::optional<CivilDateTime> date = parseUtcDate(value);
-    const std::optional<AstronomicalEpoch> epoch = date.has_value() ? epochFromUtcDate(*date) : std::nullopt;
+    const std::optional<AstronomicalEpoch> epoch =
+        date.has_value() ? CalendarTime::astronomicalEpochFromCivilDateTime(*date) : std::nullopt;
     if (!epoch.has_value()) {
         return "Earth-orientation data contains malformed prediction end metadata at line " + std::to_string(lineNumber)
                + ".";
@@ -243,7 +229,7 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     if (std::optional<std::string> value = metadataValue(line, "expires"); value.has_value()) {
         const std::optional<CivilDateTime> expiresDate = parseUtcDate(*value);
         const std::optional<AstronomicalEpoch> expiresEpoch =
-            expiresDate.has_value() ? epochFromUtcDate(*expiresDate) : std::nullopt;
+            expiresDate.has_value() ? CalendarTime::astronomicalEpochFromCivilDateTime(*expiresDate) : std::nullopt;
         if (!expiresEpoch.has_value()) {
             return "Earth-orientation data contains malformed expiration metadata at line " + std::to_string(lineNumber)
                    + ".";
@@ -331,11 +317,12 @@ isBlankFixedColumn(const std::string_view line, const std::size_t offset, const 
     effectiveDate.month = month;
     effectiveDate.day = day;
     effectiveDate.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(effectiveDate)) {
+    if (!CalendarTime::isValidCivilDateTime(effectiveDate)) {
         return false;
     }
 
-    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(effectiveDate);
+    const std::optional<AstronomicalEpoch> effectiveEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -452,11 +439,12 @@ isBlankFixedColumn(const std::string_view line, const std::size_t offset, const 
     effectiveDate.month = month;
     effectiveDate.day = day;
     effectiveDate.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(effectiveDate)) {
+    if (!CalendarTime::isValidCivilDateTime(effectiveDate)) {
         return false;
     }
 
-    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(effectiveDate);
+    const std::optional<AstronomicalEpoch> effectiveEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }
@@ -499,7 +487,8 @@ isBlankFixedColumn(const std::string_view line, const std::size_t offset, const 
         return false;
     }
 
-    const std::optional<AstronomicalEpoch> effectiveEpoch = epochFromUtcDate(*effectiveDate);
+    const std::optional<AstronomicalEpoch> effectiveEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(*effectiveDate);
     if (!effectiveEpoch.has_value()) {
         return false;
     }

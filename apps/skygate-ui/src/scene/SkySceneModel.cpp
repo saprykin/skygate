@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "SkySceneModel.hpp"
 
 #include "SkyContextController.hpp"
@@ -17,11 +18,6 @@
 
 namespace {
 
-[[nodiscard]] double epochSortKey(const skygate::ephemeris::AstronomicalEpoch& epoch) noexcept
-{
-    return epoch.julianDatePart1 + epoch.julianDatePart2;
-}
-
 [[nodiscard]] bool epochInRange(
     const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::EphemerisDateRange& range
 ) noexcept
@@ -32,12 +28,13 @@ namespace {
 
 [[nodiscard]] QString formatEpochDate(const skygate::ephemeris::AstronomicalEpoch& epoch)
 {
-    const auto dateTime = skygate::ephemeris::civilDateTimeFromAstronomicalEpoch(epoch);
+    const auto dateTime = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
     if (!dateTime.has_value()) {
         return QStringLiteral("--");
     }
 
-    const int historicalYear = skygate::ephemeris::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+    const int historicalYear =
+        skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
     return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 

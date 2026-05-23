@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include <QtTest>
 
 #include "SkyContextController.hpp"
@@ -293,7 +294,7 @@ public:
     ) const override
     {
         const std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
-            skygate::ephemeris::astronomicalEpochFromCivilDateTime(dateTime);
+            skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (epoch.has_value()) {
             return convert(*epoch, targetScale);
         }

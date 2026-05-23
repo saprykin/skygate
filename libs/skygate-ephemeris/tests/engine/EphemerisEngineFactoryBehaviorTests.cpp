@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "EphemerisEngineFactory.hpp"
 
 #include "engine/highprecision/CalcephKernelProvider.hpp"
@@ -139,7 +140,7 @@ public:
         const skygate::ephemeris::CivilDateTime& dateTime, const skygate::ephemeris::TimeScale targetScale
     ) const override
     {
-        const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(dateTime);
+        const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (epoch.has_value()) {
             return convert(*epoch, targetScale);
         }

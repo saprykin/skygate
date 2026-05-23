@@ -1,6 +1,7 @@
 #include "EphemerisRequestFactory.hpp"
-#include "engine/simple/AstronomicalTime.hpp"
 #include "math/TimeConstants.hpp"
+#include "time/AstronomicalEpoch.hpp"
+#include "time/EpochCodec.hpp"
 
 #include <chrono>
 
@@ -11,8 +12,8 @@ using core::TimeConstants;
 core::SkyContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
 {
     core::SkyContext context = request.context;
-    if (request.epoch.timeScale == TimeScale::Utc && AstronomicalTime::hasExplicitEpoch(request.epoch)) {
-        context.utcTime = AstronomicalTime::utcTimeFromEpoch(request.epoch);
+    if (request.epoch.timeScale == TimeScale::Utc && hasExplicitEpoch(request.epoch)) {
+        context.utcTime = EpochCodec::utcTimeFromEpoch(request.epoch);
     }
 
     return context;
@@ -22,7 +23,7 @@ EphemerisRequest
 EphemerisRequestFactory::fromContext(const core::SkyContext& context, const EphemerisEngineOptions& options) noexcept
 {
     return EphemerisRequest{
-        .epoch = AstronomicalTime::epochFromUtcTime(context.utcTime),
+        .epoch = EpochCodec::epochFromUtcTime(context.utcTime),
         .context = context,
         .options = options,
     };

@@ -23,11 +23,19 @@ private slots:
     void kMinutesPerHour_is60();
     void kHoursPerDay_is24();
     void kMinutesPerDay_is1440();
+    void kDaysPerCommonYear_is365();
+    void kDaysPerLeapYear_is366();
     void kJulianDaysPerYear_is365_25();
     void kSecondsPerJulianYear_isDaysPerYearTimesSecondsPerDay();
     void kJulianDateUnixEpoch_hasExpectedValue();
     void kJulianDateJ2000_hasExpectedValue();
     void kTtMinusTaiSeconds_hasExpectedValue();
+    void kNanosecondsPerSecond_is1e9();
+    void kNanosecondsPerMinute_is60e9();
+    void kNanosecondsPerHour_is3600e9();
+    void kNanosecondsPerDay_is86400e9();
+    void kMicrosecondsPerSecond_is1e6();
+    void kMicrosecondsPerDay_is86400e6();
 };
 
 void TimeConstantsTests::kSecondsPerDay_is86400()
@@ -60,6 +68,16 @@ void TimeConstantsTests::kMinutesPerDay_is1440()
     QCOMPARE(skygate::core::TimeConstants::kMinutesPerDay, 1440.0);
 }
 
+void TimeConstantsTests::kDaysPerCommonYear_is365()
+{
+    QCOMPARE(skygate::core::TimeConstants::kDaysPerCommonYear, 365.0);
+}
+
+void TimeConstantsTests::kDaysPerLeapYear_is366()
+{
+    QCOMPARE(skygate::core::TimeConstants::kDaysPerLeapYear, 366.0);
+}
+
 void TimeConstantsTests::kJulianDaysPerYear_is365_25()
 {
     QCOMPARE(skygate::core::TimeConstants::kJulianDaysPerYear, 365.25);
@@ -86,6 +104,36 @@ void TimeConstantsTests::kJulianDateJ2000_hasExpectedValue()
 void TimeConstantsTests::kTtMinusTaiSeconds_hasExpectedValue()
 {
     QCOMPARE(skygate::core::TimeConstants::kTtMinusTaiSeconds, 32.184);
+}
+
+void TimeConstantsTests::kNanosecondsPerSecond_is1e9()
+{
+    QCOMPARE(skygate::core::TimeConstants::kNanosecondsPerSecond, 1'000'000'000LL);
+}
+
+void TimeConstantsTests::kNanosecondsPerMinute_is60e9()
+{
+    QCOMPARE(skygate::core::TimeConstants::kNanosecondsPerMinute, 60'000'000'000LL);
+}
+
+void TimeConstantsTests::kNanosecondsPerHour_is3600e9()
+{
+    QCOMPARE(skygate::core::TimeConstants::kNanosecondsPerHour, 3'600'000'000'000LL);
+}
+
+void TimeConstantsTests::kNanosecondsPerDay_is86400e9()
+{
+    QCOMPARE(skygate::core::TimeConstants::kNanosecondsPerDay, 86'400'000'000'000LL);
+}
+
+void TimeConstantsTests::kMicrosecondsPerSecond_is1e6()
+{
+    QCOMPARE(skygate::core::TimeConstants::kMicrosecondsPerSecond, 1'000'000.0);
+}
+
+void TimeConstantsTests::kMicrosecondsPerDay_is86400e6()
+{
+    QCOMPARE(skygate::core::TimeConstants::kMicrosecondsPerDay, 86'400'000'000.0);
 }
 
 QTEST_APPLESS_MAIN(TimeConstantsTests)

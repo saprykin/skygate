@@ -1,4 +1,5 @@
 #include "engine/highprecision/TimeScaleService.hpp"
+#include "time/CalendarTime.hpp"
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "engine/highprecision/ErfaAstrometry.hpp"
@@ -51,17 +52,6 @@ struct Ut1OffsetLookupResult {
         return status == TimeScaleConversionStatus::Valid || status == TimeScaleConversionStatus::Degraded;
     }
 };
-
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
-}
 
 [[nodiscard]] AstronomicalEpoch
 addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
@@ -772,7 +762,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
 TimeScaleConversionResult
 LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const
 {
-    if (!isValidCivilDateTime(dateTime)) {
+    if (!CalendarTime::isValidCivilDateTime(dateTime)) {
         AstronomicalEpoch epoch;
         epoch.timeScale = targetScale;
         TimeScaleConversionResult result = failureResult(epoch, targetScale, "Civil date/time input is invalid.");
@@ -782,11 +772,12 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
 
     std::optional<AstronomicalEpoch> epoch;
     if (!isUtcLeapSecondLabel(dateTime)) {
-        epoch = astronomicalEpochFromCivilDateTime(dateTime);
+        epoch = CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
     } else {
         CivilDateTime precedingSecond = dateTime;
         precedingSecond.second = 59;
-        const std::optional<AstronomicalEpoch> precedingEpoch = astronomicalEpochFromCivilDateTime(precedingSecond);
+        const std::optional<AstronomicalEpoch> precedingEpoch =
+            CalendarTime::astronomicalEpochFromCivilDateTime(precedingSecond);
         if (precedingEpoch.has_value()) {
             epoch = addSeconds(*precedingEpoch, 1.0, TimeScale::Utc);
         }
@@ -807,7 +798,8 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
 
     CivilDateTime precedingSecond = dateTime;
     precedingSecond.second = 59;
-    const std::optional<AstronomicalEpoch> precedingEpoch = astronomicalEpochFromCivilDateTime(precedingSecond);
+    const std::optional<AstronomicalEpoch> precedingEpoch =
+        CalendarTime::astronomicalEpochFromCivilDateTime(precedingSecond);
     if (!precedingEpoch.has_value()) {
         TimeScaleConversionResult result =
             failureResult(*epoch, targetScale, "Leap-second civil date/time input is invalid.");

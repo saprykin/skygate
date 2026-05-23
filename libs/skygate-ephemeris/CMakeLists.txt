@@ -15,7 +15,6 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 endif()
 
 set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
-    src/engine/simple/AstronomicalTime.hpp
     src/engine/simple/EclipticToEquatorialCalculator.hpp
     src/engine/simple/EquatorialToHorizontalCalculator.hpp
     src/engine/simple/MoonEquatorialCalculator.hpp
@@ -23,7 +22,6 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
     src/engine/simple/SunEquatorialCalculator.hpp
     src/engine/simple/SimpleEphemerisEngine.hpp
     src/engine/simple/SimpleEphemerisEngine.cpp
-    src/engine/simple/AstronomicalTime.cpp
     src/engine/simple/EclipticToEquatorialCalculator.cpp
     src/engine/simple/EquatorialToHorizontalCalculator.cpp
     src/engine/simple/MoonEquatorialCalculator.cpp
@@ -134,6 +132,12 @@ add_library(skygate-ephemeris STATIC
     src/ObservationEventCalculator.hpp
     src/catalog/stellarium/StellariumConstellationParser.hpp
     src/engine/highprecision/TimeScaleService.hpp
+    src/time/TimeScale.hpp
+    src/time/AstronomicalEpoch.hpp
+    src/time/CivilDateTime.hpp
+    src/time/CalendarTime.hpp
+    src/time/EpochCodec.hpp
+    src/time/AstronomicalTime.hpp
     src/Types.hpp
     src/StringUtilities.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
@@ -215,6 +219,12 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumHipParser.cpp
     src/catalog/stellarium/StellariumLabelRefExtractor.cpp
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
+    src/time/TimeScale.cpp
+    src/time/AstronomicalEpoch.cpp
+    src/time/CivilDateTime.cpp
+    src/time/CalendarTime.cpp
+    src/time/EpochCodec.cpp
+    src/time/AstronomicalTime.cpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
     src/EphemerisEngineFactory.cpp

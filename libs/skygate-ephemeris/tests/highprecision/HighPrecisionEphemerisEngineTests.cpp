@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
@@ -143,7 +144,7 @@ makeFixedStarBody(std::string id, const double rightAscensionHours, const double
     const int second = 0
 )
 {
-    const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(
+    const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(
         CivilDateTime{
             .astronomicalYear = year,
             .month = month,

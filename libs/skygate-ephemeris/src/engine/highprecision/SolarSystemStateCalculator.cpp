@@ -32,11 +32,6 @@ struct TargetKernelState {
     int requestedTargetNaifId = 0;
 };
 
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
 [[nodiscard]] std::optional<int> naifIdForBody(const CelestialBody& body) noexcept
 {
     if (body.ephemerisSource == CelestialBodyEphemerisSource::Sun || body.type == CelestialBodyType::Sun) {

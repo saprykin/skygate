@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
 
 #include "SkyQtTimeCodec.hpp"
@@ -216,12 +217,12 @@ QStringList correctionNames(const ephemeris::EphemerisCorrectionFlags flags)
 
 QString formatDate(const ephemeris::AstronomicalEpoch& epoch)
 {
-    const auto dateTime = ephemeris::civilDateTimeFromAstronomicalEpoch(epoch);
+    const auto dateTime = ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
     if (!dateTime.has_value()) {
         return "--";
     }
 
-    const int historicalYear = ephemeris::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+    const int historicalYear = ephemeris::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
     return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 
