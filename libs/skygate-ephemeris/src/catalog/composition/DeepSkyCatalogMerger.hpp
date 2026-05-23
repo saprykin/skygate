@@ -1,17 +1,11 @@
 #pragma once
 
-#include "catalog/CatalogCompositionSource.hpp"
+#include "catalog/composition/DeepSkyCatalogMergeResult.hpp"
 #include "Types.hpp"
 
 #include <span>
-#include <vector>
 
 namespace skygate::ephemeris {
-
-struct DeepSkyCatalogMergeResult final {
-    std::vector<CelestialBody> bodies;
-    std::vector<CatalogCompositionSource> sourceKinds;
-};
 
 class DeepSkyCatalogMerger final {
 public:
