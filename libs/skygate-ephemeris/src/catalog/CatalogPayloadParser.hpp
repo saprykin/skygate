@@ -1,20 +1,14 @@
 #pragma once
 
 #include "catalog/CatalogLoadResult.hpp"
+#include "catalog/CatalogParseRequest.hpp"
 #include "catalog/CatalogSelectionOptions.hpp"
-#include "catalog/CatalogSourceRequest.hpp"
 #include "catalog/IStarCatalog.hpp"
 
 #include <memory>
 #include <string_view>
 
 namespace skygate::ephemeris {
-
-struct CatalogParseRequest {
-    std::string_view payload;
-    HygParseProgressCallback progressCallback;
-    CatalogSelectionOptions selectionOptions;
-};
 
 class CatalogPayloadParser final {
 public:
