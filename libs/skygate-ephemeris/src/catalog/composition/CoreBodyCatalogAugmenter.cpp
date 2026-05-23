@@ -37,8 +37,8 @@ bool isSunOrMoonType(const CelestialBodyType type)
 
 CatalogCompositionSource sourceKindForBody(const CelestialBody& body)
 {
-    return catalog_identity::isAnalyticSolarSystemBody(body) ? CatalogCompositionSource::BuiltInEphemeris
-                                                             : CatalogCompositionSource::Primary;
+    return CatalogIdentity::isAnalyticSolarSystemBody(body) ? CatalogCompositionSource::BuiltInEphemeris
+                                                            : CatalogCompositionSource::Primary;
 }
 
 }  // namespace
@@ -73,7 +73,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
             continue;
         }
 
-        if (catalog_identity::containsBodyId(result.bodies, body.id)) {
+        if (CatalogIdentity::containsBodyId(result.bodies, body.id)) {
             continue;
         }
 
@@ -83,7 +83,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
 
     if (starCount == 0U) {
         for (const BundledBrightStar& star : kBundledBrightStars) {
-            if (catalog_identity::containsBodyId(result.bodies, star.id)) {
+            if (CatalogIdentity::containsBodyId(result.bodies, star.id)) {
                 continue;
             }
 

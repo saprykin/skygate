@@ -35,7 +35,7 @@ DeepSkyCatalogMergeResult DeepSkyCatalogMerger::merge(
         const bool replacedByDeepSkyObject =
             std::any_of(deepSkyBodies.begin(), deepSkyBodies.end(), [&body](const CelestialBody& deepSkyBody) {
                 return deepSkyBody.type == CelestialBodyType::DeepSkyObject
-                       && catalog_identity::sharesDeepSkyAlias(body, deepSkyBody);
+                       && CatalogIdentity::sharesDeepSkyAlias(body, deepSkyBody);
             });
         if (replacedByDeepSkyObject) {
             continue;

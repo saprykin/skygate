@@ -53,7 +53,7 @@ ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompo
     result.foundDeepSkyObjectCount = request.knownDeepSkyObjectCount;
     if (deepSkyCatalog != nullptr) {
         if (result.foundDeepSkyObjectCount == 0U || request.useBundledDeepSkyCatalog) {
-            result.foundDeepSkyObjectCount = catalog_identity::countDeepSkyObjects(deepSkyCatalog->bodies());
+            result.foundDeepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(deepSkyCatalog->bodies());
         }
 
         DeepSkyCatalogMergeResult merged =
