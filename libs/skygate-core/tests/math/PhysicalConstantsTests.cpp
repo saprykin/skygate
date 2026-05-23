@@ -23,6 +23,7 @@ private slots:
     void kAstronomicalUnitKilometers_hasExpectedValue();
     void kAuPerParsec_hasExpectedValue();
     void kSolarSchwarzschildRadiusAu_hasExpectedValue();
+    void kSynodicMonthDays_hasExpectedValue();
     void kAstronomicalUnit_isConsistentMetersToKilometers();
 };
 
@@ -54,6 +55,14 @@ void PhysicalConstantsTests::kAuPerParsec_hasExpectedValue()
 void PhysicalConstantsTests::kSolarSchwarzschildRadiusAu_hasExpectedValue()
 {
     QCOMPARE(skygate::core::PhysicalConstants::kSolarSchwarzschildRadiusAu, 1.97412574336e-8);
+}
+
+void PhysicalConstantsTests::kSynodicMonthDays_hasExpectedValue()
+{
+    QCOMPARE(skygate::core::PhysicalConstants::kSynodicMonthDays, 29.530588853);
+    // Synodic month is between 29.2 and 29.9 days.
+    QVERIFY(skygate::core::PhysicalConstants::kSynodicMonthDays > 29.0);
+    QVERIFY(skygate::core::PhysicalConstants::kSynodicMonthDays < 30.0);
 }
 
 void PhysicalConstantsTests::kAstronomicalUnit_isConsistentMetersToKilometers()

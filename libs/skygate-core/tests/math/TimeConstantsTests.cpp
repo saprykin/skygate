@@ -29,6 +29,7 @@ private slots:
     void kSecondsPerJulianYear_isDaysPerYearTimesSecondsPerDay();
     void kJulianDateUnixEpoch_hasExpectedValue();
     void kJulianDateJ2000_hasExpectedValue();
+    void kJulianDateKnownNewMoon_hasExpectedValue();
     void kTtMinusTaiSeconds_hasExpectedValue();
     void kNanosecondsPerSecond_is1e9();
     void kNanosecondsPerMinute_is60e9();
@@ -99,6 +100,17 @@ void TimeConstantsTests::kJulianDateUnixEpoch_hasExpectedValue()
 void TimeConstantsTests::kJulianDateJ2000_hasExpectedValue()
 {
     QCOMPARE(skygate::core::TimeConstants::kJulianDateJ2000, 2'451'545.0);
+}
+
+void TimeConstantsTests::kJulianDateKnownNewMoon_hasExpectedValue()
+{
+    QCOMPARE(skygate::core::TimeConstants::kJulianDateKnownNewMoon, 2'451'550.1);
+    // Known new moon of 2000-01-06 should be ~5.1 days after J2000.
+    QVERIFY(isNear(
+        skygate::core::TimeConstants::kJulianDateKnownNewMoon - skygate::core::TimeConstants::kJulianDateJ2000,
+        5.1,
+        1e-9
+    ));
 }
 
 void TimeConstantsTests::kTtMinusTaiSeconds_hasExpectedValue()

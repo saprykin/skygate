@@ -1,5 +1,7 @@
 #include "NightConditionsCalculator.hpp"
 #include "math/MathConstants.hpp"
+#include "math/TimeConstants.hpp"
+#include "math/PhysicalConstants.hpp"
 #include "EphemerisPrecisionPolicy.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "IEphemerisEngine.hpp"
@@ -15,8 +17,6 @@ constexpr double kSunriseSunsetAltitudeDeg = -0.833;
 constexpr double kCivilTwilightAltitudeDeg = -6.0;
 constexpr double kNauticalTwilightAltitudeDeg = -12.0;
 constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
-constexpr double kKnownNewMoonJulianDay = 2451550.1;
-constexpr double kSynodicMonthDays = 29.530588853;
 
 [[nodiscard]] ObservationEvent unavailableEvent() noexcept
 {
@@ -33,8 +33,8 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
 {
     const AstronomicalEpoch normalizedEpoch = normalizedAstronomicalEpoch(epoch);
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
-    const double daysSinceKnownNewMoon = julianDay - kKnownNewMoonJulianDay;
-    double fraction = std::fmod(daysSinceKnownNewMoon / kSynodicMonthDays, 1.0);
+    const double daysSinceKnownNewMoon = julianDay - core::TimeConstants::kJulianDateKnownNewMoon;
+    double fraction = std::fmod(daysSinceKnownNewMoon / core::PhysicalConstants::kSynodicMonthDays, 1.0);
     if (fraction < 0.0) {
         fraction += 1.0;
     }
