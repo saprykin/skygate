@@ -13,6 +13,7 @@ namespace skygate::ephemeris::strings {
 [[nodiscard]] bool containsIgnoreAsciiCase(std::string_view value, std::string_view token);
 [[nodiscard]] std::string normalizedLookupKey(std::string_view value);
 [[nodiscard]] std::string normalizedAlnumKey(std::string_view value);
+[[nodiscard]] std::vector<std::string_view> splitView(std::string_view text, char delimiter);
 
 bool appendUnique(std::vector<std::string>& values, std::string value);
 bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string value);

@@ -69,6 +69,25 @@ std::string normalizedAlnumKey(const std::string_view value)
     return key;
 }
 
+std::vector<std::string_view> splitView(const std::string_view text, const char delimiter)
+{
+    std::vector<std::string_view> tokens;
+    std::size_t cursor = 0;
+    while (cursor < text.size()) {
+        const std::size_t next = text.find(delimiter, cursor);
+        const std::size_t end = (next == std::string_view::npos) ? text.size() : next;
+        const std::string_view token = text.substr(cursor, end - cursor);
+        if (!token.empty()) {
+            tokens.push_back(token);
+        }
+        if (next == std::string_view::npos) {
+            break;
+        }
+        cursor = next + 1U;
+    }
+    return tokens;
+}
+
 bool appendUnique(std::vector<std::string>& values, std::string value)
 {
     if (value.empty() || std::find(values.begin(), values.end(), value) != values.end()) {

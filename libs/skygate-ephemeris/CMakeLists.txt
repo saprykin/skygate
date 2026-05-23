@@ -148,7 +148,11 @@ add_library(skygate-ephemeris STATIC
     src/catalog/composition/CoreBodyCatalogAugmenter.hpp
     src/catalog/composition/DeepSkyCatalogMerger.hpp
     src/catalog/composition/DeepSkyCatalogMergeResult.hpp
+    src/catalog/io/CompressedCatalogParser.hpp
+    src/catalog/io/DelimitedCatalogParser.hpp
+    src/catalog/io/DelimitedCatalogParserOptions.hpp
     src/catalog/io/DelimitedCatalogReader.hpp
+    src/catalog/io/RowParseOutcome.hpp
     src/catalog/io/DelimitedCatalogReaderOptions.hpp
     src/catalog/io/DelimitedCatalogRow.hpp
     src/catalog/opengc/OpenNgcObjectMapper.hpp
@@ -179,6 +183,10 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
     src/catalog/io/CompressedDataInflateOptions.cpp
+    src/catalog/io/CompressedCatalogParser.cpp
+    src/catalog/io/DelimitedCatalogParser.cpp
+    src/catalog/io/DelimitedCatalogParserOptions.cpp
+    src/catalog/io/RowParseOutcome.cpp
     src/catalog/constellation/ConstellationDataCodec.cpp
     src/catalog/composition/CatalogAugmentationResult.cpp
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
@@ -189,7 +197,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/DelimitedCatalogRow.cpp
     src/catalog/io/CsvRowTokenizer.hpp
     src/catalog/hyg/HygCatalogParser.hpp
-    src/catalog/hyg/HygGzipCatalogParser.hpp
     src/catalog/model/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
     src/catalog/opengc/OpenNgcObjectMapping.cpp
@@ -215,7 +222,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
     src/catalog/hyg/HygCatalogParser.cpp
-    src/catalog/hyg/HygGzipCatalogParser.cpp
     src/catalog/model/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
