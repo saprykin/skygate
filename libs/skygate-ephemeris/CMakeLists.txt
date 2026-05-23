@@ -98,6 +98,8 @@ add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
     include/skygate/ephemeris/CatalogLoadResult.hpp
     include/skygate/ephemeris/BodyTrailCalculator.hpp
+    include/skygate/ephemeris/BodyTrailOptions.hpp
+    include/skygate/ephemeris/BodyTrailSample.hpp
     include/skygate/ephemeris/CatalogComposer.hpp
     include/skygate/ephemeris/CatalogFactory.hpp
     include/skygate/ephemeris/CatalogLoader.hpp
@@ -185,6 +187,8 @@ add_library(skygate-ephemeris STATIC
     src/catalog/opengc/OpenNgcCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
     src/BodyTrailCalculator.cpp
+    src/BodyTrailOptions.cpp
+    src/BodyTrailSample.cpp
 )
 
 target_include_directories(skygate-ephemeris
