@@ -83,7 +83,7 @@ HygCatalogParser::parse(const std::string_view csvData, const HygParseProgressCa
                     QStringLiteral("dec"),
                     QStringLiteral("mag"),
                 },
-            .invalidErrorCode = CatalogLoadErrorCode::InvalidHygCsv,
+            .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidHygCsv,
             .rowCountLimitFloor = kHygRowCountLimitFloor,
             .minExpectedBytesPerDataRow = kHygMinExpectedBytesPerDataRow,
             .emptyInputDetail = "HYG CSV payload is empty.",
@@ -178,7 +178,7 @@ HygCatalogParser::parse(const std::string_view csvData, const HygParseProgressCa
     }
 
     if (parsedObjectCount == 0U) {
-        result.errorCode = CatalogLoadErrorCode::InvalidHygCsv;
+        result.errorCode = CatalogLoadResult::ErrorCode::InvalidHygCsv;
         result.errorDetail = "HYG CSV payload does not contain any valid star rows.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "HYG CSV parse failed:" << QString::fromStdString(result.errorDetail);

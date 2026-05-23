@@ -45,7 +45,7 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                     QStringLiteral("RA"),
                     QStringLiteral("Dec"),
                 },
-            .invalidErrorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv,
+            .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
             .rowCountLimitFloor = kOpenNgcRowCountLimitFloor,
             .minExpectedBytesPerDataRow = kOpenNgcMinExpectedBytesPerDataRow,
             .emptyInputDetail = "OpenNGC CSV payload is empty.",
@@ -154,7 +154,7 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
     }
 
     if (parsedObjectCount == 0U) {
-        result.errorCode = CatalogLoadErrorCode::InvalidOpenNgcCsv;
+        result.errorCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv;
         result.errorDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "OpenNGC CSV parse failed:" << QString::fromStdString(result.errorDetail);

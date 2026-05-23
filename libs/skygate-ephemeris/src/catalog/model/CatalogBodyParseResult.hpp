@@ -1,5 +1,6 @@
 #pragma once
 
+#include "catalog/CatalogLoadDiagnostics.hpp"
 #include "catalog/CatalogLoadResult.hpp"
 #include "Types.hpp"
 
@@ -10,13 +11,13 @@ namespace skygate::ephemeris {
 
 struct CatalogBodyParseResult {
     std::vector<CelestialBody> bodies;
-    CatalogLoadErrorCode errorCode = CatalogLoadErrorCode::NoError;
+    CatalogLoadResult::ErrorCode errorCode = CatalogLoadResult::ErrorCode::NoError;
     std::string errorDetail;
     CatalogLoadDiagnostics diagnostics;
 
     [[nodiscard]] bool isSuccess() const noexcept
     {
-        return errorCode == CatalogLoadErrorCode::NoError;
+        return errorCode == CatalogLoadResult::ErrorCode::NoError;
     }
 };
 

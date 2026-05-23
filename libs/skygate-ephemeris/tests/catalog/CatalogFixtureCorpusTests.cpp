@@ -10,7 +10,7 @@
 #include <string>
 #include <string_view>
 
-Q_DECLARE_METATYPE(skygate::ephemeris::CatalogPayloadFormat)
+Q_DECLARE_METATYPE(skygate::ephemeris::CatalogLoadResult::PayloadFormat)
 
 #ifndef SKYGATE_EPHEMERIS_TESTDATA_DIR
 #define SKYGATE_EPHEMERIS_TESTDATA_DIR ""
@@ -55,32 +55,34 @@ bool containsBody(const std::span<const skygate::ephemeris::CelestialBody> bodie
 void CatalogFixtureCorpusTests::parsesFixtureCorpus_data()
 {
     QTest::addColumn<QString>("fixturePath");
-    QTest::addColumn<skygate::ephemeris::CatalogPayloadFormat>("expectedFormat");
+    QTest::addColumn<skygate::ephemeris::CatalogLoadResult::PayloadFormat>("expectedFormat");
     QTest::addColumn<QString>("expectedBodyId");
     QTest::addColumn<int>("expectedBodyCount");
 
     QTest::newRow("hyg-csv") << QStringLiteral("catalogs/realistic-hyg.csv")
-                             << skygate::ephemeris::CatalogPayloadFormat::HygCsv << QStringLiteral("hip_32349") << 3;
+                             << skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsv
+                             << QStringLiteral("hip_32349") << 3;
     QTest::newRow("open-ngc-csv") << QStringLiteral("catalogs/realistic-openngc.csv")
-                                  << skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv
+                                  << skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv
                                   << QStringLiteral("messier_031") << 3;
     QTest::newRow("hyg-gzip") << QStringLiteral("catalogs/realistic-hyg.csv.gz")
-                              << skygate::ephemeris::CatalogPayloadFormat::HygCsvGzip << QStringLiteral("hip_32349")
-                              << 3;
+                              << skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsvGzip
+                              << QStringLiteral("hip_32349") << 3;
     QTest::newRow("hyg-zip") << QStringLiteral("catalogs/realistic-hyg.zip")
-                             << skygate::ephemeris::CatalogPayloadFormat::HygCsvZip << QStringLiteral("hip_32349") << 3;
+                             << skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsvZip
+                             << QStringLiteral("hip_32349") << 3;
     QTest::newRow("hyg-extra-columns") << QStringLiteral("catalogs/realistic-hyg-extra-columns.csv")
-                                       << skygate::ephemeris::CatalogPayloadFormat::HygCsv << QStringLiteral("hip_7588")
-                                       << 2;
+                                       << skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsv
+                                       << QStringLiteral("hip_7588") << 2;
     QTest::newRow("open-ngc-mixed") << QStringLiteral("catalogs/realistic-openngc-mixed.csv")
-                                    << skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv
+                                    << skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv
                                     << QStringLiteral("messier_042") << 4;
 }
 
 void CatalogFixtureCorpusTests::parsesFixtureCorpus()
 {
     QFETCH(QString, fixturePath);
-    QFETCH(skygate::ephemeris::CatalogPayloadFormat, expectedFormat);
+    QFETCH(skygate::ephemeris::CatalogLoadResult::PayloadFormat, expectedFormat);
     QFETCH(QString, expectedBodyId);
     QFETCH(int, expectedBodyCount);
 

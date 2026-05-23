@@ -16,26 +16,26 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
-QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadErrorCode errorCode)
+QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadResult::ErrorCode errorCode)
 {
     switch (errorCode) {
-    case skygate::ephemeris::CatalogLoadErrorCode::NoError:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::NoError:
         return "Unknown parse failure";
-    case skygate::ephemeris::CatalogLoadErrorCode::EmptyInput:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::EmptyInput:
         return "empty payload";
-    case skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat:
         return "unsupported format";
-    case skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns:
         return "missing required HYG columns";
-    case skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidHygCsv:
         return "invalid HYG CSV payload";
-    case skygate::ephemeris::CatalogLoadErrorCode::InvalidOpenNgcCsv:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv:
         return "invalid OpenNGC CSV payload";
-    case skygate::ephemeris::CatalogLoadErrorCode::InvalidGzipData:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidGzipData:
         return "invalid gzip payload";
-    case skygate::ephemeris::CatalogLoadErrorCode::InvalidZipData:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidZipData:
         return "invalid ZIP payload";
-    case skygate::ephemeris::CatalogLoadErrorCode::NoBodies:
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::NoBodies:
         return "catalog contains no usable bodies";
     }
 

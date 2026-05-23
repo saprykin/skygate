@@ -102,13 +102,13 @@ void CatalogPropertyTests::randomUnknownPayloadsReturnExplicitFailures()
         const auto result = parser.parseResult(payload);
         QVERIFY(!result.isSuccess());
         QVERIFY(result.catalog == nullptr);
-        QVERIFY(result.errorCode != skygate::ephemeris::CatalogLoadErrorCode::NoError);
+        QVERIFY(result.errorCode != skygate::ephemeris::CatalogLoadResult::ErrorCode::NoError);
         QVERIFY(!result.errorDetail.empty());
         if (payload.empty()) {
-            QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadErrorCode::EmptyInput);
+            QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::EmptyInput);
         } else {
-            QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogPayloadFormat::Unknown);
-            QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat);
+            QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown);
+            QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat);
         }
     }
 
@@ -160,7 +160,7 @@ void CatalogPropertyTests::generatedHygPayloadsKeepExactlyTheFiniteRows()
         const auto result = parser.parseResult(payload);
 
         QVERIFY(result.isSuccess());
-        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogPayloadFormat::HygCsv);
+        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsv);
         QCOMPARE(result.diagnostics.processedRowCount, static_cast<std::size_t>(rowCount));
         QCOMPARE(result.diagnostics.parsedBodyCount, validRows);
         QCOMPARE(result.diagnostics.selectedBodyCount, validRows);
@@ -213,7 +213,7 @@ void CatalogPropertyTests::generatedOpenNgcPayloadsKeepExactlyTheValidMappedRows
         const auto result = parser.parseResult(payload);
 
         QVERIFY(result.isSuccess());
-        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv);
+        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv);
         QCOMPARE(result.diagnostics.processedRowCount, static_cast<std::size_t>(rowCount));
         QCOMPARE(result.diagnostics.parsedBodyCount, validRows);
         QCOMPARE(result.diagnostics.selectedBodyCount, validRows);

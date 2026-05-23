@@ -99,6 +99,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/ActiveCatalogCompositionRequest.hpp
     src/catalog/ActiveCatalogCompositionResult.hpp
     src/catalog/CatalogCompositionSource.hpp
+    src/catalog/CatalogLoadDiagnostics.hpp
     src/catalog/CatalogLoadResult.hpp
     src/catalog/CatalogSelectionMode.hpp
     src/catalog/CatalogSelectionOptions.hpp
@@ -170,6 +171,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogSourceType.cpp
     src/catalog/normalize/CatalogParsingUtilities.cpp
     src/catalog/CatalogFactory.cpp
+    src/catalog/CatalogLoadDiagnostics.cpp
     src/catalog/CatalogLoader.cpp
     src/catalog/io/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogParseRequest.cpp

@@ -16,18 +16,18 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
-QString catalogPayloadFormatText(const CatalogPayloadFormat format)
+QString catalogPayloadFormatText(const CatalogLoadResult::PayloadFormat format)
 {
     switch (format) {
-    case CatalogPayloadFormat::HygCsv:
+    case CatalogLoadResult::PayloadFormat::HygCsv:
         return QStringLiteral("HYG CSV");
-    case CatalogPayloadFormat::HygCsvGzip:
+    case CatalogLoadResult::PayloadFormat::HygCsvGzip:
         return QStringLiteral("HYG CSV gzip");
-    case CatalogPayloadFormat::HygCsvZip:
+    case CatalogLoadResult::PayloadFormat::HygCsvZip:
         return QStringLiteral("HYG CSV ZIP");
-    case CatalogPayloadFormat::OpenNgcCsv:
+    case CatalogLoadResult::PayloadFormat::OpenNgcCsv:
         return QStringLiteral("OpenNGC CSV");
-    case CatalogPayloadFormat::Unknown:
+    case CatalogLoadResult::PayloadFormat::Unknown:
         return QStringLiteral("unknown");
     }
 
@@ -50,7 +50,7 @@ CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
 
 }  // namespace
 
-CatalogPayloadFormat CatalogPayloadParser::detectFormat(const std::string_view payload) const noexcept
+CatalogLoadResult::PayloadFormat CatalogPayloadParser::detectFormat(const std::string_view payload) const noexcept
 {
     return CatalogPayloadFormatDetector::detect(payload);
 }
@@ -59,7 +59,7 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
 {
     CatalogLoadResult result;
     if (request.payload.empty()) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorCode = CatalogLoadResult::ErrorCode::EmptyInput;
         result.errorDetail = "Catalog payload is empty.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "Catalog payload parse failed:" << QString::fromStdString(result.errorDetail);
@@ -68,45 +68,45 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
 
     result.detectedFormat = detectFormat(request.payload);
     switch (result.detectedFormat) {
-    case CatalogPayloadFormat::HygCsv:
+    case CatalogLoadResult::PayloadFormat::HygCsv:
         result = CatalogLoader::load(
             CatalogSourceType::HygCsv, request.payload, request.progressCallback, request.selectionOptions
         );
-        result.detectedFormat = CatalogPayloadFormat::HygCsv;
+        result.detectedFormat = CatalogLoadResult::PayloadFormat::HygCsv;
         return logSuccessfulParse(std::move(result));
-    case CatalogPayloadFormat::HygCsvGzip:
+    case CatalogLoadResult::PayloadFormat::HygCsvGzip:
         result = CatalogLoader::load(
             CatalogSourceType::HygCsvGzip, request.payload, request.progressCallback, request.selectionOptions
         );
-        result.detectedFormat = CatalogPayloadFormat::HygCsvGzip;
+        result.detectedFormat = CatalogLoadResult::PayloadFormat::HygCsvGzip;
         return logSuccessfulParse(std::move(result));
-    case CatalogPayloadFormat::HygCsvZip: {
+    case CatalogLoadResult::PayloadFormat::HygCsvZip: {
         const ZipCodec zipCodec;
         const auto extractedCsv = zipCodec.extractFirstCsvEntry(request.payload);
         if (extractedCsv.has_value()) {
             result = CatalogLoader::load(
                 CatalogSourceType::HygCsv, *extractedCsv, request.progressCallback, request.selectionOptions
             );
-            result.detectedFormat = CatalogPayloadFormat::HygCsvZip;
+            result.detectedFormat = CatalogLoadResult::PayloadFormat::HygCsvZip;
             return logSuccessfulParse(std::move(result));
         }
-        result.errorCode = CatalogLoadErrorCode::InvalidZipData;
+        result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
         result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "Catalog ZIP parse failed:" << QString::fromStdString(result.errorDetail);
         return result;
     }
-    case CatalogPayloadFormat::OpenNgcCsv:
+    case CatalogLoadResult::PayloadFormat::OpenNgcCsv:
         result = CatalogLoader::load(
             CatalogSourceType::OpenNgcCsv, request.payload, request.progressCallback, request.selectionOptions
         );
-        result.detectedFormat = CatalogPayloadFormat::OpenNgcCsv;
+        result.detectedFormat = CatalogLoadResult::PayloadFormat::OpenNgcCsv;
         return logSuccessfulParse(std::move(result));
-    case CatalogPayloadFormat::Unknown:
+    case CatalogLoadResult::PayloadFormat::Unknown:
         break;
     }
 
-    result.errorCode = CatalogLoadErrorCode::UnsupportedFormat;
+    result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
     result.errorDetail = "Catalog payload format is not recognized.";
     qCWarning(skygateCatalogParseLog).noquote()
         << "Catalog payload parse failed:" << QString::fromStdString(result.errorDetail);

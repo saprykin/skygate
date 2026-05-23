@@ -102,7 +102,7 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
         "1,NoCoordinates\n"
     );
     QVERIFY(!invalidCatalog.isSuccess());
-    QVERIFY(invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns);
+    QVERIFY(invalidCatalog.errorCode == skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
 }
 
 void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput()
@@ -146,7 +146,7 @@ void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes()
     const auto unsupported =
         skygate::ephemeris::CatalogLoader::load(static_cast<skygate::ephemeris::CatalogSourceType>(255U), "unused");
     QVERIFY(!unsupported.isSuccess());
-    QVERIFY(unsupported.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat);
+    QVERIFY(unsupported.errorCode == skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat);
     QVERIFY(!unsupported.errorDetail.empty());
     QVERIFY(unsupported.catalog == nullptr);
 }

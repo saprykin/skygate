@@ -14,7 +14,7 @@ namespace skygate::ephemeris {
 struct DelimitedCatalogReaderOptions {
     QChar separator = ',';
     std::vector<QString> requiredColumns;
-    CatalogLoadErrorCode invalidErrorCode = CatalogLoadErrorCode::UnsupportedFormat;
+    CatalogLoadResult::ErrorCode invalidErrorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
     std::size_t rowCountLimitFloor = 0;
     std::size_t minExpectedBytesPerDataRow = 1;
     std::string emptyInputDetail;
