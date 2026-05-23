@@ -1,20 +1,10 @@
 #pragma once
 
-#include "Types.hpp"
+#include "catalog/opengc/OpenNgcObjectMapping.hpp"
 
 #include <QString>
 
-#include <string>
-#include <vector>
-
 namespace skygate::ephemeris {
-
-struct OpenNgcObjectMapping final {
-    std::string id;
-    std::string displayName;
-    DeepSkyObjectKind kind = DeepSkyObjectKind::Unknown;
-    std::vector<std::string> aliases;
-};
 
 class OpenNgcObjectMapper final {
 public:
