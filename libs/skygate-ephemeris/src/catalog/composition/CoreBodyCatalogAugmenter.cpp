@@ -1,6 +1,6 @@
 #include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
 
-#include "catalog/model/CatalogIdentity.hpp"
+#include "catalog/CatalogIdentity.hpp"
 #include "catalog/CatalogFactory.hpp"
 
 #include <algorithm>

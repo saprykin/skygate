@@ -1,4 +1,4 @@
-#include "catalog/model/CatalogIdentity.hpp"
+#include "catalog/CatalogIdentity.hpp"
 
 #include "StringUtilities.hpp"
 

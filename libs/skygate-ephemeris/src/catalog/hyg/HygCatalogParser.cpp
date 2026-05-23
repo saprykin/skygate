@@ -1,5 +1,5 @@
 #include "catalog/hyg/HygCatalogParser.hpp"
-#include "catalog/normalize/CatalogParsingUtilities.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 
 #include <QString>

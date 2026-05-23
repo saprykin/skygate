@@ -138,8 +138,8 @@ add_library(skygate-ephemeris STATIC
     src/catalog/normalize/CatalogBodyNormalization.hpp
     src/catalog/CatalogBodyParseResult.hpp
     src/catalog/bundled/BundledCatalogParser.hpp
-    src/catalog/model/CatalogIdentity.hpp
-    src/catalog/normalize/CatalogParsingUtilities.hpp
+    src/catalog/CatalogIdentity.hpp
+    src/catalog/io/CatalogParsingUtilities.hpp
     src/catalog/io/CatalogPayloadFormatDetector.hpp
     src/catalog/io/CatalogZipEntrySelector.hpp
     src/catalog/io/CompressedDataInflater.hpp
@@ -165,7 +165,7 @@ add_library(skygate-ephemeris STATIC
     src/StringUtilities.cpp
     src/catalog/CatalogBodyParseResult.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
-    src/catalog/model/CatalogIdentity.cpp
+    src/catalog/CatalogIdentity.cpp
     src/catalog/ActiveCatalogCompositionRequest.cpp
     src/catalog/ActiveCatalogCompositionResult.cpp
     src/catalog/CatalogComposer.cpp
@@ -174,7 +174,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogSelectionOptions.cpp
     src/catalog/CatalogSourceRequest.cpp
     src/catalog/CatalogSourceType.cpp
-    src/catalog/normalize/CatalogParsingUtilities.cpp
+    src/catalog/io/CatalogParsingUtilities.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoadDiagnostics.cpp
     src/catalog/CatalogLoader.cpp
@@ -198,7 +198,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/DelimitedCatalogRow.cpp
     src/catalog/io/CsvRowTokenizer.hpp
     src/catalog/hyg/HygCatalogParser.hpp
-    src/catalog/model/InMemoryStarCatalog.hpp
+    src/catalog/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
     src/catalog/opengc/OpenNgcObjectMapping.cpp
     src/catalog/opengc/OpenNgcCatalogParser.hpp
@@ -223,7 +223,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
     src/catalog/hyg/HygCatalogParser.cpp
-    src/catalog/model/InMemoryStarCatalog.cpp
+    src/catalog/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
     src/BodyTrailCalculator.cpp
