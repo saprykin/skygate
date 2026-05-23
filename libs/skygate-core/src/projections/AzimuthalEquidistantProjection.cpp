@@ -10,8 +10,7 @@ ProjectionType AzimuthalEquidistantProjection::type() const noexcept
 }
 
 ScreenPoint AzimuthalEquidistantProjection::project(
-    const HorizontalCoordinate& coordinate,
-    const ProjectionParams& params
+    const HorizontalCoordinate& coordinate, const ProjectionParams& params
 ) const noexcept
 {
     return ProjectionAlgorithms::project(type(), coordinate, params);

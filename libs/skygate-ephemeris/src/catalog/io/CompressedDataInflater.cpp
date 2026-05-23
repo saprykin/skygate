@@ -39,7 +39,7 @@ std::optional<std::string> CompressedDataInflater::inflate(
         return std::nullopt;
     }
 
-    z_stream stream {};
+    z_stream stream{};
     stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(compressedData.data()));
     stream.avail_in = static_cast<uInt>(compressedData.size());
 
@@ -54,7 +54,7 @@ std::optional<std::string> CompressedDataInflater::inflate(
         output.reserve(compressedData.size() * 3U);
     }
 
-    std::array<char, 1 << 14> buffer {};
+    std::array<char, 1 << 14> buffer{};
     int status = Z_OK;
     while (status == Z_OK) {
         stream.next_out = reinterpret_cast<Bytef*>(buffer.data());
@@ -78,10 +78,7 @@ std::optional<std::string> CompressedDataInflater::inflate(
     if (status != Z_STREAM_END || (!options.allowEmptyOutput && output.empty())) {
         return std::nullopt;
     }
-    if (
-        options.expectedOutputBytes > 0U
-        && output.size() != options.expectedOutputBytes
-    ) {
+    if (options.expectedOutputBytes > 0U && output.size() != options.expectedOutputBytes) {
         return std::nullopt;
     }
 

@@ -23,9 +23,7 @@ public:
     [[nodiscard]] static SkyLoggingConfiguration defaultConfiguration();
     [[nodiscard]] static QString defaultLogFilePath();
     [[nodiscard]] static SkyLoggingConfiguration configuration();
-    [[nodiscard]] static std::optional<QtMsgType> messageTypeFromLevelText(
-        const QString& levelText
-    );
+    [[nodiscard]] static std::optional<QtMsgType> messageTypeFromLevelText(const QString& levelText);
     [[nodiscard]] static QString levelSummary(QtMsgType type);
     [[nodiscard]] static QString outputSummary(const SkyLoggingConfiguration& configuration);
     [[nodiscard]] static QString configurationSummary(const SkyLoggingConfiguration& configuration);

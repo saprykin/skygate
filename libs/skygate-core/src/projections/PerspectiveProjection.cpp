@@ -9,10 +9,8 @@ ProjectionType PerspectiveProjection::type() const noexcept
     return ProjectionType::Perspective;
 }
 
-ScreenPoint PerspectiveProjection::project(
-    const HorizontalCoordinate& coordinate,
-    const ProjectionParams& params
-) const noexcept
+ScreenPoint
+PerspectiveProjection::project(const HorizontalCoordinate& coordinate, const ProjectionParams& params) const noexcept
 {
     return ProjectionAlgorithms::project(type(), coordinate, params);
 }

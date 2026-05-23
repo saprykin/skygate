@@ -59,7 +59,7 @@ QString objectIdFromAlias(const QString& alias)
     while (id.endsWith('_')) {
         id.chop(1);
     }
-    return id.isEmpty() ? QString {} : "open_ngc_" + id;
+    return id.isEmpty() ? QString{} : "open_ngc_" + id;
 }
 
 void appendAlias(std::vector<std::string>& aliases, const QString& alias)
@@ -94,13 +94,7 @@ DeepSkyObjectKind kindFromOpenNgcType(QString typeText)
     if (typeText == "PN") {
         return DeepSkyObjectKind::PlanetaryNebula;
     }
-    if (
-        typeText == "Neb"
-        || typeText == "HII"
-        || typeText == "EmN"
-        || typeText == "RfN"
-        || typeText == "SNR"
-    ) {
+    if (typeText == "Neb" || typeText == "HII" || typeText == "EmN" || typeText == "RfN" || typeText == "SNR") {
         return DeepSkyObjectKind::Nebula;
     }
     if (typeText == "*Ass") {
@@ -149,16 +143,16 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     appendDelimitedAliases(mapping.aliases, identifiers);
     appendDelimitedAliases(mapping.aliases, commonNames);
 
-    const QString displayName = !messier.isEmpty()
-        ? QString("M%1").arg(messier)
-        : (!ngc.isEmpty()
-            ? QString("NGC %1").arg(ngc)
-            : (!ic.isEmpty() ? QString("IC %1").arg(ic) : normalizedCatalogAlias(name)));
-    const QString id = !messier.isEmpty()
-        ? objectIdFromAlias("M " + messier)
-        : (!ngc.isEmpty()
-            ? objectIdFromAlias("NGC " + ngc)
-            : (!ic.isEmpty() ? objectIdFromAlias("IC " + ic) : objectIdFromAlias(name)));
+    const QString displayName =
+        !messier.isEmpty()
+            ? QString("M%1").arg(messier)
+            : (!ngc.isEmpty() ? QString("NGC %1").arg(ngc)
+                              : (!ic.isEmpty() ? QString("IC %1").arg(ic) : normalizedCatalogAlias(name)));
+    const QString id =
+        !messier.isEmpty()
+            ? objectIdFromAlias("M " + messier)
+            : (!ngc.isEmpty() ? objectIdFromAlias("NGC " + ngc)
+                              : (!ic.isEmpty() ? objectIdFromAlias("IC " + ic) : objectIdFromAlias(name)));
 
     mapping.id = catalog_parsing::toUtf8String(id);
     mapping.displayName = catalog_parsing::toUtf8String(displayName);

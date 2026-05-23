@@ -79,9 +79,7 @@ bool SkyTimelineController::setStepSeconds(const int stepSeconds) noexcept
     return true;
 }
 
-void SkyTimelineController::setCatchingUpToCurrentUtc(
-    const bool catchingUpToCurrentUtc
-) noexcept
+void SkyTimelineController::setCatchingUpToCurrentUtc(const bool catchingUpToCurrentUtc) noexcept
 {
     m_state.catchingUpToCurrentUtc = catchingUpToCurrentUtc;
 }
@@ -163,10 +161,8 @@ bool SkyViewController::setCenter(const double altitudeDeg, const double azimuth
 {
     const double nextAltitudeDeg = skygate::core::ViewportMath::clampAltitudeDeg(altitudeDeg);
     const double nextAzimuthDeg = skygate::core::ViewportMath::normalizeAzimuthDeg(azimuthDeg);
-    if (
-        std::abs(m_state.centerAltitudeDeg - nextAltitudeDeg) < 1e-9
-        && std::abs(m_state.centerAzimuthDeg - nextAzimuthDeg) < 1e-9
-    ) {
+    if (std::abs(m_state.centerAltitudeDeg - nextAltitudeDeg) < 1e-9
+        && std::abs(m_state.centerAzimuthDeg - nextAzimuthDeg) < 1e-9) {
         return false;
     }
 
@@ -177,8 +173,7 @@ bool SkyViewController::setCenter(const double altitudeDeg, const double azimuth
 
 bool SkyViewController::setFieldOfViewDeg(const double fieldOfViewDeg) noexcept
 {
-    const double nextFieldOfViewDeg =
-        skygate::core::ViewportMath::clampFieldOfViewDeg(fieldOfViewDeg);
+    const double nextFieldOfViewDeg = skygate::core::ViewportMath::clampFieldOfViewDeg(fieldOfViewDeg);
     if (std::abs(m_state.fieldOfViewDeg - nextFieldOfViewDeg) < 1e-9) {
         return false;
     }
@@ -258,16 +253,12 @@ void SkyLocationController::setPositionSource(QGeoPositionInfoSource* positionSo
     m_state.positionSource = positionSource;
 }
 
-void SkyLocationController::setPositionSourceConnected(
-    const bool positionSourceConnected
-) noexcept
+void SkyLocationController::setPositionSourceConnected(const bool positionSourceConnected) noexcept
 {
     m_state.positionSourceConnected = positionSourceConnected;
 }
 
-void SkyLocationController::setRequestLocationPermission(
-    const bool requestLocationPermission
-) noexcept
+void SkyLocationController::setRequestLocationPermission(const bool requestLocationPermission) noexcept
 {
     m_state.requestLocationPermission = requestLocationPermission;
 }
@@ -304,21 +295,17 @@ bool SkyLocationController::setStatusText(const QString& statusText)
 
 SkySelectedCityChange SkyLocationController::clearSelectedCity()
 {
-    SkySelectedCityChange change {
-        .idChanged = !m_state.selectedCityId.isEmpty(),
-        .displayTextChanged = !m_state.selectedCityDisplayText.isEmpty()
+    SkySelectedCityChange change{
+        .idChanged = !m_state.selectedCityId.isEmpty(), .displayTextChanged = !m_state.selectedCityDisplayText.isEmpty()
     };
     m_state.selectedCityId.clear();
     m_state.selectedCityDisplayText.clear();
     return change;
 }
 
-SkySelectedCityChange SkyLocationController::setSelectedCity(
-    const QString& cityId,
-    const QString& displayText
-)
+SkySelectedCityChange SkyLocationController::setSelectedCity(const QString& cityId, const QString& displayText)
 {
-    SkySelectedCityChange change {
+    SkySelectedCityChange change{
         .idChanged = m_state.selectedCityId != cityId,
         .displayTextChanged = m_state.selectedCityDisplayText != displayText
     };
@@ -345,8 +332,7 @@ QString SkySearchController::selectedTargetId() const
 
 bool SkySearchController::hasTrackedTarget() const
 {
-    return !m_state.trackedTargetKind.trimmed().isEmpty()
-        && !m_state.trackedTargetId.trimmed().isEmpty();
+    return !m_state.trackedTargetKind.trimmed().isEmpty() && !m_state.trackedTargetId.trimmed().isEmpty();
 }
 
 QString SkySearchController::trackedTargetKind() const
@@ -378,10 +364,7 @@ bool SkySearchController::setSelectedTarget(const QString& targetKind, const QSt
 {
     const QString normalizedTargetKind = targetKind.trimmed();
     const QString normalizedTargetId = targetId.trimmed();
-    if (
-        m_state.selectedTargetKind == normalizedTargetKind
-        && m_state.selectedTargetId == normalizedTargetId
-    ) {
+    if (m_state.selectedTargetKind == normalizedTargetKind && m_state.selectedTargetId == normalizedTargetId) {
         return false;
     }
 
@@ -391,19 +374,14 @@ bool SkySearchController::setSelectedTarget(const QString& targetKind, const QSt
 }
 
 bool SkySearchController::setTrackedTarget(
-    const QString& targetKind,
-    const QString& targetId,
-    const QString& displayText
+    const QString& targetKind, const QString& targetId, const QString& displayText
 )
 {
     const QString normalizedTargetKind = targetKind.trimmed();
     const QString normalizedTargetId = targetId.trimmed();
     const QString normalizedDisplayText = displayText.trimmed();
-    if (
-        m_state.trackedTargetKind == normalizedTargetKind
-        && m_state.trackedTargetId == normalizedTargetId
-        && m_state.trackedTargetDisplayText == normalizedDisplayText
-    ) {
+    if (m_state.trackedTargetKind == normalizedTargetKind && m_state.trackedTargetId == normalizedTargetId
+        && m_state.trackedTargetDisplayText == normalizedDisplayText) {
         return false;
     }
 

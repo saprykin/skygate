@@ -43,8 +43,7 @@ private slots:
 
 void StereographicProjectionTests::centerDirectionMapsToScreenCenter()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
     const skygate::core::ProjectionParams params = makeDefaultStereographicParams();
@@ -58,15 +57,11 @@ void StereographicProjectionTests::centerDirectionMapsToScreenCenter()
 
 void StereographicProjectionTests::oppositeDirectionIsHidden()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
     const skygate::core::ProjectionParams params = makeDefaultStereographicParams();
-    const auto oppositePoint = projection->project(
-        {.altitudeDeg = -45.0, .azimuthDeg = 0.0},
-        params
-    );
+    const auto oppositePoint = projection->project({.altitudeDeg = -45.0, .azimuthDeg = 0.0}, params);
 
     QVERIFY(!oppositePoint.isVisible);
     QCOMPARE(oppositePoint.status, skygate::core::ProjectionStatus::Culled);
@@ -74,8 +69,7 @@ void StereographicProjectionTests::oppositeDirectionIsHidden()
 
 void StereographicProjectionTests::invalidParamsAreRejected()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
     skygate::core::ProjectionParams params = makeDefaultStereographicParams();
@@ -112,15 +106,11 @@ void StereographicProjectionTests::invalidParamsAreRejected()
 
 void StereographicProjectionTests::invalidCoordinateIsRejected()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
     const skygate::core::ProjectionParams params = makeDefaultStereographicParams();
-    const auto invalidCoordinatePoint = projection->project(
-        {.altitudeDeg = 95.0, .azimuthDeg = 0.0},
-        params
-    );
+    const auto invalidCoordinatePoint = projection->project({.altitudeDeg = 95.0, .azimuthDeg = 0.0}, params);
 
     QVERIFY(!invalidCoordinatePoint.isVisible);
     QCOMPARE(invalidCoordinatePoint.status, skygate::core::ProjectionStatus::InvalidCoordinate);
@@ -128,8 +118,7 @@ void StereographicProjectionTests::invalidCoordinateIsRejected()
 
 void StereographicProjectionTests::legalFovBoundaryValuesAreAccepted()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
     skygate::core::ProjectionParams params = makeDefaultStereographicParams();
@@ -147,11 +136,10 @@ void StereographicProjectionTests::legalFovBoundaryValuesAreAccepted()
 
 void StereographicProjectionTests::directionAtCircularFovEdgeIsVisible()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 60.0,
         .rollDeg = 0.0,
@@ -159,28 +147,21 @@ void StereographicProjectionTests::directionAtCircularFovEdgeIsVisible()
         .viewportHeight = 1000.0,
     };
 
-    const auto edgePoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 30.0},
-        params
-    );
+    const auto edgePoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 30.0}, params);
     QVERIFY(edgePoint.isVisible);
     QCOMPARE(edgePoint.status, skygate::core::ProjectionStatus::Visible);
 
-    const auto outsidePoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 30.25},
-        params
-    );
+    const auto outsidePoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 30.25}, params);
     QVERIFY(!outsidePoint.isVisible);
     QCOMPARE(outsidePoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void StereographicProjectionTests::directionOutsideFovIsHidden()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 20.0,
         .rollDeg = 0.0,
@@ -188,22 +169,18 @@ void StereographicProjectionTests::directionOutsideFovIsHidden()
         .viewportHeight = 1000.0,
     };
 
-    const auto outsideFovPoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 50.0},
-        params
-    );
+    const auto outsideFovPoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 50.0}, params);
     QVERIFY(!outsideFovPoint.isVisible);
     QCOMPARE(outsideFovPoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void StereographicProjectionTests::rollRotatesProjectedPoint()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::HorizontalCoordinate target {.altitudeDeg = 10.0, .azimuthDeg = 10.0};
-    const skygate::core::ProjectionParams baseParams {
+    const skygate::core::HorizontalCoordinate target{.altitudeDeg = 10.0, .azimuthDeg = 10.0};
+    const skygate::core::ProjectionParams baseParams{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 120.0,
         .rollDeg = 0.0,
@@ -232,11 +209,10 @@ void StereographicProjectionTests::rollRotatesProjectedPoint()
 
 void StereographicProjectionTests::zenithCenterIsSupported()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 90.0, .azimuthDeg = 0.0},
         .fovDeg = 90.0,
         .rollDeg = 0.0,
@@ -253,19 +229,18 @@ void StereographicProjectionTests::zenithCenterIsSupported()
 
 void StereographicProjectionTests::zenithOrientationRemainsContinuous()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::Stereographic);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::HorizontalCoordinate target {.altitudeDeg = 89.0, .azimuthDeg = 0.0};
-    const skygate::core::ProjectionParams nearPoleParams {
+    const skygate::core::HorizontalCoordinate target{.altitudeDeg = 89.0, .azimuthDeg = 0.0};
+    const skygate::core::ProjectionParams nearPoleParams{
         .center = {.altitudeDeg = 89.999, .azimuthDeg = 90.0},
         .fovDeg = 60.0,
         .rollDeg = 0.0,
         .viewportWidth = 1000.0,
         .viewportHeight = 1000.0,
     };
-    const skygate::core::ProjectionParams poleParams {
+    const skygate::core::ProjectionParams poleParams{
         .center = {.altitudeDeg = 90.0, .azimuthDeg = 90.0},
         .fovDeg = 60.0,
         .rollDeg = 0.0,

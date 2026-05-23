@@ -16,9 +16,8 @@ struct CatalogCacheSnapshotOptions final {
     std::size_t constellationCount = 1;
 };
 
-[[nodiscard]] inline SkySettingsStore::CatalogCacheSnapshot sampleCatalogCacheSnapshot(
-    const CatalogCacheSnapshotOptions& options = {}
-)
+[[nodiscard]] inline SkySettingsStore::CatalogCacheSnapshot
+sampleCatalogCacheSnapshot(const CatalogCacheSnapshotOptions& options = {})
 {
     SkySettingsStore::CatalogCacheSnapshot snapshot;
     snapshot.sourceLabel = options.sourceLabel;

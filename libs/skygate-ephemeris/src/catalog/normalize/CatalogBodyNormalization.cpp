@@ -38,9 +38,8 @@ void CatalogBodyNormalization::apply(CelestialBody& body)
         body.ephemerisSource = CelestialBodyEphemerisSource::Unresolved;
         break;
     case CelestialBodyType::DeepSkyObject:
-        body.ephemerisSource = body.fixedEquatorial.has_value()
-            ? CelestialBodyEphemerisSource::FixedEquatorial
-            : CelestialBodyEphemerisSource::Unresolved;
+        body.ephemerisSource = body.fixedEquatorial.has_value() ? CelestialBodyEphemerisSource::FixedEquatorial
+                                                                : CelestialBodyEphemerisSource::Unresolved;
         break;
     }
 }

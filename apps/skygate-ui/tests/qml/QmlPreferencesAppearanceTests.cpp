@@ -36,7 +36,9 @@ void QmlPreferencesAppearanceTests::generalLoggingControlsBindDraft()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -53,7 +55,9 @@ void QmlPreferencesAppearanceTests::generalLoggingControlsBindDraft()
                 preferencesDraft: draft
             }
         }
-    )"), QStringLiteral("PreferencesGeneralLoggingTest.qml"));
+    )"),
+        QStringLiteral("PreferencesGeneralLoggingTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -62,10 +66,7 @@ void QmlPreferencesAppearanceTests::generalLoggingControlsBindDraft()
     QObject* draft = qvariant_cast<QObject*>(root->property("draft"));
     QVERIFY(draft != nullptr);
 
-    QObject* terminalBox = firstObjectWithObjectName(
-        root,
-        QStringLiteral("logToTerminalCheckBox")
-    );
+    QObject* terminalBox = firstObjectWithObjectName(root, QStringLiteral("logToTerminalCheckBox"));
     QObject* fileBox = firstObjectWithObjectName(root, QStringLiteral("logToFileCheckBox"));
     QVERIFY(terminalBox != nullptr);
     QVERIFY(fileBox != nullptr);
@@ -81,10 +82,7 @@ void QmlPreferencesAppearanceTests::generalLoggingControlsBindDraft()
     QVERIFY2(logFileInput->width() >= 260.0, "Log file field should stay wide enough to read paths");
     logFileInput->setProperty("text", QStringLiteral("/tmp/skygate-qml-preferences.log"));
     QVERIFY(QMetaObject::invokeMethod(logFileInput, "editingFinished"));
-    QTRY_COMPARE(
-        draft->property("logFilePath").toString(),
-        QString("/tmp/skygate-qml-preferences.log")
-    );
+    QTRY_COMPARE(draft->property("logFilePath").toString(), QString("/tmp/skygate-qml-preferences.log"));
 
     QObject* browseButton = firstObjectWithObjectName(root, QStringLiteral("logFileBrowseButton"));
     QVERIFY(browseButton != nullptr);
@@ -111,7 +109,9 @@ void QmlPreferencesAppearanceTests::appearanceThemeSwitchWorks()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -128,7 +128,9 @@ void QmlPreferencesAppearanceTests::appearanceThemeSwitchWorks()
                 preferencesDraft: draft
             }
         }
-    )"), QStringLiteral("PreferencesAppearanceThemeTest.qml"));
+    )"),
+        QStringLiteral("PreferencesAppearanceThemeTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -155,24 +157,21 @@ void QmlPreferencesAppearanceTests::appearanceCheckboxChangesRender_data()
     QTest::addColumn<QString>("checkboxObjectName");
     QTest::addColumn<QString>("name");
 
-    QTest::newRow("horizon")
-        << QStringLiteral("overlayHorizonCheckBox") << QStringLiteral("Horizon");
-    QTest::newRow("alt-az-grid")
-        << QStringLiteral("overlayAltAzGridCheckBox") << QStringLiteral("Alt/Az grid");
-    QTest::newRow("constellation-lines")
-        << QStringLiteral("overlayConstellationLinesCheckBox") << QStringLiteral("Constellation lines");
+    QTest::newRow("horizon") << QStringLiteral("overlayHorizonCheckBox") << QStringLiteral("Horizon");
+    QTest::newRow("alt-az-grid") << QStringLiteral("overlayAltAzGridCheckBox") << QStringLiteral("Alt/Az grid");
+    QTest::newRow("constellation-lines") << QStringLiteral("overlayConstellationLinesCheckBox")
+                                         << QStringLiteral("Constellation lines");
     QTest::newRow("constellation-labels")
         << QStringLiteral("overlayConstellationLabelsCheckBox") << QStringLiteral("Constellation labels");
-    QTest::newRow("solar-system-labels")
-        << QStringLiteral("overlaySolarSystemLabelsCheckBox") << QStringLiteral("Solar system labels");
-    QTest::newRow("deep-sky-objects")
-        << QStringLiteral("overlayDeepSkyObjectsCheckBox") << QStringLiteral("Deep sky objects");
-    QTest::newRow("deep-sky-labels")
-        << QStringLiteral("overlayDeepSkyLabelsCheckBox") << QStringLiteral("Deep sky labels");
-    QTest::newRow("ecliptic")
-        << QStringLiteral("overlayEclipticCheckBox") << QStringLiteral("Ecliptic");
-    QTest::newRow("celestial-equator")
-        << QStringLiteral("overlayCelestialEquatorCheckBox") << QStringLiteral("Celestial equator");
+    QTest::newRow("solar-system-labels") << QStringLiteral("overlaySolarSystemLabelsCheckBox")
+                                         << QStringLiteral("Solar system labels");
+    QTest::newRow("deep-sky-objects") << QStringLiteral("overlayDeepSkyObjectsCheckBox")
+                                      << QStringLiteral("Deep sky objects");
+    QTest::newRow("deep-sky-labels") << QStringLiteral("overlayDeepSkyLabelsCheckBox")
+                                     << QStringLiteral("Deep sky labels");
+    QTest::newRow("ecliptic") << QStringLiteral("overlayEclipticCheckBox") << QStringLiteral("Ecliptic");
+    QTest::newRow("celestial-equator") << QStringLiteral("overlayCelestialEquatorCheckBox")
+                                       << QStringLiteral("Celestial equator");
     QTest::newRow("circumpolar-boundary")
         << QStringLiteral("overlayCircumpolarBoundaryCheckBox") << QStringLiteral("Circumpolar boundary");
 }
@@ -193,7 +192,9 @@ void QmlPreferencesAppearanceTests::appearanceCheckboxChangesRender()
     setupEngine(engine, *controller, sceneModel.get());
 
     const QmlWarningScope warnings(QmlWarningScope::Forwarding::Disabled);
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -210,7 +211,9 @@ void QmlPreferencesAppearanceTests::appearanceCheckboxChangesRender()
                 preferencesDraft: draft
             }
         }
-    )"), QStringLiteral("PreferencesAppearanceCheckboxTest.qml"));
+    )"),
+        QStringLiteral("PreferencesAppearanceCheckboxTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);

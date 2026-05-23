@@ -17,10 +17,7 @@ private slots:
 
 void CatalogParsingUtilitiesTests::convertsQtTextToUtf8()
 {
-    QCOMPARE(
-        skygate::ephemeris::catalog_parsing::toUtf8String(QString::fromUtf8("M31")),
-        std::string("M31")
-    );
+    QCOMPARE(skygate::ephemeris::catalog_parsing::toUtf8String(QString::fromUtf8("M31")), std::string("M31"));
 }
 
 void CatalogParsingUtilitiesTests::parsesFiniteAndPositiveDoubles()

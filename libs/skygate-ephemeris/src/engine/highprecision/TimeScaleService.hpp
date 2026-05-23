@@ -49,8 +49,8 @@ enum class TimeScaleConversionWarningCode : std::uint8_t {
     EarthOrientationDataEstimated
 };
 
-[[nodiscard]] constexpr std::string_view timeScaleConversionWarningText(const TimeScaleConversionWarningCode code
-) noexcept
+[[nodiscard]] constexpr std::string_view
+timeScaleConversionWarningText(const TimeScaleConversionWarningCode code) noexcept
 {
     switch (code) {
     case TimeScaleConversionWarningCode::LeapSecondTableMissing:

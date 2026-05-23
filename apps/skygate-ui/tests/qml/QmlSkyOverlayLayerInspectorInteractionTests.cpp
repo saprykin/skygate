@@ -11,9 +11,7 @@ private slots:
 
 void QmlSkyOverlayLayerInspectorInteractionTests::initTestCase()
 {
-    QVERIFY(initializeOverlayRenderingSettings(
-        QStringLiteral("QmlSkyOverlayLayerInspectorInteractionTests")
-    ));
+    QVERIFY(initializeOverlayRenderingSettings(QStringLiteral("QmlSkyOverlayLayerInspectorInteractionTests")));
 }
 
 void QmlSkyOverlayLayerInspectorInteractionTests::init()
@@ -30,7 +28,9 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -128,7 +128,9 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
                 avoidItems: [avoidPanel]
             }
         }
-    )"), QStringLiteral("SkyOverlayLayerActionBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SkyOverlayLayerActionBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -148,52 +150,34 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
     QVERIFY(inspectorItem->x() + inspectorItem->width() <= root->width() - 8.0);
     QVERIFY(inspectorItem->y() >= 8.0);
 
-    auto* selectionMarker = firstQuickItemWithObjectName(
-        root,
-        QStringLiteral("searchSelectionMarker")
-    );
+    auto* selectionMarker = firstQuickItemWithObjectName(root, QStringLiteral("searchSelectionMarker"));
     QVERIFY(selectionMarker != nullptr);
     QCOMPARE(selectionMarker->x(), -12.0);
     QCOMPARE(selectionMarker->y(), -12.0);
 
-    QObject* centerButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("objectInspectorCenterButton")
-    );
+    QObject* centerButton = firstObjectWithObjectName(root, QStringLiteral("objectInspectorCenterButton"));
     QVERIFY(centerButton != nullptr);
     QVERIFY(activateControl(centerButton));
     QTRY_COMPARE(controller->selectedSearchTargetKind(), QString("body"));
     QCOMPARE(controller->selectedSearchTargetId(), QString("sun"));
 
-    QObject* trackButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("objectInspectorTrackButton")
-    );
+    QObject* trackButton = firstObjectWithObjectName(root, QStringLiteral("objectInspectorTrackButton"));
     QVERIFY(trackButton != nullptr);
     QVERIFY(activateControl(trackButton));
     QTRY_VERIFY(controller->hasTrackedTarget());
     QCOMPARE(controller->trackedTargetId(), QString("sun"));
 
-    QObject* untrackButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("objectInspectorUntrackButton")
-    );
+    QObject* untrackButton = firstObjectWithObjectName(root, QStringLiteral("objectInspectorUntrackButton"));
     QVERIFY(untrackButton != nullptr);
     QVERIFY(activateControl(untrackButton));
     QTRY_VERIFY(!controller->hasTrackedTarget());
 
-    QObject* pinButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("objectInspectorPinButton")
-    );
+    QObject* pinButton = firstObjectWithObjectName(root, QStringLiteral("objectInspectorPinButton"));
     QVERIFY(pinButton != nullptr);
     QVERIFY(activateControl(pinButton));
     QTRY_VERIFY(scene->property("movedX").toReal() >= 0.0);
 
-    QObject* unpinButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("objectInspectorUnpinButton")
-    );
+    QObject* unpinButton = firstObjectWithObjectName(root, QStringLiteral("objectInspectorUnpinButton"));
     QVERIFY(unpinButton != nullptr);
     QVERIFY(activateControl(unpinButton));
     QTRY_VERIFY(scene->property("unpinned").toBool());
@@ -204,20 +188,12 @@ void QmlSkyOverlayLayerInspectorInteractionTests::skyOverlayLayerInspectorAction
     QTest::mouseMove(exposed.window(), dragStart + QPoint(-120, 80));
     QVERIFY(!scene->property("dragged").toBool());
     QVERIFY(inspectorItem->x() < root->width());
-    QTest::mouseRelease(
-        exposed.window(),
-        Qt::LeftButton,
-        Qt::NoModifier,
-        dragStart + QPoint(-120, 80)
-    );
+    QTest::mouseRelease(exposed.window(), Qt::LeftButton, Qt::NoModifier, dragStart + QPoint(-120, 80));
     QTRY_VERIFY(scene->property("dragged").toBool());
     QVERIFY(scene->property("movedX").toReal() < root->width());
     QVERIFY(scene->property("movedY").toReal() >= 8.0);
 
-    QObject* closeButton = firstObjectWithObjectName(
-        root,
-        QStringLiteral("objectInspectorCloseButton")
-    );
+    QObject* closeButton = firstObjectWithObjectName(root, QStringLiteral("objectInspectorCloseButton"));
     QVERIFY(closeButton != nullptr);
     QVERIFY(activateControl(closeButton));
     QTRY_VERIFY(scene->property("cleared").toBool());

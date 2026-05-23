@@ -10,17 +10,14 @@ namespace {
 bool containsTimeZoneId(const TimeZoneCatalogModel& model, const QString& timeZoneId)
 {
     for (int row = 0; row < model.rowCount(); ++row) {
-        if (
-            model.index(row, 0).data(TimeZoneCatalogModel::TimeZoneIdRole).toString()
-            == timeZoneId
-        ) {
+        if (model.index(row, 0).data(TimeZoneCatalogModel::TimeZoneIdRole).toString() == timeZoneId) {
             return true;
         }
     }
     return false;
 }
 
-} // namespace
+}  // namespace
 
 class TimeZoneCatalogModelTests final : public QObject {
     Q_OBJECT
@@ -36,18 +33,22 @@ private slots:
 
 void TimeZoneCatalogModelTests::aliasSourceCoversCommonUserTerms()
 {
-    QVERIFY(TimeZoneAliasCatalog::aliasesForTimeZoneId(
-        QStringLiteral("America/Los_Angeles")
-    ).contains(QStringLiteral("PST")));
-    QVERIFY(TimeZoneAliasCatalog::aliasesForTimeZoneId(
-        QStringLiteral("America/New_York")
-    ).contains(QStringLiteral("Eastern Time")));
-    QVERIFY(TimeZoneAliasCatalog::aliasesForTimeZoneId(
-        QStringLiteral("Asia/Kolkata")
-    ).contains(QStringLiteral("Indian Standard Time")));
-    QVERIFY(TimeZoneAliasCatalog::aliasesForTimeZoneId(
-        QStringLiteral("Asia/Shanghai")
-    ).contains(QStringLiteral("China Standard Time")));
+    QVERIFY(
+        TimeZoneAliasCatalog::aliasesForTimeZoneId(QStringLiteral("America/Los_Angeles"))
+            .contains(QStringLiteral("PST"))
+    );
+    QVERIFY(
+        TimeZoneAliasCatalog::aliasesForTimeZoneId(QStringLiteral("America/New_York"))
+            .contains(QStringLiteral("Eastern Time"))
+    );
+    QVERIFY(
+        TimeZoneAliasCatalog::aliasesForTimeZoneId(QStringLiteral("Asia/Kolkata"))
+            .contains(QStringLiteral("Indian Standard Time"))
+    );
+    QVERIFY(
+        TimeZoneAliasCatalog::aliasesForTimeZoneId(QStringLiteral("Asia/Shanghai"))
+            .contains(QStringLiteral("China Standard Time"))
+    );
 }
 
 void TimeZoneCatalogModelTests::loadsQtTimeZonesAndUtc()
@@ -80,10 +81,7 @@ void TimeZoneCatalogModelTests::filtersByIanaIdLabelAndOffset()
 
     model.setFilterText(QStringLiteral("zurich"));
     QCOMPARE(model.rowCount(), 1);
-    QCOMPARE(
-        model.index(0, 0).data(TimeZoneCatalogModel::TimeZoneIdRole).toString(),
-        QStringLiteral("Europe/Zurich")
-    );
+    QCOMPARE(model.index(0, 0).data(TimeZoneCatalogModel::TimeZoneIdRole).toString(), QStringLiteral("Europe/Zurich"));
 
     model.setFilterText(QStringLiteral("CEST"));
     QVERIFY(model.rowCount() >= 1);
@@ -108,8 +106,8 @@ void TimeZoneCatalogModelTests::filtersByIanaIdLabelAndOffset()
 
     model.setFilterText(QStringLiteral("IST"));
     const QString indiaTimeZoneId = model.hasTimeZoneId(QStringLiteral("Asia/Kolkata"))
-        ? QStringLiteral("Asia/Kolkata")
-        : QStringLiteral("Asia/Calcutta");
+                                        ? QStringLiteral("Asia/Kolkata")
+                                        : QStringLiteral("Asia/Calcutta");
     QVERIFY(containsTimeZoneId(model, indiaTimeZoneId));
 
     model.setFilterText(QStringLiteral("CST"));

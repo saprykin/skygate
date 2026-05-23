@@ -28,10 +28,7 @@ void appendDeepSkyAliasKeys(std::vector<std::string>& keys, const CelestialBody&
 
 }  // namespace
 
-bool containsBodyId(
-    const std::span<const CelestialBody> bodies,
-    const std::string_view id
-)
+bool containsBodyId(const std::span<const CelestialBody> bodies, const std::string_view id)
 {
     return std::any_of(bodies.begin(), bodies.end(), [id](const CelestialBody& body) {
         return strings::equalsIgnoreAsciiCase(body.id, id);
@@ -52,19 +49,15 @@ bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs)
 bool isAnalyticSolarSystemBody(const CelestialBody& body) noexcept
 {
     return body.ephemerisSource == CelestialBodyEphemerisSource::Sun
-        || body.ephemerisSource == CelestialBodyEphemerisSource::Moon
-        || body.ephemerisSource == CelestialBodyEphemerisSource::Planet;
+           || body.ephemerisSource == CelestialBodyEphemerisSource::Moon
+           || body.ephemerisSource == CelestialBodyEphemerisSource::Planet;
 }
 
 std::size_t countDeepSkyObjects(const std::span<const CelestialBody> bodies)
 {
-    return static_cast<std::size_t>(std::count_if(
-        bodies.begin(),
-        bodies.end(),
-        [](const CelestialBody& body) {
-            return body.type == CelestialBodyType::DeepSkyObject;
-        }
-    ));
+    return static_cast<std::size_t>(std::count_if(bodies.begin(), bodies.end(), [](const CelestialBody& body) {
+        return body.type == CelestialBodyType::DeepSkyObject;
+    }));
 }
 
 }  // namespace skygate::ephemeris::catalog_identity

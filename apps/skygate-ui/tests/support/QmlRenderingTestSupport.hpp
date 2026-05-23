@@ -49,28 +49,18 @@ int renderingMaxRgbChannelDistance(const QColor& lhs, const QColor& rhs)
     });
 }
 
-bool renderingColorsAreNear(
-    const QColor& lhs,
-    const QColor& rhs,
-    const int maxChannelDistance
-)
+bool renderingColorsAreNear(const QColor& lhs, const QColor& rhs, const int maxChannelDistance)
 {
     return renderingMaxRgbChannelDistance(lhs, rhs) <= maxChannelDistance;
 }
 
 QRectF renderingQuickItemSceneRect(const QQuickItem& item)
 {
-    return QRectF(
-        item.mapToScene(QPointF(0.0, 0.0)),
-        item.mapToScene(QPointF(item.width(), item.height()))
-    ).normalized();
+    return QRectF(item.mapToScene(QPointF(0.0, 0.0)), item.mapToScene(QPointF(item.width(), item.height())))
+        .normalized();
 }
 
-QRect renderingImageRectForSceneRect(
-    const QQuickWindow& window,
-    const QImage& image,
-    const QRectF& sceneRect
-)
+QRect renderingImageRectForSceneRect(const QQuickWindow& window, const QImage& image, const QRectF& sceneRect)
 {
     if (window.width() <= 0 || window.height() <= 0 || image.isNull()) {
         return {};
@@ -87,11 +77,7 @@ QRect renderingImageRectForSceneRect(
         .intersected(QRect(0, 0, image.width(), image.height()));
 }
 
-QPoint renderingImagePointForScenePoint(
-    const QQuickWindow& window,
-    const QImage& image,
-    const QPointF& scenePoint
-)
+QPoint renderingImagePointForScenePoint(const QQuickWindow& window, const QImage& image, const QPointF& scenePoint)
 {
     if (window.width() <= 0 || window.height() <= 0 || image.isNull()) {
         return {};
@@ -106,10 +92,7 @@ QPoint renderingImagePointForScenePoint(
 }
 
 bool renderingImageRegionContainsColorNear(
-    const QImage& image,
-    const QRect& imageRect,
-    const QColor& targetColor,
-    const int maxChannelDistance
+    const QImage& image, const QRect& imageRect, const QColor& targetColor, const int maxChannelDistance
 )
 {
     if (image.isNull() || imageRect.isEmpty()) {
@@ -118,13 +101,7 @@ bool renderingImageRegionContainsColorNear(
 
     for (int y = imageRect.top(); y <= imageRect.bottom(); ++y) {
         for (int x = imageRect.left(); x <= imageRect.right(); ++x) {
-            if (
-                renderingColorsAreNear(
-                    image.pixelColor(x, y),
-                    targetColor,
-                    maxChannelDistance
-                )
-            ) {
+            if (renderingColorsAreNear(image.pixelColor(x, y), targetColor, maxChannelDistance)) {
                 return true;
             }
         }
@@ -161,16 +138,11 @@ bool renderingScenePointIsColorNear(
     }
 
     const QPoint imagePoint = renderingImagePointForScenePoint(window, image, scenePoint);
-    return renderingColorsAreNear(
-        image.pixelColor(imagePoint),
-        targetColor,
-        maxChannelDistance
-    );
+    return renderingColorsAreNear(image.pixelColor(imagePoint), targetColor, maxChannelDistance);
 }
 
 QList<QColor> renderingExpectedGeometryColors(
-    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme,
-    const QString& propertyName
+    const skygate::ui::internal::SkyThemeRenderPalette& renderTheme, const QString& propertyName
 )
 {
     if (propertyName == QStringLiteral("horizon")) {
@@ -195,17 +167,14 @@ QList<QColor> renderingExpectedGeometryColors(
 }
 
 bool renderingHasVisibleGeometryWithColor(
-    const QSGNode* paintNode,
-    const QColor& color,
-    const QSizeF& viewportSize,
-    QString* failure
+    const QSGNode* paintNode, const QColor& color, const QSizeF& viewportSize, QString* failure
 )
 {
     const SkyViewGeometryProbe probe = geometryMaterialColorProbe(paintNode, color);
     if (!probe.hasGeometry()) {
         if (failure != nullptr) {
             *failure = QStringLiteral("No scene-graph geometry used color %1; actual colors: %2")
-                .arg(color.name(QColor::HexArgb), geometryMaterialColorNames(paintNode).join(", "));
+                           .arg(color.name(QColor::HexArgb), geometryMaterialColorNames(paintNode).join(", "));
         }
         return false;
     }
@@ -213,13 +182,13 @@ bool renderingHasVisibleGeometryWithColor(
     if (!geometryProbeIntersectsViewport(probe, viewportSize)) {
         if (failure != nullptr) {
             *failure = QStringLiteral("Scene-graph geometry for %1 at [%2,%3 %4x%5] misses %6x%7")
-                .arg(color.name(QColor::HexArgb))
-                .arg(probe.bounds.x())
-                .arg(probe.bounds.y())
-                .arg(probe.bounds.width())
-                .arg(probe.bounds.height())
-                .arg(viewportSize.width())
-                .arg(viewportSize.height());
+                           .arg(color.name(QColor::HexArgb))
+                           .arg(probe.bounds.x())
+                           .arg(probe.bounds.y())
+                           .arg(probe.bounds.width())
+                           .arg(probe.bounds.height())
+                           .arg(viewportSize.width())
+                           .arg(viewportSize.height());
         }
         return false;
     }
@@ -254,13 +223,8 @@ bool visibleQuickItemsFitWithinWindow(QQuickWindow& window, QString* failure)
     const QRectF windowRect(0.0, 0.0, window.width(), window.height());
     for (QObject* object : objectTree(&window)) {
         auto* item = qobject_cast<QQuickItem*>(object);
-        if (
-            item == nullptr
-            || item->window() != &window
-            || !item->isVisible()
-            || item->width() <= 0.0
-            || item->height() <= 0.0
-        ) {
+        if (item == nullptr || item->window() != &window || !item->isVisible() || item->width() <= 0.0
+            || item->height() <= 0.0) {
             continue;
         }
 
@@ -269,13 +233,13 @@ bool visibleQuickItemsFitWithinWindow(QQuickWindow& window, QString* failure)
         if (!relaxedWindowRect.contains(bounds)) {
             if (failure != nullptr) {
                 *failure = QStringLiteral("%1 at [%2,%3 %4x%5] outside %6x%7")
-                    .arg(QString::fromUtf8(item->metaObject()->className()))
-                    .arg(bounds.x())
-                    .arg(bounds.y())
-                    .arg(bounds.width())
-                    .arg(bounds.height())
-                    .arg(window.width())
-                    .arg(window.height());
+                               .arg(QString::fromUtf8(item->metaObject()->className()))
+                               .arg(bounds.x())
+                               .arg(bounds.y())
+                               .arg(bounds.width())
+                               .arg(bounds.height())
+                               .arg(window.width())
+                               .arg(window.height());
             }
             return false;
         }

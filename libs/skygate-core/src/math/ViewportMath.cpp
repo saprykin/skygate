@@ -31,8 +31,7 @@ ProjectionParams ViewportMath::buildProjectionParams(
 {
     ProjectionParams projectionParams;
     projectionParams.center = {
-        .altitudeDeg = clampAltitudeDeg(centerAltitudeDeg),
-        .azimuthDeg = normalizeAzimuthDeg(centerAzimuthDeg)
+        .altitudeDeg = clampAltitudeDeg(centerAltitudeDeg), .azimuthDeg = normalizeAzimuthDeg(centerAzimuthDeg)
     };
     projectionParams.fovDeg = clampFieldOfViewDeg(fieldOfViewDeg);
     projectionParams.rollDeg = 0.0;

@@ -76,31 +76,22 @@ void SkyViewportInternalsTests::geometryAppendsFrameLinesAndDeepSkyGlyphSegments
     theme.celestialEquatorLine = QColor("#555555");
     theme.circumpolarBoundaryLine = QColor("#666666");
 
-    const std::vector<SkyRenderLine> frameLines {
-        {
-            .x1 = 10.0,
-            .y1 = 20.0,
-            .x2 = 30.0,
-            .y2 = 45.0,
-            .widthPx = 2.5,
-            .color = QColor("#abcdef")
-        }
+    const std::vector<SkyRenderLine> frameLines{
+        {.x1 = 10.0, .y1 = 20.0, .x2 = 30.0, .y2 = 45.0, .widthPx = 2.5, .color = QColor("#abcdef")}
     };
-    const std::vector<SkyRenderGlyph> glyphs {
-        {
-            .x = 100.0,
-            .y = 120.0,
-            .radiusXPx = 8.0,
-            .radiusYPx = 6.0,
-            .rotationDeg = 0.0,
-            .widthPx = 1.5,
-            .kind = skygate::ephemeris::DeepSkyObjectKind::GlobularCluster,
-            .color = QColor("#fedcba")
-        }
+    const std::vector<SkyRenderGlyph> glyphs{
+        {.x = 100.0,
+         .y = 120.0,
+         .radiusXPx = 8.0,
+         .radiusYPx = 6.0,
+         .rotationDeg = 0.0,
+         .widthPx = 1.5,
+         .kind = skygate::ephemeris::DeepSkyObjectKind::GlobularCluster,
+         .color = QColor("#fedcba")}
     };
 
     const auto segments = skygate::ui::internal::buildSkyViewportLineSegments(
-        skygate::ui::internal::SkyViewportGeometryInput {
+        skygate::ui::internal::SkyViewportGeometryInput{
             .projection = *projection,
             .viewportWidth = 800.0,
             .viewportHeight = 600.0,
@@ -122,9 +113,7 @@ void SkyViewportInternalsTests::geometryAppendsFrameLinesAndDeepSkyGlyphSegments
     QCOMPARE(segments.front().color, QColor("#abcdef"));
 
     const auto glyphSegmentCount = std::count_if(
-        segments.begin(),
-        segments.end(),
-        [](const skygate::ui::internal::SkyViewportLineSegment& segment) {
+        segments.begin(), segments.end(), [](const skygate::ui::internal::SkyViewportLineSegment& segment) {
             return segment.color == QColor("#fedcba");
         }
     );
@@ -134,31 +123,10 @@ void SkyViewportInternalsTests::geometryAppendsFrameLinesAndDeepSkyGlyphSegments
 void SkyViewportInternalsTests::sceneGraphBucketsLineSegmentsAndSkipsDegenerateLines()
 {
     QSGNode root;
-    const std::vector<skygate::ui::internal::SkyViewportLineSegment> segments {
-        {
-            .x1 = 0.0F,
-            .y1 = 0.0F,
-            .x2 = 10.0F,
-            .y2 = 0.0F,
-            .widthPx = 2.0F,
-            .color = QColor("#ff0000")
-        },
-        {
-            .x1 = 4.0F,
-            .y1 = 4.0F,
-            .x2 = 4.0F,
-            .y2 = 12.0F,
-            .widthPx = 2.0F,
-            .color = QColor("#ff0000")
-        },
-        {
-            .x1 = 5.0F,
-            .y1 = 5.0F,
-            .x2 = 5.0F,
-            .y2 = 5.0F,
-            .widthPx = 2.0F,
-            .color = QColor("#ff0000")
-        },
+    const std::vector<skygate::ui::internal::SkyViewportLineSegment> segments{
+        {.x1 = 0.0F, .y1 = 0.0F, .x2 = 10.0F, .y2 = 0.0F, .widthPx = 2.0F, .color = QColor("#ff0000")},
+        {.x1 = 4.0F, .y1 = 4.0F, .x2 = 4.0F, .y2 = 12.0F, .widthPx = 2.0F, .color = QColor("#ff0000")},
+        {.x1 = 5.0F, .y1 = 5.0F, .x2 = 5.0F, .y2 = 5.0F, .widthPx = 2.0F, .color = QColor("#ff0000")},
     };
 
     skygate::ui::internal::syncSkyViewportLineNodes(&root, segments);
@@ -167,14 +135,8 @@ void SkyViewportInternalsTests::sceneGraphBucketsLineSegmentsAndSkipsDegenerateL
     const QSGGeometryNode* geometryNode = firstGeometryChild(root);
     QVERIFY(geometryNode != nullptr);
     QCOMPARE(geometryNode->geometry()->vertexCount(), 12);
-    QCOMPARE(
-        geometryNode->geometry()->drawingMode(),
-        static_cast<unsigned int>(QSGGeometry::DrawTriangles)
-    );
-    QCOMPARE(
-        static_cast<QSGFlatColorMaterial*>(geometryNode->material())->color(),
-        QColor("#ff0000")
-    );
+    QCOMPARE(geometryNode->geometry()->drawingMode(), static_cast<unsigned int>(QSGGeometry::DrawTriangles));
+    QCOMPARE(static_cast<QSGFlatColorMaterial*>(geometryNode->material())->color(), QColor("#ff0000"));
 
     skygate::ui::internal::clearSkyViewportChildNodes(&root);
     QCOMPARE(childCount(root), 0);
@@ -183,7 +145,7 @@ void SkyViewportInternalsTests::sceneGraphBucketsLineSegmentsAndSkipsDegenerateL
 void SkyViewportInternalsTests::sceneGraphBucketsPointsByColor()
 {
     QSGNode root;
-    const std::vector<SkyRenderPoint> points {
+    const std::vector<SkyRenderPoint> points{
         {.x = 10.0, .y = 20.0, .sizePx = 4.0, .color = QColor("#00ff00")},
         {.x = 30.0, .y = 40.0, .sizePx = 6.0, .color = QColor("#00ff00")},
         {.x = 50.0, .y = 60.0, .sizePx = 8.0, .color = QColor("#0000ff")},

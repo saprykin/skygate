@@ -25,10 +25,7 @@ namespace {
         return false;
     }
 
-    return strings::equalsIgnoreAsciiCase(
-        leafName.substr(leafName.size() - 4U),
-        ".csv"
-    );
+    return strings::equalsIgnoreAsciiCase(leafName.substr(leafName.size() - 4U), ".csv");
 }
 
 [[nodiscard]] bool isUsableEntry(const ZipEntryMetadata& entry)
@@ -38,9 +35,7 @@ namespace {
 
 }  // namespace
 
-const ZipEntryMetadata* CatalogZipEntrySelector::selectFirstCsvEntry(
-    const std::span<const ZipEntryMetadata> entries
-)
+const ZipEntryMetadata* CatalogZipEntrySelector::selectFirstCsvEntry(const std::span<const ZipEntryMetadata> entries)
 {
     const ZipEntryMetadata* firstCandidate = nullptr;
     for (const ZipEntryMetadata& entry : entries) {

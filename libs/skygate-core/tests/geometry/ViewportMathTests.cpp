@@ -49,13 +49,7 @@ void ViewportMathTests::nonFiniteInputsRemainNonFinite()
 void ViewportMathTests::buildProjectionParamsNormalizesAndClampsInputs()
 {
     const skygate::core::ProjectionParams params =
-        skygate::core::ViewportMath::buildProjectionParams(
-            1200.0,
-            800.0,
-            120.0,
-            -150.0,
-            0.5
-        );
+        skygate::core::ViewportMath::buildProjectionParams(1200.0, 800.0, 120.0, -150.0, 0.5);
 
     QCOMPARE(params.center.altitudeDeg, 90.0);
     QCOMPARE(params.center.azimuthDeg, 210.0);
@@ -70,13 +64,7 @@ void ViewportMathTests::buildProjectionParamsPreservesNonFinitePolicy()
     const double nan = std::numeric_limits<double>::quiet_NaN();
 
     const skygate::core::ProjectionParams params =
-        skygate::core::ViewportMath::buildProjectionParams(
-            nan,
-            800.0,
-            nan,
-            nan,
-            nan
-        );
+        skygate::core::ViewportMath::buildProjectionParams(nan, 800.0, nan, nan, nan);
 
     QVERIFY(std::isnan(params.center.altitudeDeg));
     QVERIFY(std::isnan(params.center.azimuthDeg));

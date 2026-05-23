@@ -8,19 +8,13 @@
 
 namespace skygate::ephemeris::tests {
 
-[[nodiscard]] inline bool isNear(
-    const double value,
-    const double expected,
-    const double tolerance
-) noexcept
+[[nodiscard]] inline bool isNear(const double value, const double expected, const double tolerance) noexcept
 {
     return std::abs(value - expected) <= tolerance;
 }
 
-[[nodiscard]] inline const CelestialBody* findBodyById(
-    const std::span<const CelestialBody> bodies,
-    const std::string_view id
-)
+[[nodiscard]] inline const CelestialBody*
+findBodyById(const std::span<const CelestialBody> bodies, const std::string_view id)
 {
     for (const CelestialBody& body : bodies) {
         if (body.id == id) {
@@ -30,10 +24,7 @@ namespace skygate::ephemeris::tests {
     return nullptr;
 }
 
-[[nodiscard]] inline const CelestialBodyState* findStateById(
-    const SkySnapshot& snapshot,
-    const std::string_view id
-)
+[[nodiscard]] inline const CelestialBodyState* findStateById(const SkySnapshot& snapshot, const std::string_view id)
 {
     for (const CelestialBodyState& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == id) {

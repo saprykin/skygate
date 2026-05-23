@@ -22,8 +22,7 @@ bool matchesFilter(const LocationCatalogEntry& entry, const QString& filterText)
         return true;
     }
 
-    return entry.cityName.toCaseFolded().contains(filterText)
-        || entry.countryName.toCaseFolded().contains(filterText);
+    return entry.cityName.toCaseFolded().contains(filterText) || entry.countryName.toCaseFolded().contains(filterText);
 }
 
 }  // namespace
@@ -38,8 +37,7 @@ QString LocationCatalogEntry::displayText() const
     return QString("%1, %2").arg(cityName, countryName);
 }
 
-LocationCatalogModel::LocationCatalogModel(QObject* parent)
-    : QAbstractListModel(parent)
+LocationCatalogModel::LocationCatalogModel(QObject* parent) : QAbstractListModel(parent)
 {
     ensureLocationCatalogResourcesLoaded();
     (void)loadCatalog();
@@ -123,21 +121,16 @@ bool LocationCatalogModel::hasCityId(const QString& cityId) const
     return entryForCityId(cityId).has_value();
 }
 
-std::optional<LocationCatalogEntry> LocationCatalogModel::entryForCityId(
-    const QString& cityId
-) const
+std::optional<LocationCatalogEntry> LocationCatalogModel::entryForCityId(const QString& cityId) const
 {
     if (cityId.trimmed().isEmpty()) {
         return std::nullopt;
     }
 
-    const auto entryIterator = std::find_if(
-        m_entries.cbegin(),
-        m_entries.cend(),
-        [&cityId](const LocationCatalogEntry& entry) {
+    const auto entryIterator =
+        std::find_if(m_entries.cbegin(), m_entries.cend(), [&cityId](const LocationCatalogEntry& entry) {
             return entry.id == cityId;
-        }
-    );
+        });
     if (entryIterator == m_entries.cend()) {
         return std::nullopt;
     }
@@ -163,13 +156,7 @@ bool LocationCatalogModel::loadCatalog()
     const int cityNameIndex = headers.indexOf("cityName");
     const int latitudeIndex = headers.indexOf("latitudeDeg");
     const int longitudeIndex = headers.indexOf("longitudeDeg");
-    if (
-        idIndex < 0
-        || countryNameIndex < 0
-        || cityNameIndex < 0
-        || latitudeIndex < 0
-        || longitudeIndex < 0
-    ) {
+    if (idIndex < 0 || countryNameIndex < 0 || cityNameIndex < 0 || latitudeIndex < 0 || longitudeIndex < 0) {
         return false;
     }
 
@@ -193,13 +180,8 @@ bool LocationCatalogModel::loadCatalog()
         entry.cityName = fields.at(cityNameIndex).trimmed();
         entry.latitudeDeg = fields.at(latitudeIndex).trimmed().toDouble(&latitudeIsValid);
         entry.longitudeDeg = fields.at(longitudeIndex).trimmed().toDouble(&longitudeIsValid);
-        if (
-            entry.id.isEmpty()
-            || entry.countryName.isEmpty()
-            || entry.cityName.isEmpty()
-            || !latitudeIsValid
-            || !longitudeIsValid
-        ) {
+        if (entry.id.isEmpty() || entry.countryName.isEmpty() || entry.cityName.isEmpty() || !latitudeIsValid
+            || !longitudeIsValid) {
             continue;
         }
 
@@ -207,11 +189,7 @@ bool LocationCatalogModel::loadCatalog()
     }
 
     std::sort(entries.begin(), entries.end(), [](const LocationCatalogEntry& lhs, const LocationCatalogEntry& rhs) {
-        const int countryCompare = QString::compare(
-            lhs.countryName,
-            rhs.countryName,
-            Qt::CaseInsensitive
-        );
+        const int countryCompare = QString::compare(lhs.countryName, rhs.countryName, Qt::CaseInsensitive);
         if (countryCompare != 0) {
             return countryCompare < 0;
         }
@@ -236,18 +214,22 @@ void LocationCatalogModel::rebuildRows()
 
         if (currentCountryName != entry.countryName) {
             currentCountryName = entry.countryName;
-            m_rows.push_back(Row {
-                .kind = RowKind::CountryHeader,
-                .displayText = currentCountryName,
-            });
+            m_rows.push_back(
+                Row{
+                    .kind = RowKind::CountryHeader,
+                    .displayText = currentCountryName,
+                }
+            );
         }
 
-        m_rows.push_back(Row {
-            .kind = RowKind::City,
-            .displayText = entry.cityName,
-            .detailText = entry.countryName,
-            .entry = entry,
-        });
+        m_rows.push_back(
+            Row{
+                .kind = RowKind::City,
+                .displayText = entry.cityName,
+                .detailText = entry.countryName,
+                .entry = entry,
+            }
+        );
     }
 
     endResetModel();

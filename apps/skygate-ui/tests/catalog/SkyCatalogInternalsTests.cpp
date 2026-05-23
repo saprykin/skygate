@@ -22,34 +22,13 @@ void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
 
     QCOMPARE(SkyCatalogText::datasetInfo(12U, 3U), QString("Objects: 12 | Constellations: 3"));
     QCOMPARE(SkyCatalogText::deepSkyCatalogInfo(9U), QString("Objects: 9"));
-    QCOMPARE(
-        SkyCatalogText::unknownCatalogPreset("demo"),
-        QString("Catalog: Unknown preset 'demo'")
-    );
-    QCOMPARE(
-        SkyCatalogText::unknownDeepSkyPreset("deep"),
-        QString("Catalog: Unknown deep-sky preset 'deep'")
-    );
-    QCOMPARE(
-        SkyCatalogText::cacheClearBlocked(),
-        QString("Catalog: Cannot clear cache while download is in progress")
-    );
-    QCOMPARE(
-        SkyCatalogText::starCacheClearResult(true),
-        QString("Catalog: Star catalog cache cleared")
-    );
-    QCOMPARE(
-        SkyCatalogText::starCacheClearResult(false),
-        QString("Catalog: Star catalog cache clear failed")
-    );
-    QCOMPARE(
-        SkyCatalogText::deepSkyCacheClearResult(true),
-        QString("Catalog: Deep-sky catalog cache cleared")
-    );
-    QCOMPARE(
-        SkyCatalogText::deepSkyCacheClearResult(false),
-        QString("Catalog: Deep-sky catalog cache clear failed")
-    );
+    QCOMPARE(SkyCatalogText::unknownCatalogPreset("demo"), QString("Catalog: Unknown preset 'demo'"));
+    QCOMPARE(SkyCatalogText::unknownDeepSkyPreset("deep"), QString("Catalog: Unknown deep-sky preset 'deep'"));
+    QCOMPARE(SkyCatalogText::cacheClearBlocked(), QString("Catalog: Cannot clear cache while download is in progress"));
+    QCOMPARE(SkyCatalogText::starCacheClearResult(true), QString("Catalog: Star catalog cache cleared"));
+    QCOMPARE(SkyCatalogText::starCacheClearResult(false), QString("Catalog: Star catalog cache clear failed"));
+    QCOMPARE(SkyCatalogText::deepSkyCacheClearResult(true), QString("Catalog: Deep-sky catalog cache cleared"));
+    QCOMPARE(SkyCatalogText::deepSkyCacheClearResult(false), QString("Catalog: Deep-sky catalog cache clear failed"));
     QVERIFY(SkyCatalogText::isProcessingStatus("catalog: processing stars"));
     QVERIFY(!SkyCatalogText::isProcessingStatus("Catalog: Ready"));
 }
@@ -79,11 +58,11 @@ void SkyCatalogInternalsTests::catalogTextComposesSummaryDetails()
 void SkyCatalogInternalsTests::constellationStoreKeepsCustomRefsAndCounts()
 {
     skygate::ui::internal::SkyCatalogConstellationStore store;
-    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs {
+    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs{
         {"hip_1", "hip_2"},
         {"hip_2", "hip_3"},
     };
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs {
+    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{
         {"Demo", {"hip_1", "hip_2"}},
     };
 

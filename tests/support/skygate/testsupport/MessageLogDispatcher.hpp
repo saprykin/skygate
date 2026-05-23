@@ -16,12 +16,7 @@ public:
         Stop
     };
 
-    using Callback = Result (*)(
-        void* owner,
-        QtMsgType type,
-        const QMessageLogContext& context,
-        const QString& message
-    );
+    using Callback = Result (*)(void* owner, QtMsgType type, const QMessageLogContext& context, const QString& message);
 
     MessageLogDispatcher() = delete;
 
@@ -29,8 +24,7 @@ public:
     {
         QMutexLocker lock(&s_mutex);
         if (s_subscriptions.isEmpty()) {
-            const QtMessageHandler previousHandler =
-                qInstallMessageHandler(&MessageLogDispatcher::messageHandler);
+            const QtMessageHandler previousHandler = qInstallMessageHandler(&MessageLogDispatcher::messageHandler);
             if (previousHandler != &MessageLogDispatcher::messageHandler) {
                 s_previousHandler = previousHandler;
             }
@@ -71,8 +65,7 @@ private:
 
     class HandlingGuard final {
     public:
-        explicit HandlingGuard(bool& isHandling) :
-            m_isHandling(isHandling)
+        explicit HandlingGuard(bool& isHandling) : m_isHandling(isHandling)
         {
             m_isHandling = true;
         }
@@ -98,11 +91,7 @@ private:
         qInstallMessageHandler(replacedHandler);
     }
 
-    static void messageHandler(
-        const QtMsgType type,
-        const QMessageLogContext& context,
-        const QString& message
-    )
+    static void messageHandler(const QtMsgType type, const QMessageLogContext& context, const QString& message)
     {
         if (s_isHandling) {
             return;
@@ -120,21 +109,14 @@ private:
         bool shouldForward = true;
         for (qsizetype index = subscriptions.size() - 1; index >= 0; --index) {
             const Subscription& subscription = subscriptions.at(index);
-            if (
-                subscription.callback != nullptr
-                && subscription.callback(subscription.owner, type, context, message)
-                    == Result::Stop
-            ) {
+            if (subscription.callback != nullptr
+                && subscription.callback(subscription.owner, type, context, message) == Result::Stop) {
                 shouldForward = false;
                 break;
             }
         }
 
-        if (
-            shouldForward
-            && previousHandler != nullptr
-            && previousHandler != &MessageLogDispatcher::messageHandler
-        ) {
+        if (shouldForward && previousHandler != nullptr && previousHandler != &MessageLogDispatcher::messageHandler) {
             previousHandler(type, context, message);
         }
     }

@@ -48,10 +48,7 @@ public:
 
     [[nodiscard]] bool clearCatalogCache() const;
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
-    [[nodiscard]] SkyCatalogCacheRestoreResult restore(
-        int catalogPresetIndex,
-        int deepSkyCatalogPresetIndex
-    ) const;
+    [[nodiscard]] SkyCatalogCacheRestoreResult restore(int catalogPresetIndex, int deepSkyCatalogPresetIndex) const;
     void persist(const SkyCatalogCachePersistRequest& request) const;
 
 private:

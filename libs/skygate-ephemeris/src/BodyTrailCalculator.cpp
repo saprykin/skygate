@@ -8,11 +8,13 @@ namespace {
 
 [[nodiscard]] AstronomicalEpoch addMinutes(const AstronomicalEpoch& epoch, const int offsetMinutes) noexcept
 {
-    return normalizedAstronomicalEpoch(AstronomicalEpoch{
-        .julianDatePart1 = epoch.julianDatePart1,
-        .julianDatePart2 = epoch.julianDatePart2 + static_cast<double>(offsetMinutes) / (24.0 * 60.0),
-        .timeScale = epoch.timeScale
-    });
+    return normalizedAstronomicalEpoch(
+        AstronomicalEpoch{
+            .julianDatePart1 = epoch.julianDatePart1,
+            .julianDatePart2 = epoch.julianDatePart2 + static_cast<double>(offsetMinutes) / (24.0 * 60.0),
+            .timeScale = epoch.timeScale
+        }
+    );
 }
 
 [[nodiscard]] bool validateOptions(const BodyTrailOptions& options) noexcept

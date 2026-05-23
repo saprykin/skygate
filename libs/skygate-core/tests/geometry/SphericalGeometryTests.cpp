@@ -12,8 +12,7 @@ namespace {
 }
 
 void compareVector(
-    const skygate::core::SphericalGeometry::Vector3d& actual,
-    const skygate::core::SphericalGeometry::Vector3d& expected
+    const skygate::core::SphericalGeometry::Vector3d& actual, const skygate::core::SphericalGeometry::Vector3d& expected
 )
 {
     QVERIFY(isNear(actual[0], expected[0]));
@@ -38,24 +37,15 @@ private slots:
 void SphericalGeometryTests::horizontalCoordinatesMapToUnitVectors()
 {
     compareVector(
-        skygate::core::SphericalGeometry::horizontalToUnitVector({
-            .altitudeDeg = 0.0,
-            .azimuthDeg = 0.0
-        }),
+        skygate::core::SphericalGeometry::horizontalToUnitVector({.altitudeDeg = 0.0, .azimuthDeg = 0.0}),
         {0.0, 1.0, 0.0}
     );
     compareVector(
-        skygate::core::SphericalGeometry::horizontalToUnitVector({
-            .altitudeDeg = 0.0,
-            .azimuthDeg = 90.0
-        }),
+        skygate::core::SphericalGeometry::horizontalToUnitVector({.altitudeDeg = 0.0, .azimuthDeg = 90.0}),
         {1.0, 0.0, 0.0}
     );
     compareVector(
-        skygate::core::SphericalGeometry::horizontalToUnitVector({
-            .altitudeDeg = 90.0,
-            .azimuthDeg = 123.0
-        }),
+        skygate::core::SphericalGeometry::horizontalToUnitVector({.altitudeDeg = 90.0, .azimuthDeg = 123.0}),
         {0.0, 0.0, 1.0}
     );
 }
@@ -64,9 +54,9 @@ void SphericalGeometryTests::dotAndCrossUseRightHandedVectorAlgebra()
 {
     using Vector3d = skygate::core::SphericalGeometry::Vector3d;
 
-    const Vector3d xAxis {1.0, 0.0, 0.0};
-    const Vector3d yAxis {0.0, 1.0, 0.0};
-    const Vector3d zAxis {0.0, 0.0, 1.0};
+    const Vector3d xAxis{1.0, 0.0, 0.0};
+    const Vector3d yAxis{0.0, 1.0, 0.0};
+    const Vector3d zAxis{0.0, 0.0, 1.0};
 
     QCOMPARE(skygate::core::SphericalGeometry::dot(xAxis, yAxis), 0.0);
     QCOMPARE(skygate::core::SphericalGeometry::dot(xAxis, xAxis), 1.0);
@@ -85,12 +75,11 @@ void SphericalGeometryTests::buildsOrthonormalProjectionBasis()
     skygate::core::SphericalGeometry::Vector3d center;
     skygate::core::SphericalGeometry::Vector3d right;
     skygate::core::SphericalGeometry::Vector3d up;
-    QVERIFY(skygate::core::SphericalGeometry::tryBuildProjectionBasis(
-        {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
-        center,
-        right,
-        up
-    ));
+    QVERIFY(
+        skygate::core::SphericalGeometry::tryBuildProjectionBasis(
+            {.altitudeDeg = 45.0, .azimuthDeg = 180.0}, center, right, up
+        )
+    );
 
     QVERIFY(isNear(skygate::core::SphericalGeometry::length(center), 1.0));
     QVERIFY(isNear(skygate::core::SphericalGeometry::length(right), 1.0));
@@ -105,22 +94,20 @@ void SphericalGeometryTests::projectionBasisNormalizesAzimuthAndSupportsNadir()
     skygate::core::SphericalGeometry::Vector3d negativeAzimuthCenter;
     skygate::core::SphericalGeometry::Vector3d negativeAzimuthRight;
     skygate::core::SphericalGeometry::Vector3d negativeAzimuthUp;
-    QVERIFY(skygate::core::SphericalGeometry::tryBuildProjectionBasis(
-        {.altitudeDeg = 0.0, .azimuthDeg = -90.0},
-        negativeAzimuthCenter,
-        negativeAzimuthRight,
-        negativeAzimuthUp
-    ));
+    QVERIFY(
+        skygate::core::SphericalGeometry::tryBuildProjectionBasis(
+            {.altitudeDeg = 0.0, .azimuthDeg = -90.0}, negativeAzimuthCenter, negativeAzimuthRight, negativeAzimuthUp
+        )
+    );
 
     skygate::core::SphericalGeometry::Vector3d wrappedAzimuthCenter;
     skygate::core::SphericalGeometry::Vector3d wrappedAzimuthRight;
     skygate::core::SphericalGeometry::Vector3d wrappedAzimuthUp;
-    QVERIFY(skygate::core::SphericalGeometry::tryBuildProjectionBasis(
-        {.altitudeDeg = 0.0, .azimuthDeg = 270.0},
-        wrappedAzimuthCenter,
-        wrappedAzimuthRight,
-        wrappedAzimuthUp
-    ));
+    QVERIFY(
+        skygate::core::SphericalGeometry::tryBuildProjectionBasis(
+            {.altitudeDeg = 0.0, .azimuthDeg = 270.0}, wrappedAzimuthCenter, wrappedAzimuthRight, wrappedAzimuthUp
+        )
+    );
 
     compareVector(negativeAzimuthCenter, wrappedAzimuthCenter);
     compareVector(negativeAzimuthRight, wrappedAzimuthRight);
@@ -129,12 +116,11 @@ void SphericalGeometryTests::projectionBasisNormalizesAzimuthAndSupportsNadir()
     skygate::core::SphericalGeometry::Vector3d nadirCenter;
     skygate::core::SphericalGeometry::Vector3d nadirRight;
     skygate::core::SphericalGeometry::Vector3d nadirUp;
-    QVERIFY(skygate::core::SphericalGeometry::tryBuildProjectionBasis(
-        {.altitudeDeg = -90.0, .azimuthDeg = 123.0},
-        nadirCenter,
-        nadirRight,
-        nadirUp
-    ));
+    QVERIFY(
+        skygate::core::SphericalGeometry::tryBuildProjectionBasis(
+            {.altitudeDeg = -90.0, .azimuthDeg = 123.0}, nadirCenter, nadirRight, nadirUp
+        )
+    );
 
     QVERIFY(isNear(skygate::core::SphericalGeometry::length(nadirCenter), 1.0));
     QVERIFY(isNear(skygate::core::SphericalGeometry::length(nadirRight), 1.0));
@@ -146,14 +132,11 @@ void SphericalGeometryTests::projectionBasisNormalizesAzimuthAndSupportsNadir()
 
 void SphericalGeometryTests::rejectsInvalidProjectionCenterWithoutMutatingOutputs()
 {
-    skygate::core::SphericalGeometry::Vector3d center {1.0, 2.0, 3.0};
-    skygate::core::SphericalGeometry::Vector3d right {4.0, 5.0, 6.0};
-    skygate::core::SphericalGeometry::Vector3d up {7.0, 8.0, 9.0};
+    skygate::core::SphericalGeometry::Vector3d center{1.0, 2.0, 3.0};
+    skygate::core::SphericalGeometry::Vector3d right{4.0, 5.0, 6.0};
+    skygate::core::SphericalGeometry::Vector3d up{7.0, 8.0, 9.0};
     QVERIFY(!skygate::core::SphericalGeometry::tryBuildProjectionBasis(
-        {.altitudeDeg = 120.0, .azimuthDeg = 0.0},
-        center,
-        right,
-        up
+        {.altitudeDeg = 120.0, .azimuthDeg = 0.0}, center, right, up
     ));
 
     compareVector(center, {1.0, 2.0, 3.0});

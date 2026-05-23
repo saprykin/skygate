@@ -37,7 +37,7 @@ void StellariumConstellationParserTests::rejectsEmptyWhitespaceAndMalformedJsonP
 {
     const skygate::ephemeris::StellariumConstellationParser parser;
 
-    for (const std::string_view payload : {"", "   \n\t  ", "[1, 2, 3]", "{ not json" }) {
+    for (const std::string_view payload : {"", "   \n\t  ", "[1, 2, 3]", "{ not json"}) {
         const auto result = parser.parse(payload);
 
         QVERIFY(result.constellationCount == 0U);

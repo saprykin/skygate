@@ -79,17 +79,19 @@ QSGNode* SkyViewportItem::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*
     }
 
     const std::vector<skygate::ui::internal::SkyViewportLineSegment> lineSegments =
-        skygate::ui::internal::buildSkyViewportLineSegments(skygate::ui::internal::SkyViewportGeometryInput{
-            .projection = *renderData->preparedProjection,
-            .viewportWidth = renderData->viewportWidth,
-            .viewportHeight = renderData->viewportHeight,
-            .renderTheme = renderData->renderTheme,
-            .overlayLayers = renderData->overlayLayers,
-            .observer = renderData->observer,
-            .utcTime = renderData->utcTime,
-            .renderLines = std::span<const SkyRenderLine>(renderData->lines.data(), renderData->lines.size()),
-            .renderGlyphs = std::span<const SkyRenderGlyph>(renderData->glyphs.data(), renderData->glyphs.size())
-        });
+        skygate::ui::internal::buildSkyViewportLineSegments(
+            skygate::ui::internal::SkyViewportGeometryInput{
+                .projection = *renderData->preparedProjection,
+                .viewportWidth = renderData->viewportWidth,
+                .viewportHeight = renderData->viewportHeight,
+                .renderTheme = renderData->renderTheme,
+                .overlayLayers = renderData->overlayLayers,
+                .observer = renderData->observer,
+                .utcTime = renderData->utcTime,
+                .renderLines = std::span<const SkyRenderLine>(renderData->lines.data(), renderData->lines.size()),
+                .renderGlyphs = std::span<const SkyRenderGlyph>(renderData->glyphs.data(), renderData->glyphs.size())
+            }
+        );
 
     skygate::ui::internal::clearSkyViewportChildNodes(rootNode->lineRoot());
     skygate::ui::internal::clearSkyViewportChildNodes(rootNode->pointRoot());

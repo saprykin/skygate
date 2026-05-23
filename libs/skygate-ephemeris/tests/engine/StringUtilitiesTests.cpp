@@ -30,7 +30,7 @@ void StringUtilitiesTests::appendsUniqueValuesIgnoringAsciiCase()
 {
     using namespace skygate::ephemeris;
 
-    std::vector<std::string> values {"M 31"};
+    std::vector<std::string> values{"M 31"};
     QVERIFY(!strings::appendUniqueIgnoreAsciiCase(values, "m 31"));
     QVERIFY(strings::appendUniqueIgnoreAsciiCase(values, "NGC 224"));
     QCOMPARE(values.size(), 2U);

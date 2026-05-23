@@ -4,10 +4,8 @@
 
 namespace skygate::core {
 
-std::optional<PreparedProjection> PreparedProjection::create(
-    const ProjectionType projectionType,
-    const ProjectionParams& params
-) noexcept
+std::optional<PreparedProjection>
+PreparedProjection::create(const ProjectionType projectionType, const ProjectionParams& params) noexcept
 {
     ProjectionAlgorithms::ProjectionFrame frame;
     if (!ProjectionAlgorithms::prepareFrame(projectionType, params, frame)) {
@@ -41,10 +39,8 @@ ScreenPoint PreparedProjection::project(const HorizontalCoordinate& coordinate) 
     return projectWithMargin(coordinate, 0.0);
 }
 
-ScreenPoint PreparedProjection::projectWithMargin(
-    const HorizontalCoordinate& coordinate,
-    const double marginPx
-) const noexcept
+ScreenPoint
+PreparedProjection::projectWithMargin(const HorizontalCoordinate& coordinate, const double marginPx) const noexcept
 {
     ProjectionAlgorithms::ProjectionFrame frame;
     frame.projectionType = m_projectionType;

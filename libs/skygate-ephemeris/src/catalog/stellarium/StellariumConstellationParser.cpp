@@ -37,9 +37,7 @@ std::size_t inferConstellationCountFromJson(const QJsonObject& rootObject)
 
 }  // namespace
 
-StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(
-    const std::string_view payload
-) const
+StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(const std::string_view payload) const
 {
     ParseResult result;
     if (payload.empty()) {

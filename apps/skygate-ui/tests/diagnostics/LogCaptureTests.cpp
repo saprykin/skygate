@@ -16,22 +16,14 @@ namespace {
 QStringList s_forwardedWarnings;
 int s_recursiveHandlerCalls = 0;
 
-void recordWarnings(
-    const QtMsgType type,
-    const QMessageLogContext& /*context*/,
-    const QString& message
-)
+void recordWarnings(const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
 {
     if (type == QtWarningMsg) {
         s_forwardedWarnings.push_back(message);
     }
 }
 
-void recordAndRecurseOnce(
-    const QtMsgType type,
-    const QMessageLogContext& /*context*/,
-    const QString& message
-)
+void recordAndRecurseOnce(const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
 {
     if (type != QtWarningMsg) {
         return;
@@ -46,10 +38,7 @@ void recordAndRecurseOnce(
 
 class MessageHandlerGuard final {
 public:
-    explicit MessageHandlerGuard(const QtMessageHandler handler) :
-        m_previousHandler(qInstallMessageHandler(handler))
-    {
-    }
+    explicit MessageHandlerGuard(const QtMessageHandler handler) : m_previousHandler(qInstallMessageHandler(handler)) {}
 
     ~MessageHandlerGuard()
     {
@@ -236,13 +225,9 @@ void LogCaptureTests::disabledQmlWarningScopeStopsForwardingToOuterScopes()
     QStringList innerMessages;
 
     {
-        const skygate::ui::tests::QmlWarningScope outer(
-            skygate::ui::tests::QmlWarningScope::Forwarding::Disabled
-        );
+        const skygate::ui::tests::QmlWarningScope outer(skygate::ui::tests::QmlWarningScope::Forwarding::Disabled);
         {
-            const skygate::ui::tests::QmlWarningScope inner(
-                skygate::ui::tests::QmlWarningScope::Forwarding::Disabled
-            );
+            const skygate::ui::tests::QmlWarningScope inner(skygate::ui::tests::QmlWarningScope::Forwarding::Disabled);
             qWarning().noquote() << "suppressed-nested-qml-warning";
             innerMessages = inner.messages();
         }

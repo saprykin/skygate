@@ -179,12 +179,14 @@ namespace {
 
 [[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = year,
-        .month = month,
-        .day = day,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = year,
+            .month = month,
+            .day = day,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }

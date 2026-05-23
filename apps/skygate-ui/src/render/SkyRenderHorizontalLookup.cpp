@@ -22,8 +22,7 @@ SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
 }
 
 void SkyRenderHorizontalLookup::capture(
-    const skygate::ephemeris::CelestialBody& body,
-    const skygate::core::HorizontalCoordinate& horizontal
+    const skygate::ephemeris::CelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal
 )
 {
     if (!m_requiredBodyIds.empty() && m_requiredBodyIds.contains(body.id)) {
@@ -31,9 +30,8 @@ void SkyRenderHorizontalLookup::capture(
     }
 }
 
-const skygate::core::HorizontalCoordinate* SkyRenderHorizontalLookup::findHorizontal(
-    const std::string_view bodyId
-) const
+const skygate::core::HorizontalCoordinate*
+SkyRenderHorizontalLookup::findHorizontal(const std::string_view bodyId) const
 {
     if (const auto idIt = m_horizontalByBodyId.find(bodyId); idIt != m_horizontalByBodyId.end()) {
         return &idIt->second;

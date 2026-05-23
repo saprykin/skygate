@@ -12,11 +12,7 @@ inline FakeNetworkReply* onlyIssuedReply(FakeNetworkAccessManager& networkAccess
 {
     const QList<FakeNetworkReply*> replies = networkAccessManager.issuedReplies();
     if (replies.size() != 1) {
-        QTest::qFail(
-            qPrintable(QString("Expected 1 issued reply, got %1").arg(replies.size())),
-            __FILE__,
-            __LINE__
-        );
+        QTest::qFail(qPrintable(QString("Expected 1 issued reply, got %1").arg(replies.size())), __FILE__, __LINE__);
         return nullptr;
     }
     return replies.front();

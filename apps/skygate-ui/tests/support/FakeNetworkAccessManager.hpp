@@ -30,8 +30,7 @@ struct FakeNetworkResponse final {
 class FakeNetworkReply final : public QNetworkReply {
 public:
     FakeNetworkReply(const QNetworkRequest& request, FakeNetworkResponse response, QObject* parent)
-        : QNetworkReply(parent)
-        , m_payload(std::move(response.payload))
+        : QNetworkReply(parent), m_payload(std::move(response.payload))
     {
         setRequest(request);
         setUrl(request.url());
@@ -42,9 +41,7 @@ public:
         }
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 
-        QTimer::singleShot(response.delayMs, this, [this] {
-            finish();
-        });
+        QTimer::singleShot(response.delayMs, this, [this] { finish(); });
     }
 
     void abort() override
@@ -78,10 +75,7 @@ protected:
             return -1;
         }
 
-        const qint64 bytesToRead = std::min<qint64>(
-            maxSize,
-            static_cast<qint64>(m_payload.size() - m_offset)
-        );
+        const qint64 bytesToRead = std::min<qint64>(maxSize, static_cast<qint64>(m_payload.size() - m_offset));
         std::memcpy(data, m_payload.constData() + m_offset, static_cast<std::size_t>(bytesToRead));
         m_offset += bytesToRead;
         return bytesToRead;
@@ -146,11 +140,8 @@ public:
     }
 
 protected:
-    QNetworkReply* createRequest(
-        const Operation operation,
-        const QNetworkRequest& request,
-        QIODevice* outgoingData = nullptr
-    ) override
+    QNetworkReply*
+    createRequest(const Operation operation, const QNetworkRequest& request, QIODevice* outgoingData = nullptr) override
     {
         (void)operation;
         (void)outgoingData;

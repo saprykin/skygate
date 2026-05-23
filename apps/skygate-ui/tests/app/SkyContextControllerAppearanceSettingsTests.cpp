@@ -33,10 +33,7 @@ void SkyContextControllerAppearanceSettingsTests::defaultsThemeToBundledDefault(
     const auto controller = createController(true);
 
     QCOMPARE(controller->themeId(), QString("default"));
-    QCOMPARE(
-        controller->theme()->property("windowBackground").value<QColor>(),
-        QColor("#171b30")
-    );
+    QCOMPARE(controller->theme()->property("windowBackground").value<QColor>(), QColor("#171b30"));
 }
 
 void SkyContextControllerAppearanceSettingsTests::restoresSavedThemeId()
@@ -48,10 +45,7 @@ void SkyContextControllerAppearanceSettingsTests::restoresSavedThemeId()
 
     const auto controller = createController(true);
     QCOMPARE(controller->themeId(), QString("night-vision"));
-    QCOMPARE(
-        controller->theme()->property("windowBackground").value<QColor>(),
-        QColor("#150707")
-    );
+    QCOMPARE(controller->theme()->property("windowBackground").value<QColor>(), QColor("#150707"));
 }
 
 void SkyContextControllerAppearanceSettingsTests::invalidSavedThemeFallsBackToDefault()
@@ -61,10 +55,7 @@ void SkyContextControllerAppearanceSettingsTests::invalidSavedThemeFallsBackToDe
     snapshot.themeId = "missing-theme";
     QVERIFY(store.saveState(snapshot));
 
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Unknown theme id missing-theme - using default theme"
-    );
+    QTest::ignoreMessage(QtWarningMsg, "Unknown theme id missing-theme - using default theme");
     const auto controller = createController(true);
     QCOMPARE(controller->themeId(), QString("default"));
 }
@@ -82,10 +73,7 @@ void SkyContextControllerAppearanceSettingsTests::setThemeIdUpdatesPaletteAndEmi
     QCOMPARE(controllerThemeSpy.count(), 1);
     QCOMPARE(themePaletteSpy.count(), 1);
     QCOMPARE(skyContextChangedSpy.count(), 1);
-    QCOMPARE(
-        controller->theme()->property("windowBackground").value<QColor>(),
-        QColor("#150707")
-    );
+    QCOMPARE(controller->theme()->property("windowBackground").value<QColor>(), QColor("#150707"));
 }
 
 void SkyContextControllerAppearanceSettingsTests::loggingSettingsApplyAndPersist()

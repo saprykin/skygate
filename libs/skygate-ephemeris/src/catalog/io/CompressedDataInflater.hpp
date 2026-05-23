@@ -20,9 +20,7 @@ struct CompressedDataInflateOptions final {
 class CompressedDataInflater final {
 public:
     [[nodiscard]] static std::optional<std::string> inflate(
-        std::string_view compressedData,
-        CompressedDataFormat format,
-        const CompressedDataInflateOptions& options = {}
+        std::string_view compressedData, CompressedDataFormat format, const CompressedDataInflateOptions& options = {}
     );
 };
 

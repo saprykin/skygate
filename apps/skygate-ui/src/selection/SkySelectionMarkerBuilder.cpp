@@ -15,19 +15,12 @@ namespace {
 
 SkySelectionMarker selectionMarkerEntry(const double x, const double y)
 {
-    return SkySelectionMarker {
-        .visible = true,
-        .kind = "searchSelection",
-        .x = x,
-        .y = y
-    };
+    return SkySelectionMarker{.visible = true, .kind = "searchSelection", .x = x, .y = y};
 }
 
 bool hasSelectionInputs(const SkySelectionOverlayInput& input)
 {
-    return input.snapshot != nullptr
-        && input.preparedProjection != nullptr
-        && input.stateIndexByBodyId != nullptr;
+    return input.snapshot != nullptr && input.preparedProjection != nullptr && input.stateIndexByBodyId != nullptr;
 }
 
 std::optional<QPointF> selectedBodyPoint(
@@ -79,7 +72,7 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    skygate::core::SphericalGeometry::Vector3d sum {0.0, 0.0, 0.0};
+    skygate::core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
     int validAnchorCount = 0;
     for (const std::string& hipId : labelRefIt->second) {
         const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(hipId));
@@ -108,16 +101,10 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    const skygate::core::HorizontalCoordinate center {
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(
-            normalizedVector[2],
-            -1.0,
-            1.0
-        ))),
+    const skygate::core::HorizontalCoordinate center{
+        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector[2], -1.0, 1.0))),
         .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
-            skygate::core::AngleMath::toDegrees(
-                std::atan2(normalizedVector[0], normalizedVector[1])
-            )
+            skygate::core::AngleMath::toDegrees(std::atan2(normalizedVector[0], normalizedVector[1]))
         )
     };
     const auto projected = preparedProjection.project(center);
@@ -130,9 +117,7 @@ std::optional<QPointF> selectedConstellationPoint(
 
 }  // namespace
 
-SkySelectionMarker SkySelectionMarkerBuilder::build(
-    const SkySelectionOverlayInput& input
-) const
+SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInput& input) const
 {
     if (!hasSelectionInputs(input)) {
         return {};
@@ -156,12 +141,8 @@ SkySelectionMarker SkySelectionMarkerBuilder::build(
 
     std::optional<QPointF> markerPoint;
     if (normalizedSceneLookupKey(targetKind) == "body") {
-        markerPoint = selectedBodyPoint(
-            *input.snapshot,
-            *input.stateIndexByBodyId,
-            *input.preparedProjection,
-            targetId
-        );
+        markerPoint =
+            selectedBodyPoint(*input.snapshot, *input.stateIndexByBodyId, *input.preparedProjection, targetId);
     } else if (normalizedSceneLookupKey(targetKind) == "constellationlabel") {
         markerPoint = selectedConstellationPoint(
             *input.snapshot,

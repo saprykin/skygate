@@ -101,17 +101,13 @@ QString constellationLabelFromEntry(const QString& fallbackId, const QJsonObject
 
 }  // namespace
 
-std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(
-    const QJsonObject& rootObject
-)
+std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(const QJsonObject& rootObject)
 {
     std::vector<ConstellationLabelRef> labelRefs;
     std::unordered_map<std::string, std::size_t> indexByLabelKey;
 
-    const auto addLabelEntry = [&labelRefs, &indexByLabelKey](
-        QString labelText,
-        const std::vector<std::vector<int>>& polylines
-    ) {
+    const auto addLabelEntry = [&labelRefs,
+                                &indexByLabelKey](QString labelText, const std::vector<std::vector<int>>& polylines) {
         labelText = labelText.trimmed();
         if (labelText.isEmpty()) {
             return;
@@ -146,8 +142,7 @@ std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(
         }
 
         std::unordered_set<std::string> existingIds(
-            labelRefs[indexIt->second].second.begin(),
-            labelRefs[indexIt->second].second.end()
+            labelRefs[indexIt->second].second.begin(), labelRefs[indexIt->second].second.end()
         );
         for (const int hip : uniqueHips) {
             const std::string hipId = "hip_" + std::to_string(hip);

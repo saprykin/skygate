@@ -7,10 +7,7 @@
 
 namespace skygate::ephemeris::zip_binary {
 
-[[nodiscard]] inline std::optional<std::uint16_t> readLe16(
-    const std::string_view data,
-    const std::size_t offset
-)
+[[nodiscard]] inline std::optional<std::uint16_t> readLe16(const std::string_view data, const std::size_t offset)
 {
     if (offset + 2U > data.size()) {
         return std::nullopt;
@@ -22,10 +19,7 @@ namespace skygate::ephemeris::zip_binary {
     );
 }
 
-[[nodiscard]] inline std::optional<std::uint32_t> readLe32(
-    const std::string_view data,
-    const std::size_t offset
-)
+[[nodiscard]] inline std::optional<std::uint32_t> readLe32(const std::string_view data, const std::size_t offset)
 {
     if (offset + 4U > data.size()) {
         return std::nullopt;

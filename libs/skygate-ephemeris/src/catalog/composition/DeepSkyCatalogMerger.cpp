@@ -32,14 +32,11 @@ DeepSkyCatalogMergeResult DeepSkyCatalogMerger::merge(
             continue;
         }
 
-        const bool replacedByDeepSkyObject = std::any_of(
-            deepSkyBodies.begin(),
-            deepSkyBodies.end(),
-            [&body](const CelestialBody& deepSkyBody) {
+        const bool replacedByDeepSkyObject =
+            std::any_of(deepSkyBodies.begin(), deepSkyBodies.end(), [&body](const CelestialBody& deepSkyBody) {
                 return deepSkyBody.type == CelestialBodyType::DeepSkyObject
-                    && catalog_identity::sharesDeepSkyAlias(body, deepSkyBody);
-            }
-        );
+                       && catalog_identity::sharesDeepSkyAlias(body, deepSkyBody);
+            });
         if (replacedByDeepSkyObject) {
             continue;
         }

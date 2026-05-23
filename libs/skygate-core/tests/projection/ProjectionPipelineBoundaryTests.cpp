@@ -9,7 +9,7 @@ namespace {
 
 [[nodiscard]] skygate::core::ProjectionParams baseParams()
 {
-    return skygate::core::ProjectionParams {
+    return skygate::core::ProjectionParams{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 90.0,
         .rollDeg = 0.0,
@@ -48,24 +48,18 @@ void ProjectionPipelineBoundaryTests::finishCircularRejectsInvalidScaleInputs()
 
     auto params = baseParams();
     expectInvalidParameters(ProjectionPipeline::finishCircular(0.0, 0.0, params, 0.0));
-    expectInvalidParameters(ProjectionPipeline::finishCircular(
-        0.0,
-        0.0,
-        params,
-        std::numeric_limits<double>::quiet_NaN()
-    ));
+    expectInvalidParameters(
+        ProjectionPipeline::finishCircular(0.0, 0.0, params, std::numeric_limits<double>::quiet_NaN())
+    );
 
     params.viewportWidth = 0.0;
     params.viewportHeight = 0.0;
     expectInvalidParameters(ProjectionPipeline::finishCircular(0.0, 0.0, params, 1.0));
 
     params = baseParams();
-    expectInvalidParameters(ProjectionPipeline::finishCircular(
-        std::numeric_limits<double>::quiet_NaN(),
-        0.0,
-        params,
-        1.0
-    ));
+    expectInvalidParameters(
+        ProjectionPipeline::finishCircular(std::numeric_limits<double>::quiet_NaN(), 0.0, params, 1.0)
+    );
 }
 
 void ProjectionPipelineBoundaryTests::finishCircularCullsOutsideRadiusAndAllowsVisiblePoints()
@@ -91,25 +85,17 @@ void ProjectionPipelineBoundaryTests::finishRectangularRejectsInvalidScaleInputs
     auto params = baseParams();
     expectInvalidParameters(ProjectionPipeline::finishRectangular(0.0, 0.0, params, 0.0, 1.0));
     expectInvalidParameters(ProjectionPipeline::finishRectangular(0.0, 0.0, params, 1.0, 0.0));
-    expectInvalidParameters(ProjectionPipeline::finishRectangular(
-        0.0,
-        0.0,
-        params,
-        std::numeric_limits<double>::infinity(),
-        1.0
-    ));
+    expectInvalidParameters(
+        ProjectionPipeline::finishRectangular(0.0, 0.0, params, std::numeric_limits<double>::infinity(), 1.0)
+    );
 
     params.viewportWidth = 0.0;
     expectInvalidParameters(ProjectionPipeline::finishRectangular(0.0, 0.0, params, 1.0, 1.0));
 
     params = baseParams();
-    expectInvalidParameters(ProjectionPipeline::finishRectangular(
-        std::numeric_limits<double>::quiet_NaN(),
-        0.0,
-        params,
-        1.0,
-        1.0
-    ));
+    expectInvalidParameters(
+        ProjectionPipeline::finishRectangular(std::numeric_limits<double>::quiet_NaN(), 0.0, params, 1.0, 1.0)
+    );
 }
 
 void ProjectionPipelineBoundaryTests::finishRectangularCullsOutsideBoundsAndAllowsVisiblePoints()
@@ -124,8 +110,7 @@ void ProjectionPipelineBoundaryTests::finishRectangularCullsOutsideBoundsAndAllo
     QVERIFY(std::isfinite(visible.y));
 
     expectCulled(ProjectionPipeline::finishRectangular(1.01, 0.0, params, 1.0, 1.0, -20.0));
-    const auto visibleWithMargin =
-        ProjectionPipeline::finishRectangular(1.01, 0.0, params, 1.0, 1.0, 10.0);
+    const auto visibleWithMargin = ProjectionPipeline::finishRectangular(1.01, 0.0, params, 1.0, 1.0, 10.0);
     QCOMPARE(visibleWithMargin.status, skygate::core::ProjectionStatus::Visible);
 }
 

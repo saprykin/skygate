@@ -4,7 +4,5 @@
 
 class SkyObjectInspectorBuilder final {
 public:
-    [[nodiscard]] SkySelectedObjectInspector build(
-        const SkySelectionOverlayInput& input
-    ) const;
+    [[nodiscard]] SkySelectedObjectInspector build(const SkySelectionOverlayInput& input) const;
 };

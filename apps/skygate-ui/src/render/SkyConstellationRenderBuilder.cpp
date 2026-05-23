@@ -38,23 +38,18 @@ void SkyConstellationRenderBuilder::appendLines(
             continue;
         }
 
-        const std::array<skygate::core::HorizontalCoordinate, 2> coordinates {
-            *startHorizontal,
-            *endHorizontal
-        };
-        for (const auto& segment : lineBuilder.build(
-                 projection,
-                 coordinates,
-                 maxSegmentLengthSquared
-             )) {
-            frame.lines.push_back(SkyRenderLine {
-                .x1 = segment.x1,
-                .y1 = segment.y1,
-                .x2 = segment.x2,
-                .y2 = segment.y2,
-                .widthPx = kConstellationLineWidthPx,
-                .color = lineColor
-            });
+        const std::array<skygate::core::HorizontalCoordinate, 2> coordinates{*startHorizontal, *endHorizontal};
+        for (const auto& segment : lineBuilder.build(projection, coordinates, maxSegmentLengthSquared)) {
+            frame.lines.push_back(
+                SkyRenderLine{
+                    .x1 = segment.x1,
+                    .y1 = segment.y1,
+                    .x2 = segment.x2,
+                    .y2 = segment.y2,
+                    .widthPx = kConstellationLineWidthPx,
+                    .color = lineColor
+                }
+            );
         }
     }
 }
@@ -107,10 +102,8 @@ void SkyConstellationRenderBuilder::appendLabels(
         const double labelX = sumX / static_cast<double>(visiblePointCount);
         const double labelY = sumY / static_cast<double>(visiblePointCount);
         const skygate::core::Rect2d bounds = skyRenderLabelBounds(labelX, labelY, labelRef.first);
-        if (
-            !skyRenderLabelFitsViewport(bounds, viewportWidth, viewportHeight, edgeMarginPx)
-            || labelGrid.collides(bounds)
-        ) {
+        if (!skyRenderLabelFitsViewport(bounds, viewportWidth, viewportHeight, edgeMarginPx)
+            || labelGrid.collides(bounds)) {
             continue;
         }
 
@@ -119,10 +112,7 @@ void SkyConstellationRenderBuilder::appendLabels(
             labelX,
             labelY,
             labelRef.first,
-            skyRenderLabelColorForBodyType(
-                skygate::ephemeris::CelestialBodyType::Constellation,
-                renderTheme
-            )
+            skyRenderLabelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation, renderTheme)
         );
         labelGrid.add(bounds);
     }

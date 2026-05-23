@@ -23,14 +23,8 @@ private:
 
 void clearSkyViewportChildNodes(QSGNode* rootNode);
 
-void syncSkyViewportLineNodes(
-    QSGNode* rootNode,
-    std::span<const SkyViewportLineSegment> lineSegments
-);
+void syncSkyViewportLineNodes(QSGNode* rootNode, std::span<const SkyViewportLineSegment> lineSegments);
 
-void syncSkyViewportPointNodes(
-    QSGNode* rootNode,
-    std::span<const SkyRenderPoint> points
-);
+void syncSkyViewportPointNodes(QSGNode* rootNode, std::span<const SkyRenderPoint> points);
 
 }  // namespace skygate::ui::internal

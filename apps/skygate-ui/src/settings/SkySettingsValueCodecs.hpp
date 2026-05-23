@@ -15,15 +15,7 @@ namespace skygate::ui::internal {
 [[nodiscard]] double readDoubleSetting(QSettings& settings, const QString& key, double fallback);
 [[nodiscard]] int readIntSetting(QSettings& settings, const QString& key, int fallback);
 [[nodiscard]] qint64 readLongLongSetting(QSettings& settings, const QString& key, qint64 fallback);
-[[nodiscard]] qulonglong readULongLongSetting(
-    QSettings& settings,
-    const QString& key,
-    qulonglong fallback
-);
-[[nodiscard]] QString readNonBlankStringSetting(
-    QSettings& settings,
-    const QString& key,
-    const QString& fallback
-);
+[[nodiscard]] qulonglong readULongLongSetting(QSettings& settings, const QString& key, qulonglong fallback);
+[[nodiscard]] QString readNonBlankStringSetting(QSettings& settings, const QString& key, const QString& fallback);
 
 }  // namespace skygate::ui::internal

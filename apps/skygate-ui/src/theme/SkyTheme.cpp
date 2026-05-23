@@ -182,23 +182,18 @@ Q_LOGGING_CATEGORY(skygateThemeLog, "skygate.theme")
     return theme;
 }
 
-[[nodiscard]] std::optional<QColor> parseColor(
-    const QJsonObject& object,
-    const char* key,
-    const QString& sourceDescription
-)
+[[nodiscard]] std::optional<QColor>
+parseColor(const QJsonObject& object, const char* key, const QString& sourceDescription)
 {
     const QJsonValue value = object.value(QString::fromUtf8(key));
     if (!value.isString()) {
-        qCWarning(skygateThemeLog).noquote()
-            << "Theme" << sourceDescription << "is missing color key" << key;
+        qCWarning(skygateThemeLog).noquote() << "Theme" << sourceDescription << "is missing color key" << key;
         return std::nullopt;
     }
 
     const QColor color(value.toString());
     if (!color.isValid()) {
-        qCWarning(skygateThemeLog).noquote()
-            << "Theme" << sourceDescription << "has invalid color for key" << key;
+        qCWarning(skygateThemeLog).noquote() << "Theme" << sourceDescription << "has invalid color for key" << key;
         return std::nullopt;
     }
 
@@ -206,12 +201,8 @@ Q_LOGGING_CATEGORY(skygateThemeLog, "skygate.theme")
 }
 
 template <typename Palette>
-[[nodiscard]] bool parsePalette(
-    Palette& palette,
-    const QJsonObject& object,
-    const QString& sourceDescription,
-    const auto& assigners
-)
+[[nodiscard]] bool
+parsePalette(Palette& palette, const QJsonObject& object, const QString& sourceDescription, const auto& assigners)
 {
     for (const auto& [key, assign] : assigners) {
         const std::optional<QColor> color = parseColor(object, key, sourceDescription);
@@ -229,11 +220,10 @@ using PaletteAssigner = void (*)(Palette&, const QColor&);
 
 [[nodiscard]] const auto& uiAssigners()
 {
-    static const auto kAssigners = std::to_array<
-        std::pair<const char*, PaletteAssigner<SkyThemeUiPalette>>
-    >({
-#define SKYGATE_UI_ASSIGNER(name) {#name, [](SkyThemeUiPalette& palette, const QColor& color) { palette.name = color; }},
-            SKYGATE_UI_THEME_UI_COLOR_PROPERTIES(SKYGATE_UI_ASSIGNER)
+    static const auto kAssigners = std::to_array<std::pair<const char*, PaletteAssigner<SkyThemeUiPalette>>>({
+#define SKYGATE_UI_ASSIGNER(name)                                                                                      \
+    {#name, [](SkyThemeUiPalette& palette, const QColor& color) { palette.name = color; }},
+        SKYGATE_UI_THEME_UI_COLOR_PROPERTIES(SKYGATE_UI_ASSIGNER)
 #undef SKYGATE_UI_ASSIGNER
     });
     return kAssigners;
@@ -241,20 +231,16 @@ using PaletteAssigner = void (*)(Palette&, const QColor&);
 
 [[nodiscard]] const auto& renderAssigners()
 {
-    static const auto kAssigners = std::to_array<
-        std::pair<const char*, PaletteAssigner<SkyThemeRenderPalette>>
-    >({
-#define SKYGATE_RENDER_ASSIGNER(name) {#name, [](SkyThemeRenderPalette& palette, const QColor& color) { palette.name = color; }},
-            SKYGATE_UI_THEME_RENDER_COLOR_PROPERTIES(SKYGATE_RENDER_ASSIGNER)
+    static const auto kAssigners = std::to_array<std::pair<const char*, PaletteAssigner<SkyThemeRenderPalette>>>({
+#define SKYGATE_RENDER_ASSIGNER(name)                                                                                  \
+    {#name, [](SkyThemeRenderPalette& palette, const QColor& color) { palette.name = color; }},
+        SKYGATE_UI_THEME_RENDER_COLOR_PROPERTIES(SKYGATE_RENDER_ASSIGNER)
 #undef SKYGATE_RENDER_ASSIGNER
     });
     return kAssigners;
 }
 
-[[nodiscard]] std::optional<QByteArray> readResourceBytes(
-    const QString& resourcePath,
-    const QString& description
-)
+[[nodiscard]] std::optional<QByteArray> readResourceBytes(const QString& resourcePath, const QString& description)
 {
     QFile file(resourcePath);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -280,11 +266,7 @@ void ensureThemeResourcesInitialized()
 
 }  // namespace
 
-SkyThemePalette::SkyThemePalette(QObject* parent)
-    : QObject(parent)
-    , m_definition(makeBuiltInDefaultTheme())
-{
-}
+SkyThemePalette::SkyThemePalette(QObject* parent) : QObject(parent), m_definition(makeBuiltInDefaultTheme()) {}
 
 QString SkyThemePalette::id() const
 {
@@ -296,18 +278,18 @@ QString SkyThemePalette::displayName() const
     return m_definition.displayName;
 }
 
-#define SKYGATE_DEFINE_UI_COLOR_GETTER(name) \
-    QColor SkyThemePalette::name() const noexcept \
-    { \
-        return m_definition.ui.name; \
+#define SKYGATE_DEFINE_UI_COLOR_GETTER(name)                                                                           \
+    QColor SkyThemePalette::name() const noexcept                                                                      \
+    {                                                                                                                  \
+        return m_definition.ui.name;                                                                                   \
     }
 SKYGATE_UI_THEME_UI_COLOR_PROPERTIES(SKYGATE_DEFINE_UI_COLOR_GETTER)
 #undef SKYGATE_DEFINE_UI_COLOR_GETTER
 
-#define SKYGATE_DEFINE_RENDER_COLOR_GETTER(name) \
-    QColor SkyThemePalette::name() const noexcept \
-    { \
-        return m_definition.render.name; \
+#define SKYGATE_DEFINE_RENDER_COLOR_GETTER(name)                                                                       \
+    QColor SkyThemePalette::name() const noexcept                                                                      \
+    {                                                                                                                  \
+        return m_definition.render.name;                                                                               \
     }
 SKYGATE_UI_THEME_RENDER_COLOR_PROPERTIES(SKYGATE_DEFINE_RENDER_COLOR_GETTER)
 #undef SKYGATE_DEFINE_RENDER_COLOR_GETTER
@@ -323,10 +305,8 @@ void SkyThemePalette::setDefinition(const SkyThemeDefinition& definition)
     emit themeChanged();
 }
 
-std::optional<SkyThemeDefinition> SkyThemeJsonCodec::parseTheme(
-    const QByteArray& jsonBytes,
-    const QString& sourceDescription
-)
+std::optional<SkyThemeDefinition>
+SkyThemeJsonCodec::parseTheme(const QByteArray& jsonBytes, const QString& sourceDescription)
 {
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(jsonBytes, &parseError);
@@ -340,16 +320,14 @@ std::optional<SkyThemeDefinition> SkyThemeJsonCodec::parseTheme(
     const QString id = rootObject.value("id").toString().trimmed();
     const QString displayName = rootObject.value("displayName").toString().trimmed();
     if (id.isEmpty() || displayName.isEmpty()) {
-        qCWarning(skygateThemeLog).noquote()
-            << "Theme" << sourceDescription << "is missing id or displayName";
+        qCWarning(skygateThemeLog).noquote() << "Theme" << sourceDescription << "is missing id or displayName";
         return std::nullopt;
     }
 
     const QJsonValue uiValue = rootObject.value("ui");
     const QJsonValue renderValue = rootObject.value("render");
     if (!uiValue.isObject() || !renderValue.isObject()) {
-        qCWarning(skygateThemeLog).noquote()
-            << "Theme" << sourceDescription << "is missing ui/render sections";
+        qCWarning(skygateThemeLog).noquote() << "Theme" << sourceDescription << "is missing ui/render sections";
         return std::nullopt;
     }
 
@@ -365,8 +343,7 @@ std::optional<SkyThemeDefinition> SkyThemeJsonCodec::parseTheme(
     return theme;
 }
 
-SkyThemeRepository::SkyThemeRepository(const QString& manifestResourcePath)
-    : m_fallbackTheme(makeBuiltInDefaultTheme())
+SkyThemeRepository::SkyThemeRepository(const QString& manifestResourcePath) : m_fallbackTheme(makeBuiltInDefaultTheme())
 {
     ensureThemeResourcesInitialized();
     loadManifest(manifestResourcePath);
@@ -383,8 +360,7 @@ const SkyThemeDefinition& SkyThemeRepository::themeById(const QString& id) const
             }
         }
 
-        qCWarning(skygateThemeLog).noquote()
-            << "Unknown theme id" << requestedId << "- using default theme";
+        qCWarning(skygateThemeLog).noquote() << "Unknown theme id" << requestedId << "- using default theme";
     }
 
     return defaultTheme();
@@ -410,41 +386,27 @@ std::vector<SkyThemeOption> SkyThemeRepository::themeOptionData() const
     std::vector<SkyThemeOption> options;
     options.reserve(m_themes.size());
     for (const auto& theme : m_themes) {
-        options.push_back(SkyThemeOption {
-            .id = theme.id,
-            .label = theme.displayName
-        });
+        options.push_back(SkyThemeOption{.id = theme.id, .label = theme.displayName});
     }
 
     if (options.empty()) {
-        options.push_back(SkyThemeOption {
-            .id = m_fallbackTheme.id,
-            .label = m_fallbackTheme.displayName
-        });
+        options.push_back(SkyThemeOption{.id = m_fallbackTheme.id, .label = m_fallbackTheme.displayName});
     }
     return options;
 }
 
 void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
 {
-    const std::optional<QByteArray> manifestBytes = readResourceBytes(
-        manifestResourcePath,
-        "theme manifest"
-    );
+    const std::optional<QByteArray> manifestBytes = readResourceBytes(manifestResourcePath, "theme manifest");
     if (!manifestBytes.has_value()) {
         return;
     }
 
     QJsonParseError parseError;
-    const QJsonDocument manifestDocument = QJsonDocument::fromJson(
-        manifestBytes.value(),
-        &parseError
-    );
+    const QJsonDocument manifestDocument = QJsonDocument::fromJson(manifestBytes.value(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !manifestDocument.isObject()) {
         qCWarning(skygateThemeLog).noquote()
-            << "Failed to parse theme manifest"
-            << manifestResourcePath
-            << parseError.errorString();
+            << "Failed to parse theme manifest" << manifestResourcePath << parseError.errorString();
         return;
     }
 
@@ -461,8 +423,7 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
         const QString resourcePath = themeObject.value("resourcePath").toString().trimmed();
         if (id.isEmpty() || resourcePath.isEmpty()) {
             qCWarning(skygateThemeLog).noquote()
-                << "Skipping invalid theme descriptor in manifest"
-                << manifestResourcePath;
+                << "Skipping invalid theme descriptor in manifest" << manifestResourcePath;
             continue;
         }
 
@@ -471,32 +432,22 @@ void SkyThemeRepository::loadManifest(const QString& manifestResourcePath)
             continue;
         }
 
-        const std::optional<SkyThemeDefinition> parsedTheme = SkyThemeJsonCodec::parseTheme(
-            themeBytes.value(),
-            resourcePath
-        );
+        const std::optional<SkyThemeDefinition> parsedTheme =
+            SkyThemeJsonCodec::parseTheme(themeBytes.value(), resourcePath);
         if (!parsedTheme.has_value()) {
             continue;
         }
 
         if (parsedTheme->id != id) {
             qCWarning(skygateThemeLog).noquote()
-                << "Theme manifest id mismatch for"
-                << resourcePath
-                << "- expected"
-                << id
-                << "got"
-                << parsedTheme->id;
+                << "Theme manifest id mismatch for" << resourcePath << "- expected" << id << "got" << parsedTheme->id;
             continue;
         }
 
         if (parsedTheme->id == defaultThemeId) {
             m_defaultThemeIndex = static_cast<qsizetype>(m_themes.size());
         }
-        m_descriptors.push_back(SkyThemeDescriptor {
-            .id = id,
-            .resourcePath = resourcePath
-        });
+        m_descriptors.push_back(SkyThemeDescriptor{.id = id, .resourcePath = resourcePath});
         m_themes.push_back(parsedTheme.value());
     }
 }

@@ -12,10 +12,7 @@
 namespace {
 
 skygate::ephemeris::CelestialBody makeBody(
-    std::string id,
-    std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
-    const double magnitude
+    std::string id, std::string displayName, const skygate::ephemeris::CelestialBodyType type, const double magnitude
 )
 {
     skygate::ephemeris::CelestialBody body;
@@ -30,18 +27,14 @@ skygate::ephemeris::CelestialBody makeDeepSkyBody(
     std::string id,
     std::string displayName,
     const double magnitude,
-    const skygate::ephemeris::DeepSkyObjectKind kind =
-        skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+    const skygate::ephemeris::DeepSkyObjectKind kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
     std::vector<std::string> aliases = {"Common Name"}
 )
 {
     auto body = makeBody(
-        std::move(id),
-        std::move(displayName),
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        magnitude
+        std::move(id), std::move(displayName), skygate::ephemeris::CelestialBodyType::DeepSkyObject, magnitude
     );
-    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo {
+    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
         .kind = kind,
         .aliases = std::move(aliases),
         .majorAxisArcmin = 120.0,
@@ -57,23 +50,21 @@ struct FrameFixture final {
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
 };
 
-FrameFixture makeFixture(
-    std::vector<skygate::ephemeris::CelestialBody> bodies,
-    const double fovDeg = 40.0
-)
+FrameFixture makeFixture(std::vector<skygate::ephemeris::CelestialBody> bodies, const double fovDeg = 40.0)
 {
     FrameFixture fixture;
-    auto catalogBodies =
-        std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
+    auto catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
     fixture.snapshot.catalogBodies = catalogBodies;
     for (std::uint32_t index = 0; index < catalogBodies->size(); ++index) {
-        fixture.snapshot.states.push_back(skygate::ephemeris::CelestialBodyState {
-            .bodyIndex = index,
-            .horizontal = {
-                .altitudeDeg = 45.0 + (static_cast<double>(index % 5U) * 0.01),
-                .azimuthDeg = 180.0 + (static_cast<double>(index % 5U) * 0.01)
+        fixture.snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = index,
+                .horizontal = {
+                    .altitudeDeg = 45.0 + (static_cast<double>(index % 5U) * 0.01),
+                    .azimuthDeg = 180.0 + (static_cast<double>(index % 5U) * 0.01)
+                }
             }
-        });
+        );
     }
 
     fixture.projection = skygate::core::PreparedProjection::create(
@@ -145,12 +136,9 @@ void SkyRenderBuildersTests::starDecimationKeepsBrighterStarInScreenCell()
     bodies.push_back(makeBody("faint", "Faint", skygate::ephemeris::CelestialBodyType::Star, 5.0));
     bodies.push_back(makeBody("bright", "Bright", skygate::ephemeris::CelestialBodyType::Star, 1.0));
     for (int index = 2; index < 30001; ++index) {
-        bodies.push_back(makeBody(
-            "star_" + std::to_string(index),
-            "Star",
-            skygate::ephemeris::CelestialBodyType::Star,
-            6.0
-        ));
+        bodies.push_back(
+            makeBody("star_" + std::to_string(index), "Star", skygate::ephemeris::CelestialBodyType::Star, 6.0)
+        );
     }
 
     auto fixture = makeFixture(std::move(bodies), 120.0);
@@ -166,19 +154,25 @@ void SkyRenderBuildersTests::starDecimationKeepsBrighterStarInScreenCell()
 
 void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowPresentationRules()
 {
-    auto fixture = makeFixture({
-        makeDeepSkyBody("bright", "Bright DSO", 7.0),
-        makeDeepSkyBody("faint", "Faint DSO", 8.5, skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula),
-    }, 80.0);
+    auto fixture = makeFixture(
+        {
+            makeDeepSkyBody("bright", "Bright DSO", 7.0),
+            makeDeepSkyBody("faint", "Faint DSO", 8.5, skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula),
+        },
+        80.0
+    );
 
     auto frame = buildFrame(fixture);
     QCOMPARE(frame.glyphs.size(), 1U);
     QCOMPARE(frame.glyphs.front().bodyIndex, 0U);
     QCOMPARE(frame.glyphs.front().rotationDeg, 42.0);
 
-    fixture = makeFixture({
-        makeDeepSkyBody("faint", "Faint DSO", 8.5, skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula),
-    }, 20.0);
+    fixture = makeFixture(
+        {
+            makeDeepSkyBody("faint", "Faint DSO", 8.5, skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula),
+        },
+        20.0
+    );
     frame = buildFrame(fixture);
     QCOMPARE(frame.glyphs.size(), 1U);
     QCOMPARE(frame.glyphs.front().kind, skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula);
@@ -192,9 +186,12 @@ void SkyRenderBuildersTests::deepSkyVisibilityAndGlyphPolicyFollowPresentationRu
 
 void SkyRenderBuildersTests::deepSkyGlyphRendersWhenCenterIsJustOutsideViewport()
 {
-    auto fixture = makeFixture({
-        makeDeepSkyBody("edge", "Edge DSO", 7.0),
-    }, 1.0);
+    auto fixture = makeFixture(
+        {
+            makeDeepSkyBody("edge", "Edge DSO", 7.0),
+        },
+        1.0
+    );
     fixture.snapshot.states.front().horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 180.76};
 
     QVERIFY(!fixture.projection->project(fixture.snapshot.states.front().horizontal).isVisible);
@@ -206,16 +203,13 @@ void SkyRenderBuildersTests::deepSkyGlyphRendersWhenCenterIsJustOutsideViewport(
 
 void SkyRenderBuildersTests::deepSkyLabelsPreferNamedObjectsAndRespectVisibility()
 {
-    auto fixture = makeFixture({
-        makeDeepSkyBody(
-            "ngc_100",
-            "NGC 100",
-            8.0,
-            skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-            {"NGC 100"}
-        ),
-        makeDeepSkyBody("messier_031", "M31", 8.0),
-    }, 40.0);
+    auto fixture = makeFixture(
+        {
+            makeDeepSkyBody("ngc_100", "NGC 100", 8.0, skygate::ephemeris::DeepSkyObjectKind::Galaxy, {"NGC 100"}),
+            makeDeepSkyBody("messier_031", "M31", 8.0),
+        },
+        40.0
+    );
 
     auto frame = buildFrame(fixture);
 
@@ -234,11 +228,11 @@ void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility
         makeBody("hip_a", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
         makeBody("hip_b", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
     });
-    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs {
+    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs{
         {"hip_a", "hip_b"},
         {"hip_a", "missing"},
     };
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs {
+    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{
         {"Demo", {"hip_a", "hip_b"}},
         {"Missing", {"missing"}},
     };
@@ -259,13 +253,16 @@ void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility
 
 void SkyRenderBuildersTests::constellationLineRendersWhenEndpointsAreOutsideViewport()
 {
-    auto fixture = makeFixture({
-        makeBody("hip_a", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
-        makeBody("hip_b", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
-    }, 1.0);
+    auto fixture = makeFixture(
+        {
+            makeBody("hip_a", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+            makeBody("hip_b", "", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
+        },
+        1.0
+    );
     fixture.snapshot.states[0].horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0};
     fixture.snapshot.states[1].horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0};
-    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs {
+    const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs{
         {"hip_a", "hip_b"},
     };
 

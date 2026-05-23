@@ -25,9 +25,7 @@ struct DeepSkyCatalogPayloadOptions final {
     QByteArray commonName = "Andromeda Galaxy";
 };
 
-[[nodiscard]] inline QByteArray sampleHygCsvPayload(
-    const StarCatalogPayloadOptions& options = {}
-)
+[[nodiscard]] inline QByteArray sampleHygCsvPayload(const StarCatalogPayloadOptions& options = {})
 {
     QByteArray payload = "id,hip,proper,ra,dec,mag\n";
     payload += QByteArray::number(options.id);
@@ -45,14 +43,11 @@ struct DeepSkyCatalogPayloadOptions final {
     return payload;
 }
 
-[[nodiscard]] inline QByteArray sampleOpenNgcCsvPayload(
-    const DeepSkyCatalogPayloadOptions& options = {}
-)
+[[nodiscard]] inline QByteArray sampleOpenNgcCsvPayload(const DeepSkyCatalogPayloadOptions& options = {})
 {
-    QByteArray payload =
-        "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
-        "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
-        "Identifiers;Common names;NED notes;OpenNGC notes\n";
+    QByteArray payload = "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;"
+                         "SurfBr;Hubble;Cstar U-Mag;Cstar B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;"
+                         "Identifiers;Common names;NED notes;OpenNGC notes\n";
     payload += options.name;
     payload += ';';
     payload += options.type;
@@ -74,9 +69,7 @@ struct DeepSkyCatalogPayloadOptions final {
     return payload;
 }
 
-[[nodiscard]] inline QByteArray sampleCompactOpenNgcCsvPayload(
-    const DeepSkyCatalogPayloadOptions& options = {}
-)
+[[nodiscard]] inline QByteArray sampleCompactOpenNgcCsvPayload(const DeepSkyCatalogPayloadOptions& options = {})
 {
     QByteArray payload = "Name;Type;RA;Dec;M;NGC;IC\n";
     payload += options.name;

@@ -79,7 +79,8 @@ void CatalogCoordinator::downloadCatalogFromUrls(
         urlTexts,
         callbackContext,
         statusHandler,
-        [this, callbackContext, statusHandler, completionHandler](CatalogDownloadService::DownloadResult downloadResult
+        [this, callbackContext, statusHandler, completionHandler](
+            CatalogDownloadService::DownloadResult downloadResult
         ) mutable {
             if (downloadResult.payload.isEmpty()) {
                 DownloadResult result;

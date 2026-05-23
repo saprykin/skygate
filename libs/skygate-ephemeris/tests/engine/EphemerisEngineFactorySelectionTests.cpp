@@ -16,11 +16,10 @@ namespace {
         .id = "factory-target",
         .displayName = "Factory Target",
         .type = skygate::ephemeris::CelestialBodyType::Star,
-        .fixedEquatorial =
-            skygate::core::EquatorialCoordinate{
-                .rightAscensionHours = 11.25,
-                .declinationDeg = -6.5,
-            },
+        .fixedEquatorial = skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = 11.25,
+            .declinationDeg = -6.5,
+        },
     };
 }
 

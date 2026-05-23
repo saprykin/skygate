@@ -23,9 +23,7 @@ struct ZipEntryMetadata final {
 
 class ZipDirectoryReader final {
 public:
-    [[nodiscard]] static std::optional<std::vector<ZipEntryMetadata>> readEntries(
-        std::string_view zipData
-    );
+    [[nodiscard]] static std::optional<std::vector<ZipEntryMetadata>> readEntries(std::string_view zipData);
 };
 
 }  // namespace skygate::ephemeris
