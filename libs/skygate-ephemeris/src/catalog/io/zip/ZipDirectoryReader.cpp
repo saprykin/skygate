@@ -23,7 +23,7 @@ constexpr std::size_t kZipMaxCommentBytes = 0xffffU;
     const std::size_t searchWindow = kZipEndOfCentralDirectoryMinSize + kZipMaxCommentBytes;
     const std::size_t minOffset = zipData.size() > searchWindow ? zipData.size() - searchWindow : 0U;
     for (std::size_t offset = zipData.size() - kZipEndOfCentralDirectoryMinSize;; --offset) {
-        const auto signature = zip_binary::readLe32(zipData, offset);
+        const auto signature = ZipBinaryUtilities::readLe32(zipData, offset);
         if (signature.has_value() && *signature == kZipEndOfCentralDirectorySignature) {
             return offset;
         }
@@ -54,8 +54,8 @@ std::optional<std::vector<ZipEntryMetadata>> ZipDirectoryReader::readEntries(con
         return std::nullopt;
     }
 
-    const auto centralDirectorySize = zip_binary::readLe32(zipData, *endOfCentralDirectoryOffset + 12U);
-    const auto centralDirectoryOffset = zip_binary::readLe32(zipData, *endOfCentralDirectoryOffset + 16U);
+    const auto centralDirectorySize = ZipBinaryUtilities::readLe32(zipData, *endOfCentralDirectoryOffset + 12U);
+    const auto centralDirectoryOffset = ZipBinaryUtilities::readLe32(zipData, *endOfCentralDirectoryOffset + 16U);
     if (!centralDirectorySize.has_value() || !centralDirectoryOffset.has_value()) {
         return std::nullopt;
     }
@@ -75,19 +75,19 @@ std::optional<std::vector<ZipEntryMetadata>> ZipDirectoryReader::readEntries(con
             return std::nullopt;
         }
 
-        const auto signature = zip_binary::readLe32(zipData, cursor);
+        const auto signature = ZipBinaryUtilities::readLe32(zipData, cursor);
         if (!signature.has_value() || *signature != kZipCentralDirectoryHeaderSignature) {
             return std::nullopt;
         }
 
-        const auto generalPurposeFlag = zip_binary::readLe16(zipData, cursor + 8U);
-        const auto compressionMethod = zip_binary::readLe16(zipData, cursor + 10U);
-        const auto compressedSize = zip_binary::readLe32(zipData, cursor + 20U);
-        const auto uncompressedSize = zip_binary::readLe32(zipData, cursor + 24U);
-        const auto fileNameLength = zip_binary::readLe16(zipData, cursor + 28U);
-        const auto extraFieldLength = zip_binary::readLe16(zipData, cursor + 30U);
-        const auto commentLength = zip_binary::readLe16(zipData, cursor + 32U);
-        const auto localHeaderOffset = zip_binary::readLe32(zipData, cursor + 42U);
+        const auto generalPurposeFlag = ZipBinaryUtilities::readLe16(zipData, cursor + 8U);
+        const auto compressionMethod = ZipBinaryUtilities::readLe16(zipData, cursor + 10U);
+        const auto compressedSize = ZipBinaryUtilities::readLe32(zipData, cursor + 20U);
+        const auto uncompressedSize = ZipBinaryUtilities::readLe32(zipData, cursor + 24U);
+        const auto fileNameLength = ZipBinaryUtilities::readLe16(zipData, cursor + 28U);
+        const auto extraFieldLength = ZipBinaryUtilities::readLe16(zipData, cursor + 30U);
+        const auto commentLength = ZipBinaryUtilities::readLe16(zipData, cursor + 32U);
+        const auto localHeaderOffset = ZipBinaryUtilities::readLe32(zipData, cursor + 42U);
         if (!generalPurposeFlag.has_value() || !compressionMethod.has_value() || !compressedSize.has_value()
             || !uncompressedSize.has_value() || !fileNameLength.has_value() || !extraFieldLength.has_value()
             || !commentLength.has_value() || !localHeaderOffset.has_value()) {
