@@ -2,7 +2,7 @@
 
 #include "skygate/ephemeris/IStarCatalog.hpp"
 #include "skygate/ephemeris/CatalogLoadResult.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "skygate/ephemeris/CatalogSelectionOptions.hpp"
 
 #include <QByteArray>
 

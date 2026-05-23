@@ -274,7 +274,7 @@ std::unique_ptr<SkyContextController> createRequestSensitiveController(
         1.0,
         skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
     )};
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     Q_ASSERT(starCatalog != nullptr);
 
     auto ephemerisEngine = std::make_unique<RequestSensitiveEngine>(std::move(bodies));
@@ -339,7 +339,7 @@ void SkyContextControllerSearchTrackingTests::init()
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersBodyResult()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_target",
             "Demo Target",
@@ -387,7 +387,7 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSingleBodyLoo
         makeBody("moon", "Moon", skygate::ephemeris::CelestialBodyType::Moon, -12.0)
     };
     bodies.front().ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon;
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(starCatalog != nullptr);
 
     auto ephemerisEngine = std::make_unique<BodyLookupCountingEngine>(std::move(bodies));
@@ -619,7 +619,7 @@ void SkyContextControllerSearchTrackingTests::staleTrackedTargetClearsAndAllowsV
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingForDifferentTarget()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "tracked_target",
             "Tracked Target",
@@ -673,7 +673,7 @@ void SkyContextControllerSearchTrackingTests::clearingTrackedTargetPreservesSele
 
 void SkyContextControllerSearchTrackingTests::collapsingSearchToolbarClearsSelectedSearchTarget()
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_target",
             "Demo Target",

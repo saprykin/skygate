@@ -52,13 +52,13 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
         result.sourceKinds.push_back(sourceKindForBody(body));
     }
 
-    const std::size_t starCount = static_cast<std::size_t>(std::count_if(
-        result.bodies.begin(),
-        result.bodies.end(),
-        [](const CelestialBody& body) { return body.type == CelestialBodyType::Star; }
-    ));
+    const std::size_t starCount = static_cast<std::size_t>(
+        std::count_if(result.bodies.begin(), result.bodies.end(), [](const CelestialBody& body) {
+            return body.type == CelestialBodyType::Star;
+        })
+    );
 
-    std::unique_ptr<IStarCatalog> bundledCatalog = createBundledStarCatalog();
+    std::unique_ptr<IStarCatalog> bundledCatalog = CatalogFactory::createBundledStarCatalog();
     if (bundledCatalog == nullptr) {
         return result;
     }

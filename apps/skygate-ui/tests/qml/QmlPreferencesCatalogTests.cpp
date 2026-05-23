@@ -184,7 +184,7 @@ std::unique_ptr<SkyContextController> makeControllerWithManifest(
     const QString& writableCacheRoot
 )
 {
-    auto starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (starCatalog == nullptr) {
         return {};
     }

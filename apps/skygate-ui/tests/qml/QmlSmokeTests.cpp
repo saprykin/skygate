@@ -33,7 +33,7 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
 {
     qmlRegisterType<SkyViewportItem>("com.skygate.app", 1, 0, "SkyViewportItem");
 
-    auto starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(starCatalog != nullptr);
     auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
     QVERIFY(ephemerisEngine != nullptr);
@@ -50,47 +50,24 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
     engine.rootContext()->setContextProperty("skygateGitHash", QString("test"));
 
     bool objectCreationFailed = false;
-    QObject::connect(
-        &engine,
-        &QQmlApplicationEngine::objectCreationFailed,
-        &engine,
-        [&objectCreationFailed] {
-            objectCreationFailed = true;
-        }
-    );
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &engine, [&objectCreationFailed] {
+        objectCreationFailed = true;
+    });
 
-    const QUrl mainQmlUrl = QUrl::fromLocalFile(
-        QStringLiteral(SKYGATE_QML_SOURCE_DIR) + QStringLiteral("/Main.qml")
-    );
+    const QUrl mainQmlUrl = QUrl::fromLocalFile(QStringLiteral(SKYGATE_QML_SOURCE_DIR) + QStringLiteral("/Main.qml"));
     engine.load(mainQmlUrl);
     QCoreApplication::processEvents();
 
     QVERIFY(!objectCreationFailed);
     QVERIFY(!engine.rootObjects().isEmpty());
     QObject* rootObject = engine.rootObjects().front();
+    QVERIFY(skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("statusFooter")) != nullptr);
+    QVERIFY(skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("dateTimePopup")) != nullptr);
     QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("statusFooter")
-        ) != nullptr
+        skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("nightConditionsPopup")) != nullptr
     );
     QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("dateTimePopup")
-        ) != nullptr
-    );
-    QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("nightConditionsPopup")
-        ) != nullptr
-    );
-    QVERIFY(
-        skygate::ui::tests::firstObjectWithObjectName(
-            rootObject,
-            QStringLiteral("skyInteractionLayer")
-        ) != nullptr
+        skygate::ui::tests::firstObjectWithObjectName(rootObject, QStringLiteral("skyInteractionLayer")) != nullptr
     );
 }
 

@@ -59,7 +59,7 @@ struct TestRig final {
 [[nodiscard]] TestRig makeTestRig()
 {
     TestRig rig;
-    rig.catalog = skygate::ephemeris::createBundledStarCatalog();
+    rig.catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     Q_ASSERT(rig.catalog != nullptr);
     rig.engine = skygate::ephemeris::createEphemerisEngine(*rig.catalog);
     Q_ASSERT(rig.engine != nullptr);
@@ -74,7 +74,7 @@ struct TestRig final {
 
 [[nodiscard]] std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> makeSunMoonBodies()
 {
-    auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     Q_ASSERT(catalog != nullptr);
     const auto sunIndex = bodyIndexById(catalog->bodies(), "sun");
     const auto moonIndex = bodyIndexById(catalog->bodies(), "moon");
@@ -93,7 +93,7 @@ struct TestRig final {
 [[nodiscard]] skygate::ephemeris::tests::RequestCountingEphemerisEngine
 makeGuidedNightEngine(std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> bodies)
 {
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(*bodies);
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(*bodies);
     Q_ASSERT(catalog != nullptr);
     auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     Q_ASSERT(engine != nullptr);

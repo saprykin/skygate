@@ -100,6 +100,10 @@ add_library(skygate-ephemeris STATIC
     include/skygate/ephemeris/ActiveCatalogCompositionResult.hpp
     include/skygate/ephemeris/CatalogCompositionSource.hpp
     include/skygate/ephemeris/CatalogLoadResult.hpp
+    include/skygate/ephemeris/CatalogSelectionMode.hpp
+    include/skygate/ephemeris/CatalogSelectionOptions.hpp
+    include/skygate/ephemeris/CatalogSourceRequest.hpp
+    include/skygate/ephemeris/CatalogSourceType.hpp
     include/skygate/ephemeris/BodyTrailCalculator.hpp
     include/skygate/ephemeris/BodyTrailOptions.hpp
     include/skygate/ephemeris/BodyTrailSample.hpp
@@ -152,6 +156,10 @@ add_library(skygate-ephemeris STATIC
     src/catalog/ActiveCatalogCompositionResult.cpp
     src/catalog/CatalogComposer.cpp
     src/catalog/CatalogCompositionSource.cpp
+    src/catalog/CatalogSelectionMode.cpp
+    src/catalog/CatalogSelectionOptions.cpp
+    src/catalog/CatalogSourceRequest.cpp
+    src/catalog/CatalogSourceType.cpp
     src/catalog/normalize/CatalogParsingUtilities.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp

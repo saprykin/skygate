@@ -280,7 +280,7 @@ OverlayFixture makeFixture()
     bodies->push_back(makeBody("circumpolar", "Circumpolar"));
     bodies->back().fixedEquatorial =
         skygate::core::EquatorialCoordinate{.rightAscensionHours = 4.0, .declinationDeg = 80.0};
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(*bodies);
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(*bodies);
     Q_ASSERT(catalog != nullptr);
     fixture.ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*catalog);
     fixture.snapshot.catalogBodies = bodies;

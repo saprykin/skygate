@@ -20,7 +20,7 @@ private slots:
 
 void HygCatalogParserTests::parsesBasicRows()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,32349,Sirius,6.7525,-16.7161,-1.46\n"
@@ -39,7 +39,7 @@ void HygCatalogParserTests::parsesBasicRows()
 
 void HygCatalogParserTests::parsesAstrometryColumns()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag,pmra,pmdec,rv,dist\n"
         "1,32349,Sirius,6.7525,-16.7161,-1.46,-546.01,-1223.07,-5.5,2.637\n"
@@ -63,7 +63,7 @@ void HygCatalogParserTests::parsesAstrometryColumns()
 
 void HygCatalogParserTests::treatsMissingDistanceSentinelAsAbsentParallax()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag,pmra,pmdec,rv,dist\n"
         "1,999,Sentinel,1.0,45.0,5.0,12.0,-3.0,20.0,100000\n"
@@ -87,7 +87,7 @@ void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
     QTest::ignoreMessage(
         QtWarningMsg, "HYG CSV skipped 1 rows with invalid numeric values; samples: row 7 ra='1.0' dec='2.0' mag=''"
     );
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "hip,id,proper,bf,ra,dec,mag\n"
         ",,Unnamed,,1.0,2.0,3.0\n"
@@ -148,10 +148,10 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
     }
 
     std::size_t lastProgress = 0;
-    auto loadResult = skygate::ephemeris::loadStarCatalog(
-        skygate::ephemeris::CatalogSourceType::HygCsv,
-        csv,
-        [&lastProgress](const std::size_t parsedObjectCount) { lastProgress = parsedObjectCount; }
+    auto loadResult = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::HygCsv, csv, [&lastProgress](const std::size_t parsedObjectCount) {
+            lastProgress = parsedObjectCount;
+        }
     );
     QVERIFY(loadResult.isSuccess());
     QVERIFY(lastProgress == 30000U);
@@ -172,7 +172,7 @@ void HygCatalogParserTests::keepsWholeCatalogByDefault()
 void HygCatalogParserTests::rejectsMalformedInput()
 {
     QTest::ignoreMessage(QtWarningMsg, "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows.");
-    const auto headerOnlyResult = skygate::ephemeris::loadStarCatalog(
+    const auto headerOnlyResult = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv, "hip,id,proper,ra,dec,mag\n"
     );
     QVERIFY(!headerOnlyResult.isSuccess());
@@ -180,7 +180,7 @@ void HygCatalogParserTests::rejectsMalformedInput()
     QTest::ignoreMessage(
         QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
     );
-    const auto malformedResult = skygate::ephemeris::loadStarCatalog(
+    const auto malformedResult = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,name\n"
         "1,NoCoordinates\n"

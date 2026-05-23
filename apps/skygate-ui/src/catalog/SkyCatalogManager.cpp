@@ -163,7 +163,7 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
     if (preset.bundled) {
         m_cachedCatalogPayload.clear();
         resetConstellationLineRefs();
-        applyCatalog(skygate::ephemeris::createBundledStarCatalog(), preset.sourceLabel);
+        applyCatalog(skygate::ephemeris::CatalogFactory::createBundledStarCatalog(), preset.sourceLabel);
         return;
     }
 

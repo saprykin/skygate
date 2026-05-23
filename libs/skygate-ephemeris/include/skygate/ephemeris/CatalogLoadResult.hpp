@@ -19,9 +19,6 @@ enum class CatalogPayloadFormat : std::uint8_t {
 
 enum class CatalogLoadErrorCode : std::uint8_t {
     NoError,
-#ifndef None
-    None [[deprecated("Use CatalogLoadErrorCode::NoError")]] = NoError,
-#endif
     EmptyInput,
     UnsupportedFormat,
     MissingRequiredColumns,

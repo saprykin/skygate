@@ -14,10 +14,8 @@
 namespace skygate::ephemeris {
 namespace {
 
-CatalogLoadResult finalizeCatalogLoad(
-    CatalogBodyParseResult parsedBodies,
-    const CatalogSelectionOptions& selectionOptions
-)
+CatalogLoadResult
+finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionOptions& selectionOptions)
 {
     CatalogLoadResult result;
     result.errorCode = parsedBodies.errorCode;
@@ -29,11 +27,8 @@ CatalogLoadResult finalizeCatalogLoad(
 
     std::vector<CelestialBody> bodies = std::move(parsedBodies.bodies);
     const std::size_t parsedBodyCount = bodies.size();
-    if (
-        selectionOptions.isEnabled()
-        && selectionOptions.mode == CatalogSelectionMode::BrightestByVisualMagnitude
-        && selectionOptions.maxBodyCount < bodies.size()
-    ) {
+    if (selectionOptions.isEnabled() && selectionOptions.mode == CatalogSelectionMode::BrightestByVisualMagnitude
+        && selectionOptions.maxBodyCount < bodies.size()) {
         std::stable_sort(bodies.begin(), bodies.end(), [](const CelestialBody& lhs, const CelestialBody& rhs) {
             return lhs.visualMagnitude < rhs.visualMagnitude;
         });
@@ -43,7 +38,7 @@ CatalogLoadResult finalizeCatalogLoad(
     result.diagnostics.parsedBodyCount = parsedBodyCount;
     result.diagnostics.selectedBodyCount = bodies.size();
     result.diagnostics.truncatedBodyCount = parsedBodyCount - bodies.size();
-    result.catalog = createStarCatalogFromBodies(std::move(bodies));
+    result.catalog = CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
     if (result.catalog == nullptr) {
         result.errorCode = CatalogLoadErrorCode::NoBodies;
         result.errorDetail = "Catalog contains no bodies.";
@@ -54,7 +49,7 @@ CatalogLoadResult finalizeCatalogLoad(
 
 }  // namespace
 
-CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request)
+CatalogLoadResult CatalogLoader::load(const CatalogSourceRequest& request)
 {
     switch (request.type) {
     case CatalogSourceType::Bundled: {
@@ -63,24 +58,15 @@ CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request)
     }
     case CatalogSourceType::HygCsv: {
         const HygCatalogParser parser;
-        return finalizeCatalogLoad(
-            parser.parse(request.data, request.progressCallback),
-            request.selectionOptions
-        );
+        return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
     }
     case CatalogSourceType::HygCsvGzip: {
         const HygGzipCatalogParser parser;
-        return finalizeCatalogLoad(
-            parser.parse(request.data, request.progressCallback),
-            request.selectionOptions
-        );
+        return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
     }
     case CatalogSourceType::OpenNgcCsv: {
         const OpenNgcCatalogParser parser;
-        return finalizeCatalogLoad(
-            parser.parse(request.data, request.progressCallback),
-            request.selectionOptions
-        );
+        return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
     }
     }
 
@@ -90,19 +76,16 @@ CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request)
     return result;
 }
 
-CatalogLoadResult loadStarCatalog(
+CatalogLoadResult CatalogLoader::load(
     const CatalogSourceType type,
     const std::string_view data,
     const HygParseProgressCallback& progressCallback,
     const CatalogSelectionOptions& selectionOptions
 )
 {
-    return loadStarCatalog(
-        CatalogSourceRequest {
-            .type = type,
-            .data = data,
-            .progressCallback = progressCallback,
-            .selectionOptions = selectionOptions
+    return load(
+        CatalogSourceRequest{
+            .type = type, .data = data, .progressCallback = progressCallback, .selectionOptions = selectionOptions
         }
     );
 }

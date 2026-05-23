@@ -106,7 +106,7 @@ private slots:
 
 void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePriority()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody("sun", "SunById", skygate::ephemeris::CelestialBodyType::Star, 0.0),
         makeBody("moon", "MoonById", skygate::ephemeris::CelestialBodyType::Planet, 0.0),
         makeBody(
@@ -257,7 +257,7 @@ void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupByIndex()
 
 void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver()
 {
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, 0.0),
     });
     QVERIFY(catalog != nullptr);
@@ -309,7 +309,7 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     QVERIFY(skygate::ephemeris::tests::isNear(directState->equatorial.rightAscensionHours, 3.25, 1e-9));
     QVERIFY(skygate::ephemeris::tests::isNear(directState->equatorial.declinationDeg, -12.5, 1e-9));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({body});
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({body});
     QVERIFY(catalog != nullptr);
     QCOMPARE(catalog->bodies()[0].ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
 

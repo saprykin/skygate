@@ -44,7 +44,7 @@ ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompo
     const IStarCatalog* deepSkyCatalog = request.deepSkyCatalog;
     std::unique_ptr<IStarCatalog> bundledDeepSkyCatalog;
     if (deepSkyCatalog == nullptr && request.useBundledDeepSkyCatalog) {
-        bundledDeepSkyCatalog = createBundledStarCatalog();
+        bundledDeepSkyCatalog = CatalogFactory::createBundledStarCatalog();
         deepSkyCatalog = bundledDeepSkyCatalog.get();
     }
 
@@ -62,7 +62,7 @@ ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompo
         active.sourceKinds = std::move(merged.sourceKinds);
     }
 
-    result.catalog = createStarCatalogFromBodies(std::move(active.bodies));
+    result.catalog = CatalogFactory::createStarCatalogFromBodies(std::move(active.bodies));
     if (result.catalog == nullptr) {
         result.sourceKinds.clear();
         return result;

@@ -23,7 +23,7 @@ skygate::ephemeris::CelestialBody makeFixedBody(std::string id, std::string disp
 
 std::unique_ptr<skygate::ephemeris::IStarCatalog> makeCatalog()
 {
-    return skygate::ephemeris::createStarCatalogFromBodies(
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
         {makeFixedBody("hip_1", "HIP 1"), makeFixedBody("hip_2", "HIP 2", 2.0)}
     );
 }

@@ -40,10 +40,7 @@ QDateTime fixedNowUtc()
 
 class FakeTimeSource final : public skygate::core::ITimeSource {
 public:
-    explicit FakeTimeSource(const QDateTime& nowUtc = fixedNowUtc())
-        : m_nowUtc(nowUtc.toUTC())
-    {
-    }
+    explicit FakeTimeSource(const QDateTime& nowUtc = fixedNowUtc()) : m_nowUtc(nowUtc.toUTC()) {}
 
     [[nodiscard]] skygate::core::UtcTimePoint nowUtc() const noexcept override
     {
@@ -83,20 +80,17 @@ skygate::ephemeris::CelestialBody makeBody(
 
 std::unique_ptr<skygate::ephemeris::IStarCatalog> createTestCatalog()
 {
-    return skygate::ephemeris::createBundledStarCatalog();
+    return skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
 }
 
-std::unique_ptr<skygate::ephemeris::IEphemerisEngine> createTestEphemerisEngine(
-    const skygate::ephemeris::IStarCatalog& starCatalog
-)
+std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+createTestEphemerisEngine(const skygate::ephemeris::IStarCatalog& starCatalog)
 {
     return skygate::ephemeris::createEphemerisEngine(starCatalog);
 }
 
-SkyContextController::InitializationOptions controllerInitializationOptions(
-    bool loadSettings,
-    const skygate::core::ITimeSource* timeSource = nullptr
-)
+SkyContextController::InitializationOptions
+controllerInitializationOptions(bool loadSettings, const skygate::core::ITimeSource* timeSource = nullptr)
 {
     SkyContextController::InitializationOptions initializationOptions;
     initializationOptions.loadSettings = loadSettings;
@@ -118,9 +112,8 @@ std::unique_ptr<SkyContextController> createController(
     const skygate::core::ITimeSource* timeSource
 );
 
-std::unique_ptr<SkyContextController> createControllerWithOptions(
-    SkyContextController::InitializationOptions initializationOptions
-);
+std::unique_ptr<SkyContextController>
+createControllerWithOptions(SkyContextController::InitializationOptions initializationOptions);
 
 std::unique_ptr<SkyContextController> createController(bool loadSettings = false)
 {
@@ -129,19 +122,12 @@ std::unique_ptr<SkyContextController> createController(bool loadSettings = false
     return createController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
 }
 
-std::unique_ptr<SkyContextController> createControllerWithTimeSource(
-    const skygate::core::ITimeSource& timeSource,
-    const bool loadSettings = false
-)
+std::unique_ptr<SkyContextController>
+createControllerWithTimeSource(const skygate::core::ITimeSource& timeSource, const bool loadSettings = false)
 {
     auto starCatalog = createTestCatalog();
     auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    return createController(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        loadSettings,
-        &timeSource
-    );
+    return createController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings, &timeSource);
 }
 
 std::unique_ptr<SkyContextController> createController(
@@ -165,25 +151,16 @@ std::unique_ptr<SkyContextController> createController(
     const bool loadSettings
 )
 {
-    return createController(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        loadSettings,
-        nullptr
-    );
+    return createController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings, nullptr);
 }
 
-std::unique_ptr<SkyContextController> createControllerWithOptions(
-    SkyContextController::InitializationOptions initializationOptions
-)
+std::unique_ptr<SkyContextController>
+createControllerWithOptions(SkyContextController::InitializationOptions initializationOptions)
 {
     auto starCatalog = createTestCatalog();
     auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
     return std::make_unique<SkyContextController>(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        initializationOptions,
-        nullptr
+        std::move(starCatalog), std::move(ephemerisEngine), initializationOptions, nullptr
     );
 }
 
@@ -192,10 +169,8 @@ QDateTime controllerUtcTime(const SkyContextController& controller)
     return skygate::ui::internal::SkyContextTimeCodec::toQDateTimeUtc(controller.skyContext().utcTime);
 }
 
-const skygate::ephemeris::CelestialBodyState* findStateById(
-    const skygate::ephemeris::SkySnapshot& snapshot,
-    const std::string& bodyId
-)
+const skygate::ephemeris::CelestialBodyState*
+findStateById(const skygate::ephemeris::SkySnapshot& snapshot, const std::string& bodyId)
 {
     for (const auto& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
@@ -221,27 +196,19 @@ std::unique_ptr<SkyContextController> createSingleBodyController(
     const skygate::core::ITimeSource* timeSource = nullptr
 )
 {
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             id,
             displayName,
             skygate::ephemeris::CelestialBodyType::Star,
             1.0,
-            skygate::core::EquatorialCoordinate {
-                .rightAscensionHours = 1.5,
-                .declinationDeg = 2.5
-            }
+            skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
     });
     Q_ASSERT(starCatalog != nullptr);
 
     auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
-    auto controller = createController(
-        std::move(starCatalog),
-        std::move(ephemerisEngine),
-        false,
-        timeSource
-    );
+    auto controller = createController(std::move(starCatalog), std::move(ephemerisEngine), false, timeSource);
     configureFocusTestContext(*controller);
     return controller;
 }
@@ -255,10 +222,7 @@ double azimuthDifferenceDeg(const double lhs, const double rhs)
 #if SKYGATE_HAS_POSITIONING
 class FakePositionSource final : public QGeoPositionInfoSource {
 public:
-    explicit FakePositionSource(QObject* parent = nullptr)
-        : QGeoPositionInfoSource(parent)
-    {
-    }
+    explicit FakePositionSource(QObject* parent = nullptr) : QGeoPositionInfoSource(parent) {}
 
     [[nodiscard]] PositioningMethods supportedPositioningMethods() const override
     {
@@ -275,9 +239,7 @@ public:
         return m_error;
     }
 
-    [[nodiscard]] QGeoPositionInfo lastKnownPosition(
-        bool fromSatellitePositioningMethodsOnly = false
-    ) const override
+    [[nodiscard]] QGeoPositionInfo lastKnownPosition(bool fromSatellitePositioningMethodsOnly = false) const override
     {
         (void)fromSatellitePositioningMethodsOnly;
         return m_lastPosition;
@@ -302,11 +264,7 @@ public:
         return m_lastTimeoutMs;
     }
 
-    void publishPosition(
-        const double latitudeDeg,
-        const double longitudeDeg,
-        const double altitudeMeters
-    )
+    void publishPosition(const double latitudeDeg, const double longitudeDeg, const double altitudeMeters)
     {
         QGeoCoordinate coordinate(latitudeDeg, longitudeDeg, altitudeMeters);
         QGeoPositionInfo positionInfo(coordinate, fixedNowUtc());
