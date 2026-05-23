@@ -1,17 +1,11 @@
 #pragma once
 
-#include "catalog/CatalogCompositionSource.hpp"
+#include "catalog/composition/CatalogAugmentationResult.hpp"
 #include "Types.hpp"
 
 #include <span>
-#include <vector>
 
 namespace skygate::ephemeris {
-
-struct CatalogAugmentationResult final {
-    std::vector<CelestialBody> bodies;
-    std::vector<CatalogCompositionSource> sourceKinds;
-};
 
 class CoreBodyCatalogAugmenter final {
 public:
