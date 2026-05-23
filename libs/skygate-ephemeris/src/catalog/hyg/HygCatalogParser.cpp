@@ -34,8 +34,7 @@ Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
     };
 }
 
-[[nodiscard]] std::optional<double>
-optionalFiniteDoubleColumn(const DelimitedCatalogReader::Row& row, const QString& name)
+[[nodiscard]] std::optional<double> optionalFiniteDoubleColumn(const DelimitedCatalogRow& row, const QString& name)
 {
     const QString text = row.decodeColumn(name);
     if (text.trimmed().isEmpty()) {
@@ -45,7 +44,7 @@ optionalFiniteDoubleColumn(const DelimitedCatalogReader::Row& row, const QString
     return catalog_parsing::parseFiniteDouble(QStringView{text});
 }
 
-[[nodiscard]] std::optional<double> parallaxMasFromHygRow(const DelimitedCatalogReader::Row& row)
+[[nodiscard]] std::optional<double> parallaxMasFromHygRow(const DelimitedCatalogRow& row)
 {
     if (const std::optional<double> parallaxMas = optionalFiniteDoubleColumn(row, QStringLiteral("parallax"));
         parallaxMas.has_value()) {
@@ -91,7 +90,7 @@ HygCatalogParser::parse(const std::string_view csvData, const HygParseProgressCa
             .missingColumnsDetail = "HYG CSV payload is missing one of the required columns: ra, dec, mag.",
             .rowLimitDetail = "HYG CSV payload exceeds the supported row limit.",
         },
-        [&](const DelimitedCatalogReader::Row& row, CatalogBodyParseResult& rowResult) {
+        [&](const DelimitedCatalogRow& row, CatalogBodyParseResult& rowResult) {
             ++dataRowNumber;
             const QString raText = row.decodeColumn(QStringLiteral("ra"));
             const QString decText = row.decodeColumn(QStringLiteral("dec"));

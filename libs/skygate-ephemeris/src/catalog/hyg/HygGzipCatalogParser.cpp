@@ -25,7 +25,7 @@ HygGzipCatalogParser::parse(const std::string_view gzipData, const HygParseProgr
         return result;
     }
 
-    const auto uncompressedData = CompressedDataInflater::inflate(gzipData, CompressedDataFormat::Gzip);
+    const auto uncompressedData = CompressedDataInflater::inflate(gzipData, CompressedDataInflater::Format::Gzip);
     if (!uncompressedData.has_value()) {
         result.errorCode = CatalogLoadErrorCode::InvalidGzipData;
         result.errorDetail = "Gzip catalog payload could not be decompressed.";

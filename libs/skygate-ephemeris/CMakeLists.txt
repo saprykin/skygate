@@ -142,11 +142,14 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/CatalogPayloadFormatDetector.hpp
     src/catalog/io/CatalogZipEntrySelector.hpp
     src/catalog/io/CompressedDataInflater.hpp
+    src/catalog/io/CompressedDataInflateOptions.hpp
     src/catalog/composition/CatalogAugmentationResult.hpp
     src/catalog/composition/CoreBodyCatalogAugmenter.hpp
     src/catalog/composition/DeepSkyCatalogMerger.hpp
     src/catalog/composition/DeepSkyCatalogMergeResult.hpp
     src/catalog/io/DelimitedCatalogReader.hpp
+    src/catalog/io/DelimitedCatalogReaderOptions.hpp
+    src/catalog/io/DelimitedCatalogRow.hpp
     src/catalog/opengc/OpenNgcObjectMapper.hpp
     src/catalog/stellarium/StellariumHipParser.hpp
     src/catalog/stellarium/StellariumLabelRefExtractor.hpp
@@ -172,12 +175,15 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogPayloadParser.cpp
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
+    src/catalog/io/CompressedDataInflateOptions.cpp
     src/catalog/constellation/ConstellationDataCodec.cpp
     src/catalog/composition/CatalogAugmentationResult.cpp
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
     src/catalog/composition/DeepSkyCatalogMerger.cpp
     src/catalog/composition/DeepSkyCatalogMergeResult.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
+    src/catalog/io/DelimitedCatalogReaderOptions.cpp
+    src/catalog/io/DelimitedCatalogRow.cpp
     src/catalog/io/CsvRowTokenizer.hpp
     src/catalog/hyg/HygCatalogParser.hpp
     src/catalog/hyg/HygGzipCatalogParser.hpp
