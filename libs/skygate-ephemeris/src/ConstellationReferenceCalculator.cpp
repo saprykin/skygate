@@ -1,5 +1,4 @@
 #include "ConstellationReferenceCalculator.hpp"
-
 #include "StringUtilities.hpp"
 #include "math/AngleMath.hpp"
 #include "math/SphericalGeometry.hpp"

@@ -1,5 +1,5 @@
 #include "CelestialReferenceCalculator.hpp"
-
+#include "math/TimeConstants.hpp"
 #include "engine/simple/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
@@ -7,6 +7,8 @@
 #include <cmath>
 
 namespace skygate::ephemeris {
+
+using core::TimeConstants;
 
 core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
     const double eclipticLongitudeDeg, const core::GeoLocation& observer, const core::UtcTimePoint& utcTime
@@ -44,7 +46,8 @@ core::HorizontalCoordinate CelestialReferenceCalculator::declinationCirclePoint(
         return equatorialPoint(0.0, declinationDeg, observer, utcTime);
     }
 
-    const double rightAscensionHours = 24.0 * static_cast<double>(sampleIndex) / static_cast<double>(sampleCount);
+    const double rightAscensionHours =
+        TimeConstants::kHoursPerDay * static_cast<double>(sampleIndex) / static_cast<double>(sampleCount);
     return equatorialPoint(rightAscensionHours, declinationDeg, observer, utcTime);
 }
 

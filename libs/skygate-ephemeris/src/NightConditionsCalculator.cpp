@@ -1,5 +1,4 @@
 #include "NightConditionsCalculator.hpp"
-
 #include "math/MathConstants.hpp"
 #include "EphemerisPrecisionPolicy.hpp"
 #include "EphemerisRequestFactory.hpp"

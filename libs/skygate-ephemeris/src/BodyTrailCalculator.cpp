@@ -1,9 +1,13 @@
 #include "BodyTrailCalculator.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <chrono>
 #include <cstddef>
 
 namespace skygate::ephemeris {
+
+using core::TimeConstants;
+
 namespace {
 
 [[nodiscard]] AstronomicalEpoch addMinutes(const AstronomicalEpoch& epoch, const int offsetMinutes) noexcept
@@ -11,7 +15,8 @@ namespace {
     return normalizedAstronomicalEpoch(
         AstronomicalEpoch{
             .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2 + static_cast<double>(offsetMinutes) / (24.0 * 60.0),
+            .julianDatePart2 =
+                epoch.julianDatePart2 + static_cast<double>(offsetMinutes) / TimeConstants::kMinutesPerDay,
             .timeScale = epoch.timeScale
         }
     );
@@ -29,8 +34,8 @@ namespace {
         return samples;
     }
 
-    const int startOffsetMinutes = -options.pastHours * 60;
-    const int endOffsetMinutes = options.futureHours * 60;
+    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
+    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
     samples.reserve(static_cast<std::size_t>((endOffsetMinutes - startOffsetMinutes) / options.sampleStepMinutes) + 1U);
     return samples;
 }
@@ -49,8 +54,8 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
         return samples;
     }
 
-    const int startOffsetMinutes = -options.pastHours * 60;
-    const int endOffsetMinutes = options.futureHours * 60;
+    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
+    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
 
     for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
          offsetMinutes += options.sampleStepMinutes) {
@@ -82,8 +87,8 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
         return samples;
     }
 
-    const int startOffsetMinutes = -options.pastHours * 60;
-    const int endOffsetMinutes = options.futureHours * 60;
+    const int startOffsetMinutes = -options.pastHours * static_cast<int>(TimeConstants::kMinutesPerHour);
+    const int endOffsetMinutes = options.futureHours * static_cast<int>(TimeConstants::kMinutesPerHour);
 
     for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
          offsetMinutes += options.sampleStepMinutes) {
