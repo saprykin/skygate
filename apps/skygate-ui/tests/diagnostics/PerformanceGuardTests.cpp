@@ -563,7 +563,7 @@ skygate::ui::internal::SkyThemeRenderPalette makeTrailRenderTheme()
 
 void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
 {
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(makeLargeMixedCatalog());
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(makeLargeMixedCatalog());
     QVERIFY(catalog != nullptr);
     auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
     QVERIFY(engine != nullptr);
@@ -594,7 +594,7 @@ void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
 void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail()
 {
     std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(catalog != nullptr);
 
     auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
@@ -671,7 +671,7 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
 void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
 {
     std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(catalog != nullptr);
 
     auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
@@ -868,7 +868,7 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
 void PerformanceGuardTests::profilesHighPrecisionMoonSearchSelection()
 {
     std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionMoonGuardCatalog();
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(catalog != nullptr);
 
     auto solarSystemCalculator = std::make_shared<GuardSolarSystemStateCalculator>();

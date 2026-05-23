@@ -67,7 +67,7 @@ private slots:
 
 void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
 {
-    const auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
@@ -144,7 +144,7 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
 
 void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
 {
-    const auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
@@ -176,7 +176,7 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
 
 void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates()
 {
-    const auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, -26.74),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -215,7 +215,7 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     QVERIFY(nullCatalogEngine != nullptr);
     QVERIFY(nullCatalogEngine->compute(context).states.empty());
 
-    const auto importedCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto importedCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -241,7 +241,7 @@ void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAnd
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -274,7 +274,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -342,7 +342,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -405,7 +405,7 @@ void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefract
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -448,7 +448,7 @@ void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefau
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -500,7 +500,7 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",
@@ -568,7 +568,7 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateReturnsNulloptForM
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
-    const auto catalog = skygate::ephemeris::createStarCatalogFromBodies({
+    const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "demo_star",
             "Demo Star",

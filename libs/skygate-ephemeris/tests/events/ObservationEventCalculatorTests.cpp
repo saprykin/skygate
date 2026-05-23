@@ -40,7 +40,7 @@ skygate::ephemeris::CelestialBody makeFixedBody(const skygate::core::EquatorialC
 
 std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(const skygate::ephemeris::CelestialBody& body)
 {
-    auto catalog = skygate::ephemeris::createStarCatalogFromBodies({body});
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({body});
     Q_ASSERT(catalog != nullptr);
     return skygate::ephemeris::createEphemerisEngine(*catalog);
 }

@@ -1,54 +1,21 @@
 #pragma once
 
 #include "skygate/ephemeris/CatalogLoadResult.hpp"
+#include "skygate/ephemeris/CatalogSourceRequest.hpp"
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
 #include <string_view>
 
 namespace skygate::ephemeris {
 
-using HygParseProgressCallback = std::function<void(std::size_t parsedObjectCount)>;
-
-enum class CatalogSelectionMode : std::uint8_t {
-    Disabled,
-#ifndef None
-    None [[deprecated("Use CatalogSelectionMode::Disabled")]] = Disabled,
-#endif
-    BrightestByVisualMagnitude
+class CatalogLoader final {
+public:
+    [[nodiscard]] static CatalogLoadResult load(const CatalogSourceRequest& request);
+    [[nodiscard]] static CatalogLoadResult load(
+        CatalogSourceType type,
+        std::string_view data = {},
+        const HygParseProgressCallback& progressCallback = {},
+        const CatalogSelectionOptions& selectionOptions = {}
+    );
 };
-
-struct CatalogSelectionOptions {
-    CatalogSelectionMode mode = CatalogSelectionMode::Disabled;
-    std::size_t maxBodyCount = 0;
-
-    [[nodiscard]] bool isEnabled() const noexcept
-    {
-        return mode != CatalogSelectionMode::Disabled && maxBodyCount > 0;
-    }
-};
-
-enum class CatalogSourceType : std::uint8_t {
-    Bundled,
-    HygCsv,
-    HygCsvGzip,
-    OpenNgcCsv
-};
-
-struct CatalogSourceRequest {
-    CatalogSourceType type = CatalogSourceType::Bundled;
-    std::string_view data;
-    HygParseProgressCallback progressCallback;
-    CatalogSelectionOptions selectionOptions;
-};
-
-[[nodiscard]] CatalogLoadResult loadStarCatalog(const CatalogSourceRequest& request);
-[[nodiscard]] CatalogLoadResult loadStarCatalog(
-    CatalogSourceType type,
-    std::string_view data = {},
-    const HygParseProgressCallback& progressCallback = {},
-    const CatalogSelectionOptions& selectionOptions = {}
-);
 
 }  // namespace skygate::ephemeris

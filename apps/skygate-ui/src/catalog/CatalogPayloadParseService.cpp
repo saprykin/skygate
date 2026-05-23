@@ -20,13 +20,11 @@ void CatalogPayloadParseService::parseAsync(
 ) const
 {
     QPointer<QObject> safeContext(callbackContext);
-    auto task = QRunnable::create([
-        payload = std::move(payload),
-        safeContext,
-        selectionOptions,
-        progressHandler = std::move(progressHandler),
-        completionHandler = std::move(completionHandler)
-    ]() mutable {
+    auto task = QRunnable::create([payload = std::move(payload),
+                                   safeContext,
+                                   selectionOptions,
+                                   progressHandler = std::move(progressHandler),
+                                   completionHandler = std::move(completionHandler)]() mutable {
         const auto reportProgress = [&safeContext, &progressHandler](const std::size_t parsedObjectCount) {
             if (!progressHandler) {
                 return;
@@ -39,17 +37,12 @@ void CatalogPayloadParseService::parseAsync(
 
             QMetaObject::invokeMethod(
                 contextObject,
-                [progressHandler, parsedObjectCount]() mutable {
-                    progressHandler(parsedObjectCount);
-                },
+                [progressHandler, parsedObjectCount]() mutable { progressHandler(parsedObjectCount); },
                 Qt::QueuedConnection
             );
         };
 
-        const std::string_view payloadView(
-            payload.constData(),
-            static_cast<std::size_t>(payload.size())
-        );
+        const std::string_view payloadView(payload.constData(), static_cast<std::size_t>(payload.size()));
         const skygate::ephemeris::CatalogPayloadParser parser;
         const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(
             parser.parseResult(payloadView, reportProgress, selectionOptions)
@@ -62,9 +55,7 @@ void CatalogPayloadParseService::parseAsync(
 
         QMetaObject::invokeMethod(
             contextObject,
-            [completionHandler, parsedResult]() mutable {
-                completionHandler(std::move(*parsedResult));
-            },
+            [completionHandler, parsedResult]() mutable { completionHandler(std::move(*parsedResult)); },
             Qt::QueuedConnection
         );
     });

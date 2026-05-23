@@ -1,7 +1,7 @@
 #pragma once
 
 #include "catalog/model/CatalogBodyParseResult.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "skygate/ephemeris/CatalogSourceRequest.hpp"
 
 #include <string_view>
 
@@ -9,10 +9,8 @@ namespace skygate::ephemeris {
 
 class HygGzipCatalogParser final {
 public:
-    [[nodiscard]] CatalogBodyParseResult parse(
-        std::string_view gzipData,
-        const HygParseProgressCallback& progressCallback
-    ) const;
+    [[nodiscard]] CatalogBodyParseResult
+    parse(std::string_view gzipData, const HygParseProgressCallback& progressCallback) const;
 };
 
 }  // namespace skygate::ephemeris

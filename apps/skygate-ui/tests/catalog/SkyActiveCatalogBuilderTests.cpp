@@ -23,10 +23,7 @@ skygate::ephemeris::CelestialBody makeBody(
     body.ephemerisSource = source;
     body.visualMagnitude = magnitude;
     if (source == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial) {
-        body.fixedEquatorial = skygate::core::EquatorialCoordinate {
-            .rightAscensionHours = 1.0,
-            .declinationDeg = 2.0
-        };
+        body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     }
     return body;
 }
@@ -42,18 +39,28 @@ private slots:
 
 void SkyActiveCatalogBuilderTests::assignsSourceIdsAndFallbackLabels()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
-        makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, skygate::ephemeris::CelestialBodyEphemerisSource::Sun),
-        makeBody("hip_1", "HIP 1", skygate::ephemeris::CelestialBodyType::Star, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial),
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
+        makeBody(
+            "sun",
+            "Sun",
+            skygate::ephemeris::CelestialBodyType::Sun,
+            skygate::ephemeris::CelestialBodyEphemerisSource::Sun
+        ),
+        makeBody(
+            "hip_1",
+            "HIP 1",
+            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+        ),
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    const auto result = skygate::ui::internal::SkyActiveCatalogBuilder::build({
-        .sourceCatalog = *sourceCatalog,
-        .useBundledDeepSkyCatalog = false,
-        .sourceLabel = " ",
-        .deepSkySourceLabel = " "
-    });
+    const auto result = skygate::ui::internal::SkyActiveCatalogBuilder::build(
+        {.sourceCatalog = *sourceCatalog,
+         .useBundledDeepSkyCatalog = false,
+         .sourceLabel = " ",
+         .deepSkySourceLabel = " "}
+    );
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.sourceLabels, QStringList({"Catalog", "Deep sky catalog", "Built-in ephemeris"}));

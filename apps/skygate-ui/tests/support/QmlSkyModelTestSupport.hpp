@@ -17,7 +17,7 @@ namespace skygate::ui::tests {
 
 inline std::unique_ptr<SkyContextController> makeController()
 {
-    auto starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (starCatalog == nullptr) {
         return {};
     }
@@ -26,10 +26,7 @@ inline std::unique_ptr<SkyContextController> makeController()
         return {};
     }
 
-    return std::make_unique<SkyContextController>(
-        std::move(starCatalog),
-        std::move(ephemerisEngine)
-    );
+    return std::make_unique<SkyContextController>(std::move(starCatalog), std::move(ephemerisEngine));
 }
 
 inline std::unique_ptr<SkySceneModel> makeSceneModel(SkyContextController& controller)
@@ -39,41 +36,26 @@ inline std::unique_ptr<SkySceneModel> makeSceneModel(SkyContextController& contr
     return sceneModel;
 }
 
-inline bool catalogContainsDisplayName(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies,
-    const QString& displayName
-)
+inline bool
+catalogContainsDisplayName(const std::span<const skygate::ephemeris::CelestialBody> bodies, const QString& displayName)
 {
-    return std::any_of(
-        bodies.begin(),
-        bodies.end(),
-        [&displayName](const skygate::ephemeris::CelestialBody& body) {
-            return QString::fromStdString(body.displayName) == displayName;
-        }
-    );
+    return std::any_of(bodies.begin(), bodies.end(), [&displayName](const skygate::ephemeris::CelestialBody& body) {
+        return QString::fromStdString(body.displayName) == displayName;
+    });
 }
 
-inline bool catalogContainsAlias(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies,
-    const QString& alias
-)
+inline bool catalogContainsAlias(const std::span<const skygate::ephemeris::CelestialBody> bodies, const QString& alias)
 {
-    return std::any_of(
-        bodies.begin(),
-        bodies.end(),
-        [&alias](const skygate::ephemeris::CelestialBody& body) {
-            if (!body.deepSkyObject.has_value()) {
-                return false;
-            }
-            return std::any_of(
-                body.deepSkyObject->aliases.begin(),
-                body.deepSkyObject->aliases.end(),
-                [&alias](const std::string& bodyAlias) {
-                    return QString::fromStdString(bodyAlias) == alias;
-                }
-            );
+    return std::any_of(bodies.begin(), bodies.end(), [&alias](const skygate::ephemeris::CelestialBody& body) {
+        if (!body.deepSkyObject.has_value()) {
+            return false;
         }
-    );
+        return std::any_of(
+            body.deepSkyObject->aliases.begin(),
+            body.deepSkyObject->aliases.end(),
+            [&alias](const std::string& bodyAlias) { return QString::fromStdString(bodyAlias) == alias; }
+        );
+    });
 }
 
 }  // namespace skygate::ui::tests

@@ -37,21 +37,14 @@ public:
         initialize(std::move(starCatalog), std::move(ephemerisEngine), contextConfig, viewport);
     }
 
-    static SkySceneModelTestHarness fromBundledCatalog(
-        const TestSkyContextConfig& contextConfig = {},
-        const TestViewport& viewport = {}
-    )
+    static SkySceneModelTestHarness
+    fromBundledCatalog(const TestSkyContextConfig& contextConfig = {}, const TestViewport& viewport = {})
     {
-        auto starCatalog = ephemeris::createBundledStarCatalog();
+        auto starCatalog = ephemeris::CatalogFactory::createBundledStarCatalog();
         Q_ASSERT(starCatalog != nullptr);
         auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
         Q_ASSERT(ephemerisEngine != nullptr);
-        return SkySceneModelTestHarness(
-            std::move(starCatalog),
-            std::move(ephemerisEngine),
-            contextConfig,
-            viewport
-        );
+        return SkySceneModelTestHarness(std::move(starCatalog), std::move(ephemerisEngine), contextConfig, viewport);
     }
 
     [[nodiscard]] SkyContextController& controller() noexcept
@@ -84,9 +77,7 @@ public:
         return m_controller->ephemerisEngine()->compute(m_controller->skyContext());
     }
 
-    [[nodiscard]] std::optional<ephemeris::CelestialBodyState> bodyStateById(
-        const std::string& bodyId
-    ) const
+    [[nodiscard]] std::optional<ephemeris::CelestialBodyState> bodyStateById(const std::string& bodyId) const
     {
         return findBodyStateById(computeSnapshot(), bodyId);
     }
@@ -94,22 +85,16 @@ public:
     [[nodiscard]] bool centerOnBody(const std::string& bodyId)
     {
         const std::optional<ephemeris::CelestialBodyState> state = bodyStateById(bodyId);
-        if (!state.has_value()
-            || !std::isfinite(state->horizontal.altitudeDeg)
+        if (!state.has_value() || !std::isfinite(state->horizontal.altitudeDeg)
             || !std::isfinite(state->horizontal.azimuthDeg)) {
             return false;
         }
 
-        m_controller->setViewCenter(
-            state->horizontal.altitudeDeg,
-            state->horizontal.azimuthDeg
-        );
+        m_controller->setViewCenter(state->horizontal.altitudeDeg, state->horizontal.azimuthDeg);
         return true;
     }
 
-    [[nodiscard]] const SkyRenderPoint* renderPointForBodyIndex(
-        const std::uint32_t bodyIndex
-    ) const
+    [[nodiscard]] const SkyRenderPoint* renderPointForBodyIndex(const std::uint32_t bodyIndex) const
     {
         for (const SkyRenderPoint& point : m_sceneModel.renderPointSpan()) {
             if (point.bodyIndex == bodyIndex) {

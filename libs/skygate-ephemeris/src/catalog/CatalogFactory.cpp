@@ -9,7 +9,7 @@
 
 namespace skygate::ephemeris {
 
-std::unique_ptr<IStarCatalog> createStarCatalogFromBodies(std::vector<CelestialBody> bodies)
+std::unique_ptr<IStarCatalog> CatalogFactory::createStarCatalogFromBodies(std::vector<CelestialBody> bodies)
 {
     if (bodies.empty()) {
         return nullptr;
@@ -19,9 +19,9 @@ std::unique_ptr<IStarCatalog> createStarCatalogFromBodies(std::vector<CelestialB
     return std::make_unique<InMemoryStarCatalog>(std::move(bodies));
 }
 
-std::unique_ptr<IStarCatalog> createBundledStarCatalog()
+std::unique_ptr<IStarCatalog> CatalogFactory::createBundledStarCatalog()
 {
-    CatalogLoadResult result = loadStarCatalog(CatalogSourceType::Bundled);
+    CatalogLoadResult result = CatalogLoader::load(CatalogSourceType::Bundled);
     return std::move(result.catalog);
 }
 

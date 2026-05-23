@@ -94,7 +94,7 @@ struct TestSkyContextConfig {
 [[nodiscard]] inline std::unique_ptr<ephemeris::IStarCatalog>
 createTestCatalog(std::vector<ephemeris::CelestialBody> bodies)
 {
-    return ephemeris::createStarCatalogFromBodies(std::move(bodies));
+    return ephemeris::CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
 }
 
 [[nodiscard]] inline std::unique_ptr<ephemeris::IEphemerisEngine>

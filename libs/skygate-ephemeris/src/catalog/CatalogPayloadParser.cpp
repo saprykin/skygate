@@ -1,5 +1,7 @@
 #include "skygate/ephemeris/CatalogPayloadParser.hpp"
 
+#include "skygate/ephemeris/CatalogLoader.hpp"
+
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 #include "catalog/io/zip/ZipCodec.hpp"
 
@@ -39,10 +41,10 @@ CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
     }
 
     qCInfo(skygateCatalogParseLog).noquote()
-        << "Catalog payload parsed: format" << catalogPayloadFormatText(result.detectedFormat)
-        << "parsed" << static_cast<qulonglong>(result.diagnostics.parsedBodyCount)
-        << "selected" << static_cast<qulonglong>(result.diagnostics.selectedBodyCount)
-        << "truncated" << static_cast<qulonglong>(result.diagnostics.truncatedBodyCount);
+        << "Catalog payload parsed: format" << catalogPayloadFormatText(result.detectedFormat) << "parsed"
+        << static_cast<qulonglong>(result.diagnostics.parsedBodyCount) << "selected"
+        << static_cast<qulonglong>(result.diagnostics.selectedBodyCount) << "truncated"
+        << static_cast<qulonglong>(result.diagnostics.truncatedBodyCount);
     return result;
 }
 
@@ -67,20 +69,14 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
     result.detectedFormat = detectFormat(request.payload);
     switch (result.detectedFormat) {
     case CatalogPayloadFormat::HygCsv:
-        result = loadStarCatalog(
-            CatalogSourceType::HygCsv,
-            request.payload,
-            request.progressCallback,
-            request.selectionOptions
+        result = CatalogLoader::load(
+            CatalogSourceType::HygCsv, request.payload, request.progressCallback, request.selectionOptions
         );
         result.detectedFormat = CatalogPayloadFormat::HygCsv;
         return logSuccessfulParse(std::move(result));
     case CatalogPayloadFormat::HygCsvGzip:
-        result = loadStarCatalog(
-            CatalogSourceType::HygCsvGzip,
-            request.payload,
-            request.progressCallback,
-            request.selectionOptions
+        result = CatalogLoader::load(
+            CatalogSourceType::HygCsvGzip, request.payload, request.progressCallback, request.selectionOptions
         );
         result.detectedFormat = CatalogPayloadFormat::HygCsvGzip;
         return logSuccessfulParse(std::move(result));
@@ -88,11 +84,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         const ZipCodec zipCodec;
         const auto extractedCsv = zipCodec.extractFirstCsvEntry(request.payload);
         if (extractedCsv.has_value()) {
-            result = loadStarCatalog(
-                CatalogSourceType::HygCsv,
-                *extractedCsv,
-                request.progressCallback,
-                request.selectionOptions
+            result = CatalogLoader::load(
+                CatalogSourceType::HygCsv, *extractedCsv, request.progressCallback, request.selectionOptions
             );
             result.detectedFormat = CatalogPayloadFormat::HygCsvZip;
             return logSuccessfulParse(std::move(result));
@@ -104,11 +97,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         return result;
     }
     case CatalogPayloadFormat::OpenNgcCsv:
-        result = loadStarCatalog(
-            CatalogSourceType::OpenNgcCsv,
-            request.payload,
-            request.progressCallback,
-            request.selectionOptions
+        result = CatalogLoader::load(
+            CatalogSourceType::OpenNgcCsv, request.payload, request.progressCallback, request.selectionOptions
         );
         result.detectedFormat = CatalogPayloadFormat::OpenNgcCsv;
         return logSuccessfulParse(std::move(result));
@@ -130,10 +120,8 @@ CatalogLoadResult CatalogPayloadParser::parseResult(
 ) const
 {
     return parseResult(
-        CatalogParseRequest {
-            .payload = payload,
-            .progressCallback = progressCallback,
-            .selectionOptions = selectionOptions
+        CatalogParseRequest{
+            .payload = payload, .progressCallback = progressCallback, .selectionOptions = selectionOptions
         }
     );
 }

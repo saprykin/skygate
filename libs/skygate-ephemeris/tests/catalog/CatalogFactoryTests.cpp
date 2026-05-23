@@ -23,7 +23,7 @@ private slots:
 
 void CatalogFactoryTests::loadsBundledCatalogBySourceType()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(skygate::ephemeris::CatalogSourceType::Bundled);
+    auto result = skygate::ephemeris::CatalogLoader::load(skygate::ephemeris::CatalogSourceType::Bundled);
     QVERIFY(result.isSuccess());
     const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
@@ -42,11 +42,13 @@ void CatalogFactoryTests::loadsBundledCatalogBySourceType()
 
 void CatalogFactoryTests::loadsHygCatalogBySourceRequest()
 {
-    auto result = skygate::ephemeris::loadStarCatalog(skygate::ephemeris::CatalogSourceRequest{
-        .type = skygate::ephemeris::CatalogSourceType::HygCsv,
-        .data = "id,hip,proper,ra,dec,mag\n"
-                "1,11,Alpha,12.5,-30.0,4.0\n"
-    });
+    auto result = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceRequest{
+            .type = skygate::ephemeris::CatalogSourceType::HygCsv,
+            .data = "id,hip,proper,ra,dec,mag\n"
+                    "1,11,Alpha,12.5,-30.0,4.0\n"
+        }
+    );
     QVERIFY(result.isSuccess());
     const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
@@ -60,7 +62,7 @@ void CatalogFactoryTests::loadsHygCatalogBySourceRequest()
 void CatalogFactoryTests::loadsHygCatalogBySourceTypeWithProgress()
 {
     std::size_t callbackLastCount = 0;
-    auto result = skygate::ephemeris::loadStarCatalog(
+    auto result = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,11,Alpha,1.0,2.0,3.0\n"
@@ -76,7 +78,7 @@ void CatalogFactoryTests::loadsHygCatalogBySourceTypeWithProgress()
 
 void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
 {
-    const auto selectedCatalog = skygate::ephemeris::loadStarCatalog(
+    const auto selectedCatalog = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,11,Alpha,1.0,2.0,3.0\n"
@@ -94,7 +96,7 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
     QTest::ignoreMessage(
         QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
     );
-    const auto invalidCatalog = skygate::ephemeris::loadStarCatalog(
+    const auto invalidCatalog = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,name\n"
         "1,NoCoordinates\n"
@@ -105,7 +107,7 @@ void CatalogFactoryTests::reportsDiagnosticsForSelectionAndErrors()
 
 void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLargerThanInput()
 {
-    const auto disabledSelection = skygate::ephemeris::loadStarCatalog(
+    const auto disabledSelection = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,11,Alpha,1.0,2.0,3.0\n"
@@ -120,7 +122,7 @@ void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLarge
     QCOMPARE(disabledSelection.catalog->bodies().size(), std::size_t(2));
     QCOMPARE(disabledSelection.diagnostics.truncatedBodyCount, std::size_t(0));
 
-    const auto oversizedSelection = skygate::ephemeris::loadStarCatalog(
+    const auto oversizedSelection = skygate::ephemeris::CatalogLoader::load(
         skygate::ephemeris::CatalogSourceType::HygCsv,
         "id,hip,proper,ra,dec,mag\n"
         "1,11,Alpha,1.0,2.0,3.0\n"
@@ -139,10 +141,10 @@ void CatalogFactoryTests::leavesCatalogUntruncatedWhenSelectionIsDisabledOrLarge
 
 void CatalogFactoryTests::rejectsEmptyBodyCatalogsAndUnsupportedSourceTypes()
 {
-    QVERIFY(skygate::ephemeris::createStarCatalogFromBodies({}) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({}) == nullptr);
 
     const auto unsupported =
-        skygate::ephemeris::loadStarCatalog(static_cast<skygate::ephemeris::CatalogSourceType>(255U), "unused");
+        skygate::ephemeris::CatalogLoader::load(static_cast<skygate::ephemeris::CatalogSourceType>(255U), "unused");
     QVERIFY(!unsupported.isSuccess());
     QVERIFY(unsupported.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat);
     QVERIFY(!unsupported.errorDetail.empty());

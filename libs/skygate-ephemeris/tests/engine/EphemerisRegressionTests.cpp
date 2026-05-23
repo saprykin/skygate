@@ -65,7 +65,7 @@ private slots:
 
 void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
 {
-    const auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
@@ -102,7 +102,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
 
 void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximationAcrossContexts()
 {
-    const auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
@@ -191,7 +191,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximationAcrossCo
 
 void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues()
 {
-    const auto catalog = skygate::ephemeris::createBundledStarCatalog();
+    const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
     const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);

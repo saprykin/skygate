@@ -318,7 +318,8 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = skygate::ephemeris::createBundledStarCatalog();
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog =
+        skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
         skygate::ephemeris::createEphemerisEngine(*starCatalog);
     StartupEphemerisDataConfiguration ephemerisDataConfiguration = startupEphemerisDataConfiguration();
@@ -366,10 +367,12 @@ int main(int argc, char* argv[])
 
     QQmlApplicationEngine engine;
     const QSize initialMainWindowSize = settingsStore.loadMainWindowSize();
-    engine.setInitialProperties(QVariantMap{
-        {QStringLiteral("width"), initialMainWindowSize.width()},
-        {QStringLiteral("height"), initialMainWindowSize.height()}
-    });
+    engine.setInitialProperties(
+        QVariantMap{
+            {QStringLiteral("width"), initialMainWindowSize.width()},
+            {QStringLiteral("height"), initialMainWindowSize.height()}
+        }
+    );
     engine.rootContext()->setContextProperty("skyContext", &skyContextController);
     engine.rootContext()->setContextProperty("skyScene", &skySceneModel);
     engine.rootContext()->setContextProperty("skygateBuildDateTime", QStringLiteral(SKYGATE_BUILD_DATE_TIME));

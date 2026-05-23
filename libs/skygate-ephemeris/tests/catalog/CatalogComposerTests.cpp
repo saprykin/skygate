@@ -84,7 +84,7 @@ private slots:
 
 void CatalogComposerTests::tagsPrimaryAndBuiltInSources()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "sun",
             "Sun",
@@ -115,7 +115,7 @@ void CatalogComposerTests::tagsPrimaryAndBuiltInSources()
 
 void CatalogComposerTests::replacesPrimaryDeepSkyAliasWithDownloadedObject()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -124,7 +124,7 @@ void CatalogComposerTests::replacesPrimaryDeepSkyAliasWithDownloadedObject()
         ),
         makeDeepSkyObject("messier_031", "M31", {"M31", "NGC 224"}),
     });
-    auto deepSkyCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeDeepSkyObject("open_ngc_m31", "OpenNGC M31", {"M 31", "NGC0224"}),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -144,7 +144,7 @@ void CatalogComposerTests::replacesPrimaryDeepSkyAliasWithDownloadedObject()
 
 void CatalogComposerTests::replacesDeepSkyObjectsByNormalizedPrimaryIdentity()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -153,7 +153,7 @@ void CatalogComposerTests::replacesDeepSkyObjectsByNormalizedPrimaryIdentity()
         ),
         makeDeepSkyObject("ngc_224", "Primary M31", {}),
     });
-    auto deepSkyCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeDeepSkyObject("open_ngc_m31", "OpenNGC M31", {"NGC 224"}),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -170,7 +170,7 @@ void CatalogComposerTests::replacesDeepSkyObjectsByNormalizedPrimaryIdentity()
 
 void CatalogComposerTests::bundledFallbackAddsDeepSkySourceKinds()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -200,7 +200,7 @@ void CatalogComposerTests::bundledFallbackAddsDeepSkySourceKinds()
 
 void CatalogComposerTests::doesNotDuplicatePrimarySolarSystemBodies()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "sun",
             "Sun",
@@ -232,7 +232,7 @@ void CatalogComposerTests::doesNotDuplicatePrimarySolarSystemBodies()
 
 void CatalogComposerTests::addsBundledBrightStarsWhenSourceHasNoStars()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "orion",
             "Orion",
@@ -252,7 +252,7 @@ void CatalogComposerTests::addsBundledBrightStarsWhenSourceHasNoStars()
 
 void CatalogComposerTests::doesNotAddBundledBrightStarsWhenSourceHasStars()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -270,7 +270,7 @@ void CatalogComposerTests::doesNotAddBundledBrightStarsWhenSourceHasStars()
 
 void CatalogComposerTests::usesCurrentConstellationCountWhenLarger()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -290,7 +290,7 @@ void CatalogComposerTests::usesCurrentConstellationCountWhenLarger()
 
 void CatalogComposerTests::ignoresNonDeepSkyRowsFromDeepSkyCatalog()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -298,7 +298,7 @@ void CatalogComposerTests::ignoresNonDeepSkyRowsFromDeepSkyCatalog()
             skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
         ),
     });
-    auto deepSkyCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_bad",
             "Not Deep Sky",
@@ -321,7 +321,7 @@ void CatalogComposerTests::ignoresNonDeepSkyRowsFromDeepSkyCatalog()
 
 void CatalogComposerTests::bundledFallbackCanBeDisabled()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -351,7 +351,7 @@ void CatalogComposerTests::bundledFallbackCanBeDisabled()
 
 void CatalogComposerTests::preservesKnownDeepSkyObjectCountWhenProvided()
 {
-    auto sourceCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeBody(
             "hip_1",
             "HIP 1",
@@ -359,7 +359,7 @@ void CatalogComposerTests::preservesKnownDeepSkyObjectCountWhenProvided()
             skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
         ),
     });
-    auto deepSkyCatalog = skygate::ephemeris::createStarCatalogFromBodies({
+    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
         makeDeepSkyObject("ngc_1", "NGC 1", {"NGC 1"}),
     });
     QVERIFY(sourceCatalog != nullptr);

@@ -118,7 +118,7 @@ SkyCatalogRuntime::clearDeepSkyCatalog(const QString& sourceLabel, const SkyCata
 SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options)
 {
     if (m_sourceCatalog == nullptr) {
-        m_sourceCatalog = skygate::ephemeris::createBundledStarCatalog();
+        m_sourceCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
         m_sourceLabel = QStringLiteral("Bundled");
     }
 

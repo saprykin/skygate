@@ -182,7 +182,7 @@ std::unique_ptr<SkyContextController> createRequestSensitiveNightController(Requ
         makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, -26.7),
         makeBody("moon", "Moon", skygate::ephemeris::CelestialBodyType::Moon, -12.0),
     };
-    auto starCatalog = skygate::ephemeris::createStarCatalogFromBodies(bodies);
+    auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     Q_ASSERT(starCatalog != nullptr);
 
     auto ephemerisEngine = std::make_unique<RequestSensitiveNightEngine>(std::move(bodies));
