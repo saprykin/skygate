@@ -1,7 +1,7 @@
 #include "catalog/CatalogFactory.hpp"
 
 #include "catalog/normalize/CatalogBodyNormalization.hpp"
-#include "catalog/model/InMemoryStarCatalog.hpp"
+#include "catalog/InMemoryStarCatalog.hpp"
 #include "catalog/CatalogLoader.hpp"
 
 #include <memory>

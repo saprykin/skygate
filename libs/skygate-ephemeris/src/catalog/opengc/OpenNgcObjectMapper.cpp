@@ -1,6 +1,6 @@
 #include "catalog/opengc/OpenNgcObjectMapper.hpp"
 
-#include "catalog/normalize/CatalogParsingUtilities.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
 #include "StringUtilities.hpp"
 
 #include <QRegularExpression>

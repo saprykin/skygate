@@ -1,6 +1,6 @@
 #include "catalog/CatalogComposer.hpp"
 
-#include "catalog/model/CatalogIdentity.hpp"
+#include "catalog/CatalogIdentity.hpp"
 #include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
 #include "catalog/composition/DeepSkyCatalogMerger.hpp"
 #include "catalog/CatalogFactory.hpp"

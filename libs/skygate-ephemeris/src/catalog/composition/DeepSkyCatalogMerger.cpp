@@ -1,6 +1,6 @@
 #include "catalog/composition/DeepSkyCatalogMerger.hpp"
 
-#include "catalog/model/CatalogIdentity.hpp"
+#include "catalog/CatalogIdentity.hpp"
 
 #include <algorithm>
 

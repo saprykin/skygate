@@ -1,4 +1,4 @@
-#include "catalog/model/InMemoryStarCatalog.hpp"
+#include "catalog/InMemoryStarCatalog.hpp"
 
 #include <utility>
 

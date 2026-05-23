@@ -1,5 +1,5 @@
 #include "catalog/opengc/OpenNgcCatalogParser.hpp"
-#include "catalog/normalize/CatalogParsingUtilities.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 #include "catalog/opengc/OpenNgcObjectMapper.hpp"
 
