@@ -110,6 +110,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogComposer.hpp
     src/catalog/CatalogFactory.hpp
     src/catalog/CatalogLoader.hpp
+    src/catalog/CatalogParseRequest.hpp
     src/catalog/CatalogPayloadParser.hpp
     src/CelestialReferenceCalculator.hpp
     src/catalog/constellation/ConstellationData.hpp
@@ -164,6 +165,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp
     src/catalog/io/CatalogPayloadFormatDetector.cpp
+    src/catalog/CatalogParseRequest.cpp
     src/catalog/CatalogPayloadParser.cpp
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
