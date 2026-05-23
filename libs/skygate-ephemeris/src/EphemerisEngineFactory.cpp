@@ -1,5 +1,4 @@
 #include "EphemerisEngineFactory.hpp"
-
 #include "StringUtilities.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"

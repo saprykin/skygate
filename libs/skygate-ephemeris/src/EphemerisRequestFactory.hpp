@@ -8,9 +8,6 @@ namespace skygate::ephemeris {
 
 class EphemerisRequestFactory final {
 public:
-    [[nodiscard]] static bool hasExplicitEpoch(const AstronomicalEpoch& epoch) noexcept;
-    [[nodiscard]] static AstronomicalEpoch epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept;
-    [[nodiscard]] static core::UtcTimePoint utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept;
     [[nodiscard]] static core::SkyContext contextFromRequest(const EphemerisRequest& request) noexcept;
     [[nodiscard]] static EphemerisRequest
     fromContext(const core::SkyContext& context, const EphemerisEngineOptions& options) noexcept;

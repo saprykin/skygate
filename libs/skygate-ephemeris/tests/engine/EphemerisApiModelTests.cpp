@@ -2,6 +2,7 @@
 #include "EphemerisRequestFactory.hpp"
 #include "Types.hpp"
 #include "UtcTimeCodec.hpp"
+#include "engine/simple/AstronomicalTime.hpp"
 
 #include <QtTest/QtTest>
 
@@ -207,7 +208,7 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
 
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::fromContext(context, options);
-    QVERIFY(skygate::ephemeris::EphemerisRequestFactory::hasExplicitEpoch(request.epoch));
+    QVERIFY(skygate::ephemeris::AstronomicalTime::hasExplicitEpoch(request.epoch));
     QCOMPARE(
         static_cast<std::uint8_t>(request.options.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)

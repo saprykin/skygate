@@ -1,5 +1,4 @@
 #include "ObservationEventCalculator.hpp"
-
 #include "EphemerisEngineFactory.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "IEphemerisEngine.hpp"

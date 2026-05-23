@@ -1,5 +1,4 @@
 #include "EphemerisEngineQueries.hpp"
-
 #include "StringUtilities.hpp"
 
 namespace skygate::ephemeris {
