@@ -60,8 +60,9 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                 return true;
             }
 
-            const auto raHours = catalog_parsing::parseRightAscensionHours(row.decodeColumn(QStringLiteral("RA")));
-            const auto decDeg = catalog_parsing::parseDeclinationDeg(row.decodeColumn(QStringLiteral("Dec")));
+            const auto raHours =
+                CatalogParsingUtilities::parseRightAscensionHours(row.decodeColumn(QStringLiteral("RA")));
+            const auto decDeg = CatalogParsingUtilities::parseDeclinationDeg(row.decodeColumn(QStringLiteral("Dec")));
             if (!raHours.has_value() || !decDeg.has_value()) {
                 ++invalidCoordinateRowCount;
                 if (invalidCoordinateRowSamples.size() < static_cast<qsizetype>(kMaxInvalidRowSamples)) {
@@ -107,7 +108,8 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                 progressCallback(parsedObjectCount);
             }
 
-            const auto visualMagnitude = catalog_parsing::parseFiniteDouble(row.decodeColumn(QStringLiteral("V-Mag")));
+            const auto visualMagnitude =
+                CatalogParsingUtilities::parseFiniteDouble(row.decodeColumn(QStringLiteral("V-Mag")));
             CelestialBody body;
             body.id = std::move(mapping.id);
             body.displayName = std::move(mapping.displayName);
@@ -118,9 +120,12 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
             body.deepSkyObject = DeepSkyObjectInfo{
                 .kind = mapping.kind,
                 .aliases = std::move(mapping.aliases),
-                .majorAxisArcmin = catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("MajAx"))),
-                .minorAxisArcmin = catalog_parsing::parsePositiveDouble(row.decodeColumn(QStringLiteral("MinAx"))),
-                .positionAngleDeg = catalog_parsing::parseNonNegativeDouble(row.decodeColumn(QStringLiteral("PosAng"))),
+                .majorAxisArcmin =
+                    CatalogParsingUtilities::parsePositiveDouble(row.decodeColumn(QStringLiteral("MajAx"))),
+                .minorAxisArcmin =
+                    CatalogParsingUtilities::parsePositiveDouble(row.decodeColumn(QStringLiteral("MinAx"))),
+                .positionAngleDeg =
+                    CatalogParsingUtilities::parseNonNegativeDouble(row.decodeColumn(QStringLiteral("PosAng"))),
             };
             rowResult.bodies.push_back(std::move(body));
             return true;

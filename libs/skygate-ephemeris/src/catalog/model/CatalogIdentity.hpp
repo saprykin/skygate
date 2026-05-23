@@ -6,11 +6,14 @@
 #include <span>
 #include <string_view>
 
-namespace skygate::ephemeris::catalog_identity {
+namespace skygate::ephemeris {
 
-[[nodiscard]] bool containsBodyId(std::span<const CelestialBody> bodies, std::string_view id);
-[[nodiscard]] bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs);
-[[nodiscard]] bool isAnalyticSolarSystemBody(const CelestialBody& body) noexcept;
-[[nodiscard]] std::size_t countDeepSkyObjects(std::span<const CelestialBody> bodies);
+class CatalogIdentity final {
+public:
+    [[nodiscard]] static bool containsBodyId(std::span<const CelestialBody> bodies, std::string_view id);
+    [[nodiscard]] static bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs);
+    [[nodiscard]] static bool isAnalyticSolarSystemBody(const CelestialBody& body) noexcept;
+    [[nodiscard]] static std::size_t countDeepSkyObjects(std::span<const CelestialBody> bodies);
+};
 
-}  // namespace skygate::ephemeris::catalog_identity
+}  // namespace skygate::ephemeris

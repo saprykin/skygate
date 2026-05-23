@@ -6,15 +6,15 @@
 #include <cmath>
 #include <cstddef>
 
-namespace skygate::ephemeris::catalog_parsing {
+namespace skygate::ephemeris {
 
-std::string toUtf8String(const QString& text)
+std::string CatalogParsingUtilities::toUtf8String(const QString& text)
 {
     const QByteArray utf8 = text.toUtf8();
     return std::string(utf8.constData(), static_cast<std::size_t>(utf8.size()));
 }
 
-std::optional<double> parseFiniteDouble(const QStringView text)
+std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QStringView text)
 {
     const QString trimmed = text.trimmed().toString();
     if (trimmed.isEmpty()) {
@@ -30,12 +30,12 @@ std::optional<double> parseFiniteDouble(const QStringView text)
     return value;
 }
 
-std::optional<double> parseFiniteDouble(const QString& text)
+std::optional<double> CatalogParsingUtilities::parseFiniteDouble(const QString& text)
 {
     return parseFiniteDouble(QStringView{text});
 }
 
-std::optional<double> parsePositiveDouble(const QStringView text)
+std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QStringView text)
 {
     const auto value = parseFiniteDouble(text);
     if (!value.has_value() || *value <= 0.0) {
@@ -44,12 +44,12 @@ std::optional<double> parsePositiveDouble(const QStringView text)
     return value;
 }
 
-std::optional<double> parsePositiveDouble(const QString& text)
+std::optional<double> CatalogParsingUtilities::parsePositiveDouble(const QString& text)
 {
     return parsePositiveDouble(QStringView{text});
 }
 
-std::optional<double> parseNonNegativeDouble(const QStringView text)
+std::optional<double> CatalogParsingUtilities::parseNonNegativeDouble(const QStringView text)
 {
     const auto value = parseFiniteDouble(text);
     if (!value.has_value() || *value < 0.0) {
@@ -58,12 +58,12 @@ std::optional<double> parseNonNegativeDouble(const QStringView text)
     return value;
 }
 
-std::optional<double> parseNonNegativeDouble(const QString& text)
+std::optional<double> CatalogParsingUtilities::parseNonNegativeDouble(const QString& text)
 {
     return parseNonNegativeDouble(QStringView{text});
 }
 
-std::optional<double> parseRightAscensionHours(QString text)
+std::optional<double> CatalogParsingUtilities::parseRightAscensionHours(QString text)
 {
     text = text.trimmed();
     if (text.isEmpty()) {
@@ -93,7 +93,7 @@ std::optional<double> parseRightAscensionHours(QString text)
     return value;
 }
 
-std::optional<double> parseDeclinationDeg(QString text)
+std::optional<double> CatalogParsingUtilities::parseDeclinationDeg(QString text)
 {
     text = text.trimmed();
     if (text.isEmpty()) {
@@ -127,4 +127,4 @@ std::optional<double> parseDeclinationDeg(QString text)
     return value;
 }
 
-}  // namespace skygate::ephemeris::catalog_parsing
+}  // namespace skygate::ephemeris

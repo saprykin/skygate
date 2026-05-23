@@ -6,16 +6,19 @@
 #include <optional>
 #include <string>
 
-namespace skygate::ephemeris::catalog_parsing {
+namespace skygate::ephemeris {
 
-[[nodiscard]] std::string toUtf8String(const QString& text);
-[[nodiscard]] std::optional<double> parseFiniteDouble(QStringView text);
-[[nodiscard]] std::optional<double> parseFiniteDouble(const QString& text);
-[[nodiscard]] std::optional<double> parsePositiveDouble(QStringView text);
-[[nodiscard]] std::optional<double> parsePositiveDouble(const QString& text);
-[[nodiscard]] std::optional<double> parseNonNegativeDouble(QStringView text);
-[[nodiscard]] std::optional<double> parseNonNegativeDouble(const QString& text);
-[[nodiscard]] std::optional<double> parseRightAscensionHours(QString text);
-[[nodiscard]] std::optional<double> parseDeclinationDeg(QString text);
+class CatalogParsingUtilities final {
+public:
+    [[nodiscard]] static std::string toUtf8String(const QString& text);
+    [[nodiscard]] static std::optional<double> parseFiniteDouble(QStringView text);
+    [[nodiscard]] static std::optional<double> parseFiniteDouble(const QString& text);
+    [[nodiscard]] static std::optional<double> parsePositiveDouble(QStringView text);
+    [[nodiscard]] static std::optional<double> parsePositiveDouble(const QString& text);
+    [[nodiscard]] static std::optional<double> parseNonNegativeDouble(QStringView text);
+    [[nodiscard]] static std::optional<double> parseNonNegativeDouble(const QString& text);
+    [[nodiscard]] static std::optional<double> parseRightAscensionHours(QString text);
+    [[nodiscard]] static std::optional<double> parseDeclinationDeg(QString text);
+};
 
-}  // namespace skygate::ephemeris::catalog_parsing
+}  // namespace skygate::ephemeris

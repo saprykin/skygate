@@ -69,7 +69,7 @@ void appendAlias(std::vector<std::string>& aliases, const QString& alias)
         return;
     }
 
-    strings::appendUniqueIgnoreAsciiCase(aliases, catalog_parsing::toUtf8String(normalized));
+    strings::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(normalized));
 }
 
 void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& text)
@@ -154,8 +154,8 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
             : (!ngc.isEmpty() ? objectIdFromAlias("NGC " + ngc)
                               : (!ic.isEmpty() ? objectIdFromAlias("IC " + ic) : objectIdFromAlias(name)));
 
-    mapping.id = catalog_parsing::toUtf8String(id);
-    mapping.displayName = catalog_parsing::toUtf8String(displayName);
+    mapping.id = CatalogParsingUtilities::toUtf8String(id);
+    mapping.displayName = CatalogParsingUtilities::toUtf8String(displayName);
     mapping.kind = kindFromOpenNgcType(typeText);
     return mapping;
 }
