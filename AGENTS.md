@@ -6,8 +6,14 @@ repository.
 
 ## C++ Conventions
 - Use UTF-8 and prefer ASCII in source unless non-ASCII is required.
+- Group `#include` directives into three blocks, each separated by a blank
+  line: (1) local project includes (`"..."`), (2) third-party includes
+  (e.g., Qt `<Q...>`), (3) system/compiler includes (`<c...>`, `<utility>`,
+  etc.). Do not place blank lines inside a block.
 - Prefer `.hpp` headers and `#pragma once`.
-- Use one class or structure per header/source pair.
+- Use one enum, class, or struct per header/source pair. Nest a type inside
+  another class only when it is tightly coupled and has no standalone
+  meaning outside that class.
 - Keep functions short and focused.
 - Use `const` correctness consistently.
 - Use `override` for overridden virtual functions.
