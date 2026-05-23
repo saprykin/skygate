@@ -4,6 +4,7 @@
 #include "engine/highprecision/HighPrecisionTypes.hpp"
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 namespace skygate::ephemeris::highprecision {
@@ -18,7 +19,7 @@ public:
         const EphemerisRequest& request,
         const CatalogStarAstrometryArrays& arrays,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
-    ) const;
+    ) const = 0;
 };
 
 }  // namespace skygate::ephemeris::highprecision

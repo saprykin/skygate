@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "engine/highprecision/IApparentPlaceCalculator.hpp"
 
 #include <memory>
 #include <span>
@@ -8,19 +8,14 @@
 
 namespace skygate::ephemeris::highprecision {
 
-class IApparentPlaceCalculator {
+class BaseApparentPlaceCalculator : public IApparentPlaceCalculator {
 public:
-    virtual ~IApparentPlaceCalculator() = default;
-
-    [[nodiscard]] virtual HighPrecisionCalculatorResult
-    apply(const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult) const = 0;
-
-    [[nodiscard]] virtual std::vector<StarAstrometryBatchResult> applyBatch(
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
         const EphemerisRequest& request,
         std::span<const CelestialBody> bodies,
         std::span<const StarAstrometryBatchResult> calculatorResults,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
-    ) const = 0;
+    ) const override;
 };
 
 }  // namespace skygate::ephemeris::highprecision

@@ -1,6 +1,9 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
+#include <QtGlobal>
+
 #include "StringUtilities.hpp"
+#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
@@ -176,7 +179,7 @@ void mergeKernelEpochTimeScaleMetadata(
     EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
 }
 
-class DefaultApparentPlaceCalculator final : public IApparentPlaceCalculator {
+class DefaultApparentPlaceCalculator final : public BaseApparentPlaceCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult
     apply(const HighPrecisionComputationInput&, const HighPrecisionCalculatorResult& calculatorResult) const override
