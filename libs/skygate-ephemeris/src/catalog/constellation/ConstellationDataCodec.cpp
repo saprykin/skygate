@@ -1,4 +1,5 @@
 #include "catalog/constellation/ConstellationDataCodec.hpp"
+#include "StringUtilities.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -6,25 +7,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-std::vector<std::string_view> splitView(const std::string_view text, const char delimiter)
-{
-    std::vector<std::string_view> tokens;
-    std::size_t cursor = 0;
-    while (cursor < text.size()) {
-        const std::size_t next = text.find(delimiter, cursor);
-        const std::size_t end = (next == std::string_view::npos) ? text.size() : next;
-        const std::string_view token = text.substr(cursor, end - cursor);
-        if (!token.empty()) {
-            tokens.push_back(token);
-        }
-        if (next == std::string_view::npos) {
-            break;
-        }
-        cursor = next + 1U;
-    }
-    return tokens;
-}
 
 void sanitizeLabel(std::string& label)
 {
@@ -70,7 +52,7 @@ std::string ConstellationDataCodec::serializeLineRows(const std::span<const Cons
 std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const std::string_view rows)
 {
     std::vector<ConstellationLineRef> lineRefs;
-    for (const std::string_view line : splitView(rows, '\n')) {
+    for (const std::string_view line : strings::splitView(rows, '\n')) {
         const std::size_t delimiter = line.find('|');
         if (delimiter == std::string_view::npos) {
             continue;
@@ -131,7 +113,7 @@ std::string ConstellationDataCodec::serializeLabelRows(const std::span<const Con
 std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const std::string_view rows)
 {
     std::vector<ConstellationLabelRef> labelRefs;
-    for (const std::string_view line : splitView(rows, '\n')) {
+    for (const std::string_view line : strings::splitView(rows, '\n')) {
         const std::size_t delimiter = line.find('|');
         if (delimiter == std::string_view::npos) {
             continue;
@@ -144,7 +126,7 @@ std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const 
         }
 
         std::vector<std::string> hipIds;
-        for (const std::string_view hipId : splitView(hipList, ',')) {
+        for (const std::string_view hipId : strings::splitView(hipList, ',')) {
             hipIds.emplace_back(hipId);
         }
         if (!hipIds.empty()) {

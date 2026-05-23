@@ -1,9 +1,8 @@
 #include "catalog/CatalogLoader.hpp"
-
 #include "catalog/bundled/BundledCatalogParser.hpp"
 #include "catalog/model/CatalogBodyParseResult.hpp"
 #include "catalog/hyg/HygCatalogParser.hpp"
-#include "catalog/hyg/HygGzipCatalogParser.hpp"
+#include "catalog/io/CompressedCatalogParser.hpp"
 #include "catalog/opengc/OpenNgcCatalogParser.hpp"
 #include "catalog/CatalogFactory.hpp"
 
@@ -61,8 +60,17 @@ CatalogLoadResult CatalogLoader::load(const CatalogSourceRequest& request)
         return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
     }
     case CatalogSourceType::HygCsvGzip: {
-        const HygGzipCatalogParser parser;
-        return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
+        const HygCatalogParser parser;
+        return finalizeCatalogLoad(
+            CompressedCatalogParser::parse(
+                request.data,
+                request.progressCallback,
+                [&parser](const std::string_view data, const HygParseProgressCallback& callback) {
+                    return parser.parse(data, callback);
+                }
+            ),
+            request.selectionOptions
+        );
     }
     case CatalogSourceType::OpenNgcCsv: {
         const OpenNgcCatalogParser parser;

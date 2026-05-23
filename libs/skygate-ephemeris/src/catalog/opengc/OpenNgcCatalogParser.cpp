@@ -1,40 +1,32 @@
 #include "catalog/opengc/OpenNgcCatalogParser.hpp"
-
 #include "catalog/normalize/CatalogParsingUtilities.hpp"
-#include "catalog/io/DelimitedCatalogReader.hpp"
+#include "catalog/io/DelimitedCatalogParser.hpp"
 #include "catalog/opengc/OpenNgcObjectMapper.hpp"
 
-#include <QLoggingCategory>
 #include <QString>
-#include <QStringList>
 
 #include <cstddef>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 namespace skygate::ephemeris {
 namespace {
 
-constexpr std::size_t kOpenNgcProgressCallbackInterval = 512;
 constexpr std::size_t kOpenNgcRowCountLimitFloor = 200000;
 constexpr std::size_t kOpenNgcMinExpectedBytesPerDataRow = 12;
-constexpr std::size_t kMaxInvalidRowSamples = 5;
 
-Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
+constexpr std::string_view kOpenNgcInvalidCategoryLabels[] = {
+    "invalid coordinates",
+    "unmappable identifiers",
+};
 
 }  // namespace
 
 CatalogBodyParseResult
 OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgressCallback& progressCallback) const
 {
-    std::size_t parsedObjectCount = 0;
-    std::size_t dataRowNumber = 0;
-    std::size_t invalidCoordinateRowCount = 0;
-    std::size_t invalidMappingRowCount = 0;
-    QStringList invalidCoordinateRowSamples;
-    QStringList invalidMappingRowSamples;
-
-    CatalogBodyParseResult result = DelimitedCatalogReader::read(
+    return DelimitedCatalogParser::run(
         csvData,
         DelimitedCatalogReaderOptions{
             .separator = ';',
@@ -53,30 +45,32 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                                     "Name, Type, RA, Dec.",
             .rowLimitDetail = "OpenNGC CSV payload exceeds the supported row limit.",
         },
-        [&](const DelimitedCatalogRow& row, CatalogBodyParseResult& rowResult) {
-            ++dataRowNumber;
+        DelimitedCatalogParserOptions{
+            .zeroResultCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
+            .zeroResultDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.",
+            .formatName = "OpenNGC CSV",
+        },
+        kOpenNgcInvalidCategoryLabels,
+        [](const DelimitedCatalogRow& row, std::size_t rowNumber) -> RowParseOutcome {
             const QString typeText = row.decodeColumn(QStringLiteral("Type"));
             if (OpenNgcObjectMapper::shouldSkipType(typeText)) {
-                return true;
+                return {};
             }
 
             const auto raHours =
                 CatalogParsingUtilities::parseRightAscensionHours(row.decodeColumn(QStringLiteral("RA")));
             const auto decDeg = CatalogParsingUtilities::parseDeclinationDeg(row.decodeColumn(QStringLiteral("Dec")));
             if (!raHours.has_value() || !decDeg.has_value()) {
-                ++invalidCoordinateRowCount;
-                if (invalidCoordinateRowSamples.size() < static_cast<qsizetype>(kMaxInvalidRowSamples)) {
-                    invalidCoordinateRowSamples.push_back(
-                        QStringLiteral("row %1 name='%2' ra='%3' dec='%4'")
-                            .arg(
-                                QString::number(static_cast<qulonglong>(dataRowNumber + 1U)),
-                                row.decodeColumn(QStringLiteral("Name")),
-                                row.decodeColumn(QStringLiteral("RA")),
-                                row.decodeColumn(QStringLiteral("Dec"))
-                            )
-                    );
-                }
-                return true;
+                return RowParseOutcome{
+                    .invalidCategoryIndex = 0,
+                    .invalidSample = QStringLiteral("row %1 name='%2' ra='%3' dec='%4'")
+                                         .arg(
+                                             QString::number(static_cast<qulonglong>(rowNumber + 1U)),
+                                             row.decodeColumn(QStringLiteral("Name")),
+                                             row.decodeColumn(QStringLiteral("RA")),
+                                             row.decodeColumn(QStringLiteral("Dec"))
+                                         ),
+                };
             }
 
             const QString name = row.decodeColumn(QStringLiteral("Name"));
@@ -93,19 +87,11 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                 row.decodeColumn(QStringLiteral("Common names"))
             );
             if (mapping.displayName.empty() || mapping.id.empty()) {
-                ++invalidMappingRowCount;
-                if (invalidMappingRowSamples.size() < static_cast<qsizetype>(kMaxInvalidRowSamples)) {
-                    invalidMappingRowSamples.push_back(
-                        QStringLiteral("row %1 name='%2' type='%3'")
-                            .arg(QString::number(static_cast<qulonglong>(dataRowNumber + 1U)), name, typeText)
-                    );
-                }
-                return true;
-            }
-
-            ++parsedObjectCount;
-            if (progressCallback && (parsedObjectCount % kOpenNgcProgressCallbackInterval) == 0U) {
-                progressCallback(parsedObjectCount);
+                return RowParseOutcome{
+                    .invalidCategoryIndex = 1,
+                    .invalidSample = QStringLiteral("row %1 name='%2' type='%3'")
+                                         .arg(QString::number(static_cast<qulonglong>(rowNumber + 1U)), name, typeText),
+                };
             }
 
             const auto visualMagnitude =
@@ -127,42 +113,11 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                 .positionAngleDeg =
                     CatalogParsingUtilities::parseNonNegativeDouble(row.decodeColumn(QStringLiteral("PosAng"))),
             };
-            rowResult.bodies.push_back(std::move(body));
-            return true;
-        }
+
+            return RowParseOutcome{.body = std::move(body)};
+        },
+        progressCallback
     );
-
-    if (!result.isSuccess()) {
-        qCWarning(skygateCatalogParseLog).noquote()
-            << "OpenNGC CSV parse failed:" << QString::fromStdString(result.errorDetail);
-        return result;
-    }
-
-    if (invalidCoordinateRowCount > 0U) {
-        qCWarning(skygateCatalogParseLog).noquote()
-            << "OpenNGC CSV skipped" << static_cast<qulonglong>(invalidCoordinateRowCount)
-            << "rows with invalid coordinates; samples:" << invalidCoordinateRowSamples.join(QStringLiteral("; "));
-    }
-    if (invalidMappingRowCount > 0U) {
-        qCWarning(skygateCatalogParseLog).noquote()
-            << "OpenNGC CSV skipped" << static_cast<qulonglong>(invalidMappingRowCount)
-            << "rows with unmappable identifiers; samples:" << invalidMappingRowSamples.join(QStringLiteral("; "));
-    }
-
-    if (progressCallback) {
-        progressCallback(parsedObjectCount);
-    }
-
-    if (parsedObjectCount == 0U) {
-        result.errorCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv;
-        result.errorDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.";
-        qCWarning(skygateCatalogParseLog).noquote()
-            << "OpenNGC CSV parse failed:" << QString::fromStdString(result.errorDetail);
-        return result;
-    }
-
-    result.diagnostics.parsedBodyCount = parsedObjectCount;
-    return result;
 }
 
 }  // namespace skygate::ephemeris

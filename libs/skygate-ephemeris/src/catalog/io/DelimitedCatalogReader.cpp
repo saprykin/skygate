@@ -1,31 +1,12 @@
 #include "catalog/io/DelimitedCatalogReader.hpp"
-
 #include "catalog/io/CsvRowTokenizer.hpp"
+#include "StringUtilities.hpp"
 
 #include <algorithm>
 #include <optional>
 
 namespace skygate::ephemeris {
 namespace {
-
-std::vector<std::string_view> splitView(const std::string_view text, const char delimiter)
-{
-    std::vector<std::string_view> tokens;
-    std::size_t cursor = 0;
-    while (cursor < text.size()) {
-        const std::size_t next = text.find(delimiter, cursor);
-        const std::size_t end = (next == std::string_view::npos) ? text.size() : next;
-        const std::string_view token = text.substr(cursor, end - cursor);
-        if (!token.empty()) {
-            tokens.push_back(token);
-        }
-        if (next == std::string_view::npos) {
-            break;
-        }
-        cursor = next + 1U;
-    }
-    return tokens;
-}
 
 std::optional<QHash<QString, qsizetype>> parseHeaderRow(
     const QVector<QStringView>& columns,
@@ -82,7 +63,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
     bool hasHeader = false;
     QHash<QString, qsizetype> headerIndex;
 
-    for (const std::string_view rawLine : splitView(payload, '\n')) {
+    for (const std::string_view rawLine : strings::splitView(payload, '\n')) {
         const QString line = QString::fromUtf8(rawLine.data(), static_cast<qsizetype>(rawLine.size())).trimmed();
         if (line.isEmpty()) {
             continue;
