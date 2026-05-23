@@ -38,10 +38,7 @@ void SkyThemeRepositoryTests::missingThemeIdFallsBackToDefaultTheme()
 {
     const SkyThemeRepository repository;
     const SkyThemeDefinition& defaultTheme = repository.defaultTheme();
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Unknown theme id missing-theme - using default theme"
-    );
+    QTest::ignoreMessage(QtWarningMsg, "Unknown theme id missing-theme - using default theme");
     const SkyThemeDefinition& resolvedTheme = repository.themeById("missing-theme");
 
     QCOMPARE(resolvedTheme.id, defaultTheme.id);
@@ -85,8 +82,7 @@ void SkyThemeRepositoryTests::malformedThemeDefinitionFallsBackToBuiltInDefault(
     manifestFile.close();
 
     QTest::ignoreMessage(
-        QtWarningMsg,
-        QRegularExpression("Theme .*broken-theme\\.json has invalid color for key windowBackground")
+        QtWarningMsg, QRegularExpression("Theme .*broken-theme\\.json has invalid color for key windowBackground")
     );
     const SkyThemeRepository repository(manifestPath);
     const SkyThemeDefinition& fallbackTheme = repository.defaultTheme();

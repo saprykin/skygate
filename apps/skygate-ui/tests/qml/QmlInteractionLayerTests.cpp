@@ -34,7 +34,9 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -95,7 +97,9 @@ void QmlInteractionLayerTests::hoverClickDragAndWheelReachSceneAndController()
                 skySceneModel: fakeScene
             }
         }
-    )"), QStringLiteral("SkyInteractionLayerBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SkyInteractionLayerBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
@@ -173,7 +177,9 @@ void QmlInteractionLayerTests::pinchScaleHandlerZoomsAndClearsHover()
     setupEngine(engine, *controller);
 
     const QmlWarningScope warnings;
-    auto object = createInlineComponent(engine, QStringLiteral(R"(
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
         import QtQuick
         Item {
             id: root
@@ -210,16 +216,15 @@ void QmlInteractionLayerTests::pinchScaleHandlerZoomsAndClearsHover()
                 hoveredObjectLabel: "before-pinch"
             }
         }
-    )"), QStringLiteral("SkyInteractionLayerPinchBehaviorTest.qml"));
+    )"),
+        QStringLiteral("SkyInteractionLayerPinchBehaviorTest.qml")
+    );
     QVERIFY(object != nullptr);
     auto* root = qobject_cast<QQuickItem*>(object.get());
     QVERIFY(root != nullptr);
     QObject* fakeController = qvariant_cast<QObject*>(root->property("fakeController"));
     QObject* interaction = qvariant_cast<QObject*>(root->property("interaction"));
-    QObject* handler = firstObjectWithObjectName(
-        root,
-        QStringLiteral("skyInteractionPinchHandler")
-    );
+    QObject* handler = firstObjectWithObjectName(root, QStringLiteral("skyInteractionPinchHandler"));
     QVERIFY(fakeController != nullptr);
     QVERIFY(interaction != nullptr);
     QVERIFY(handler != nullptr);

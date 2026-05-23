@@ -17,8 +17,8 @@ void sanitizeLabel(std::string& label)
         return !std::isspace(character);
     });
     const auto last = std::find_if(label.rbegin(), label.rend(), [](const unsigned char character) {
-        return !std::isspace(character);
-    }).base();
+                          return !std::isspace(character);
+                      }).base();
 
     if (first >= last) {
         label.clear();
@@ -30,9 +30,7 @@ void sanitizeLabel(std::string& label)
 
 }  // namespace
 
-std::string ConstellationDataCodec::serializeLineRows(
-    const std::span<const ConstellationLineRef> lineRefs
-)
+std::string ConstellationDataCodec::serializeLineRows(const std::span<const ConstellationLineRef> lineRefs)
 {
     std::string rows;
     rows.reserve(lineRefs.size() * 24U);
@@ -50,9 +48,7 @@ std::string ConstellationDataCodec::serializeLineRows(
     return rows;
 }
 
-std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(
-    const std::string_view rows
-)
+std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const std::string_view rows)
 {
     std::vector<ConstellationLineRef> lineRefs;
     std::size_t cursor = 0;
@@ -81,9 +77,7 @@ std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(
     return lineRefs;
 }
 
-std::string ConstellationDataCodec::serializeLabelRows(
-    const std::span<const ConstellationLabelRef> labelRefs
-)
+std::string ConstellationDataCodec::serializeLabelRows(const std::span<const ConstellationLabelRef> labelRefs)
 {
     std::string rows;
     rows.reserve(labelRefs.size() * 48U);
@@ -123,9 +117,7 @@ std::string ConstellationDataCodec::serializeLabelRows(
     return rows;
 }
 
-std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(
-    const std::string_view rows
-)
+std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const std::string_view rows)
 {
     std::vector<ConstellationLabelRef> labelRefs;
     std::size_t cursor = 0;
@@ -144,12 +136,8 @@ std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(
                     std::size_t hipCursor = 0;
                     while (hipCursor < hipList.size()) {
                         const std::size_t comma = hipList.find(',', hipCursor);
-                        const std::size_t hipEnd =
-                            comma == std::string_view::npos ? hipList.size() : comma;
-                        const std::string_view hipId = hipList.substr(
-                            hipCursor,
-                            hipEnd - hipCursor
-                        );
+                        const std::size_t hipEnd = comma == std::string_view::npos ? hipList.size() : comma;
+                        const std::string_view hipId = hipList.substr(hipCursor, hipEnd - hipCursor);
                         if (!hipId.empty()) {
                             hipIds.emplace_back(hipId);
                         }

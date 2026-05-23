@@ -14,8 +14,7 @@ namespace skygate::testsupport {
 
 class LogCapture final {
 public:
-    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg)
-        : m_minimumType(minimumType)
+    explicit LogCapture(const QtMsgType minimumType = QtWarningMsg) : m_minimumType(minimumType)
     {
         QMutexLocker lock(&s_mutex);
         if (s_captures.isEmpty()) {
@@ -69,19 +68,14 @@ private:
         return 1;
     }
 
-    static detail::MessageLogDispatcher::Result handler(
-        void* /*owner*/,
-        const QtMsgType type,
-        const QMessageLogContext& context,
-        const QString& message
-    )
+    static detail::MessageLogDispatcher::Result
+    handler(void* /*owner*/, const QtMsgType type, const QMessageLogContext& context, const QString& message)
     {
         QMutexLocker lock(&s_mutex);
         for (LogCapture* capture : s_captures) {
             if (severityRank(type) >= severityRank(capture->m_minimumType)) {
                 capture->m_messages.push_back(QStringLiteral("%1 %2").arg(
-                    QString::fromUtf8(context.category != nullptr ? context.category : "default"),
-                    message
+                    QString::fromUtf8(context.category != nullptr ? context.category : "default"), message
                 ));
             }
         }

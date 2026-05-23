@@ -55,9 +55,7 @@ void CatalogPayloadParseServiceTests::parsesValidPayloadAndReportsProgress()
             validPayload(),
             this,
             {},
-            [&lastProgress](const std::size_t parsedObjectCount) {
-                lastProgress = parsedObjectCount;
-            },
+            [&lastProgress](const std::size_t parsedObjectCount) { lastProgress = parsedObjectCount; },
             [&finalResult, &loop](skygate::ephemeris::CatalogLoadResult result) {
                 finalResult = std::move(result);
                 loop.quit();
@@ -75,17 +73,10 @@ void CatalogPayloadParseServiceTests::invalidPayloadCompletesWithFailure()
     CatalogPayloadParseService service;
     skygate::ephemeris::CatalogLoadResult finalResult;
 
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Catalog payload parse failed: Catalog payload format is not recognized."
-    );
+    QTest::ignoreMessage(QtWarningMsg, "Catalog payload parse failed: Catalog payload format is not recognized.");
     runAsync([&](QEventLoop& loop) {
         service.parseAsync(
-            "not a catalog",
-            this,
-            {},
-            {},
-            [&finalResult, &loop](skygate::ephemeris::CatalogLoadResult result) {
+            "not a catalog", this, {}, {}, [&finalResult, &loop](skygate::ephemeris::CatalogLoadResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }
@@ -106,12 +97,8 @@ void CatalogPayloadParseServiceTests::destroyedContextSuppressesCallbacks()
         validPayload(),
         context,
         {},
-        [&progressCalled](std::size_t) {
-            progressCalled = true;
-        },
-        [&completionCalled](skygate::ephemeris::CatalogLoadResult) {
-            completionCalled = true;
-        }
+        [&progressCalled](std::size_t) { progressCalled = true; },
+        [&completionCalled](skygate::ephemeris::CatalogLoadResult) { completionCalled = true; }
     );
     delete context;
 

@@ -17,13 +17,9 @@ public:
         Disabled
     };
 
-    explicit QmlWarningScope(const Forwarding forwarding = Forwarding::Enabled) :
-        m_forwarding(forwarding)
+    explicit QmlWarningScope(const Forwarding forwarding = Forwarding::Enabled) : m_forwarding(forwarding)
     {
-        testsupport::detail::MessageLogDispatcher::subscribe(
-            this,
-            &QmlWarningScope::messageHandler
-        );
+        testsupport::detail::MessageLogDispatcher::subscribe(this, &QmlWarningScope::messageHandler);
     }
 
     QmlWarningScope(const QmlWarningScope&) = delete;
@@ -33,10 +29,7 @@ public:
 
     ~QmlWarningScope()
     {
-        testsupport::detail::MessageLogDispatcher::unsubscribe(
-            this,
-            &QmlWarningScope::messageHandler
-        );
+        testsupport::detail::MessageLogDispatcher::unsubscribe(this, &QmlWarningScope::messageHandler);
     }
 
     [[nodiscard]] QStringList messages() const
@@ -46,12 +39,8 @@ public:
     }
 
 private:
-    static testsupport::detail::MessageLogDispatcher::Result messageHandler(
-        void* owner,
-        const QtMsgType type,
-        const QMessageLogContext& /*context*/,
-        const QString& message
-    )
+    static testsupport::detail::MessageLogDispatcher::Result
+    messageHandler(void* owner, const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
     {
         QmlWarningScope* scope = static_cast<QmlWarningScope*>(owner);
 

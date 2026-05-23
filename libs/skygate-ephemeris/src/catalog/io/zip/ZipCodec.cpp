@@ -15,9 +15,8 @@ std::optional<std::string> ZipCodec::extractFirstCsvEntry(const std::string_view
         return std::nullopt;
     }
 
-    const ZipEntryMetadata* const entry = CatalogZipEntrySelector::selectFirstCsvEntry(
-        std::span<const ZipEntryMetadata>(*entries)
-    );
+    const ZipEntryMetadata* const entry =
+        CatalogZipEntrySelector::selectFirstCsvEntry(std::span<const ZipEntryMetadata>(*entries));
     if (entry == nullptr) {
         return std::nullopt;
     }

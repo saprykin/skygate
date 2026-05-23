@@ -38,14 +38,7 @@ void SkySceneModelLayerVisibilityTests::init()
 void SkySceneModelLayerVisibilityTests::themeChangesUpdateRenderedColors()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_planet",
-            "Demo Planet",
-            skygate::ephemeris::CelestialBodyType::Planet,
-            -1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_planet", "Demo Planet", skygate::ephemeris::CelestialBodyType::Planet, -1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     QVERIFY(harness.centerOnBody("demo_planet"));
@@ -65,8 +58,7 @@ void SkySceneModelLayerVisibilityTests::themeChangesUpdateRenderedColors()
 
     const QVariantList defaultOverlayItems = sceneModel.overlayItems();
     QVERIFY(!defaultOverlayItems.isEmpty());
-    const QColor defaultOverlayColor =
-        defaultOverlayItems.first().toMap().value("color").value<QColor>();
+    const QColor defaultOverlayColor = defaultOverlayItems.first().toMap().value("color").value<QColor>();
     QVERIFY(defaultOverlayColor.isValid());
 
     controller.setThemeId("night-vision");
@@ -83,8 +75,7 @@ void SkySceneModelLayerVisibilityTests::themeChangesUpdateRenderedColors()
 
     const QVariantList nightOverlayItems = sceneModel.overlayItems();
     QVERIFY(!nightOverlayItems.isEmpty());
-    const QColor nightOverlayColor =
-        nightOverlayItems.first().toMap().value("color").value<QColor>();
+    const QColor nightOverlayColor = nightOverlayItems.first().toMap().value("color").value<QColor>();
     QVERIFY(nightOverlayColor.isValid());
     QVERIFY(defaultOverlayColor != nightOverlayColor);
 }
@@ -92,14 +83,7 @@ void SkySceneModelLayerVisibilityTests::themeChangesUpdateRenderedColors()
 void SkySceneModelLayerVisibilityTests::solarSystemLabelsCanBeHidden()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_planet",
-            "Demo Planet",
-            skygate::ephemeris::CelestialBodyType::Planet,
-            -1.0,
-            1.5,
-            2.5
-        ),
+        makeFixedBody("demo_planet", "Demo Planet", skygate::ephemeris::CelestialBodyType::Planet, -1.0, 1.5, 2.5),
     });
     QVERIFY(harness.isValid());
     QVERIFY(harness.centerOnBody("demo_planet"));
@@ -119,14 +103,7 @@ void SkySceneModelLayerVisibilityTests::constellationLabelsAndLinesCanBeHiddenIn
 {
     QVERIFY(seedOrionConstellationCache());
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "placeholder",
-            "Placeholder",
-            skygate::ephemeris::CelestialBodyType::Star,
-            6.0,
-            1.0,
-            1.0
-        ),
+        makeFixedBody("placeholder", "Placeholder", skygate::ephemeris::CelestialBodyType::Star, 6.0, 1.0, 1.0),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
@@ -152,14 +129,7 @@ void SkySceneModelLayerVisibilityTests::constellationLabelsAndLinesCanBeHiddenIn
 void SkySceneModelLayerVisibilityTests::referenceLayerLabelsFollowVisibility()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_star",
-            "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
-            2.0,
-            5.5,
-            5.0
-        ),
+        makeFixedBody("demo_star", "Demo Star", skygate::ephemeris::CelestialBodyType::Star, 2.0, 5.5, 5.0),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
@@ -182,23 +152,21 @@ void SkySceneModelLayerVisibilityTests::referenceLayerLabelsFollowVisibility()
         return true;
     };
 
-    QVERIFY(centerOn(skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-        90.0,
-        controller.skyContext().observer,
-        controller.skyContext().utcTime
-    )));
+    QVERIFY(centerOn(
+        skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
+            90.0, controller.skyContext().observer, controller.skyContext().utcTime
+        )
+    ));
     overlayLayers->setEcliptic(true);
     QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Ecliptic"));
     overlayLayers->setEcliptic(false);
     QVERIFY(!overlayItemsContainText(sceneModel.overlayItems(), "Ecliptic"));
 
-    QVERIFY(centerOn(skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-        24,
-        96,
-        0.0,
-        controller.skyContext().observer,
-        controller.skyContext().utcTime
-    )));
+    QVERIFY(centerOn(
+        skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+            24, 96, 0.0, controller.skyContext().observer, controller.skyContext().utcTime
+        )
+    ));
     overlayLayers->setCelestialEquator(true);
     QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Celestial equator"));
     overlayLayers->setCelestialEquator(false);
@@ -208,13 +176,11 @@ void SkySceneModelLayerVisibilityTests::referenceLayerLabelsFollowVisibility()
         skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
             controller.skyContext().observer
         );
-    QVERIFY(centerOn(skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-        24,
-        96,
-        boundaryDeclinationDeg,
-        controller.skyContext().observer,
-        controller.skyContext().utcTime
-    )));
+    QVERIFY(centerOn(
+        skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
+            24, 96, boundaryDeclinationDeg, controller.skyContext().observer, controller.skyContext().utcTime
+        )
+    ));
     overlayLayers->setCircumpolarBoundary(true);
     QVERIFY(overlayItemsContainText(sceneModel.overlayItems(), "Circumpolar"));
     overlayLayers->setCircumpolarBoundary(false);

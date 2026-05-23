@@ -2,9 +2,8 @@
 
 class QString;
 
-namespace skygate::ui
-{
+namespace skygate::ui {
 
 void setMacDockIcon(const QString& iconFilePath);
 
-} // namespace skygate::ui
+}  // namespace skygate::ui

@@ -7,22 +7,15 @@ namespace skygate::ephemeris::strings {
 
 char toLowerAscii(const char character) noexcept
 {
-    return character >= 'A' && character <= 'Z'
-        ? static_cast<char>(character - 'A' + 'a')
-        : character;
+    return character >= 'A' && character <= 'Z' ? static_cast<char>(character - 'A' + 'a') : character;
 }
 
 std::string toLowerAscii(const std::string_view value)
 {
     std::string lowered(value);
-    std::transform(
-        lowered.begin(),
-        lowered.end(),
-        lowered.begin(),
-        [](const char character) {
-            return toLowerAscii(character);
-        }
-    );
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](const char character) {
+        return toLowerAscii(character);
+    });
     return lowered;
 }
 
@@ -39,10 +32,7 @@ std::string_view trimAsciiWhitespace(std::string_view value) noexcept
     return value;
 }
 
-bool equalsIgnoreAsciiCase(
-    const std::string_view lhs,
-    const std::string_view rhs
-) noexcept
+bool equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept
 {
     if (lhs.size() != rhs.size()) {
         return false;
@@ -57,10 +47,7 @@ bool equalsIgnoreAsciiCase(
     return true;
 }
 
-bool containsIgnoreAsciiCase(
-    const std::string_view value,
-    const std::string_view token
-)
+bool containsIgnoreAsciiCase(const std::string_view value, const std::string_view token)
 {
     return toLowerAscii(value).find(toLowerAscii(token)) != std::string::npos;
 }
@@ -98,13 +85,9 @@ bool appendUniqueIgnoreAsciiCase(std::vector<std::string>& values, std::string v
         return false;
     }
 
-    const auto existingIt = std::find_if(
-        values.begin(),
-        values.end(),
-        [&value](const std::string& existing) {
-            return equalsIgnoreAsciiCase(existing, value);
-        }
-    );
+    const auto existingIt = std::find_if(values.begin(), values.end(), [&value](const std::string& existing) {
+        return equalsIgnoreAsciiCase(existing, value);
+    });
     if (existingIt != values.end()) {
         return false;
     }

@@ -27,12 +27,7 @@ void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoint
     observer.elevationMeters = 408.0;
     const skygate::core::UtcTimePoint utcTime(std::chrono::seconds(1'717'276'800));
 
-    const auto eclipticPoint =
-        skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(
-            90.0,
-            observer,
-            utcTime
-        );
+    const auto eclipticPoint = skygate::ephemeris::CelestialReferenceCalculator::eclipticPoint(90.0, observer, utcTime);
     QVERIFY(std::isfinite(eclipticPoint.altitudeDeg));
     QVERIFY(std::isfinite(eclipticPoint.azimuthDeg));
     QVERIFY(eclipticPoint.altitudeDeg >= -90.0);
@@ -41,12 +36,7 @@ void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoint
     QVERIFY(eclipticPoint.azimuthDeg < 360.0);
 
     const auto equatorialPoint =
-        skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(
-            6.0,
-            0.0,
-            observer,
-            utcTime
-        );
+        skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(6.0, 0.0, observer, utcTime);
     QVERIFY(std::isfinite(equatorialPoint.altitudeDeg));
     QVERIFY(std::isfinite(equatorialPoint.azimuthDeg));
     QVERIFY(equatorialPoint.altitudeDeg >= -90.0);
@@ -64,20 +54,9 @@ void CelestialReferenceCalculatorTests::declinationCircleFallsBackForNonPositive
     const skygate::core::UtcTimePoint utcTime(std::chrono::seconds(1'717'276'800));
 
     const auto fallbackPoint =
-        skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(
-            5,
-            0,
-            12.0,
-            observer,
-            utcTime
-        );
+        skygate::ephemeris::CelestialReferenceCalculator::declinationCirclePoint(5, 0, 12.0, observer, utcTime);
     const auto equivalentPoint =
-        skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(
-            0.0,
-            12.0,
-            observer,
-            utcTime
-        );
+        skygate::ephemeris::CelestialReferenceCalculator::equatorialPoint(0.0, 12.0, observer, utcTime);
 
     QVERIFY(std::abs(fallbackPoint.altitudeDeg - equivalentPoint.altitudeDeg) < 1e-9);
     QVERIFY(std::abs(fallbackPoint.azimuthDeg - equivalentPoint.azimuthDeg) < 1e-9);
@@ -88,55 +67,40 @@ void CelestialReferenceCalculatorTests::circumpolarBoundaryDeclinationFollowsHem
     skygate::core::GeoLocation northernObserver;
     northernObserver.latitudeDeg = 47.0;
     QCOMPARE(
-        skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
-            northernObserver
-        ),
-        43.0
+        skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(northernObserver), 43.0
     );
 
     skygate::core::GeoLocation southernObserver;
     southernObserver.latitudeDeg = -33.0;
     QCOMPARE(
-        skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(
-            southernObserver
-        ),
-        -57.0
+        skygate::ephemeris::CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(southernObserver), -57.0
     );
 }
 
 void CelestialReferenceCalculatorTests::constellationLabelCenterAveragesAnchorVectors()
 {
     auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-        std::vector<skygate::ephemeris::CelestialBody> {
-            skygate::ephemeris::CelestialBody {.id = "hip_1", .displayName = "HIP 1"},
-            skygate::ephemeris::CelestialBody {.id = "hip_2", .displayName = "HIP 2"}
+        std::vector<skygate::ephemeris::CelestialBody>{
+            skygate::ephemeris::CelestialBody{.id = "hip_1", .displayName = "HIP 1"},
+            skygate::ephemeris::CelestialBody{.id = "hip_2", .displayName = "HIP 2"}
         }
     );
 
     skygate::ephemeris::SkySnapshot snapshot;
     snapshot.catalogBodies = bodies;
     snapshot.states = {
-        skygate::ephemeris::CelestialBodyState {
-            .bodyIndex = 0,
-            .equatorial = {},
-            .horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 0.0}
+        skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0, .equatorial = {}, .horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 0.0}
         },
-        skygate::ephemeris::CelestialBodyState {
-            .bodyIndex = 1,
-            .equatorial = {},
-            .horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 90.0}
+        skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 1, .equatorial = {}, .horizontal = {.altitudeDeg = 0.0, .azimuthDeg = 90.0}
         }
     };
 
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs {
-        {"Demo", {"HIP_1", "hip_2"}}
-    };
+    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{{"Demo", {"HIP_1", "hip_2"}}};
 
-    const auto center = skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(
-        snapshot,
-        labelRefs,
-        " demo "
-    );
+    const auto center =
+        skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(snapshot, labelRefs, " demo ");
     QVERIFY(center.has_value());
     QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
     QVERIFY(std::abs(center->azimuthDeg - 45.0) < 1e-9);

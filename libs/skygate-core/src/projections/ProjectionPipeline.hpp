@@ -12,11 +12,7 @@ public:
     [[nodiscard]] static ScreenPoint invalidParametersPoint() noexcept;
 
     [[nodiscard]] static ScreenPoint finishCircular(
-        double projectedX,
-        double projectedY,
-        const ProjectionParams& params,
-        double maxRadius,
-        double marginPx = 0.0
+        double projectedX, double projectedY, const ProjectionParams& params, double maxRadius, double marginPx = 0.0
     ) noexcept;
 
     [[nodiscard]] static ScreenPoint finishRectangular(

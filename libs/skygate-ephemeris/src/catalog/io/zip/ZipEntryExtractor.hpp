@@ -10,10 +10,7 @@ namespace skygate::ephemeris {
 
 class ZipEntryExtractor final {
 public:
-    [[nodiscard]] static std::optional<std::string> extract(
-        std::string_view zipData,
-        const ZipEntryMetadata& entry
-    );
+    [[nodiscard]] static std::optional<std::string> extract(std::string_view zipData, const ZipEntryMetadata& entry);
 };
 
 }  // namespace skygate::ephemeris

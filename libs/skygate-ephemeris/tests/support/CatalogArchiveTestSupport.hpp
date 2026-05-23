@@ -27,10 +27,7 @@ inline void appendLe32(std::string& data, const std::uint32_t value)
     appendLe16(data, static_cast<std::uint16_t>((value >> 16U) & 0xffffU));
 }
 
-[[nodiscard]] inline std::string makeZip(
-    const std::vector<ZipEntrySpec>& entries,
-    const std::string_view comment = {}
-)
+[[nodiscard]] inline std::string makeZip(const std::vector<ZipEntrySpec>& entries, const std::string_view comment = {})
 {
     std::string zipData;
     std::vector<std::uint32_t> localHeaderOffsets;
@@ -76,8 +73,7 @@ inline void appendLe32(std::string& data, const std::uint32_t value)
         zipData += entry.path;
     }
 
-    const std::uint32_t centralDirectorySize =
-        static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
+    const std::uint32_t centralDirectorySize = static_cast<std::uint32_t>(zipData.size()) - centralDirectoryOffset;
     appendLe32(zipData, 0x06054b50U);
     appendLe16(zipData, 0U);
     appendLe16(zipData, 0U);

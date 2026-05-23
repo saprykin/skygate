@@ -11,10 +11,8 @@ namespace skygate::ui::tests {
 
 class SettingsTestFixture final {
 public:
-    [[nodiscard]] bool initialize(
-        const QString& applicationName,
-        const QString& organizationName = QStringLiteral("SkygateTests")
-    )
+    [[nodiscard]] bool
+    initialize(const QString& applicationName, const QString& organizationName = QStringLiteral("SkygateTests"))
     {
         if (!m_settingsDir.isValid()) {
             return false;
@@ -42,20 +40,11 @@ public:
         setCatalogCachePaths(filePath(catalogFileName), filePath(deepSkyCatalogFileName));
     }
 
-    void setCatalogCachePaths(
-        const QString& catalogCachePath,
-        const QString& deepSkyCatalogCachePath
-    ) const
+    void setCatalogCachePaths(const QString& catalogCachePath, const QString& deepSkyCatalogCachePath) const
     {
         QSettings settings;
-        settings.setValue(
-            QStringLiteral("skyContext/catalogCachePath"),
-            catalogCachePath
-        );
-        settings.setValue(
-            QStringLiteral("skyContext/deepSkyCatalogCachePath"),
-            deepSkyCatalogCachePath
-        );
+        settings.setValue(QStringLiteral("skyContext/catalogCachePath"), catalogCachePath);
+        settings.setValue(QStringLiteral("skyContext/deepSkyCatalogCachePath"), deepSkyCatalogCachePath);
     }
 
     void resetSettingsWithCatalogCachePaths(

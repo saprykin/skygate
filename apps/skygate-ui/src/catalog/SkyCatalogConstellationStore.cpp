@@ -11,9 +11,7 @@ void SkyCatalogConstellationStore::clear()
     m_count = 0;
 }
 
-void SkyCatalogConstellationStore::setLineRefs(
-    std::vector<ConstellationLineRef> lineRefs
-)
+void SkyCatalogConstellationStore::setLineRefs(std::vector<ConstellationLineRef> lineRefs)
 {
     if (lineRefs.empty()) {
         clear();
@@ -23,9 +21,7 @@ void SkyCatalogConstellationStore::setLineRefs(
     m_lineRefs = std::move(lineRefs);
 }
 
-void SkyCatalogConstellationStore::setLabelRefs(
-    std::vector<ConstellationLabelRef> labelRefs
-)
+void SkyCatalogConstellationStore::setLabelRefs(std::vector<ConstellationLabelRef> labelRefs)
 {
     m_labelRefs = std::move(labelRefs);
 }

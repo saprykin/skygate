@@ -27,17 +27,11 @@ void LocationCatalogModelTests::filtersByCityAndCountry()
 
     model.setFilterText("zurich");
     QCOMPARE(model.rowCount(), 2);
-    QCOMPARE(
-        model.index(1, 0).data(LocationCatalogModel::CityIdRole).toString(),
-        QString("ch-zurich")
-    );
+    QCOMPARE(model.index(1, 0).data(LocationCatalogModel::CityIdRole).toString(), QString("ch-zurich"));
 
     model.setFilterText("switzerland");
     QVERIFY(model.rowCount() >= 3);
-    QCOMPARE(
-        model.index(0, 0).data(LocationCatalogModel::DisplayTextRole).toString(),
-        QString("Switzerland")
-    );
+    QCOMPARE(model.index(0, 0).data(LocationCatalogModel::DisplayTextRole).toString(), QString("Switzerland"));
 }
 
 void LocationCatalogModelTests::groupsFilteredRowsByCountry()
@@ -45,14 +39,8 @@ void LocationCatalogModelTests::groupsFilteredRowsByCountry()
     LocationCatalogModel model;
 
     model.setFilterText("switzerland");
-    QCOMPARE(
-        model.index(0, 0).data(LocationCatalogModel::RowKindRole).toString(),
-        QString("countryHeader")
-    );
-    QCOMPARE(
-        model.index(1, 0).data(LocationCatalogModel::RowKindRole).toString(),
-        QString("city")
-    );
+    QCOMPARE(model.index(0, 0).data(LocationCatalogModel::RowKindRole).toString(), QString("countryHeader"));
+    QCOMPARE(model.index(1, 0).data(LocationCatalogModel::RowKindRole).toString(), QString("city"));
     QVERIFY(model.index(0, 0).data(LocationCatalogModel::SelectableRole).toBool() == false);
     QVERIFY(model.index(1, 0).data(LocationCatalogModel::SelectableRole).toBool());
 }
@@ -78,10 +66,7 @@ void LocationCatalogModelTests::includesRussiaAndMoscow()
 
     model.setFilterText("russia");
     QVERIFY(model.rowCount() >= 4);
-    QCOMPARE(
-        model.index(0, 0).data(LocationCatalogModel::DisplayTextRole).toString(),
-        QString("Russia")
-    );
+    QCOMPARE(model.index(0, 0).data(LocationCatalogModel::DisplayTextRole).toString(), QString("Russia"));
 
     const auto cityEntry = model.entryForCityId("ru-moscow");
     QVERIFY(cityEntry.has_value());

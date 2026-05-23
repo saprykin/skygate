@@ -8,14 +8,8 @@
 
 namespace skygate::ephemeris::catalog_identity {
 
-[[nodiscard]] bool containsBodyId(
-    std::span<const CelestialBody> bodies,
-    std::string_view id
-);
-[[nodiscard]] bool sharesDeepSkyAlias(
-    const CelestialBody& lhs,
-    const CelestialBody& rhs
-);
+[[nodiscard]] bool containsBodyId(std::span<const CelestialBody> bodies, std::string_view id);
+[[nodiscard]] bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs);
 [[nodiscard]] bool isAnalyticSolarSystemBody(const CelestialBody& body) noexcept;
 [[nodiscard]] std::size_t countDeepSkyObjects(std::span<const CelestialBody> bodies);
 

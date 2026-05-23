@@ -17,15 +17,10 @@ constexpr std::size_t kZIndex = 2;
 
 double SphericalGeometry::dot(const Vector3d& lhs, const Vector3d& rhs) noexcept
 {
-    return (lhs[kXIndex] * rhs[kXIndex])
-        + (lhs[kYIndex] * rhs[kYIndex])
-        + (lhs[kZIndex] * rhs[kZIndex]);
+    return (lhs[kXIndex] * rhs[kXIndex]) + (lhs[kYIndex] * rhs[kYIndex]) + (lhs[kZIndex] * rhs[kZIndex]);
 }
 
-SphericalGeometry::Vector3d SphericalGeometry::cross(
-    const Vector3d& lhs,
-    const Vector3d& rhs
-) noexcept
+SphericalGeometry::Vector3d SphericalGeometry::cross(const Vector3d& lhs, const Vector3d& rhs) noexcept
 {
     return {
         (lhs[kYIndex] * rhs[kZIndex]) - (lhs[kZIndex] * rhs[kYIndex]),
@@ -46,33 +41,20 @@ SphericalGeometry::Vector3d SphericalGeometry::normalize(const Vector3d& vector)
         return {};
     }
 
-    return {
-        vector[kXIndex] / vectorLength,
-        vector[kYIndex] / vectorLength,
-        vector[kZIndex] / vectorLength
-    };
+    return {vector[kXIndex] / vectorLength, vector[kYIndex] / vectorLength, vector[kZIndex] / vectorLength};
 }
 
-SphericalGeometry::Vector3d SphericalGeometry::horizontalToUnitVector(
-    const HorizontalCoordinate& coordinate
-) noexcept
+SphericalGeometry::Vector3d SphericalGeometry::horizontalToUnitVector(const HorizontalCoordinate& coordinate) noexcept
 {
     const double altitudeRad = AngleMath::toRadians(coordinate.altitudeDeg);
     const double azimuthRad = AngleMath::toRadians(coordinate.azimuthDeg);
 
     const double cosAltitude = std::cos(altitudeRad);
-    return {
-        cosAltitude * std::sin(azimuthRad),
-        cosAltitude * std::cos(azimuthRad),
-        std::sin(altitudeRad)
-    };
+    return {cosAltitude * std::sin(azimuthRad), cosAltitude * std::cos(azimuthRad), std::sin(altitudeRad)};
 }
 
 bool SphericalGeometry::tryBuildProjectionBasis(
-    const HorizontalCoordinate& centerCoordinate,
-    Vector3d& center,
-    Vector3d& right,
-    Vector3d& up
+    const HorizontalCoordinate& centerCoordinate, Vector3d& center, Vector3d& right, Vector3d& up
 ) noexcept
 {
     if (!centerCoordinate.isValid()) {
@@ -88,21 +70,9 @@ bool SphericalGeometry::tryBuildProjectionBasis(
     const double sinAzimuth = std::sin(azimuthRad);
     const double cosAzimuth = std::cos(azimuthRad);
 
-    center = {
-        cosAltitude * sinAzimuth,
-        cosAltitude * cosAzimuth,
-        sinAltitude
-    };
-    right = {
-        -cosAzimuth,
-        sinAzimuth,
-        0.0
-    };
-    up = {
-        -sinAltitude * sinAzimuth,
-        -sinAltitude * cosAzimuth,
-        cosAltitude
-    };
+    center = {cosAltitude * sinAzimuth, cosAltitude * cosAzimuth, sinAltitude};
+    right = {-cosAzimuth, sinAzimuth, 0.0};
+    up = {-sinAltitude * sinAzimuth, -sinAltitude * cosAzimuth, cosAltitude};
     return true;
 }
 

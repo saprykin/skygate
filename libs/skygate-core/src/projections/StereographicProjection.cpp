@@ -9,10 +9,8 @@ ProjectionType StereographicProjection::type() const noexcept
     return ProjectionType::Stereographic;
 }
 
-ScreenPoint StereographicProjection::project(
-    const HorizontalCoordinate& coordinate,
-    const ProjectionParams& params
-) const noexcept
+ScreenPoint
+StereographicProjection::project(const HorizontalCoordinate& coordinate, const ProjectionParams& params) const noexcept
 {
     return ProjectionAlgorithms::project(type(), coordinate, params);
 }

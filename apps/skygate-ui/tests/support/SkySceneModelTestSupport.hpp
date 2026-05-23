@@ -36,10 +36,7 @@ inline bool overlayItemsContainText(const QVariantList& overlayItems, const QStr
     return false;
 }
 
-inline bool overlayItemsContainText(
-    const std::vector<SkyRenderLabel>& overlayItems,
-    const QString& text
-)
+inline bool overlayItemsContainText(const std::vector<SkyRenderLabel>& overlayItems, const QString& text)
 {
     for (const SkyRenderLabel& overlayItem : overlayItems) {
         if (overlayItem.text == text) {
@@ -81,28 +78,18 @@ inline SkyRenderFrame buildDeepSkyRenderFrame(
 )
 {
     skygate::ephemeris::SkySnapshot snapshot;
-    auto catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(
-        std::move(bodies)
-    );
+    auto catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
     snapshot.catalogBodies = catalogBodies;
     for (std::uint32_t index = 0; index < catalogBodies->size(); ++index) {
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState {
-            .bodyIndex = index,
-            .horizontal = horizontalCoordinates.at(index)
-        });
+        snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState{.bodyIndex = index, .horizontal = horizontalCoordinates.at(index)}
+        );
     }
 
-    const auto projectionParams = skygate::core::ViewportMath::buildProjectionParams(
-        1000.0,
-        700.0,
-        45.0,
-        180.0,
-        fovDeg
-    );
-    const auto projection = skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::Stereographic,
-        projectionParams
-    );
+    const auto projectionParams =
+        skygate::core::ViewportMath::buildProjectionParams(1000.0, 700.0, 45.0, 180.0, fovDeg);
+    const auto projection =
+        skygate::core::PreparedProjection::create(skygate::core::ProjectionType::Stereographic, projectionParams);
     Q_ASSERT(projection.has_value());
 
     const skygate::ui::internal::SkyThemeRepository themeRepository;
@@ -116,7 +103,7 @@ inline SkyRenderFrame buildDeepSkyRenderFrame(
         1000.0,
         700.0,
         themeRepository.defaultTheme().render,
-        SkyOverlayLayerVisibility {}
+        SkyOverlayLayerVisibility{}
     );
 }
 

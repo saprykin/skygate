@@ -8,9 +8,7 @@ namespace skygate::ephemeris {
 
 class CatalogZipEntrySelector final {
 public:
-    [[nodiscard]] static const ZipEntryMetadata* selectFirstCsvEntry(
-        std::span<const ZipEntryMetadata> entries
-    );
+    [[nodiscard]] static const ZipEntryMetadata* selectFirstCsvEntry(std::span<const ZipEntryMetadata> entries);
 };
 
 }  // namespace skygate::ephemeris

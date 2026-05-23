@@ -47,13 +47,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const SkyConstellationRenderBuilder constellationBuilder;
     if (horizontalLookup.has_value() && overlayLayers.constellationLines) {
         constellationBuilder.appendLines(
-            frame,
-            *horizontalLookup,
-            projection,
-            lineRefs,
-            viewportWidth,
-            viewportHeight,
-            renderTheme
+            frame, *horizontalLookup, projection, lineRefs, viewportWidth, viewportHeight, renderTheme
         );
     }
 
@@ -63,15 +57,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     skygate::core::RectOccupancyGrid labelGrid(72.0);
 
     appendBodyPointLabels(
-        frame,
-        snapshot,
-        viewportWidth,
-        viewportHeight,
-        renderTheme,
-        overlayLayers,
-        kEdgeMarginPx,
-        seenLabels,
-        labelGrid
+        frame, snapshot, viewportWidth, viewportHeight, renderTheme, overlayLayers, kEdgeMarginPx, seenLabels, labelGrid
     );
 
     if (overlayLayers.deepSkyLabels) {

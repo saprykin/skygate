@@ -28,12 +28,12 @@ private slots:
 
 void PreparedProjectionTests::matchesDirectProjectionForAllProjectionTypes()
 {
-    const std::array<skygate::core::ProjectionType, 3> projectionTypes {
+    const std::array<skygate::core::ProjectionType, 3> projectionTypes{
         skygate::core::ProjectionType::Stereographic,
         skygate::core::ProjectionType::AzimuthalEquidistant,
         skygate::core::ProjectionType::Perspective
     };
-    const std::array<skygate::core::HorizontalCoordinate, 5> sampleCoordinates {{
+    const std::array<skygate::core::HorizontalCoordinate, 5> sampleCoordinates{{
         {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         {.altitudeDeg = 60.0, .azimuthDeg = 150.0},
         {.altitudeDeg = 25.0, .azimuthDeg = 210.0},
@@ -41,7 +41,7 @@ void PreparedProjectionTests::matchesDirectProjectionForAllProjectionTypes()
         {.altitudeDeg = -15.0, .azimuthDeg = 310.0},
     }};
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         .fovDeg = 100.0,
         .rollDeg = 12.5,
@@ -53,8 +53,7 @@ void PreparedProjectionTests::matchesDirectProjectionForAllProjectionTypes()
         const auto projection = skygate::core::createProjection(projectionType);
         QVERIFY(projection != nullptr);
 
-        const auto preparedProjection =
-            skygate::core::PreparedProjection::create(projectionType, params);
+        const auto preparedProjection = skygate::core::PreparedProjection::create(projectionType, params);
         QVERIFY(preparedProjection.has_value());
 
         for (const auto& coordinate : sampleCoordinates) {
@@ -71,7 +70,7 @@ void PreparedProjectionTests::matchesDirectProjectionForAllProjectionTypes()
 
 void PreparedProjectionTests::rejectsInvalidProjectionParams()
 {
-    skygate::core::ProjectionParams params {
+    skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         .fovDeg = 90.0,
         .rollDeg = 0.0,
@@ -80,31 +79,25 @@ void PreparedProjectionTests::rejectsInvalidProjectionParams()
     };
 
     params.fovDeg = skygate::core::ProjectionParams::kFieldOfViewMinDeg - 0.1;
-    QVERIFY(!skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::Stereographic,
-        params
-    ).has_value());
+    QVERIFY(
+        !skygate::core::PreparedProjection::create(skygate::core::ProjectionType::Stereographic, params).has_value()
+    );
 
     params.fovDeg = 90.0;
     params.viewportWidth = 0.0;
-    QVERIFY(!skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::Perspective,
-        params
-    ).has_value());
+    QVERIFY(!skygate::core::PreparedProjection::create(skygate::core::ProjectionType::Perspective, params).has_value());
 
     params.viewportWidth = 1280.0;
     params.center.altitudeDeg = 91.0;
-    QVERIFY(!skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::AzimuthalEquidistant,
-        params
-    ).has_value());
+    QVERIFY(!skygate::core::PreparedProjection::create(skygate::core::ProjectionType::AzimuthalEquidistant, params)
+                 .has_value());
 }
 
 void PreparedProjectionTests::normalizesStoredCenterAzimuth()
 {
     const auto preparedProjection = skygate::core::PreparedProjection::create(
         skygate::core::ProjectionType::Stereographic,
-        skygate::core::ProjectionParams {
+        skygate::core::ProjectionParams{
             .center = {.altitudeDeg = 10.0, .azimuthDeg = -45.0},
             .fovDeg = 90.0,
             .rollDeg = 15.0,
@@ -120,17 +113,15 @@ void PreparedProjectionTests::normalizesStoredCenterAzimuth()
 
 void PreparedProjectionTests::reportsTypeAndStoredParams()
 {
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 10.0, .azimuthDeg = 20.0},
         .fovDeg = 75.0,
         .rollDeg = 12.5,
         .viewportWidth = 900.0,
         .viewportHeight = 500.0,
     };
-    const auto preparedProjection = skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::Perspective,
-        params
-    );
+    const auto preparedProjection =
+        skygate::core::PreparedProjection::create(skygate::core::ProjectionType::Perspective, params);
 
     QVERIFY(preparedProjection.has_value());
     QCOMPARE(preparedProjection->type(), skygate::core::ProjectionType::Perspective);
@@ -142,27 +133,21 @@ void PreparedProjectionTests::reportsTypeAndStoredParams()
 
 void PreparedProjectionTests::matchesDirectInvalidCoordinateStatus()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 45.0, .azimuthDeg = 180.0},
         .fovDeg = 100.0,
         .rollDeg = 0.0,
         .viewportWidth = 1280.0,
         .viewportHeight = 720.0,
     };
-    const auto preparedProjection = skygate::core::PreparedProjection::create(
-        skygate::core::ProjectionType::AzimuthalEquidistant,
-        params
-    );
+    const auto preparedProjection =
+        skygate::core::PreparedProjection::create(skygate::core::ProjectionType::AzimuthalEquidistant, params);
     QVERIFY(preparedProjection.has_value());
 
-    const skygate::core::HorizontalCoordinate invalidCoordinate {
-        .altitudeDeg = -95.0,
-        .azimuthDeg = 180.0
-    };
+    const skygate::core::HorizontalCoordinate invalidCoordinate{.altitudeDeg = -95.0, .azimuthDeg = 180.0};
     const auto directPoint = projection->project(invalidCoordinate, params);
     const auto preparedPoint = preparedProjection->project(invalidCoordinate);
 

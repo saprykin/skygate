@@ -106,10 +106,7 @@ QString bodyDetailText(const skygate::ephemeris::CelestialBody& body)
 
 }  // namespace
 
-SkyObjectSearchModel::SkyObjectSearchModel(QObject* parent)
-    : QAbstractListModel(parent)
-{
-}
+SkyObjectSearchModel::SkyObjectSearchModel(QObject* parent) : QAbstractListModel(parent) {}
 
 int SkyObjectSearchModel::rowCount(const QModelIndex& parent) const
 {
@@ -203,11 +200,7 @@ void SkyObjectSearchModel::setCatalogData(
             return false;
         }
 
-        const int displayCompare = QString::compare(
-            candidate.displayText,
-            existing.displayText,
-            Qt::CaseInsensitive
-        );
+        const int displayCompare = QString::compare(candidate.displayText, existing.displayText, Qt::CaseInsensitive);
         if (displayCompare != 0) {
             return displayCompare < 0;
         }
@@ -244,18 +237,19 @@ void SkyObjectSearchModel::setCatalogData(
         }
 
         const QString targetId = QString::fromStdString(body.id);
-        upsertEntry(SourceEntry {
-            .displayText = QString::fromStdString(body.displayName),
-            .detailText = bodyDetailText(body),
-            .targetKind = "body",
-            .targetId = targetId,
-            .brightnessMagnitude = body.visualMagnitude,
-            .selectable = true,
-            .isBody = true,
-        });
+        upsertEntry(
+            SourceEntry{
+                .displayText = QString::fromStdString(body.displayName),
+                .detailText = bodyDetailText(body),
+                .targetKind = "body",
+                .targetId = targetId,
+                .brightnessMagnitude = body.visualMagnitude,
+                .selectable = true,
+                .isBody = true,
+            }
+        );
 
-        if (body.type != skygate::ephemeris::CelestialBodyType::DeepSkyObject
-            || !body.deepSkyObject.has_value()) {
+        if (body.type != skygate::ephemeris::CelestialBodyType::DeepSkyObject || !body.deepSkyObject.has_value()) {
             continue;
         }
 
@@ -264,15 +258,17 @@ void SkyObjectSearchModel::setCatalogData(
                 continue;
             }
 
-            upsertEntry(SourceEntry {
-                .displayText = QString::fromStdString(alias),
-                .detailText = bodyDetailText(body),
-                .targetKind = "body",
-                .targetId = targetId,
-                .brightnessMagnitude = body.visualMagnitude,
-                .selectable = true,
-                .isBody = true,
-            });
+            upsertEntry(
+                SourceEntry{
+                    .displayText = QString::fromStdString(alias),
+                    .detailText = bodyDetailText(body),
+                    .targetKind = "body",
+                    .targetId = targetId,
+                    .brightnessMagnitude = body.visualMagnitude,
+                    .selectable = true,
+                    .isBody = true,
+                }
+            );
         }
     }
 
@@ -292,15 +288,17 @@ void SkyObjectSearchModel::setCatalogData(
             continue;
         }
 
-        upsertEntry(SourceEntry {
-            .displayText = QString::fromStdString(labelRef.first),
-            .detailText = "Constellation",
-            .targetKind = "constellationLabel",
-            .targetId = QString::fromStdString(labelRef.first),
-            .brightnessMagnitude = 99.0,
-            .selectable = true,
-            .isBody = false,
-        });
+        upsertEntry(
+            SourceEntry{
+                .displayText = QString::fromStdString(labelRef.first),
+                .detailText = "Constellation",
+                .targetKind = "constellationLabel",
+                .targetId = QString::fromStdString(labelRef.first),
+                .brightnessMagnitude = 99.0,
+                .selectable = true,
+                .isBody = false,
+            }
+        );
     }
 
     endResetModel();
@@ -322,28 +320,23 @@ void SkyObjectSearchModel::rebuildRows()
     for (int sourceIndex = 0; sourceIndex < m_sourceEntries.size(); ++sourceIndex) {
         const SourceEntry& entry = m_sourceEntries.at(sourceIndex);
         int entryMatchRank = -1;
-        const bool matchesExactName =
-            entry.displayKey == filterKey || entry.compactDisplayKey == compactFilterKey;
+        const bool matchesExactName = entry.displayKey == filterKey || entry.compactDisplayKey == compactFilterKey;
         if (matchesExactName) {
             entryMatchRank = 0;
         } else {
             const bool matchesPrefixName =
-                entry.displayKey.startsWith(filterKey)
-                || entry.compactDisplayKey.startsWith(compactFilterKey);
+                entry.displayKey.startsWith(filterKey) || entry.compactDisplayKey.startsWith(compactFilterKey);
             if (matchesPrefixName) {
                 entryMatchRank = 1;
             } else {
                 const bool matchesPrefixId =
-                    entry.targetIdKey.startsWith(filterKey)
-                    || entry.compactTargetIdKey.startsWith(compactFilterKey);
+                    entry.targetIdKey.startsWith(filterKey) || entry.compactTargetIdKey.startsWith(compactFilterKey);
                 if (matchesPrefixId) {
                     entryMatchRank = 2;
                 } else {
                     const bool matchesContains =
-                        entry.displayKey.contains(filterKey)
-                        || entry.compactDisplayKey.contains(compactFilterKey)
-                        || entry.targetIdKey.contains(filterKey)
-                        || entry.compactTargetIdKey.contains(compactFilterKey);
+                        entry.displayKey.contains(filterKey) || entry.compactDisplayKey.contains(compactFilterKey)
+                        || entry.targetIdKey.contains(filterKey) || entry.compactTargetIdKey.contains(compactFilterKey);
                     if (matchesContains) {
                         entryMatchRank = 3;
                     }
@@ -355,10 +348,12 @@ void SkyObjectSearchModel::rebuildRows()
             continue;
         }
 
-        m_rows.push_back(Row {
-            .sourceIndex = sourceIndex,
-            .matchRank = entryMatchRank,
-        });
+        m_rows.push_back(
+            Row{
+                .sourceIndex = sourceIndex,
+                .matchRank = entryMatchRank,
+            }
+        );
     }
 
     std::sort(m_rows.begin(), m_rows.end(), [this](const Row& lhs, const Row& rhs) {
@@ -372,11 +367,7 @@ void SkyObjectSearchModel::rebuildRows()
             return lhsEntry.brightnessMagnitude < rhsEntry.brightnessMagnitude;
         }
 
-        const int displayCompare = QString::compare(
-            lhsEntry.displayText,
-            rhsEntry.displayText,
-            Qt::CaseInsensitive
-        );
+        const int displayCompare = QString::compare(lhsEntry.displayText, rhsEntry.displayText, Qt::CaseInsensitive);
         if (displayCompare != 0) {
             return displayCompare < 0;
         }

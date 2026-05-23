@@ -38,10 +38,10 @@ void SkyCatalogCacheControllerTests::init()
 
 SkySettingsStore::CatalogCacheSnapshot SkyCatalogCacheControllerTests::makeValidCacheSnapshot() const
 {
-    return skygate::ui::tests::sampleCatalogCacheSnapshot({
-        .sourceLabel = QStringLiteral("Downloaded (saved) (saved)"),
-        .deepSkySourceLabel = QStringLiteral("OpenNGC (saved)")
-    });
+    return skygate::ui::tests::sampleCatalogCacheSnapshot(
+        {.sourceLabel = QStringLiteral("Downloaded (saved) (saved)"),
+         .deepSkySourceLabel = QStringLiteral("OpenNGC (saved)")}
+    );
 }
 
 void SkyCatalogCacheControllerTests::restoresSavedCatalogsAndConstellationLabels()
@@ -77,10 +77,7 @@ void SkyCatalogCacheControllerTests::unreadableSavedStarCatalogFallsBack()
     QVERIFY(store.saveCatalogCache(snapshot));
 
     const skygate::ui::internal::SkyCatalogCacheController controller(&store);
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Catalog payload parse failed: Catalog payload format is not recognized."
-    );
+    QTest::ignoreMessage(QtWarningMsg, "Catalog payload parse failed: Catalog payload format is not recognized.");
     QTest::ignoreMessage(
         QtWarningMsg,
         "Saved star catalog cache unreadable; using bundled catalog: Catalog payload format is not recognized."
@@ -117,13 +114,9 @@ void SkyCatalogCacheControllerTests::persistRoundTripsConstellationRows()
 
     skygate::ui::internal::SkyCatalogCachePersistRequest request;
     request.sourceLabel = "Custom";
-    request.catalogPayload = skygate::ui::tests::sampleHygCsvPayload({
-        .hip = 11,
-        .properName = "Alpha",
-        .ra = "1.0",
-        .dec = "2.0",
-        .mag = "3.0"
-    });
+    request.catalogPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.hip = 11, .properName = "Alpha", .ra = "1.0", .dec = "2.0", .mag = "3.0"}
+    );
     request.constellationLineRefs = {{"hip_a", "hip_b"}};
     request.constellationLabelRefs = {{"Label", {"hip_a", "hip_b", "hip_c"}}};
     request.constellationCount = 12;

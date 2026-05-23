@@ -43,9 +43,7 @@ public:
     void setFilterText(const QString& filterText);
 
     [[nodiscard]] bool hasCityId(const QString& cityId) const;
-    [[nodiscard]] std::optional<LocationCatalogEntry> entryForCityId(
-        const QString& cityId
-    ) const;
+    [[nodiscard]] std::optional<LocationCatalogEntry> entryForCityId(const QString& cityId) const;
 
 signals:
     void filterTextChanged();

@@ -32,7 +32,7 @@ std::optional<double> parseFiniteDouble(const QStringView text)
 
 std::optional<double> parseFiniteDouble(const QString& text)
 {
-    return parseFiniteDouble(QStringView {text});
+    return parseFiniteDouble(QStringView{text});
 }
 
 std::optional<double> parsePositiveDouble(const QStringView text)
@@ -46,7 +46,7 @@ std::optional<double> parsePositiveDouble(const QStringView text)
 
 std::optional<double> parsePositiveDouble(const QString& text)
 {
-    return parsePositiveDouble(QStringView {text});
+    return parsePositiveDouble(QStringView{text});
 }
 
 std::optional<double> parseNonNegativeDouble(const QStringView text)
@@ -60,7 +60,7 @@ std::optional<double> parseNonNegativeDouble(const QStringView text)
 
 std::optional<double> parseNonNegativeDouble(const QString& text)
 {
-    return parseNonNegativeDouble(QStringView {text});
+    return parseNonNegativeDouble(QStringView{text});
 }
 
 std::optional<double> parseRightAscensionHours(QString text)

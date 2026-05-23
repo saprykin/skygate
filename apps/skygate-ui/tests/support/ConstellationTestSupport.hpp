@@ -39,12 +39,7 @@ namespace skygate::ui::tests {
 
 [[nodiscard]] inline std::vector<skygate::ephemeris::ConstellationLabelRef> orionLabelRefs()
 {
-    return {
-        {
-            "Orion",
-            {"hip_27989", "hip_25336", "hip_25930", "hip_26311", "hip_26727", "hip_24436"}
-        }
-    };
+    return {{"Orion", {"hip_27989", "hip_25336", "hip_25930", "hip_26311", "hip_26727", "hip_24436"}}};
 }
 
 [[nodiscard]] inline bool seedOrionConstellationCache()

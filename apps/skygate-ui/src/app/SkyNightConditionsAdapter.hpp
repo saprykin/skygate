@@ -7,9 +7,7 @@
 
 class SkyNightConditionsAdapter final {
 public:
-    [[nodiscard]] QVariantMap nightConditions(
-        const SkyNightConditionsData& conditions
-    ) const
+    [[nodiscard]] QVariantMap nightConditions(const SkyNightConditionsData& conditions) const
     {
         QVariantList sunRows;
         sunRows.reserve(static_cast<qsizetype>(conditions.sunRows.size()));

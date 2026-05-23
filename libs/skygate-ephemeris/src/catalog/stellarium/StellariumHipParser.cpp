@@ -48,12 +48,8 @@ std::optional<int> StellariumHipParser::parseHipIdentifier(const QJsonValue& val
 {
     if (value.isDouble()) {
         const double numericValue = value.toDouble();
-        if (
-            std::isfinite(numericValue)
-            && numericValue > 0.0
-            && std::floor(numericValue) == numericValue
-            && numericValue <= static_cast<double>(std::numeric_limits<int>::max())
-        ) {
+        if (std::isfinite(numericValue) && numericValue > 0.0 && std::floor(numericValue) == numericValue
+            && numericValue <= static_cast<double>(std::numeric_limits<int>::max())) {
             return static_cast<int>(numericValue);
         }
         return std::nullopt;
@@ -88,9 +84,7 @@ std::optional<int> StellariumHipParser::parseHipIdentifier(const QJsonValue& val
     return std::nullopt;
 }
 
-std::optional<std::vector<int>> StellariumHipParser::parseHipPolyline(
-    const QJsonArray& array
-)
+std::optional<std::vector<int>> StellariumHipParser::parseHipPolyline(const QJsonArray& array)
 {
     if (array.size() < 2) {
         return std::nullopt;
@@ -109,10 +103,7 @@ std::optional<std::vector<int>> StellariumHipParser::parseHipPolyline(
     return hips;
 }
 
-void StellariumHipParser::collectHipPolylines(
-    const QJsonValue& value,
-    std::vector<std::vector<int>>& polylines
-)
+void StellariumHipParser::collectHipPolylines(const QJsonValue& value, std::vector<std::vector<int>>& polylines)
 {
     if (value.isArray()) {
         const QJsonArray array = value.toArray();

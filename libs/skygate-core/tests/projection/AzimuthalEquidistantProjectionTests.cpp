@@ -44,8 +44,7 @@ private slots:
 
 void AzimuthalEquidistantProjectionTests::centerDirectionMapsToScreenCenter()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
     const skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
@@ -59,11 +58,10 @@ void AzimuthalEquidistantProjectionTests::centerDirectionMapsToScreenCenter()
 
 void AzimuthalEquidistantProjectionTests::radialDistanceIsLinearWithAngularDistance()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 120.0,
         .rollDeg = 0.0,
@@ -71,10 +69,7 @@ void AzimuthalEquidistantProjectionTests::radialDistanceIsLinearWithAngularDista
         .viewportHeight = 1000.0,
     };
 
-    const auto projectedPoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 330.0},
-        params
-    );
+    const auto projectedPoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 330.0}, params);
     QVERIFY(projectedPoint.isVisible);
 
     const double centerX = params.viewportWidth * 0.5;
@@ -86,15 +81,11 @@ void AzimuthalEquidistantProjectionTests::radialDistanceIsLinearWithAngularDista
 
 void AzimuthalEquidistantProjectionTests::oppositeDirectionIsHidden()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
     const skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
-    const auto oppositePoint = projection->project(
-        {.altitudeDeg = -45.0, .azimuthDeg = 0.0},
-        params
-    );
+    const auto oppositePoint = projection->project({.altitudeDeg = -45.0, .azimuthDeg = 0.0}, params);
 
     QVERIFY(!oppositePoint.isVisible);
     QCOMPARE(oppositePoint.status, skygate::core::ProjectionStatus::Culled);
@@ -102,8 +93,7 @@ void AzimuthalEquidistantProjectionTests::oppositeDirectionIsHidden()
 
 void AzimuthalEquidistantProjectionTests::invalidParamsAreRejected()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
     skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
@@ -140,15 +130,11 @@ void AzimuthalEquidistantProjectionTests::invalidParamsAreRejected()
 
 void AzimuthalEquidistantProjectionTests::invalidCoordinateIsRejected()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
     const skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
-    const auto invalidCoordinatePoint = projection->project(
-        {.altitudeDeg = 95.0, .azimuthDeg = 0.0},
-        params
-    );
+    const auto invalidCoordinatePoint = projection->project({.altitudeDeg = 95.0, .azimuthDeg = 0.0}, params);
 
     QVERIFY(!invalidCoordinatePoint.isVisible);
     QCOMPARE(invalidCoordinatePoint.status, skygate::core::ProjectionStatus::InvalidCoordinate);
@@ -156,8 +142,7 @@ void AzimuthalEquidistantProjectionTests::invalidCoordinateIsRejected()
 
 void AzimuthalEquidistantProjectionTests::legalFovBoundaryValuesAreAccepted()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
     skygate::core::ProjectionParams params = makeDefaultAzimuthalParams();
@@ -175,11 +160,10 @@ void AzimuthalEquidistantProjectionTests::legalFovBoundaryValuesAreAccepted()
 
 void AzimuthalEquidistantProjectionTests::directionAtCircularFovEdgeIsVisible()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 60.0,
         .rollDeg = 0.0,
@@ -187,28 +171,21 @@ void AzimuthalEquidistantProjectionTests::directionAtCircularFovEdgeIsVisible()
         .viewportHeight = 1000.0,
     };
 
-    const auto edgePoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 30.0},
-        params
-    );
+    const auto edgePoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 30.0}, params);
     QVERIFY(edgePoint.isVisible);
     QCOMPARE(edgePoint.status, skygate::core::ProjectionStatus::Visible);
 
-    const auto outsidePoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 30.25},
-        params
-    );
+    const auto outsidePoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 30.25}, params);
     QVERIFY(!outsidePoint.isVisible);
     QCOMPARE(outsidePoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void AzimuthalEquidistantProjectionTests::directionOutsideFovIsHidden()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 20.0,
         .rollDeg = 0.0,
@@ -216,22 +193,18 @@ void AzimuthalEquidistantProjectionTests::directionOutsideFovIsHidden()
         .viewportHeight = 1000.0,
     };
 
-    const auto outsideFovPoint = projection->project(
-        {.altitudeDeg = 0.0, .azimuthDeg = 50.0},
-        params
-    );
+    const auto outsideFovPoint = projection->project({.altitudeDeg = 0.0, .azimuthDeg = 50.0}, params);
     QVERIFY(!outsideFovPoint.isVisible);
     QCOMPARE(outsideFovPoint.status, skygate::core::ProjectionStatus::Culled);
 }
 
 void AzimuthalEquidistantProjectionTests::rollRotatesProjectedPoint()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::HorizontalCoordinate target {.altitudeDeg = 10.0, .azimuthDeg = 10.0};
-    const skygate::core::ProjectionParams baseParams {
+    const skygate::core::HorizontalCoordinate target{.altitudeDeg = 10.0, .azimuthDeg = 10.0};
+    const skygate::core::ProjectionParams baseParams{
         .center = {.altitudeDeg = 0.0, .azimuthDeg = 0.0},
         .fovDeg = 120.0,
         .rollDeg = 0.0,
@@ -260,11 +233,10 @@ void AzimuthalEquidistantProjectionTests::rollRotatesProjectedPoint()
 
 void AzimuthalEquidistantProjectionTests::zenithCenterIsSupported()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::ProjectionParams params {
+    const skygate::core::ProjectionParams params{
         .center = {.altitudeDeg = 90.0, .azimuthDeg = 0.0},
         .fovDeg = 90.0,
         .rollDeg = 0.0,
@@ -281,19 +253,18 @@ void AzimuthalEquidistantProjectionTests::zenithCenterIsSupported()
 
 void AzimuthalEquidistantProjectionTests::zenithOrientationRemainsContinuous()
 {
-    const auto projection =
-        skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
+    const auto projection = skygate::core::createProjection(skygate::core::ProjectionType::AzimuthalEquidistant);
     QVERIFY(projection != nullptr);
 
-    const skygate::core::HorizontalCoordinate target {.altitudeDeg = 89.0, .azimuthDeg = 0.0};
-    const skygate::core::ProjectionParams nearPoleParams {
+    const skygate::core::HorizontalCoordinate target{.altitudeDeg = 89.0, .azimuthDeg = 0.0};
+    const skygate::core::ProjectionParams nearPoleParams{
         .center = {.altitudeDeg = 89.999, .azimuthDeg = 90.0},
         .fovDeg = 60.0,
         .rollDeg = 0.0,
         .viewportWidth = 1000.0,
         .viewportHeight = 1000.0,
     };
-    const skygate::core::ProjectionParams poleParams {
+    const skygate::core::ProjectionParams poleParams{
         .center = {.altitudeDeg = 90.0, .azimuthDeg = 90.0},
         .fovDeg = 60.0,
         .rollDeg = 0.0,

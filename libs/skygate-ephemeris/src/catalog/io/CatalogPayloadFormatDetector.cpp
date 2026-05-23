@@ -48,13 +48,9 @@ bool hasZipSignature(const std::string_view payload) noexcept
     const auto secondByte = static_cast<unsigned char>(payload[1]);
     const auto thirdByte = static_cast<unsigned char>(payload[2]);
     const auto fourthByte = static_cast<unsigned char>(payload[3]);
-    return firstByte == 0x50U
-        && secondByte == 0x4bU
-        && (
-            (thirdByte == 0x03U && fourthByte == 0x04U)
-            || (thirdByte == 0x05U && fourthByte == 0x06U)
-            || (thirdByte == 0x07U && fourthByte == 0x08U)
-        );
+    return firstByte == 0x50U && secondByte == 0x4bU
+           && ((thirdByte == 0x03U && fourthByte == 0x04U) || (thirdByte == 0x05U && fourthByte == 0x06U)
+               || (thirdByte == 0x07U && fourthByte == 0x08U));
 }
 
 }  // namespace
@@ -74,22 +70,14 @@ CatalogPayloadFormat CatalogPayloadFormatDetector::detect(const std::string_view
         return CatalogPayloadFormat::Unknown;
     }
 
-    if (
-        headerLine.find(',') != std::string_view::npos
-        && strings::containsIgnoreAsciiCase(headerLine, "ra")
-        && strings::containsIgnoreAsciiCase(headerLine, "dec")
-        && strings::containsIgnoreAsciiCase(headerLine, "mag")
-    ) {
+    if (headerLine.find(',') != std::string_view::npos && strings::containsIgnoreAsciiCase(headerLine, "ra")
+        && strings::containsIgnoreAsciiCase(headerLine, "dec") && strings::containsIgnoreAsciiCase(headerLine, "mag")) {
         return CatalogPayloadFormat::HygCsv;
     }
 
-    if (
-        headerLine.find(';') != std::string_view::npos
-        && strings::containsIgnoreAsciiCase(headerLine, "Name")
-        && strings::containsIgnoreAsciiCase(headerLine, "Type")
-        && strings::containsIgnoreAsciiCase(headerLine, "RA")
-        && strings::containsIgnoreAsciiCase(headerLine, "Dec")
-    ) {
+    if (headerLine.find(';') != std::string_view::npos && strings::containsIgnoreAsciiCase(headerLine, "Name")
+        && strings::containsIgnoreAsciiCase(headerLine, "Type") && strings::containsIgnoreAsciiCase(headerLine, "RA")
+        && strings::containsIgnoreAsciiCase(headerLine, "Dec")) {
         return CatalogPayloadFormat::OpenNgcCsv;
     }
 

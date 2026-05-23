@@ -9,10 +9,7 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
-    std::string id,
-    std::string displayName
-)
+skygate::ephemeris::CelestialBody makeBody(std::string id, std::string displayName)
 {
     skygate::ephemeris::CelestialBody body;
     body.id = std::move(id);
@@ -20,13 +17,10 @@ skygate::ephemeris::CelestialBody makeBody(
     return body;
 }
 
-skygate::ephemeris::SkySnapshot makeSnapshot(
-    std::vector<skygate::ephemeris::CelestialBody> bodies
-)
+skygate::ephemeris::SkySnapshot makeSnapshot(std::vector<skygate::ephemeris::CelestialBody> bodies)
 {
     skygate::ephemeris::SkySnapshot snapshot;
-    snapshot.catalogBodies =
-        std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
+    snapshot.catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
     return snapshot;
 }
 
@@ -49,18 +43,8 @@ void SkyHitTargetIndexTests::ignoresBodiesWithoutDisplayNames()
         makeBody("visible", "Visible"),
     });
     SkyRenderFrame frame;
-    frame.points.push_back(SkyRenderPoint {
-        .x = 50.0,
-        .y = 50.0,
-        .sizePx = 20.0,
-        .bodyIndex = 0U
-    });
-    frame.points.push_back(SkyRenderPoint {
-        .x = 100.0,
-        .y = 100.0,
-        .sizePx = 2.0,
-        .bodyIndex = 1U
-    });
+    frame.points.push_back(SkyRenderPoint{.x = 50.0, .y = 50.0, .sizePx = 20.0, .bodyIndex = 0U});
+    frame.points.push_back(SkyRenderPoint{.x = 100.0, .y = 100.0, .sizePx = 2.0, .bodyIndex = 1U});
 
     SkyHitTargetIndex index;
     index.rebuild(frame, snapshot);
@@ -76,19 +60,8 @@ void SkyHitTargetIndexTests::pointAndGlyphRadiiFollowUiPolicy()
         makeBody("glyph", "Glyph"),
     });
     SkyRenderFrame frame;
-    frame.points.push_back(SkyRenderPoint {
-        .x = 50.0,
-        .y = 50.0,
-        .sizePx = 2.0,
-        .bodyIndex = 0U
-    });
-    frame.glyphs.push_back(SkyRenderGlyph {
-        .x = 120.0,
-        .y = 120.0,
-        .radiusXPx = 4.0,
-        .radiusYPx = 5.0,
-        .bodyIndex = 1U
-    });
+    frame.points.push_back(SkyRenderPoint{.x = 50.0, .y = 50.0, .sizePx = 2.0, .bodyIndex = 0U});
+    frame.glyphs.push_back(SkyRenderGlyph{.x = 120.0, .y = 120.0, .radiusXPx = 4.0, .radiusYPx = 5.0, .bodyIndex = 1U});
 
     SkyHitTargetIndex index;
     index.rebuild(frame, snapshot);
@@ -103,12 +76,7 @@ void SkyHitTargetIndexTests::invalidViewportAndClearReturnNoHits()
 {
     auto snapshot = makeSnapshot({makeBody("target", "Target")});
     SkyRenderFrame frame;
-    frame.points.push_back(SkyRenderPoint {
-        .x = 50.0,
-        .y = 50.0,
-        .sizePx = 12.0,
-        .bodyIndex = 0U
-    });
+    frame.points.push_back(SkyRenderPoint{.x = 50.0, .y = 50.0, .sizePx = 12.0, .bodyIndex = 0U});
 
     SkyHitTargetIndex index;
     index.rebuild(frame, snapshot);
@@ -126,18 +94,8 @@ void SkyHitTargetIndexTests::overlappingTargetsChooseNearestBody()
         makeBody("near", "Near"),
     });
     SkyRenderFrame frame;
-    frame.points.push_back(SkyRenderPoint {
-        .x = 50.0,
-        .y = 50.0,
-        .sizePx = 30.0,
-        .bodyIndex = 0U
-    });
-    frame.points.push_back(SkyRenderPoint {
-        .x = 65.0,
-        .y = 50.0,
-        .sizePx = 30.0,
-        .bodyIndex = 1U
-    });
+    frame.points.push_back(SkyRenderPoint{.x = 50.0, .y = 50.0, .sizePx = 30.0, .bodyIndex = 0U});
+    frame.points.push_back(SkyRenderPoint{.x = 65.0, .y = 50.0, .sizePx = 30.0, .bodyIndex = 1U});
 
     SkyHitTargetIndex index;
     index.rebuild(frame, snapshot);

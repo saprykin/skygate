@@ -76,22 +76,16 @@ ScreenPoint ProjectionPipeline::finishRectangular(
 
     const double scaleX = params.viewportWidth / (halfWidth * 2.0);
     const double scaleY = params.viewportHeight / (halfHeight * 2.0);
-    if (
-        !std::isfinite(scaleX)
-        || !std::isfinite(scaleY)
-        || scaleX <= MathConstants::kEpsilon
-        || scaleY <= MathConstants::kEpsilon
-    ) {
+    if (!std::isfinite(scaleX) || !std::isfinite(scaleY) || scaleX <= MathConstants::kEpsilon
+        || scaleY <= MathConstants::kEpsilon) {
         return invalidParametersPoint();
     }
 
     const double boundedMarginPx = std::max(0.0, marginPx);
     const double marginX = boundedMarginPx / scaleX;
     const double marginY = boundedMarginPx / scaleY;
-    if (
-        std::abs(projectedX) > (halfWidth + marginX + MathConstants::kEpsilon)
-        || std::abs(projectedY) > (halfHeight + marginY + MathConstants::kEpsilon)
-    ) {
+    if (std::abs(projectedX) > (halfWidth + marginX + MathConstants::kEpsilon)
+        || std::abs(projectedY) > (halfHeight + marginY + MathConstants::kEpsilon)) {
         return culledPoint();
     }
 

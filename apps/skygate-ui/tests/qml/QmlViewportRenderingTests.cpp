@@ -66,20 +66,17 @@ void QmlViewportRenderingTests::skyViewportItemRendersNonBlankScene()
     QVERIFY2(
         geometryProbeIntersectsViewport(sceneProbe, viewport.size()),
         qPrintable(QStringLiteral("Viewport geometry bounds [%1,%2 %3x%4] missed %5x%6")
-            .arg(sceneProbe.bounds.x())
-            .arg(sceneProbe.bounds.y())
-            .arg(sceneProbe.bounds.width())
-            .arg(sceneProbe.bounds.height())
-            .arg(viewport.width())
-            .arg(viewport.height()))
+                       .arg(sceneProbe.bounds.x())
+                       .arg(sceneProbe.bounds.y())
+                       .arg(sceneProbe.bounds.width())
+                       .arg(sceneProbe.bounds.height())
+                       .arg(viewport.width())
+                       .arg(viewport.height()))
     );
     QString failure;
     QVERIFY2(
         renderingHasVisibleGeometryWithColor(
-            paintNode.get(),
-            controller->renderTheme().gridAzimuthLine,
-            viewport.size(),
-            &failure
+            paintNode.get(), controller->renderTheme().gridAzimuthLine, viewport.size(), &failure
         ),
         qPrintable(failure)
     );
@@ -199,13 +196,13 @@ void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry(
     QObject* overlayLayers = controller->overlayLayers();
     QVERIFY(overlayLayers != nullptr);
     for (const char* layerProperty : {
-        "horizon",
-        "altAzGrid",
-        "ecliptic",
-        "celestialEquator",
-        "circumpolarBoundary",
-        "deepSkyObjects",
-    }) {
+             "horizon",
+             "altAzGrid",
+             "ecliptic",
+             "celestialEquator",
+             "circumpolarBoundary",
+             "deepSkyObjects",
+         }) {
         QVERIFY(overlayLayers->setProperty(layerProperty, false));
     }
     QCoreApplication::processEvents();
@@ -219,10 +216,7 @@ void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry(
     std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
     QVERIFY(paintNode != nullptr);
     const int baselineVertexCount = geometryVertexCount(paintNode.get());
-    const QList<QColor> expectedColors = renderingExpectedGeometryColors(
-        controller->renderTheme(),
-        propertyName
-    );
+    const QList<QColor> expectedColors = renderingExpectedGeometryColors(controller->renderTheme(), propertyName);
     QVERIFY(!expectedColors.isEmpty());
     for (const QColor& color : expectedColors) {
         QCOMPARE(geometryMaterialColorProbe(paintNode.get(), color).vertexCount, 0);
@@ -244,12 +238,7 @@ void QmlViewportRenderingTests::skyViewportItemOverlayLayersAddExpectedGeometry(
     for (const QColor& color : expectedColors) {
         QString failure;
         QVERIFY2(
-            renderingHasVisibleGeometryWithColor(
-                paintNode.get(),
-                color,
-                viewport.size(),
-                &failure
-            ),
+            renderingHasVisibleGeometryWithColor(paintNode.get(), color, viewport.size(), &failure),
             qPrintable(QStringLiteral("%1: %2").arg(propertyName, failure))
         );
     }
@@ -266,21 +255,11 @@ void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeom
     QTest::addColumn<double>("centerAzimuthDeg");
 
     QTest::newRow("ecliptic-greenwich-equinox")
-        << QStringLiteral("ecliptic")
-        << QStringLiteral("Ecliptic")
-        << 51.4769
-        << 0.0
-        << QDateTime(QDate(2026, 3, 20), QTime(10, 0), QTimeZone::UTC)
-        << 30.0
-        << 180.0;
+        << QStringLiteral("ecliptic") << QStringLiteral("Ecliptic") << 51.4769 << 0.0
+        << QDateTime(QDate(2026, 3, 20), QTime(10, 0), QTimeZone::UTC) << 30.0 << 180.0;
     QTest::newRow("circumpolar-reykjavik")
-        << QStringLiteral("circumpolarBoundary")
-        << QStringLiteral("Circumpolar")
-        << 64.1466
-        << -21.9426
-        << QDateTime(QDate(2026, 1, 15), QTime(0, 0), QTimeZone::UTC)
-        << 45.0
-        << 0.0;
+        << QStringLiteral("circumpolarBoundary") << QStringLiteral("Circumpolar") << 64.1466 << -21.9426
+        << QDateTime(QDate(2026, 1, 15), QTime(0, 0), QTimeZone::UTC) << 45.0 << 0.0;
 }
 
 void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeometry()
@@ -298,8 +277,7 @@ void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeom
     controller->setLatitudeText(QString::number(latitudeDeg, 'f', 4));
     controller->setLongitudeText(QString::number(longitudeDeg, 'f', 4));
     QVERIFY(controller->setUtcDateTimeText(
-        utcTime.date().toString(QStringLiteral("yyyy-MM-dd")),
-        utcTime.time().toString(QStringLiteral("HH:mm:ss"))
+        utcTime.date().toString(QStringLiteral("yyyy-MM-dd")), utcTime.time().toString(QStringLiteral("HH:mm:ss"))
     ));
     controller->setViewCenter(centerAltitudeDeg, centerAzimuthDeg);
     auto sceneModel = makeSceneModel(*controller);
@@ -308,13 +286,13 @@ void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeom
     QObject* overlayLayers = controller->overlayLayers();
     QVERIFY(overlayLayers != nullptr);
     for (const char* layerProperty : {
-        "horizon",
-        "altAzGrid",
-        "ecliptic",
-        "celestialEquator",
-        "circumpolarBoundary",
-        "deepSkyObjects",
-    }) {
+             "horizon",
+             "altAzGrid",
+             "ecliptic",
+             "celestialEquator",
+             "circumpolarBoundary",
+             "deepSkyObjects",
+         }) {
         QVERIFY(overlayLayers->setProperty(layerProperty, false));
     }
     QCoreApplication::processEvents();
@@ -330,10 +308,7 @@ void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeom
     const int baselineVertexCount = geometryVertexCount(paintNode.get());
     const int baselineNodeCount = nodeTreeSize(paintNode.get());
     const int baselineOverlayItemCount = sceneModel->overlayItems().size();
-    const QList<QColor> expectedColors = renderingExpectedGeometryColors(
-        controller->renderTheme(),
-        propertyName
-    );
+    const QList<QColor> expectedColors = renderingExpectedGeometryColors(controller->renderTheme(), propertyName);
     QVERIFY(!expectedColors.isEmpty());
     for (const QColor& color : expectedColors) {
         QCOMPARE(geometryMaterialColorProbe(paintNode.get(), color).vertexCount, 0);
@@ -356,12 +331,7 @@ void QmlViewportRenderingTests::skyViewportItemAstronomicalLayersAddExpectedGeom
     for (const QColor& color : expectedColors) {
         QString failure;
         QVERIFY2(
-            renderingHasVisibleGeometryWithColor(
-                paintNode.get(),
-                color,
-                viewport.size(),
-                &failure
-            ),
+            renderingHasVisibleGeometryWithColor(paintNode.get(), color, viewport.size(), &failure),
             qPrintable(QStringLiteral("%1: %2").arg(propertyName, failure))
         );
     }

@@ -19,8 +19,8 @@ class CountingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit CountingEngine(std::string bodyId = "target") : m_bodyId(std::move(bodyId)) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::ephemeris::EphemerisRequest& request
-    ) const override
+    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestComputeCount;
         return makeSnapshot(
@@ -93,9 +93,11 @@ private:
         auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
         bodies->push_back(std::move(body));
         snapshot.catalogBodies = std::move(bodies);
-        snapshot.states.push_back(skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = 0U, .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg}
-        });
+        snapshot.states.push_back(
+            skygate::ephemeris::CelestialBodyState{
+                .bodyIndex = 0U, .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg}
+            }
+        );
         return snapshot;
     }
 

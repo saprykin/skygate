@@ -9,8 +9,8 @@ namespace skygate::testsupport {
 
 class DeterministicRng final {
 public:
-    explicit constexpr DeterministicRng(const std::uint64_t seed) noexcept :
-        m_state(seed == 0U ? 0x9e3779b97f4a7c15ULL : seed)
+    explicit constexpr DeterministicRng(const std::uint64_t seed) noexcept
+        : m_state(seed == 0U ? 0x9e3779b97f4a7c15ULL : seed)
     {
     }
 
@@ -39,15 +39,11 @@ public:
 
     [[nodiscard]] double realInRange(const double minValue, const double maxValue) noexcept
     {
-        const double unit =
-            static_cast<double>(nextU32()) / static_cast<double>(UINT32_MAX);
+        const double unit = static_cast<double>(nextU32()) / static_cast<double>(UINT32_MAX);
         return minValue + ((maxValue - minValue) * unit);
     }
 
-    [[nodiscard]] bool chance(
-        const std::uint32_t numerator,
-        const std::uint32_t denominator
-    ) noexcept
+    [[nodiscard]] bool chance(const std::uint32_t numerator, const std::uint32_t denominator) noexcept
     {
         if (denominator == 0U) {
             return false;
@@ -63,10 +59,7 @@ public:
         return alphabet[index(alphabet.size())];
     }
 
-    [[nodiscard]] std::string token(
-        const std::size_t length,
-        const std::string_view alphabet
-    ) noexcept
+    [[nodiscard]] std::string token(const std::size_t length, const std::string_view alphabet) noexcept
     {
         std::string value;
         value.reserve(length);

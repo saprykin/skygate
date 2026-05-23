@@ -21,10 +21,7 @@ private slots:
 void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
 {
     FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/catalog.csv",
-        {.payload = sampleHygCsvPayload()}
-    );
+    networkAccessManager.enqueueResponse("https://example.test/catalog.csv", {.payload = sampleHygCsvPayload()});
     CatalogCoordinator coordinator(&networkAccessManager);
 
     CatalogCoordinator::DownloadResult finalResult;
@@ -33,9 +30,7 @@ void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/catalog.csv"},
             this,
-            [&statuses](const QString& status) {
-                statuses.push_back(status);
-            },
+            [&statuses](const QString& status) { statuses.push_back(status); },
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
                 finalResult = std::move(result);
                 loop.quit();
@@ -55,8 +50,7 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
-        "https://example.test/bad.csv",
-        {.payload = sampleHygCsvPayload({1, 42, "Bad", "not-ra", "2.0", "3.0"})}
+        "https://example.test/bad.csv", {.payload = sampleHygCsvPayload({1, 42, "Bad", "not-ra", "2.0", "3.0"})}
     );
     CatalogCoordinator coordinator(&networkAccessManager);
 
@@ -66,21 +60,17 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
         QtWarningMsg,
         "HYG CSV skipped 1 rows with invalid numeric values; samples: row 2 ra='not-ra' dec='2.0' mag='3.0'"
     );
+    QTest::ignoreMessage(QtWarningMsg, "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows.");
     QTest::ignoreMessage(
         QtWarningMsg,
-        "HYG CSV parse failed: HYG CSV payload does not contain any valid star rows."
-    );
-    QTest::ignoreMessage(
-        QtWarningMsg,
-        "Catalog: Source https://example.test/bad.csv parse failed: invalid HYG CSV payload (HYG CSV payload does not contain any valid star rows.)"
+        "Catalog: Source https://example.test/bad.csv parse failed: invalid HYG CSV payload (HYG CSV payload does not "
+        "contain any valid star rows.)"
     );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/bad.csv"},
             this,
-            [&statuses](const QString& status) {
-                statuses.push_back(status);
-            },
+            [&statuses](const QString& status) { statuses.push_back(status); },
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
                 finalResult = std::move(result);
                 loop.quit();

@@ -9,9 +9,7 @@
 
 class SkyThemeOptionsAdapter final {
 public:
-    [[nodiscard]] QVariantList themeOptions(
-        const std::span<const skygate::ui::internal::SkyThemeOption> options
-    ) const
+    [[nodiscard]] QVariantList themeOptions(const std::span<const skygate::ui::internal::SkyThemeOption> options) const
     {
         QVariantList entries;
         entries.reserve(static_cast<qsizetype>(options.size()));

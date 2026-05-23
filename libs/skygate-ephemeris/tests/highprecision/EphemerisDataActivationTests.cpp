@@ -75,18 +75,22 @@ void writeFile(const QString& path, const QByteArray& payload)
     const int startYear, const int endYear, std::string id = "test-range", std::string displayName = "Test range"
 )
 {
-    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = startYear,
-        .month = 1,
-        .day = 1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
-    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{
-        .astronomicalYear = endYear,
-        .month = 1,
-        .day = 1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
-    });
+    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = startYear,
+            .month = 1,
+            .day = 1,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
+    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
+            .astronomicalYear = endYear,
+            .month = 1,
+            .day = 1,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
+        }
+    );
     Q_ASSERT(start.has_value());
     Q_ASSERT(end.has_value());
     return skygate::ephemeris::EphemerisDateRange{
@@ -131,13 +135,15 @@ void writeFile(const QString& path, const QByteArray& payload)
     manifest.dataSetInfo.displayName = "Test data";
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
-    manifest.profiles.push_back(skygate::ephemeris::EphemerisDataManifestProfile{
-        .id = "modern",
-        .displayName = "Modern",
-        .bundled = false,
-        .longRange = false,
-        .assetIds = {"de440s-kernel", "leap-seconds", "earth-orientation", "delta-t"},
-    });
+    manifest.profiles.push_back(
+        skygate::ephemeris::EphemerisDataManifestProfile{
+            .id = "modern",
+            .displayName = "Modern",
+            .bundled = false,
+            .longRange = false,
+            .assetIds = {"de440s-kernel", "leap-seconds", "earth-orientation", "delta-t"},
+        }
+    );
     manifest.assets.push_back(makeUncompressedAsset(
         "de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
     ));
@@ -201,13 +207,12 @@ verificationRequest(const skygate::ephemeris::EphemerisDataManifest& manifest, c
                 skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
                 skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
             },
-        .expectedComponents =
-            {
-                {"de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel},
-                {"leap-seconds", skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable},
-                {"earth-orientation", skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData},
-                {"delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData},
-            },
+        .expectedComponents = {
+            {"de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel},
+            {"leap-seconds", skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable},
+            {"earth-orientation", skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData},
+            {"delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData},
+        },
     };
 
     for (skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent& component :

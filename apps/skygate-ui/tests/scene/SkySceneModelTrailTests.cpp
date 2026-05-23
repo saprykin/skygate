@@ -38,14 +38,7 @@ void SkySceneModelTrailTests::init()
 void SkySceneModelTrailTests::selectedBodyBuildsTrailAndClearsIt()
 {
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "demo_trail",
-            "Demo Trail",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            5.5,
-            20.0
-        ),
+        makeFixedBody("demo_trail", "Demo Trail", skygate::ephemeris::CelestialBodyType::Star, 1.0, 5.5, 20.0),
     });
     QVERIFY(harness.isValid());
     QVERIFY(harness.centerOnBody("demo_trail"));
@@ -67,12 +60,7 @@ void SkySceneModelTrailTests::trackedBodyTrailSurvivesClearedSearchSelection()
 {
     SkySceneModelTestHarness harness({
         makeFixedBody(
-            "demo_tracked_trail",
-            "Demo Tracked Trail",
-            skygate::ephemeris::CelestialBodyType::Star,
-            1.0,
-            5.5,
-            20.0
+            "demo_tracked_trail", "Demo Tracked Trail", skygate::ephemeris::CelestialBodyType::Star, 1.0, 5.5, 20.0
         ),
     });
     QVERIFY(harness.isValid());
@@ -93,14 +81,7 @@ void SkySceneModelTrailTests::constellationSelectionDoesNotBuildTrail()
 {
     QVERIFY(seedOrionConstellationCache());
     SkySceneModelTestHarness harness({
-        makeFixedBody(
-            "placeholder",
-            "Placeholder",
-            skygate::ephemeris::CelestialBodyType::Star,
-            6.0,
-            1.0,
-            1.0
-        ),
+        makeFixedBody("placeholder", "Placeholder", skygate::ephemeris::CelestialBodyType::Star, 6.0, 1.0, 1.0),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();
@@ -119,12 +100,7 @@ void SkySceneModelTrailTests::constellationSelectionDoesNotBuildTrail()
 void SkySceneModelTrailTests::unresolvedBodySelectionDoesNotBuildTrail()
 {
     SkySceneModelTestHarness harness({
-        makeBody(
-            "unresolved_target",
-            "Unresolved Target",
-            skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-            8.0
-        ),
+        makeBody("unresolved_target", "Unresolved Target", skygate::ephemeris::CelestialBodyType::DeepSkyObject, 8.0),
     });
     QVERIFY(harness.isValid());
     SkyContextController& controller = harness.controller();

@@ -30,8 +30,7 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
-        "https://example.test/index.json",
-        {.payload = sampleConstellationIndexJsonPayload()}
+        "https://example.test/index.json", {.payload = sampleConstellationIndexJsonPayload()}
     );
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
@@ -42,12 +41,8 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
         workflow.downloadConstellationLines(
             {"https://example.test/index.json"},
             this,
-            [&statuses](const QString& status) {
-                statuses.push_back(status);
-            },
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyConstellationLineImportResult result
-            ) {
+            [&statuses](const QString& status) { statuses.push_back(status); },
+            [&finalResult, &loop](skygate::ui::internal::SkyConstellationLineImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }
@@ -70,11 +65,7 @@ void SkyCatalogImportWorkflowTests::doesNotCompleteConstellationAfterContextDest
 {
     FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
-        "https://example.test/slow-index.json",
-        {
-            .payload = sampleConstellationIndexJsonPayload(),
-            .delayMs = 20
-        }
+        "https://example.test/slow-index.json", {.payload = sampleConstellationIndexJsonPayload(), .delayMs = 20}
     );
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
@@ -84,9 +75,7 @@ void SkyCatalogImportWorkflowTests::doesNotCompleteConstellationAfterContextDest
         {"https://example.test/slow-index.json"},
         callbackContext.get(),
         {},
-        [&completionCalled](skygate::ui::internal::SkyConstellationLineImportResult) {
-            completionCalled = true;
-        }
+        [&completionCalled](skygate::ui::internal::SkyConstellationLineImportResult) { completionCalled = true; }
     );
 
     FakeNetworkReply* reply = onlyIssuedReply(networkAccessManager);
@@ -102,25 +91,19 @@ void SkyCatalogImportWorkflowTests::doesNotCompleteConstellationAfterContextDest
 void SkyCatalogImportWorkflowTests::fallsBackForMalformedConstellationPayload()
 {
     FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/bad-index.json",
-        {.payload = "not-json"}
-    );
+    networkAccessManager.enqueueResponse("https://example.test/bad-index.json", {.payload = "not-json"});
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
     skygate::ui::internal::SkyConstellationLineImportResult finalResult;
     QTest::ignoreMessage(
-        QtWarningMsg,
-        "Constellation line parse failed; no bundled fallback. Payload preview: not-json"
+        QtWarningMsg, "Constellation line parse failed; no bundled fallback. Payload preview: not-json"
     );
     runAsync([&](QEventLoop& loop) {
         workflow.downloadConstellationLines(
             {"https://example.test/bad-index.json"},
             this,
             {},
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyConstellationLineImportResult result
-            ) {
+            [&finalResult, &loop](skygate::ui::internal::SkyConstellationLineImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }
@@ -137,10 +120,7 @@ void SkyCatalogImportWorkflowTests::fallsBackForMalformedConstellationPayload()
 void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
 {
     FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/stars.csv",
-        {.payload = sampleHygCsvPayload()}
-    );
+    networkAccessManager.enqueueResponse("https://example.test/stars.csv", {.payload = sampleHygCsvPayload()});
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
     skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
@@ -150,9 +130,7 @@ void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
             "HYG",
             this,
             {},
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyDeepSkyCatalogImportResult result
-            ) {
+            [&finalResult, &loop](skygate::ui::internal::SkyDeepSkyCatalogImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }
@@ -168,10 +146,7 @@ void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
 void SkyCatalogImportWorkflowTests::reportsDeepSkyObjectCount()
 {
     FakeNetworkAccessManager networkAccessManager;
-    networkAccessManager.enqueueResponse(
-        "https://example.test/open-ngc.csv",
-        {.payload = sampleOpenNgcCsvPayload()}
-    );
+    networkAccessManager.enqueueResponse("https://example.test/open-ngc.csv", {.payload = sampleOpenNgcCsvPayload()});
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
     skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
@@ -181,9 +156,7 @@ void SkyCatalogImportWorkflowTests::reportsDeepSkyObjectCount()
             "OpenNGC",
             this,
             {},
-            [&finalResult, &loop](
-                skygate::ui::internal::SkyDeepSkyCatalogImportResult result
-            ) {
+            [&finalResult, &loop](skygate::ui::internal::SkyDeepSkyCatalogImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }

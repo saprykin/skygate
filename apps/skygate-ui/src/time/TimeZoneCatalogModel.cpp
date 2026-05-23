@@ -44,12 +44,8 @@ QString timeZoneLabel(const QTimeZone& timeZone, const QDateTime& utcDateTime)
         label = timeZone.displayName(zonedDateTime, QTimeZone::ShortName).trimmed();
     }
     const QString offsetText = formatUtcOffset(timeZone.offsetFromUtc(zonedDateTime));
-    if (
-        label.isEmpty()
-        || label.startsWith(QLatin1String("GMT"))
-        || label.startsWith(QLatin1Char('+'))
-        || label.startsWith(QLatin1Char('-'))
-    ) {
+    if (label.isEmpty() || label.startsWith(QLatin1String("GMT")) || label.startsWith(QLatin1Char('+'))
+        || label.startsWith(QLatin1Char('-'))) {
         return offsetText;
     }
     return label;
@@ -70,14 +66,14 @@ QString rawTimeZoneLabel(const QTimeZone& timeZone, const QDateTime& utcDateTime
 QVector<TimeZoneCatalogEntry> loadTimeZoneEntries()
 {
     QVector<TimeZoneCatalogEntry> entries;
-    entries.push_back(TimeZoneCatalogEntry {QStringLiteral("UTC")});
+    entries.push_back(TimeZoneCatalogEntry{QStringLiteral("UTC")});
 
     for (const QByteArray& idBytes : QTimeZone::availableTimeZoneIds()) {
         const QString id = QString::fromUtf8(idBytes);
         if (id.isEmpty() || id == QStringLiteral("UTC")) {
             continue;
         }
-        entries.push_back(TimeZoneCatalogEntry {id});
+        entries.push_back(TimeZoneCatalogEntry{id});
     }
 
     std::sort(entries.begin(), entries.end(), [](const auto& lhs, const auto& rhs) {
@@ -92,12 +88,11 @@ QVector<TimeZoneCatalogEntry> loadTimeZoneEntries()
     return entries;
 }
 
-} // namespace
+}  // namespace
 
 TimeZoneCatalogModel::TimeZoneCatalogModel(QObject* parent)
-    : QAbstractListModel(parent)
-    , m_entries(loadTimeZoneEntries())
-    , m_referenceUtcDateTime(QDateTime::currentDateTimeUtc())
+    : QAbstractListModel(parent), m_entries(loadTimeZoneEntries()),
+      m_referenceUtcDateTime(QDateTime::currentDateTimeUtc())
 {
     rebuildRows();
 }
@@ -164,17 +159,14 @@ void TimeZoneCatalogModel::setFilterText(const QString& filterText)
 bool TimeZoneCatalogModel::hasTimeZoneId(const QString& timeZoneId) const
 {
     const QString id = timeZoneId.trimmed();
-    return std::any_of(m_entries.cbegin(), m_entries.cend(), [&id](const auto& entry) {
-        return entry.id == id;
-    });
+    return std::any_of(m_entries.cbegin(), m_entries.cend(), [&id](const auto& entry) { return entry.id == id; });
 }
 
 QString TimeZoneCatalogModel::detailTextForTimeZoneId(const QString& timeZoneId) const
 {
     const QString id = timeZoneId.trimmed();
-    const auto entryIt = std::find_if(m_entries.cbegin(), m_entries.cend(), [&id](const auto& entry) {
-        return entry.id == id;
-    });
+    const auto entryIt =
+        std::find_if(m_entries.cbegin(), m_entries.cend(), [&id](const auto& entry) { return entry.id == id; });
     if (entryIt == m_entries.cend()) {
         return {};
     }
@@ -207,7 +199,7 @@ void TimeZoneCatalogModel::rebuildRows()
     m_rows.clear();
     for (const TimeZoneCatalogEntry& entry : m_entries) {
         if (matchesFilter(entry)) {
-            m_rows.push_back(Row {.entry = entry});
+            m_rows.push_back(Row{.entry = entry});
         }
     }
     endResetModel();
@@ -220,15 +212,12 @@ QString TimeZoneCatalogModel::detailText(const TimeZoneCatalogEntry& entry) cons
         return {};
     }
 
-    const QDateTime utc = m_referenceUtcDateTime.isValid()
-        ? m_referenceUtcDateTime.toUTC()
-        : QDateTime::currentDateTimeUtc();
+    const QDateTime utc =
+        m_referenceUtcDateTime.isValid() ? m_referenceUtcDateTime.toUTC() : QDateTime::currentDateTimeUtc();
     const QDateTime zonedDateTime = utc.toTimeZone(timeZone);
     const QString label = timeZoneLabel(timeZone, utc);
     const QString offsetText = formatUtcOffset(timeZone.offsetFromUtc(zonedDateTime));
-    return label == offsetText
-        ? offsetText
-        : QString("%1 · %2").arg(label, offsetText);
+    return label == offsetText ? offsetText : QString("%1 · %2").arg(label, offsetText);
 }
 
 bool TimeZoneCatalogModel::matchesFilter(const TimeZoneCatalogEntry& entry) const
@@ -247,9 +236,8 @@ bool TimeZoneCatalogModel::matchesFilter(const TimeZoneCatalogEntry& entry) cons
         return true;
     }
 
-    const QString aliases = normalizedFilterText(
-        TimeZoneAliasCatalog::aliasesForTimeZoneId(entry.id).join(QLatin1Char(' '))
-    );
+    const QString aliases =
+        normalizedFilterText(TimeZoneAliasCatalog::aliasesForTimeZoneId(entry.id).join(QLatin1Char(' ')));
     if (aliases.contains(m_filterText)) {
         return true;
     }
@@ -264,14 +252,11 @@ bool TimeZoneCatalogModel::matchesFilter(const TimeZoneCatalogEntry& entry) cons
         return false;
     }
 
-    const QDateTime referenceUtc = m_referenceUtcDateTime.isValid()
-        ? m_referenceUtcDateTime.toUTC()
-        : QDateTime::currentDateTimeUtc();
+    const QDateTime referenceUtc =
+        m_referenceUtcDateTime.isValid() ? m_referenceUtcDateTime.toUTC() : QDateTime::currentDateTimeUtc();
     const QString seasonalLabels = normalizedFilterText(
-        rawTimeZoneLabel(timeZone, QDateTime(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC))
-        + QLatin1Char(' ')
-        + rawTimeZoneLabel(timeZone, QDateTime(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC))
-        + QLatin1Char(' ')
+        rawTimeZoneLabel(timeZone, QDateTime(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC)) + QLatin1Char(' ')
+        + rawTimeZoneLabel(timeZone, QDateTime(QDate(2026, 7, 15), QTime(12, 0, 0), QTimeZone::UTC)) + QLatin1Char(' ')
         + rawTimeZoneLabel(timeZone, referenceUtc)
     );
     return seasonalLabels.contains(m_filterText);

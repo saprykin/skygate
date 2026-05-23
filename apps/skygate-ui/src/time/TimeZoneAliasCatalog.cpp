@@ -64,16 +64,13 @@ constexpr auto kTimeZoneAliases = std::to_array<TimeZoneAliasEntry>({
     {"Pacific/Auckland", "NZST|NZDT|New Zealand Time|New Zealand|Auckland"},
 });
 
-} // namespace
+}  // namespace
 
 QStringList TimeZoneAliasCatalog::aliasesForTimeZoneId(const QString& timeZoneId)
 {
     for (const TimeZoneAliasEntry& entry : kTimeZoneAliases) {
         if (timeZoneId == QString::fromUtf8(entry.timeZoneId)) {
-            return QString::fromUtf8(entry.aliases).split(
-                QLatin1Char('|'),
-                Qt::SkipEmptyParts
-            );
+            return QString::fromUtf8(entry.aliases).split(QLatin1Char('|'), Qt::SkipEmptyParts);
         }
     }
 

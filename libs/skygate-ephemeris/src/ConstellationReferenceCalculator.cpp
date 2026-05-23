@@ -12,9 +12,7 @@
 namespace skygate::ephemeris {
 
 std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labelCenter(
-    const SkySnapshot& snapshot,
-    const std::span<const ConstellationLabelRef> labelRefs,
-    const std::string_view label
+    const SkySnapshot& snapshot, const std::span<const ConstellationLabelRef> labelRefs, const std::string_view label
 )
 {
     const std::string normalizedLabel = strings::normalizedLookupKey(label);
@@ -22,13 +20,10 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
         return std::nullopt;
     }
 
-    const auto labelRefIt = std::find_if(
-        labelRefs.begin(),
-        labelRefs.end(),
-        [&normalizedLabel](const ConstellationLabelRef& labelRef) {
+    const auto labelRefIt =
+        std::find_if(labelRefs.begin(), labelRefs.end(), [&normalizedLabel](const ConstellationLabelRef& labelRef) {
             return strings::normalizedLookupKey(labelRef.first) == normalizedLabel;
-        }
-    );
+        });
     if (labelRefIt == labelRefs.end()) {
         return std::nullopt;
     }
@@ -40,14 +35,11 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
         horizontalByBodyId.insert({strings::normalizedLookupKey(body.id), state.horizontal});
     }
 
-    core::SphericalGeometry::Vector3d sum {0.0, 0.0, 0.0};
+    core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
     int validAnchorCount = 0;
     for (const std::string& hipId : labelRefIt->second) {
         const auto horizontalIt = horizontalByBodyId.find(strings::normalizedLookupKey(hipId));
-        if (
-            horizontalIt == horizontalByBodyId.end()
-            || !horizontalIt->second.isFinite()
-        ) {
+        if (horizontalIt == horizontalByBodyId.end() || !horizontalIt->second.isFinite()) {
             continue;
         }
 
@@ -67,12 +59,8 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
         return std::nullopt;
     }
 
-    return core::HorizontalCoordinate {
-        .altitudeDeg = core::AngleMath::toDegrees(std::asin(std::clamp(
-            normalizedVector[2],
-            -1.0,
-            1.0
-        ))),
+    return core::HorizontalCoordinate{
+        .altitudeDeg = core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector[2], -1.0, 1.0))),
         .azimuthDeg = core::AngleMath::normalizeDegrees(
             core::AngleMath::toDegrees(std::atan2(normalizedVector[0], normalizedVector[1]))
         )

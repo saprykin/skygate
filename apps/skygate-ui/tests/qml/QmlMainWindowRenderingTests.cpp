@@ -76,90 +76,60 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
         );
 
         for (const QString& objectName : {
-            QStringLiteral("appMenuButton"),
-            QStringLiteral("searchToolbarToggle"),
-            QStringLiteral("timelineToolbarToggle"),
-        }) {
+                 QStringLiteral("appMenuButton"),
+                 QStringLiteral("searchToolbarToggle"),
+                 QStringLiteral("timelineToolbarToggle"),
+             }) {
             auto* toggle = firstQuickItemWithObjectName(rootWindow, objectName);
             QVERIFY(toggle != nullptr);
             QVERIFY2(
                 renderingItemRegionContainsColorNear(
-                    *rootWindow,
-                    windowImage,
-                    *toggle,
-                    theme->property("toolbarToggleBorder").value<QColor>(),
-                    24
+                    *rootWindow, windowImage, *toggle, theme->property("toolbarToggleBorder").value<QColor>(), 24
                 ),
                 qPrintable(QStringLiteral("%1 did not paint its toggle border").arg(objectName))
             );
         }
 
-        auto* appMenuButton = firstQuickItemWithObjectName(
-            rootWindow,
-            QStringLiteral("appMenuButton")
-        );
-        auto* searchToggle = firstQuickItemWithObjectName(
-            rootWindow,
-            QStringLiteral("searchToolbarToggle")
-        );
-        auto* timelineToggle = firstQuickItemWithObjectName(
-            rootWindow,
-            QStringLiteral("timelineToolbarToggle")
-        );
+        auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
+        auto* searchToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("searchToolbarToggle"));
+        auto* timelineToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("timelineToolbarToggle"));
         auto* viewport = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyViewport"));
         QVERIFY(appMenuButton != nullptr);
         QVERIFY(searchToggle != nullptr);
         QVERIFY(timelineToggle != nullptr);
         QVERIFY(viewport != nullptr);
-        QVERIFY(renderingQuickItemSceneRect(*appMenuButton).intersects(
-            renderingQuickItemSceneRect(*viewport)
-        ));
-        QVERIFY(renderingQuickItemSceneRect(*searchToggle).intersects(
-            renderingQuickItemSceneRect(*viewport)
-        ));
-        QVERIFY(renderingQuickItemSceneRect(*timelineToggle).intersects(
-            renderingQuickItemSceneRect(*viewport)
-        ));
-        QVERIFY(!renderingQuickItemSceneRect(*searchToggle).intersects(
-            renderingQuickItemSceneRect(*timelineToggle)
-        ));
-        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(
-            renderingQuickItemSceneRect(*searchToggle)
-        ));
-        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(
-            renderingQuickItemSceneRect(*timelineToggle)
-        ));
-        QVERIFY(std::abs(
-            renderingQuickItemSceneRect(*appMenuButton).top()
-            - renderingQuickItemSceneRect(*searchToggle).top()
-        ) < 0.5);
+        QVERIFY(renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*viewport)));
+        QVERIFY(renderingQuickItemSceneRect(*searchToggle).intersects(renderingQuickItemSceneRect(*viewport)));
+        QVERIFY(renderingQuickItemSceneRect(*timelineToggle).intersects(renderingQuickItemSceneRect(*viewport)));
+        QVERIFY(!renderingQuickItemSceneRect(*searchToggle).intersects(renderingQuickItemSceneRect(*timelineToggle)));
+        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*searchToggle)));
+        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*timelineToggle)));
+        QVERIFY(
+            std::abs(
+                renderingQuickItemSceneRect(*appMenuButton).top() - renderingQuickItemSceneRect(*searchToggle).top()
+            )
+            < 0.5
+        );
     }
 
     QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("aboutMenuItem"));
     QVERIFY(aboutItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(renderingTriggerMenuItem(aboutItem));
-    auto* aboutWindow = qobject_cast<QQuickWindow*>(renderingWindowWithObjectName(
-        rootWindow,
-        QStringLiteral("aboutWindow")
-    ));
+    auto* aboutWindow =
+        qobject_cast<QQuickWindow*>(renderingWindowWithObjectName(rootWindow, QStringLiteral("aboutWindow")));
     QVERIFY(aboutWindow != nullptr);
     QTRY_VERIFY(aboutWindow->isVisible());
     QTRY_VERIFY(windowHasMultipleSampledColors(*aboutWindow));
     QString failure;
     QVERIFY2(visibleQuickItemsFitWithinWindow(*aboutWindow, &failure), qPrintable(failure));
 
-    QObject* preferencesItem = firstObjectWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesMenuItem")
-    );
+    QObject* preferencesItem = firstObjectWithObjectName(rootWindow, QStringLiteral("preferencesMenuItem"));
     QVERIFY(preferencesItem != nullptr);
     QTest::ignoreMessage(QtWarningMsg, "This plugin does not support raise()");
     QVERIFY(renderingTriggerMenuItem(preferencesItem));
-    auto* preferencesWindow = qobject_cast<QQuickWindow*>(renderingWindowWithObjectName(
-        rootWindow,
-        QStringLiteral("preferencesWindow")
-    ));
+    auto* preferencesWindow =
+        qobject_cast<QQuickWindow*>(renderingWindowWithObjectName(rootWindow, QStringLiteral("preferencesWindow")));
     QVERIFY(preferencesWindow != nullptr);
     QTRY_VERIFY(preferencesWindow->isVisible());
     QTRY_VERIFY(windowHasMultipleSampledColors(*preferencesWindow));

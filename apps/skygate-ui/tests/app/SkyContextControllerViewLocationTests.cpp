@@ -37,16 +37,10 @@ void SkyContextControllerViewLocationTests::pinchZoomScaleDeltaAdjustsAndClampsF
     QCOMPARE(controller->viewFieldOfViewDeg(), 80.0);
 
     controller->zoomViewByScaleDelta(0.5);
-    QCOMPARE(
-        controller->viewFieldOfViewDeg(),
-        skygate::core::ViewportMath::kFieldOfViewMaxDeg
-    );
+    QCOMPARE(controller->viewFieldOfViewDeg(), skygate::core::ViewportMath::kFieldOfViewMaxDeg);
 
     controller->zoomViewByScaleDelta(200.0);
-    QCOMPARE(
-        controller->viewFieldOfViewDeg(),
-        skygate::core::ViewportMath::kFieldOfViewMinDeg
-    );
+    QCOMPARE(controller->viewFieldOfViewDeg(), skygate::core::ViewportMath::kFieldOfViewMinDeg);
 }
 
 void SkyContextControllerViewLocationTests::pinchZoomScaleDeltaIgnoresInvalidValues()
@@ -129,18 +123,15 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceAppliesUp
 {
 #if SKYGATE_HAS_POSITIONING
     FakePositionSource positionSource;
-    auto controller = createControllerWithOptions({
-        .loadSettings = false,
-        .initializeLocation = false,
-        .positionSource = &positionSource,
-        .requestLocationPermission = false
-    });
+    auto controller = createControllerWithOptions(
+        {.loadSettings = false,
+         .initializeLocation = false,
+         .positionSource = &positionSource,
+         .requestLocationPermission = false}
+    );
     QVERIFY(controller != nullptr);
     QSignalSpy skyContextSpy(controller.get(), &SkyContextController::skyContextChanged);
-    QSignalSpy locationStatusSpy(
-        controller.get(),
-        &SkyContextController::locationStatusTextChanged
-    );
+    QSignalSpy locationStatusSpy(controller.get(), &SkyContextController::locationStatusTextChanged);
 
     controller->setLocationSourceText(QStringLiteral("Current Device"));
     controller->refreshCurrentLocation();
@@ -148,8 +139,7 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceAppliesUp
     QCOMPARE(controller->locationSourceText(), QString("Current Device"));
     QCOMPARE(positionSource.requestCount(), 1);
     QCOMPARE(
-        positionSource.lastTimeoutMs(),
-        skygate::ui::internal::SkyContextControllerConstants::kLocationUpdateTimeoutMs
+        positionSource.lastTimeoutMs(), skygate::ui::internal::SkyContextControllerConstants::kLocationUpdateTimeoutMs
     );
     QCOMPARE(controller->locationStatusText(), QString("Location: Locating"));
 
@@ -170,12 +160,12 @@ void SkyContextControllerViewLocationTests::currentDevicePositionSourceReportsEr
 {
 #if SKYGATE_HAS_POSITIONING
     FakePositionSource positionSource;
-    auto controller = createControllerWithOptions({
-        .loadSettings = false,
-        .initializeLocation = false,
-        .positionSource = &positionSource,
-        .requestLocationPermission = false
-    });
+    auto controller = createControllerWithOptions(
+        {.loadSettings = false,
+         .initializeLocation = false,
+         .positionSource = &positionSource,
+         .requestLocationPermission = false}
+    );
     QVERIFY(controller != nullptr);
     controller->setLatitudeText(QStringLiteral("12.000000"));
     controller->setLongitudeText(QStringLiteral("34.000000"));

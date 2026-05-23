@@ -15,14 +15,9 @@ public:
     [[nodiscard]] static double length(const Vector3d& vector) noexcept;
     [[nodiscard]] static Vector3d normalize(const Vector3d& vector) noexcept;
 
-    [[nodiscard]] static Vector3d horizontalToUnitVector(
-        const HorizontalCoordinate& coordinate
-    ) noexcept;
+    [[nodiscard]] static Vector3d horizontalToUnitVector(const HorizontalCoordinate& coordinate) noexcept;
     [[nodiscard]] static bool tryBuildProjectionBasis(
-        const HorizontalCoordinate& centerCoordinate,
-        Vector3d& center,
-        Vector3d& right,
-        Vector3d& up
+        const HorizontalCoordinate& centerCoordinate, Vector3d& center, Vector3d& right, Vector3d& up
     ) noexcept;
 };
 

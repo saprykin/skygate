@@ -49,8 +49,7 @@ public:
     using StatusHandler = std::function<void(const QString&)>;
     using CatalogCompletionHandler = std::function<void(SkyCatalogImportResult)>;
     using DeepSkyCompletionHandler = std::function<void(SkyDeepSkyCatalogImportResult)>;
-    using ConstellationCompletionHandler =
-        std::function<void(SkyConstellationLineImportResult)>;
+    using ConstellationCompletionHandler = std::function<void(SkyConstellationLineImportResult)>;
 
 public:
     explicit SkyCatalogImportWorkflow(QNetworkAccessManager* networkAccessManager);

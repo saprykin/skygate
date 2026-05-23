@@ -12,9 +12,7 @@
 
 namespace skygate::ephemeris {
 
-std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(
-    const QJsonObject& rootObject
-)
+std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(const QJsonObject& rootObject)
 {
     std::vector<ConstellationLineRef> lineRefs;
     std::unordered_set<std::string> dedupKeys;
@@ -31,10 +29,7 @@ std::vector<ConstellationLineRef> StellariumLineRefExtractor::extract(
             return;
         }
 
-        lineRefs.emplace_back(
-            "hip_" + std::to_string(startHip),
-            "hip_" + std::to_string(endHip)
-        );
+        lineRefs.emplace_back("hip_" + std::to_string(startHip), "hip_" + std::to_string(endHip));
     };
 
     const auto appendPolylines = [&appendSegment](const std::vector<std::vector<int>>& polylines) {

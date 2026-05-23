@@ -19,7 +19,7 @@ private slots:
 void CatalogArchiveZipEntryExtractorTests::extractorRejectsSizeMismatches()
 {
     const std::string zipData = skygate::ephemeris::tests::makeZip({
-        skygate::ephemeris::tests::ZipEntrySpec {
+        skygate::ephemeris::tests::ZipEntrySpec{
             .path = "hyg.csv",
             .data = "hip,ra,dec,mag\n6,1,2,3\n",
         },
@@ -41,11 +41,11 @@ void CatalogArchiveZipEntryExtractorTests::extractorRejectsSizeMismatches()
 void CatalogArchiveZipEntryExtractorTests::extractorRejectsBoundaryMetadata()
 {
     const std::string zipData = skygate::ephemeris::tests::makeZip({
-        skygate::ephemeris::tests::ZipEntrySpec {
+        skygate::ephemeris::tests::ZipEntrySpec{
             .path = "hyg.csv",
             .data = "hip,ra,dec,mag\n12,1,2,3\n",
         },
-        skygate::ephemeris::tests::ZipEntrySpec {
+        skygate::ephemeris::tests::ZipEntrySpec{
             .path = "empty.csv",
             .data = {},
         },

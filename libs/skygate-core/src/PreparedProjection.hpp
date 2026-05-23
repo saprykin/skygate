@@ -11,18 +11,13 @@ namespace skygate::core {
 
 class PreparedProjection final {
 public:
-    [[nodiscard]] static std::optional<PreparedProjection> create(
-        ProjectionType projectionType,
-        const ProjectionParams& params
-    ) noexcept;
+    [[nodiscard]] static std::optional<PreparedProjection>
+    create(ProjectionType projectionType, const ProjectionParams& params) noexcept;
 
     [[nodiscard]] ProjectionType type() const noexcept;
     [[nodiscard]] const ProjectionParams& params() const noexcept;
     [[nodiscard]] ScreenPoint project(const HorizontalCoordinate& coordinate) const noexcept;
-    [[nodiscard]] ScreenPoint projectWithMargin(
-        const HorizontalCoordinate& coordinate,
-        double marginPx
-    ) const noexcept;
+    [[nodiscard]] ScreenPoint projectWithMargin(const HorizontalCoordinate& coordinate, double marginPx) const noexcept;
 
 private:
     ProjectionType m_projectionType = ProjectionType::Stereographic;

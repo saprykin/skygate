@@ -29,25 +29,18 @@ void applyRoll(double& x, double& y, const double rollDeg) noexcept
 }  // namespace
 
 bool ProjectionAlgorithms::prepareFrame(
-    const ProjectionType projectionType,
-    const ProjectionParams& params,
-    ProjectionFrame& frame
+    const ProjectionType projectionType, const ProjectionParams& params, ProjectionFrame& frame
 ) noexcept
 {
     if (!params.isProjectable()) {
         return false;
     }
 
-    frame = ProjectionFrame {};
+    frame = ProjectionFrame{};
     frame.projectionType = projectionType;
     frame.params = params;
     frame.params.center = params.center.normalizedAzimuth();
-    if (!SphericalGeometry::tryBuildProjectionBasis(
-            frame.params.center,
-            frame.center,
-            frame.right,
-            frame.up
-        )) {
+    if (!SphericalGeometry::tryBuildProjectionBasis(frame.params.center, frame.center, frame.right, frame.up)) {
         return false;
     }
 
@@ -72,19 +65,13 @@ bool ProjectionAlgorithms::prepareFrame(
     case ProjectionType::Perspective: {
         const double halfVerticalFovRad = AngleMath::toRadians(frame.params.fovDeg) * 0.5;
         const double tanHalfVerticalFov = std::tan(halfVerticalFovRad);
-        if (
-            !isFinite(tanHalfVerticalFov)
-            || tanHalfVerticalFov <= MathConstants::kEpsilon
-        ) {
+        if (!isFinite(tanHalfVerticalFov) || tanHalfVerticalFov <= MathConstants::kEpsilon) {
             return false;
         }
 
         const double aspectRatio = frame.params.viewportWidth / frame.params.viewportHeight;
         const double tanHalfHorizontalFov = tanHalfVerticalFov * aspectRatio;
-        if (
-            !isFinite(tanHalfHorizontalFov)
-            || tanHalfHorizontalFov <= MathConstants::kEpsilon
-        ) {
+        if (!isFinite(tanHalfHorizontalFov) || tanHalfHorizontalFov <= MathConstants::kEpsilon) {
             return false;
         }
 
@@ -98,9 +85,7 @@ bool ProjectionAlgorithms::prepareFrame(
 }
 
 ScreenPoint ProjectionAlgorithms::project(
-    const ProjectionFrame& frame,
-    const HorizontalCoordinate& coordinate,
-    const double marginPx
+    const ProjectionFrame& frame, const HorizontalCoordinate& coordinate, const double marginPx
 ) noexcept
 {
     if (!coordinate.isValid()) {
@@ -112,11 +97,7 @@ ScreenPoint ProjectionAlgorithms::project(
 
     switch (frame.projectionType) {
     case ProjectionType::Stereographic: {
-        const double centerDotTarget = std::clamp(
-            SphericalGeometry::dot(target, frame.center),
-            -1.0,
-            1.0
-        );
+        const double centerDotTarget = std::clamp(SphericalGeometry::dot(target, frame.center), -1.0, 1.0);
         const double denominator = 1.0 + centerDotTarget;
         if (denominator <= 0.0) {
             return ProjectionPipeline::culledPoint();
@@ -126,19 +107,11 @@ ScreenPoint ProjectionAlgorithms::project(
         double projectedY = 2.0 * SphericalGeometry::dot(target, frame.up) / denominator;
         applyRoll(projectedX, projectedY, frame.params.rollDeg);
         return ProjectionPipeline::finishCircular(
-            projectedX,
-            projectedY,
-            frame.params,
-            frame.circularMaxRadius,
-            marginPx
+            projectedX, projectedY, frame.params, frame.circularMaxRadius, marginPx
         );
     }
     case ProjectionType::AzimuthalEquidistant: {
-        const double cosAngularDistance = std::clamp(
-            SphericalGeometry::dot(target, frame.center),
-            -1.0,
-            1.0
-        );
+        const double cosAngularDistance = std::clamp(SphericalGeometry::dot(target, frame.center), -1.0, 1.0);
         const double angularDistance = std::acos(cosAngularDistance);
         if (!isFinite(angularDistance)) {
             return ProjectionPipeline::invalidParametersPoint();
@@ -159,11 +132,7 @@ ScreenPoint ProjectionAlgorithms::project(
 
         applyRoll(projectedX, projectedY, frame.params.rollDeg);
         return ProjectionPipeline::finishCircular(
-            projectedX,
-            projectedY,
-            frame.params,
-            frame.circularMaxRadius,
-            marginPx
+            projectedX, projectedY, frame.params, frame.circularMaxRadius, marginPx
         );
     }
     case ProjectionType::Perspective: {
@@ -176,12 +145,7 @@ ScreenPoint ProjectionAlgorithms::project(
         double projectedY = SphericalGeometry::dot(target, frame.up) / forward;
         applyRoll(projectedX, projectedY, frame.params.rollDeg);
         return ProjectionPipeline::finishRectangular(
-            projectedX,
-            projectedY,
-            frame.params,
-            frame.rectHalfWidth,
-            frame.rectHalfHeight,
-            marginPx
+            projectedX, projectedY, frame.params, frame.rectHalfWidth, frame.rectHalfHeight, marginPx
         );
     }
     }

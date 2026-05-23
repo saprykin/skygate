@@ -19,10 +19,8 @@ QString stripSavedSuffixes(const QString& sourceLabel)
     QString normalizedSourceLabel = sourceLabel.trimmed();
     const QString spacedSavedSuffix = QStringLiteral(" (saved)");
     const QString compactSavedSuffix = QStringLiteral("(saved)");
-    while (
-        normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)
-        || normalizedSourceLabel.endsWith(compactSavedSuffix, Qt::CaseInsensitive)
-    ) {
+    while (normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)
+           || normalizedSourceLabel.endsWith(compactSavedSuffix, Qt::CaseInsensitive)) {
         if (normalizedSourceLabel.endsWith(spacedSavedSuffix, Qt::CaseInsensitive)) {
             normalizedSourceLabel.chop(spacedSavedSuffix.size());
         } else {
@@ -35,10 +33,7 @@ QString stripSavedSuffixes(const QString& sourceLabel)
 
 std::string_view payloadView(const QByteArray& payload)
 {
-    return std::string_view(
-        payload.constData(),
-        static_cast<std::size_t>(payload.size())
-    );
+    return std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()));
 }
 
 QString savedLabel(const QString& sourceLabel, const QString& fallbackLabel)
@@ -52,8 +47,7 @@ QString savedLabel(const QString& sourceLabel, const QString& fallbackLabel)
 
 }  // namespace
 
-SkyCatalogCacheController::SkyCatalogCacheController(SkySettingsStore* settingsStore)
-    : m_settingsStore(settingsStore)
+SkyCatalogCacheController::SkyCatalogCacheController(SkySettingsStore* settingsStore) : m_settingsStore(settingsStore)
 {
 }
 
@@ -67,10 +61,8 @@ bool SkyCatalogCacheController::clearDeepSkyCatalogCache() const
     return m_settingsStore != nullptr && m_settingsStore->clearDeepSkyCatalogCache();
 }
 
-SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
-    const int catalogPresetIndex,
-    const int deepSkyCatalogPresetIndex
-) const
+SkyCatalogCacheRestoreResult
+SkyCatalogCacheController::restore(const int catalogPresetIndex, const int deepSkyCatalogPresetIndex) const
 {
     SkyCatalogCacheRestoreResult result;
     if (m_settingsStore == nullptr) {
@@ -87,15 +79,12 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
 
     const skygate::ephemeris::CatalogPayloadParser parser;
     if (catalogPresetIndex != 0 && !cacheSnapshot->catalogPayload.isEmpty()) {
-        auto restoredCatalogResult = parser.parseResult(
-            payloadView(cacheSnapshot->catalogPayload)
-        );
+        auto restoredCatalogResult = parser.parseResult(payloadView(cacheSnapshot->catalogPayload));
         if (!restoredCatalogResult.isSuccess() || restoredCatalogResult.catalog == nullptr) {
             result.savedCatalogUnreadable = true;
             result.statusText = "Catalog: Saved cache unreadable, using bundled";
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Saved star catalog cache unreadable; using bundled catalog:"
-                << QString::fromStdString(restoredCatalogResult.errorDetail);
+            qCWarning(skygateCatalogCacheLog).noquote() << "Saved star catalog cache unreadable; using bundled catalog:"
+                                                        << QString::fromStdString(restoredCatalogResult.errorDetail);
             return result;
         }
 
@@ -104,48 +93,34 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
         result.catalog = std::move(restoredCatalogResult.catalog);
         result.restored = true;
         qCInfo(skygateCatalogCacheLog).noquote()
-            << "Saved star catalog cache restored:" << result.sourceLabel
-            << "objects" << static_cast<qulonglong>(
-                   restoredCatalogResult.diagnostics.selectedBodyCount
-               )
-            << "bytes" << cacheSnapshot->catalogPayload.size();
+            << "Saved star catalog cache restored:" << result.sourceLabel << "objects"
+            << static_cast<qulonglong>(restoredCatalogResult.diagnostics.selectedBodyCount) << "bytes"
+            << cacheSnapshot->catalogPayload.size();
     }
 
-    if (
-        deepSkyCatalogPresetIndex != 0
-        && !cacheSnapshot->deepSkyCatalogPayload.isEmpty()
-    ) {
-        auto restoredDeepSkyResult = parser.parseResult(
-            payloadView(cacheSnapshot->deepSkyCatalogPayload)
-        );
+    if (deepSkyCatalogPresetIndex != 0 && !cacheSnapshot->deepSkyCatalogPayload.isEmpty()) {
+        auto restoredDeepSkyResult = parser.parseResult(payloadView(cacheSnapshot->deepSkyCatalogPayload));
         if (restoredDeepSkyResult.isSuccess() && restoredDeepSkyResult.catalog != nullptr) {
             result.deepSkyCatalogPayload = cacheSnapshot->deepSkyCatalogPayload;
             result.deepSkyObjectCount = restoredDeepSkyResult.diagnostics.parsedBodyCount;
-            result.deepSkySourceLabel = savedLabel(
-                cacheSnapshot->deepSkySourceLabel,
-                "Saved deep sky"
-            );
+            result.deepSkySourceLabel = savedLabel(cacheSnapshot->deepSkySourceLabel, "Saved deep sky");
             result.deepSkyCatalog = std::move(restoredDeepSkyResult.catalog);
             result.restored = true;
             qCInfo(skygateCatalogCacheLog).noquote()
-                << "Saved deep-sky catalog cache restored:" << result.deepSkySourceLabel
-                << "objects" << static_cast<qulonglong>(result.deepSkyObjectCount)
-                << "bytes" << cacheSnapshot->deepSkyCatalogPayload.size();
+                << "Saved deep-sky catalog cache restored:" << result.deepSkySourceLabel << "objects"
+                << static_cast<qulonglong>(result.deepSkyObjectCount) << "bytes"
+                << cacheSnapshot->deepSkyCatalogPayload.size();
         } else {
-            qCWarning(skygateCatalogCacheLog).noquote()
-                << "Saved deep-sky catalog cache unreadable; ignoring cache:"
-                << QString::fromStdString(restoredDeepSkyResult.errorDetail);
+            qCWarning(skygateCatalogCacheLog).noquote() << "Saved deep-sky catalog cache unreadable; ignoring cache:"
+                                                        << QString::fromStdString(restoredDeepSkyResult.errorDetail);
         }
     }
 
-    if (
-        cacheSnapshot->constellationLineSchemaVersion
+    if (cacheSnapshot->constellationLineSchemaVersion
             >= SkyContextControllerConstants::kConstellationLineCacheSchemaVersion
-        && !cacheSnapshot->constellationLineRows.isEmpty()
-    ) {
-        auto parsedLineRefs = SkyContextCatalogCodec::parseConstellationLineRows(
-            payloadView(cacheSnapshot->constellationLineRows)
-        );
+        && !cacheSnapshot->constellationLineRows.isEmpty()) {
+        auto parsedLineRefs =
+            SkyContextCatalogCodec::parseConstellationLineRows(payloadView(cacheSnapshot->constellationLineRows));
         if (!parsedLineRefs.empty()) {
             result.constellationLineRefs = std::move(parsedLineRefs);
             if (!cacheSnapshot->constellationLabelRows.isEmpty()) {
@@ -157,8 +132,8 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
             result.restored = true;
             qCInfo(skygateCatalogCacheLog).noquote()
                 << "Saved constellation line cache restored: segments"
-                << static_cast<qulonglong>(result.constellationLineRefs.size())
-                << "labels" << static_cast<qulonglong>(result.constellationLabelRefs.size());
+                << static_cast<qulonglong>(result.constellationLineRefs.size()) << "labels"
+                << static_cast<qulonglong>(result.constellationLabelRefs.size());
         } else {
             qCWarning(skygateCatalogCacheLog)
                 << "Saved constellation line cache unreadable; clearing constellation refs";
@@ -171,14 +146,9 @@ SkyCatalogCacheRestoreResult SkyCatalogCacheController::restore(
     return result;
 }
 
-void SkyCatalogCacheController::persist(
-    const SkyCatalogCachePersistRequest& request
-) const
+void SkyCatalogCacheController::persist(const SkyCatalogCachePersistRequest& request) const
 {
-    if (
-        m_settingsStore == nullptr
-        || (request.catalogPayload.isEmpty() && request.deepSkyCatalogPayload.isEmpty())
-    ) {
+    if (m_settingsStore == nullptr || (request.catalogPayload.isEmpty() && request.deepSkyCatalogPayload.isEmpty())) {
         return;
     }
 
@@ -187,14 +157,11 @@ void SkyCatalogCacheController::persist(
     snapshot.deepSkySourceLabel = request.deepSkySourceLabel;
     snapshot.catalogPayload = request.catalogPayload;
     snapshot.deepSkyCatalogPayload = request.deepSkyCatalogPayload;
-    snapshot.constellationLineRows = SkyContextCatalogCodec::serializeConstellationLineRows(
-        request.constellationLineRefs
-    );
-    snapshot.constellationLabelRows = SkyContextCatalogCodec::serializeConstellationLabelRows(
-        request.constellationLabelRefs
-    );
-    snapshot.constellationLineSchemaVersion =
-        SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+    snapshot.constellationLineRows =
+        SkyContextCatalogCodec::serializeConstellationLineRows(request.constellationLineRefs);
+    snapshot.constellationLabelRows =
+        SkyContextCatalogCodec::serializeConstellationLabelRows(request.constellationLabelRefs);
+    snapshot.constellationLineSchemaVersion = SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
     snapshot.constellationCount = request.constellationCount;
     (void)m_settingsStore->saveCatalogCache(snapshot);
 }

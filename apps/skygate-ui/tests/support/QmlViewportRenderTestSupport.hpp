@@ -52,13 +52,10 @@ struct SkyViewRenderSignature final {
 
     [[nodiscard]] bool differsFrom(const SkyViewRenderSignature& other) const noexcept
     {
-        return sceneGraphNodeCount != other.sceneGraphNodeCount
-            || sceneGraphVertexCount != other.sceneGraphVertexCount
-            || renderLineCount != other.renderLineCount
-            || renderPointCount != other.renderPointCount
-            || renderGlyphCount != other.renderGlyphCount
-            || overlayItemCount != other.overlayItemCount
-            || !overlayLayers.equals(other.overlayLayers);
+        return sceneGraphNodeCount != other.sceneGraphNodeCount || sceneGraphVertexCount != other.sceneGraphVertexCount
+               || renderLineCount != other.renderLineCount || renderPointCount != other.renderPointCount
+               || renderGlyphCount != other.renderGlyphCount || overlayItemCount != other.overlayItemCount
+               || !overlayLayers.equals(other.overlayLayers);
     }
 };
 
@@ -117,10 +114,7 @@ inline SkyViewGeometryProbe geometryProbe(const QSGNode* node)
             const int vertexCount = geometry->vertexCount();
             const auto* vertices = geometry->vertexDataAsPoint2D();
             for (int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
-                expandProbeBounds(
-                    probe,
-                    QPointF(vertices[vertexIndex].x, vertices[vertexIndex].y)
-                );
+                expandProbeBounds(probe, QPointF(vertices[vertexIndex].x, vertices[vertexIndex].y));
             }
             probe.vertexCount += vertexCount;
         }
@@ -138,9 +132,7 @@ inline SkyViewGeometryProbe geometryProbe(const QSGNode* node)
 }
 
 inline bool geometryProbeIntersectsViewport(
-    const SkyViewGeometryProbe& probe,
-    const QSizeF& viewportSize,
-    const double tolerancePx = 2.0
+    const SkyViewGeometryProbe& probe, const QSizeF& viewportSize, const double tolerancePx = 2.0
 )
 {
     if (!probe.hasGeometry()) {
@@ -153,8 +145,7 @@ inline bool geometryProbeIntersectsViewport(
         viewportSize.width() + (tolerancePx * 2.0),
         viewportSize.height() + (tolerancePx * 2.0)
     );
-    return relaxedViewport.intersects(probe.bounds)
-        || relaxedViewport.contains(probe.bounds.center());
+    return relaxedViewport.intersects(probe.bounds) || relaxedViewport.contains(probe.bounds.center());
 }
 
 inline SkyViewGeometryProbe geometryMaterialColorProbe(const QSGNode* node, const QColor& color)
@@ -173,10 +164,7 @@ inline SkyViewGeometryProbe geometryMaterialColorProbe(const QSGNode* node, cons
                 const int vertexCount = geometry->vertexCount();
                 const auto* vertices = geometry->vertexDataAsPoint2D();
                 for (int vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
-                    expandProbeBounds(
-                        probe,
-                        QPointF(vertices[vertexIndex].x, vertices[vertexIndex].y)
-                    );
+                    expandProbeBounds(probe, QPointF(vertices[vertexIndex].x, vertices[vertexIndex].y));
                 }
                 probe.vertexCount += vertexCount;
             }
@@ -204,9 +192,8 @@ inline void collectGeometryMaterialColorNames(const QSGNode* node, QStringList& 
         const auto* geometryNode = static_cast<const QSGGeometryNode*>(node);
         if (geometryNode->material() != nullptr) {
             const auto* material = dynamic_cast<const QSGFlatColorMaterial*>(geometryNode->material());
-            const QString colorName = material != nullptr
-                ? material->color().name(QColor::HexArgb)
-                : QStringLiteral("<non-flat>");
+            const QString colorName =
+                material != nullptr ? material->color().name(QColor::HexArgb) : QStringLiteral("<non-flat>");
             if (!colorNames.contains(colorName)) {
                 colorNames.push_back(colorName);
             }
@@ -226,10 +213,7 @@ inline QStringList geometryMaterialColorNames(const QSGNode* node)
     return colorNames;
 }
 
-inline SkyViewRenderSignature renderSignature(
-    SkyContextController& controller,
-    SkySceneModel& sceneModel
-)
+inline SkyViewRenderSignature renderSignature(SkyContextController& controller, SkySceneModel& sceneModel)
 {
     TestSkyViewportItem viewport;
     viewport.setWidth(760.0);
@@ -241,7 +225,7 @@ inline SkyViewRenderSignature renderSignature(
     }
 
     std::unique_ptr<QSGNode> paintNode(viewport.buildPaintNode());
-    return SkyViewRenderSignature {
+    return SkyViewRenderSignature{
         .sceneGraphNodeCount = nodeTreeSize(paintNode.get()),
         .sceneGraphVertexCount = geometryVertexCount(paintNode.get()),
         .renderLineCount = sceneModel.renderLineSpan().size(),

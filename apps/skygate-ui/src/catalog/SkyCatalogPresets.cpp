@@ -54,14 +54,10 @@ SkyCatalogPreset SkyCatalogPresets::catalogPreset(const QString& presetId)
         preset.presetIndex = 1;
         preset.defaultUrlText = defaultCatalogUrlText();
         preset.sourceLabel = "HYG v4.2";
-        preset.catalogUrls = QStringList {preset.defaultUrlText};
-        preset.constellationLineUrls = QStringList {
-            QString::fromUtf8(
-                SkyContextControllerConstants::kStellariumConstellationLinesPrimaryUrl
-            ),
-            QString::fromUtf8(
-                SkyContextControllerConstants::kStellariumConstellationLinesMirrorUrl
-            ),
+        preset.catalogUrls = QStringList{preset.defaultUrlText};
+        preset.constellationLineUrls = QStringList{
+            QString::fromUtf8(SkyContextControllerConstants::kStellariumConstellationLinesPrimaryUrl),
+            QString::fromUtf8(SkyContextControllerConstants::kStellariumConstellationLinesMirrorUrl),
             QString::fromUtf8(SkyContextControllerConstants::kStellariumConstellationLinesCdnUrl)
         };
         return preset;
@@ -88,7 +84,7 @@ SkyDeepSkyCatalogPreset SkyCatalogPresets::deepSkyCatalogPreset(const QString& p
         preset.presetIndex = 1;
         preset.defaultUrlText = defaultDeepSkyCatalogUrlText();
         preset.sourceLabel = "OpenNGC";
-        preset.catalogUrls = QStringList {
+        preset.catalogUrls = QStringList{
             QString::fromUtf8(SkyContextControllerConstants::kOpenNgcCatalogPrimaryUrl),
             QString::fromUtf8(SkyContextControllerConstants::kOpenNgcCatalogMirrorUrl)
         };
