@@ -1,6 +1,6 @@
 #include "catalog/CatalogLoader.hpp"
 #include "catalog/bundled/BundledCatalogParser.hpp"
-#include "catalog/model/CatalogBodyParseResult.hpp"
+#include "catalog/CatalogBodyParseResult.hpp"
 #include "catalog/hyg/HygCatalogParser.hpp"
 #include "catalog/io/CompressedCatalogParser.hpp"
 #include "catalog/opengc/OpenNgcCatalogParser.hpp"

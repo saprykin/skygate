@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/model/CatalogBodyParseResult.hpp"
+#include "catalog/CatalogBodyParseResult.hpp"
 #include "catalog/CatalogSourceRequest.hpp"
 
 #include <string_view>
