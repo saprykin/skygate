@@ -8,7 +8,9 @@ enum class CatalogSourceType : std::uint8_t {
     Bundled,
     HygCsv,
     HygCsvGzip,
-    OpenNgcCsv
+    HygCsvZip,
+    OpenNgcCsv,
+    Unknown
 };
 
 }  // namespace skygate::ephemeris

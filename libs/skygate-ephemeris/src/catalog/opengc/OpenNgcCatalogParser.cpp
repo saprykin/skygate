@@ -24,10 +24,10 @@ constexpr std::string_view kOpenNgcInvalidCategoryLabels[] = {
 }  // namespace
 
 CatalogBodyParseResult
-OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgressCallback& progressCallback) const
+OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgressCallback& progressCallback) const
 {
     return DelimitedCatalogParser::run(
-        csvData,
+        data,
         DelimitedCatalogReaderOptions{
             .separator = ';',
             .requiredColumns =

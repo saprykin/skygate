@@ -1,3 +1,4 @@
+#include "catalog/CatalogSourceType.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 
 #include <QtTest/QtTest>
@@ -19,9 +20,12 @@ void CatalogPayloadFormatDetectorTests::detectsTextPayloadFormats()
     using namespace skygate::ephemeris;
 
     QCOMPARE(
-        CatalogPayloadFormatDetector::detect("# comment\nid,ra,dec,mag\n"), CatalogLoadResult::PayloadFormat::HygCsv
+        CatalogPayloadFormatDetector::detect("# comment\nid,ra,dec,mag\n"),
+        skygate::ephemeris::CatalogSourceType::HygCsv
     );
-    QCOMPARE(CatalogPayloadFormatDetector::detect("Name;Type;RA;Dec\n"), CatalogLoadResult::PayloadFormat::OpenNgcCsv);
+    QCOMPARE(
+        CatalogPayloadFormatDetector::detect("Name;Type;RA;Dec\n"), skygate::ephemeris::CatalogSourceType::OpenNgcCsv
+    );
 }
 
 void CatalogPayloadFormatDetectorTests::detectsCompressedPayloadFormats()
@@ -33,13 +37,13 @@ void CatalogPayloadFormatDetectorTests::detectsCompressedPayloadFormats()
         CatalogPayloadFormatDetector::detect(
             std::string_view(reinterpret_cast<const char*>(kGzip.data()), kGzip.size())
         ),
-        CatalogLoadResult::PayloadFormat::HygCsvGzip
+        skygate::ephemeris::CatalogSourceType::HygCsvGzip
     );
 
     constexpr std::array<unsigned char, 4> kZip{{0x50, 0x4b, 0x03, 0x04}};
     QCOMPARE(
         CatalogPayloadFormatDetector::detect(std::string_view(reinterpret_cast<const char*>(kZip.data()), kZip.size())),
-        CatalogLoadResult::PayloadFormat::HygCsvZip
+        skygate::ephemeris::CatalogSourceType::HygCsvZip
     );
 }
 
@@ -47,7 +51,7 @@ void CatalogPayloadFormatDetectorTests::returnsUnknownForUnrecognizedPayloads()
 {
     QCOMPARE(
         skygate::ephemeris::CatalogPayloadFormatDetector::detect("not a catalog"),
-        skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown
+        skygate::ephemeris::CatalogSourceType::Unknown
     );
 }
 

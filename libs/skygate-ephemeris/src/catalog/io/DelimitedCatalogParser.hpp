@@ -23,7 +23,7 @@ public:
         const DelimitedCatalogParserOptions& runnerOptions,
         std::span<const std::string_view> invalidCategoryLabels,
         const RowMapper& rowMapper,
-        const HygParseProgressCallback& progressCallback);
+        const CatalogParseProgressCallback& progressCallback);
 };
 
 }  // namespace skygate::ephemeris

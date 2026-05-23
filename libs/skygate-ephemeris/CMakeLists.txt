@@ -129,6 +129,7 @@ add_library(skygate-ephemeris STATIC
     src/IEphemerisEngine.hpp
     src/engine/highprecision/LeapSecondProvider.hpp
     src/NightConditionsCalculator.hpp
+    src/catalog/ICatalogParser.hpp
     src/catalog/IStarCatalog.hpp
     src/ObservationEventCalculator.hpp
     src/catalog/stellarium/StellariumConstellationParser.hpp
@@ -148,7 +149,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/composition/CoreBodyCatalogAugmenter.hpp
     src/catalog/composition/DeepSkyCatalogMerger.hpp
     src/catalog/composition/DeepSkyCatalogMergeResult.hpp
-    src/catalog/io/CompressedCatalogParser.hpp
+    src/catalog/io/GzipCatalogParser.hpp
     src/catalog/io/DelimitedCatalogParser.hpp
     src/catalog/io/DelimitedCatalogParserOptions.hpp
     src/catalog/io/DelimitedCatalogReader.hpp
@@ -184,7 +185,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
     src/catalog/io/CompressedDataInflateOptions.cpp
-    src/catalog/io/CompressedCatalogParser.cpp
+    src/catalog/io/GzipCatalogParser.cpp
     src/catalog/io/DelimitedCatalogParser.cpp
     src/catalog/io/DelimitedCatalogParserOptions.cpp
     src/catalog/io/RowParseOutcome.cpp
@@ -202,6 +203,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/opengc/OpenNgcObjectMapper.cpp
     src/catalog/opengc/OpenNgcObjectMapping.cpp
     src/catalog/opengc/OpenNgcCatalogParser.hpp
+    src/catalog/io/zip/ZipCatalogParser.hpp
     src/catalog/io/zip/ZipCodec.hpp
     src/catalog/io/zip/ZipDirectoryReader.cpp
     src/catalog/io/zip/ZipDirectoryReader.hpp
@@ -225,6 +227,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/hyg/HygCatalogParser.cpp
     src/catalog/InMemoryStarCatalog.cpp
     src/catalog/opengc/OpenNgcCatalogParser.cpp
+    src/catalog/io/zip/ZipCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
     src/BodyTrailCalculator.cpp
     src/BodyTrailOptions.cpp

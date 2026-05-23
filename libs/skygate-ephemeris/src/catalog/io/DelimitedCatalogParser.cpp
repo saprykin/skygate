@@ -26,7 +26,7 @@ CatalogBodyParseResult DelimitedCatalogParser::run(
     const DelimitedCatalogParserOptions& runnerOptions,
     const std::span<const std::string_view> invalidCategoryLabels,
     const RowMapper& rowMapper,
-    const HygParseProgressCallback& progressCallback
+    const CatalogParseProgressCallback& progressCallback
 )
 {
     std::size_t parsedObjectCount = 0;

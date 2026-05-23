@@ -13,7 +13,7 @@ public:
     [[nodiscard]] static CatalogLoadResult load(
         CatalogSourceType type,
         std::string_view data = {},
-        const HygParseProgressCallback& progressCallback = {},
+        const CatalogParseProgressCallback& progressCallback = {},
         const CatalogSelectionOptions& selectionOptions = {}
     );
 };
