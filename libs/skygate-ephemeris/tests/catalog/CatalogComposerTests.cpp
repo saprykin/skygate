@@ -1,5 +1,5 @@
-#include "skygate/ephemeris/CatalogComposer.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "catalog/CatalogComposer.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/highprecision/HighPrecisionTypes.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <cstddef>
 #include <memory>

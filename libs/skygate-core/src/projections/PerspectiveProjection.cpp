@@ -1,4 +1,4 @@
-#include "skygate/core/projections/PerspectiveProjection.hpp"
+#include "projections/PerspectiveProjection.hpp"
 
 #include "ProjectionAlgorithms.hpp"
 

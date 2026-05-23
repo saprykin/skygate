@@ -1,4 +1,4 @@
-#include "skygate/core/ProjectionFactory.hpp"
+#include "ProjectionFactory.hpp"
 
 #include <QtTest/QtTest>
 

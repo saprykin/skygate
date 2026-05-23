@@ -1,7 +1,7 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "skygate/core/math/AngleMath.hpp"
+#include "math/AngleMath.hpp"
 
 #include <algorithm>
 #include <cmath>

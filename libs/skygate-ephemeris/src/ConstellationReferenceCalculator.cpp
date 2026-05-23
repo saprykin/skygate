@@ -1,8 +1,8 @@
-#include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
+#include "ConstellationReferenceCalculator.hpp"
 
 #include "StringUtilities.hpp"
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/SphericalGeometry.hpp"
+#include "math/AngleMath.hpp"
+#include "math/SphericalGeometry.hpp"
 
 #include <algorithm>
 #include <cmath>

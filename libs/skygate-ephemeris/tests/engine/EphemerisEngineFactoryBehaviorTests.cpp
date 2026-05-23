@@ -1,11 +1,11 @@
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
 
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
-#include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QCryptographicHash>
 #include <QFile>

@@ -6,7 +6,7 @@
 #include <QPointer>
 #include <QQuickItem>
 
-#include "skygate/core/PreparedProjection.hpp"
+#include "PreparedProjection.hpp"
 
 #include <memory>
 #include <mutex>

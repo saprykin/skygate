@@ -1,6 +1,6 @@
 #include "SkyActiveCatalogBuilder.hpp"
 
-#include "skygate/ephemeris/CatalogComposer.hpp"
+#include "catalog/CatalogComposer.hpp"
 
 #include <cstdint>
 #include <utility>

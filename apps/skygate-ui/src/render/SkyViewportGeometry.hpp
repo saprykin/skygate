@@ -4,9 +4,9 @@
 #include "SkyRenderFrame.hpp"
 #include "SkyTheme.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/GeoLocation.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
+#include "PreparedProjection.hpp"
+#include "GeoLocation.hpp"
+#include "UtcTimePoint.hpp"
 
 #include <QColor>
 

@@ -1,7 +1,7 @@
 #include "engine/highprecision/ObserverGeodesy.hpp"
 
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/PhysicalConstants.hpp"
+#include "math/AngleMath.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <cmath>
 

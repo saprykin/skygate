@@ -3,7 +3,7 @@
 #include "SkyCatalogCacheController.hpp"
 #include "SkyCatalogConstellationStore.hpp"
 
-#include "skygate/ephemeris/IStarCatalog.hpp"
+#include "catalog/IStarCatalog.hpp"
 
 #include <QString>
 #include <QStringList>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "skygate/ephemeris/CatalogCompositionSource.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "catalog/CatalogCompositionSource.hpp"
+#include "Types.hpp"
 
 #include <span>
 #include <vector>

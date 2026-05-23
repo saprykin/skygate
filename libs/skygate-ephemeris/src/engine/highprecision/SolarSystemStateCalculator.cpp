@@ -3,8 +3,8 @@
 #include "StringUtilities.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/core/math/PhysicalConstants.hpp"
+#include "math/MathConstants.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <algorithm>
 #include <cmath>

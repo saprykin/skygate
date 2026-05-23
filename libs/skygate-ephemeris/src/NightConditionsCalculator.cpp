@@ -1,10 +1,10 @@
-#include "skygate/ephemeris/NightConditionsCalculator.hpp"
+#include "NightConditionsCalculator.hpp"
 
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "math/MathConstants.hpp"
+#include "EphemerisPrecisionPolicy.hpp"
+#include "EphemerisRequestFactory.hpp"
+#include "IEphemerisEngine.hpp"
+#include "Types.hpp"
 
 #include <algorithm>
 #include <cmath>

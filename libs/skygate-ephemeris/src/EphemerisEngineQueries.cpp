@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/EphemerisEngineQueries.hpp"
+#include "EphemerisEngineQueries.hpp"
 
 #include "StringUtilities.hpp"
 

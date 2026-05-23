@@ -1,10 +1,10 @@
-#include "skygate/ephemeris/ObservationEventCalculator.hpp"
+#include "ObservationEventCalculator.hpp"
 
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/Types.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "EphemerisRequestFactory.hpp"
+#include "IEphemerisEngine.hpp"
+#include "Types.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <array>
 #include <chrono>

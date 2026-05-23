@@ -1,7 +1,7 @@
-#include "skygate/core/math/SphericalGeometry.hpp"
+#include "math/SphericalGeometry.hpp"
 
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/MathConstants.hpp"
+#include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 
 #include <cstddef>
 #include <cmath>

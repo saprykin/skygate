@@ -2,8 +2,8 @@
 
 #include <QtTest/QtTest>
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include "math/ViewportMath.hpp"
+#include "CelestialReferenceCalculator.hpp"
 
 #include <QHash>
 

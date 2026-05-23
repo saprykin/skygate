@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/core/EquatorialCoordinate.hpp"
+#include "EquatorialCoordinate.hpp"
 
 namespace skygate::ephemeris {
 

@@ -3,7 +3,7 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkyRenderLabels.hpp"
 
-#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
+#include "math/ProjectedPolylineBuilder.hpp"
 
 #include <algorithm>
 #include <array>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "skygate/core/HorizontalCoordinate.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "HorizontalCoordinate.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "Types.hpp"
 
 #include <span>
 #include <string>

@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 #include "skygate/testsupport/LogCapture.hpp"
 
 #include <QtTest/QtTest>

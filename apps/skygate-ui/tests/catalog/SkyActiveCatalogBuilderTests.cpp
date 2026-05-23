@@ -1,5 +1,5 @@
 #include "catalog/SkyActiveCatalogBuilder.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 

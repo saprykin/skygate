@@ -1,7 +1,7 @@
 #include <QtTest/QtTest>
 
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
-#include "skygate/ephemeris/ConstellationReferenceCalculator.hpp"
+#include "CelestialReferenceCalculator.hpp"
+#include "ConstellationReferenceCalculator.hpp"
 
 #include <chrono>
 #include <cmath>

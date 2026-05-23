@@ -1,7 +1,7 @@
-#include "skygate/core/math/Geometry2d.hpp"
+#include "math/Geometry2d.hpp"
 
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/MathConstants.hpp"
+#include "math/AngleMath.hpp"
+#include "math/MathConstants.hpp"
 
 #include <cmath>
 

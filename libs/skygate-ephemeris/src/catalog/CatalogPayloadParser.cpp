@@ -1,6 +1,6 @@
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 
-#include "skygate/ephemeris/CatalogLoader.hpp"
+#include "catalog/CatalogLoader.hpp"
 
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 #include "catalog/io/zip/ZipCodec.hpp"

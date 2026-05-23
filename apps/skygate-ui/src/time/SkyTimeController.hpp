@@ -5,7 +5,7 @@
 #include <QString>
 #include <QTimeZone>
 
-#include "skygate/core/UtcTimePoint.hpp"
+#include "UtcTimePoint.hpp"
 
 #include <optional>
 

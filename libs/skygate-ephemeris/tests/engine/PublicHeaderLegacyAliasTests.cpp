@@ -1,5 +1,5 @@
-#include "skygate/ephemeris/CatalogLoadResult.hpp"
-#include "skygate/ephemeris/CatalogSelectionMode.hpp"
+#include "catalog/CatalogLoadResult.hpp"
+#include "catalog/CatalogSelectionMode.hpp"
 
 #include <cstdint>
 

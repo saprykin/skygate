@@ -2,7 +2,7 @@
 
 #include "StringUtilities.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
+#include "EphemerisRequestFactory.hpp"
 
 #include <cmath>
 #include <cstdint>

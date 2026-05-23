@@ -1,7 +1,7 @@
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 
 #include "engine/simple/AstronomicalTime.hpp"
-#include "skygate/core/math/AngleMath.hpp"
+#include "math/AngleMath.hpp"
 
 #include <cmath>
 

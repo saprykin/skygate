@@ -1,1 +1,1 @@
-#include "skygate/core/math/LineSegment2d.hpp"
+#include "math/LineSegment2d.hpp"

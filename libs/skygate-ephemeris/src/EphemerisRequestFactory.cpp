@@ -1,6 +1,6 @@
-#include "skygate/ephemeris/EphemerisRequestFactory.hpp"
+#include "EphemerisRequestFactory.hpp"
 
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <chrono>
 #include <cmath>

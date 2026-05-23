@@ -1,4 +1,4 @@
-#include "skygate/core/GeoLocation.hpp"
+#include "GeoLocation.hpp"
 
 #include <QtTest/QtTest>
 

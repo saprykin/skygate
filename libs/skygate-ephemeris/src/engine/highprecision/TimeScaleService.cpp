@@ -1,10 +1,10 @@
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "engine/highprecision/ErfaAstrometry.hpp"
 #endif
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/core/math/TimeConstants.hpp"
+#include "math/MathConstants.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <array>
 #include <cmath>

@@ -9,9 +9,9 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/core/ITimeSource.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "ITimeSource.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>

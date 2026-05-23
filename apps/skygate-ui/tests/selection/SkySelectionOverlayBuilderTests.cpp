@@ -1,14 +1,14 @@
 #include "SkySelectionOverlayBuilder.hpp"
 #include "SkyOverlayTestSupport.hpp"
 #include "SkyTimeController.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "math/ViewportMath.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <chrono>
 #include <cmath>

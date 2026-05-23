@@ -4,8 +4,8 @@
 #include <QFile>
 #include <QStringList>
 #include <QtTest/QtTest>
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/core/math/PhysicalConstants.hpp"
+#include "math/MathConstants.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <array>
 #include <cmath>

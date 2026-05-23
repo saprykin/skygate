@@ -1,7 +1,7 @@
 #include "engine/highprecision/ObserverGeodesy.hpp"
 
 #include <QtTest/QtTest>
-#include "skygate/core/math/PhysicalConstants.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <cmath>
 

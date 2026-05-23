@@ -9,7 +9,7 @@
 #include <QTime>
 #include <QTimeZone>
 
-#include "skygate/ephemeris/ConstellationDataCodec.hpp"
+#include "catalog/constellation/ConstellationDataCodec.hpp"
 
 #include <algorithm>
 

@@ -1,4 +1,4 @@
-#include "skygate/core/ScreenPoint.hpp"
+#include "ScreenPoint.hpp"
 
 #include <cmath>
 

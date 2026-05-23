@@ -1,4 +1,4 @@
-#include "skygate/core/math/Geometry2d.hpp"
+#include "math/Geometry2d.hpp"
 #include "skygate/testsupport/DeterministicFuzz.hpp"
 
 #include <QtTest/QtTest>

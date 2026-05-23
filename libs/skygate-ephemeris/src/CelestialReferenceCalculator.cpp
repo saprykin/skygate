@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include "CelestialReferenceCalculator.hpp"
 
 #include "engine/simple/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"

@@ -1,6 +1,6 @@
 #include <QtTest>
 
-#include "skygate/core/math/Geometry2d.hpp"
+#include "math/Geometry2d.hpp"
 
 #include <cstdint>
 #include <cmath>

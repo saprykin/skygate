@@ -1,8 +1,8 @@
 #define None 0L
 
-#include "skygate/ephemeris/CatalogLoadResult.hpp"
-#include "skygate/ephemeris/CatalogLoader.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "catalog/CatalogLoadResult.hpp"
+#include "catalog/CatalogLoader.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <cstdint>
 

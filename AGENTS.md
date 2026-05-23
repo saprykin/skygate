@@ -18,8 +18,11 @@ repository.
   they are part of the intended module interface. Avoid ad-hoc public free
   functions that do not define a clear API boundary.
 - Prefer unnamed-namespace helpers for `.cpp`-local and test-local functions.
-- Keep public library headers under `libs/*/include/skygate/...`. Keep
-  internal-only helpers in `src/` where practical.
+- Co-locate `.hpp` headers alongside their corresponding `.cpp` files under
+  `src/` in every module. The `src/` directory serves as the public include
+  root for library targets (`target_include_directories(... PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/src)`). Do not create a separate `include/`
+  tree.
 - Types/classes: `PascalCase`.
 - Interface classes: prefix with `I` (example: `IRenderer`, `IProjection`).
 - Methods/functions: `camelCase`.

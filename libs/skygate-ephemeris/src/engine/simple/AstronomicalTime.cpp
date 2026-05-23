@@ -1,7 +1,7 @@
 #include "engine/simple/AstronomicalTime.hpp"
 
-#include "skygate/core/UtcTimeCodec.hpp"
-#include "skygate/core/math/AngleMath.hpp"
+#include "UtcTimeCodec.hpp"
+#include "math/AngleMath.hpp"
 
 namespace skygate::ephemeris {
 namespace {

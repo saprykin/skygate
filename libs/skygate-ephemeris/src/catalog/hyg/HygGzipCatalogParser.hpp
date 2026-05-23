@@ -1,7 +1,7 @@
 #pragma once
 
 #include "catalog/model/CatalogBodyParseResult.hpp"
-#include "skygate/ephemeris/CatalogSourceRequest.hpp"
+#include "catalog/CatalogSourceRequest.hpp"
 
 #include <string_view>
 

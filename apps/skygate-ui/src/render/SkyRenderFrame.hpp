@@ -3,7 +3,7 @@
 #include <QColor>
 #include <QString>
 
-#include "skygate/ephemeris/Types.hpp"
+#include "Types.hpp"
 
 #include <cstdint>
 #include <vector>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/ephemeris/IStarCatalog.hpp"
+#include "catalog/IStarCatalog.hpp"
 
 #include <span>
 #include <vector>

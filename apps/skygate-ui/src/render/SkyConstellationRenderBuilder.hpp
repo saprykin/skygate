@@ -4,9 +4,9 @@
 #include "SkyRenderHorizontalLookup.hpp"
 #include "SkyTheme.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/math/RectOccupancyGrid.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
+#include "PreparedProjection.hpp"
+#include "math/RectOccupancyGrid.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>
 #include <string_view>

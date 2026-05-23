@@ -3,12 +3,12 @@
 #include "SkyContextController.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/core/EquatorialCoordinate.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/IStarCatalog.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "SkyContext.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "IEphemerisEngine.hpp"
+#include "catalog/IStarCatalog.hpp"
 
 #include <QString>
 

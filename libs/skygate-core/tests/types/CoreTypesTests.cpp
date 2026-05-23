@@ -1,8 +1,8 @@
-#include "skygate/core/HorizontalCoordinate.hpp"
-#include "skygate/core/ProjectionParams.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/core/SystemTimeSource.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "HorizontalCoordinate.hpp"
+#include "ProjectionParams.hpp"
+#include "SkyContext.hpp"
+#include "SystemTimeSource.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 

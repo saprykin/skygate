@@ -1,9 +1,9 @@
-#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
+#include "math/ProjectedPolylineBuilder.hpp"
 
-#include "skygate/core/math/AngleMath.hpp"
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/MathConstants.hpp"
-#include "skygate/core/math/SphericalGeometry.hpp"
+#include "math/AngleMath.hpp"
+#include "math/Geometry2d.hpp"
+#include "math/MathConstants.hpp"
+#include "math/SphericalGeometry.hpp"
 
 #include <algorithm>
 #include <cmath>

@@ -3,9 +3,9 @@
 #include "SkyRenderFrame.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyTheme.hpp"
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "Types.hpp"
 
 #include <span>
 

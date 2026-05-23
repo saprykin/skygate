@@ -3,12 +3,12 @@
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
 
-#include "skygate/core/math/Geometry2d.hpp"
-#include "skygate/core/math/LinePattern.hpp"
-#include "skygate/core/math/ProjectedPolylineBuilder.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "math/Geometry2d.hpp"
+#include "math/LinePattern.hpp"
+#include "math/ProjectedPolylineBuilder.hpp"
+#include "CelestialReferenceCalculator.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>

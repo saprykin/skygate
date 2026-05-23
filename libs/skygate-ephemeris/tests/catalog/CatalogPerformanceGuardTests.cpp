@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/CatalogPayloadParser.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 #include "catalog/io/zip/ZipCodec.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
 

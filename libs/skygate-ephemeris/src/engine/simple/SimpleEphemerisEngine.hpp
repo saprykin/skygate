@@ -3,7 +3,7 @@
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
 #include "engine/simple/SunEquatorialCalculator.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <memory>
 #include <optional>

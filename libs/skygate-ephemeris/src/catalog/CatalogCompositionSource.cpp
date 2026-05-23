@@ -1,1 +1,1 @@
-#include "skygate/ephemeris/CatalogCompositionSource.hpp"
+#include "catalog/CatalogCompositionSource.hpp"

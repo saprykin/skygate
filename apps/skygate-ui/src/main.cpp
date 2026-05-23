@@ -22,9 +22,9 @@
 #include <QVariantMap>
 #include <qqml.h>
 
-#include "skygate/ephemeris/EphemerisEngineFactory.hpp"
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "EphemerisEngineFactory.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <cstdio>
 #include <cstdlib>

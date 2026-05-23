@@ -3,7 +3,7 @@
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkySceneModel.hpp"
 
-#include "skygate/ephemeris/CatalogFactory.hpp"
+#include "catalog/CatalogFactory.hpp"
 
 #include <QtGlobal>
 

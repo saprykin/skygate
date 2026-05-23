@@ -4,8 +4,8 @@
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/core/ITimeSource.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "ITimeSource.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QSignalSpy>
 #include <QTimeZone>

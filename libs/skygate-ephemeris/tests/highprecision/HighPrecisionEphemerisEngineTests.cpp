@@ -9,10 +9,10 @@
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
-#include "skygate/ephemeris/DeltaTProvider.hpp"
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
-#include "skygate/ephemeris/LeapSecondProvider.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

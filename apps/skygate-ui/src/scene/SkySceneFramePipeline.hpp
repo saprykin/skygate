@@ -6,13 +6,13 @@
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderBuilders.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/GeoLocation.hpp"
-#include "skygate/core/ProjectionType.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "GeoLocation.hpp"
+#include "ProjectionType.hpp"
+#include "SkyContext.hpp"
+#include "UtcTimePoint.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "Types.hpp"
 
 #include <cstdint>
 #include <optional>

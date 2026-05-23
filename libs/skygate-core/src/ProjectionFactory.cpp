@@ -1,7 +1,7 @@
-#include "skygate/core/ProjectionFactory.hpp"
-#include "skygate/core/projections/AzimuthalEquidistantProjection.hpp"
-#include "skygate/core/projections/PerspectiveProjection.hpp"
-#include "skygate/core/projections/StereographicProjection.hpp"
+#include "ProjectionFactory.hpp"
+#include "projections/AzimuthalEquidistantProjection.hpp"
+#include "projections/PerspectiveProjection.hpp"
+#include "projections/StereographicProjection.hpp"
 
 namespace skygate::core {
 

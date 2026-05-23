@@ -6,16 +6,16 @@
 #include <QTimer>
 #include <QVariantMap>
 
-#include "skygate/core/GeoLocation.hpp"
-#include "skygate/core/ProjectionType.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
-#include "skygate/core/SystemTimeSource.hpp"
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/IStarCatalog.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "GeoLocation.hpp"
+#include "ProjectionType.hpp"
+#include "SkyContext.hpp"
+#include "UtcTimePoint.hpp"
+#include "SystemTimeSource.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "IEphemerisEngine.hpp"
+#include "catalog/IStarCatalog.hpp"
+#include "Types.hpp"
 
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"

@@ -1,4 +1,4 @@
-#include "skygate/core/math/LinePattern.hpp"
+#include "math/LinePattern.hpp"
 
 #include <algorithm>
 #include <cmath>

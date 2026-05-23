@@ -1,4 +1,4 @@
-#include "skygate/core/ProjectionParams.hpp"
+#include "ProjectionParams.hpp"
 
 #include <cmath>
 

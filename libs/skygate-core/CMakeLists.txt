@@ -1,37 +1,37 @@
 add_library(skygate-core STATIC
-    include/skygate/core/IProjection.hpp
-    include/skygate/core/PreparedProjection.hpp
-    include/skygate/core/ITimeSource.hpp
-    include/skygate/core/ProjectionFactory.hpp
-    include/skygate/core/EquatorialCoordinate.hpp
-    include/skygate/core/GeoLocation.hpp
-    include/skygate/core/HorizontalCoordinate.hpp
-    include/skygate/core/ProjectionParams.hpp
-    include/skygate/core/ProjectionStatus.hpp
-    include/skygate/core/ProjectionType.hpp
-    include/skygate/core/ScreenPoint.hpp
-    include/skygate/core/SkyContext.hpp
-    include/skygate/core/SystemTimeSource.hpp
-    include/skygate/core/UtcTimeCodec.hpp
-    include/skygate/core/UtcTimePoint.hpp
-    include/skygate/core/math/AngleMath.hpp
-    include/skygate/core/math/CircleHitIndex.hpp
-    include/skygate/core/math/CircleHitTarget.hpp
-    include/skygate/core/math/Geometry2d.hpp
-    include/skygate/core/math/LineSegment2d.hpp
-    include/skygate/core/math/LinePattern.hpp
-    include/skygate/core/math/MathConstants.hpp
-    include/skygate/core/math/TimeConstants.hpp
-    include/skygate/core/math/PhysicalConstants.hpp
-    include/skygate/core/math/ProjectedPolylineBuilder.hpp
-    include/skygate/core/math/Rect2d.hpp
-    include/skygate/core/math/RectOccupancyGrid.hpp
-    include/skygate/core/math/SphericalGeometry.hpp
-    include/skygate/core/math/Vector2d.hpp
-    include/skygate/core/math/ViewportMath.hpp
-    include/skygate/core/projections/AzimuthalEquidistantProjection.hpp
-    include/skygate/core/projections/PerspectiveProjection.hpp
-    include/skygate/core/projections/StereographicProjection.hpp
+    src/IProjection.hpp
+    src/PreparedProjection.hpp
+    src/ITimeSource.hpp
+    src/ProjectionFactory.hpp
+    src/EquatorialCoordinate.hpp
+    src/GeoLocation.hpp
+    src/HorizontalCoordinate.hpp
+    src/ProjectionParams.hpp
+    src/ProjectionStatus.hpp
+    src/ProjectionType.hpp
+    src/ScreenPoint.hpp
+    src/SkyContext.hpp
+    src/SystemTimeSource.hpp
+    src/UtcTimeCodec.hpp
+    src/UtcTimePoint.hpp
+    src/math/AngleMath.hpp
+    src/math/CircleHitIndex.hpp
+    src/math/CircleHitTarget.hpp
+    src/math/Geometry2d.hpp
+    src/math/LineSegment2d.hpp
+    src/math/LinePattern.hpp
+    src/math/MathConstants.hpp
+    src/math/TimeConstants.hpp
+    src/math/PhysicalConstants.hpp
+    src/math/ProjectedPolylineBuilder.hpp
+    src/math/Rect2d.hpp
+    src/math/RectOccupancyGrid.hpp
+    src/math/SphericalGeometry.hpp
+    src/math/Vector2d.hpp
+    src/math/ViewportMath.hpp
+    src/projections/AzimuthalEquidistantProjection.hpp
+    src/projections/PerspectiveProjection.hpp
+    src/projections/StereographicProjection.hpp
     src/EquatorialCoordinate.cpp
     src/GeoLocation.cpp
     src/HorizontalCoordinate.cpp
@@ -64,7 +64,7 @@ add_library(skygate-core STATIC
 
 target_include_directories(skygate-core
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_compile_features(skygate-core PUBLIC cxx_std_20)

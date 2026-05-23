@@ -12,8 +12,8 @@
 #include "SkyTheme.hpp"
 #include "catalog/SkyActiveCatalogBuilder.hpp"
 
-#include "skygate/core/math/ViewportMath.hpp"
-#include "skygate/ephemeris/CelestialReferenceCalculator.hpp"
+#include "math/ViewportMath.hpp"
+#include "CelestialReferenceCalculator.hpp"
 
 #include <algorithm>
 #include <cmath>

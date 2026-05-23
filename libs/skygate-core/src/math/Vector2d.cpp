@@ -1,1 +1,1 @@
-#include "skygate/core/math/Vector2d.hpp"
+#include "math/Vector2d.hpp"

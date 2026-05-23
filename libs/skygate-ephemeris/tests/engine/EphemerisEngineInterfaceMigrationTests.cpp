@@ -1,5 +1,5 @@
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "IEphemerisEngine.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
 

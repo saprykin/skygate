@@ -3,9 +3,9 @@
 #include "SkyQtTimeCodec.hpp"
 #include "TimeZoneCatalogModel.hpp"
 
-#include "skygate/core/ITimeSource.hpp"
-#include "skygate/core/SystemTimeSource.hpp"
-#include "skygate/core/UtcTimeCodec.hpp"
+#include "ITimeSource.hpp"
+#include "SystemTimeSource.hpp"
+#include "UtcTimeCodec.hpp"
 
 #include <QDate>
 #include <QRegularExpression>

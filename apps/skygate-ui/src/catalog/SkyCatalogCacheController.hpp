@@ -2,8 +2,8 @@
 
 #include "SkySettingsStore.hpp"
 
-#include "skygate/ephemeris/ConstellationData.hpp"
-#include "skygate/ephemeris/IStarCatalog.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "catalog/IStarCatalog.hpp"
 
 #include <QByteArray>
 #include <QString>

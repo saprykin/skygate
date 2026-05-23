@@ -2,8 +2,8 @@
 
 #include "SkyContextControllerSupport.hpp"
 
-#include "skygate/core/ProjectionFactory.hpp"
-#include "skygate/core/math/ViewportMath.hpp"
+#include "ProjectionFactory.hpp"
+#include "math/ViewportMath.hpp"
 
 #include <algorithm>
 #include <cmath>

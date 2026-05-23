@@ -1,4 +1,4 @@
-#include "skygate/ephemeris/StellariumConstellationParser.hpp"
+#include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
 #include "catalog/stellarium/StellariumLineRefExtractor.hpp"

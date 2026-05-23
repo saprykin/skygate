@@ -2,8 +2,8 @@
 
 #include "SkySceneModelTestSupport.hpp"
 
-#include "skygate/ephemeris/EphemerisEngineQueries.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
+#include "EphemerisEngineQueries.hpp"
+#include "IEphemerisEngine.hpp"
 
 #include <chrono>
 #include <memory>

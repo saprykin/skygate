@@ -2,8 +2,8 @@
 
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 
-#include "skygate/ephemeris/EphemerisDataManifest.hpp"
-#include "skygate/ephemeris/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 
 #include <cstdint>
 #include <filesystem>

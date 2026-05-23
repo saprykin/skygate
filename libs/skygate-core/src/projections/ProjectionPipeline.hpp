@@ -1,7 +1,7 @@
 #pragma once
 
-#include "skygate/core/ProjectionParams.hpp"
-#include "skygate/core/ScreenPoint.hpp"
+#include "ProjectionParams.hpp"
+#include "ScreenPoint.hpp"
 
 namespace skygate::core {
 

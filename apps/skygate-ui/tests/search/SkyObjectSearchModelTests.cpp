@@ -2,8 +2,8 @@
 
 #include "SkyObjectSearchModel.hpp"
 
-#include "skygate/core/EquatorialCoordinate.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "Types.hpp"
 
 #include <optional>
 #include <string>

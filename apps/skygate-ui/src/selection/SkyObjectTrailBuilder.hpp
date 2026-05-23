@@ -2,11 +2,11 @@
 
 #include "SkyRenderBuilders.hpp"
 
-#include "skygate/core/PreparedProjection.hpp"
-#include "skygate/core/EquatorialCoordinate.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/ephemeris/BodyTrailCalculator.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "PreparedProjection.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "SkyContext.hpp"
+#include "BodyTrailCalculator.hpp"
+#include "Types.hpp"
 
 #include <cstdint>
 #include <optional>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "skygate/ephemeris/ConstellationData.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <cstddef>
 #include <span>

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "skygate/core/EquatorialCoordinate.hpp"
-#include "skygate/core/HorizontalCoordinate.hpp"
-#include "skygate/ephemeris/EarthOrientationProvider.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "HorizontalCoordinate.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "Types.hpp"
 
 #include <cstddef>
 #include <memory>

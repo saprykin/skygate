@@ -1,7 +1,7 @@
 #include "engine/highprecision/FrameTransformer.hpp"
 
-#include "skygate/ephemeris/LeapSecondProvider.hpp"
-#include "skygate/ephemeris/TimeScaleService.hpp"
+#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

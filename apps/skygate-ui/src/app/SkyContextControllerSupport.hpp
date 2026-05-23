@@ -7,10 +7,10 @@
 #include <QStringList>
 
 #include "SkyTheme.hpp"
-#include "skygate/core/ProjectionType.hpp"
-#include "skygate/core/SkyContext.hpp"
-#include "skygate/core/UtcTimePoint.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "ProjectionType.hpp"
+#include "SkyContext.hpp"
+#include "UtcTimePoint.hpp"
+#include "Types.hpp"
 
 #include <optional>
 #include <string>

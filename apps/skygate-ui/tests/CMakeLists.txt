@@ -138,10 +138,6 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 60
 )
-target_include_directories(skygate-ui-context-controller-ephemeris-settings-tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src
-)
 add_skygate_ui_qtest(
     skygate-ui-context-controller-timeline-tests
     app/SkyContextControllerTimelineTests.cpp
@@ -165,10 +161,6 @@ add_skygate_ui_qtest(
     app/SkyAcceptanceMatrixTests.cpp
     LABELS "integration;acceptance"
     TIMEOUT 60
-)
-target_include_directories(skygate-ui-acceptance-matrix-tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src
 )
 add_skygate_ui_qtest(
     skygate-ui-context-controller-night-catalog-tests
@@ -232,10 +224,6 @@ add_skygate_ui_qtest(
     diagnostics/PerformanceGuardTests.cpp
     LABELS integration perf platform slow advisory
     TIMEOUT 120
-)
-target_include_directories(skygate-ui-performance-guard-tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src
 )
 add_skygate_ui_qtest(
     skygate-ui-resource-diagnostics-tests

@@ -2,7 +2,7 @@
 
 #include "SkyContextControllerSupport.hpp"
 
-#include "skygate/core/math/Geometry2d.hpp"
+#include "math/Geometry2d.hpp"
 
 #include <algorithm>
 #include <cmath>

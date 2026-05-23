@@ -1,4 +1,4 @@
-#include "skygate/core/math/PhysicalConstants.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <QtTest/QtTest>
 

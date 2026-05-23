@@ -5,9 +5,9 @@
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 
-#include "skygate/ephemeris/EphemerisPrecisionPolicy.hpp"
-#include "skygate/ephemeris/IEphemerisEngine.hpp"
-#include "skygate/ephemeris/Types.hpp"
+#include "EphemerisPrecisionPolicy.hpp"
+#include "IEphemerisEngine.hpp"
+#include "Types.hpp"
 
 #include <QElapsedTimer>
 #include <QStringList>

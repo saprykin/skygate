@@ -10,7 +10,7 @@ target_link_libraries(skygate-test-support
 
 target_include_directories(skygate-test-support
     INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_features(skygate-test-support INTERFACE cxx_std_20)
