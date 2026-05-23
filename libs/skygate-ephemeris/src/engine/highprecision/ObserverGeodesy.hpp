@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/HighPrecisionTypes.hpp"
 #include "skygate/core/GeoLocation.hpp"
 
 #include <optional>

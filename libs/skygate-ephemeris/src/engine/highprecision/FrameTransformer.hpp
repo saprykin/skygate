@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/HighPrecisionTypes.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -64,12 +64,14 @@ public:
         std::vector<CelestialFrameTransformResult> results;
         results.reserve(request.vectors.size());
         for (const CelestialFrameVector& vector : request.vectors) {
-            results.push_back(transformCelestialVector(CelestialFrameTransformRequest{
-                .sourceFrame = request.sourceFrame,
-                .targetFrame = request.targetFrame,
-                .epoch = request.epoch,
-                .vector = vector,
-            }));
+            results.push_back(transformCelestialVector(
+                CelestialFrameTransformRequest{
+                    .sourceFrame = request.sourceFrame,
+                    .targetFrame = request.targetFrame,
+                    .epoch = request.epoch,
+                    .vector = vector,
+                }
+            ));
         }
         return results;
     }
@@ -82,8 +84,8 @@ public:
         std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider = nullptr
     );
 
-    [[nodiscard]] CelestialFrameTransformResult transformCelestialVector(const CelestialFrameTransformRequest& request
-    ) const override;
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override;
     [[nodiscard]] std::vector<CelestialFrameTransformResult>
     transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const override;
 

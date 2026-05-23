@@ -1,4 +1,5 @@
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "engine/highprecision/ICalcephKernelProvider.hpp"
 
 #include <QFile>
 #include <QStringList>

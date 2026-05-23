@@ -76,17 +76,6 @@ refractionCorrectionDegrees(const double altitudeDeg, const EphemerisEngineOptio
 
 }  // namespace
 
-HighPrecisionCalculatorResult IAtmosphericRefractionCalculator::apply(
-    const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
-) const
-{
-    HighPrecisionCalculatorResult result = calculatorResult;
-    if (isRequested(input.request)) {
-        markUnavailable(result.metadata);
-    }
-    return result;
-}
-
 HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
     const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
 ) const

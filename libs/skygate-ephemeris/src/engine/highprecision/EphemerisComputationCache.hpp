@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IEphemerisComputationCache.hpp"
 
 #include <cstddef>
 #include <deque>
