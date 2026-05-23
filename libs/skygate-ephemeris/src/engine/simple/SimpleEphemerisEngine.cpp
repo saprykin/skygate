@@ -1,5 +1,4 @@
 #include "engine/simple/SimpleEphemerisEngine.hpp"
-
 #include "StringUtilities.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 #include "EphemerisRequestFactory.hpp"

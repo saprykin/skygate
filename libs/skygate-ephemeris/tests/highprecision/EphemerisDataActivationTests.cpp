@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/EphemerisDataActivation.hpp"
 
 #include <QDir>
@@ -75,7 +76,7 @@ void writeFile(const QString& path, const QByteArray& payload)
     const int startYear, const int endYear, std::string id = "test-range", std::string displayName = "Test range"
 )
 {
-    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = startYear,
             .month = 1,
@@ -83,7 +84,7 @@ void writeFile(const QString& path, const QByteArray& payload)
             .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = endYear,
             .month = 1,

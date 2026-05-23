@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "SkyEphemerisDataManager.hpp"
 
 #include "SettingsTestFixture.hpp"
@@ -73,7 +74,7 @@ SkySettingsStore::EphemerisDataCacheSnapshot installedSnapshot(
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 2000,
             .month = 1,
@@ -81,7 +82,7 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
             .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 2100,
             .month = 1,

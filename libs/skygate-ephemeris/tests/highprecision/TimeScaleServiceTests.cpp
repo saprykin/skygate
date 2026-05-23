@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/DeltaTProvider.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
@@ -107,7 +108,7 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
     const std::uint32_t nanosecond = 0U
 )
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = year,
             .month = month,
@@ -175,21 +176,21 @@ private slots:
 
 void TimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
 {
-    const std::optional<int> oneBceAstronomicalYear = skygate::ephemeris::astronomicalYearFromHistoricalYear(-1);
+    const std::optional<int> oneBceAstronomicalYear = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(oneBceAstronomicalYear.has_value());
     QCOMPARE(*oneBceAstronomicalYear, 0);
-    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
-    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(-1), -2);
-    QVERIFY(!skygate::ephemeris::astronomicalYearFromHistoricalYear(0).has_value());
+    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
+    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(-1), -2);
+    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
 
     const skygate::ephemeris::AstronomicalEpoch oneBce =
         makeEpoch(skygate::ephemeris::TimeScale::Tt, *oneBceAstronomicalYear, 12, 31, 12, 0, 0);
     const std::optional<skygate::ephemeris::CivilDateTime> roundTrip =
-        skygate::ephemeris::civilDateTimeFromAstronomicalEpoch(oneBce);
+        skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(oneBce);
 
     QVERIFY(roundTrip.has_value());
     QCOMPARE(roundTrip->astronomicalYear, 0);
-    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
+    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
     QCOMPARE(roundTrip->month, 12);
     QCOMPARE(roundTrip->day, 31);
     QCOMPARE(roundTrip->hour, 12);
@@ -283,8 +284,8 @@ void TimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
         .second = 60,
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     };
-    QVERIFY(skygate::ephemeris::isValidCivilDateTime(leapSecond));
-    QVERIFY(!skygate::ephemeris::astronomicalEpochFromCivilDateTime(leapSecond).has_value());
+    QVERIFY(skygate::ephemeris::CalendarTime::isValidCivilDateTime(leapSecond));
+    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(leapSecond).has_value());
 
     const skygate::ephemeris::TimeScaleConversionResult tai =
         service.convertCivilDateTime(leapSecond, skygate::ephemeris::TimeScale::Tai);

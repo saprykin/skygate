@@ -1,5 +1,4 @@
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
-
 #include "math/AngleMath.hpp"
 
 #include <cmath>

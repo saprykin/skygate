@@ -1,8 +1,9 @@
 #include "CelestialReferenceCalculator.hpp"
 #include "math/TimeConstants.hpp"
-#include "engine/simple/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
+#include "time/AstronomicalTime.hpp"
+#include "time/EpochCodec.hpp"
 
 #include <cmath>
 
@@ -14,7 +15,7 @@ core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
     const double eclipticLongitudeDeg, const core::GeoLocation& observer, const core::UtcTimePoint& utcTime
 ) noexcept
 {
-    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(AstronomicalTime::daysSinceJ2000(utcTime));
+    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(EpochCodec::daysSinceJ2000(utcTime));
     return EquatorialToHorizontalCalculator::compute(
         EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, 0.0, obliquityDeg), observer, utcTime
     );

@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
 
 #include <QtTest/QtTest>
@@ -42,7 +43,7 @@ private:
 
 [[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = year,
             .month = month,

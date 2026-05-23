@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 #include "SkyOverlayTestSupport.hpp"
 #include "SkyTimeController.hpp"
@@ -423,14 +424,14 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
     metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
         .displayName = "DE440s short-range kernel",
-        .start = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        .start = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
             skygate::ephemeris::CivilDateTime{
                 .astronomicalYear = 1849,
                 .month = 12,
                 .day = 26,
             }
         ),
-        .end = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        .end = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
             skygate::ephemeris::CivilDateTime{
                 .astronomicalYear = 2150,
                 .month = 1,
@@ -450,7 +451,7 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
+        .epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
         .options = skygate::ephemeris::EphemerisEngineOptions{
             .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
@@ -483,7 +484,7 @@ void SkySelectionOverlayBuilderTests::inspectorUsesHighPrecisionStateForSelected
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
+        .epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
         .options = skygate::ephemeris::EphemerisEngineOptions{
             .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
@@ -544,7 +545,7 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        .epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
             skygate::ephemeris::CivilDateTime{
                 .astronomicalYear = 1970,
                 .month = 1,
@@ -593,7 +594,7 @@ void SkySelectionOverlayBuilderTests::inspectorAvoidsSynchronousHighPrecisionEve
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "mars";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+        .epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
             skygate::ephemeris::CivilDateTime{
                 .astronomicalYear = 2024,
                 .month = 6,

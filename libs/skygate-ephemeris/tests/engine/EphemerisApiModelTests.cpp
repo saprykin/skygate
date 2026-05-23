@@ -1,8 +1,9 @@
+#include "time/CalendarTime.hpp"
 #include "EphemerisEngineFactory.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "Types.hpp"
 #include "UtcTimeCodec.hpp"
-#include "engine/simple/AstronomicalTime.hpp"
+#include "time/AstronomicalEpoch.hpp"
 
 #include <QtTest/QtTest>
 
@@ -208,7 +209,7 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
 
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::fromContext(context, options);
-    QVERIFY(skygate::ephemeris::AstronomicalTime::hasExplicitEpoch(request.epoch));
+    QVERIFY(skygate::ephemeris::hasExplicitEpoch(request.epoch));
     QCOMPARE(
         static_cast<std::uint8_t>(request.options.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
@@ -306,7 +307,7 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
         .second = 0,
         .timeScale = skygate::ephemeris::TimeScale::Tt,
     };
-    const auto j2000Epoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(j2000Noon);
+    const auto j2000Epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(j2000Noon);
     QVERIFY(j2000Epoch.has_value());
     QCOMPARE(j2000Epoch->julianDatePart1, 2'451'545.0);
     QCOMPARE(j2000Epoch->julianDatePart2, 0.0);
@@ -328,9 +329,9 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     };
 
-    const auto preciseEpoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(preciseDateTime);
+    const auto preciseEpoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(preciseDateTime);
     QVERIFY(preciseEpoch.has_value());
-    const auto preciseRoundTrip = skygate::ephemeris::civilDateTimeFromAstronomicalEpoch(*preciseEpoch);
+    const auto preciseRoundTrip = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(*preciseEpoch);
     QVERIFY(preciseRoundTrip.has_value());
     QCOMPARE(preciseRoundTrip->astronomicalYear, preciseDateTime.astronomicalYear);
     QCOMPARE(preciseRoundTrip->month, preciseDateTime.month);
@@ -349,31 +350,32 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
         .day = 1,
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     };
-    const auto yearZeroEpoch = skygate::ephemeris::astronomicalEpochFromCivilDateTime(astronomicalYearZero);
+    const auto yearZeroEpoch =
+        skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(astronomicalYearZero);
     QVERIFY(yearZeroEpoch.has_value());
-    const auto yearZeroRoundTrip = skygate::ephemeris::civilDateTimeFromAstronomicalEpoch(*yearZeroEpoch);
+    const auto yearZeroRoundTrip = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(*yearZeroEpoch);
     QVERIFY(yearZeroRoundTrip.has_value());
     QCOMPARE(yearZeroRoundTrip->astronomicalYear, 0);
     QCOMPARE(yearZeroRoundTrip->month, 1);
     QCOMPARE(yearZeroRoundTrip->day, 1);
 
-    const auto astronomicalFromOneBce = skygate::ephemeris::astronomicalYearFromHistoricalYear(-1);
+    const auto astronomicalFromOneBce = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(astronomicalFromOneBce.has_value());
     QCOMPARE(*astronomicalFromOneBce, 0);
-    const auto astronomicalFromFortyFourBce = skygate::ephemeris::astronomicalYearFromHistoricalYear(-44);
+    const auto astronomicalFromFortyFourBce = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-44);
     QVERIFY(astronomicalFromFortyFourBce.has_value());
     QCOMPARE(*astronomicalFromFortyFourBce, -43);
-    QVERIFY(!skygate::ephemeris::astronomicalYearFromHistoricalYear(0).has_value());
-    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(0), -1);
-    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(-43), -44);
-    QCOMPARE(skygate::ephemeris::historicalYearFromAstronomicalYear(2026), 2026);
+    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
+    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(0), -1);
+    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(-43), -44);
+    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(2026), 2026);
 
     const skygate::ephemeris::CivilDateTime invalidLeapDay{
         .astronomicalYear = 2023,
         .month = 2,
         .day = 29,
     };
-    QVERIFY(!skygate::ephemeris::astronomicalEpochFromCivilDateTime(invalidLeapDay).has_value());
+    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(invalidLeapDay).has_value());
 
     const skygate::ephemeris::CivilDateTime leapSecondLabel{
         .astronomicalYear = 2016,
@@ -384,8 +386,8 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
         .second = 60,
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     };
-    QVERIFY(skygate::ephemeris::isValidCivilDateTime(leapSecondLabel));
-    QVERIFY(!skygate::ephemeris::astronomicalEpochFromCivilDateTime(leapSecondLabel).has_value());
+    QVERIFY(skygate::ephemeris::CalendarTime::isValidCivilDateTime(leapSecondLabel));
+    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(leapSecondLabel).has_value());
 }
 
 void EphemerisApiModelTests::constructsFactoryRequestDefaults()

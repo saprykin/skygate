@@ -1,4 +1,5 @@
-#include "engine/simple/AstronomicalTime.hpp"
+#include "time/CalendarTime.hpp"
+#include "time/AstronomicalTime.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
 #include "UtcTimeCodec.hpp"
 #include "math/AngleMath.hpp"
@@ -416,7 +417,7 @@ void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSear
     );
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext();
-    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    request.epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 2024,
             .month = 6,
@@ -442,7 +443,7 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext(0.0, 0.0);
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
-    request.epoch = *skygate::ephemeris::astronomicalEpochFromCivilDateTime(
+    request.epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
         skygate::ephemeris::CivilDateTime{
             .astronomicalYear = 1970,
             .month = 1,

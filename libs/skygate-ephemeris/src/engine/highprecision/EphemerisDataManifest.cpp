@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 
 #include <QByteArray>
@@ -74,7 +75,7 @@ constexpr double kMaxExactJsonInteger = 9007199254740991.0;
     dateTime.month = month;
     dateTime.day = day;
     dateTime.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(dateTime)) {
+    if (!CalendarTime::isValidCivilDateTime(dateTime)) {
         return std::nullopt;
     }
 
@@ -89,18 +90,7 @@ constexpr double kMaxExactJsonInteger = 9007199254740991.0;
         return std::nullopt;
     }
 
-    return astronomicalEpochFromCivilDateTime(*dateTime);
-}
-
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
-}
-
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
+    return CalendarTime::astronomicalEpochFromCivilDateTime(*dateTime);
 }
 
 [[nodiscard]] bool hasNonEmptyString(const QJsonObject& object, const QString& key) noexcept

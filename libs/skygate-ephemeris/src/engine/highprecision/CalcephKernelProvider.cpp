@@ -25,17 +25,6 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
 
 using core::PhysicalConstants;
 
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
-}
-
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
-{
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
-}
-
 void addDiagnostic(std::vector<std::string>& diagnostics, std::string diagnostic)
 {
     diagnostics.push_back(std::move(diagnostic));

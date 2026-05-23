@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
@@ -91,7 +92,7 @@ constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d11
 [[nodiscard]] AstronomicalEpoch makeCivilEpoch(const int year, const int month, const int day)
 {
     const std::optional<AstronomicalEpoch> epoch =
-        astronomicalEpochFromCivilDateTime(CivilDateTime{.astronomicalYear = year, .month = month, .day = day});
+        CalendarTime::astronomicalEpochFromCivilDateTime(CivilDateTime{.astronomicalYear = year, .month = month, .day = day});
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -341,7 +342,7 @@ public:
     convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
-        const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(dateTime);
+        const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         result.epoch = epoch.value_or(AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
         result.status = epoch.has_value() ? TimeScaleConversionStatus::Valid : TimeScaleConversionStatus::Failed;

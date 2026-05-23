@@ -1,7 +1,6 @@
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
-
-#include "engine/simple/AstronomicalTime.hpp"
 #include "math/AngleMath.hpp"
+#include "time/AstronomicalTime.hpp"
 
 #include <cmath>
 

@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "EphemerisFixtureSupport.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
@@ -114,7 +115,7 @@ public:
     [[nodiscard]] TimeScaleConversionResult
     convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
     {
-        const std::optional<AstronomicalEpoch> epoch = astronomicalEpochFromCivilDateTime(dateTime);
+        const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (!epoch.has_value()) {
             TimeScaleConversionResult result;
             result.status = TimeScaleConversionStatus::Failed;

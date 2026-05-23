@@ -1,3 +1,4 @@
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/HighPrecisionTextParser.hpp"
 
 #include <charconv>
@@ -114,7 +115,7 @@ std::optional<CivilDateTime> HighPrecisionTextParser::parseUtcDate(std::string_v
     dateTime.month = month;
     dateTime.day = day;
     dateTime.timeScale = TimeScale::Utc;
-    if (!isValidCivilDateTime(dateTime)) {
+    if (!CalendarTime::isValidCivilDateTime(dateTime)) {
         return std::nullopt;
     }
 
