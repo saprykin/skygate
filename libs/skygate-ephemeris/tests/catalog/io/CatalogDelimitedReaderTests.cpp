@@ -70,9 +70,7 @@ void CatalogDelimitedReaderTests::readerHandlesBomBlankRowsCrlfAndFinalLineWitho
     const auto result = skygate::ephemeris::DelimitedCatalogReader::read(
         std::string_view(payload),
         options,
-        [&names](
-            const skygate::ephemeris::DelimitedCatalogReader::Row& row, skygate::ephemeris::CatalogBodyParseResult&
-        ) {
+        [&names](const skygate::ephemeris::DelimitedCatalogRow& row, skygate::ephemeris::CatalogBodyParseResult&) {
             names.push_back(row.decodeColumn(QStringLiteral("NAME")));
             return true;
         }
@@ -111,8 +109,7 @@ void CatalogDelimitedReaderTests::readerStopsOnHandlerFailureAndPreservesPartial
         std::string_view("name,value\nAlpha,1\nBeta,2\n"),
         options,
         [&handledRows](
-            const skygate::ephemeris::DelimitedCatalogReader::Row&,
-            skygate::ephemeris::CatalogBodyParseResult& parseResult
+            const skygate::ephemeris::DelimitedCatalogRow&, skygate::ephemeris::CatalogBodyParseResult& parseResult
         ) {
             ++handledRows;
             parseResult.errorCode = skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv;

@@ -53,7 +53,7 @@ OpenNgcCatalogParser::parse(const std::string_view csvData, const HygParseProgre
                                     "Name, Type, RA, Dec.",
             .rowLimitDetail = "OpenNGC CSV payload exceeds the supported row limit.",
         },
-        [&](const DelimitedCatalogReader::Row& row, CatalogBodyParseResult& rowResult) {
+        [&](const DelimitedCatalogRow& row, CatalogBodyParseResult& rowResult) {
             ++dataRowNumber;
             const QString typeText = row.decodeColumn(QStringLiteral("Type"));
             if (OpenNgcObjectMapper::shouldSkipType(typeText)) {

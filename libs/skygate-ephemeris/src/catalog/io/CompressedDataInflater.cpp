@@ -9,12 +9,12 @@ namespace {
 
 constexpr std::size_t kMaxInflatedCatalogBytes = 768U << 20;
 
-int windowBitsForFormat(const CompressedDataFormat format)
+int windowBitsForFormat(const CompressedDataInflater::Format format)
 {
     switch (format) {
-    case CompressedDataFormat::Gzip:
+    case CompressedDataInflater::Format::Gzip:
         return 16 + MAX_WBITS;
-    case CompressedDataFormat::RawDeflate:
+    case CompressedDataInflater::Format::RawDeflate:
         return -MAX_WBITS;
     }
 
@@ -24,9 +24,7 @@ int windowBitsForFormat(const CompressedDataFormat format)
 }  // namespace
 
 std::optional<std::string> CompressedDataInflater::inflate(
-    const std::string_view compressedData,
-    const CompressedDataFormat format,
-    const CompressedDataInflateOptions& options
+    const std::string_view compressedData, const Format format, const CompressedDataInflateOptions& options
 )
 {
     if (compressedData.empty()) {

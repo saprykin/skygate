@@ -49,7 +49,7 @@ std::optional<std::string> ZipEntryExtractor::extract(const std::string_view zip
     if (entry.compressionMethod == 8U) {
         return CompressedDataInflater::inflate(
             compressedData,
-            CompressedDataFormat::RawDeflate,
+            CompressedDataInflater::Format::RawDeflate,
             CompressedDataInflateOptions{.expectedOutputBytes = entry.uncompressedSize, .allowEmptyOutput = false}
         );
     }

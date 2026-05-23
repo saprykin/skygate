@@ -29,7 +29,7 @@ void CatalogArchiveInflaterTests::inflatesGzipCsvPayloads()
     };
     const std::string_view compressedData(reinterpret_cast<const char*>(kCompressedCsv.data()), kCompressedCsv.size());
 
-    const auto inflated = CompressedDataInflater::inflate(compressedData, CompressedDataFormat::Gzip);
+    const auto inflated = CompressedDataInflater::inflate(compressedData, CompressedDataInflater::Format::Gzip);
 
     QVERIFY(inflated.has_value());
     QVERIFY(inflated->find("hip") != std::string::npos);
@@ -46,23 +46,23 @@ void CatalogArchiveInflaterTests::inflaterRejectsInvalidInputsAndHonorsOptions()
 
     const auto inflated = CompressedDataInflater::inflate(
         rawDeflate,
-        CompressedDataFormat::RawDeflate,
+        CompressedDataInflater::Format::RawDeflate,
         CompressedDataInflateOptions{.expectedOutputBytes = 15U, .allowEmptyOutput = false}
     );
     QVERIFY(inflated.has_value());
     QCOMPARE(*inflated, std::string("alpha,beta\n1,2\n"));
 
-    QVERIFY(!CompressedDataInflater::inflate("", CompressedDataFormat::RawDeflate).has_value());
-    QVERIFY(!CompressedDataInflater::inflate("not compressed", CompressedDataFormat::RawDeflate).has_value());
+    QVERIFY(!CompressedDataInflater::inflate("", CompressedDataInflater::Format::RawDeflate).has_value());
+    QVERIFY(!CompressedDataInflater::inflate("not compressed", CompressedDataInflater::Format::RawDeflate).has_value());
     QVERIFY(!CompressedDataInflater::inflate(
                  rawDeflate,
-                 CompressedDataFormat::RawDeflate,
+                 CompressedDataInflater::Format::RawDeflate,
                  CompressedDataInflateOptions{.expectedOutputBytes = 16U, .allowEmptyOutput = false}
     )
                  .has_value());
     QVERIFY(!CompressedDataInflater::inflate(
                  rawDeflate,
-                 CompressedDataFormat::RawDeflate,
+                 CompressedDataInflater::Format::RawDeflate,
                  CompressedDataInflateOptions{
                      .expectedOutputBytes = std::numeric_limits<std::size_t>::max(), .allowEmptyOutput = false
                  }
@@ -73,10 +73,10 @@ void CatalogArchiveInflaterTests::inflaterRejectsInvalidInputsAndHonorsOptions()
     const std::string_view emptyRawDeflate(
         reinterpret_cast<const char*>(kEmptyRawDeflate.data()), kEmptyRawDeflate.size()
     );
-    QVERIFY(!CompressedDataInflater::inflate(emptyRawDeflate, CompressedDataFormat::RawDeflate).has_value());
+    QVERIFY(!CompressedDataInflater::inflate(emptyRawDeflate, CompressedDataInflater::Format::RawDeflate).has_value());
     const auto emptyInflated = CompressedDataInflater::inflate(
         emptyRawDeflate,
-        CompressedDataFormat::RawDeflate,
+        CompressedDataInflater::Format::RawDeflate,
         CompressedDataInflateOptions{.expectedOutputBytes = 0U, .allowEmptyOutput = true}
     );
     QVERIFY(emptyInflated.has_value());

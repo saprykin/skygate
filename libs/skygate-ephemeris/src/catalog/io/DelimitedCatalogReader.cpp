@@ -3,40 +3,13 @@
 #include "catalog/io/CsvRowTokenizer.hpp"
 
 #include <algorithm>
-#include <utility>
 
 namespace skygate::ephemeris {
 
-DelimitedCatalogReader::Row::Row(QVector<QStringView> columns, const QHash<QString, qsizetype>& headerIndex) noexcept
-    : m_columns(std::move(columns)), m_headerIndex(headerIndex)
-{
-}
-
-QString DelimitedCatalogReader::Row::decodeColumn(const QString& name) const
-{
-    return decodeColumn(columnIndex(name));
-}
-
-QString DelimitedCatalogReader::Row::decodeColumn(const qsizetype columnIndex) const
-{
-    if (columnIndex < 0 || columnIndex >= m_columns.size()) {
-        return {};
-    }
-
-    return CsvRowTokenizer::decodeField(m_columns.at(columnIndex)).trimmed();
-}
-
-qsizetype DelimitedCatalogReader::Row::columnIndex(const QString& name) const
-{
-    const auto it = m_headerIndex.constFind(name.toLower());
-    if (it == m_headerIndex.cend()) {
-        return -1;
-    }
-    return *it;
-}
-
 CatalogBodyParseResult DelimitedCatalogReader::read(
-    const std::string_view payload, const DelimitedCatalogReaderOptions& options, const RowHandler& rowHandler
+    const std::string_view payload,
+    const DelimitedCatalogReaderOptions& options,
+    const DelimitedCatalogRowHandler& rowHandler
 )
 {
     CatalogBodyParseResult result;
@@ -94,7 +67,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
                     return result;
                 }
 
-                Row row(std::move(columns), headerIndex);
+                DelimitedCatalogRow row(std::move(columns), headerIndex);
                 if (rowHandler && !rowHandler(row, result)) {
                     return result;
                 }
