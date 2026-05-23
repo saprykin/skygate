@@ -24,7 +24,7 @@ bool SkyActiveCatalogBuildResult::isSuccess() const noexcept
 SkyActiveCatalogBuildResult SkyActiveCatalogBuilder::build(const SkyActiveCatalogBuildRequest& request)
 {
     SkyActiveCatalogBuildResult result;
-    auto activeCatalog = skygate::ephemeris::composeActiveCatalog(
+    auto activeCatalog = skygate::ephemeris::CatalogComposer::compose(
         {.sourceCatalog = request.sourceCatalog,
          .deepSkyCatalog = request.deepSkyCatalog,
          .useBundledDeepSkyCatalog = request.useBundledDeepSkyCatalog,

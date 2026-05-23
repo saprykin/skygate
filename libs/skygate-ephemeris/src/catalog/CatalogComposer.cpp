@@ -38,14 +38,7 @@ void assignCompositionCounts(
 
 }  // namespace
 
-bool ActiveCatalogCompositionResult::isSuccess() const noexcept
-{
-    return catalog != nullptr;
-}
-
-ActiveCatalogCompositionResult composeActiveCatalog(
-    const ActiveCatalogCompositionRequest& request
-)
+ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompositionRequest& request)
 {
     ActiveCatalogCompositionResult result;
     const IStarCatalog* deepSkyCatalog = request.deepSkyCatalog;
@@ -63,11 +56,8 @@ ActiveCatalogCompositionResult composeActiveCatalog(
             result.foundDeepSkyObjectCount = catalog_identity::countDeepSkyObjects(deepSkyCatalog->bodies());
         }
 
-        DeepSkyCatalogMergeResult merged = DeepSkyCatalogMerger::merge(
-            active.bodies,
-            active.sourceKinds,
-            deepSkyCatalog->bodies()
-        );
+        DeepSkyCatalogMergeResult merged =
+            DeepSkyCatalogMerger::merge(active.bodies, active.sourceKinds, deepSkyCatalog->bodies());
         active.bodies = std::move(merged.bodies);
         active.sourceKinds = std::move(merged.sourceKinds);
     }

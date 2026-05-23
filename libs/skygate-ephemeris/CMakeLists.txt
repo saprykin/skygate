@@ -96,6 +96,9 @@ endif()
 add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}
     ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
+    include/skygate/ephemeris/ActiveCatalogCompositionRequest.hpp
+    include/skygate/ephemeris/ActiveCatalogCompositionResult.hpp
+    include/skygate/ephemeris/CatalogCompositionSource.hpp
     include/skygate/ephemeris/CatalogLoadResult.hpp
     include/skygate/ephemeris/BodyTrailCalculator.hpp
     include/skygate/ephemeris/BodyTrailOptions.hpp
@@ -145,7 +148,10 @@ add_library(skygate-ephemeris STATIC
     src/StringUtilities.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
     src/catalog/model/CatalogIdentity.cpp
+    src/catalog/ActiveCatalogCompositionRequest.cpp
+    src/catalog/ActiveCatalogCompositionResult.cpp
     src/catalog/CatalogComposer.cpp
+    src/catalog/CatalogCompositionSource.cpp
     src/catalog/normalize/CatalogParsingUtilities.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoader.cpp

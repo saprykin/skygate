@@ -100,7 +100,7 @@ void CatalogComposerTests::tagsPrimaryAndBuiltInSources()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog});
+    auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *sourceCatalog});
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.sourceKinds.size(), result.catalog->bodies().size());
@@ -130,7 +130,7 @@ void CatalogComposerTests::replacesPrimaryDeepSkyAliasWithDownloadedObject()
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog(
+    auto result = skygate::ephemeris::CatalogComposer::compose(
         {.sourceCatalog = *sourceCatalog, .deepSkyCatalog = deepSkyCatalog.get()}
     );
 
@@ -159,7 +159,7 @@ void CatalogComposerTests::replacesDeepSkyObjectsByNormalizedPrimaryIdentity()
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog(
+    auto result = skygate::ephemeris::CatalogComposer::compose(
         {.sourceCatalog = *sourceCatalog, .deepSkyCatalog = deepSkyCatalog.get()}
     );
 
@@ -180,19 +180,22 @@ void CatalogComposerTests::bundledFallbackAddsDeepSkySourceKinds()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result =
-        skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog, .useBundledDeepSkyCatalog = true});
+    auto result = skygate::ephemeris::CatalogComposer::compose(
+        {.sourceCatalog = *sourceCatalog, .useBundledDeepSkyCatalog = true}
+    );
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.deepSkyObjectCount > 0U);
     QVERIFY(result.foundDeepSkyObjectCount > 0U);
-    QVERIFY(std::any_of(
-        result.sourceKinds.begin(),
-        result.sourceKinds.end(),
-        [](const skygate::ephemeris::CatalogCompositionSource source) {
-            return source == skygate::ephemeris::CatalogCompositionSource::DeepSky;
-        }
-    ));
+    QVERIFY(
+        std::any_of(
+            result.sourceKinds.begin(),
+            result.sourceKinds.end(),
+            [](const skygate::ephemeris::CatalogCompositionSource source) {
+                return source == skygate::ephemeris::CatalogCompositionSource::DeepSky;
+            }
+        )
+    );
 }
 
 void CatalogComposerTests::doesNotDuplicatePrimarySolarSystemBodies()
@@ -219,7 +222,7 @@ void CatalogComposerTests::doesNotDuplicatePrimarySolarSystemBodies()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog});
+    auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *sourceCatalog});
 
     QVERIFY(result.isSuccess());
     QCOMPARE(countBodiesById(result.catalog->bodies(), "sun"), 1U);
@@ -239,7 +242,7 @@ void CatalogComposerTests::addsBundledBrightStarsWhenSourceHasNoStars()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog});
+    auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *sourceCatalog});
 
     QVERIFY(result.isSuccess());
     const auto siriusIndex = bodyIndexById(result.catalog->bodies(), "sirius");
@@ -259,7 +262,7 @@ void CatalogComposerTests::doesNotAddBundledBrightStarsWhenSourceHasStars()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog});
+    auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *sourceCatalog});
 
     QVERIFY(result.isSuccess());
     QVERIFY(!bodyIndexById(result.catalog->bodies(), "sirius").has_value());
@@ -277,8 +280,9 @@ void CatalogComposerTests::usesCurrentConstellationCountWhenLarger()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result =
-        skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog, .currentConstellationCount = 12U});
+    auto result = skygate::ephemeris::CatalogComposer::compose(
+        {.sourceCatalog = *sourceCatalog, .currentConstellationCount = 12U}
+    );
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.constellationCount, 12U);
@@ -306,7 +310,7 @@ void CatalogComposerTests::ignoresNonDeepSkyRowsFromDeepSkyCatalog()
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog(
+    auto result = skygate::ephemeris::CatalogComposer::compose(
         {.sourceCatalog = *sourceCatalog, .deepSkyCatalog = deepSkyCatalog.get()}
     );
 
@@ -327,19 +331,22 @@ void CatalogComposerTests::bundledFallbackCanBeDisabled()
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto result =
-        skygate::ephemeris::composeActiveCatalog({.sourceCatalog = *sourceCatalog, .useBundledDeepSkyCatalog = false});
+    auto result = skygate::ephemeris::CatalogComposer::compose(
+        {.sourceCatalog = *sourceCatalog, .useBundledDeepSkyCatalog = false}
+    );
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, 0U);
     QCOMPARE(result.foundDeepSkyObjectCount, 0U);
-    QVERIFY(std::none_of(
-        result.sourceKinds.begin(),
-        result.sourceKinds.end(),
-        [](const skygate::ephemeris::CatalogCompositionSource source) {
-            return source == skygate::ephemeris::CatalogCompositionSource::DeepSky;
-        }
-    ));
+    QVERIFY(
+        std::none_of(
+            result.sourceKinds.begin(),
+            result.sourceKinds.end(),
+            [](const skygate::ephemeris::CatalogCompositionSource source) {
+                return source == skygate::ephemeris::CatalogCompositionSource::DeepSky;
+            }
+        )
+    );
 }
 
 void CatalogComposerTests::preservesKnownDeepSkyObjectCountWhenProvided()
@@ -358,7 +365,7 @@ void CatalogComposerTests::preservesKnownDeepSkyObjectCountWhenProvided()
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
-    auto result = skygate::ephemeris::composeActiveCatalog(
+    auto result = skygate::ephemeris::CatalogComposer::compose(
         {.sourceCatalog = *sourceCatalog, .deepSkyCatalog = deepSkyCatalog.get(), .knownDeepSkyObjectCount = 42U}
     );
 
