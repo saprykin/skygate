@@ -34,6 +34,8 @@ repository.
 - Methods/functions: `camelCase`.
 - Member variables: `m_camelCase`.
 - Local variables/parameters: `camelCase`.
+- Use `Q_UNUSED(name)` in the function body for unused parameters. Do not
+  comment out parameter names (`/* name */`).
 - Constants/macros: `kPascalCase` for constants, avoid macros unless necessary.
 - Setters are prefixed with `set` (example: `setLatitude(double latitude)`).
 - Getters use the property name directly (example: `latitude() const`).
