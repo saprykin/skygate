@@ -1,5 +1,7 @@
 #include "catalog/bundled/BundledCatalogParser.hpp"
 
+#include <QObject>
+
 #include <array>
 #include <optional>
 #include <string>
@@ -1003,8 +1005,12 @@ std::optional<double> positiveOptional(const double value)
 
 }  // namespace
 
-CatalogBodyParseResult BundledCatalogParser::parse() const
+CatalogBodyParseResult
+BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgressCallback& progressCallback) const
 {
+    Q_UNUSED(data);
+    Q_UNUSED(progressCallback);
+
     CatalogBodyParseResult result;
     result.bodies.reserve(kBundledCatalogEntries.size() + kBundledMessierEntries.size());
     for (const auto& entry : kBundledCatalogEntries) {

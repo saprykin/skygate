@@ -9,7 +9,7 @@ namespace skygate::ephemeris {
 
 struct CatalogParseRequest {
     std::string_view payload;
-    HygParseProgressCallback progressCallback;
+    CatalogParseProgressCallback progressCallback;
     CatalogSelectionOptions selectionOptions;
 };
 

@@ -107,7 +107,7 @@ void CatalogPropertyTests::randomUnknownPayloadsReturnExplicitFailures()
         if (payload.empty()) {
             QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::EmptyInput);
         } else {
-            QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown);
+            QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogSourceType::Unknown);
             QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat);
         }
     }
@@ -160,7 +160,7 @@ void CatalogPropertyTests::generatedHygPayloadsKeepExactlyTheFiniteRows()
         const auto result = parser.parseResult(payload);
 
         QVERIFY(result.isSuccess());
-        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsv);
+        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogSourceType::HygCsv);
         QCOMPARE(result.diagnostics.processedRowCount, static_cast<std::size_t>(rowCount));
         QCOMPARE(result.diagnostics.parsedBodyCount, validRows);
         QCOMPARE(result.diagnostics.selectedBodyCount, validRows);
@@ -213,7 +213,7 @@ void CatalogPropertyTests::generatedOpenNgcPayloadsKeepExactlyTheValidMappedRows
         const auto result = parser.parseResult(payload);
 
         QVERIFY(result.isSuccess());
-        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv);
+        QCOMPARE(result.detectedFormat, skygate::ephemeris::CatalogSourceType::OpenNgcCsv);
         QCOMPARE(result.diagnostics.processedRowCount, static_cast<std::size_t>(rowCount));
         QCOMPARE(result.diagnostics.parsedBodyCount, validRows);
         QCOMPARE(result.diagnostics.selectedBodyCount, validRows);

@@ -55,35 +55,35 @@ bool hasZipSignature(const std::string_view payload) noexcept
 
 }  // namespace
 
-CatalogLoadResult::PayloadFormat CatalogPayloadFormatDetector::detect(const std::string_view payload) noexcept
+CatalogSourceType CatalogPayloadFormatDetector::detect(const std::string_view payload) noexcept
 {
     if (hasGzipSignature(payload)) {
-        return CatalogLoadResult::PayloadFormat::HygCsvGzip;
+        return CatalogSourceType::HygCsvGzip;
     }
 
     if (hasZipSignature(payload)) {
-        return CatalogLoadResult::PayloadFormat::HygCsvZip;
+        return CatalogSourceType::HygCsvZip;
     }
 
     const std::string_view headerLine = firstNonEmptyLine(payload);
     if (headerLine.empty()) {
-        return CatalogLoadResult::PayloadFormat::Unknown;
+        return CatalogSourceType::Unknown;
     }
 
     if (headerLine.find(',') != std::string_view::npos && StringUtilities::containsIgnoreAsciiCase(headerLine, "ra")
         && StringUtilities::containsIgnoreAsciiCase(headerLine, "dec")
         && StringUtilities::containsIgnoreAsciiCase(headerLine, "mag")) {
-        return CatalogLoadResult::PayloadFormat::HygCsv;
+        return CatalogSourceType::HygCsv;
     }
 
     if (headerLine.find(';') != std::string_view::npos && StringUtilities::containsIgnoreAsciiCase(headerLine, "Name")
         && StringUtilities::containsIgnoreAsciiCase(headerLine, "Type")
         && StringUtilities::containsIgnoreAsciiCase(headerLine, "RA")
         && StringUtilities::containsIgnoreAsciiCase(headerLine, "Dec")) {
-        return CatalogLoadResult::PayloadFormat::OpenNgcCsv;
+        return CatalogSourceType::OpenNgcCsv;
     }
 
-    return CatalogLoadResult::PayloadFormat::Unknown;
+    return CatalogSourceType::Unknown;
 }
 
 }  // namespace skygate::ephemeris

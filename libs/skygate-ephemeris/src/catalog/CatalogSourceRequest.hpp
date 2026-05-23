@@ -9,12 +9,12 @@
 
 namespace skygate::ephemeris {
 
-using HygParseProgressCallback = std::function<void(std::size_t parsedObjectCount)>;
+using CatalogParseProgressCallback = std::function<void(std::size_t parsedObjectCount)>;
 
 struct CatalogSourceRequest {
     CatalogSourceType type = CatalogSourceType::Bundled;
     std::string_view data;
-    HygParseProgressCallback progressCallback;
+    CatalogParseProgressCallback progressCallback;
     CatalogSelectionOptions selectionOptions;
 };
 

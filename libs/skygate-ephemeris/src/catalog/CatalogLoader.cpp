@@ -1,12 +1,15 @@
 #include "catalog/CatalogLoader.hpp"
 #include "catalog/bundled/BundledCatalogParser.hpp"
 #include "catalog/CatalogBodyParseResult.hpp"
-#include "catalog/hyg/HygCatalogParser.hpp"
-#include "catalog/io/CompressedCatalogParser.hpp"
-#include "catalog/opengc/OpenNgcCatalogParser.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/hyg/HygCatalogParser.hpp"
+#include "catalog/ICatalogParser.hpp"
+#include "catalog/io/GzipCatalogParser.hpp"
+#include "catalog/io/zip/ZipCatalogParser.hpp"
+#include "catalog/opengc/OpenNgcCatalogParser.hpp"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -46,48 +49,45 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
     return result;
 }
 
+[[nodiscard]] std::unique_ptr<ICatalogParser> createParser(const CatalogSourceType type)
+{
+    switch (type) {
+    case CatalogSourceType::Bundled:
+        return std::make_unique<BundledCatalogParser>();
+    case CatalogSourceType::HygCsv:
+        return std::make_unique<HygCatalogParser>();
+    case CatalogSourceType::HygCsvGzip:
+        return std::make_unique<GzipCatalogParser>(std::make_unique<HygCatalogParser>());
+    case CatalogSourceType::HygCsvZip:
+        return std::make_unique<ZipCatalogParser>();
+    case CatalogSourceType::OpenNgcCsv:
+        return std::make_unique<OpenNgcCatalogParser>();
+    case CatalogSourceType::Unknown:
+        return nullptr;
+    }
+
+    return nullptr;
+}
+
 }  // namespace
 
 CatalogLoadResult CatalogLoader::load(const CatalogSourceRequest& request)
 {
-    switch (request.type) {
-    case CatalogSourceType::Bundled: {
-        const BundledCatalogParser parser;
-        return finalizeCatalogLoad(parser.parse(), request.selectionOptions);
-    }
-    case CatalogSourceType::HygCsv: {
-        const HygCatalogParser parser;
-        return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
-    }
-    case CatalogSourceType::HygCsvGzip: {
-        const HygCatalogParser parser;
-        return finalizeCatalogLoad(
-            CompressedCatalogParser::parse(
-                request.data,
-                request.progressCallback,
-                [&parser](const std::string_view data, const HygParseProgressCallback& callback) {
-                    return parser.parse(data, callback);
-                }
-            ),
-            request.selectionOptions
-        );
-    }
-    case CatalogSourceType::OpenNgcCsv: {
-        const OpenNgcCatalogParser parser;
-        return finalizeCatalogLoad(parser.parse(request.data, request.progressCallback), request.selectionOptions);
-    }
+    const auto parser = createParser(request.type);
+    if (parser == nullptr) {
+        CatalogLoadResult result;
+        result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
+        result.errorDetail = "Catalog source type is not supported.";
+        return result;
     }
 
-    CatalogLoadResult result;
-    result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
-    result.errorDetail = "Catalog source type is not supported.";
-    return result;
+    return finalizeCatalogLoad(parser->parse(request.data, request.progressCallback), request.selectionOptions);
 }
 
 CatalogLoadResult CatalogLoader::load(
     const CatalogSourceType type,
     const std::string_view data,
-    const HygParseProgressCallback& progressCallback,
+    const CatalogParseProgressCallback& progressCallback,
     const CatalogSelectionOptions& selectionOptions
 )
 {

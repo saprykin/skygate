@@ -35,29 +35,19 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
 
-    QVERIFY(
-        parser.detectFormat("alpha|Alpha|Star|1.0\n") == skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown
-    );
-    QVERIFY(
-        parser.detectFormat("id,hip,proper,ra,dec,mag\n")
-        == skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsv
-    );
-    QVERIFY(
-        parser.detectFormat("Name;Type;RA;Dec;M;NGC;IC\n")
-        == skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv
-    );
+    QVERIFY(parser.detectFormat("alpha|Alpha|Star|1.0\n") == skygate::ephemeris::CatalogSourceType::Unknown);
+    QVERIFY(parser.detectFormat("id,hip,proper,ra,dec,mag\n") == skygate::ephemeris::CatalogSourceType::HygCsv);
+    QVERIFY(parser.detectFormat("Name;Type;RA;Dec;M;NGC;IC\n") == skygate::ephemeris::CatalogSourceType::OpenNgcCsv);
 
     constexpr std::array<unsigned char, 2> kGzipPrefix{{0x1f, 0x8b}};
     const std::string_view gzipPrefix(reinterpret_cast<const char*>(kGzipPrefix.data()), kGzipPrefix.size());
-    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsvGzip);
+    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogSourceType::HygCsvGzip);
 
     constexpr std::array<unsigned char, 4> kZipPrefix{{0x50, 0x4b, 0x03, 0x04}};
     const std::string_view zipPrefix(reinterpret_cast<const char*>(kZipPrefix.data()), kZipPrefix.size());
-    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsvZip);
+    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogSourceType::HygCsvZip);
 
-    QVERIFY(
-        parser.detectFormat("just some plain text") == skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown
-    );
+    QVERIFY(parser.detectFormat("just some plain text") == skygate::ephemeris::CatalogSourceType::Unknown);
 }
 
 void CatalogPayloadParserTests::rejectsPipeRowsPayload()
@@ -86,7 +76,7 @@ void CatalogPayloadParserTests::parsesOpenNgcPayload()
     const auto parseResult = parser.parseResult(kOpenNgcCsv);
     QVERIFY(parseResult.isSuccess());
     QVERIFY(parseResult.catalog != nullptr);
-    QVERIFY(parseResult.detectedFormat == skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv);
+    QVERIFY(parseResult.detectedFormat == skygate::ephemeris::CatalogSourceType::OpenNgcCsv);
 
     const auto bodies = parseResult.catalog->bodies();
     QCOMPARE(bodies.size(), 2U);

@@ -7,7 +7,7 @@
 
 namespace skygate::ephemeris {
 
-class HygCatalogParser final : public ICatalogParser {
+class ZipCatalogParser final : public ICatalogParser {
 public:
     [[nodiscard]] CatalogBodyParseResult
     parse(std::string_view data, const CatalogParseProgressCallback& progressCallback) const override;

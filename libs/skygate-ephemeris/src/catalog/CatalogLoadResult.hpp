@@ -1,6 +1,7 @@
 #pragma once
 
 #include "catalog/CatalogLoadDiagnostics.hpp"
+#include "catalog/CatalogSourceType.hpp"
 #include "catalog/IStarCatalog.hpp"
 
 #include <cstdint>
@@ -10,14 +11,6 @@
 namespace skygate::ephemeris {
 
 struct CatalogLoadResult {
-    enum class PayloadFormat : std::uint8_t {
-        HygCsv,
-        HygCsvGzip,
-        HygCsvZip,
-        OpenNgcCsv,
-        Unknown
-    };
-
     enum class ErrorCode : std::uint8_t {
         NoError,
         EmptyInput,
@@ -31,7 +24,7 @@ struct CatalogLoadResult {
     };
 
     std::unique_ptr<IStarCatalog> catalog;
-    PayloadFormat detectedFormat = PayloadFormat::Unknown;
+    CatalogSourceType detectedFormat = CatalogSourceType::Unknown;
     ErrorCode errorCode = ErrorCode::NoError;
     std::string errorDetail;
     CatalogLoadDiagnostics diagnostics;
