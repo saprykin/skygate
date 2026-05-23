@@ -9,7 +9,7 @@ EphemerisEngineQueries::findBodyStateById(const SkySnapshot& snapshot, const std
 {
     for (const CelestialBodyState& state : snapshot.states) {
         const CelestialBody& body = snapshot.bodyAt(state.bodyIndex);
-        if (strings::equalsIgnoreAsciiCase(body.id, bodyId)) {
+        if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
             return state;
         }
     }

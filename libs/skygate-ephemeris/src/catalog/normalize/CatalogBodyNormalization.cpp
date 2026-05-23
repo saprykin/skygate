@@ -11,7 +11,7 @@ void CatalogBodyNormalization::apply(CelestialBody& body)
         return;
     }
 
-    const std::string normalizedId = strings::toLowerAscii(body.id);
+    const std::string normalizedId = StringUtilities::toLowerAscii(body.id);
     if (normalizedId == "sun") {
         body.ephemerisSource = CelestialBodyEphemerisSource::Sun;
         return;

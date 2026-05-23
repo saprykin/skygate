@@ -69,7 +69,7 @@ void appendAlias(std::vector<std::string>& aliases, const QString& alias)
         return;
     }
 
-    strings::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(normalized));
+    StringUtilities::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(normalized));
 }
 
 void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& text)
