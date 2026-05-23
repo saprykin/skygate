@@ -151,6 +151,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/DelimitedCatalogReaderOptions.hpp
     src/catalog/io/DelimitedCatalogRow.hpp
     src/catalog/opengc/OpenNgcObjectMapper.hpp
+    src/catalog/opengc/OpenNgcObjectMapping.hpp
     src/catalog/stellarium/StellariumHipParser.hpp
     src/catalog/stellarium/StellariumLabelRefExtractor.hpp
     src/catalog/stellarium/StellariumLineRefExtractor.hpp
@@ -189,6 +190,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/hyg/HygGzipCatalogParser.hpp
     src/catalog/model/InMemoryStarCatalog.hpp
     src/catalog/opengc/OpenNgcObjectMapper.cpp
+    src/catalog/opengc/OpenNgcObjectMapping.cpp
     src/catalog/opengc/OpenNgcCatalogParser.hpp
     src/catalog/io/zip/ZipCodec.hpp
     src/catalog/io/zip/ZipDirectoryReader.cpp
