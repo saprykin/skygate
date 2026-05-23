@@ -93,7 +93,7 @@ void CatalogDelimitedReaderTests::readerRejectsMissingRequiredColumns()
     const auto result =
         skygate::ephemeris::DelimitedCatalogReader::read(std::string_view("name\nAlpha\n"), options, {});
 
-    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns);
+    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
     QCOMPARE(result.errorDetail, std::string("missing value"));
 }
 
@@ -112,14 +112,14 @@ void CatalogDelimitedReaderTests::readerStopsOnHandlerFailureAndPreservesPartial
             const skygate::ephemeris::DelimitedCatalogRow&, skygate::ephemeris::CatalogBodyParseResult& parseResult
         ) {
             ++handledRows;
-            parseResult.errorCode = skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv;
+            parseResult.errorCode = skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidHygCsv;
             parseResult.errorDetail = "handler stopped";
             return false;
         }
     );
 
     QCOMPARE(handledRows, 1);
-    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadErrorCode::InvalidHygCsv);
+    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidHygCsv);
     QCOMPARE(result.errorDetail, std::string("handler stopped"));
 }
 

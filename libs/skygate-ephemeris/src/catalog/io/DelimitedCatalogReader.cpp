@@ -14,7 +14,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
 {
     CatalogBodyParseResult result;
     if (payload.empty()) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorCode = CatalogLoadResult::ErrorCode::EmptyInput;
         result.errorDetail = options.emptyInputDetail;
         return result;
     }
@@ -54,7 +54,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
                     [&headerIndex](const QString& columnName) { return headerIndex.contains(columnName.toLower()); }
                 );
                 if (!hasRequiredColumns) {
-                    result.errorCode = CatalogLoadErrorCode::MissingRequiredColumns;
+                    result.errorCode = CatalogLoadResult::ErrorCode::MissingRequiredColumns;
                     result.errorDetail = options.missingColumnsDetail;
                     return result;
                 }
@@ -82,7 +82,7 @@ CatalogBodyParseResult DelimitedCatalogReader::read(
 
     result.diagnostics.processedRowCount = processedRowCount;
     if (!hasHeader) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorCode = CatalogLoadResult::ErrorCode::EmptyInput;
         result.errorDetail = options.emptyInputDetail;
     }
 

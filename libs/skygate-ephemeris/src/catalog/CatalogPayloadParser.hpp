@@ -12,7 +12,7 @@ namespace skygate::ephemeris {
 
 class CatalogPayloadParser final {
 public:
-    [[nodiscard]] CatalogPayloadFormat detectFormat(std::string_view payload) const noexcept;
+    [[nodiscard]] CatalogLoadResult::PayloadFormat detectFormat(std::string_view payload) const noexcept;
 
     [[nodiscard]] CatalogLoadResult parseResult(const CatalogParseRequest& request) const;
     [[nodiscard]] CatalogLoadResult parseResult(

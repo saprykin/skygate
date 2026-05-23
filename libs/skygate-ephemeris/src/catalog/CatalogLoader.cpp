@@ -40,7 +40,7 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
     result.diagnostics.truncatedBodyCount = parsedBodyCount - bodies.size();
     result.catalog = CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
     if (result.catalog == nullptr) {
-        result.errorCode = CatalogLoadErrorCode::NoBodies;
+        result.errorCode = CatalogLoadResult::ErrorCode::NoBodies;
         result.errorDetail = "Catalog contains no bodies.";
     }
 
@@ -71,7 +71,7 @@ CatalogLoadResult CatalogLoader::load(const CatalogSourceRequest& request)
     }
 
     CatalogLoadResult result;
-    result.errorCode = CatalogLoadErrorCode::UnsupportedFormat;
+    result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
     result.errorDetail = "Catalog source type is not supported.";
     return result;
 }

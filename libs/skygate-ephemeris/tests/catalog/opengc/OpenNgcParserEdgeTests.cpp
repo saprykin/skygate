@@ -56,7 +56,7 @@ void OpenNgcParserEdgeTests::rejectsMissingRequiredColumns()
     );
 
     QVERIFY(!result.isSuccess());
-    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadErrorCode::MissingRequiredColumns);
+    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
 }
 
 void OpenNgcParserEdgeTests::skipsInvalidCoordinatesButKeepsValidRows()
@@ -100,7 +100,7 @@ void OpenNgcParserEdgeTests::rejectsPayloadWithNoUsableDeepSkyRows()
     const auto result = parser.parseResult(payload);
 
     QVERIFY(!result.isSuccess());
-    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadErrorCode::InvalidOpenNgcCsv);
+    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv);
 }
 
 void OpenNgcParserEdgeTests::mapsSupportedObjectKinds()

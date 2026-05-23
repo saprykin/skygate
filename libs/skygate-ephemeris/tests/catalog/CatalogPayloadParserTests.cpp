@@ -35,19 +35,29 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
 {
     const skygate::ephemeris::CatalogPayloadParser parser;
 
-    QVERIFY(parser.detectFormat("alpha|Alpha|Star|1.0\n") == skygate::ephemeris::CatalogPayloadFormat::Unknown);
-    QVERIFY(parser.detectFormat("id,hip,proper,ra,dec,mag\n") == skygate::ephemeris::CatalogPayloadFormat::HygCsv);
-    QVERIFY(parser.detectFormat("Name;Type;RA;Dec;M;NGC;IC\n") == skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv);
+    QVERIFY(
+        parser.detectFormat("alpha|Alpha|Star|1.0\n") == skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown
+    );
+    QVERIFY(
+        parser.detectFormat("id,hip,proper,ra,dec,mag\n")
+        == skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsv
+    );
+    QVERIFY(
+        parser.detectFormat("Name;Type;RA;Dec;M;NGC;IC\n")
+        == skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv
+    );
 
     constexpr std::array<unsigned char, 2> kGzipPrefix{{0x1f, 0x8b}};
     const std::string_view gzipPrefix(reinterpret_cast<const char*>(kGzipPrefix.data()), kGzipPrefix.size());
-    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogPayloadFormat::HygCsvGzip);
+    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsvGzip);
 
     constexpr std::array<unsigned char, 4> kZipPrefix{{0x50, 0x4b, 0x03, 0x04}};
     const std::string_view zipPrefix(reinterpret_cast<const char*>(kZipPrefix.data()), kZipPrefix.size());
-    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogPayloadFormat::HygCsvZip);
+    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogLoadResult::PayloadFormat::HygCsvZip);
 
-    QVERIFY(parser.detectFormat("just some plain text") == skygate::ephemeris::CatalogPayloadFormat::Unknown);
+    QVERIFY(
+        parser.detectFormat("just some plain text") == skygate::ephemeris::CatalogLoadResult::PayloadFormat::Unknown
+    );
 }
 
 void CatalogPayloadParserTests::rejectsPipeRowsPayload()
@@ -59,7 +69,7 @@ void CatalogPayloadParserTests::rejectsPipeRowsPayload()
         "demo_constellation|Demo Constellation|Constellation|2.0\n"
     );
     QVERIFY(!parseResult.isSuccess());
-    QVERIFY(parseResult.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat);
+    QVERIFY(parseResult.errorCode == skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat);
 }
 
 void CatalogPayloadParserTests::parsesOpenNgcPayload()
@@ -76,7 +86,7 @@ void CatalogPayloadParserTests::parsesOpenNgcPayload()
     const auto parseResult = parser.parseResult(kOpenNgcCsv);
     QVERIFY(parseResult.isSuccess());
     QVERIFY(parseResult.catalog != nullptr);
-    QVERIFY(parseResult.detectedFormat == skygate::ephemeris::CatalogPayloadFormat::OpenNgcCsv);
+    QVERIFY(parseResult.detectedFormat == skygate::ephemeris::CatalogLoadResult::PayloadFormat::OpenNgcCsv);
 
     const auto bodies = parseResult.catalog->bodies();
     QCOMPARE(bodies.size(), 2U);
@@ -165,7 +175,7 @@ void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()
     QTest::ignoreMessage(QtWarningMsg, "Gzip catalog parse failed: Gzip catalog payload could not be decompressed.");
     const auto invalidGzipResult = parser.parseResult(invalidGzipData);
     QVERIFY(!invalidGzipResult.isSuccess());
-    QCOMPARE(invalidGzipResult.errorCode, skygate::ephemeris::CatalogLoadErrorCode::InvalidGzipData);
+    QCOMPARE(invalidGzipResult.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidGzipData);
 
     constexpr std::array<unsigned char, 22> kEmptyZip{0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -175,7 +185,7 @@ void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()
     );
     const auto emptyZipResult = parser.parseResult(emptyZipData);
     QVERIFY(!emptyZipResult.isSuccess());
-    QCOMPARE(emptyZipResult.errorCode, skygate::ephemeris::CatalogLoadErrorCode::InvalidZipData);
+    QCOMPARE(emptyZipResult.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidZipData);
 }
 
 void CatalogPayloadParserTests::reportsUnsupportedPayload()
@@ -185,7 +195,7 @@ void CatalogPayloadParserTests::reportsUnsupportedPayload()
     auto parseResult = parser.parseResult("just some plain text");
 
     QVERIFY(!parseResult.isSuccess());
-    QVERIFY(parseResult.errorCode == skygate::ephemeris::CatalogLoadErrorCode::UnsupportedFormat);
+    QVERIFY(parseResult.errorCode == skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat);
 }
 
 void CatalogPayloadParserTests::logsSampledInvalidHygRows()

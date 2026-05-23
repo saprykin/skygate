@@ -18,7 +18,7 @@ HygGzipCatalogParser::parse(const std::string_view gzipData, const HygParseProgr
 {
     CatalogBodyParseResult result;
     if (gzipData.empty()) {
-        result.errorCode = CatalogLoadErrorCode::EmptyInput;
+        result.errorCode = CatalogLoadResult::ErrorCode::EmptyInput;
         result.errorDetail = "Gzip catalog payload is empty.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "Gzip catalog parse failed:" << QString::fromStdString(result.errorDetail);
@@ -27,7 +27,7 @@ HygGzipCatalogParser::parse(const std::string_view gzipData, const HygParseProgr
 
     const auto uncompressedData = CompressedDataInflater::inflate(gzipData, CompressedDataInflater::Format::Gzip);
     if (!uncompressedData.has_value()) {
-        result.errorCode = CatalogLoadErrorCode::InvalidGzipData;
+        result.errorCode = CatalogLoadResult::ErrorCode::InvalidGzipData;
         result.errorDetail = "Gzip catalog payload could not be decompressed.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "Gzip catalog parse failed:" << QString::fromStdString(result.errorDetail);
