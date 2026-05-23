@@ -20,9 +20,9 @@ std::optional<std::string> ZipEntryExtractor::extract(const std::string_view zip
         return std::nullopt;
     }
 
-    const auto localHeaderSignature = zip_binary::readLe32(zipData, entry.localHeaderOffset);
-    const auto fileNameLength = zip_binary::readLe16(zipData, entry.localHeaderOffset + 26U);
-    const auto extraFieldLength = zip_binary::readLe16(zipData, entry.localHeaderOffset + 28U);
+    const auto localHeaderSignature = ZipBinaryUtilities::readLe32(zipData, entry.localHeaderOffset);
+    const auto fileNameLength = ZipBinaryUtilities::readLe16(zipData, entry.localHeaderOffset + 26U);
+    const auto extraFieldLength = ZipBinaryUtilities::readLe16(zipData, entry.localHeaderOffset + 28U);
     if (!localHeaderSignature.has_value() || *localHeaderSignature != kZipLocalFileHeaderSignature
         || !fileNameLength.has_value() || !extraFieldLength.has_value()) {
         return std::nullopt;

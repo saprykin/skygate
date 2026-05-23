@@ -152,6 +152,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumLabelRefExtractor.hpp
     src/catalog/stellarium/StellariumLineRefExtractor.hpp
     src/catalog/io/zip/ZipBinaryUtilities.hpp
+    src/catalog/io/zip/ZipEntryMetadata.hpp
     src/StringUtilities.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
     src/catalog/model/CatalogIdentity.cpp
@@ -188,6 +189,8 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/zip/ZipDirectoryReader.hpp
     src/catalog/io/zip/ZipEntryExtractor.cpp
     src/catalog/io/zip/ZipEntryExtractor.hpp
+    src/catalog/io/zip/ZipBinaryUtilities.cpp
+    src/catalog/io/zip/ZipEntryMetadata.cpp
     src/catalog/stellarium/StellariumConstellationParser.cpp
     src/catalog/stellarium/StellariumHipParser.cpp
     src/catalog/stellarium/StellariumLabelRefExtractor.cpp

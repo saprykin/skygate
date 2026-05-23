@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/io/zip/ZipDirectoryReader.hpp"
+#include "catalog/io/zip/ZipEntryMetadata.hpp"
 
 #include <optional>
 #include <string>
