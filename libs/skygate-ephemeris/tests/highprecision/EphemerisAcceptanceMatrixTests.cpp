@@ -1,3 +1,4 @@
+#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
@@ -381,7 +382,7 @@ private:
     std::vector<EarthOrientationTableEntry> m_entries;
 };
 
-class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
+class RecordingApparentPlaceCalculator final : public BaseApparentPlaceCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult apply(
         const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult

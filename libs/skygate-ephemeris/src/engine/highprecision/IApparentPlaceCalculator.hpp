@@ -2,6 +2,7 @@
 
 #include "engine/highprecision/HighPrecisionTypes.hpp"
 
+#include <memory>
 #include <span>
 #include <vector>
 
@@ -19,7 +20,7 @@ public:
         std::span<const CelestialBody> bodies,
         std::span<const StarAstrometryBatchResult> calculatorResults,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
-    ) const;
+    ) const = 0;
 };
 
 }  // namespace skygate::ephemeris::highprecision

@@ -37,6 +37,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ApparentPlaceCalculator.cpp
     src/engine/highprecision/AtmosphericRefractionCalculator.hpp
     src/engine/highprecision/AtmosphericRefractionCalculator.cpp
+    src/engine/highprecision/BaseApparentPlaceCalculator.hpp
+    src/engine/highprecision/BaseApparentPlaceCalculator.cpp
     src/engine/highprecision/CatalogStarAstrometryArrays.hpp
     src/engine/highprecision/CatalogStarAstrometryArrays.cpp
     src/engine/highprecision/CalcephKernelProvider.hpp
@@ -45,14 +47,11 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
     src/engine/highprecision/HighPrecisionTypes.hpp
     src/engine/highprecision/IApparentPlaceCalculator.hpp
-    src/engine/highprecision/IApparentPlaceCalculator.cpp
     src/engine/highprecision/IAtmosphericRefractionCalculator.hpp
-    src/engine/highprecision/IAtmosphericRefractionCalculator.cpp
     src/engine/highprecision/ICalcephKernelProvider.hpp
     src/engine/highprecision/IEphemerisComputationCache.hpp
     src/engine/highprecision/IEphemerisResultBuilder.hpp
     src/engine/highprecision/IStarAstrometryCalculator.hpp
-    src/engine/highprecision/IStarAstrometryCalculator.cpp
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
     src/engine/highprecision/DeltaTProvider.cpp
     src/engine/highprecision/EarthOrientationProvider.cpp

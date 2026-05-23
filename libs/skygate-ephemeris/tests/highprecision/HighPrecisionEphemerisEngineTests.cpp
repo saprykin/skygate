@@ -1,6 +1,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
+#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
@@ -307,6 +308,18 @@ public:
         return makeCalculatorResult(input, 3.5, 42.0, "star-astrometry fake");
     }
 
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> calculateBatch(
+        const EphemerisRequest& request,
+        const CatalogStarAstrometryArrays& arrays,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
+    ) const override
+    {
+        Q_UNUSED(request);
+        Q_UNUSED(arrays);
+        Q_UNUSED(preparedRequestState);
+        return {};
+    }
+
     [[nodiscard]] int callCount() const noexcept
     {
         return m_callCount;
@@ -500,7 +513,7 @@ private:
     mutable AstronomicalEpoch m_lastEpoch;
 };
 
-class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
+class RecordingApparentPlaceCalculator final : public BaseApparentPlaceCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult apply(
         const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
@@ -722,7 +735,14 @@ private:
     EarthOrientationDataInfo m_dataInfo;
 };
 
-class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionCalculator {};
+class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionCalculator {
+public:
+    [[nodiscard]] HighPrecisionCalculatorResult
+    apply(const HighPrecisionComputationInput&, const HighPrecisionCalculatorResult& calculatorResult) const override
+    {
+        return calculatorResult;
+    }
+};
 
 void mergeConversionMetadata(EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion) noexcept
 {
