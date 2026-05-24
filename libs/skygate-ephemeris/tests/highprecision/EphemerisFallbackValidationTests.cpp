@@ -1,7 +1,7 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QtTest/QtTest>
 
@@ -137,7 +137,7 @@ void EphemerisFallbackValidationTests::simpleFactoryCreationSucceeds()
     request.engineKind = EphemerisEngineKind::Simple;
     request.options.engineKind = EphemerisEngineKind::Simple;
 
-    const auto result = createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
@@ -153,7 +153,7 @@ void EphemerisFallbackValidationTests::highPrecisionUnavailableFallbackProducesW
     request.options.engineKind = EphemerisEngineKind::HighPrecision;
     request.fallbackPolicy = EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
-    const auto result = createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.usedSimpleEngineFallback());
@@ -180,7 +180,7 @@ void EphemerisFallbackValidationTests::strictHighPrecisionUnavailableProducesErr
     request.options.engineKind = EphemerisEngineKind::HighPrecision;
     request.fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
 
-    const auto result = createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isFailure());
     QVERIFY(result.engine == nullptr);

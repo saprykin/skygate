@@ -1,5 +1,6 @@
 #include "time/CalendarTime.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "factory/IEphemerisDiagnosticsSink.hpp"
 
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 
@@ -432,7 +433,7 @@ void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueI
     QVERIFY(request.timeScaleService != nullptr);
     QVERIFY(request.earthOrientationProvider != nullptr);
     QVERIFY(request.diagnosticsSink != nullptr);
-    QVERIFY(skygate::ephemeris::allowsSimpleEngineFallback(request.fallbackPolicy));
+    QVERIFY(skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy));
 }
 
 void EphemerisEngineFactoryBehaviorTests::resultHelpersDistinguishSuccessFallbackFailureAndDiagnostics()
@@ -447,16 +448,17 @@ void EphemerisEngineFactoryBehaviorTests::resultHelpersDistinguishSuccessFallbac
         "invalid engine kind",
     };
 
-    auto success =
-        skygate::ephemeris::EphemerisEngineFactoryResult::success(skygate::ephemeris::createEphemerisEngine());
+    auto successEngine = skygate::ephemeris::EphemerisEngineFactory::create();
+    auto success = skygate::ephemeris::EphemerisEngineFactoryResult::success(std::move(successEngine.engine));
     QVERIFY(success.isSuccess());
     QVERIFY(!success.isFailure());
     QVERIFY(!success.usedSimpleEngineFallback());
     QVERIFY(!success.hasDiagnostics());
     QVERIFY(!success.hasErrors());
 
+    auto fallbackEngine = skygate::ephemeris::EphemerisEngineFactory::create();
     auto fallback = skygate::ephemeris::EphemerisEngineFactoryResult::success(
-        skygate::ephemeris::createEphemerisEngine(),
+        std::move(fallbackEngine.engine),
         skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback,
         {warning}
     );
@@ -482,32 +484,36 @@ void EphemerisEngineFactoryBehaviorTests::compatibilityOverloadsCreateSimpleEngi
     const auto context = makeContext();
     const std::array bodies{makeFactoryBehaviorBody()};
 
-    const auto emptyEngine = skygate::ephemeris::createEphemerisEngine();
-    QVERIFY(emptyEngine != nullptr);
+    auto emptyEngineResult = skygate::ephemeris::EphemerisEngineFactory::create();
+    QVERIFY(emptyEngineResult.isSuccess());
+    const auto& emptyEngine = emptyEngineResult.engine;
     QCOMPARE(
         static_cast<std::uint8_t>(emptyEngine->kind()),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
     );
     QVERIFY(emptyEngine->compute(context).states.empty());
 
-    const auto initializerEngine = skygate::ephemeris::createEphemerisEngine({makeFactoryBehaviorBody()});
-    QVERIFY(initializerEngine != nullptr);
+    auto initializerEngineResult = skygate::ephemeris::EphemerisEngineFactory::create({makeFactoryBehaviorBody()});
+    QVERIFY(initializerEngineResult.isSuccess());
+    const auto& initializerEngine = initializerEngineResult.engine;
     const auto initializerState = initializerEngine->computeBodyState(context, "factory-behavior-target");
     QVERIFY(initializerState.has_value());
     QCOMPARE(initializerState->bodyIndex, 0U);
 
-    const auto spanEngine = skygate::ephemeris::createEphemerisEngine(
+    auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(
         std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
     );
-    QVERIFY(spanEngine != nullptr);
+    QVERIFY(spanEngineResult.isSuccess());
+    const auto& spanEngine = spanEngineResult.engine;
     const auto spanState = spanEngine->computeBodyState(context, std::size_t{0});
     QVERIFY(spanState.has_value());
     QCOMPARE(spanState->equatorial.rightAscensionHours, 5.25);
     QCOMPARE(spanState->equatorial.declinationDeg, -12.75);
 
     const TestStarCatalog catalog({makeFactoryBehaviorBody()});
-    const auto catalogEngine = skygate::ephemeris::createEphemerisEngine(catalog);
-    QVERIFY(catalogEngine != nullptr);
+    auto catalogEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(catalog);
+    QVERIFY(catalogEngineResult.isSuccess());
+    const auto& catalogEngine = catalogEngineResult.engine;
     const auto catalogState = catalogEngine->computeBodyState(context, "factory-behavior-target");
     QVERIFY(catalogState.has_value());
     QCOMPARE(catalogState->equatorial.rightAscensionHours, spanState->equatorial.rightAscensionHours);
@@ -525,7 +531,7 @@ void EphemerisEngineFactoryBehaviorTests::simpleRequestCreatesRequestedEngineWit
     request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime
                                       | skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration;
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
@@ -576,7 +582,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     auto runtime = std::make_shared<TestCalcephKernelRuntime>();
     request.calcephKernelRuntime = runtime;
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
@@ -646,7 +652,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelW
     auto runtime = std::make_shared<TestCalcephKernelRuntime>();
     request.calcephKernelRuntime = runtime;
 
-    const auto result = skygate::ephemeris::createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
@@ -694,7 +700,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
     auto runtime = std::make_shared<RecordingCalcephKernelRuntime>();
     request.calcephKernelRuntime = runtime;
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
@@ -750,7 +756,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopoc
     request.earthOrientationProvider = earthOrientationProvider;
     request.calcephKernelRuntime = std::make_shared<TestCalcephKernelRuntime>();
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
@@ -785,7 +791,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
     fallbackRequest.diagnosticsSink = &fallbackDiagnosticsSink;
 
-    auto fallback = skygate::ephemeris::createEphemerisEngine(fallbackRequest);
+    auto fallback = skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
 
     QVERIFY(fallback.isSuccess());
     QVERIFY(fallback.usedSimpleEngineFallback());
@@ -807,7 +813,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     strictRequest.diagnosticsSink = &strictDiagnosticsSink;
 
-    const auto strict = skygate::ephemeris::createEphemerisEngine(strictRequest);
+    const auto strict = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
 
     QVERIFY(!strict.isSuccess());
     QVERIFY(strict.isFailure());
@@ -834,7 +840,7 @@ void EphemerisEngineFactoryBehaviorTests::invalidEngineKindReturnsStructuredInva
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = static_cast<skygate::ephemeris::EphemerisEngineKind>(std::uint8_t{255});
 
-    const auto result = skygate::ephemeris::createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(result.isFailure());

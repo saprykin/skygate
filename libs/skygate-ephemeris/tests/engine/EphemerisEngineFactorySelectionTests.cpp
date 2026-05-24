@@ -1,4 +1,4 @@
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QtTest/QtTest>
 
@@ -58,7 +58,7 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
     request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
     request.options.enableAtmosphericRefraction = true;
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(!result.usedSimpleEngineFallback());
@@ -99,7 +99,7 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
     request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.usedSimpleEngineFallback());
@@ -138,7 +138,7 @@ void EphemerisEngineFactorySelectionTests::failsDefaultHighPrecisionRequestWhenH
     request.catalogBodies = bodies;
     request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
 
-    const auto result = skygate::ephemeris::createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(result.isFailure());
@@ -167,7 +167,7 @@ void EphemerisEngineFactorySelectionTests::failsStrictHighPrecisionRequestWhenHi
     request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
 
-    const auto result = skygate::ephemeris::createEphemerisEngine(request);
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(result.isFailure());

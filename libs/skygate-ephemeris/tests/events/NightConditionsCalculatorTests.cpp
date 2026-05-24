@@ -1,7 +1,7 @@
 #include "time/CalendarTime.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "NightConditionsCalculator.hpp"
 
@@ -62,7 +62,7 @@ struct TestRig final {
     TestRig rig;
     rig.catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     Q_ASSERT(rig.catalog != nullptr);
-    rig.engine = skygate::ephemeris::createEphemerisEngine(*rig.catalog);
+    rig.engine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*rig.catalog).engine);
     Q_ASSERT(rig.engine != nullptr);
     const auto sunIndex = bodyIndexById(rig.catalog->bodies(), "sun");
     const auto moonIndex = bodyIndexById(rig.catalog->bodies(), "moon");
@@ -96,7 +96,7 @@ makeGuidedNightEngine(std::shared_ptr<const std::vector<skygate::ephemeris::Cele
 {
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(*bodies);
     Q_ASSERT(catalog != nullptr);
-    auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
     Q_ASSERT(engine != nullptr);
     return skygate::ephemeris::tests::RequestCountingEphemerisEngine(
         std::move(engine), skygate::ephemeris::tests::highPrecisionLightTimeOptions(), std::move(bodies)

@@ -6,7 +6,7 @@
 #include "EquatorialCoordinate.hpp"
 #include "SkyContext.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "IEphemerisEngine.hpp"
 #include "catalog/IStarCatalog.hpp"
 
@@ -100,7 +100,7 @@ createTestCatalog(std::vector<ephemeris::CelestialBody> bodies)
 [[nodiscard]] inline std::unique_ptr<ephemeris::IEphemerisEngine>
 createTestEphemerisEngine(const ephemeris::IStarCatalog& starCatalog)
 {
-    return ephemeris::createEphemerisEngine(starCatalog);
+    return std::move(ephemeris::EphemerisEngineFactory::create(starCatalog).engine);
 }
 
 [[nodiscard]] inline std::unique_ptr<SkyContextController> createTestController(

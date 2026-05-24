@@ -7,7 +7,7 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 
 #include "engine/highprecision/EarthOrientationProvider.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -379,7 +379,7 @@ ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEngine(
     request.earthOrientationProvider = std::make_shared<AcceptanceEarthOrientationProvider>();
     request.calcephKernelRuntime = std::make_shared<AcceptanceCalcephKernelRuntime>();
     request.fallbackPolicy = ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
-    return ephemeris::createEphemerisEngine(request);
+    return ephemeris::EphemerisEngineFactory::create(request);
 }
 
 void verifyDE440sShortRangeBodyState(const ephemeris::IEphemerisEngine& engine)

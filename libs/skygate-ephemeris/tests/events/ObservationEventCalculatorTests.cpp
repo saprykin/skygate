@@ -4,7 +4,7 @@
 #include "UtcTimeCodec.hpp"
 #include "math/AngleMath.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "ObservationEventCalculator.hpp"
 
 #include <QtTest/QtTest>
@@ -43,7 +43,7 @@ std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(const sk
 {
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({body});
     Q_ASSERT(catalog != nullptr);
-    return skygate::ephemeris::createEphemerisEngine(*catalog);
+    return std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
 }
 
 double currentLocalSiderealHours(const skygate::core::SkyContext& context)

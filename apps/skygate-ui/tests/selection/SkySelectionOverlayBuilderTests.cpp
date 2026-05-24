@@ -8,7 +8,7 @@
 
 #include "math/ViewportMath.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "IEphemerisEngine.hpp"
 
 #include <chrono>
@@ -283,7 +283,7 @@ OverlayFixture makeFixture()
         skygate::core::EquatorialCoordinate{.rightAscensionHours = 4.0, .declinationDeg = 80.0};
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(*bodies);
     Q_ASSERT(catalog != nullptr);
-    fixture.ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    fixture.ephemerisEngine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
     fixture.snapshot.catalogBodies = bodies;
     fixture.snapshot.states = {
         {.bodyIndex = 0U,
@@ -451,7 +451,8 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
+        .epoch =
+            *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
         .options = skygate::ephemeris::EphemerisEngineOptions{
             .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
@@ -484,7 +485,8 @@ void SkySelectionOverlayBuilderTests::inspectorUsesHighPrecisionStateForSelected
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
-        .epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
+        .epoch =
+            *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
         .options = skygate::ephemeris::EphemerisEngineOptions{
             .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
