@@ -3,7 +3,7 @@
 #include "SkySceneShared.hpp"
 
 #include "math/ViewportMath.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 namespace {
 

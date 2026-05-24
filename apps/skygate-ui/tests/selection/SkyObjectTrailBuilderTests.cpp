@@ -1,10 +1,9 @@
 #include "SkyObjectTrailBuilder.hpp"
+#include "engine/IEphemerisEngine.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "math/ViewportMath.hpp"
 
 #include <QtTest/QtTest>
-
-#include "math/ViewportMath.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "IEphemerisEngine.hpp"
 
 #include <algorithm>
 #include <chrono>

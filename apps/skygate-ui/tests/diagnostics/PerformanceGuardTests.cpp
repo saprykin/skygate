@@ -1,17 +1,10 @@
-#include "time/CalendarTime.hpp"
-#include <QtTest>
-
 #include "SkyContextController.hpp"
 #include "SkyHitTargetIndex.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneModel.hpp"
-
-#include "math/ViewportMath.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "IEphemerisEngine.hpp"
-
+#include "engine/IEphemerisEngine.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
@@ -19,10 +12,13 @@
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/highprecision/IStarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
-
+#include "factory/EphemerisEngineFactory.hpp"
+#include "math/ViewportMath.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QElapsedTimer>
+#include <QtTest>
 
 #include <chrono>
 #include <cmath>

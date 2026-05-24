@@ -2,7 +2,7 @@
 
 #include "EphemerisFactoryCreationStatus.hpp"
 #include "EphemerisFactoryCreationDiagnostic.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <memory>
 #include <vector>

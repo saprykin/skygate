@@ -1,21 +1,15 @@
 #pragma once
 
-#include <QAbstractItemModel>
-#include <QObject>
-#include <QStringList>
-#include <QTimer>
-#include <QVariantMap>
-
 #include "GeoLocation.hpp"
 #include "ProjectionType.hpp"
 #include "SkyContext.hpp"
 #include "UtcTimePoint.hpp"
 #include "SystemTimeSource.hpp"
+#include "Types.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 #include "catalog/IStarCatalog.hpp"
-#include "Types.hpp"
 
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"
@@ -23,6 +17,12 @@
 #include "SkySettingsStore.hpp"
 #include "SkyLiveClock.hpp"
 #include "SkyTimeController.hpp"
+
+#include <QAbstractItemModel>
+#include <QObject>
+#include <QStringList>
+#include <QTimer>
+#include <QVariantMap>
 
 #include <cstdint>
 #include <memory>

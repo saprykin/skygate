@@ -2,7 +2,7 @@
 
 #include "catalog/CatalogLoadResult.hpp"
 #include "catalog/CatalogLoader.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <cstdint>
 

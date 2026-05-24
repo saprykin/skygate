@@ -1,15 +1,14 @@
-#include "time/CalendarTime.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 #include "SkyOverlayTestSupport.hpp"
 #include "SkyTimeController.hpp"
 #include "UtcTimeCodec.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "engine/IEphemerisEngine.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "math/ViewportMath.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QtTest/QtTest>
-
-#include "math/ViewportMath.hpp"
-#include "catalog/CatalogFactory.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "IEphemerisEngine.hpp"
 
 #include <chrono>
 #include <cmath>

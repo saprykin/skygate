@@ -129,10 +129,10 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisEngineFactoryResult.hpp
     src/factory/EphemerisFactoryCreationDiagnostic.hpp
     src/factory/IEphemerisDiagnosticsSink.hpp
-    src/EphemerisEngineQueries.hpp
-    src/EphemerisPrecisionPolicy.hpp
+    src/engine/EphemerisEngineQueries.hpp
+    src/engine/EphemerisPrecisionPolicy.hpp
     src/EphemerisRequestFactory.hpp
-    src/IEphemerisEngine.hpp
+    src/engine/IEphemerisEngine.hpp
     src/engine/highprecision/LeapSecondProvider.hpp
     src/NightConditionsCalculator.hpp
     src/catalog/ICatalogParser.hpp
@@ -243,7 +243,8 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisEngineFactoryRequest.cpp
     src/factory/EphemerisEngineFactoryResult.cpp
     src/factory/EphemerisFactoryCreationDiagnostic.cpp
-    src/EphemerisEngineQueries.cpp
+    src/engine/EphemerisEngineQueries.cpp
+    src/engine/EphemerisPrecisionPolicy.cpp
     src/EphemerisRequestFactory.cpp
     src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp

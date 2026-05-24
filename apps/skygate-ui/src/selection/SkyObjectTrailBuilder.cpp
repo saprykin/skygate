@@ -1,14 +1,13 @@
 #include "SkyObjectTrailBuilder.hpp"
-
+#include "CelestialReferenceCalculator.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
 
+#include "engine/IEphemerisEngine.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "math/Geometry2d.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
-#include "CelestialReferenceCalculator.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "IEphemerisEngine.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>

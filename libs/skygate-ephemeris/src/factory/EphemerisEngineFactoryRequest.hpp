@@ -1,7 +1,7 @@
 #pragma once
 
 #include "EphemerisFactoryFallbackPolicy.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <memory>
 #include <span>

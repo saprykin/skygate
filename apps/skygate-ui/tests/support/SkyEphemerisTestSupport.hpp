@@ -1,14 +1,13 @@
 #pragma once
 
 #include "SkyContextController.hpp"
-#include "SkyTimeController.hpp"
-
 #include "EquatorialCoordinate.hpp"
 #include "SkyContext.hpp"
+#include "SkyTimeController.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "IEphemerisEngine.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "engine/IEphemerisEngine.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QString>
 

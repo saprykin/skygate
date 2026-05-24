@@ -1,11 +1,11 @@
 #include "NightConditionsCalculator.hpp"
+#include "EphemerisRequestFactory.hpp"
+#include "Types.hpp"
 #include "math/MathConstants.hpp"
 #include "math/TimeConstants.hpp"
 #include "math/PhysicalConstants.hpp"
-#include "EphemerisPrecisionPolicy.hpp"
-#include "EphemerisRequestFactory.hpp"
-#include "IEphemerisEngine.hpp"
-#include "Types.hpp"
+#include "engine/EphemerisPrecisionPolicy.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <algorithm>
 #include <cmath>

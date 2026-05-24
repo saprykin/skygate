@@ -3,7 +3,7 @@
 #include "SkyContext.hpp"
 #include "BodyTrailOptions.hpp"
 #include "BodyTrailSample.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <cstdint>
 #include <vector>
