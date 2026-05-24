@@ -103,9 +103,9 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogSelectionOptions.hpp
     src/catalog/CatalogSourceRequest.hpp
     src/catalog/CatalogSourceType.hpp
-    src/BodyTrailCalculator.hpp
-    src/BodyTrailOptions.hpp
-    src/BodyTrailSample.hpp
+    src/trail/BodyTrailCalculator.hpp
+    src/trail/BodyTrailOptions.hpp
+    src/trail/BodyTrailSample.hpp
     src/catalog/CatalogComposer.hpp
     src/catalog/CatalogFactory.hpp
     src/catalog/CatalogLoader.hpp
@@ -255,9 +255,9 @@ add_library(skygate-ephemeris STATIC
     src/catalog/opengc/OpenNgcCatalogParser.cpp
     src/catalog/io/zip/ZipCatalogParser.cpp
     src/catalog/io/zip/ZipCodec.cpp
-    src/BodyTrailCalculator.cpp
-    src/BodyTrailOptions.cpp
-    src/BodyTrailSample.cpp
+    src/trail/BodyTrailCalculator.cpp
+    src/trail/BodyTrailOptions.cpp
+    src/trail/BodyTrailSample.cpp
 )
 
 target_include_directories(skygate-ephemeris
