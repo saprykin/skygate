@@ -1,9 +1,9 @@
 #pragma once
 
 #include "SkyContext.hpp"
-#include "BodyTrailOptions.hpp"
-#include "BodyTrailSample.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "trail/BodyTrailOptions.hpp"
+#include "trail/BodyTrailSample.hpp"
 
 #include <cstdint>
 #include <vector>

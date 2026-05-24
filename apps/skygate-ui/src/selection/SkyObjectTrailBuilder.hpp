@@ -1,12 +1,11 @@
 #pragma once
 
-#include "SkyRenderBuilders.hpp"
-
-#include "PreparedProjection.hpp"
 #include "EquatorialCoordinate.hpp"
+#include "PreparedProjection.hpp"
 #include "SkyContext.hpp"
-#include "BodyTrailCalculator.hpp"
+#include "SkyRenderBuilders.hpp"
 #include "Types.hpp"
+#include "trail/BodyTrailCalculator.hpp"
 
 #include <cstdint>
 #include <optional>

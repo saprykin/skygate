@@ -1,4 +1,4 @@
-#include "BodyTrailCalculator.hpp"
+#include "trail/BodyTrailCalculator.hpp"
 #include "UtcTimeCodec.hpp"
 
 #include <QtTest/QtTest>
