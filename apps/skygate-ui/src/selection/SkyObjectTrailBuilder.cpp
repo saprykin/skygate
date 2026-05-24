@@ -7,7 +7,7 @@
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "CelestialReferenceCalculator.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "IEphemerisEngine.hpp"
 
 #include <QColor>
@@ -474,8 +474,11 @@ void appendAdaptiveHighPrecisionAnchors(
 )
 {
     const std::array<skygate::ephemeris::CelestialBody, 1> bodies{*input.targetBody};
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine = skygate::ephemeris::createEphemerisEngine(
-        std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine = std::move(
+        skygate::ephemeris::EphemerisEngineFactory::create(
+            std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
+        )
+            .engine
     );
     if (guidanceEngine == nullptr) {
         return std::nullopt;

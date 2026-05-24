@@ -22,7 +22,7 @@
 #include <QVariantMap>
 #include <qqml.h>
 
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "catalog/CatalogFactory.hpp"
 
@@ -321,7 +321,7 @@ int main(int argc, char* argv[])
     std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog =
         skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine =
-        skygate::ephemeris::createEphemerisEngine(*starCatalog);
+        std::move(skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog).engine);
     StartupEphemerisDataConfiguration ephemerisDataConfiguration = startupEphemerisDataConfiguration();
     if (ephemerisDataConfiguration.manifest.has_value()) {
         qCInfo(skygateAppLog).noquote() << "Loaded ephemeris data manifest" << ephemerisDataConfiguration.manifestPath;

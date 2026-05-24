@@ -189,10 +189,11 @@ std::unique_ptr<SkyContextController> makeControllerWithManifest(
     if (starCatalog == nullptr) {
         return {};
     }
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
-    if (ephemerisEngine == nullptr) {
+    auto ephemerisEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog);
+    if (!ephemerisEngineResult.isSuccess() || ephemerisEngineResult.engine == nullptr) {
         return {};
     }
+    auto ephemerisEngine = std::move(ephemerisEngineResult.engine);
 
     SkyContextController::InitializationOptions options;
     options.ephemerisFactoryInputs.dataManifest = &manifest;

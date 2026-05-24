@@ -1,7 +1,7 @@
 #include "TestHelpers.hpp"
 #include "UtcTimeCodec.hpp"
 #include "catalog/CatalogComposer.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
@@ -70,7 +70,9 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -147,7 +149,9 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -189,7 +193,9 @@ void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates(
     QVERIFY(siriusBody != nullptr);
     QCOMPARE(siriusBody->ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*activeCatalog.catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*activeCatalog.catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -211,7 +217,9 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
 
-    const auto nullCatalogEngine = skygate::ephemeris::createEphemerisEngine();
+    auto nullCatalogEngineResult = skygate::ephemeris::EphemerisEngineFactory::create();
+    QVERIFY(nullCatalogEngineResult.isSuccess());
+    const auto& nullCatalogEngine = nullCatalogEngineResult.engine;
     QVERIFY(nullCatalogEngine != nullptr);
     QVERIFY(nullCatalogEngine->compute(context).states.empty());
 
@@ -226,7 +234,9 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
     });
     QVERIFY(importedCatalog != nullptr);
 
-    const auto importedEngine = skygate::ephemeris::createEphemerisEngine(*importedCatalog);
+    auto importedEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*importedCatalog);
+    QVERIFY(importedEngineResult.isSuccess());
+    const auto& importedEngine = importedEngineResult.engine;
     QVERIFY(importedEngine != nullptr);
     const auto importedSnapshot = importedEngine->compute(context);
     QVERIFY(importedSnapshot.states.size() == 1U);
@@ -252,7 +262,9 @@ void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAnd
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     const auto byId = engine->computeBodyState(context, "DEMO_STAR");
@@ -288,7 +300,9 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::ephemeris::EphemerisRequest request;
@@ -356,7 +370,9 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::ephemeris::EphemerisRequest request;
@@ -419,7 +435,9 @@ void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefract
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::ephemeris::EphemerisRequest request;
@@ -462,7 +480,9 @@ void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefau
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::ephemeris::EphemerisRequest defaultRequest;
@@ -514,7 +534,9 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::ephemeris::EphemerisRequest request;
@@ -582,7 +604,9 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateReturnsNulloptForM
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::ephemeris::EphemerisRequest request;

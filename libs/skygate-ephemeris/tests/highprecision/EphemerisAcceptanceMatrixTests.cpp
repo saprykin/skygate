@@ -8,7 +8,7 @@
 #include "EphemerisFixtureSupport.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -91,8 +91,9 @@ constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d11
 
 [[nodiscard]] AstronomicalEpoch makeCivilEpoch(const int year, const int month, const int day)
 {
-    const std::optional<AstronomicalEpoch> epoch =
-        CalendarTime::astronomicalEpochFromCivilDateTime(CivilDateTime{.astronomicalYear = year, .month = month, .day = day});
+    const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(
+        CivilDateTime{.astronomicalYear = year, .month = month, .day = day}
+    );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -475,7 +476,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     simpleRequest.engineKind = EphemerisEngineKind::Simple;
     simpleRequest.catalogBodies = bodies;
     simpleRequest.options.engineKind = EphemerisEngineKind::Simple;
-    const EphemerisEngineFactoryResult simpleResult = createEphemerisEngine(simpleRequest);
+    const EphemerisEngineFactoryResult simpleResult = skygate::ephemeris::EphemerisEngineFactory::create(simpleRequest);
     QVERIFY(simpleResult.isSuccess());
     QVERIFY(simpleResult.engine != nullptr);
     QCOMPARE(
@@ -487,7 +488,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     strictRequest.catalogBodies = bodies;
     strictRequest.options = makeOptions(EphemerisCorrectionFlags::ApparentTopocentric);
     strictRequest.fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
-    const EphemerisEngineFactoryResult strictResult = createEphemerisEngine(strictRequest);
+    const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
     QVERIFY(strictResult.isFailure());
     QVERIFY(strictResult.engine == nullptr);
     QVERIFY(strictResult.hasErrors());
@@ -496,7 +497,8 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
 
     EphemerisEngineFactoryRequest fallbackRequest = strictRequest;
     fallbackRequest.fallbackPolicy = EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
-    const EphemerisEngineFactoryResult fallbackResult = createEphemerisEngine(fallbackRequest);
+    const EphemerisEngineFactoryResult fallbackResult =
+        skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
     QVERIFY(fallbackResult.isSuccess());
     QVERIFY(fallbackResult.usedSimpleEngineFallback());
     QVERIFY(fallbackResult.engine != nullptr);

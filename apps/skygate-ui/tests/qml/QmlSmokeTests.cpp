@@ -3,7 +3,7 @@
 #include "SkyViewportItem.hpp"
 #include "QmlObjectTreeTestSupport.hpp"
 
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
@@ -35,7 +35,9 @@ void QmlSmokeTests::mainQmlLoadsWithRealContextObjects()
 
     auto starCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(starCatalog != nullptr);
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    auto ephemerisEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog);
+    QVERIFY(ephemerisEngineResult.isSuccess());
+    auto ephemerisEngine = std::move(ephemerisEngineResult.engine);
     QVERIFY(ephemerisEngine != nullptr);
 
     SkyContextController skyContextController(std::move(starCatalog), std::move(ephemerisEngine));

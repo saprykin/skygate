@@ -3,7 +3,7 @@
 #include <QtTest/QtTest>
 
 #include "math/ViewportMath.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "IEphemerisEngine.hpp"
 
 #include <algorithm>
@@ -488,7 +488,7 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     };
 
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
-        skygate::ephemeris::createEphemerisEngine({body});
+        std::move(skygate::ephemeris::EphemerisEngineFactory::create({body}).engine);
     QVERIFY(guidanceEngine != nullptr);
     skygate::ephemeris::EphemerisRequest guidanceRequest = request;
     guidanceRequest.options = guidanceEngine->options();

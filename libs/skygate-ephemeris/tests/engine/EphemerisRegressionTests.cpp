@@ -1,7 +1,7 @@
 #include "time/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
@@ -68,7 +68,9 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -105,7 +107,9 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximationAcrossCo
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     struct ExpectedBody final {
@@ -194,7 +198,9 @@ void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues(
     const auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;

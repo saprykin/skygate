@@ -1,5 +1,5 @@
 #include "TestHelpers.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "EphemerisEngineQueries.hpp"
 #include "catalog/CatalogFactory.hpp"
 
@@ -131,7 +131,9 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -262,7 +264,9 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
     });
     QVERIFY(catalog != nullptr);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     skygate::core::SkyContext context;
@@ -301,7 +305,9 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1710000000));
 
     const std::vector<skygate::ephemeris::CelestialBody> bodies{body};
-    const auto directEngine = skygate::ephemeris::createEphemerisEngine(bodies);
+    auto directEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(bodies);
+    QVERIFY(directEngineResult.isSuccess());
+    const auto& directEngine = directEngineResult.engine;
     QVERIFY(directEngine != nullptr);
 
     const auto directState = directEngine->computeBodyState(context, "mars");
@@ -313,7 +319,9 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
     QVERIFY(catalog != nullptr);
     QCOMPARE(catalog->bodies()[0].ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
 
-    const auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
     const auto state = engine->computeBodyState(context, "mars");

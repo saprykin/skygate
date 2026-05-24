@@ -1,5 +1,5 @@
 #include "ObservationEventCalculator.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "IEphemerisEngine.hpp"
 #include "Types.hpp"
@@ -100,8 +100,9 @@ sampleAltitudes(const IEphemerisEngine& ephemerisEngine, const EphemerisRequest&
 )
 {
     const std::array<CelestialBody, 1> bodies{body};
-    std::unique_ptr<IEphemerisEngine> guidanceEngine =
-        createEphemerisEngine(std::span<const CelestialBody>{bodies.data(), bodies.size()});
+    auto guidanceEngineResult =
+        EphemerisEngineFactory::create(std::span<const CelestialBody>{bodies.data(), bodies.size()});
+    std::unique_ptr<IEphemerisEngine> guidanceEngine = std::move(guidanceEngineResult.engine);
     if (guidanceEngine == nullptr) {
         return std::nullopt;
     }

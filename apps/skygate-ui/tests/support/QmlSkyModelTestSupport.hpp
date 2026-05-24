@@ -5,7 +5,7 @@
 #include "SkySceneModel.hpp"
 
 #include "catalog/CatalogFactory.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QString>
 
@@ -21,7 +21,11 @@ inline std::unique_ptr<SkyContextController> makeController()
     if (starCatalog == nullptr) {
         return {};
     }
-    auto ephemerisEngine = skygate::ephemeris::createEphemerisEngine(*starCatalog);
+    auto ephemerisEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(*starCatalog);
+    if (!ephemerisEngineResult.isSuccess()) {
+        return {};
+    }
+    auto ephemerisEngine = std::move(ephemerisEngineResult.engine);
     if (ephemerisEngine == nullptr) {
         return {};
     }

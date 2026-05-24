@@ -21,7 +21,7 @@
 #include <QStandardPaths>
 
 #include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "engine/highprecision/DeltaTProvider.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
@@ -1022,7 +1022,7 @@ void SkyContextController::rebuildEphemerisEngine()
                                  ? skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision
                                  : skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
-    auto result = skygate::ephemeris::createEphemerisEngine(request);
+    auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
     if (result.usedSimpleEngineFallback()
         && m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
         && m_ephemerisEngine != nullptr

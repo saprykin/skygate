@@ -10,7 +10,7 @@
 #include "SkyTimeController.hpp"
 
 #include "ITimeSource.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "catalog/CatalogFactory.hpp"
 
 #include <QCoreApplication>
@@ -86,7 +86,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> createTestCatalog()
 std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
 createTestEphemerisEngine(const skygate::ephemeris::IStarCatalog& starCatalog)
 {
-    return skygate::ephemeris::createEphemerisEngine(starCatalog);
+    return std::move(skygate::ephemeris::EphemerisEngineFactory::create(starCatalog).engine);
 }
 
 SkyContextController::InitializationOptions

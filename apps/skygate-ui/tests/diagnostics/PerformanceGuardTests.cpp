@@ -9,7 +9,7 @@
 
 #include "math/ViewportMath.hpp"
 #include "catalog/CatalogFactory.hpp"
-#include "EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "IEphemerisEngine.hpp"
 
 #include "engine/highprecision/EphemerisComputationCache.hpp"
@@ -566,7 +566,9 @@ void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
 {
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(makeLargeMixedCatalog());
     QVERIFY(catalog != nullptr);
-    auto engine = skygate::ephemeris::createEphemerisEngine(*catalog);
+    auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
+    QVERIFY(engineResult.isSuccess());
+    auto engine = std::move(engineResult.engine);
     QVERIFY(engine != nullptr);
 
     SkyContextController controller(std::move(catalog), std::move(engine), testInitializationOptions(), nullptr);

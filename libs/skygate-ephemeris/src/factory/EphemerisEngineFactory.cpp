@@ -1,4 +1,6 @@
 #include "EphemerisEngineFactory.hpp"
+#include "EphemerisFactoryCreationDiagnostic.hpp"
+#include "IEphemerisDiagnosticsSink.hpp"
 #include "StringUtilities.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
@@ -17,6 +19,68 @@
 #include <vector>
 
 namespace skygate::ephemeris {
+
+bool EphemerisEngineFactory::allowsSimpleEngineFallback(const EphemerisFactoryFallbackPolicy policy) noexcept
+{
+    return policy == EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+}
+
+std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryFallbackPolicy policy) noexcept
+{
+    switch (policy) {
+    case EphemerisFactoryFallbackPolicy::StrictHighPrecision:
+        return "strict high precision";
+    case EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback:
+        return "allow simple engine fallback";
+    }
+
+    return {};
+}
+
+std::string_view EphemerisEngineFactory::displayName(const EphemerisFactoryCreationStatus status) noexcept
+{
+    switch (status) {
+    case EphemerisFactoryCreationStatus::CreatedRequestedEngine:
+        return "created requested engine";
+    case EphemerisFactoryCreationStatus::CreatedSimpleFallback:
+        return "created simple engine fallback";
+    case EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable:
+        return "strict high precision unavailable";
+    case EphemerisFactoryCreationStatus::FailedInvalidRequest:
+        return "invalid factory request";
+    case EphemerisFactoryCreationStatus::FailedCreationError:
+        return "engine creation failed";
+    }
+
+    return {};
+}
+
+bool EphemerisEngineFactory::isCreationSuccess(const EphemerisFactoryCreationStatus status) noexcept
+{
+    return status == EphemerisFactoryCreationStatus::CreatedRequestedEngine
+           || status == EphemerisFactoryCreationStatus::CreatedSimpleFallback;
+}
+
+std::string_view EphemerisEngineFactory::diagnosticText(const EphemerisFactoryCreationDiagnosticCode code) noexcept
+{
+    switch (code) {
+    case EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable:
+        return "High-precision ephemeris creation is unavailable.";
+    case EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable:
+        return "Required ephemeris data is unavailable.";
+    case EphemerisFactoryCreationDiagnosticCode::RequiredTimeScaleServiceUnavailable:
+        return "Required time-scale service is unavailable.";
+    case EphemerisFactoryCreationDiagnosticCode::RequiredEarthOrientationProviderUnavailable:
+        return "Required Earth-orientation provider is unavailable.";
+    case EphemerisFactoryCreationDiagnosticCode::InvalidRequest:
+        return "The ephemeris engine factory request is invalid.";
+    case EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed:
+        return "Ephemeris engine creation failed.";
+    }
+
+    return "Ephemeris engine creation diagnostic.";
+}
+
 namespace {
 
 [[nodiscard]] EphemerisFactoryCreationDiagnostic makeDiagnostic(
@@ -152,8 +216,6 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
 
     if (diagnostics.empty()) {
         highprecision::CalcephKernelSelectionOptions kernelSelectionOptions;
-        // Active kernels are verified during activation. Rehashing DE441 here
-        // makes every high-precision engine rebuild scan gigabytes on startup.
         kernelSelectionOptions.verifyChecksum = false;
         auto kernelProvider = std::make_shared<highprecision::CalcephKernelProvider>(
             *request.activeDataSnapshot,
@@ -199,7 +261,7 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
         }
     }
 
-    if (allowsSimpleEngineFallback(request.fallbackPolicy)) {
+    if (EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy)) {
         return EphemerisEngineFactoryResult::success(
             std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options),
             EphemerisFactoryCreationStatus::CreatedSimpleFallback,
@@ -225,7 +287,7 @@ void publishDiagnostics(
 
 }  // namespace
 
-EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryRequest& request)
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngineFactoryRequest& request)
 {
     EphemerisEngineFactoryResult result;
     switch (request.engineKind) {
@@ -246,31 +308,29 @@ EphemerisEngineFactoryResult createEphemerisEngine(const EphemerisEngineFactoryR
     return result;
 }
 
-std::unique_ptr<IEphemerisEngine> createEphemerisEngine()
+EphemerisEngineFactoryResult EphemerisEngineFactory::create()
 {
     EphemerisEngineFactoryRequest request;
     request.options = simpleEphemerisEngineDefaultOptions();
-    EphemerisEngineFactoryResult result = createEphemerisEngine(request);
-    return std::move(result.engine);
+    return create(request);
 }
 
-std::unique_ptr<IEphemerisEngine> createEphemerisEngine(const IStarCatalog& catalog)
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(const IStarCatalog& catalog)
 {
-    return createEphemerisEngine(catalog.bodies());
+    return create(catalog.bodies());
 }
 
-std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::initializer_list<CelestialBody> bodies)
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::initializer_list<CelestialBody> bodies)
 {
-    return createEphemerisEngine(std::span<const CelestialBody>{bodies.begin(), bodies.size()});
+    return create(std::span<const CelestialBody>{bodies.begin(), bodies.size()});
 }
 
-std::unique_ptr<IEphemerisEngine> createEphemerisEngine(std::span<const CelestialBody> bodies)
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::span<const CelestialBody> bodies)
 {
     EphemerisEngineFactoryRequest request;
     request.catalogBodies = bodies;
     request.options = simpleEphemerisEngineDefaultOptions();
-    EphemerisEngineFactoryResult result = createEphemerisEngine(request);
-    return std::move(result.engine);
+    return create(request);
 }
 
 }  // namespace skygate::ephemeris

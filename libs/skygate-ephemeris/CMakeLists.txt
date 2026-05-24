@@ -120,7 +120,15 @@ add_library(skygate-ephemeris STATIC
     src/engine/highprecision/EphemerisDataActivation.hpp
     src/engine/highprecision/EphemerisDataManifest.hpp
     src/engine/highprecision/EphemerisDataSnapshot.hpp
-    src/EphemerisEngineFactory.hpp
+    src/factory/EphemerisEngineFactory.hpp
+    src/factory/EphemerisFactoryCreationDiagnosticCode.hpp
+    src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp
+    src/factory/EphemerisFactoryCreationStatus.hpp
+    src/factory/EphemerisFactoryFallbackPolicy.hpp
+    src/factory/EphemerisEngineFactoryRequest.hpp
+    src/factory/EphemerisEngineFactoryResult.hpp
+    src/factory/EphemerisFactoryCreationDiagnostic.hpp
+    src/factory/IEphemerisDiagnosticsSink.hpp
     src/EphemerisEngineQueries.hpp
     src/EphemerisPrecisionPolicy.hpp
     src/EphemerisRequestFactory.hpp
@@ -227,7 +235,14 @@ add_library(skygate-ephemeris STATIC
     src/time/AstronomicalTime.cpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
-    src/EphemerisEngineFactory.cpp
+    src/factory/EphemerisEngineFactory.cpp
+    src/factory/EphemerisFactoryCreationDiagnosticCode.cpp
+    src/factory/EphemerisFactoryCreationDiagnosticSeverity.cpp
+    src/factory/EphemerisFactoryCreationStatus.cpp
+    src/factory/EphemerisFactoryFallbackPolicy.cpp
+    src/factory/EphemerisEngineFactoryRequest.cpp
+    src/factory/EphemerisEngineFactoryResult.cpp
+    src/factory/EphemerisFactoryCreationDiagnostic.cpp
     src/EphemerisEngineQueries.cpp
     src/EphemerisRequestFactory.cpp
     src/NightConditionsCalculator.cpp
