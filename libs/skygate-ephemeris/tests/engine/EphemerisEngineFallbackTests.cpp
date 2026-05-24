@@ -1,7 +1,7 @@
 #include "TestHelpers.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "EphemerisEngineQueries.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "engine/EphemerisEngineQueries.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QtTest/QtTest>
 

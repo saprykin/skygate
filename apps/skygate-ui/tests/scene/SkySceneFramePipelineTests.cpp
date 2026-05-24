@@ -2,8 +2,8 @@
 
 #include <QtTest/QtTest>
 
-#include "EphemerisEngineQueries.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/EphemerisEngineQueries.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <cmath>
 #include <limits>

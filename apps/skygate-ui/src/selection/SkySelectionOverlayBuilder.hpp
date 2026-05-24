@@ -4,13 +4,12 @@
 #include <QString>
 #include <QStringList>
 
-#include "SkySceneOverlayData.hpp"
-
 #include "PreparedProjection.hpp"
+#include "SkySceneOverlayData.hpp"
 #include "SkyContext.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
-#include "IEphemerisEngine.hpp"
 #include "Types.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <cstdint>
 #include <optional>

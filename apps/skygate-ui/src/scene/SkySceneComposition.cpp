@@ -4,7 +4,7 @@
 
 #include "math/Geometry2d.hpp"
 #include "CelestialReferenceCalculator.hpp"
-#include "EphemerisPrecisionPolicy.hpp"
+#include "engine/EphemerisPrecisionPolicy.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>

@@ -6,8 +6,8 @@
 #include "EphemerisFactoryFallbackPolicy.hpp"
 #include "EphemerisEngineFactoryRequest.hpp"
 #include "EphemerisEngineFactoryResult.hpp"
-#include "IEphemerisEngine.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <initializer_list>
 #include <memory>

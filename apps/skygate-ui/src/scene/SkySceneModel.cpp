@@ -6,8 +6,8 @@
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 
-#include "EphemerisPrecisionPolicy.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/EphemerisPrecisionPolicy.hpp"
+#include "engine/IEphemerisEngine.hpp"
 #include "Types.hpp"
 
 #include <QElapsedTimer>

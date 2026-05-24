@@ -3,8 +3,8 @@
 
 #include "SkySceneModelTestSupport.hpp"
 
-#include "EphemerisEngineQueries.hpp"
-#include "IEphemerisEngine.hpp"
+#include "engine/EphemerisEngineQueries.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 #include <chrono>
 #include <memory>

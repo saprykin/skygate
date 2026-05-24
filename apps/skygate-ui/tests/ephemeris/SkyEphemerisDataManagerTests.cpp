@@ -6,7 +6,7 @@
 #include "SkyContextController.hpp"
 #include "SkySettingsStore.hpp"
 
-#include "IEphemerisEngine.hpp"
+#include "engine/IEphemerisEngine.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 
 #include <QtTest/QtTest>
