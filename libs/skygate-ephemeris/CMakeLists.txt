@@ -134,6 +134,9 @@ add_library(skygate-ephemeris STATIC
     src/EphemerisRequestFactory.hpp
     src/engine/IEphemerisEngine.hpp
     src/engine/highprecision/LeapSecondProvider.hpp
+    src/MoonPhase.hpp
+    src/MoonPhaseCalculator.hpp
+    src/NightConditions.hpp
     src/NightConditionsCalculator.hpp
     src/catalog/ICatalogParser.hpp
     src/catalog/IStarCatalog.hpp
@@ -246,6 +249,9 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisEngineQueries.cpp
     src/engine/EphemerisPrecisionPolicy.cpp
     src/EphemerisRequestFactory.cpp
+    src/MoonPhase.cpp
+    src/MoonPhaseCalculator.cpp
+    src/NightConditions.cpp
     src/NightConditionsCalculator.cpp
     src/ObservationEventCalculator.cpp
     src/catalog/bundled/BundledCatalogParser.cpp

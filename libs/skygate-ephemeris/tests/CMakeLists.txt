@@ -373,6 +373,10 @@ add_skygate_ephemeris_qtest(
     events/ObservationEventCalculatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-moon-phase-calculator-tests
+    engine/MoonPhaseCalculatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-night-conditions-calculator-tests
     events/NightConditionsCalculatorTests.cpp
 )

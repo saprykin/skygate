@@ -1,14 +1,12 @@
 #include "NightConditionsCalculator.hpp"
-#include "EphemerisRequestFactory.hpp"
+#include "MoonPhaseCalculator.hpp"
+#include "ObservationEventCalculator.hpp"
 #include "Types.hpp"
-#include "math/MathConstants.hpp"
-#include "math/TimeConstants.hpp"
-#include "math/PhysicalConstants.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
-#include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace skygate::ephemeris {
 namespace {
@@ -23,59 +21,11 @@ constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
     return ObservationEvent{.status = ObservationEventStatus::Unresolved};
 }
 
-[[nodiscard]] EphemerisRequest
-requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephemerisEngine) noexcept
+[[nodiscard]] ObservationEventSearchMode
+observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noexcept
 {
-    return EphemerisRequestFactory::fromContext(context, ephemerisEngine.options());
-}
-
-[[nodiscard]] double normalizedLunarCycleFraction(const AstronomicalEpoch& epoch) noexcept
-{
-    const AstronomicalEpoch normalizedEpoch = epoch.normalized();
-    const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
-    const double daysSinceKnownNewMoon = julianDay - core::TimeConstants::kJulianDateKnownNewMoon;
-    double fraction = std::fmod(daysSinceKnownNewMoon / core::PhysicalConstants::kSynodicMonthDays, 1.0);
-    if (fraction < 0.0) {
-        fraction += 1.0;
-    }
-    return fraction;
-}
-
-[[nodiscard]] double moonIlluminationPercent(const double lunarCycleFraction) noexcept
-{
-    return std::clamp((1.0 - std::cos(core::MathConstants::kTwoPi * lunarCycleFraction)) * 50.0, 0.0, 100.0);
-}
-
-[[nodiscard]] std::string moonPhaseName(const double lunarCycleFraction)
-{
-    if (lunarCycleFraction < 1.0 / 16.0 || lunarCycleFraction >= 15.0 / 16.0) {
-        return "New Moon";
-    }
-    if (lunarCycleFraction < 3.0 / 16.0) {
-        return "Waxing crescent";
-    }
-    if (lunarCycleFraction < 5.0 / 16.0) {
-        return "First quarter";
-    }
-    if (lunarCycleFraction < 7.0 / 16.0) {
-        return "Waxing gibbous";
-    }
-    if (lunarCycleFraction < 9.0 / 16.0) {
-        return "Full Moon";
-    }
-    if (lunarCycleFraction < 11.0 / 16.0) {
-        return "Waning gibbous";
-    }
-    if (lunarCycleFraction < 13.0 / 16.0) {
-        return "Last quarter";
-    }
-    return "Waning crescent";
-}
-
-[[nodiscard]] ObservationEventSearchMode observationSearchMode(const NightConditionsEventSearchMode mode) noexcept
-{
-    return mode == NightConditionsEventSearchMode::Verified ? ObservationEventSearchMode::Direct
-                                                            : ObservationEventSearchMode::GuidedApproximate;
+    return mode == NightConditionsCalculator::EventSearchMode::Verified ? ObservationEventSearchMode::Direct
+                                                                        : ObservationEventSearchMode::GuidedApproximate;
 }
 
 [[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
@@ -85,12 +35,12 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
     const std::uint32_t bodyIndex,
     const CelestialBody* body,
     const double crossingAltitudeDeg,
-    const NightConditionsEventSearchMode eventSearchMode
+    const NightConditionsCalculator::EventSearchMode eventSearchMode
 )
 {
     const EphemerisRequest eventRequest = ephemerisRequestForPrecisionPolicy(
         request,
-        eventSearchMode == NightConditionsEventSearchMode::Verified
+        eventSearchMode == NightConditionsCalculator::EventSearchMode::Verified
             ? EphemerisPrecisionPolicy::NightConditionsVerified
             : EphemerisPrecisionPolicy::NightConditionsApproximate
     );
@@ -109,7 +59,7 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
     const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
     const CelestialBody* body,
-    const NightConditionsEventSearchMode eventSearchMode
+    const NightConditionsCalculator::EventSearchMode eventSearchMode
 )
 {
     return computeEventSummaryForNightConditions(
@@ -121,101 +71,12 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
 
 NightConditions NightConditionsCalculator::compute(
     const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
-    const std::uint32_t sunBodyIndex,
-    const std::uint32_t moonBodyIndex
-) const
-{
-    return compute(
-        ephemerisEngine,
-        requestFromContext(context, ephemerisEngine),
-        sunBodyIndex,
-        nullptr,
-        moonBodyIndex,
-        nullptr,
-        NightConditionsEventSearchMode::Approximate
-    );
-}
-
-NightConditions NightConditionsCalculator::compute(
-    const IEphemerisEngine& ephemerisEngine,
-    const core::SkyContext& context,
-    const std::uint32_t sunBodyIndex,
-    const CelestialBody& sunBody,
-    const std::uint32_t moonBodyIndex,
-    const CelestialBody& moonBody
-) const
-{
-    return compute(
-        ephemerisEngine,
-        requestFromContext(context, ephemerisEngine),
-        sunBodyIndex,
-        &sunBody,
-        moonBodyIndex,
-        &moonBody,
-        NightConditionsEventSearchMode::Approximate
-    );
-}
-
-NightConditions NightConditionsCalculator::compute(
-    const IEphemerisEngine& ephemerisEngine,
-    const EphemerisRequest& request,
-    const std::uint32_t sunBodyIndex,
-    const std::uint32_t moonBodyIndex
-) const
-{
-    return compute(
-        ephemerisEngine,
-        request,
-        sunBodyIndex,
-        nullptr,
-        moonBodyIndex,
-        nullptr,
-        NightConditionsEventSearchMode::Approximate
-    );
-}
-
-NightConditions NightConditionsCalculator::compute(
-    const IEphemerisEngine& ephemerisEngine,
-    const EphemerisRequest& request,
-    const std::uint32_t sunBodyIndex,
-    const CelestialBody& sunBody,
-    const std::uint32_t moonBodyIndex,
-    const CelestialBody& moonBody
-) const
-{
-    return compute(
-        ephemerisEngine,
-        request,
-        sunBodyIndex,
-        &sunBody,
-        moonBodyIndex,
-        &moonBody,
-        NightConditionsEventSearchMode::Approximate
-    );
-}
-
-NightConditions NightConditionsCalculator::compute(
-    const IEphemerisEngine& ephemerisEngine,
-    const EphemerisRequest& request,
-    const std::uint32_t sunBodyIndex,
-    const CelestialBody& sunBody,
-    const std::uint32_t moonBodyIndex,
-    const CelestialBody& moonBody,
-    const NightConditionsEventSearchMode eventSearchMode
-) const
-{
-    return compute(ephemerisEngine, request, sunBodyIndex, &sunBody, moonBodyIndex, &moonBody, eventSearchMode);
-}
-
-NightConditions NightConditionsCalculator::compute(
-    const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
     const std::uint32_t sunBodyIndex,
     const CelestialBody* sunBody,
     const std::uint32_t moonBodyIndex,
     const CelestialBody* moonBody,
-    const NightConditionsEventSearchMode eventSearchMode
+    const EventSearchMode eventSearchMode
 ) const
 {
     NightConditions conditions;
@@ -265,7 +126,9 @@ NightConditions NightConditionsCalculator::compute(
         eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, eventSearchMode
     );
 
-    const double lunarCycleFraction = normalizedLunarCycleFraction(request.epoch);
+    const MoonPhaseCalculator moonPhaseCalculator;
+    const MoonPhase moonPhase = moonPhaseCalculator.compute(request.epoch);
+
     conditions.valid = true;
     conditions.sunAltitudeDeg = sunState->horizontal.altitudeDeg;
     conditions.sunrise = sunHorizon.nextRise;
@@ -278,8 +141,8 @@ NightConditions NightConditionsCalculator::compute(
     conditions.astronomicalDusk = astronomical.nextSet;
     conditions.moonrise = moonHorizon.nextRise;
     conditions.moonset = moonHorizon.nextSet;
-    conditions.moonIlluminationPercent = moonIlluminationPercent(lunarCycleFraction);
-    conditions.moonPhaseName = moonPhaseName(lunarCycleFraction);
+    conditions.moonIlluminationPercent = moonPhase.illuminationPercent;
+    conditions.moonPhaseName = moonPhase.phaseName;
     return conditions;
 }
 
