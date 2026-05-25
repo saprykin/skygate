@@ -31,7 +31,7 @@ requestFromContext(const core::SkyContext& context, const IEphemerisEngine& ephe
 
 [[nodiscard]] double normalizedLunarCycleFraction(const AstronomicalEpoch& epoch) noexcept
 {
-    const AstronomicalEpoch normalizedEpoch = normalizedAstronomicalEpoch(epoch);
+    const AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
     const double daysSinceKnownNewMoon = julianDay - core::TimeConstants::kJulianDateKnownNewMoon;
     double fraction = std::fmod(daysSinceKnownNewMoon / core::PhysicalConstants::kSynodicMonthDays, 1.0);

@@ -231,7 +231,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
 )
 {
     if (request.epoch.timeScale == TimeScale::Tdb) {
-        return normalizedAstronomicalEpoch(request.epoch);
+        return request.epoch.normalized();
     }
     if (preparedState != nullptr && preparedState->tdbKernelEpoch.has_value()) {
         EphemerisMetadataMerger::merge(metadata, preparedState->tdbKernelEpochMetadata);
@@ -249,7 +249,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
         return std::nullopt;
     }
 
-    return normalizedAstronomicalEpoch(conversion.epoch);
+    return conversion.epoch.normalized();
 }
 
 [[nodiscard]] std::vector<StarAstrometryBatchResult> applyApparentPlaceBatchIfRequested(
@@ -532,7 +532,7 @@ private:
         auto preparedState = std::make_shared<PreparedEphemerisRequestState>();
         {
             if (request.epoch.timeScale == TimeScale::Tdb) {
-                preparedState->tdbKernelEpoch = normalizedAstronomicalEpoch(request.epoch);
+                preparedState->tdbKernelEpoch = request.epoch.normalized();
             } else if (m_dependencies.timeScaleService == nullptr) {
                 preparedState->tdbKernelEpochMetadata.status = EphemerisResultStatus::Degraded;
                 preparedState->tdbKernelEpochMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
@@ -541,7 +541,7 @@ private:
                     m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Tdb);
                 mergeKernelEpochTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
                 if (conversion.isSuccess()) {
-                    preparedState->tdbKernelEpoch = normalizedAstronomicalEpoch(conversion.epoch);
+                    preparedState->tdbKernelEpoch = conversion.epoch.normalized();
                 }
             }
 

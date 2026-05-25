@@ -97,13 +97,12 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 {
     constexpr double kModifiedJulianDateEpoch = 2'400'000.5;
     constexpr double kModifiedJulianDateAtNtpEpoch = 15'020.0;
-    return normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = kModifiedJulianDateEpoch + kModifiedJulianDateAtNtpEpoch,
-            .julianDatePart2 = static_cast<double>(ntpTimestamp) / skygate::core::TimeConstants::kSecondsPerDay,
-            .timeScale = TimeScale::Utc,
-        }
-    );
+    return AstronomicalEpoch{
+        .julianDatePart1 = kModifiedJulianDateEpoch + kModifiedJulianDateAtNtpEpoch,
+        .julianDatePart2 = static_cast<double>(ntpTimestamp) / skygate::core::TimeConstants::kSecondsPerDay,
+        .timeScale = TimeScale::Utc,
+    }
+        .normalized();
 }
 
 [[nodiscard]] std::optional<std::string>
@@ -267,14 +266,14 @@ std::span<const LeapSecondTableEntry> TableBackedLeapSecondProvider::entries() c
 
 std::optional<int> TableBackedLeapSecondProvider::taiMinusUtcSeconds(const AstronomicalEpoch& utcEpoch) const noexcept
 {
-    if (!isFiniteUtcEpoch(utcEpoch)) {
+    if (!utcEpoch.isFiniteUtc()) {
         return std::nullopt;
     }
 
-    const double requestedEpochKey = epochSortKey(utcEpoch);
+    const double requestedEpochKey = utcEpoch.sortKey();
     std::optional<int> offset;
     for (const LeapSecondTableEntry& entry : m_entries) {
-        if (epochSortKey(entry.effectiveUtcEpoch) > requestedEpochKey) {
+        if (entry.effectiveUtcEpoch.sortKey() > requestedEpochKey) {
             break;
         }
         offset = entry.taiMinusUtcSeconds;
@@ -352,7 +351,7 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
     }
 
     const bool sorted = std::ranges::is_sorted(entries, {}, [](const LeapSecondTableEntry& entry) {
-        return epochSortKey(entry.effectiveUtcEpoch);
+        return entry.effectiveUtcEpoch.sortKey();
     });
     if (!sorted) {
         return failureResult(
@@ -363,8 +362,8 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
     info.validityRange = makeValidityRange(entries.front(), entries.back(), info.expiresAt);
     info.status = LeapSecondTableStatus::Available;
     info.diagnosticText = "Leap-second table loaded.";
-    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && isFiniteUtcEpoch(*options.referenceEpoch)
-        && epochSortKey(*options.referenceEpoch) > epochSortKey(*info.expiresAt)) {
+    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFiniteUtc()
+        && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
         info.status = LeapSecondTableStatus::Stale;
         info.diagnosticText = "Leap-second table is stale for the reference epoch.";
     }

@@ -209,7 +209,7 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
 
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::fromContext(context, options);
-    QVERIFY(skygate::ephemeris::hasExplicitEpoch(request.epoch));
+    QVERIFY(request.epoch.hasExplicit());
     QCOMPARE(
         static_cast<std::uint8_t>(request.options.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
@@ -277,7 +277,7 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
         .julianDatePart2 = 1.75,
         .timeScale = skygate::ephemeris::TimeScale::Tt,
     };
-    const auto normalizedOverflow = skygate::ephemeris::normalizedAstronomicalEpoch(overflowEpoch);
+    const auto normalizedOverflow = overflowEpoch.normalized();
     QCOMPARE(normalizedOverflow.julianDatePart1, 2'451'546.0);
     QCOMPARE(normalizedOverflow.julianDatePart2, 0.75);
     QCOMPARE(
@@ -290,7 +290,7 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
         .julianDatePart2 = -0.25,
         .timeScale = skygate::ephemeris::TimeScale::Tdb,
     };
-    const auto normalizedNegativeFraction = skygate::ephemeris::normalizedAstronomicalEpoch(negativeFractionEpoch);
+    const auto normalizedNegativeFraction = negativeFractionEpoch.normalized();
     QCOMPARE(normalizedNegativeFraction.julianDatePart1, 2'451'544.0);
     QCOMPARE(normalizedNegativeFraction.julianDatePart2, 0.75);
     QCOMPARE(

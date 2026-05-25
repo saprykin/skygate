@@ -1,5 +1,6 @@
 #pragma once
 
+#include "math/TimeConstants.hpp"
 #include "time/TimeScale.hpp"
 
 #include <optional>
@@ -10,15 +11,17 @@ struct AstronomicalEpoch {
     double julianDatePart1 = 0.0;
     double julianDatePart2 = 0.0;
     TimeScale timeScale = TimeScale::Utc;
+
+    [[nodiscard]] AstronomicalEpoch normalized() const noexcept;
+
+    [[nodiscard]] bool hasExplicit() const noexcept;
+    [[nodiscard]] bool isFinite() const noexcept;
+    [[nodiscard]] bool isFiniteUtc() const noexcept;
+    [[nodiscard]] double sortKey() const noexcept;
+
+    [[nodiscard]] AstronomicalEpoch addMinutes(int offsetMinutes) const noexcept;
 };
 
 using AstronomicalEpochResult = std::optional<AstronomicalEpoch>;
-
-[[nodiscard]] AstronomicalEpoch normalizedAstronomicalEpoch(const AstronomicalEpoch& epoch) noexcept;
-
-[[nodiscard]] bool hasExplicitEpoch(const AstronomicalEpoch& epoch) noexcept;
-[[nodiscard]] bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept;
-[[nodiscard]] bool isFiniteUtcEpoch(const AstronomicalEpoch& epoch) noexcept;
-[[nodiscard]] double epochSortKey(const AstronomicalEpoch& epoch) noexcept;
 
 }  // namespace skygate::ephemeris

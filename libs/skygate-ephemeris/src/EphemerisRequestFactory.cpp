@@ -12,7 +12,7 @@ using core::TimeConstants;
 core::SkyContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
 {
     core::SkyContext context = request.context;
-    if (request.epoch.timeScale == TimeScale::Utc && hasExplicitEpoch(request.epoch)) {
+    if (request.epoch.timeScale == TimeScale::Utc && request.epoch.hasExplicit()) {
         context.utcTime = EpochCodec::utcTimeFromEpoch(request.epoch);
     }
 
@@ -35,13 +35,13 @@ EphemerisRequestFactory::atUtcTime(const EphemerisRequest& baseRequest, const co
     EphemerisRequest request = baseRequest;
     const double offsetSeconds = std::chrono::duration<double>(utcTime - baseRequest.context.utcTime).count();
     request.context.utcTime = utcTime;
-    request.epoch = normalizedAstronomicalEpoch(
+    request.epoch =
         AstronomicalEpoch{
             .julianDatePart1 = baseRequest.epoch.julianDatePart1,
             .julianDatePart2 = baseRequest.epoch.julianDatePart2 + offsetSeconds / TimeConstants::kSecondsPerDay,
             .timeScale = baseRequest.epoch.timeScale,
         }
-    );
+            .normalized();
     return request;
 }
 

@@ -251,12 +251,12 @@ failureResult(DeltaTDataInfo info, const DeltaTDataStatus status, std::string di
 
 [[nodiscard]] bool epochWithinRange(const AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
 {
-    if (!isFiniteEpoch(epoch)) {
+    if (!epoch.isFinite()) {
         return false;
     }
 
-    const double key = epochSortKey(epoch);
-    return key >= epochSortKey(range.start) && key <= epochSortKey(range.end);
+    const double key = epoch.sortKey();
+    return key >= range.start.sortKey() && key <= range.end.sortKey();
 }
 
 [[nodiscard]] DeltaTEstimate unavailableEstimate(std::string diagnosticText)
@@ -286,7 +286,7 @@ std::span<const DeltaTTableEntry> TableBackedDeltaTProvider::entries() const noe
 
 DeltaTEstimate TableBackedDeltaTProvider::deltaTSeconds(const AstronomicalEpoch& epoch) const
 {
-    if (!isFiniteEpoch(epoch)) {
+    if (!epoch.isFinite()) {
         return unavailableEstimate("Delta T estimate requires a finite epoch.");
     }
 
@@ -294,12 +294,12 @@ DeltaTEstimate TableBackedDeltaTProvider::deltaTSeconds(const AstronomicalEpoch&
         return unavailableEstimate("Delta T data contains no table entries.");
     }
 
-    const double requestedEpochKey = epochSortKey(epoch);
-    if (requestedEpochKey >= epochSortKey(m_entries.front().effectiveUtcEpoch)
-        && requestedEpochKey <= epochSortKey(m_entries.back().effectiveUtcEpoch)) {
+    const double requestedEpochKey = epoch.sortKey();
+    if (requestedEpochKey >= m_entries.front().effectiveUtcEpoch.sortKey()
+        && requestedEpochKey <= m_entries.back().effectiveUtcEpoch.sortKey()) {
         const auto upper =
             std::ranges::lower_bound(m_entries, requestedEpochKey, {}, [](const DeltaTTableEntry& entry) {
-                return epochSortKey(entry.effectiveUtcEpoch);
+                return entry.effectiveUtcEpoch.sortKey();
             });
         if (upper == m_entries.begin()) {
             return DeltaTEstimate{
@@ -320,8 +320,8 @@ DeltaTEstimate TableBackedDeltaTProvider::deltaTSeconds(const AstronomicalEpoch&
 
         const DeltaTTableEntry& before = *(upper - 1);
         const DeltaTTableEntry& after = *upper;
-        const double beforeKey = epochSortKey(before.effectiveUtcEpoch);
-        const double afterKey = epochSortKey(after.effectiveUtcEpoch);
+        const double beforeKey = before.effectiveUtcEpoch.sortKey();
+        const double afterKey = after.effectiveUtcEpoch.sortKey();
         const double ratio = (requestedEpochKey - beforeKey) / (afterKey - beforeKey);
         return DeltaTEstimate{
             .status = DeltaTEstimateStatus::Available,
@@ -416,7 +416,7 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
     }
 
     const bool sorted = std::ranges::is_sorted(entries, {}, [](const DeltaTTableEntry& entry) {
-        return epochSortKey(entry.effectiveUtcEpoch);
+        return entry.effectiveUtcEpoch.sortKey();
     });
     if (!sorted) {
         return failureResult(std::move(info), DeltaTDataStatus::Malformed, "Delta T rows are not sorted by UTC date.");
@@ -424,9 +424,9 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
 
     if (info.ancientFallbackModel.has_value()) {
         DeltaTFallbackModelInfo fallback = std::move(*info.ancientFallbackModel);
-        if (!hasFallbackStart || !hasFallbackEnd || !isFiniteEpoch(fallback.validityRange.start)
-            || !isFiniteEpoch(fallback.validityRange.end)
-            || epochSortKey(fallback.validityRange.start) > epochSortKey(fallback.validityRange.end)) {
+        if (!hasFallbackStart || !hasFallbackEnd || !fallback.validityRange.start.isFinite()
+            || !fallback.validityRange.end.isFinite()
+            || fallback.validityRange.start.sortKey() > fallback.validityRange.end.sortKey()) {
             return failureResult(
                 std::move(info),
                 DeltaTDataStatus::Malformed,
@@ -454,8 +454,8 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
     );
     info.status = DeltaTDataStatus::Available;
     info.diagnosticText = "Delta T data loaded.";
-    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && isFiniteEpoch(*options.referenceEpoch)
-        && epochSortKey(*options.referenceEpoch) > epochSortKey(*info.expiresAt)) {
+    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFinite()
+        && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
         info.status = DeltaTDataStatus::Stale;
         info.diagnosticText = "Delta T data is stale for the reference epoch.";
     }

@@ -56,13 +56,12 @@ struct Ut1OffsetLookupResult {
 [[nodiscard]] AstronomicalEpoch
 addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
 {
-    return normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
-            .timeScale = targetScale,
-        }
-    );
+    return AstronomicalEpoch{
+        .julianDatePart1 = epoch.julianDatePart1,
+        .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
+        .timeScale = targetScale,
+    }
+        .normalized();
 }
 
 [[nodiscard]] double epochJulianDate(const AstronomicalEpoch& epoch) noexcept
@@ -99,7 +98,7 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
     }
 #endif
 
-    if (!isFiniteEpoch(terrestrialTime)) {
+    if (!terrestrialTime.isFinite()) {
         return std::nullopt;
     }
 
@@ -119,7 +118,7 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
     }
 
     return TimeScaleConversionResult{
-        .epoch = normalizedAstronomicalEpoch(epoch),
+        .epoch = epoch.normalized(),
         .status = status,
         .warningCodeMask = warningCodeMask,
         .diagnosticText = std::move(diagnosticText),
@@ -145,8 +144,8 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
 
 [[nodiscard]] bool epochOutsideRange(const AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
 {
-    const double key = epochSortKey(epoch);
-    return key < epochSortKey(range.start) || key > epochSortKey(range.end);
+    const double key = epoch.sortKey();
+    return key < range.start.sortKey() || key > range.end.sortKey();
 }
 
 [[nodiscard]] bool taiEpochOutsideUtcRange(
@@ -161,12 +160,12 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
         return true;
     }
 
-    const double key = epochSortKey(taiEpoch);
+    const double key = taiEpoch.sortKey();
     const AstronomicalEpoch startTaiEpoch =
         addSeconds(utcRange.start, static_cast<double>(*startOffsetSeconds), TimeScale::Tai);
     const AstronomicalEpoch endTaiEpoch =
         addSeconds(utcRange.end, static_cast<double>(*endOffsetSeconds), TimeScale::Tai);
-    return key < epochSortKey(startTaiEpoch) || key > epochSortKey(endTaiEpoch);
+    return key < startTaiEpoch.sortKey() || key > endTaiEpoch.sortKey();
 }
 
 [[nodiscard]] OffsetLookupResult fallbackOffset(
@@ -262,12 +261,12 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
         result.diagnosticText = "Leap-second table is stale for TAI conversion.";
     }
 
-    const double requestedKey = epochSortKey(taiEpoch);
+    const double requestedKey = taiEpoch.sortKey();
     std::optional<int> offset;
     for (const LeapSecondTableEntry& entry : provider->entries()) {
         const AstronomicalEpoch entryTaiEpoch =
             addSeconds(entry.effectiveUtcEpoch, static_cast<double>(entry.taiMinusUtcSeconds), TimeScale::Tai);
-        if (epochSortKey(entryTaiEpoch) > requestedKey) {
+        if (entryTaiEpoch.sortKey() > requestedKey) {
             break;
         }
         offset = entry.taiMinusUtcSeconds;
@@ -558,7 +557,7 @@ LeapSecondTimeScaleService::LeapSecondTimeScaleService(
 TimeScaleConversionResult
 LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const
 {
-    if (!isFiniteEpoch(epoch)) {
+    if (!epoch.isFinite()) {
         TimeScaleConversionResult result = failureResult(epoch, targetScale, "Time-scale conversion input is invalid.");
         result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
         return result;
