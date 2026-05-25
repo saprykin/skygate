@@ -133,13 +133,12 @@ AstronomicalEpochResult CalendarTime::astronomicalEpochFromCivilDateTime(const C
     const double dayFraction =
         static_cast<double>(nanosecondsSinceMidnight) / static_cast<double>(TimeConstants::kNanosecondsPerDay);
 
-    return normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = TimeConstants::kJulianDateUnixEpoch + static_cast<double>(daysSinceUnixEpoch),
-            .julianDatePart2 = dayFraction,
-            .timeScale = dateTime.timeScale,
-        }
-    );
+    return AstronomicalEpoch{
+        .julianDatePart1 = TimeConstants::kJulianDateUnixEpoch + static_cast<double>(daysSinceUnixEpoch),
+        .julianDatePart2 = dayFraction,
+        .timeScale = dateTime.timeScale,
+    }
+        .normalized();
 }
 
 CivilDateTimeResult CalendarTime::civilDateTimeFromAstronomicalEpoch(const AstronomicalEpoch& epoch) noexcept
@@ -148,7 +147,7 @@ CivilDateTimeResult CalendarTime::civilDateTimeFromAstronomicalEpoch(const Astro
         return std::nullopt;
     }
 
-    const AstronomicalEpoch normalizedEpoch = normalizedAstronomicalEpoch(epoch);
+    const AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double daysSinceUnixEpochDouble =
         (normalizedEpoch.julianDatePart1 - TimeConstants::kJulianDateUnixEpoch) + normalizedEpoch.julianDatePart2;
     if (!std::isfinite(daysSinceUnixEpochDouble)

@@ -552,19 +552,18 @@ failureResult(EarthOrientationDataInfo info, const EarthOrientationDataStatus st
 
 [[nodiscard]] bool isValidPredictionRange(const EphemerisDateRange& range) noexcept
 {
-    return isFiniteUtcEpoch(range.start) && isFiniteUtcEpoch(range.end)
-           && epochSortKey(range.start) <= epochSortKey(range.end);
+    return range.start.isFiniteUtc() && range.end.isFiniteUtc() && range.start.sortKey() <= range.end.sortKey();
 }
 
 [[nodiscard]] bool epochInRange(const AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
 {
-    const double key = epochSortKey(epoch);
-    return key >= epochSortKey(range.start) && key <= epochSortKey(range.end);
+    const double key = epoch.sortKey();
+    return key >= range.start.sortKey() && key <= range.end.sortKey();
 }
 
 [[nodiscard]] bool epochAfter(const AstronomicalEpoch& epoch, const AstronomicalEpoch& boundary) noexcept
 {
-    return epochSortKey(epoch) > epochSortKey(boundary);
+    return epoch.sortKey() > boundary.sortKey();
 }
 
 void addSampleWarning(EarthOrientationSample& sample, const EarthOrientationSampleWarningCode code) noexcept
@@ -625,8 +624,8 @@ sampleFromEntry(const AstronomicalEpoch& requestedEpoch, const EarthOrientationT
     const AstronomicalEpoch& utcEpoch, const EarthOrientationTableEntry& lower, const EarthOrientationTableEntry& upper
 )
 {
-    const double lowerKey = epochSortKey(lower.effectiveUtcEpoch);
-    const double upperKey = epochSortKey(upper.effectiveUtcEpoch);
+    const double lowerKey = lower.effectiveUtcEpoch.sortKey();
+    const double upperKey = upper.effectiveUtcEpoch.sortKey();
     const double denominator = upperKey - lowerKey;
     if (denominator <= 0.0) {
         return failedSample(
@@ -636,7 +635,7 @@ sampleFromEntry(const AstronomicalEpoch& requestedEpoch, const EarthOrientationT
         );
     }
 
-    const double ratio = (epochSortKey(utcEpoch) - lowerKey) / denominator;
+    const double ratio = (utcEpoch.sortKey() - lowerKey) / denominator;
     EarthOrientationSample sample;
     sample.requestedUtcEpoch = utcEpoch;
     sample.ut1MinusUtcSeconds =
@@ -779,7 +778,7 @@ EarthOrientationDataLoadResult loadEarthOrientationDataFromTextAsset(
     }
 
     const bool sorted = std::ranges::is_sorted(entries, {}, [](const EarthOrientationTableEntry& entry) {
-        return epochSortKey(entry.effectiveUtcEpoch);
+        return entry.effectiveUtcEpoch.sortKey();
     });
     if (!sorted) {
         return failureResult(
@@ -804,8 +803,8 @@ EarthOrientationDataLoadResult loadEarthOrientationDataFromTextAsset(
     );
     info.status = EarthOrientationDataStatus::Available;
     info.diagnosticText = "Earth-orientation data loaded.";
-    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && isFiniteUtcEpoch(*options.referenceEpoch)
-        && epochSortKey(*options.referenceEpoch) > epochSortKey(*info.expiresAt)) {
+    if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFiniteUtc()
+        && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
         info.status = EarthOrientationDataStatus::Stale;
         info.diagnosticText = "Earth-orientation data is stale for the reference epoch.";
     }
@@ -822,7 +821,7 @@ EarthOrientationSample sampleEarthOrientation(
     const EarthOrientationSampleOptions& options
 )
 {
-    if (!isFiniteUtcEpoch(utcEpoch)) {
+    if (!utcEpoch.isFiniteUtc()) {
         return failedSample(
             utcEpoch,
             EarthOrientationSampleWarningCode::InvalidInput,
@@ -835,13 +834,13 @@ EarthOrientationSample sampleEarthOrientation(
     }
 
     const std::span<const EarthOrientationTableEntry> entries = provider->entries();
-    const double requestedKey = epochSortKey(utcEpoch);
+    const double requestedKey = utcEpoch.sortKey();
     const auto lowerBound = std::ranges::lower_bound(entries, requestedKey, {}, [](const auto& entry) {
-        return epochSortKey(entry.effectiveUtcEpoch);
+        return entry.effectiveUtcEpoch.sortKey();
     });
 
     EarthOrientationSample sample;
-    if (lowerBound != entries.end() && epochSortKey(lowerBound->effectiveUtcEpoch) == requestedKey) {
+    if (lowerBound != entries.end() && lowerBound->effectiveUtcEpoch.sortKey() == requestedKey) {
         sample = sampleFromEntry(utcEpoch, *lowerBound);
     } else if (lowerBound == entries.begin()) {
         if (!options.allowOutOfRangeNearestSampleFallback) {

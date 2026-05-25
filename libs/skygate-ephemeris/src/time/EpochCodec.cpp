@@ -23,7 +23,7 @@ AstronomicalEpoch EpochCodec::epochFromUtcTime(const core::UtcTimePoint& utcTime
 
 core::UtcTimePoint EpochCodec::utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept
 {
-    const AstronomicalEpoch normalizedEpoch = normalizedAstronomicalEpoch(epoch);
+    const AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
     const double epochMicros =
         std::round((julianDay - TimeConstants::kJulianDateUnixEpoch) * TimeConstants::kMicrosecondsPerDay);

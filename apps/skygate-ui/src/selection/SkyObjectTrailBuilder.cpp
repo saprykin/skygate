@@ -141,18 +141,6 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
     return normalizedDeg < 0.0 ? normalizedDeg + 360.0 : normalizedDeg;
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch
-addMinutes(const skygate::ephemeris::AstronomicalEpoch& epoch, const int offsetMinutes) noexcept
-{
-    return skygate::ephemeris::normalizedAstronomicalEpoch(
-        skygate::ephemeris::AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2 + static_cast<double>(offsetMinutes) / (24.0 * 60.0),
-            .timeScale = epoch.timeScale
-        }
-    );
-}
-
 struct UnitVector3d final {
     double x = 0.0;
     double y = 0.0;
@@ -376,7 +364,7 @@ sampleHighPrecisionTrailAtOffset(const SkyObjectTrailInput& input, const int off
 {
     skygate::ephemeris::EphemerisRequest sampleRequest = *input.ephemerisRequest;
     sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
-    sampleRequest.epoch = addMinutes(input.ephemerisRequest->epoch, offsetMinutes);
+    sampleRequest.epoch = input.ephemerisRequest->epoch.addMinutes(offsetMinutes);
 
     skygate::ephemeris::BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
     const auto bodyState = input.ephemerisEngine->computeBodyState(sampleRequest, std::size_t{input.targetBodyIndex});

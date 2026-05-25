@@ -101,13 +101,13 @@ public:
     convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
-        result.epoch = normalizedAstronomicalEpoch(
+        result.epoch =
             AstronomicalEpoch{
                 .julianDatePart1 = epoch.julianDatePart1,
                 .julianDatePart2 = epoch.julianDatePart2,
                 .timeScale = targetScale,
             }
-        );
+                .normalized();
         result.status = TimeScaleConversionStatus::Valid;
         return result;
     }

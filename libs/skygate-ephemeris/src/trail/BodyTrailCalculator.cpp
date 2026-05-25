@@ -10,18 +10,6 @@ using core::TimeConstants;
 
 namespace {
 
-[[nodiscard]] AstronomicalEpoch addMinutes(const AstronomicalEpoch& epoch, const int offsetMinutes) noexcept
-{
-    return normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 =
-                epoch.julianDatePart2 + static_cast<double>(offsetMinutes) / TimeConstants::kMinutesPerDay,
-            .timeScale = epoch.timeScale
-        }
-    );
-}
-
 [[nodiscard]] bool validateOptions(const BodyTrailOptions& options) noexcept
 {
     return options.pastHours >= 0 && options.futureHours >= 0 && options.sampleStepMinutes > 0;
@@ -94,7 +82,7 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
          offsetMinutes += options.sampleStepMinutes) {
         EphemerisRequest sampleRequest = request;
         sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
-        sampleRequest.epoch = addMinutes(request.epoch, offsetMinutes);
+        sampleRequest.epoch = request.epoch.addMinutes(offsetMinutes);
 
         BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};
 

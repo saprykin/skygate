@@ -271,13 +271,12 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
 
 [[nodiscard]] AstronomicalEpoch retardedEpoch(const AstronomicalEpoch& epoch, const double lightTimeDays) noexcept
 {
-    return normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2 - lightTimeDays,
-            .timeScale = epoch.timeScale,
-        }
-    );
+    return AstronomicalEpoch{
+        .julianDatePart1 = epoch.julianDatePart1,
+        .julianDatePart2 = epoch.julianDatePart2 - lightTimeDays,
+        .timeScale = epoch.timeScale,
+    }
+        .normalized();
 }
 
 [[nodiscard]] TargetKernelState computeTargetKernelState(
@@ -372,7 +371,7 @@ SolarSystemStateCalculator::SolarSystemStateCalculator(
 
 HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPrecisionComputationInput& input) const
 {
-    if (!isFiniteEpoch(input.request.epoch)) {
+    if (!input.request.epoch.isFinite()) {
         return makeStatusResult(EphemerisResultStatus::Failed, EphemerisWarningCode::ComputationFailed);
     }
     if (input.request.epoch.timeScale != TimeScale::Tdb) {

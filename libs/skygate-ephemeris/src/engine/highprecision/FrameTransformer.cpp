@@ -112,13 +112,12 @@ multiplyTranspose(const Matrix3x3& matrix, const CelestialFrameVector& vector) n
 [[nodiscard]] AstronomicalEpoch
 addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
 {
-    return normalizedAstronomicalEpoch(
-        AstronomicalEpoch{
-            .julianDatePart1 = epoch.julianDatePart1,
-            .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
-            .timeScale = targetScale,
-        }
-    );
+    return AstronomicalEpoch{
+        .julianDatePart1 = epoch.julianDatePart1,
+        .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
+        .timeScale = targetScale,
+    }
+        .normalized();
 }
 
 [[nodiscard]] Matrix3x3 earthRotationMatrix(const double earthRotationAngle) noexcept
@@ -213,14 +212,14 @@ struct FrameTransformContext {
     [[nodiscard]] std::optional<AstronomicalEpoch>
     epochInScale(TimeScale targetScale, EphemerisResultMetadata& metadata) const
     {
-        if (!isFiniteEpoch(request.epoch)) {
+        if (!request.epoch.isFinite()) {
             metadata.status = EphemerisResultStatus::Failed;
             metadata.addWarning(EphemerisWarningCode::ComputationFailed);
             return std::nullopt;
         }
 
         if (request.epoch.timeScale == targetScale) {
-            return normalizedAstronomicalEpoch(request.epoch);
+            return request.epoch.normalized();
         }
 
         if (timeScaleService == nullptr) {
@@ -282,7 +281,7 @@ struct FrameTransformContext {
 
     [[nodiscard]] std::optional<AstronomicalEpoch> ut1Epoch(EphemerisResultMetadata& metadata) const
     {
-        if (!isFiniteEpoch(request.epoch)) {
+        if (!request.epoch.isFinite()) {
             metadata.status = EphemerisResultStatus::Failed;
             metadata.addWarning(EphemerisWarningCode::ComputationFailed);
             return std::nullopt;

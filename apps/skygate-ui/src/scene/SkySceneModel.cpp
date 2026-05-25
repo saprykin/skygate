@@ -22,8 +22,8 @@ namespace {
     const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::EphemerisDateRange& range
 ) noexcept
 {
-    const double key = epochSortKey(epoch);
-    return key >= epochSortKey(range.start) && key <= epochSortKey(range.end);
+    const double key = epoch.sortKey();
+    return key >= range.start.sortKey() && key <= range.end.sortKey();
 }
 
 [[nodiscard]] QString formatEpochDate(const skygate::ephemeris::AstronomicalEpoch& epoch)

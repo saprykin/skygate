@@ -269,7 +269,7 @@ parseCompressionKind(const std::string_view text, EphemerisDataManifestCompressi
         diagnostics.push_back(std::string(context) + " contains malformed UTC date fields.");
         return false;
     }
-    if (!isFiniteEpoch(*start) || !isFiniteEpoch(*end) || epochSortKey(*start) > epochSortKey(*end)) {
+    if (!start->isFinite() || !end->isFinite() || start->sortKey() > end->sortKey()) {
         diagnostics.push_back(std::string(context) + " must have an ordered finite UTC validity range.");
         return false;
     }

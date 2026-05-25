@@ -423,13 +423,13 @@ public:
         ++m_convertCallCount;
         m_lastTargetScale = targetScale;
         return {
-            .epoch = normalizedAstronomicalEpoch(
+            .epoch =
                 AstronomicalEpoch{
                     .julianDatePart1 = epoch.julianDatePart1,
                     .julianDatePart2 = epoch.julianDatePart2,
                     .timeScale = targetScale,
                 }
-            ),
+                    .normalized(),
             .status = TimeScaleConversionStatus::Valid,
             .diagnosticText = "unit test conversion",
         };
@@ -478,7 +478,7 @@ public:
         } else if (epoch.timeScale == TimeScale::Utc && targetScale == TimeScale::Ut1) {
             result.epoch.julianDatePart2 = addSecondsToJulianDatePart2(epoch.julianDatePart2, m_ut1MinusUtcSeconds);
         }
-        result.epoch = normalizedAstronomicalEpoch(result.epoch);
+        result.epoch = result.epoch.normalized();
         return result;
     }
 
@@ -511,13 +511,13 @@ public:
         }
 
         TimeScaleConversionResult result;
-        result.epoch = normalizedAstronomicalEpoch(
+        result.epoch =
             AstronomicalEpoch{
                 .julianDatePart1 = epoch.julianDatePart1,
                 .julianDatePart2 = epoch.julianDatePart2,
                 .timeScale = TimeScale::Tt,
             }
-        );
+                .normalized();
         result.status = TimeScaleConversionStatus::Degraded;
         result.diagnosticText = "unit test degraded TT conversion";
         result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing);

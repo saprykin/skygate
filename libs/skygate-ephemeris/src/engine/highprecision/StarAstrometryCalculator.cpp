@@ -38,7 +38,7 @@ struct CartesianVector {
 
 [[nodiscard]] double yearsBetween(const AstronomicalEpoch& start, const AstronomicalEpoch& end) noexcept
 {
-    return (epochSortKey(end) - epochSortKey(start)) / TimeConstants::kJulianDaysPerYear;
+    return (end.sortKey() - start.sortKey()) / TimeConstants::kJulianDaysPerYear;
 }
 
 [[nodiscard]] bool hasPositiveParallax(const CatalogStarAstrometry& astrometry) noexcept
@@ -376,7 +376,7 @@ void recordAppliedCorrections(
         return result;
     }
 
-    if (!isFiniteEpoch(request.epoch) || !isFiniteEpoch(astrometry->referenceEpoch)) {
+    if (!request.epoch.isFinite() || !astrometry->referenceEpoch.isFinite()) {
         return makeFailedResult();
     }
 

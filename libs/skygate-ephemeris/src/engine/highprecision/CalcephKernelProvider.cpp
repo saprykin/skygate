@@ -349,8 +349,8 @@ CalcephKernelProviderStatus CalcephKernelProvider::statusForEpoch(const Astronom
     if (!isReady() || !m_kernelInfo.has_value()) {
         return m_status;
     }
-    if (!isFiniteEpoch(epoch) || epochSortKey(epoch) < epochSortKey(m_kernelInfo->validityRange.start)
-        || epochSortKey(epoch) > epochSortKey(m_kernelInfo->validityRange.end)) {
+    if (!epoch.isFinite() || epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
+        || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
         return CalcephKernelProviderStatus::OutOfRange;
     }
 

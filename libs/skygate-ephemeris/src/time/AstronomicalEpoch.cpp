@@ -4,43 +4,52 @@
 
 namespace skygate::ephemeris {
 
-AstronomicalEpoch normalizedAstronomicalEpoch(const AstronomicalEpoch& epoch) noexcept
+AstronomicalEpoch AstronomicalEpoch::normalized() const noexcept
 {
-    if (!std::isfinite(epoch.julianDatePart1) || !std::isfinite(epoch.julianDatePart2)) {
-        return epoch;
+    if (!std::isfinite(julianDatePart1) || !std::isfinite(julianDatePart2)) {
+        return *this;
     }
 
-    const double part1Whole = std::floor(epoch.julianDatePart1);
-    const double part2WithPart1Fraction = (epoch.julianDatePart1 - part1Whole) + epoch.julianDatePart2;
+    const double part1Whole = std::floor(julianDatePart1);
+    const double part2WithPart1Fraction = (julianDatePart1 - part1Whole) + julianDatePart2;
     const double part2Whole = std::floor(part2WithPart1Fraction);
     return AstronomicalEpoch{
         .julianDatePart1 = part1Whole + part2Whole,
         .julianDatePart2 = part2WithPart1Fraction - part2Whole,
-        .timeScale = epoch.timeScale,
+        .timeScale = timeScale,
     };
 }
 
-bool hasExplicitEpoch(const AstronomicalEpoch& epoch) noexcept
+bool AstronomicalEpoch::hasExplicit() const noexcept
 {
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2)
-           && (epoch.julianDatePart1 != 0.0 || epoch.julianDatePart2 != 0.0);
+    return std::isfinite(julianDatePart1) && std::isfinite(julianDatePart2)
+           && (julianDatePart1 != 0.0 || julianDatePart2 != 0.0);
 }
 
-bool isFiniteEpoch(const AstronomicalEpoch& epoch) noexcept
+bool AstronomicalEpoch::isFinite() const noexcept
 {
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
+    return std::isfinite(julianDatePart1) && std::isfinite(julianDatePart2);
 }
 
-bool isFiniteUtcEpoch(const AstronomicalEpoch& epoch) noexcept
+bool AstronomicalEpoch::isFiniteUtc() const noexcept
 {
-    return epoch.timeScale == TimeScale::Utc && std::isfinite(epoch.julianDatePart1)
-           && std::isfinite(epoch.julianDatePart2);
+    return timeScale == TimeScale::Utc && std::isfinite(julianDatePart1) && std::isfinite(julianDatePart2);
 }
 
-double epochSortKey(const AstronomicalEpoch& epoch) noexcept
+double AstronomicalEpoch::sortKey() const noexcept
 {
-    const AstronomicalEpoch normalized = normalizedAstronomicalEpoch(epoch);
-    return normalized.julianDatePart1 + normalized.julianDatePart2;
+    const AstronomicalEpoch normalizedEpoch = normalized();
+    return normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
+}
+
+AstronomicalEpoch AstronomicalEpoch::addMinutes(const int offsetMinutes) const noexcept
+{
+    return AstronomicalEpoch{
+        .julianDatePart1 = julianDatePart1,
+        .julianDatePart2 = julianDatePart2 + static_cast<double>(offsetMinutes) / core::TimeConstants::kMinutesPerDay,
+        .timeScale = timeScale
+    }
+        .normalized();
 }
 
 }  // namespace skygate::ephemeris
