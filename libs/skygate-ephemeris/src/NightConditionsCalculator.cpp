@@ -5,7 +5,6 @@
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
-#include <cmath>
 #include <cstdint>
 
 namespace skygate::ephemeris {
@@ -21,11 +20,12 @@ constexpr double kAstronomicalTwilightAltitudeDeg = -18.0;
     return ObservationEvent{.status = ObservationEventStatus::Unresolved};
 }
 
-[[nodiscard]] ObservationEventSearchMode
+[[nodiscard]] ObservationEventCalculator::SearchMode
 observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noexcept
 {
-    return mode == NightConditionsCalculator::EventSearchMode::Verified ? ObservationEventSearchMode::Direct
-                                                                        : ObservationEventSearchMode::GuidedApproximate;
+    return mode == NightConditionsCalculator::EventSearchMode::Verified
+               ? ObservationEventCalculator::SearchMode::Direct
+               : ObservationEventCalculator::SearchMode::GuidedApproximate;
 }
 
 [[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
@@ -44,26 +44,8 @@ observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noe
             ? EphemerisPrecisionPolicy::NightConditionsVerified
             : EphemerisPrecisionPolicy::NightConditionsApproximate
     );
-    if (body != nullptr) {
-        return eventCalculator.compute(
-            ephemerisEngine, eventRequest, bodyIndex, *body, crossingAltitudeDeg, observationSearchMode(eventSearchMode)
-        );
-    }
-
-    return eventCalculator.compute(ephemerisEngine, eventRequest, bodyIndex, crossingAltitudeDeg);
-}
-
-[[nodiscard]] ObservationEventSummary computeEventSummaryForNightConditions(
-    const ObservationEventCalculator& eventCalculator,
-    const IEphemerisEngine& ephemerisEngine,
-    const EphemerisRequest& request,
-    const std::uint32_t bodyIndex,
-    const CelestialBody* body,
-    const NightConditionsCalculator::EventSearchMode eventSearchMode
-)
-{
-    return computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, bodyIndex, body, 0.0, eventSearchMode
+    return eventCalculator.compute(
+        ephemerisEngine, eventRequest, bodyIndex, body, crossingAltitudeDeg, observationSearchMode(eventSearchMode)
     );
 }
 
@@ -123,7 +105,7 @@ NightConditions NightConditionsCalculator::compute(
         eventSearchMode
     );
     const auto moonHorizon = computeEventSummaryForNightConditions(
-        eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, eventSearchMode
+        eventCalculator, ephemerisEngine, request, moonBodyIndex, moonBody, 0.0, eventSearchMode
     );
 
     const MoonPhaseCalculator moonPhaseCalculator;

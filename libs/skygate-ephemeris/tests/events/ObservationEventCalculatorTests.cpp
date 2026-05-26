@@ -1,11 +1,12 @@
-#include "time/CalendarTime.hpp"
-#include "time/AstronomicalTime.hpp"
+#include "ObservationEventCalculator.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
+#include "EphemerisRequestFactory.hpp"
 #include "UtcTimeCodec.hpp"
-#include "math/AngleMath.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
-#include "ObservationEventCalculator.hpp"
+#include "math/AngleMath.hpp"
+#include "time/AstronomicalTime.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QtTest/QtTest>
 
@@ -37,6 +38,12 @@ skygate::ephemeris::CelestialBody makeFixedBody(const skygate::core::EquatorialC
     body.visualMagnitude = 1.0;
     body.fixedEquatorial = equatorial;
     return body;
+}
+
+skygate::ephemeris::EphemerisRequest
+makeRequest(const skygate::core::SkyContext& context, const skygate::ephemeris::IEphemerisEngine& engine)
+{
+    return skygate::ephemeris::EphemerisRequestFactory::fromContext(context, engine.options());
 }
 
 std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(const skygate::ephemeris::CelestialBody& body)
@@ -223,6 +230,8 @@ public:
     mutable bool sawSampleEpochUpdate = false;
 };
 
+using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
+
 }  // namespace
 
 class ObservationEventCalculatorTests final : public QObject {
@@ -249,7 +258,8 @@ void ObservationEventCalculatorTests::normalObjectFindsOrderedEventsAndRefinedHo
     const auto engine = makeEngineForBody(makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0}));
     QVERIFY(engine != nullptr);
 
-    const auto summary = calculator.compute(*engine, context, 0U);
+    const auto request = makeRequest(context, *engine);
+    const auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -274,7 +284,8 @@ void ObservationEventCalculatorTests::circumpolarAndNeverRisingObjectsReportFall
     const auto circumpolarContext = makeContext(60.0, 0.0);
     const auto circumpolarBody = makeFixedBody({.rightAscensionHours = 3.0, .declinationDeg = 80.0});
     auto engine = makeEngineForBody(circumpolarBody);
-    auto summary = calculator.compute(*engine, circumpolarContext, 0U, circumpolarBody);
+    auto request = makeRequest(circumpolarContext, *engine);
+    auto summary = calculator.compute(*engine, request, 0U, &circumpolarBody, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysAbove);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -284,7 +295,8 @@ void ObservationEventCalculatorTests::circumpolarAndNeverRisingObjectsReportFall
     const auto neverRisingContext = makeContext(60.0, 0.0);
     const auto neverRisingBody = makeFixedBody({.rightAscensionHours = 3.0, .declinationDeg = -80.0});
     engine = makeEngineForBody(neverRisingBody);
-    summary = calculator.compute(*engine, neverRisingContext, 0U, neverRisingBody);
+    request = makeRequest(neverRisingContext, *engine);
+    summary = calculator.compute(*engine, request, 0U, &neverRisingBody, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::AlwaysBelow);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -300,7 +312,8 @@ void ObservationEventCalculatorTests::currentAboveHorizonSetsBeforeItRisesAgain(
         makeFixedBody({.rightAscensionHours = currentLocalSiderealHours(context), .declinationDeg = 0.0})
     );
 
-    const auto summary = calculator.compute(*engine, context, 0U);
+    const auto request = makeRequest(context, *engine);
+    const auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -318,7 +331,8 @@ void ObservationEventCalculatorTests::currentBelowHorizonRisesBeforeItSetsAgain(
          .declinationDeg = 0.0}
     ));
 
-    const auto summary = calculator.compute(*engine, context, 0U);
+    const auto request = makeRequest(context, *engine);
+    const auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -336,8 +350,9 @@ void ObservationEventCalculatorTests::configurableAltitudeThresholdFindsDifferen
          .declinationDeg = 0.0}
     ));
 
-    const auto horizonSummary = calculator.compute(*engine, context, 0U, 0.0);
-    const auto twilightSummary = calculator.compute(*engine, context, 0U, -6.0);
+    const auto request = makeRequest(context, *engine);
+    const auto horizonSummary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
+    const auto twilightSummary = calculator.compute(*engine, request, 0U, nullptr, -6.0, SearchMode::Guided);
 
     QCOMPARE(horizonSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(twilightSummary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -347,6 +362,15 @@ void ObservationEventCalculatorTests::configurableAltitudeThresholdFindsDifferen
 
     verifyCrossingAltitude(*engine, context, *horizonSummary.nextRise.utcTime, 0.0);
     verifyCrossingAltitude(*engine, context, *twilightSummary.nextRise.utcTime, -6.0);
+
+    QVERIFY(horizonSummary.nextRise.altitudeDeg.has_value());
+    QCOMPARE(*horizonSummary.nextRise.altitudeDeg, 0.0);
+    QVERIFY(horizonSummary.nextSet.altitudeDeg.has_value());
+    QCOMPARE(*horizonSummary.nextSet.altitudeDeg, 0.0);
+    QVERIFY(twilightSummary.nextRise.altitudeDeg.has_value());
+    QCOMPARE(*twilightSummary.nextRise.altitudeDeg, -6.0);
+    QVERIFY(twilightSummary.nextSet.altitudeDeg.has_value());
+    QCOMPARE(*twilightSummary.nextSet.altitudeDeg, -6.0);
 }
 
 void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitStatuses()
@@ -356,7 +380,8 @@ void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitSt
     auto engine = makeEngineForBody(makeFixedBody({.rightAscensionHours = 1.0, .declinationDeg = 10.0}));
 
     context.observer.latitudeDeg = 120.0;
-    auto summary = calculator.compute(*engine, context, 0U);
+    auto request = makeRequest(context, *engine);
+    auto summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
@@ -367,7 +392,8 @@ void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitSt
     unresolved.displayName = "Unresolved";
     unresolved.type = skygate::ephemeris::CelestialBodyType::DeepSkyObject;
     engine = makeEngineForBody(unresolved);
-    summary = calculator.compute(*engine, context, 0U);
+    request = makeRequest(context, *engine);
+    summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Unresolved);
@@ -380,12 +406,14 @@ void ObservationEventCalculatorTests::unprovenWindowMissDoesNotReportAlwaysAbove
     const skygate::ephemeris::tests::FixedAltitudeEngine aboveHorizonEngine(20.0);
     const auto context = makeContext(70.0, 0.0);
 
-    auto summary = calculator.compute(belowHorizonEngine, context, 0U);
+    auto request = makeRequest(context, belowHorizonEngine);
+    auto summary = calculator.compute(belowHorizonEngine, request, 0U, nullptr, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
 
-    summary = calculator.compute(aboveHorizonEngine, context, 0U);
+    request = makeRequest(context, aboveHorizonEngine);
+    summary = calculator.compute(aboveHorizonEngine, request, 0U, nullptr, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -398,7 +426,8 @@ void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()
     auto context = makeContext(0.0, 0.0);
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
 
-    const auto summary = calculator.compute(engine, context, 0U);
+    const auto request = makeRequest(context, engine);
+    const auto summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QVERIFY(engine.sampleCount > 300);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
@@ -427,7 +456,7 @@ void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSear
     );
     request.options = engine.options();
 
-    const auto summary = calculator.compute(engine, request, 0U, body);
+    const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
 
     QCOMPARE(engine.contextSampleCount(), 0);
     QCOMPARE(engine.requestSampleCount(), 0);
@@ -456,12 +485,12 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
     engine.baseUtcTime = request.context.utcTime;
     engine.baseEpoch = request.epoch;
 
-    auto summary = calculator.compute(engine, request, 0U);
+    auto summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
 
     request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
-    summary = calculator.compute(engine, request, 0U);
+    summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QCOMPARE(engine.contextSampleCount, 0);
     QVERIFY(engine.requestSampleCount > 300);
@@ -481,7 +510,8 @@ void ObservationEventCalculatorTests::contextOverloadSeedsRequestOptionsFromEngi
     auto context = makeContext(0.0, 0.0);
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
 
-    const auto summary = calculator.compute(engine, context, 0U);
+    const auto request = makeRequest(context, engine);
+    const auto summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QCOMPARE(engine.contextSampleCount, 0);
     QVERIFY(engine.requestSampleCount > 0);

@@ -140,7 +140,10 @@ add_library(skygate-ephemeris STATIC
     src/NightConditionsCalculator.hpp
     src/catalog/ICatalogParser.hpp
     src/catalog/IStarCatalog.hpp
+    src/ObservationEvent.hpp
     src/ObservationEventCalculator.hpp
+    src/ObservationEventStatus.hpp
+    src/ObservationEventSummary.hpp
     src/catalog/stellarium/StellariumConstellationParser.hpp
     src/engine/highprecision/TimeScaleService.hpp
     src/time/TimeScale.hpp
@@ -253,7 +256,10 @@ add_library(skygate-ephemeris STATIC
     src/MoonPhaseCalculator.cpp
     src/NightConditions.cpp
     src/NightConditionsCalculator.cpp
+    src/ObservationEvent.cpp
     src/ObservationEventCalculator.cpp
+    src/ObservationEventStatus.cpp
+    src/ObservationEventSummary.cpp
     src/catalog/bundled/BundledCatalogParser.cpp
     src/catalog/io/CsvRowTokenizer.cpp
     src/catalog/hyg/HygCatalogParser.cpp

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ObservationEventCalculator.hpp"
+#include "ObservationEvent.hpp"
 
 #include <optional>
 #include <string>

@@ -1,10 +1,9 @@
 #include "SkyObjectInspectorBuilder.hpp"
-
-#include "SkyPerformanceLogging.hpp"
-#include "SkyObjectInspectorFormatters.hpp"
-#include "SkySceneShared.hpp"
-
+#include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"
+#include "SkyObjectInspectorFormatters.hpp"
+#include "SkyPerformanceLogging.hpp"
+#include "SkySceneShared.hpp"
 
 #include <QElapsedTimer>
 
@@ -63,7 +62,7 @@ void appendObservationEventFields(
     ));
 }
 
-skygate::ephemeris::ObservationEventSearchMode observationEventSearchModeForInspector(
+skygate::ephemeris::ObservationEventCalculator::SearchMode observationEventSearchModeForInspector(
     const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body
 ) noexcept
 {
@@ -72,10 +71,10 @@ skygate::ephemeris::ObservationEventSearchMode observationEventSearchModeForInsp
         && input.ephemerisRequest.has_value()
         && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
         && !body.fixedEquatorial.has_value()) {
-        return skygate::ephemeris::ObservationEventSearchMode::GuidedApproximate;
+        return skygate::ephemeris::ObservationEventCalculator::SearchMode::GuidedApproximate;
     }
 
-    return skygate::ephemeris::ObservationEventSearchMode::Guided;
+    return skygate::ephemeris::ObservationEventCalculator::SearchMode::Guided;
 }
 
 struct EphemerisInspectorMetadata final {
@@ -105,11 +104,15 @@ skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
 )
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
-    const skygate::ephemeris::ObservationEventSearchMode searchMode =
+    const skygate::ephemeris::ObservationEventCalculator::SearchMode searchMode =
         observationEventSearchModeForInspector(input, body);
-    return input.ephemerisRequest.has_value()
-               ? calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, body, 0.0, searchMode)
-               : calculator.compute(*input.ephemerisEngine, *input.skyContext, bodyIndex, body);
+    if (input.ephemerisRequest.has_value()) {
+        return calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, &body, 0.0, searchMode);
+    }
+
+    const auto request =
+        skygate::ephemeris::EphemerisRequestFactory::fromContext(*input.skyContext, input.ephemerisEngine->options());
+    return calculator.compute(*input.ephemerisEngine, request, bodyIndex, &body, 0.0, searchMode);
 }
 
 skygate::ephemeris::CelestialBodyState

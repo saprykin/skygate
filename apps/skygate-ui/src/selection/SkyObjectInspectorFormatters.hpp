@@ -2,9 +2,9 @@
 
 #include "EquatorialCoordinate.hpp"
 #include "HorizontalCoordinate.hpp"
-#include "UtcTimePoint.hpp"
-#include "ObservationEventCalculator.hpp"
+#include "ObservationEvent.hpp"
 #include "Types.hpp"
+#include "UtcTimePoint.hpp"
 
 #include <QString>
 #include <QStringList>
@@ -25,9 +25,8 @@ namespace skygate::ui::internal {
 [[nodiscard]] QString formatObservationEvent(const ephemeris::ObservationEvent& event);
 [[nodiscard]] QString
 formatObservationEvent(const ephemeris::ObservationEvent& event, const SkyTimeController* timeController);
-[[nodiscard]] QString formatObservationCulmination(
-    const ephemeris::ObservationCulmination& culmination, const SkyTimeController* timeController
-);
+[[nodiscard]] QString
+formatObservationCulmination(const ephemeris::ObservationEvent& culmination, const SkyTimeController* timeController);
 [[nodiscard]] QString angularSizeText(const ephemeris::DeepSkyObjectInfo& deepSkyObject);
 [[nodiscard]] QString aliasesText(const ephemeris::CelestialBody& body);
 [[nodiscard]] QString formatEphemerisStatus(ephemeris::EphemerisResultStatus status);
