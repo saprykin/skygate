@@ -1,8 +1,8 @@
 #pragma once
 
 #include "SkyContext.hpp"
-#include "UtcTimePoint.hpp"
 #include "Types.hpp"
+#include "UtcTimePoint.hpp"
 
 namespace skygate::ephemeris {
 
@@ -10,7 +10,7 @@ class EphemerisRequestFactory final {
 public:
     [[nodiscard]] static core::SkyContext contextFromRequest(const EphemerisRequest& request) noexcept;
     [[nodiscard]] static EphemerisRequest
-    fromContext(const core::SkyContext& context, const EphemerisEngineOptions& options) noexcept;
+    requestFromContext(const core::SkyContext& context, const EphemerisEngineOptions& options) noexcept;
     [[nodiscard]] static EphemerisRequest
     atUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& utcTime) noexcept;
 };

@@ -208,7 +208,7 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
     options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
 
     const skygate::ephemeris::EphemerisRequest request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(context, options);
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, options);
     QVERIFY(request.epoch.hasExplicit());
     QCOMPARE(
         static_cast<std::uint8_t>(request.options.engineKind),

@@ -1,9 +1,9 @@
-#include "time/CalendarTime.hpp"
+#include "NightConditionsCalculator.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
+#include "EphemerisRequestFactory.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
-#include "EphemerisRequestFactory.hpp"
-#include "NightConditionsCalculator.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QtTest/QtTest>
 
@@ -125,7 +125,7 @@ void NightConditionsCalculatorTests::twilightEventsAreOrderedForOrdinaryLocation
     auto rig = makeTestRig();
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const auto request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), rig.engine->options());
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), rig.engine->options());
 
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
@@ -150,7 +150,8 @@ void NightConditionsCalculatorTests::invalidObserverReturnsUnavailableConditions
     auto context = makeZurichContext();
     context.observer.latitudeDeg = 120.0;
     const skygate::ephemeris::NightConditionsCalculator calculator;
-    const auto request = skygate::ephemeris::EphemerisRequestFactory::fromContext(context, rig.engine->options());
+    const auto request =
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, rig.engine->options());
 
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
@@ -166,8 +167,9 @@ void NightConditionsCalculatorTests::polarTwilightReportsStableUnavailableStatus
 {
     auto rig = makeTestRig();
     const skygate::ephemeris::NightConditionsCalculator calculator;
-    const auto request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(makePolarSummerContext(), rig.engine->options());
+    const auto request = skygate::ephemeris::EphemerisRequestFactory::requestFromContext(
+        makePolarSummerContext(), rig.engine->options()
+    );
 
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
@@ -184,7 +186,7 @@ void NightConditionsCalculatorTests::moonRiseSetAndIlluminationArePopulated()
     auto rig = makeTestRig();
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const auto request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), rig.engine->options());
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), rig.engine->options());
 
     const auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
 
@@ -204,24 +206,24 @@ void NightConditionsCalculatorTests::lunarPhaseBucketsAreDeterministic()
     const auto engineOptions = rig.engine->options();
 
     context.utcTime = utcFromUnixSeconds(947'182'440);  // 2000-01-06 18:14:00 UTC
-    auto request = skygate::ephemeris::EphemerisRequestFactory::fromContext(context, engineOptions);
+    auto request = skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engineOptions);
     auto conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("New Moon"));
     QVERIFY(conditions.moonIlluminationPercent < 1.0);
 
     context.utcTime += std::chrono::seconds(7 * 86400 + 9 * 3600);
-    request = skygate::ephemeris::EphemerisRequestFactory::fromContext(context, engineOptions);
+    request = skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engineOptions);
     conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("First quarter"));
 
     context.utcTime += std::chrono::seconds(7 * 86400 + 9 * 3600);
-    request = skygate::ephemeris::EphemerisRequestFactory::fromContext(context, engineOptions);
+    request = skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engineOptions);
     conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("Full Moon"));
     QVERIFY(conditions.moonIlluminationPercent > 99.0);
 
     context.utcTime += std::chrono::seconds(7 * 86400 + 9 * 3600);
-    request = skygate::ephemeris::EphemerisRequestFactory::fromContext(context, engineOptions);
+    request = skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engineOptions);
     conditions = calculator.compute(*rig.engine, request, rig.sunIndex, nullptr, rig.moonIndex, nullptr);
     QCOMPARE(QString::fromStdString(conditions.moonPhaseName), QString("Last quarter"));
 }
@@ -274,7 +276,9 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
     const auto verifiedEngine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const skygate::ephemeris::EphemerisRequest request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), approximateEngine.options());
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(
+            makeZurichContext(), approximateEngine.options()
+        );
 
     const auto approximateConditions =
         calculator.compute(approximateEngine, request, 0U, &(*bodies)[0], 1U, &(*bodies)[1]);
@@ -303,7 +307,9 @@ void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSim
     const auto verifiedEngine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const skygate::ephemeris::EphemerisRequest request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), approximateEngine.options());
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(
+            makeZurichContext(), approximateEngine.options()
+        );
 
     const auto approximateConditions =
         calculator.compute(approximateEngine, request, 0U, &(*bodies)[0], 1U, &(*bodies)[1]);
@@ -336,7 +342,7 @@ void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSele
     const auto engine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const skygate::ephemeris::EphemerisRequest request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(makeZurichContext(), engine.options());
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), engine.options());
 
     const auto conditions = calculator.compute(
         engine,

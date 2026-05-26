@@ -19,8 +19,9 @@ core::SkyContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequ
     return context;
 }
 
-EphemerisRequest
-EphemerisRequestFactory::fromContext(const core::SkyContext& context, const EphemerisEngineOptions& options) noexcept
+EphemerisRequest EphemerisRequestFactory::requestFromContext(
+    const core::SkyContext& context, const EphemerisEngineOptions& options
+) noexcept
 {
     return EphemerisRequest{
         .epoch = EpochCodec::epochFromUtcTime(context.utcTime),

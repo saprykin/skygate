@@ -43,7 +43,7 @@ skygate::ephemeris::CelestialBody makeFixedBody(const skygate::core::EquatorialC
 skygate::ephemeris::EphemerisRequest
 makeRequest(const skygate::core::SkyContext& context, const skygate::ephemeris::IEphemerisEngine& engine)
 {
-    return skygate::ephemeris::EphemerisRequestFactory::fromContext(context, engine.options());
+    return skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engine.options());
 }
 
 std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(const skygate::ephemeris::CelestialBody& body)

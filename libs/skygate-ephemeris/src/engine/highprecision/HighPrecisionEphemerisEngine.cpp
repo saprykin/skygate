@@ -1,8 +1,8 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 
-#include <QtGlobal>
-
+#include "EphemerisRequestFactory.hpp"
 #include "StringUtilities.hpp"
+#include "UtcTimeCodec.hpp"
 #include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "engine/highprecision/EphemerisResultBuilder.hpp"
@@ -17,8 +17,8 @@
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
 #include "engine/simple/SunEquatorialCalculator.hpp"
-#include "UtcTimeCodec.hpp"
-#include "EphemerisRequestFactory.hpp"
+
+#include <QtGlobal>
 
 #include <bit>
 #include <cmath>
@@ -329,7 +329,7 @@ public:
 
     [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept
     {
-        return EphemerisRequestFactory::fromContext(context, m_options);
+        return EphemerisRequestFactory::requestFromContext(context, m_options);
     }
 
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const
