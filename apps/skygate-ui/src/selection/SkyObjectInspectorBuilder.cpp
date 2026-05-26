@@ -110,8 +110,9 @@ skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
         return calculator.compute(*input.ephemerisEngine, *input.ephemerisRequest, bodyIndex, &body, 0.0, searchMode);
     }
 
-    const auto request =
-        skygate::ephemeris::EphemerisRequestFactory::fromContext(*input.skyContext, input.ephemerisEngine->options());
+    const auto request = skygate::ephemeris::EphemerisRequestFactory::requestFromContext(
+        *input.skyContext, input.ephemerisEngine->options()
+    );
     return calculator.compute(*input.ephemerisEngine, request, bodyIndex, &body, 0.0, searchMode);
 }
 
