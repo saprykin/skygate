@@ -1,9 +1,9 @@
-#include <QtTest>
-
 #include "SkyObjectSearchModel.hpp"
 
 #include "EquatorialCoordinate.hpp"
 #include "Types.hpp"
+
+#include <QtTest>
 
 #include <optional>
 #include <string>
@@ -70,7 +70,7 @@ void SkyObjectSearchModelTests::blankQueryReturnsNoRows()
         std::vector<skygate::ephemeris::CelestialBody>{
             makeBody("mars", "Mars", skygate::ephemeris::CelestialBodyType::Planet, -2.0),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef>{}
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     QCOMPARE(model.rowCount(), 0);
@@ -87,7 +87,7 @@ void SkyObjectSearchModelTests::filtersPlanetStarHipAndConstellationTargets()
             makeBody("sirius", "Sirius", skygate::ephemeris::CelestialBodyType::Star, -1.46),
             makeBody("hip_77", "HIP 77", skygate::ephemeris::CelestialBodyType::Star, 4.2),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef>{
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{
             {"Orion", {"hip_77", "hip_88"}},
         }
     );
@@ -121,7 +121,7 @@ void SkyObjectSearchModelTests::normalizesHipQueries()
         std::vector<skygate::ephemeris::CelestialBody>{
             makeBody("hip_77", "HIP 77", skygate::ephemeris::CelestialBodyType::Star, 4.2),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef>{}
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     const QStringList queries{"hip77", "hip 77", "hip_77"};
@@ -148,7 +148,7 @@ void SkyObjectSearchModelTests::filtersDeepSkyAliases()
 
     SkyObjectSearchModel model;
     model.setCatalogData(
-        std::vector<skygate::ephemeris::CelestialBody>{m31}, std::vector<skygate::ephemeris::ConstellationLabelRef>{}
+        std::vector<skygate::ephemeris::CelestialBody>{m31}, std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     model.setFilterText("andromeda");
@@ -166,7 +166,7 @@ void SkyObjectSearchModelTests::deduplicatesDisplayNamesPreferringBodies()
         std::vector<skygate::ephemeris::CelestialBody>{
             makeBody("orion_body", "Orion", skygate::ephemeris::CelestialBodyType::Constellation, 1.0),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef>{
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{
             {"Orion", {"hip_77", "hip_88"}},
         }
     );
@@ -188,7 +188,7 @@ void SkyObjectSearchModelTests::ranksExactPrefixAndContainsMatches()
             makeBody("mariner", "Scout", skygate::ephemeris::CelestialBodyType::Star, 1.0),
             makeBody("landmark", "Landmark", skygate::ephemeris::CelestialBodyType::Star, -1.0),
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef>{}
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
     );
 
     model.setFilterText("mar");
@@ -231,7 +231,7 @@ void SkyObjectSearchModelTests::ranksLargerMixedCatalogWithCollisions()
             m57,
             dimRingAlias,
         },
-        std::vector<skygate::ephemeris::ConstellationLabelRef>{
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{
             {"Andromeda", {"hip_24436"}},
             {"Orion", {"hip_24436", "hip_25930"}},
             {"Ring Nebula", {"hip_25930"}},

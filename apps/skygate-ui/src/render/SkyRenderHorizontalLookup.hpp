@@ -1,8 +1,9 @@
 #pragma once
 
 #include "HorizontalCoordinate.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
 #include "Types.hpp"
+
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>
 #include <string>
@@ -16,7 +17,7 @@ class SkyRenderHorizontalLookup final {
 public:
     SkyRenderHorizontalLookup(
         std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+        std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
     );
 
     void capture(const skygate::ephemeris::CelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal);

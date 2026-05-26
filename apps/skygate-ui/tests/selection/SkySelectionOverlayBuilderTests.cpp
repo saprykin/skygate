@@ -55,7 +55,7 @@ struct OverlayFixture final {
     skygate::ephemeris::SkySnapshot snapshot;
     QHash<QString, std::size_t> stateIndexByBodyId;
     std::optional<skygate::core::PreparedProjection> projection;
-    std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs;
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
     std::vector<std::uint8_t> sourceIds;
     QStringList sourceLabels;
     skygate::core::SkyContext skyContext;
@@ -310,7 +310,7 @@ OverlayFixture makeFixture()
         skygate::core::ProjectionType::Stereographic,
         skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 45.0, 180.0, 90.0)
     );
-    fixture.labelRefs = {{"Orion", {"selected", "tracked"}}};
+    fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
     fixture.sourceIds = {0U, 0U, 0U, 2U, 0U};
     fixture.sourceLabels = {"Catalog", "", "Deep Sky"};
     fixture.skyContext.observer = {.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
@@ -326,7 +326,7 @@ SkySelectionOverlayInput makeInput(const OverlayFixture& fixture)
         .preparedProjection = &*fixture.projection,
         .stateIndexByBodyId = &fixture.stateIndexByBodyId,
         .skyContext = fixture.skyContext,
-        .constellationLabelRefs = fixture.labelRefs,
+        .constellationAnchorGroups = fixture.anchorGroups,
         .catalogSourceIds = fixture.sourceIds,
         .catalogSourceLabels = fixture.sourceLabels
     };
@@ -339,7 +339,7 @@ class SkySelectionOverlayBuilderTests final : public QObject {
 
 private slots:
     void markerPriorityPrefersSelectedThenTrackedThenSearch();
-    void constellationLabelMarkerUsesLabelReferences();
+    void constellationAnchorMarkerUsesAnchorGroups();
     void inspectorFormatsSourceAliasesAndFallbacks();
     void inspectorSurfacesEphemerisMetadataAndWarnings();
     void inspectorUsesHighPrecisionStateForSelectedObject();
@@ -375,7 +375,7 @@ void SkySelectionOverlayBuilderTests::markerPriorityPrefersSelectedThenTrackedTh
     QVERIFY(searchMarker.x != trackedMarker.x);
 }
 
-void SkySelectionOverlayBuilderTests::constellationLabelMarkerUsesLabelReferences()
+void SkySelectionOverlayBuilderTests::constellationAnchorMarkerUsesAnchorGroups()
 {
     const SkySelectionOverlayBuilder builder;
     const auto fixture = makeFixture();

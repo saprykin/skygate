@@ -1,16 +1,16 @@
 #pragma once
 
+#include "ProjectionType.hpp"
+#include "SkyContext.hpp"
+#include "SkyTheme.hpp"
+#include "Types.hpp"
+#include "UtcTimePoint.hpp"
+
 #include <QByteArray>
 #include <QColor>
 #include <QDateTime>
 #include <QString>
 #include <QStringList>
-
-#include "SkyTheme.hpp"
-#include "ProjectionType.hpp"
-#include "SkyContext.hpp"
-#include "UtcTimePoint.hpp"
-#include "Types.hpp"
 
 #include <optional>
 #include <string>
@@ -107,10 +107,11 @@ public:
     [[nodiscard]] static std::vector<std::pair<std::string, std::string>>
     parseConstellationLineRows(std::string_view rows);
 
-    [[nodiscard]] static QByteArray
-    serializeConstellationLabelRows(const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs);
+    [[nodiscard]] static QByteArray serializeConstellationAnchorGroupRows(
+        const std::vector<std::pair<std::string, std::vector<std::string>>>& anchorGroups
+    );
     [[nodiscard]] static std::vector<std::pair<std::string, std::vector<std::string>>>
-    parseConstellationLabelRows(std::string_view rows);
+    parseConstellationAnchorGroupRows(std::string_view rows);
 };
 
 class SkyContextRenderStyle final {

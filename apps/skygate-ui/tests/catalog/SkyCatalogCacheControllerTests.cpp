@@ -61,9 +61,9 @@ void SkyCatalogCacheControllerTests::restoresSavedCatalogsAndConstellationLabels
     QCOMPARE(result.constellationLineRefs.size(), 1U);
     QCOMPARE(result.constellationLineRefs[0].first, std::string("hip_1"));
     QCOMPARE(result.constellationLineRefs[0].second, std::string("hip_2"));
-    QCOMPARE(result.constellationLabelRefs.size(), 1U);
-    QCOMPARE(result.constellationLabelRefs[0].first, std::string("Demo"));
-    QCOMPARE(result.constellationLabelRefs[0].second.size(), 2U);
+    QCOMPARE(result.constellationAnchorGroups.size(), 1U);
+    QCOMPARE(result.constellationAnchorGroups[0].first, std::string("Demo"));
+    QCOMPARE(result.constellationAnchorGroups[0].second.size(), 2U);
     QVERIFY(result.constellationCount.has_value());
     QCOMPARE(*result.constellationCount, 1U);
 }
@@ -118,7 +118,7 @@ void SkyCatalogCacheControllerTests::persistRoundTripsConstellationRows()
         {.hip = 11, .properName = "Alpha", .ra = "1.0", .dec = "2.0", .mag = "3.0"}
     );
     request.constellationLineRefs = {{"hip_a", "hip_b"}};
-    request.constellationLabelRefs = {{"Label", {"hip_a", "hip_b", "hip_c"}}};
+    request.constellationAnchorGroups = {{"Label", {"hip_a", "hip_b", "hip_c"}}};
     request.constellationCount = 12;
     controller.persist(request);
 
@@ -126,8 +126,8 @@ void SkyCatalogCacheControllerTests::persistRoundTripsConstellationRows()
     QVERIFY(result.restored);
     QCOMPARE(result.sourceLabel, QString("Custom (saved)"));
     QCOMPARE(result.constellationLineRefs.size(), 1U);
-    QCOMPARE(result.constellationLabelRefs.size(), 1U);
-    QCOMPARE(result.constellationLabelRefs[0].second.size(), 3U);
+    QCOMPARE(result.constellationAnchorGroups.size(), 1U);
+    QCOMPARE(result.constellationAnchorGroups[0].second.size(), 3U);
     QVERIFY(result.constellationCount.has_value());
     QCOMPARE(*result.constellationCount, 12U);
 }

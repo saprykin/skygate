@@ -12,7 +12,7 @@ class StellariumConstellationParser final {
 public:
     struct ParseResult {
         std::vector<ConstellationLineRef> lineRefs;
-        std::vector<ConstellationLabelRef> labelRefs;
+        std::vector<ConstellationAnchorGroup> anchorGroups;
         std::size_t constellationCount = 0;
     };
 

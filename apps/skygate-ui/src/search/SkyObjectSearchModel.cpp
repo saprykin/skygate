@@ -169,7 +169,7 @@ void SkyObjectSearchModel::setFilterText(const QString& filterText)
 
 void SkyObjectSearchModel::setCatalogData(
     const std::span<const skygate::ephemeris::CelestialBody> bodies,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
 )
 {
     beginResetModel();
@@ -272,13 +272,13 @@ void SkyObjectSearchModel::setCatalogData(
         }
     }
 
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty()) {
+    for (const auto& anchorGroup : anchorGroups) {
+        if (anchorGroup.first.empty()) {
             continue;
         }
 
         bool hasAnyAnchor = false;
-        for (const std::string& hipId : labelRef.second) {
+        for (const std::string& hipId : anchorGroup.second) {
             if (availableBodyIds.contains(normalizedKey(QString::fromStdString(hipId)))) {
                 hasAnyAnchor = true;
                 break;
@@ -290,10 +290,10 @@ void SkyObjectSearchModel::setCatalogData(
 
         upsertEntry(
             SourceEntry{
-                .displayText = QString::fromStdString(labelRef.first),
+                .displayText = QString::fromStdString(anchorGroup.first),
                 .detailText = "Constellation",
                 .targetKind = "constellationLabel",
-                .targetId = QString::fromStdString(labelRef.first),
+                .targetId = QString::fromStdString(anchorGroup.first),
                 .brightnessMagnitude = 99.0,
                 .selectable = true,
                 .isBody = false,

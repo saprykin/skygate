@@ -7,6 +7,6 @@
 namespace skygate::ephemeris {
 
 using ConstellationLineRef = std::pair<std::string, std::string>;
-using ConstellationLabelRef = std::pair<std::string, std::vector<std::string>>;
+using ConstellationAnchorGroup = std::pair<std::string, std::vector<std::string>>;
 
 }  // namespace skygate::ephemeris

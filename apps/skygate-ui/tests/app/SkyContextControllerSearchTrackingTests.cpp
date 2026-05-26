@@ -422,9 +422,11 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersConstellat
     QVERIFY(targetState != nullptr);
     QVERIFY(
         std::any_of(
-            controller->constellationLabelRefs().begin(),
-            controller->constellationLabelRefs().end(),
-            [](const SkyContextController::ConstellationLabelRef& labelRef) { return labelRef.first == "Orion"; }
+            controller->constellationAnchorGroups().begin(),
+            controller->constellationAnchorGroups().end(),
+            [](const SkyContextController::ConstellationAnchorGroup& anchorGroup) {
+                return anchorGroup.first == "Orion";
+            }
         )
     );
 

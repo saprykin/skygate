@@ -1,14 +1,14 @@
-#include "time/CalendarTime.hpp"
 #include "SkySceneModel.hpp"
 
 #include "SkyContextController.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
+#include "Types.hpp"
 
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "Types.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QElapsedTimer>
 #include <QStringList>
@@ -416,7 +416,7 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
                 .renderTheme = m_skyContextController->renderTheme(),
                 .overlayLayers = m_skyContextController->overlayLayerVisibility(),
                 .constellationLineRefs = m_skyContextController->constellationLineRefs(),
-                .constellationLabelRefs = m_skyContextController->constellationLabelRefs()
+                .constellationAnchorGroups = m_skyContextController->constellationAnchorGroups()
             },
         .selectionEphemerisRequest = ephemerisRequestContext.request,
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),

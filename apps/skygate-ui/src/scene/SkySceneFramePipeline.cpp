@@ -146,7 +146,7 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
             m_snapshot,
             *m_preparedProjection,
             input.constellationLineRefs,
-            input.constellationLabelRefs,
+            input.constellationAnchorGroups,
             input.magnitudeCutoff,
             viewportWidth,
             viewportHeight,

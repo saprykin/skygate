@@ -1,11 +1,12 @@
 #pragma once
 
-#include "SkyRenderFrame.hpp"
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkyTheme.hpp"
 #include "PreparedProjection.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
+#include "SkyOverlayLayerVisibility.hpp"
+#include "SkyRenderFrame.hpp"
+#include "SkyTheme.hpp"
 #include "Types.hpp"
+
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>
 
@@ -15,7 +16,7 @@ public:
         const skygate::ephemeris::SkySnapshot& snapshot,
         const skygate::core::PreparedProjection& projection,
         std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+        std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
         double magnitudeCutoff,
         double viewportWidth,
         double viewportHeight,

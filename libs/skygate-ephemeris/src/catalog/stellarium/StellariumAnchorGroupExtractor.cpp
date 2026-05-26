@@ -1,7 +1,7 @@
-#include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
+#include "catalog/stellarium/StellariumAnchorGroupExtractor.hpp"
 
-#include "catalog/stellarium/StellariumHipParser.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/stellarium/StellariumHipParser.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -101,13 +101,13 @@ QString constellationLabelFromEntry(const QString& fallbackId, const QJsonObject
 
 }  // namespace
 
-std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(const QJsonObject& rootObject)
+std::vector<ConstellationAnchorGroup> StellariumAnchorGroupExtractor::extract(const QJsonObject& rootObject)
 {
-    std::vector<ConstellationLabelRef> labelRefs;
+    std::vector<ConstellationAnchorGroup> anchorGroups;
     std::unordered_map<std::string, std::size_t> indexByLabelKey;
 
-    const auto addLabelEntry = [&labelRefs,
-                                &indexByLabelKey](QString labelText, const std::vector<std::vector<int>>& polylines) {
+    const auto addAnchorGroup = [&anchorGroups,
+                                 &indexByLabelKey](QString labelText, const std::vector<std::vector<int>>& polylines) {
         labelText = labelText.trimmed();
         if (labelText.isEmpty()) {
             return;
@@ -135,24 +135,24 @@ std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(const QJ
             for (const int hip : uniqueHips) {
                 hipIds.push_back("hip_" + std::to_string(hip));
             }
-            const std::size_t newIndex = labelRefs.size();
-            labelRefs.emplace_back(labelText.toStdString(), std::move(hipIds));
+            const std::size_t newIndex = anchorGroups.size();
+            anchorGroups.emplace_back(labelText.toStdString(), std::move(hipIds));
             indexByLabelKey.insert({labelKey, newIndex});
             return;
         }
 
         std::unordered_set<std::string> existingIds(
-            labelRefs[indexIt->second].second.begin(), labelRefs[indexIt->second].second.end()
+            anchorGroups[indexIt->second].second.begin(), anchorGroups[indexIt->second].second.end()
         );
         for (const int hip : uniqueHips) {
             const std::string hipId = "hip_" + std::to_string(hip);
             if (existingIds.insert(hipId).second) {
-                labelRefs[indexIt->second].second.push_back(hipId);
+                anchorGroups[indexIt->second].second.push_back(hipId);
             }
         }
     };
 
-    const auto collectEntry = [&addLabelEntry](const QJsonValue& entry, const QString& fallbackId) {
+    const auto collectEntry = [&addAnchorGroup](const QJsonValue& entry, const QString& fallbackId) {
         std::vector<std::vector<int>> polylines;
         QString labelText;
 
@@ -172,7 +172,7 @@ std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(const QJ
             labelText = prettifyConstellationId(fallbackId);
         }
 
-        addLabelEntry(labelText, polylines);
+        addAnchorGroup(labelText, polylines);
     };
 
     const QJsonValue constellationsValue = rootObject.value("constellations");
@@ -198,7 +198,7 @@ std::vector<ConstellationLabelRef> StellariumLabelRefExtractor::extract(const QJ
         }
     }
 
-    return labelRefs;
+    return anchorGroups;
 }
 
 }  // namespace skygate::ephemeris

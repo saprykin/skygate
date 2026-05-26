@@ -239,17 +239,19 @@ SkyContextCatalogCodec::parseConstellationLineRows(const std::string_view rows)
     return skygate::ephemeris::ConstellationDataCodec::parseLineRows(rows);
 }
 
-QByteArray SkyContextCatalogCodec::serializeConstellationLabelRows(
-    const std::vector<std::pair<std::string, std::vector<std::string>>>& labelRefs
+QByteArray SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& anchorGroups
 )
 {
-    return QByteArray::fromStdString(skygate::ephemeris::ConstellationDataCodec::serializeLabelRows(labelRefs));
+    return QByteArray::fromStdString(
+        skygate::ephemeris::ConstellationDataCodec::serializeAnchorGroupRows(anchorGroups)
+    );
 }
 
 std::vector<std::pair<std::string, std::vector<std::string>>>
-SkyContextCatalogCodec::parseConstellationLabelRows(const std::string_view rows)
+SkyContextCatalogCodec::parseConstellationAnchorGroupRows(const std::string_view rows)
 {
-    return skygate::ephemeris::ConstellationDataCodec::parseLabelRows(rows);
+    return skygate::ephemeris::ConstellationDataCodec::parseAnchorGroupRows(rows);
 }
 
 double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)

@@ -1,9 +1,9 @@
+#include "catalog/stellarium/StellariumAnchorGroupExtractor.hpp"
 #include "catalog/stellarium/StellariumHipParser.hpp"
-#include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
 #include "catalog/stellarium/StellariumLineRefExtractor.hpp"
 
-#include <QJsonArray>
 #include <QByteArray>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -41,7 +41,7 @@ class StellariumExtractorTests final : public QObject {
 
 private slots:
     void extractsLineRefs();
-    void extractsLabelRefs();
+    void extractsAnchorGroups();
     void dropsMalformedAndDuplicateLineRefs();
     void mergesDuplicateLabelsAndUsesFallbackNames();
     void prefersCommonNameFieldsInOrder();
@@ -59,12 +59,12 @@ void StellariumExtractorTests::extractsLineRefs()
     QVERIFY(lineRefs.size() == 4U);
 }
 
-void StellariumExtractorTests::extractsLabelRefs()
+void StellariumExtractorTests::extractsAnchorGroups()
 {
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(makeStellariumRoot());
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(makeStellariumRoot());
 
-    QVERIFY(labelRefs.size() == 2U);
-    QCOMPARE(labelRefs[0].first, std::string("Orion"));
+    QVERIFY(anchorGroups.size() == 2U);
+    QCOMPARE(anchorGroups[0].first, std::string("Orion"));
 }
 
 void StellariumExtractorTests::dropsMalformedAndDuplicateLineRefs()
@@ -114,16 +114,16 @@ void StellariumExtractorTests::mergesDuplicateLabelsAndUsesFallbackNames()
     const QJsonDocument document =
         QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(document.object());
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
 
-    QCOMPARE(labelRefs.size(), 2U);
-    QCOMPARE(labelRefs[0].first, std::string("Canis Minor"));
-    QCOMPARE(labelRefs[0].second.size(), 2U);
-    QCOMPARE(labelRefs[1].first, std::string("Ursa Major"));
-    QCOMPARE(labelRefs[1].second.size(), 3U);
-    QCOMPARE(labelRefs[1].second[0], std::string("hip_1"));
-    QCOMPARE(labelRefs[1].second[1], std::string("hip_2"));
-    QCOMPARE(labelRefs[1].second[2], std::string("hip_3"));
+    QCOMPARE(anchorGroups.size(), 2U);
+    QCOMPARE(anchorGroups[0].first, std::string("Canis Minor"));
+    QCOMPARE(anchorGroups[0].second.size(), 2U);
+    QCOMPARE(anchorGroups[1].first, std::string("Ursa Major"));
+    QCOMPARE(anchorGroups[1].second.size(), 3U);
+    QCOMPARE(anchorGroups[1].second[0], std::string("hip_1"));
+    QCOMPARE(anchorGroups[1].second[1], std::string("hip_2"));
+    QCOMPARE(anchorGroups[1].second[2], std::string("hip_3"));
 }
 
 void StellariumExtractorTests::prefersCommonNameFieldsInOrder()
@@ -142,10 +142,10 @@ void StellariumExtractorTests::prefersCommonNameFieldsInOrder()
     const QJsonDocument document =
         QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(document.object());
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
 
-    QCOMPARE(labelRefs.size(), 1U);
-    QCOMPARE(labelRefs[0].first, std::string("Native Demo"));
+    QCOMPARE(anchorGroups.size(), 1U);
+    QCOMPARE(anchorGroups[0].first, std::string("Native Demo"));
 }
 
 void StellariumExtractorTests::supportsArrayFormConstellations()
@@ -163,11 +163,11 @@ void StellariumExtractorTests::supportsArrayFormConstellations()
         QJsonDocument::fromJson(QByteArray(kJsonPayload.data(), static_cast<qsizetype>(kJsonPayload.size())));
 
     const auto lineRefs = skygate::ephemeris::StellariumLineRefExtractor::extract(document.object());
-    const auto labelRefs = skygate::ephemeris::StellariumLabelRefExtractor::extract(document.object());
+    const auto anchorGroups = skygate::ephemeris::StellariumAnchorGroupExtractor::extract(document.object());
 
     QCOMPARE(lineRefs.size(), 3U);
-    QCOMPARE(labelRefs.size(), 1U);
-    QCOMPARE(labelRefs[0].first, std::string("Array Demo"));
+    QCOMPARE(anchorGroups.size(), 1U);
+    QCOMPARE(anchorGroups[0].first, std::string("Array Demo"));
 }
 
 void StellariumExtractorTests::parsesStrictHipText()

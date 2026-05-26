@@ -10,20 +10,23 @@
 
 namespace skygate::ephemeris {
 
-std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labelCenter(
-    const SkySnapshot& snapshot, const std::span<const ConstellationLabelRef> labelRefs, const std::string_view label
+std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::anchorCentroid(
+    const SkySnapshot& snapshot,
+    const std::span<const ConstellationAnchorGroup> anchorGroups,
+    const std::string_view labelName
 )
 {
-    const std::string normalizedLabel = StringUtilities::normalizedLookupKey(label);
+    const std::string normalizedLabel = StringUtilities::normalizedLookupKey(labelName);
     if (normalizedLabel.empty()) {
         return std::nullopt;
     }
 
-    const auto labelRefIt =
-        std::find_if(labelRefs.begin(), labelRefs.end(), [&normalizedLabel](const ConstellationLabelRef& labelRef) {
-            return StringUtilities::normalizedLookupKey(labelRef.first) == normalizedLabel;
-        });
-    if (labelRefIt == labelRefs.end()) {
+    const auto anchorGroupIt = std::find_if(
+        anchorGroups.begin(), anchorGroups.end(), [&normalizedLabel](const ConstellationAnchorGroup& anchorGroup) {
+            return StringUtilities::normalizedLookupKey(anchorGroup.first) == normalizedLabel;
+        }
+    );
+    if (anchorGroupIt == anchorGroups.end()) {
         return std::nullopt;
     }
 
@@ -36,7 +39,7 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::labe
 
     core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
     int validAnchorCount = 0;
-    for (const std::string& hipId : labelRefIt->second) {
+    for (const std::string& hipId : anchorGroupIt->second) {
         const auto horizontalIt = horizontalByBodyId.find(StringUtilities::normalizedLookupKey(hipId));
         if (horizontalIt == horizontalByBodyId.end() || !horizontalIt->second.isFinite()) {
             continue;

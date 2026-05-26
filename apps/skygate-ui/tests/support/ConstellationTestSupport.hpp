@@ -37,7 +37,7 @@ namespace skygate::ui::tests {
     };
 }
 
-[[nodiscard]] inline std::vector<skygate::ephemeris::ConstellationLabelRef> orionLabelRefs()
+[[nodiscard]] inline std::vector<skygate::ephemeris::ConstellationAnchorGroup> orionAnchorGroups()
 {
     return {{"Orion", {"hip_27989", "hip_25336", "hip_25930", "hip_26311", "hip_26727", "hip_24436"}}};
 }
@@ -45,15 +45,15 @@ namespace skygate::ui::tests {
 [[nodiscard]] inline bool seedOrionConstellationCache()
 {
     const std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs = orionLineRefs();
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs = orionLabelRefs();
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups = orionAnchorGroups();
 
     SkySettingsStore::CatalogCacheSnapshot snapshot;
     snapshot.sourceLabel = QStringLiteral("Test HYG");
     snapshot.catalogPayload = orionHygCsvPayload();
     snapshot.constellationLineRows =
         skygate::ui::internal::SkyContextCatalogCodec::serializeConstellationLineRows(lineRefs);
-    snapshot.constellationLabelRows =
-        skygate::ui::internal::SkyContextCatalogCodec::serializeConstellationLabelRows(labelRefs);
+    snapshot.constellationAnchorGroupRows =
+        skygate::ui::internal::SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(anchorGroups);
     snapshot.constellationLineSchemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
     snapshot.constellationCount = 1U;

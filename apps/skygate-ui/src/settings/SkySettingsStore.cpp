@@ -147,7 +147,7 @@ bool SkySettingsStore::clearCatalogCache() const
     settings.remove(SkyContextSettings::key("catalogCachePath"));
     settings.remove(SkyContextSettings::key("catalogSourceLabel"));
     settings.remove(SkyContextSettings::key("catalogConstellationLineRefs"));
-    settings.remove(SkyContextSettings::key("catalogConstellationLabelRefs"));
+    settings.remove(SkyContextSettings::key("catalogConstellationAnchorGroups"));
     settings.remove(SkyContextSettings::key("catalogConstellationLineSchemaVersion"));
     settings.remove(SkyContextSettings::key("catalogConstellationCount"));
     settings.sync();
@@ -257,7 +257,9 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
     if (!snapshot.catalogPayload.isEmpty()) {
         settings.setValue(SkyContextSettings::key("catalogSourceLabel"), snapshot.sourceLabel);
         settings.setValue(SkyContextSettings::key("catalogConstellationLineRefs"), snapshot.constellationLineRows);
-        settings.setValue(SkyContextSettings::key("catalogConstellationLabelRefs"), snapshot.constellationLabelRows);
+        settings.setValue(
+            SkyContextSettings::key("catalogConstellationAnchorGroups"), snapshot.constellationAnchorGroupRows
+        );
         settings.setValue(
             SkyContextSettings::key("catalogConstellationLineSchemaVersion"), snapshot.constellationLineSchemaVersion
         );
@@ -323,8 +325,8 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
     }
     snapshot.constellationLineRows =
         settings.value(SkyContextSettings::key("catalogConstellationLineRefs")).toByteArray();
-    snapshot.constellationLabelRows =
-        settings.value(SkyContextSettings::key("catalogConstellationLabelRefs")).toByteArray();
+    snapshot.constellationAnchorGroupRows =
+        settings.value(SkyContextSettings::key("catalogConstellationAnchorGroups")).toByteArray();
     snapshot.constellationLineSchemaVersion =
         readIntSetting(settings, SkyContextSettings::key("catalogConstellationLineSchemaVersion"), 0);
     snapshot.constellationCount = static_cast<std::size_t>(

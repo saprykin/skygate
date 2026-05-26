@@ -4,7 +4,7 @@ namespace skygate::ui::internal {
 
 SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
     const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
 )
 {
     for (const auto& lineRef : lineRefs) {
@@ -12,8 +12,8 @@ SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
         trackBodyId(lineRef.second);
     }
 
-    for (const auto& labelRef : labelRefs) {
-        for (const std::string& hipId : labelRef.second) {
+    for (const auto& anchorGroup : anchorGroups) {
+        for (const std::string& hipId : anchorGroup.second) {
             trackBodyId(hipId);
         }
     }

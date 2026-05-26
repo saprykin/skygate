@@ -1,10 +1,8 @@
 #include "SkySceneComposition.hpp"
-
-#include "SkyPerformanceLogging.hpp"
-
-#include "math/Geometry2d.hpp"
 #include "CelestialReferenceCalculator.hpp"
+#include "SkyPerformanceLogging.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
+#include "math/Geometry2d.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>
@@ -344,7 +342,7 @@ SkySelectionOverlayInput SkySceneComposer::buildSelectionInput(
         .stateIndexByBodyId = frameResult.stateIndexByBodyId,
         .skyContext = input.frameInput.skyContext,
         .ephemerisRequest = input.selectionEphemerisRequest,
-        .constellationLabelRefs = input.frameInput.constellationLabelRefs,
+        .constellationAnchorGroups = input.frameInput.constellationAnchorGroups,
         .catalogSourceIds = input.catalogSourceIds,
         .catalogSourceLabels = input.catalogSourceLabels,
         .selectedObjectTargetId = input.selectedObjectTargetId,

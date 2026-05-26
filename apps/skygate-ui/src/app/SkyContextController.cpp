@@ -1,4 +1,3 @@
-#include "time/CalendarTime.hpp"
 #include "SkyContextController.hpp"
 
 #include "LocationCatalogModel.hpp"
@@ -7,25 +6,26 @@
 #include "SkyLogging.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
+#include "SkyQtTimeCodec.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
-
-#include "SkyQtTimeCodec.hpp"
 #include "UtcTimeCodec.hpp"
+
+#include "factory/EphemerisEngineFactory.hpp"
+#include "time/CalendarTime.hpp"
+
+#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QDateTime>
 #include <QDir>
-#include <QFileInfo>
 #include <QFile>
+#include <QFileInfo>
 #include <QLoggingCategory>
 #include <QStandardPaths>
-
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "engine/highprecision/DeltaTProvider.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
-#include "engine/highprecision/LeapSecondProvider.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -1050,11 +1050,11 @@ std::span<const SkyContextController::ConstellationLineRef> SkyContextController
                                        : std::span<const ConstellationLineRef>{};
 }
 
-std::span<const SkyContextController::ConstellationLabelRef>
-SkyContextController::constellationLabelRefs() const noexcept
+std::span<const SkyContextController::ConstellationAnchorGroup>
+SkyContextController::constellationAnchorGroups() const noexcept
 {
-    return m_catalogManager != nullptr ? m_catalogManager->constellationLabelRefs()
-                                       : std::span<const ConstellationLabelRef>{};
+    return m_catalogManager != nullptr ? m_catalogManager->constellationAnchorGroups()
+                                       : std::span<const ConstellationAnchorGroup>{};
 }
 
 int SkyContextController::catalogPresetIndex() const noexcept
@@ -1073,7 +1073,7 @@ void SkyContextController::refreshObjectSearchModel()
         return;
     }
 
-    m_objectSearchModel->setCatalogData(catalogBodies(), constellationLabelRefs());
+    m_objectSearchModel->setCatalogData(catalogBodies(), constellationAnchorGroups());
 }
 
 void SkyContextController::setCatalogPresetIndex(const int catalogPresetIndex)

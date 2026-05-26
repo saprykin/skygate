@@ -8,9 +8,9 @@
 
 namespace skygate::ephemeris {
 
-class StellariumLabelRefExtractor final {
+class StellariumAnchorGroupExtractor final {
 public:
-    [[nodiscard]] static std::vector<ConstellationLabelRef> extract(const QJsonObject& rootObject);
+    [[nodiscard]] static std::vector<ConstellationAnchorGroup> extract(const QJsonObject& rootObject);
 };
 
 }  // namespace skygate::ephemeris

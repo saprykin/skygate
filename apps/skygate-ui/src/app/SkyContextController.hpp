@@ -3,20 +3,21 @@
 #include "GeoLocation.hpp"
 #include "ProjectionType.hpp"
 #include "SkyContext.hpp"
-#include "UtcTimePoint.hpp"
-#include "SystemTimeSource.hpp"
-#include "Types.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/IEphemerisEngine.hpp"
-#include "catalog/IStarCatalog.hpp"
-
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"
+#include "SkyLiveClock.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkySettingsStore.hpp"
-#include "SkyLiveClock.hpp"
 #include "SkyTimeController.hpp"
+#include "SystemTimeSource.hpp"
+#include "Types.hpp"
+#include "UtcTimePoint.hpp"
+
+#include "catalog/IStarCatalog.hpp"
+#include "engine/IEphemerisEngine.hpp"
+
+#include "catalog/constellation/ConstellationData.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
 
 #include <QAbstractItemModel>
 #include <QObject>
@@ -219,7 +220,7 @@ class SkyContextController final : public QObject {
 
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
-    using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
+    using ConstellationAnchorGroup = skygate::ephemeris::ConstellationAnchorGroup;
 
 public:
     struct EphemerisRequestContext final {
@@ -346,7 +347,7 @@ public:
     [[nodiscard]] QStringList catalogSourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
-    [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void setTimelineToolbarCollapsed(bool timelineToolbarCollapsed);

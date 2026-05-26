@@ -1,9 +1,8 @@
 #include "SkyContextController.hpp"
 
+#include "ConstellationReferenceCalculator.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyTimeController.hpp"
-
-#include "ConstellationReferenceCalculator.hpp"
 
 #include <QElapsedTimer>
 
@@ -108,8 +107,8 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
     if (normalizedTargetKind == "constellationlabel") {
         const auto snapshot = engine->compute(requestContext.request);
         const qint64 snapshotNs = skygate::ui::performanceElapsedNanoseconds(timer);
-        const auto center = skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(
-            snapshot, constellationLabelRefs(), targetId.toStdString()
+        const auto center = skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(
+            snapshot, constellationAnchorGroups(), targetId.toStdString()
         );
         const qint64 centerLookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
         if (!center.has_value()) {

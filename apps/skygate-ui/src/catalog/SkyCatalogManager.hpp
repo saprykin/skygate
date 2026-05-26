@@ -2,13 +2,13 @@
 
 #include "SkySettingsStore.hpp"
 
+#include "catalog/IStarCatalog.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
+
 #include <QByteArray>
 #include <QObject>
 #include <QString>
 #include <QStringList>
-
-#include "catalog/IStarCatalog.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -33,7 +33,7 @@ class SkyCatalogManager final : public QObject {
 
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
-    using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
+    using ConstellationAnchorGroup = skygate::ephemeris::ConstellationAnchorGroup;
 
     explicit SkyCatalogManager(
         SkySettingsStore* settingsStore,
@@ -59,7 +59,7 @@ public:
     [[nodiscard]] QStringList sourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
-    [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
 
     void setCatalogPresetIndex(int catalogPresetIndex);
     void setCatalogUrlText(const QString& catalogUrlText);
