@@ -1,9 +1,7 @@
-#include "time/CalendarTime.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
-
 #include "SkyQtTimeCodec.hpp"
-
 #include "SkyTimeController.hpp"
+#include "time/CalendarTime.hpp"
 
 #include <QDateTime>
 #include <QTimeZone>
@@ -259,9 +257,8 @@ QString formatObservationEvent(const ephemeris::ObservationEvent& event, const S
     return formatObservationEvent(event);
 }
 
-QString formatObservationCulmination(
-    const ephemeris::ObservationCulmination& culmination, const SkyTimeController* timeController
-)
+QString
+formatObservationCulmination(const ephemeris::ObservationEvent& culmination, const SkyTimeController* timeController)
 {
     if (culmination.status == ephemeris::ObservationEventStatus::Available && culmination.utcTime.has_value()
         && culmination.altitudeDeg.has_value()) {
