@@ -177,7 +177,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/opengc/OpenNgcObjectMapper.hpp
     src/catalog/opengc/OpenNgcObjectMapping.hpp
     src/catalog/stellarium/StellariumHipParser.hpp
-    src/catalog/stellarium/StellariumLabelRefExtractor.hpp
+    src/catalog/stellarium/StellariumAnchorGroupExtractor.hpp
     src/catalog/stellarium/StellariumLineRefExtractor.hpp
     src/catalog/io/zip/ZipBinaryUtilities.hpp
     src/catalog/io/zip/ZipEntryMetadata.hpp
@@ -231,7 +231,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/zip/ZipEntryMetadata.cpp
     src/catalog/stellarium/StellariumConstellationParser.cpp
     src/catalog/stellarium/StellariumHipParser.cpp
-    src/catalog/stellarium/StellariumLabelRefExtractor.cpp
+    src/catalog/stellarium/StellariumAnchorGroupExtractor.cpp
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
     src/time/TimeScale.cpp
     src/time/AstronomicalEpoch.cpp

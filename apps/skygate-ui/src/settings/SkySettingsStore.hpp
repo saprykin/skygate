@@ -67,7 +67,7 @@ public:
         QString deepSkySourceLabel;
         QByteArray deepSkyCatalogPayload;
         QByteArray constellationLineRows;
-        QByteArray constellationLabelRows;
+        QByteArray constellationAnchorGroupRows;
         int constellationLineSchemaVersion = 0;
         std::size_t constellationCount = 0;
     };

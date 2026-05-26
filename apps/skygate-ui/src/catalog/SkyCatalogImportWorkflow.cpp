@@ -172,13 +172,13 @@ void SkyCatalogImportWorkflow::downloadConstellationLines(
             }
 
             result.lineRefs = std::move(parsedData.lineRefs);
-            result.labelRefs = std::move(parsedData.labelRefs);
+            result.anchorGroups = std::move(parsedData.anchorGroups);
             result.constellationCount = parsedData.constellationCount;
             result.statusSuffix =
                 QString("%1 segments").arg(QString::number(static_cast<qulonglong>(result.lineRefs.size())));
             qCInfo(skygateCatalogParseLog).noquote()
                 << "Constellation lines parsed:" << static_cast<qulonglong>(result.lineRefs.size()) << "segments"
-                << static_cast<qulonglong>(result.labelRefs.size()) << "labels"
+                << static_cast<qulonglong>(result.anchorGroups.size()) << "labels"
                 << static_cast<qulonglong>(result.constellationCount) << "constellations";
             completionHandler(std::move(result));
         }

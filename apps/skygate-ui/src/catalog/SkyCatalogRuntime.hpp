@@ -32,7 +32,7 @@ struct SkyCatalogRuntimeResult final {
 class SkyCatalogRuntime final {
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
-    using ConstellationLabelRef = skygate::ephemeris::ConstellationLabelRef;
+    using ConstellationAnchorGroup = skygate::ephemeris::ConstellationAnchorGroup;
 
 public:
     explicit SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog);
@@ -47,7 +47,7 @@ public:
     [[nodiscard]] QStringList sourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
-    [[nodiscard]] std::span<const ConstellationLabelRef> constellationLabelRefs() const noexcept;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
 
     [[nodiscard]] SkyCatalogRuntimeResult initialize(const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult applyCatalog(
@@ -66,10 +66,11 @@ public:
     [[nodiscard]] SkyCatalogRuntimeResult rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult resetConstellationLineRefs();
     [[nodiscard]] SkyCatalogRuntimeResult setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
-    [[nodiscard]] SkyCatalogRuntimeResult setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs);
+    [[nodiscard]] SkyCatalogRuntimeResult
+    setConstellationAnchorGroups(std::vector<ConstellationAnchorGroup> anchorGroups);
     [[nodiscard]] SkyCatalogRuntimeResult restoreConstellationRefs(
         std::vector<ConstellationLineRef> lineRefs,
-        std::vector<ConstellationLabelRef> labelRefs,
+        std::vector<ConstellationAnchorGroup> anchorGroups,
         std::optional<std::size_t> constellationCount
     );
     [[nodiscard]] std::optional<SkyCatalogCachePersistRequest>

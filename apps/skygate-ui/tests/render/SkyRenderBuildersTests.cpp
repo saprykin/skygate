@@ -1,8 +1,8 @@
 #include "SkyRenderBuilders.hpp"
+#include "math/ViewportMath.hpp"
 
 #include <QtTest/QtTest>
 
-#include "math/ViewportMath.hpp"
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -87,7 +87,7 @@ SkyRenderFrame buildFrame(
     const FrameFixture& fixture,
     const SkyOverlayLayerVisibility& overlayLayers = {},
     const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs = {},
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs = {},
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups = {},
     const double magnitudeCutoff = 8.0
 )
 {
@@ -96,7 +96,7 @@ SkyRenderFrame buildFrame(
         fixture.snapshot,
         *fixture.projection,
         lineRefs,
-        labelRefs,
+        anchorGroups,
         magnitudeCutoff,
         1000.0,
         800.0,
@@ -232,12 +232,12 @@ void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility
         {"hip_a", "hip_b"},
         {"hip_a", "missing"},
     };
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{
         {"Demo", {"hip_a", "hip_b"}},
         {"Missing", {"missing"}},
     };
 
-    auto frame = buildFrame(fixture, {}, lineRefs, labelRefs);
+    auto frame = buildFrame(fixture, {}, lineRefs, anchorGroups);
 
     QCOMPARE(frame.lines.size(), 1U);
     QVERIFY(labelsContainText(frame.labels, "Demo"));
@@ -246,7 +246,7 @@ void SkyRenderBuildersTests::constellationLinesAndLabelsRespectRefsAndVisibility
     SkyOverlayLayerVisibility hidden;
     hidden.constellationLines = false;
     hidden.constellationLabels = false;
-    frame = buildFrame(fixture, hidden, lineRefs, labelRefs);
+    frame = buildFrame(fixture, hidden, lineRefs, anchorGroups);
     QVERIFY(frame.lines.empty());
     QVERIFY(!labelsContainText(frame.labels, "Demo"));
 }

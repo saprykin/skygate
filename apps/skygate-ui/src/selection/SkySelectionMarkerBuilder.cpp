@@ -52,7 +52,7 @@ std::optional<QPointF> selectedConstellationPoint(
     const skygate::ephemeris::SkySnapshot& snapshot,
     const QHash<QString, std::size_t>& stateIndexByBodyId,
     const skygate::core::PreparedProjection& preparedProjection,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
     const QString& targetId
 )
 {
@@ -61,20 +61,20 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    const auto labelRefIt = std::find_if(
-        labelRefs.begin(),
-        labelRefs.end(),
-        [&normalizedTargetId](const skygate::ephemeris::ConstellationLabelRef& labelRef) {
-            return normalizedSceneLookupKey(labelRef.first) == normalizedTargetId;
+    const auto anchorGroupIt = std::find_if(
+        anchorGroups.begin(),
+        anchorGroups.end(),
+        [&normalizedTargetId](const skygate::ephemeris::ConstellationAnchorGroup& anchorGroup) {
+            return normalizedSceneLookupKey(anchorGroup.first) == normalizedTargetId;
         }
     );
-    if (labelRefIt == labelRefs.end()) {
+    if (anchorGroupIt == anchorGroups.end()) {
         return std::nullopt;
     }
 
     skygate::core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
     int validAnchorCount = 0;
-    for (const std::string& hipId : labelRefIt->second) {
+    for (const std::string& hipId : anchorGroupIt->second) {
         const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(hipId));
         if (stateIndexIt == stateIndexByBodyId.cend()) {
             continue;
@@ -148,7 +148,7 @@ SkySelectionMarker SkySelectionMarkerBuilder::build(const SkySelectionOverlayInp
             *input.snapshot,
             *input.stateIndexByBodyId,
             *input.preparedProjection,
-            input.constellationLabelRefs,
+            input.constellationAnchorGroups,
             targetId
         );
     }

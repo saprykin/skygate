@@ -123,9 +123,9 @@ SkyCatalogCacheController::restore(const int catalogPresetIndex, const int deepS
             SkyContextCatalogCodec::parseConstellationLineRows(payloadView(cacheSnapshot->constellationLineRows));
         if (!parsedLineRefs.empty()) {
             result.constellationLineRefs = std::move(parsedLineRefs);
-            if (!cacheSnapshot->constellationLabelRows.isEmpty()) {
-                result.constellationLabelRefs = SkyContextCatalogCodec::parseConstellationLabelRows(
-                    payloadView(cacheSnapshot->constellationLabelRows)
+            if (!cacheSnapshot->constellationAnchorGroupRows.isEmpty()) {
+                result.constellationAnchorGroups = SkyContextCatalogCodec::parseConstellationAnchorGroupRows(
+                    payloadView(cacheSnapshot->constellationAnchorGroupRows)
                 );
             }
             result.constellationCount = cacheSnapshot->constellationCount;
@@ -133,7 +133,7 @@ SkyCatalogCacheController::restore(const int catalogPresetIndex, const int deepS
             qCInfo(skygateCatalogCacheLog).noquote()
                 << "Saved constellation line cache restored: segments"
                 << static_cast<qulonglong>(result.constellationLineRefs.size()) << "labels"
-                << static_cast<qulonglong>(result.constellationLabelRefs.size());
+                << static_cast<qulonglong>(result.constellationAnchorGroups.size());
         } else {
             qCWarning(skygateCatalogCacheLog)
                 << "Saved constellation line cache unreadable; clearing constellation refs";
@@ -159,8 +159,8 @@ void SkyCatalogCacheController::persist(const SkyCatalogCachePersistRequest& req
     snapshot.deepSkyCatalogPayload = request.deepSkyCatalogPayload;
     snapshot.constellationLineRows =
         SkyContextCatalogCodec::serializeConstellationLineRows(request.constellationLineRefs);
-    snapshot.constellationLabelRows =
-        SkyContextCatalogCodec::serializeConstellationLabelRows(request.constellationLabelRefs);
+    snapshot.constellationAnchorGroupRows =
+        SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(request.constellationAnchorGroups);
     snapshot.constellationLineSchemaVersion = SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
     snapshot.constellationCount = request.constellationCount;
     (void)m_settingsStore->saveCatalogCache(snapshot);

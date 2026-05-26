@@ -1,6 +1,6 @@
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
-#include "catalog/stellarium/StellariumLabelRefExtractor.hpp"
+#include "catalog/stellarium/StellariumAnchorGroupExtractor.hpp"
 #include "catalog/stellarium/StellariumLineRefExtractor.hpp"
 
 #include <QByteArray>
@@ -57,7 +57,7 @@ StellariumConstellationParser::ParseResult StellariumConstellationParser::parse(
 
     const QJsonObject rootObject = document.object();
     result.lineRefs = StellariumLineRefExtractor::extract(rootObject);
-    result.labelRefs = StellariumLabelRefExtractor::extract(rootObject);
+    result.anchorGroups = StellariumAnchorGroupExtractor::extract(rootObject);
     result.constellationCount = inferConstellationCountFromJson(rootObject);
     return result;
 }

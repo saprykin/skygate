@@ -71,7 +71,7 @@ void SkyCatalogRuntimeTests::restoreConstellationRefsUpdatesRevisionAndCount()
     QVERIFY(runtime.catalogRevision() > originalRevision);
     QCOMPARE(runtime.constellationCount(), 1U);
     QCOMPARE(runtime.constellationLineRefs().size(), 1U);
-    QCOMPARE(runtime.constellationLabelRefs().size(), 1U);
+    QCOMPARE(runtime.constellationAnchorGroups().size(), 1U);
 }
 
 void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()

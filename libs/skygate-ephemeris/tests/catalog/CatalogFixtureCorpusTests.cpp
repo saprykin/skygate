@@ -1,10 +1,9 @@
-#include "catalog/CatalogSourceType.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
+#include "catalog/CatalogSourceType.hpp"
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
-#include <QtTest/QtTest>
-
 #include <QFile>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 #include <span>
@@ -117,9 +116,9 @@ void CatalogFixtureCorpusTests::parsesStellariumFixture()
 
     QCOMPARE(result.constellationCount, 2U);
     QVERIFY(result.lineRefs.size() >= 3U);
-    QCOMPARE(result.labelRefs.size(), 2U);
-    QCOMPARE(result.labelRefs[0].first, std::string("Orion"));
-    QCOMPARE(result.labelRefs[1].first, std::string("Ursa Major"));
+    QCOMPARE(result.anchorGroups.size(), 2U);
+    QCOMPARE(result.anchorGroups[0].first, std::string("Orion"));
+    QCOMPARE(result.anchorGroups[1].first, std::string("Ursa Major"));
 }
 
 void CatalogFixtureCorpusTests::toleratesMalformedStellariumFixture()
@@ -132,8 +131,8 @@ void CatalogFixtureCorpusTests::toleratesMalformedStellariumFixture()
 
     QCOMPARE(result.constellationCount, 2U);
     QCOMPARE(result.lineRefs.size(), 1U);
-    QCOMPARE(result.labelRefs.size(), 1U);
-    QCOMPARE(result.labelRefs.front().first, std::string("Cassiopeia"));
+    QCOMPARE(result.anchorGroups.size(), 1U);
+    QCOMPARE(result.anchorGroups.front().first, std::string("Cassiopeia"));
 }
 
 QTEST_APPLESS_MAIN(CatalogFixtureCorpusTests)

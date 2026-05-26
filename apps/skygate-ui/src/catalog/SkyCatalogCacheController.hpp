@@ -1,9 +1,8 @@
 #pragma once
 
 #include "SkySettingsStore.hpp"
-
-#include "catalog/constellation/ConstellationData.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
 #include <QString>
@@ -27,7 +26,7 @@ struct SkyCatalogCacheRestoreResult final {
     QString deepSkySourceLabel;
     std::size_t deepSkyObjectCount = 0;
     std::vector<skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
-    std::vector<skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
     std::optional<std::size_t> constellationCount;
     bool resetConstellationLineRefs = false;
 };
@@ -38,7 +37,7 @@ struct SkyCatalogCachePersistRequest final {
     QByteArray catalogPayload;
     QByteArray deepSkyCatalogPayload;
     std::vector<skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
-    std::vector<skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
     std::size_t constellationCount = 0;
 };
 

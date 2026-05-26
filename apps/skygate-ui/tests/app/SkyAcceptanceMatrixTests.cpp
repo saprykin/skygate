@@ -1,21 +1,20 @@
-#include "time/CalendarTime.hpp"
 #include "CatalogCacheTestSupport.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkySettingsStore.hpp"
 
-#include "engine/highprecision/CalcephKernelProvider.hpp"
-
-#include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
+#include "time/CalendarTime.hpp"
 
-#include <QtTest/QtTest>
+#include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
+#include <QtTest/QtTest>
 
 #include <array>
 #include <chrono>
@@ -403,7 +402,7 @@ void compareCatalogCacheSnapshots(
     QCOMPARE(actual.deepSkySourceLabel, expected.deepSkySourceLabel);
     QCOMPARE(actual.deepSkyCatalogPayload, expected.deepSkyCatalogPayload);
     QCOMPARE(actual.constellationLineRows, expected.constellationLineRows);
-    QCOMPARE(actual.constellationLabelRows, expected.constellationLabelRows);
+    QCOMPARE(actual.constellationAnchorGroupRows, expected.constellationAnchorGroupRows);
     QCOMPARE(actual.constellationLineSchemaVersion, expected.constellationLineSchemaVersion);
     QCOMPARE(actual.constellationCount, expected.constellationCount);
 }

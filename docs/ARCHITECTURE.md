@@ -336,7 +336,7 @@ than rendering hand-authored bundled outlines.
 
 `StellariumConstellationParser` is a small orchestration entrypoint over
 private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and
-`StellariumLabelRefExtractor`.
+`StellariumAnchorGroupExtractor`.
 
 ## Caching and Performance Model
 The current application uses several lightweight caches instead of a global

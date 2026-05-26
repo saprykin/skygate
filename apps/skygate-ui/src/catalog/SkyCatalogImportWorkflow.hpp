@@ -1,8 +1,8 @@
 #pragma once
 
 #include "catalog/CatalogLoadResult.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
 #include <QString>
@@ -37,7 +37,7 @@ struct SkyDeepSkyCatalogImportResult final {
 
 struct SkyConstellationLineImportResult final {
     std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs;
-    std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs;
+    std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
     std::size_t constellationCount = 0;
     QString statusSuffix;
 

@@ -1,7 +1,7 @@
-#include <QtTest/QtTest>
-
 #include "CelestialReferenceCalculator.hpp"
 #include "ConstellationReferenceCalculator.hpp"
+
+#include <QtTest/QtTest>
 
 #include <chrono>
 #include <cmath>
@@ -16,7 +16,7 @@ private slots:
     void computesFiniteEclipticAndEquatorialPoints();
     void declinationCircleFallsBackForNonPositiveSampleCounts();
     void circumpolarBoundaryDeclinationFollowsHemisphere();
-    void constellationLabelCenterAveragesAnchorVectors();
+    void constellationAnchorCentroidAveragesAnchorVectors();
 };
 
 void CelestialReferenceCalculatorTests::computesFiniteEclipticAndEquatorialPoints()
@@ -77,7 +77,7 @@ void CelestialReferenceCalculatorTests::circumpolarBoundaryDeclinationFollowsHem
     );
 }
 
-void CelestialReferenceCalculatorTests::constellationLabelCenterAveragesAnchorVectors()
+void CelestialReferenceCalculatorTests::constellationAnchorCentroidAveragesAnchorVectors()
 {
     auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
         std::vector<skygate::ephemeris::CelestialBody>{
@@ -97,10 +97,10 @@ void CelestialReferenceCalculatorTests::constellationLabelCenterAveragesAnchorVe
         }
     };
 
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{{"Demo", {"HIP_1", "hip_2"}}};
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{{"Demo", {"HIP_1", "hip_2"}}};
 
     const auto center =
-        skygate::ephemeris::ConstellationReferenceCalculator::labelCenter(snapshot, labelRefs, " demo ");
+        skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(snapshot, anchorGroups, " demo ");
     QVERIFY(center.has_value());
     QVERIFY(std::abs(center->altitudeDeg) < 1e-9);
     QVERIFY(std::abs(center->azimuthDeg - 45.0) < 1e-9);

@@ -1,15 +1,17 @@
 #pragma once
 
+#include "PreparedProjection.hpp"
+#include "SkyContext.hpp"
+#include "SkySceneOverlayData.hpp"
+#include "Types.hpp"
+
+#include "engine/IEphemerisEngine.hpp"
+
+#include "catalog/constellation/ConstellationData.hpp"
+
 #include <QHash>
 #include <QString>
 #include <QStringList>
-
-#include "PreparedProjection.hpp"
-#include "SkySceneOverlayData.hpp"
-#include "SkyContext.hpp"
-#include "Types.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
-#include "engine/IEphemerisEngine.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -25,7 +27,7 @@ struct SkySelectionOverlayInput final {
     const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
     std::optional<skygate::core::SkyContext> skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
-    std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+    std::span<const skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
     std::span<const std::uint8_t> catalogSourceIds;
     QStringList catalogSourceLabels;
     QString selectedObjectTargetId;

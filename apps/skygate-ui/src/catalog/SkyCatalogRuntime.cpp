@@ -64,9 +64,10 @@ std::span<const SkyCatalogRuntime::ConstellationLineRef> SkyCatalogRuntime::cons
     return m_constellationRefs.lineRefs();
 }
 
-std::span<const SkyCatalogRuntime::ConstellationLabelRef> SkyCatalogRuntime::constellationLabelRefs() const noexcept
+std::span<const SkyCatalogRuntime::ConstellationAnchorGroup>
+SkyCatalogRuntime::constellationAnchorGroups() const noexcept
 {
-    return m_constellationRefs.labelRefs();
+    return m_constellationRefs.anchorGroups();
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::initialize(const SkyCatalogRuntimeBuildOptions& options)
@@ -180,21 +181,22 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLineRefs(std::vector<
     return SkyCatalogRuntimeResult{.catalogChanged = true};
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLabelRefs(std::vector<ConstellationLabelRef> labelRefs)
+SkyCatalogRuntimeResult
+SkyCatalogRuntime::setConstellationAnchorGroups(std::vector<ConstellationAnchorGroup> anchorGroups)
 {
-    m_constellationRefs.setLabelRefs(std::move(labelRefs));
+    m_constellationRefs.setAnchorGroups(std::move(anchorGroups));
     ++m_catalogRevision;
     return SkyCatalogRuntimeResult{.catalogChanged = true};
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::restoreConstellationRefs(
     std::vector<ConstellationLineRef> lineRefs,
-    std::vector<ConstellationLabelRef> labelRefs,
+    std::vector<ConstellationAnchorGroup> anchorGroups,
     const std::optional<std::size_t> constellationCount
 )
 {
     SkyCatalogRuntimeResult result = setConstellationLineRefs(std::move(lineRefs));
-    const SkyCatalogRuntimeResult labelResult = setConstellationLabelRefs(std::move(labelRefs));
+    const SkyCatalogRuntimeResult labelResult = setConstellationAnchorGroups(std::move(anchorGroups));
     result.catalogChanged = result.catalogChanged || labelResult.catalogChanged;
 
     if (constellationCount.has_value() && constellationCount.value() != m_constellationRefs.count()) {
@@ -222,7 +224,7 @@ SkyCatalogRuntime::cachePersistRequest(const QByteArray& catalogPayload, const Q
     request.catalogPayload = catalogPayload;
     request.deepSkyCatalogPayload = deepSkyCatalogPayload;
     request.constellationLineRefs = m_constellationRefs.lineRefVector();
-    request.constellationLabelRefs = m_constellationRefs.labelRefVector();
+    request.constellationAnchorGroups = m_constellationRefs.anchorGroupVector();
     request.constellationCount = m_constellationRefs.count();
     return request;
 }

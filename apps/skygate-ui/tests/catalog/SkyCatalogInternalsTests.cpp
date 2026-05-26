@@ -62,33 +62,33 @@ void SkyCatalogInternalsTests::constellationStoreKeepsCustomRefsAndCounts()
         {"hip_1", "hip_2"},
         {"hip_2", "hip_3"},
     };
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{
         {"Demo", {"hip_1", "hip_2"}},
     };
 
     store.setLineRefs(lineRefs);
-    store.setLabelRefs(labelRefs);
+    store.setAnchorGroups(anchorGroups);
     store.setCount(42U);
 
     QCOMPARE(store.count(), 42U);
     QCOMPARE(store.lineRefs().size(), 2U);
-    QCOMPARE(store.labelRefs().size(), 1U);
+    QCOMPARE(store.anchorGroups().size(), 1U);
     QCOMPARE(store.lineRefVector().front().first, std::string("hip_1"));
     QCOMPARE(store.lineRefVector().front().second, std::string("hip_2"));
-    QCOMPARE(store.labelRefVector().front().first, std::string("Demo"));
+    QCOMPARE(store.anchorGroupVector().front().first, std::string("Demo"));
 }
 
 void SkyCatalogInternalsTests::constellationStoreClearsRefsWhenCustomLinesAreEmpty()
 {
     skygate::ui::internal::SkyCatalogConstellationStore store;
     store.setLineRefs({{"custom_a", "custom_b"}});
-    store.setLabelRefs({{"Custom", {"custom_a", "custom_b"}}});
+    store.setAnchorGroups({{"Custom", {"custom_a", "custom_b"}}});
     store.setCount(1U);
 
     store.setLineRefs({});
 
     QVERIFY(store.lineRefs().empty());
-    QVERIFY(store.labelRefs().empty());
+    QVERIFY(store.anchorGroups().empty());
     QCOMPARE(store.count(), 0U);
 }
 

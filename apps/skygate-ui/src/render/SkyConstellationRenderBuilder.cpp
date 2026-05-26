@@ -58,7 +58,7 @@ void SkyConstellationRenderBuilder::appendLabels(
     SkyRenderFrame& frame,
     const SkyRenderHorizontalLookup& horizontalLookup,
     const skygate::core::PreparedProjection& projection,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
     const double viewportWidth,
     const double viewportHeight,
     const SkyThemeRenderPalette& renderTheme,
@@ -67,19 +67,19 @@ void SkyConstellationRenderBuilder::appendLabels(
     skygate::core::RectOccupancyGrid& labelGrid
 ) const
 {
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty() || labelRef.second.empty()) {
+    for (const auto& anchorGroup : anchorGroups) {
+        if (anchorGroup.first.empty() || anchorGroup.second.empty()) {
             continue;
         }
 
-        if (!seenLabels.insert(labelRef.first).second) {
+        if (!seenLabels.insert(anchorGroup.first).second) {
             continue;
         }
 
         double sumX = 0.0;
         double sumY = 0.0;
         int visiblePointCount = 0;
-        for (const std::string& hipId : labelRef.second) {
+        for (const std::string& hipId : anchorGroup.second) {
             const auto* horizontal = horizontalLookup.findHorizontal(hipId);
             if (horizontal == nullptr) {
                 continue;
@@ -101,7 +101,7 @@ void SkyConstellationRenderBuilder::appendLabels(
 
         const double labelX = sumX / static_cast<double>(visiblePointCount);
         const double labelY = sumY / static_cast<double>(visiblePointCount);
-        const skygate::core::Rect2d bounds = skyRenderLabelBounds(labelX, labelY, labelRef.first);
+        const skygate::core::Rect2d bounds = skyRenderLabelBounds(labelX, labelY, anchorGroup.first);
         if (!skyRenderLabelFitsViewport(bounds, viewportWidth, viewportHeight, edgeMarginPx)
             || labelGrid.collides(bounds)) {
             continue;
@@ -111,7 +111,7 @@ void SkyConstellationRenderBuilder::appendLabels(
             frame.labels,
             labelX,
             labelY,
-            labelRef.first,
+            anchorGroup.first,
             skyRenderLabelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation, renderTheme)
         );
         labelGrid.add(bounds);

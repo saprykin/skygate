@@ -15,7 +15,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     const skygate::ephemeris::SkySnapshot& snapshot,
     const skygate::core::PreparedProjection& projection,
     const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
-    const std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs,
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,
     const double magnitudeCutoff,
     const double viewportWidth,
     const double viewportHeight,
@@ -27,8 +27,8 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     frame.lines.reserve(lineRefs.size());
 
     std::optional<SkyRenderHorizontalLookup> horizontalLookup;
-    if (!lineRefs.empty() || !labelRefs.empty()) {
-        horizontalLookup.emplace(lineRefs, labelRefs);
+    if (!lineRefs.empty() || !anchorGroups.empty()) {
+        horizontalLookup.emplace(lineRefs, anchorGroups);
     }
 
     const SkyRenderBodyBuilder bodyBuilder;
@@ -52,7 +52,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
     }
 
     std::unordered_set<std::string_view> seenLabels;
-    frame.labels.reserve(labelRefs.size() + 16U);
+    frame.labels.reserve(anchorGroups.size() + 16U);
     constexpr double kEdgeMarginPx = 10.0;
     skygate::core::RectOccupancyGrid labelGrid(72.0);
 
@@ -79,7 +79,7 @@ SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
             frame,
             *horizontalLookup,
             projection,
-            labelRefs,
+            anchorGroups,
             viewportWidth,
             viewportHeight,
             renderTheme,

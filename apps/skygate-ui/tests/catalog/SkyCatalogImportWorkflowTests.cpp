@@ -1,9 +1,10 @@
 #include "AsyncTestSupport.hpp"
 #include "CatalogDownloadWorkflowTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
-#include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "FakeNetworkAccessManager.hpp"
 #include "LogCapture.hpp"
+
+#include "catalog/SkyCatalogImportWorkflow.hpp"
 
 #include <QtTest/QtTest>
 
@@ -51,7 +52,7 @@ void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
 
     QCOMPARE(finalResult.constellationCount, 1U);
     QCOMPARE(finalResult.lineRefs.size(), 2U);
-    QCOMPARE(finalResult.labelRefs.size(), 1U);
+    QCOMPARE(finalResult.anchorGroups.size(), 1U);
     QVERIFY(finalResult.hasCustomLines());
     QCOMPARE(finalResult.statusSuffix, QString("2 segments"));
     QVERIFY(std::none_of(statuses.begin(), statuses.end(), [](const QString& status) {
@@ -111,7 +112,7 @@ void SkyCatalogImportWorkflowTests::fallsBackForMalformedConstellationPayload()
     });
 
     QVERIFY(!finalResult.hasCustomLines());
-    QVERIFY(finalResult.labelRefs.empty());
+    QVERIFY(finalResult.anchorGroups.empty());
     QVERIFY(finalResult.statusSuffix.contains("no constellation data"));
     QVERIFY(finalResult.statusSuffix.contains("parse failed"));
     QVERIFY(finalResult.statusSuffix.contains("not-json"));

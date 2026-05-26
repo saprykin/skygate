@@ -117,9 +117,10 @@ std::span<const SkyCatalogManager::ConstellationLineRef> SkyCatalogManager::cons
     return m_runtime->constellationLineRefs();
 }
 
-std::span<const SkyCatalogManager::ConstellationLabelRef> SkyCatalogManager::constellationLabelRefs() const noexcept
+std::span<const SkyCatalogManager::ConstellationAnchorGroup>
+SkyCatalogManager::constellationAnchorGroups() const noexcept
 {
-    return m_runtime->constellationLabelRefs();
+    return m_runtime->constellationAnchorGroups();
 }
 
 void SkyCatalogManager::setCatalogPresetIndex(const int catalogPresetIndex)
@@ -301,7 +302,7 @@ bool SkyCatalogManager::restoreCatalogCache()
     if (!restoreResult.constellationLineRefs.empty()) {
         applyRuntimeResult(m_runtime->restoreConstellationRefs(
             std::move(restoreResult.constellationLineRefs),
-            std::move(restoreResult.constellationLabelRefs),
+            std::move(restoreResult.constellationAnchorGroups),
             restoreResult.constellationCount
         ));
         return true;
@@ -481,7 +482,7 @@ void SkyCatalogManager::handleConstellationLineImportFinished(
     if (lineResult.hasCustomLines()) {
         const SkyCatalogRuntimeResult result = m_runtime->restoreConstellationRefs(
             std::move(lineResult.lineRefs),
-            std::move(lineResult.labelRefs),
+            std::move(lineResult.anchorGroups),
             lineResult.constellationCount > 0U ? std::optional<std::size_t>(lineResult.constellationCount)
                                                : std::nullopt
         );

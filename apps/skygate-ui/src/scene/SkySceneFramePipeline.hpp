@@ -1,18 +1,18 @@
 #pragma once
 
-#include <QHash>
-#include <QString>
-
-#include "SkyOverlayLayerVisibility.hpp"
-#include "SkyRenderBuilders.hpp"
-
-#include "PreparedProjection.hpp"
 #include "GeoLocation.hpp"
+#include "PreparedProjection.hpp"
 #include "ProjectionType.hpp"
 #include "SkyContext.hpp"
-#include "UtcTimePoint.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
+#include "SkyOverlayLayerVisibility.hpp"
+#include "SkyRenderBuilders.hpp"
 #include "Types.hpp"
+#include "UtcTimePoint.hpp"
+
+#include "catalog/constellation/ConstellationData.hpp"
+
+#include <QHash>
+#include <QString>
 
 #include <cstdint>
 #include <optional>
@@ -41,7 +41,7 @@ struct SkySceneFramePipelineInput final {
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
     SkyOverlayLayerVisibility overlayLayers;
     std::span<const skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
-    std::span<const skygate::ephemeris::ConstellationLabelRef> constellationLabelRefs;
+    std::span<const skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
 };
 
 struct SkySceneFramePipelineResult final {

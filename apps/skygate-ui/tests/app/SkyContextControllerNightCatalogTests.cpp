@@ -323,7 +323,7 @@ void SkyContextControllerNightCatalogTests::restoresCachedCatalogConstellationCo
     cacheSnapshot.catalogPayload = "id,hip,proper,ra,dec,mag\n"
                                    "1,42,Demo Star,6.7525,-16.7161,-1.46\n";
     cacheSnapshot.constellationLineRows = "hyg_1|hyg_1\n";
-    cacheSnapshot.constellationLabelRows = "Demo|hyg_1\n";
+    cacheSnapshot.constellationAnchorGroupRows = "Demo|hyg_1\n";
     cacheSnapshot.constellationLineSchemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
     cacheSnapshot.constellationCount = 88;

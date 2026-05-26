@@ -1,14 +1,15 @@
 #pragma once
 
+#include "Types.hpp"
+
+#include "catalog/constellation/ConstellationData.hpp"
+
 #include <QAbstractListModel>
 #include <QByteArray>
 #include <QHash>
 #include <QString>
 #include <QVariant>
 #include <QVector>
-
-#include "catalog/constellation/ConstellationData.hpp"
-#include "Types.hpp"
 
 #include <span>
 
@@ -35,7 +36,7 @@ public:
     void setFilterText(const QString& filterText);
     void setCatalogData(
         std::span<const skygate::ephemeris::CelestialBody> bodies,
-        std::span<const skygate::ephemeris::ConstellationLabelRef> labelRefs
+        std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
     );
 
 signals:

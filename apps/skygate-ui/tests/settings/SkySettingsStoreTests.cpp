@@ -1,5 +1,3 @@
-#include <QtTest>
-
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "SettingsTestFixture.hpp"
@@ -9,6 +7,7 @@
 #include <QFile>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QtTest>
 
 #include <cstdint>
 
@@ -293,7 +292,9 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 
     SkySettingsStore store;
     const SkySettingsStore::CatalogCacheSnapshot savedSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
-        {.constellationLineRows = "a|b\n", .constellationLabelRows = "Orion|hip1,hip2\n", .constellationCount = 42}
+        {.constellationLineRows = "a|b\n",
+         .constellationAnchorGroupRows = "Orion|hip1,hip2\n",
+         .constellationCount = 42}
     );
 
     QVERIFY(store.saveCatalogCache(savedSnapshot));
@@ -313,7 +314,7 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
     QVERIFY(starClearedSnapshot->sourceLabel.isEmpty());
     QVERIFY(starClearedSnapshot->catalogPayload.isEmpty());
     QVERIFY(starClearedSnapshot->constellationLineRows.isEmpty());
-    QVERIFY(starClearedSnapshot->constellationLabelRows.isEmpty());
+    QVERIFY(starClearedSnapshot->constellationAnchorGroupRows.isEmpty());
     QCOMPARE(starClearedSnapshot->constellationLineSchemaVersion, 0);
     QCOMPARE(starClearedSnapshot->constellationCount, 0U);
     QCOMPARE(starClearedSnapshot->deepSkySourceLabel, savedSnapshot.deepSkySourceLabel);

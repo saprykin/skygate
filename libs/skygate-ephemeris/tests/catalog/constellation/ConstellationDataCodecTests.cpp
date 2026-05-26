@@ -10,7 +10,7 @@ class ConstellationDataCodecTests final : public QObject {
 
 private slots:
     void lineRowsRoundTripAndSkipMalformedRows();
-    void labelRowsRoundTripSanitizeAndSkipMalformedRows();
+    void anchorGroupRowsRoundTripSanitizeAndSkipMalformedRows();
 };
 
 void ConstellationDataCodecTests::lineRowsRoundTripAndSkipMalformedRows()
@@ -33,19 +33,20 @@ void ConstellationDataCodecTests::lineRowsRoundTripAndSkipMalformedRows()
     QVERIFY(parsed[1].second == "hip_5");
 }
 
-void ConstellationDataCodecTests::labelRowsRoundTripSanitizeAndSkipMalformedRows()
+void ConstellationDataCodecTests::anchorGroupRowsRoundTripSanitizeAndSkipMalformedRows()
 {
-    const std::vector<skygate::ephemeris::ConstellationLabelRef> labelRefs{
+    const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{
         {"  Canis|Major\n ", {"hip_1", "", "hip_2"}},
         {"", {"hip_3"}},
         {"Orion", {}},
     };
 
-    const std::string rows = skygate::ephemeris::ConstellationDataCodec::serializeLabelRows(labelRefs);
+    const std::string rows = skygate::ephemeris::ConstellationDataCodec::serializeAnchorGroupRows(anchorGroups);
     QVERIFY(rows == "Canis/Major|hip_1,hip_2\n");
 
-    const auto parsed =
-        skygate::ephemeris::ConstellationDataCodec::parseLabelRows("bad\nCanis/Major|hip_1,,hip_2\nMissing|\n|hip_3");
+    const auto parsed = skygate::ephemeris::ConstellationDataCodec::parseAnchorGroupRows(
+        "bad\nCanis/Major|hip_1,,hip_2\nMissing|\n|hip_3"
+    );
     QCOMPARE(parsed.size(), 1U);
     QVERIFY(parsed[0].first == "Canis/Major");
     QCOMPARE(parsed[0].second.size(), 2U);

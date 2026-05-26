@@ -70,16 +70,17 @@ std::vector<ConstellationLineRef> ConstellationDataCodec::parseLineRows(const st
     return lineRefs;
 }
 
-std::string ConstellationDataCodec::serializeLabelRows(const std::span<const ConstellationLabelRef> labelRefs)
+std::string
+ConstellationDataCodec::serializeAnchorGroupRows(const std::span<const ConstellationAnchorGroup> anchorGroups)
 {
     std::string rows;
-    rows.reserve(labelRefs.size() * 48U);
-    for (const auto& labelRef : labelRefs) {
-        if (labelRef.first.empty() || labelRef.second.empty()) {
+    rows.reserve(anchorGroups.size() * 48U);
+    for (const auto& anchorGroup : anchorGroups) {
+        if (anchorGroup.first.empty() || anchorGroup.second.empty()) {
             continue;
         }
 
-        std::string sanitizedLabel = labelRef.first;
+        std::string sanitizedLabel = anchorGroup.first;
         sanitizeLabel(sanitizedLabel);
         if (sanitizedLabel.empty()) {
             continue;
@@ -88,7 +89,7 @@ std::string ConstellationDataCodec::serializeLabelRows(const std::span<const Con
         std::string row = sanitizedLabel;
         row += '|';
         bool hasAnyHip = false;
-        for (const std::string& hipId : labelRef.second) {
+        for (const std::string& hipId : anchorGroup.second) {
             if (hipId.empty()) {
                 continue;
             }
@@ -110,9 +111,9 @@ std::string ConstellationDataCodec::serializeLabelRows(const std::span<const Con
     return rows;
 }
 
-std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const std::string_view rows)
+std::vector<ConstellationAnchorGroup> ConstellationDataCodec::parseAnchorGroupRows(const std::string_view rows)
 {
-    std::vector<ConstellationLabelRef> labelRefs;
+    std::vector<ConstellationAnchorGroup> anchorGroups;
     for (const std::string_view line : StringUtilities::splitView(rows, '\n')) {
         const std::size_t delimiter = line.find('|');
         if (delimiter == std::string_view::npos) {
@@ -130,11 +131,11 @@ std::vector<ConstellationLabelRef> ConstellationDataCodec::parseLabelRows(const 
             hipIds.emplace_back(hipId);
         }
         if (!hipIds.empty()) {
-            labelRefs.emplace_back(std::string(label), std::move(hipIds));
+            anchorGroups.emplace_back(std::string(label), std::move(hipIds));
         }
     }
 
-    return labelRefs;
+    return anchorGroups;
 }
 
 }  // namespace skygate::ephemeris
