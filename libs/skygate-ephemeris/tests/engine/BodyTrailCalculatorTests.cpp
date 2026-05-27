@@ -1,5 +1,5 @@
-#include "trail/BodyTrailCalculator.hpp"
 #include "UtcTimeCodec.hpp"
+#include "trail/BodyTrailCalculator.hpp"
 
 #include <QtTest/QtTest>
 
@@ -275,9 +275,9 @@ void BodyTrailCalculatorTests::requestSamplingPreservesOptionsAndUpdatesEpochs()
     request.epoch = skygate::ephemeris::AstronomicalEpoch{
         .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
     };
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric;
-    request.options.enableAtmosphericRefraction = false;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
+    request.options.setEnableAtmosphericRefraction(false);
 
     const auto samples = calculator.sample(
         engine,
@@ -294,14 +294,14 @@ void BodyTrailCalculatorTests::requestSamplingPreservesOptionsAndUpdatesEpochs()
     QCOMPARE(engine.requestSamples()[1].utcSeconds, std::int64_t{-1200});
     QCOMPARE(engine.requestSamples()[2].utcSeconds, std::int64_t{600});
     QCOMPARE(
-        static_cast<std::uint8_t>(engine.requestSamples()[0].options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(engine.requestSamples()[0].options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(engine.requestSamples()[0].options.correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric)
+        static_cast<std::uint32_t>(engine.requestSamples()[0].options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric())
     );
-    QVERIFY(!engine.requestSamples()[0].options.enableAtmosphericRefraction);
+    QVERIFY(!engine.requestSamples()[0].options.enableAtmosphericRefraction());
     QCOMPARE(engine.requestSamples()[0].epoch.julianDatePart1, 2'451'545.0);
     QVERIFY(std::abs(engine.requestSamples()[0].epoch.julianDatePart2 - (0.25 - (1.0 / 24.0))) < 1e-12);
     QVERIFY(std::abs(engine.requestSamples()[1].epoch.julianDatePart2 - (0.25 - (0.5 / 24.0))) < 1e-12);

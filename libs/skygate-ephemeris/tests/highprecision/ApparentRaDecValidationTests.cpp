@@ -1,5 +1,5 @@
-#include "time/CalendarTime.hpp"
 #include "EphemerisFixtureSupport.hpp"
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
@@ -83,7 +83,7 @@ public:
         }
 
         SolarSystemKernelStateResult result;
-        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
         result.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
         return result;
@@ -149,7 +149,7 @@ struct ApparentValidationFixture {
     if (object.contains(QStringLiteral("velocityAuPerDay"))) {
         result.velocityAuPerDay = parseVector(object.value(QStringLiteral("velocityAuPerDay")).toArray());
     }
-    result.metadata.status = EphemerisResultStatus::Valid;
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
     result.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
     return result;
 }
@@ -230,9 +230,9 @@ void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizon
 
     EphemerisRequest request;
     request.epoch = fixture.requestEpoch;
-    request.options.engineKind = EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = EphemerisCorrectionFlags::Apparent;
-    request.options.enableAtmosphericRefraction = false;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::apparent());
+    request.options.setEnableAtmosphericRefraction(false);
 
     const CelestialBody mars = makeMarsBody();
     const HighPrecisionComputationInput input = makeInput(mars, request);
@@ -270,15 +270,27 @@ void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizon
     );
     QCOMPARE(
         static_cast<std::uint8_t>(apparentResult.metadata.status),
-        static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(hasCorrectionFlag(apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
-    QVERIFY(hasCorrectionFlag(apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarAberration));
-    QVERIFY(hasCorrectionFlag(
-        apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::GravitationalLightDeflection
-    ));
     QVERIFY(
-        hasCorrectionFlag(apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::PrecessionNutation)
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarAberration()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            apparentResult.metadata.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()
+        )
     );
 }
 

@@ -3,13 +3,11 @@
 #include "SkyObjectSearchModel.hpp"
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneModel.hpp"
-
 #include "catalog/CatalogFactory.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "math/ViewportMath.hpp"
 #include "time/CalendarTime.hpp"
-
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
@@ -17,7 +15,6 @@
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/highprecision/IStarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
-
 #include "skygate/testsupport/PerformanceBudget.hpp"
 
 #include <QElapsedTimer>
@@ -113,7 +110,7 @@ public:
         ++m_singleCallCount;
         skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result;
         result.equatorial = input.body.fixedEquatorial;
-        result.metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         result.metadata.dataSourceProvenance = "performance guard single fallback";
         return result;
     }
@@ -136,7 +133,7 @@ public:
         for (std::size_t arrayIndex = 0; arrayIndex < arrays.size(); ++arrayIndex) {
             skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result;
             result.equatorial = arrays.referenceEquatorial(arrayIndex);
-            result.metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
             result.metadata.dataSourceProvenance = "performance guard batch astrometry";
             results.push_back(
                 skygate::ephemeris::highprecision::StarAstrometryBatchResult{
@@ -179,7 +176,7 @@ public:
         ++m_singleCallCount;
         skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result = calculatorResult;
         result.horizontal = horizontalForBodyIndex(input.bodyIndex);
-        result.metadata.appliedCorrections = input.request.options.correctionFlags;
+        result.metadata.appliedCorrections = input.request.options.correctionFlags();
         return result;
     }
 
@@ -202,7 +199,7 @@ public:
         for (const skygate::ephemeris::highprecision::StarAstrometryBatchResult& calculatorResult : calculatorResults) {
             skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result = calculatorResult.result;
             result.horizontal = horizontalForBodyIndex(calculatorResult.bodyIndex);
-            result.metadata.appliedCorrections = request.options.correctionFlags;
+            result.metadata.appliedCorrections = request.options.correctionFlags();
             results.push_back(
                 skygate::ephemeris::highprecision::StarAstrometryBatchResult{
                     .bodyIndex = calculatorResult.bodyIndex,
@@ -261,7 +258,7 @@ public:
             .altitudeDeg = 38.0 + std::sin(offsetMinutes / 180.0) * 12.0,
             .azimuthDeg = std::fmod(140.0 + (offsetMinutes / 4.0), 360.0),
         };
-        result.metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         result.metadata.dataSourceProvenance = "performance guard solar system";
         return result;
     }
@@ -604,8 +601,8 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
     auto computationCache = std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
 
     skygate::ephemeris::EphemerisEngineOptions options;
-    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
 
     skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
     dependencies.starAstrometryCalculator = starAstrometryCalculator;
@@ -681,8 +678,8 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
     auto computationCache = std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
 
     skygate::ephemeris::EphemerisEngineOptions options;
-    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
 
     skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
     dependencies.starAstrometryCalculator = starAstrometryCalculator;
@@ -880,8 +877,8 @@ void PerformanceGuardTests::profilesHighPrecisionMoonSearchSelection()
     auto timeScaleService = std::make_shared<GuardTimeScaleService>();
 
     skygate::ephemeris::EphemerisEngineOptions options;
-    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Geometric;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
 
     skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
     dependencies.solarSystemStateCalculator = solarSystemCalculator;

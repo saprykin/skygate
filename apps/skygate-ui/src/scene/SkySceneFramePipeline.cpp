@@ -1,9 +1,7 @@
 #include "SkySceneFramePipeline.hpp"
-
 #include "SkySceneShared.hpp"
-
-#include "math/ViewportMath.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "math/ViewportMath.hpp"
 
 namespace {
 
@@ -30,12 +28,13 @@ epochsEqual(const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::eph
     const skygate::ephemeris::EphemerisEngineOptions& lhs, const skygate::ephemeris::EphemerisEngineOptions& rhs
 ) noexcept
 {
-    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
-           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
-           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
-           && lhs.atmosphericPressureHpa == rhs.atmosphericPressureHpa
-           && lhs.atmosphericTemperatureC == rhs.atmosphericTemperatureC && lhs.relativeHumidity == rhs.relativeHumidity
-           && lhs.observingWavelengthMicrometers == rhs.observingWavelengthMicrometers;
+    return lhs.engineKind() == rhs.engineKind() && lhs.correctionFlags() == rhs.correctionFlags()
+           && lhs.fallbackToSimpleEngine() == rhs.fallbackToSimpleEngine()
+           && lhs.enableAtmosphericRefraction() == rhs.enableAtmosphericRefraction()
+           && lhs.atmosphericPressureHpa() == rhs.atmosphericPressureHpa()
+           && lhs.atmosphericTemperatureC() == rhs.atmosphericTemperatureC()
+           && lhs.relativeHumidity() == rhs.relativeHumidity()
+           && lhs.observingWavelengthMicrometers() == rhs.observingWavelengthMicrometers();
 }
 
 [[nodiscard]] bool optionalOptionsEqual(

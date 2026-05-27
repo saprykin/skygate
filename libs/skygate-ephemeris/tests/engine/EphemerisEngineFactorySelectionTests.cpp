@@ -52,11 +52,11 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
     const std::array bodies{makeFactoryBody()};
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     request.catalogBodies = bodies;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
-    request.options.enableAtmosphericRefraction = true;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+    request.options.setEnableAtmosphericRefraction(true);
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -66,15 +66,15 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
     QVERIFY(result.engine != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.engine->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
 
     const auto options = result.engine->options();
     QCOMPARE(
-        static_cast<std::uint32_t>(options.correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::LightTime)
+        static_cast<std::uint32_t>(options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::lightTime())
     );
-    QVERIFY(options.enableAtmosphericRefraction);
+    QVERIFY(options.enableAtmosphericRefraction());
 
     const auto state = result.engine->computeBodyState(makeContext(), "factory-target");
     QVERIFY(state.has_value());
@@ -83,7 +83,7 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
     QCOMPARE(state->equatorial.declinationDeg, -6.5);
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Degraded)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
     QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
 }
@@ -93,10 +93,10 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
     const std::array bodies{makeFactoryBody()};
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.catalogBodies = bodies;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
@@ -110,17 +110,17 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
     QVERIFY(result.engine != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.engine->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
 
     const auto options = result.engine->options();
     QCOMPARE(
-        static_cast<std::uint8_t>(options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(options.correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Apparent)
+        static_cast<std::uint32_t>(options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparent())
     );
 
     const auto state = result.engine->computeBodyState(makeContext(), std::size_t{0});
@@ -134,9 +134,9 @@ void EphemerisEngineFactorySelectionTests::failsDefaultHighPrecisionRequestWhenH
     const std::array bodies{makeFactoryBody()};
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.catalogBodies = bodies;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -162,9 +162,9 @@ void EphemerisEngineFactorySelectionTests::failsStrictHighPrecisionRequestWhenHi
     const std::array bodies{makeFactoryBody()};
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.catalogBodies = bodies;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);

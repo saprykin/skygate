@@ -387,7 +387,7 @@ void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialMode
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     input.ephemerisRequest = request;
 
     const skygate::ephemeris::CelestialBody body{
@@ -425,9 +425,9 @@ void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolated
     request.epoch = skygate::ephemeris::AstronomicalEpoch{
         .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
     };
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Astrometric;
-    request.options.enableAtmosphericRefraction = false;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    request.options.setEnableAtmosphericRefraction(false);
     input.ephemerisRequest = request;
 
     builder.appendTrail(frame, input);
@@ -439,14 +439,14 @@ void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolated
     QCOMPARE(engine.contextBodyStateCalls(), 0);
     QVERIFY(engine.lastRequest().has_value());
     QCOMPARE(
-        static_cast<std::uint8_t>(engine.lastRequest()->options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(engine.lastRequest()->options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(engine.lastRequest()->options.correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Astrometric)
+        static_cast<std::uint32_t>(engine.lastRequest()->options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::astrometric())
     );
-    QVERIFY(!engine.lastRequest()->options.enableAtmosphericRefraction);
+    QVERIFY(!engine.lastRequest()->options.enableAtmosphericRefraction());
     QVERIFY(containsOffset(engine.requestOffsetMinutes(), -350));
     QVERIFY(containsOffset(engine.requestOffsetMinutes(), -290));
     QVERIFY(containsOffset(engine.requestOffsetMinutes(), 1090));
@@ -475,8 +475,8 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     request.epoch = skygate::ephemeris::AstronomicalEpoch{
         .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
     };
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Astrometric;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
     input.ephemerisRequest = request;
 
     const skygate::ephemeris::CelestialBody body{
@@ -491,7 +491,7 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     QVERIFY(guidanceEngine != nullptr);
     skygate::ephemeris::EphemerisRequest guidanceRequest = request;
     guidanceRequest.options = guidanceEngine->options();
-    guidanceRequest.options.engineKind = guidanceEngine->kind();
+    guidanceRequest.options.setEngineKind(guidanceEngine->kind());
     const std::optional<skygate::ephemeris::CelestialBodyState> guidanceState =
         guidanceEngine->computeBodyState(guidanceRequest, std::size_t{0U});
     QVERIFY(guidanceState.has_value());
@@ -547,10 +547,12 @@ void SkyObjectTrailBuilderTests::highPrecisionTrailRefinesCurvedInterpolation()
     request.epoch = skygate::ephemeris::AstronomicalEpoch{
         .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Utc
     };
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Astrometric
-                                      | skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction;
-    request.options.enableAtmosphericRefraction = true;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(
+        skygate::ephemeris::EphemerisCorrectionFlags::astrometric()
+        | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction()
+    );
+    request.options.setEnableAtmosphericRefraction(true);
     input.ephemerisRequest = request;
 
     builder.appendTrail(frame, input);

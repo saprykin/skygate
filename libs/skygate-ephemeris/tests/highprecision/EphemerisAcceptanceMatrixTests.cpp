@@ -1,14 +1,14 @@
+#include "EphemerisFixtureSupport.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
-#include "EphemerisFixtureSupport.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -103,10 +103,13 @@ constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d11
     EphemerisRequest request;
     request.context = makeContext();
     request.epoch = makeEpoch();
-    request.options.engineKind = EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = correctionFlags;
-    request.options.enableAtmosphericRefraction =
-        hasCorrectionFlag(correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction);
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(correctionFlags);
+    request.options.setEnableAtmosphericRefraction(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            correctionFlags, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
+    );
     return request;
 }
 
@@ -201,10 +204,13 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
 [[nodiscard]] EphemerisEngineOptions makeOptions(const EphemerisCorrectionFlags correctionFlags)
 {
     EphemerisEngineOptions options;
-    options.engineKind = EphemerisEngineKind::HighPrecision;
-    options.correctionFlags = correctionFlags;
-    options.enableAtmosphericRefraction =
-        hasCorrectionFlag(correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction);
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(correctionFlags);
+    options.setEnableAtmosphericRefraction(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            correctionFlags, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
+    );
     return options;
 }
 
@@ -226,7 +232,7 @@ public:
             makeRange("de440-modern", "Bundled modern range", 2'300'000.5, 2'700'000.5);
 
         if (epoch.julianDatePart1 < 2'300'000.5 || epoch.julianDatePart1 > 2'700'000.5) {
-            result.metadata.status = EphemerisResultStatus::OutOfRange;
+            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
             result.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
             result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
             result.positionAu = SolarSystemKernelVector{.xAu = 1.0, .yAu = 0.0, .zAu = 0.0};
@@ -254,7 +260,7 @@ public:
             return result;
         }
 
-        result.metadata.status = EphemerisResultStatus::Unsupported;
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported;
         result.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
         return result;
     }
@@ -314,7 +320,7 @@ public:
             .declinationDeg = -2.0 + static_cast<double>(input.bodyIndex),
         };
         result.metadata.dataSourceProvenance = "acceptance counting calculator";
-        result.metadata.appliedCorrections = EphemerisCorrectionFlags::Geometric;
+        result.metadata.appliedCorrections = EphemerisCorrectionFlags::geometric();
         return result;
     }
 
@@ -391,13 +397,15 @@ public:
     ) const override
     {
         ++m_callCount;
-        m_lastRequestedCorrections = input.request.options.correctionFlags;
+        m_lastRequestedCorrections = input.request.options.correctionFlags();
         m_sawTopocentricState =
             input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared;
 
         HighPrecisionCalculatorResult result = calculatorResult;
-        result.metadata.appliedCorrections |= input.request.options.correctionFlags;
-        if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax)) {
+        result.metadata.appliedCorrections |= input.request.options.correctionFlags();
+        if (skygate::ephemeris::EphemerisCorrectionFlags::has(
+                input.request.options.correctionFlags(), EphemerisCorrectionFlags::diurnalParallax()
+            )) {
             result.horizontal = core::HorizontalCoordinate{.altitudeDeg = 42.0, .azimuthDeg = 128.0};
         }
         return result;
@@ -420,7 +428,7 @@ public:
 
 private:
     mutable int m_callCount = 0;
-    mutable EphemerisCorrectionFlags m_lastRequestedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    mutable EphemerisCorrectionFlags m_lastRequestedCorrections = EphemerisCorrectionFlags::noCorrections();
     mutable bool m_sawTopocentricState = false;
 };
 
@@ -430,7 +438,7 @@ public:
     {
         HighPrecisionCalculatorResult result;
         result.equatorial = core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
-        result.metadata.status = EphemerisResultStatus::OutOfRange;
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
         result.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
         result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
         result.metadata.dataSourceProvenance = "missing DE441 long-range kernel; bundled modern fallback";
@@ -473,20 +481,21 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     const std::array bodies{makeMarsBody()};
 
     EphemerisEngineFactoryRequest simpleRequest;
-    simpleRequest.engineKind = EphemerisEngineKind::Simple;
+    simpleRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     simpleRequest.catalogBodies = bodies;
-    simpleRequest.options.engineKind = EphemerisEngineKind::Simple;
+    simpleRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
     const EphemerisEngineFactoryResult simpleResult = skygate::ephemeris::EphemerisEngineFactory::create(simpleRequest);
     QVERIFY(simpleResult.isSuccess());
     QVERIFY(simpleResult.engine != nullptr);
     QCOMPARE(
-        static_cast<std::uint8_t>(simpleResult.engine->kind()), static_cast<std::uint8_t>(EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(simpleResult.engine->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
 
     EphemerisEngineFactoryRequest strictRequest;
-    strictRequest.engineKind = EphemerisEngineKind::HighPrecision;
+    strictRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     strictRequest.catalogBodies = bodies;
-    strictRequest.options = makeOptions(EphemerisCorrectionFlags::ApparentTopocentric);
+    strictRequest.options = makeOptions(EphemerisCorrectionFlags::apparentTopocentric());
     strictRequest.fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
     QVERIFY(strictResult.isFailure());
@@ -503,7 +512,8 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     QVERIFY(fallbackResult.usedSimpleEngineFallback());
     QVERIFY(fallbackResult.engine != nullptr);
     QCOMPARE(
-        static_cast<std::uint8_t>(fallbackResult.engine->kind()), static_cast<std::uint8_t>(EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(fallbackResult.engine->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
     QVERIFY(fallbackResult.hasDiagnostics());
     QVERIFY(!fallbackResult.hasErrors());
@@ -518,24 +528,32 @@ void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSuppor
     dependencies.dataSetInfo = makeDataSetInfo(false);
 
     const HighPrecisionEphemerisEngine engine =
-        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::LightTime), dependencies);
+        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::lightTime()), dependencies);
 
-    const auto geometricState = engine.computeBodyState(makeRequest(EphemerisCorrectionFlags::Geometric), "mars");
+    const auto geometricState = engine.computeBodyState(makeRequest(EphemerisCorrectionFlags::geometric()), "mars");
     QVERIFY(geometricState.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(geometricState->metadata.status),
-        static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
     QCOMPARE(geometricState->metadata.dataSourceProvenance, std::string{"CALCEPH acceptance kernel"});
 
-    const auto lightTimeState = engine.computeBodyState(makeRequest(EphemerisCorrectionFlags::LightTime), "mars");
+    const auto lightTimeState = engine.computeBodyState(makeRequest(EphemerisCorrectionFlags::lightTime()), "mars");
     QVERIFY(lightTimeState.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(lightTimeState->metadata.status),
-        static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(hasCorrectionFlag(lightTimeState->metadata.requestedCorrections, EphemerisCorrectionFlags::LightTime));
-    QVERIFY(hasCorrectionFlag(lightTimeState->metadata.appliedCorrections, EphemerisCorrectionFlags::LightTime));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            lightTimeState->metadata.requestedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            lightTimeState->metadata.appliedCorrections, EphemerisCorrectionFlags::lightTime()
+        )
+    );
     QVERIFY(
         !nearlyEqual(geometricState->equatorial.rightAscensionHours, lightTimeState->equatorial.rightAscensionHours)
     );
@@ -566,32 +584,34 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
     dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
     dependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine engine =
-        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), dependencies);
+        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), dependencies);
 
     AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
     epoch.timeScale = TimeScale::Tdb;
-    const auto state = engine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::Geometric, epoch), "mars");
+    const auto state =
+        engine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::geometric(), epoch), "mars");
 
     QVERIFY(state.has_value());
     QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(state->metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"NAIF DE405s acceptance fixture"});
     QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
     QCOMPARE(
         static_cast<std::uint32_t>(state->metadata.requestedCorrections),
-        static_cast<std::uint32_t>(EphemerisCorrectionFlags::Geometric)
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::geometric())
     );
 }
 
 void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAndTopocentricRequests()
 {
     const std::array matrix{
-        EphemerisCorrectionFlags::Geometric,
-        EphemerisCorrectionFlags::Astrometric,
-        EphemerisCorrectionFlags::Apparent,
-        EphemerisCorrectionFlags::ApparentTopocentric,
+        EphemerisCorrectionFlags::geometric(),
+        EphemerisCorrectionFlags::astrometric(),
+        EphemerisCorrectionFlags::apparent(),
+        EphemerisCorrectionFlags::apparentTopocentric(),
     };
 
     for (const EphemerisCorrectionFlags correctionFlags : matrix) {
@@ -618,7 +638,7 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
             == static_cast<std::uint32_t>(correctionFlags)
         );
 
-        if (correctionFlags == EphemerisCorrectionFlags::Geometric) {
+        if (correctionFlags == EphemerisCorrectionFlags::geometric()) {
             QCOMPARE(apparentPlaceCalculator->callCount(), 0);
         } else {
             QCOMPARE(apparentPlaceCalculator->callCount(), 1);
@@ -628,7 +648,7 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
             );
         }
 
-        if (correctionFlags == EphemerisCorrectionFlags::ApparentTopocentric) {
+        if (correctionFlags == EphemerisCorrectionFlags::apparentTopocentric()) {
             QVERIFY(apparentPlaceCalculator->sawTopocentricState());
             QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
             QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
@@ -643,15 +663,16 @@ void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallba
     dependencies.dataSetInfo = makeDataSetInfo(false);
 
     const HighPrecisionEphemerisEngine engine =
-        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), dependencies);
+        makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), dependencies);
 
-    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Geometric);
+    EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::geometric());
     request.epoch = makeEpoch(-1'000'000.5);
 
     const auto state = engine.computeBodyState(request, "mars");
     QVERIFY(state.has_value());
     QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+        static_cast<std::uint8_t>(state->metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
     QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
     QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
@@ -685,7 +706,7 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
         std::make_shared<SolarSystemStateCalculator>(bundledKernelProvider);
     bundledDependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine bundledEngine = makeHighPrecisionEngine(
-        {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), bundledDependencies
+        {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), bundledDependencies
     );
 
     QVERIFY(bundledKernelProvider->isReady());
@@ -705,7 +726,7 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
         std::make_shared<SolarSystemStateCalculator>(longRangeKernelProvider);
     longRangeDependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine longRangeEngine = makeHighPrecisionEngine(
-        {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::Geometric), longRangeDependencies
+        {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), longRangeDependencies
     );
 
     QVERIFY(longRangeKernelProvider->isReady());
@@ -718,15 +739,20 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
     QCOMPARE(longRangeEngine.dataSetInfo().id, std::string{"acceptance-with-de441"});
     QCOMPARE(longRangeEngine.supportedDateRanges().size(), std::size_t{2});
     QCOMPARE(longRangeEngine.supportedDateRanges()[1].id, std::string{"de441-long-range"});
-    QVERIFY(longRangeEngine.capabilities().supportsExtendedHistoricalRange);
+    QVERIFY(
+        skygate::ephemeris::EphemerisCapabilities::has(
+            longRangeEngine.capabilities(), skygate::ephemeris::EphemerisCapabilities::extendedHistoricalRange()
+        )
+    );
 
     AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
     epoch.timeScale = TimeScale::Tdb;
     const auto state =
-        longRangeEngine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::Geometric, epoch), "mars");
+        longRangeEngine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::geometric(), epoch), "mars");
     QVERIFY(state.has_value());
     QCOMPARE(
-        static_cast<std::uint8_t>(state->metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(state->metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
 }
 
@@ -757,11 +783,11 @@ void EphemerisAcceptanceMatrixTests::fullFrameComputationCacheAvoidsPerObjectRec
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(
         {makeMarsBody(), makeJupiterBody(), makeUnsupportedBody()},
-        makeOptions(EphemerisCorrectionFlags::Geometric),
+        makeOptions(EphemerisCorrectionFlags::geometric()),
         dependencies
     );
 
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::Geometric);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::geometric());
     const SkySnapshot firstSnapshot = engine.compute(request);
     QCOMPARE(firstSnapshot.states.size(), std::size_t{3});
     QCOMPARE(calculator->callCount(), 2);
@@ -771,7 +797,7 @@ void EphemerisAcceptanceMatrixTests::fullFrameComputationCacheAvoidsPerObjectRec
     QCOMPARE(calculator->callCount(), 2);
 
     EphemerisRequest changedOptionsRequest = request;
-    changedOptionsRequest.options.correctionFlags = EphemerisCorrectionFlags::LightTime;
+    changedOptionsRequest.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
     const SkySnapshot changedOptionsSnapshot = engine.compute(changedOptionsRequest);
     QCOMPARE(changedOptionsSnapshot.states.size(), std::size_t{3});
     QCOMPARE(calculator->callCount(), 4);

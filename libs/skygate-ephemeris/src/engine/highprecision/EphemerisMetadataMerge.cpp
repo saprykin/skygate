@@ -9,22 +9,23 @@ void mergeStatus(
     const EphemerisMetadataStatusMergePolicy policy
 ) noexcept
 {
-    if (source.status == EphemerisResultStatus::Failed) {
-        target.status = EphemerisResultStatus::Failed;
+    if (source.status == EphemerisEngineQueryStatus::Type::Failed) {
+        target.status = EphemerisEngineQueryStatus::Type::Failed;
         return;
     }
     if (policy == EphemerisMetadataStatusMergePolicy::FullResultStatus
-        && source.status == EphemerisResultStatus::OutOfRange) {
-        target.status = EphemerisResultStatus::OutOfRange;
+        && source.status == EphemerisEngineQueryStatus::Type::OutOfRange) {
+        target.status = EphemerisEngineQueryStatus::Type::OutOfRange;
         return;
     }
     if (policy == EphemerisMetadataStatusMergePolicy::FullResultStatus
-        && source.status == EphemerisResultStatus::Unsupported) {
-        target.status = EphemerisResultStatus::Unsupported;
+        && source.status == EphemerisEngineQueryStatus::Type::Unsupported) {
+        target.status = EphemerisEngineQueryStatus::Type::Unsupported;
         return;
     }
-    if (source.status == EphemerisResultStatus::Degraded && target.status == EphemerisResultStatus::Valid) {
-        target.status = EphemerisResultStatus::Degraded;
+    if (source.status == EphemerisEngineQueryStatus::Type::Degraded
+        && target.status == EphemerisEngineQueryStatus::Type::Valid) {
+        target.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
 }
 
@@ -56,8 +57,8 @@ void EphemerisMetadataMerger::markCorrectionUnavailable(
     EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags unavailableCorrection
 ) noexcept
 {
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
     metadata.addUnavailableCorrection(unavailableCorrection);
 }
@@ -70,15 +71,16 @@ void EphemerisMetadataMerger::mergeTimeScale(
 {
     if (conversion.status == TimeScaleConversionStatus::Failed) {
         if (failurePolicy == EphemerisMetadataFailurePolicy::MarkFailed) {
-            metadata.status = EphemerisResultStatus::Failed;
-        } else if (metadata.status == EphemerisResultStatus::Valid) {
-            metadata.status = EphemerisResultStatus::Degraded;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+        } else if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+            metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
         }
         metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
         return;
     }
-    if (conversion.status == TimeScaleConversionStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (conversion.status == TimeScaleConversionStatus::Degraded
+        && metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
         metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
     }
 }
@@ -88,12 +90,13 @@ void EphemerisMetadataMerger::mergeEarthOrientation(
 ) noexcept
 {
     if (sample.status == EarthOrientationSampleStatus::Failed) {
-        metadata.status = EphemerisResultStatus::Failed;
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
         return;
     }
-    if (sample.status == EarthOrientationSampleStatus::Degraded && metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (sample.status == EarthOrientationSampleStatus::Degraded
+        && metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
         metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
     }
     if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {

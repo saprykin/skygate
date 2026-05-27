@@ -1,9 +1,8 @@
 #include "SkySceneFramePipeline.hpp"
-
-#include <QtTest/QtTest>
-
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
+
+#include <QtTest/QtTest>
 
 #include <cmath>
 #include <limits>
@@ -25,10 +24,12 @@ public:
         ++m_requestComputeCount;
         return makeSnapshot(
             request.context,
-            request.options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+            request.options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
                 ? m_highPrecisionAltitudeDeg
                 : m_simpleAltitudeDeg,
-            hasCorrectionFlag(request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime)
+            skygate::ephemeris::EphemerisCorrectionFlags::has(
+                request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+            )
                 ? m_lightTimeAzimuthDeg
                 : m_baseAzimuthDeg
         );
@@ -189,8 +190,8 @@ void SkySceneFramePipelineTests::requestBasedSnapshotsUseSelectedEngineOptions()
 
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     input.ephemerisRequest = request;
 
     auto result = pipeline.rebuild(input, 1000.0, 800.0);
@@ -200,8 +201,8 @@ void SkySceneFramePipelineTests::requestBasedSnapshotsUseSelectedEngineOptions()
     QCOMPARE(result->snapshot->states.front().horizontal.altitudeDeg, 45.0);
     QCOMPARE(result->snapshot->states.front().horizontal.azimuthDeg, 180.0);
 
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     input.ephemerisEngine = &highPrecisionEngine;
     input.ephemerisRequest = request;
 
@@ -222,8 +223,8 @@ void SkySceneFramePipelineTests::requestOptionChangesOnSameEngineRecomputeSnapsh
 
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     input.ephemerisRequest = request;
 
     const auto first = pipeline.rebuild(input, 1000.0, 800.0);
@@ -236,8 +237,8 @@ void SkySceneFramePipelineTests::requestOptionChangesOnSameEngineRecomputeSnapsh
     const double firstX = first->frame->points.front().x;
     const double firstY = first->frame->points.front().y;
 
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     input.ephemerisRequest = request;
 
     const auto second = pipeline.rebuild(input, 1000.0, 800.0);
@@ -261,9 +262,9 @@ void SkySceneFramePipelineTests::highPrecisionRevisionChangesRecomputeSnapshot()
 
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     input.ephemerisRequest = request;
-    input.engineKind = request.options.engineKind;
+    input.engineKind = request.options.engineKind();
     input.engineOptionsRevision = 1U;
     input.ephemerisDataRevision = 1U;
     input.earthOrientationDataRevision = 1U;
@@ -298,9 +299,9 @@ void SkySceneFramePipelineTests::highPrecisionRevisionChangesRecomputeSnapshot()
     QCOMPARE(result->snapshotGeneration, 5U);
     QCOMPARE(engine.requestComputeCount(), 5);
 
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
     input.ephemerisRequest = request;
-    input.engineKind = request.options.engineKind;
+    input.engineKind = request.options.engineKind();
     result = pipeline.rebuild(input, 1000.0, 800.0);
     QVERIFY(result.has_value());
     QCOMPARE(result->snapshotGeneration, 6U);
@@ -315,10 +316,10 @@ void SkySceneFramePipelineTests::astronomicalEpochSubsecondChangesRecomputeSnaps
 
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.epoch = {.julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25};
     input.ephemerisRequest = request;
-    input.engineKind = request.options.engineKind;
+    input.engineKind = request.options.engineKind();
 
     auto result = pipeline.rebuild(input, 1000.0, 800.0);
     QVERIFY(result.has_value());

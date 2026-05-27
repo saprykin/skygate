@@ -1,5 +1,10 @@
 #pragma once
 
+#include "EphemerisCapabilities.hpp"
+#include "EphemerisCorrectionFlags.hpp"
+#include "EphemerisEngineKind.hpp"
+#include "EphemerisEngineOptions.hpp"
+#include "EphemerisEngineQueryStatus.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "HorizontalCoordinate.hpp"
 #include "SkyContext.hpp"
@@ -19,92 +24,6 @@
 
 namespace skygate::ephemeris {
 
-enum class EphemerisEngineKind : std::uint8_t {
-    Simple,
-    HighPrecision
-};
-
-enum class EphemerisCorrectionFlags : std::uint32_t {
-    NoCorrections = 0U,
-    Geometric = 0U,
-    LightTime = 1U << 0U,
-    StellarAberration = 1U << 1U,
-    GravitationalLightDeflection = 1U << 2U,
-    AnnualParallax = 1U << 3U,
-    DiurnalParallax = 1U << 4U,
-    PrecessionNutation = 1U << 5U,
-    EarthOrientation = 1U << 6U,
-    AtmosphericRefraction = 1U << 7U,
-    ProperMotion = 1U << 8U,
-    RadialVelocity = 1U << 9U,
-    StellarParallax = 1U << 10U,
-    Astrometric =
-        (1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U),
-    Apparent =
-        ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
-         | (1U << 6U)),
-    Topocentric =
-        ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
-         | (1U << 6U) | (1U << 4U)),
-    ApparentTopocentric =
-        ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
-         | (1U << 6U) | (1U << 4U) | (1U << 7U))
-};
-
-[[nodiscard]] constexpr EphemerisCorrectionFlags
-operator|(const EphemerisCorrectionFlags lhs, const EphemerisCorrectionFlags rhs) noexcept
-{
-    return static_cast<EphemerisCorrectionFlags>(static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs));
-}
-
-[[nodiscard]] constexpr EphemerisCorrectionFlags
-operator&(const EphemerisCorrectionFlags lhs, const EphemerisCorrectionFlags rhs) noexcept
-{
-    return static_cast<EphemerisCorrectionFlags>(static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs));
-}
-
-constexpr EphemerisCorrectionFlags&
-operator|=(EphemerisCorrectionFlags& lhs, const EphemerisCorrectionFlags rhs) noexcept
-{
-    lhs = lhs | rhs;
-    return lhs;
-}
-
-[[nodiscard]] constexpr bool
-hasCorrectionFlag(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags flag) noexcept
-{
-    return (flags & flag) != EphemerisCorrectionFlags::NoCorrections;
-}
-
-[[nodiscard]] constexpr EphemerisCorrectionFlags
-withoutCorrectionFlags(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
-{
-    return static_cast<EphemerisCorrectionFlags>(
-        static_cast<std::uint32_t>(flags) & ~static_cast<std::uint32_t>(removedFlags)
-    );
-}
-
-struct EphemerisEngineOptions {
-    EphemerisEngineKind engineKind = EphemerisEngineKind::Simple;
-    EphemerisCorrectionFlags correctionFlags = EphemerisCorrectionFlags::ApparentTopocentric;
-    bool fallbackToSimpleEngine = true;
-    bool enableAtmosphericRefraction = true;
-    double atmosphericPressureHpa = 1013.25;
-    double atmosphericTemperatureC = 10.0;
-    double relativeHumidity = 0.0;
-    double observingWavelengthMicrometers = 0.55;
-};
-
-struct EphemerisCapabilities {
-    EphemerisEngineKind engineKind = EphemerisEngineKind::Simple;
-    EphemerisCorrectionFlags supportedCorrections = EphemerisCorrectionFlags::NoCorrections;
-    bool supportsSolarSystemBodies = false;
-    bool supportsCatalogStars = false;
-    bool supportsTopocentricPositions = false;
-    bool supportsAtmosphericRefraction = false;
-    bool supportsExtendedHistoricalRange = false;
-};
-
 struct EphemerisDateRange {
     std::string id;
     std::string displayName;
@@ -119,37 +38,6 @@ struct EphemerisDataSetInfo {
     std::string provenance;
     std::vector<EphemerisDateRange> dateRanges;
 };
-
-enum class EphemerisResultStatus : std::uint8_t {
-    Valid,
-    Degraded,
-    Unsupported,
-    OutOfRange,
-    Failed
-};
-
-[[nodiscard]] constexpr std::size_t ephemerisResultStatusCount() noexcept
-{
-    return 5U;
-}
-
-[[nodiscard]] constexpr std::string_view displayName(const EphemerisResultStatus status) noexcept
-{
-    switch (status) {
-    case EphemerisResultStatus::Valid:
-        return "valid";
-    case EphemerisResultStatus::Degraded:
-        return "degraded";
-    case EphemerisResultStatus::Unsupported:
-        return "unsupported";
-    case EphemerisResultStatus::OutOfRange:
-        return "out of range";
-    case EphemerisResultStatus::Failed:
-        return "failed";
-    }
-
-    return {};
-}
 
 enum class EphemerisWarningCode : std::uint8_t {
     AccuracyDegraded,
@@ -208,19 +96,20 @@ struct EphemerisWarning {
 }
 
 struct EphemerisResultMetadata {
-    EphemerisResultStatus status = EphemerisResultStatus::Valid;
+    EphemerisEngineQueryStatus::Type status = EphemerisEngineQueryStatus::Type::Valid;
     std::uint32_t warningCodeMask = 0U;
     std::string dataSourceProvenance;
     std::optional<EphemerisDateRange> effectiveDataValidityRange;
     std::optional<double> estimatedAngularUncertaintyArcsec;
-    EphemerisCorrectionFlags requestedCorrections = EphemerisCorrectionFlags::NoCorrections;
-    EphemerisCorrectionFlags appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
-    EphemerisCorrectionFlags skippedCorrections = EphemerisCorrectionFlags::NoCorrections;
-    EphemerisCorrectionFlags unavailableCorrections = EphemerisCorrectionFlags::NoCorrections;
+    EphemerisCorrectionFlags requestedCorrections = EphemerisCorrectionFlags::noCorrections();
+    EphemerisCorrectionFlags appliedCorrections = EphemerisCorrectionFlags::noCorrections();
+    EphemerisCorrectionFlags skippedCorrections = EphemerisCorrectionFlags::noCorrections();
+    EphemerisCorrectionFlags unavailableCorrections = EphemerisCorrectionFlags::noCorrections();
 
     [[nodiscard]] bool isSuccessful() const noexcept
     {
-        return status == EphemerisResultStatus::Valid || status == EphemerisResultStatus::Degraded;
+        return status == EphemerisEngineQueryStatus::Type::Valid
+               || status == EphemerisEngineQueryStatus::Type::Degraded;
     }
 
     void addWarning(const EphemerisWarningCode code) noexcept
@@ -238,7 +127,8 @@ struct EphemerisResultMetadata {
     {
         requestedCorrections = requested;
         const EphemerisCorrectionFlags accountedCorrections = appliedCorrections | unavailableCorrections;
-        skippedCorrections = withoutCorrectionFlags(requestedCorrections, accountedCorrections);
+        skippedCorrections =
+            skygate::ephemeris::EphemerisCorrectionFlags::without(requestedCorrections, accountedCorrections);
     }
 
     [[nodiscard]] bool hasWarning(const EphemerisWarningCode code) const noexcept
@@ -262,23 +152,6 @@ struct EphemerisRequest {
     core::SkyContext context;
     EphemerisEngineOptions options;
 };
-
-[[nodiscard]] constexpr std::size_t ephemerisEngineKindCount() noexcept
-{
-    return 2U;
-}
-
-[[nodiscard]] constexpr std::string_view displayName(const EphemerisEngineKind kind) noexcept
-{
-    switch (kind) {
-    case EphemerisEngineKind::Simple:
-        return "Simple";
-    case EphemerisEngineKind::HighPrecision:
-        return "High precision";
-    }
-
-    return {};
-}
 
 enum class CelestialBodyType : std::uint8_t {
     Star,

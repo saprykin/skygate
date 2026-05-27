@@ -1,13 +1,11 @@
+#include "SkyLogging.hpp"
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkySettingsValueCodecs.hpp"
-
-#include <QtTest/QtTest>
-
-#include "SkyLogging.hpp"
 
 #include <QRegularExpression>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QtTest/QtTest>
 
 #include <cstdint>
 
@@ -109,8 +107,8 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     snapshot.logToTerminal = false;
     snapshot.logToFile = true;
     snapshot.logFilePath = "/tmp/skygate.log";
-    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent;
+    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::apparent();
     snapshot.ephemeris.correctionPresetId = "apparent";
     snapshot.ephemeris.fallbackToSimpleEngine = false;
     snapshot.ephemeris.refractionEnabled = false;
@@ -133,7 +131,7 @@ void SkySettingsCodecsTests::splitAndMergeStateSnapshotPreservesTypedDomains()
     QCOMPARE(domains.logging.logToFile, true);
     QCOMPARE(
         static_cast<std::uint8_t>(domains.ephemeris.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QCOMPARE(domains.ephemeris.preferredDataProfileId, QString("long-range"));
     QCOMPARE(domains.ephemerisSettingsPresent, true);
@@ -181,7 +179,7 @@ void SkySettingsCodecsTests::stateSnapshotLoadRequiresVersionAndAppliesDefaults(
     QCOMPARE(loaded->logFilePath, skygate::ui::SkyLogging::defaultLogFilePath());
     QCOMPARE(
         static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
     QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
     QCOMPARE(loaded->ephemerisSettingsPresent, false);

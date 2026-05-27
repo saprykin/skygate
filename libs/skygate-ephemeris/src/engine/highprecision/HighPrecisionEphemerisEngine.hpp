@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/highprecision/HighPrecisionTypes.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -26,7 +26,7 @@ public:
     HighPrecisionEphemerisEngine(HighPrecisionEphemerisEngine&&) noexcept;
     HighPrecisionEphemerisEngine& operator=(HighPrecisionEphemerisEngine&&) noexcept;
 
-    [[nodiscard]] EphemerisEngineKind kind() const noexcept override;
+    [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;
     [[nodiscard]] std::string_view name() const noexcept override;
     [[nodiscard]] EphemerisCapabilities capabilities() const noexcept override;
     [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept override;

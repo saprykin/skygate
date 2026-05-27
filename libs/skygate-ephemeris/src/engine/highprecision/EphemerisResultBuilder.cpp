@@ -30,8 +30,8 @@ void applyDefaultProvenance(EphemerisResultMetadata& metadata)
 
 void normalizeStatusForAvailableFallback(EphemerisResultMetadata& metadata)
 {
-    if (metadata.status == EphemerisResultStatus::OutOfRange) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (metadata.status == EphemerisEngineQueryStatus::Type::OutOfRange) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
         metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
     }
 }
@@ -39,19 +39,21 @@ void normalizeStatusForAvailableFallback(EphemerisResultMetadata& metadata)
 void normalizeMissingCoordinateStatus(EphemerisResultMetadata& metadata)
 {
     switch (metadata.status) {
-    case EphemerisResultStatus::Valid:
-    case EphemerisResultStatus::Degraded:
-        metadata.status = EphemerisResultStatus::Failed;
+    case EphemerisEngineQueryStatus::Type::Valid:
+    case EphemerisEngineQueryStatus::Type::Degraded:
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         break;
-    case EphemerisResultStatus::OutOfRange:
+    case EphemerisEngineQueryStatus::Type::OutOfRange:
         metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
         break;
-    case EphemerisResultStatus::Unsupported:
+    case EphemerisEngineQueryStatus::Type::Unsupported:
         metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
         break;
-    case EphemerisResultStatus::Failed:
+    case EphemerisEngineQueryStatus::Type::Failed:
         metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        break;
+    case EphemerisEngineQueryStatus::Type::Last:
         break;
     }
 }
@@ -65,7 +67,7 @@ CelestialBodyState EphemerisResultBuilder::buildState(
     CelestialBodyState state = makeEmptyState(input.bodyIndex);
     state.metadata = calculatorResult.metadata;
     applyDefaultProvenance(state.metadata);
-    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags);
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
 
     if (calculatorResult.equatorial.has_value()) {
         state.equatorial = *calculatorResult.equatorial;
@@ -84,20 +86,20 @@ CelestialBodyState EphemerisResultBuilder::buildState(
 CelestialBodyState EphemerisResultBuilder::buildUnsupportedState(const HighPrecisionComputationInput& input) const
 {
     CelestialBodyState state = makeEmptyState(input.bodyIndex);
-    state.metadata.status = EphemerisResultStatus::Unsupported;
+    state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
     state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
     state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
-    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags);
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
     return state;
 }
 
 CelestialBodyState EphemerisResultBuilder::buildFailedState(const HighPrecisionComputationInput& input) const
 {
     CelestialBodyState state = makeEmptyState(input.bodyIndex);
-    state.metadata.status = EphemerisResultStatus::Failed;
+    state.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
     state.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
     state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
-    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags);
+    state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
     return state;
 }
 

@@ -5,21 +5,23 @@ namespace skygate::ephemeris {
 EphemerisRequest
 ephemerisRequestForPrecisionPolicy(EphemerisRequest request, const EphemerisPrecisionPolicy policy) noexcept
 {
-    if (request.options.engineKind != EphemerisEngineKind::HighPrecision) {
+    if (request.options.engineKind() != EphemerisEngineKind::Type::HighPrecision) {
         return request;
     }
 
     switch (policy) {
     case EphemerisPrecisionPolicy::SceneRender:
     case EphemerisPrecisionPolicy::Trail: {
-        EphemerisCorrectionFlags corrections = EphemerisCorrectionFlags::PrecessionNutation
-                                               | EphemerisCorrectionFlags::EarthOrientation
-                                               | EphemerisCorrectionFlags::DiurnalParallax;
-        if (request.options.enableAtmosphericRefraction
-            && hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction)) {
-            corrections |= EphemerisCorrectionFlags::AtmosphericRefraction;
+        EphemerisCorrectionFlags corrections = EphemerisCorrectionFlags::precessionNutation()
+                                               | EphemerisCorrectionFlags::earthOrientation()
+                                               | EphemerisCorrectionFlags::diurnalParallax();
+        if (request.options.enableAtmosphericRefraction()
+            && skygate::ephemeris::EphemerisCorrectionFlags::has(
+                request.options.correctionFlags(), EphemerisCorrectionFlags::atmosphericRefraction()
+            )) {
+            corrections |= EphemerisCorrectionFlags::atmosphericRefraction();
         }
-        request.options.correctionFlags = corrections;
+        request.options.setCorrectionFlags(corrections);
         return request;
     }
     case EphemerisPrecisionPolicy::SelectionDetail:

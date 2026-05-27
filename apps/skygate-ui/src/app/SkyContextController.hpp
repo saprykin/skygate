@@ -12,10 +12,8 @@
 #include "SystemTimeSource.hpp"
 #include "Types.hpp"
 #include "UtcTimePoint.hpp"
-
 #include "catalog/IStarCatalog.hpp"
 #include "engine/IEphemerisEngine.hpp"
-
 #include "catalog/constellation/ConstellationData.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 
@@ -474,7 +472,7 @@ private:
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind activeEphemerisEngineKind() const noexcept;
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type activeEphemerisEngineKind() const noexcept;
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
     void setEphemerisDataOperationStatusText(QString statusText);
@@ -501,7 +499,8 @@ private:
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
-    skygate::ephemeris::EphemerisEngineKind m_ephemerisEngineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    skygate::ephemeris::EphemerisEngineKind::Type m_ephemerisEngineKind =
+        skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
     std::uint64_t m_ephemerisOptionsRevision = 1U;
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;

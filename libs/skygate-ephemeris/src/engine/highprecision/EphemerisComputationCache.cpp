@@ -1,5 +1,4 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
-
 #include "UtcTimeCodec.hpp"
 
 #include <array>
@@ -56,14 +55,14 @@ void mixEpoch(std::uint64_t& hash, const AstronomicalEpoch& epoch) noexcept
 
 void mixOptions(std::uint64_t& hash, const EphemerisEngineOptions& options) noexcept
 {
-    mixUint64(hash, static_cast<std::uint64_t>(options.engineKind));
-    mixUint64(hash, static_cast<std::uint32_t>(options.correctionFlags));
-    mixBool(hash, options.fallbackToSimpleEngine);
-    mixBool(hash, options.enableAtmosphericRefraction);
-    mixDouble(hash, options.atmosphericPressureHpa);
-    mixDouble(hash, options.atmosphericTemperatureC);
-    mixDouble(hash, options.relativeHumidity);
-    mixDouble(hash, options.observingWavelengthMicrometers);
+    mixUint64(hash, static_cast<std::uint64_t>(options.engineKind()));
+    mixUint64(hash, static_cast<std::uint32_t>(options.correctionFlags()));
+    mixBool(hash, options.fallbackToSimpleEngine());
+    mixBool(hash, options.enableAtmosphericRefraction());
+    mixDouble(hash, options.atmosphericPressureHpa());
+    mixDouble(hash, options.atmosphericTemperatureC());
+    mixDouble(hash, options.relativeHumidity());
+    mixDouble(hash, options.observingWavelengthMicrometers());
 }
 
 void mixObserver(std::uint64_t& hash, const core::GeoLocation& observer) noexcept
@@ -217,13 +216,13 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
 
 [[nodiscard]] bool sameOptions(const EphemerisEngineOptions& lhs, const EphemerisEngineOptions& rhs) noexcept
 {
-    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
-           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
-           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
-           && sameDoubleIdentity(lhs.atmosphericPressureHpa, rhs.atmosphericPressureHpa)
-           && sameDoubleIdentity(lhs.atmosphericTemperatureC, rhs.atmosphericTemperatureC)
-           && sameDoubleIdentity(lhs.relativeHumidity, rhs.relativeHumidity)
-           && sameDoubleIdentity(lhs.observingWavelengthMicrometers, rhs.observingWavelengthMicrometers);
+    return lhs.engineKind() == rhs.engineKind() && lhs.correctionFlags() == rhs.correctionFlags()
+           && lhs.fallbackToSimpleEngine() == rhs.fallbackToSimpleEngine()
+           && lhs.enableAtmosphericRefraction() == rhs.enableAtmosphericRefraction()
+           && sameDoubleIdentity(lhs.atmosphericPressureHpa(), rhs.atmosphericPressureHpa())
+           && sameDoubleIdentity(lhs.atmosphericTemperatureC(), rhs.atmosphericTemperatureC())
+           && sameDoubleIdentity(lhs.relativeHumidity(), rhs.relativeHumidity())
+           && sameDoubleIdentity(lhs.observingWavelengthMicrometers(), rhs.observingWavelengthMicrometers());
 }
 
 [[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept

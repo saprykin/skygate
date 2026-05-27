@@ -1,11 +1,9 @@
 #include "SkySceneModel.hpp"
-
 #include "SkyContextController.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
 #include "Types.hpp"
-
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "time/CalendarTime.hpp"
@@ -402,7 +400,7 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
                 .skyContext = ephemerisRequestContext.request.context,
                 .ephemerisRequest = renderEphemerisRequest,
                 .catalogRevision = ephemerisRequestContext.catalogRevision,
-                .engineKind = ephemerisRequestContext.request.options.engineKind,
+                .engineKind = ephemerisRequestContext.request.options.engineKind(),
                 .engineOptionsRevision = ephemerisRequestContext.engineOptionsRevision,
                 .ephemerisDataRevision = ephemerisRequestContext.ephemerisDataRevision,
                 .earthOrientationDataRevision = ephemerisRequestContext.earthOrientationDataRevision,

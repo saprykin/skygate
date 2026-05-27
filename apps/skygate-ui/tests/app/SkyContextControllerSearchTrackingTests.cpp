@@ -13,13 +13,13 @@ public:
     explicit RequestSensitiveEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
         : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
     {
-        m_options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        m_options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        m_options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+        m_options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     }
 
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] std::string_view name() const noexcept override
@@ -29,11 +29,11 @@ public:
 
     [[nodiscard]] skygate::ephemeris::EphemerisCapabilities capabilities() const noexcept override
     {
-        skygate::ephemeris::EphemerisCapabilities capabilities;
-        capabilities.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        capabilities.supportedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
-        capabilities.supportsCatalogStars = true;
-        capabilities.supportsTopocentricPositions = true;
+        skygate::ephemeris::EphemerisCapabilities capabilities =
+            skygate::ephemeris::EphemerisCapabilities::noCapabilities();
+
+        capabilities = capabilities | skygate::ephemeris::EphemerisCapabilities::catalogStars();
+        capabilities = capabilities | skygate::ephemeris::EphemerisCapabilities::topocentricPositions();
         return capabilities;
     }
 
@@ -59,9 +59,9 @@ public:
     {
         ++m_requestComputeCount;
         const bool highPrecisionRequest =
-            request.options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        const bool lightTimeRequest = skygate::ephemeris::hasCorrectionFlag(
-            request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+            request.options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+        const bool lightTimeRequest = skygate::ephemeris::EphemerisCorrectionFlags::has(
+            request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
         );
         return makeSnapshot(request.context, highPrecisionRequest && lightTimeRequest ? 64.0 : 41.0, 222.0);
     }
@@ -156,16 +156,16 @@ public:
     {
     }
 
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         skygate::ephemeris::EphemerisEngineOptions options;
-        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+        options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
         return options;
     }
 

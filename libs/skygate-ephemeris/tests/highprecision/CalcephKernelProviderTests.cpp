@@ -513,7 +513,7 @@ void CalcephKernelProviderTests::rejectsNonTdbEpochsBeforeCallingKernel()
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Failed)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
     QVERIFY(result.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::TimeScaleDataUnavailable));
     QVERIFY(!result.positionAu.has_value());
@@ -540,7 +540,7 @@ void CalcephKernelProviderTests::returnsOwnedMetadataForGeometricStates()
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
     QVERIFY(result.positionAu.has_value());
     QVERIFY(result.metadata.dataSourceProvenance == std::string{"Installed test data"});

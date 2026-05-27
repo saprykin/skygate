@@ -1,8 +1,8 @@
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "SettingsTestFixture.hpp"
-#include "SkySettingsStore.hpp"
 #include "SkyLogging.hpp"
+#include "SkySettingsStore.hpp"
 
 #include <QFile>
 #include <QRegularExpression>
@@ -94,9 +94,9 @@ void SkySettingsStoreTests::savesAndLoadsStateSnapshot()
     savedSnapshot.logToTerminal = false;
     savedSnapshot.logToFile = true;
     savedSnapshot.logFilePath = m_settings.filePath(QStringLiteral("skygate-test.log"));
-    savedSnapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    savedSnapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime
-                                              | skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration;
+    savedSnapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    savedSnapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+                                              | skygate::ephemeris::EphemerisCorrectionFlags::stellarAberration();
     savedSnapshot.ephemeris.correctionPresetId = QStringLiteral("astrometric");
     savedSnapshot.ephemeris.fallbackToSimpleEngine = false;
     savedSnapshot.ephemeris.refractionEnabled = false;

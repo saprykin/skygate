@@ -22,7 +22,7 @@ public:
         EphemerisEngineOptions engineOptions = simpleEphemerisEngineDefaultOptions()
     );
 
-    [[nodiscard]] EphemerisEngineKind kind() const noexcept override;
+    [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;
     [[nodiscard]] std::string_view name() const noexcept override;
     [[nodiscard]] EphemerisCapabilities capabilities() const noexcept override;
     [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept override;

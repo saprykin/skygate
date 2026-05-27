@@ -1,7 +1,7 @@
 #include "engine/simple/SimpleEphemerisEngine.hpp"
+#include "EphemerisRequestFactory.hpp"
 #include "StringUtilities.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
-#include "EphemerisRequestFactory.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -22,22 +22,22 @@ constexpr std::string_view kSimpleDataSetVersion = "built-in";
 
 [[nodiscard]] bool requestsUnsupportedSimpleOptions(const EphemerisEngineOptions& options) noexcept
 {
-    return options.correctionFlags != EphemerisCorrectionFlags::NoCorrections;
+    return options.correctionFlags() != EphemerisCorrectionFlags::noCorrections();
 }
 
 void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngineOptions& options) noexcept
 {
-    state.metadata.finalizeCorrectionTracking(options.correctionFlags);
+    state.metadata.finalizeCorrectionTracking(options.correctionFlags());
     if (!requestsUnsupportedSimpleOptions(options)) {
         return;
     }
 
-    if (state.metadata.status == EphemerisResultStatus::Valid) {
-        state.metadata.status = EphemerisResultStatus::Degraded;
+    if (state.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        state.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
-    state.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
-    state.metadata.addUnavailableCorrection(options.correctionFlags);
-    state.metadata.finalizeCorrectionTracking(options.correctionFlags);
+    state.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
+    state.metadata.addUnavailableCorrection(options.correctionFlags());
+    state.metadata.finalizeCorrectionTracking(options.correctionFlags());
 }
 
 void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
@@ -55,7 +55,7 @@ void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOp
 simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions) noexcept
 {
     EphemerisEngineOptions engineOptions = requestOptions;
-    engineOptions.engineKind = EphemerisEngineKind::Simple;
+    engineOptions.setEngineKind(EphemerisEngineKind::Type::Simple);
     return engineOptions;
 }
 
@@ -69,9 +69,9 @@ SimpleEphemerisEngine::SimpleEphemerisEngine(
 {
 }
 
-EphemerisEngineKind SimpleEphemerisEngine::kind() const noexcept
+EphemerisEngineKind::Type SimpleEphemerisEngine::kind() const noexcept
 {
-    return EphemerisEngineKind::Simple;
+    return EphemerisEngineKind::Type::Simple;
 }
 
 std::string_view SimpleEphemerisEngine::name() const noexcept
@@ -81,15 +81,8 @@ std::string_view SimpleEphemerisEngine::name() const noexcept
 
 EphemerisCapabilities SimpleEphemerisEngine::capabilities() const noexcept
 {
-    EphemerisCapabilities engineCapabilities;
-    engineCapabilities.engineKind = EphemerisEngineKind::Simple;
-    engineCapabilities.supportedCorrections = EphemerisCorrectionFlags::NoCorrections;
-    engineCapabilities.supportsSolarSystemBodies = true;
-    engineCapabilities.supportsCatalogStars = true;
-    engineCapabilities.supportsTopocentricPositions = true;
-    engineCapabilities.supportsAtmosphericRefraction = false;
-    engineCapabilities.supportsExtendedHistoricalRange = false;
-    return engineCapabilities;
+    return EphemerisCapabilities::solarSystemBodies() | EphemerisCapabilities::catalogStars()
+           | EphemerisCapabilities::topocentricPositions();
 }
 
 std::span<const EphemerisDateRange> SimpleEphemerisEngine::supportedDateRanges() const noexcept
@@ -222,11 +215,11 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
             state.horizontal =
                 EquatorialToHorizontalCalculator::compute(*equatorial, context.observer, context.utcTime);
         } else {
-            state.metadata.status = EphemerisResultStatus::Degraded;
+            state.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
             state.metadata.addWarning(EphemerisWarningCode::MissingObserver);
         }
     } else {
-        state.metadata.status = EphemerisResultStatus::Unsupported;
+        state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
         state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
     }
 
@@ -263,9 +256,9 @@ SimpleEphemerisEngine::computeEquatorial(const CelestialBody& body, const core::
 EphemerisEngineOptions simpleEphemerisEngineDefaultOptions() noexcept
 {
     EphemerisEngineOptions engineOptions;
-    engineOptions.engineKind = EphemerisEngineKind::Simple;
-    engineOptions.correctionFlags = EphemerisCorrectionFlags::NoCorrections;
-    engineOptions.enableAtmosphericRefraction = false;
+    engineOptions.setEngineKind(EphemerisEngineKind::Type::Simple);
+    engineOptions.setCorrectionFlags(EphemerisCorrectionFlags::noCorrections());
+    engineOptions.setEnableAtmosphericRefraction(false);
     return engineOptions;
 }
 

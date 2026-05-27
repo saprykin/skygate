@@ -153,33 +153,33 @@ QString correctionName(const ephemeris::EphemerisCorrectionFlags correction)
     using ephemeris::EphemerisCorrectionFlags;
 
     switch (correction) {
-    case EphemerisCorrectionFlags::LightTime:
+    case EphemerisCorrectionFlags::Type::LightTime:
         return "light-time";
-    case EphemerisCorrectionFlags::StellarAberration:
+    case EphemerisCorrectionFlags::Type::StellarAberration:
         return "stellar aberration";
-    case EphemerisCorrectionFlags::GravitationalLightDeflection:
+    case EphemerisCorrectionFlags::Type::GravitationalLightDeflection:
         return "gravitational deflection";
-    case EphemerisCorrectionFlags::AnnualParallax:
+    case EphemerisCorrectionFlags::Type::AnnualParallax:
         return "annual parallax";
-    case EphemerisCorrectionFlags::DiurnalParallax:
+    case EphemerisCorrectionFlags::Type::DiurnalParallax:
         return "diurnal parallax";
-    case EphemerisCorrectionFlags::PrecessionNutation:
+    case EphemerisCorrectionFlags::Type::PrecessionNutation:
         return "precession/nutation";
-    case EphemerisCorrectionFlags::EarthOrientation:
+    case EphemerisCorrectionFlags::Type::EarthOrientation:
         return "Earth orientation";
-    case EphemerisCorrectionFlags::AtmosphericRefraction:
+    case EphemerisCorrectionFlags::Type::AtmosphericRefraction:
         return "atmospheric refraction";
-    case EphemerisCorrectionFlags::ProperMotion:
+    case EphemerisCorrectionFlags::Type::ProperMotion:
         return "proper motion";
-    case EphemerisCorrectionFlags::RadialVelocity:
+    case EphemerisCorrectionFlags::Type::RadialVelocity:
         return "radial velocity";
-    case EphemerisCorrectionFlags::StellarParallax:
+    case EphemerisCorrectionFlags::Type::StellarParallax:
         return "stellar parallax";
-    case EphemerisCorrectionFlags::NoCorrections:
-    case EphemerisCorrectionFlags::Astrometric:
-    case EphemerisCorrectionFlags::Apparent:
-    case EphemerisCorrectionFlags::Topocentric:
-    case EphemerisCorrectionFlags::ApparentTopocentric:
+    case EphemerisCorrectionFlags::Type::NoCorrections:
+    case EphemerisCorrectionFlags::Type::Astrometric:
+    case EphemerisCorrectionFlags::Type::Apparent:
+    case EphemerisCorrectionFlags::Type::Topocentric:
+    case EphemerisCorrectionFlags::Type::ApparentTopocentric:
         return {};
     }
 
@@ -191,22 +191,22 @@ QStringList correctionNames(const ephemeris::EphemerisCorrectionFlags flags)
     using ephemeris::EphemerisCorrectionFlags;
 
     constexpr std::array corrections{
-        EphemerisCorrectionFlags::LightTime,
-        EphemerisCorrectionFlags::StellarAberration,
-        EphemerisCorrectionFlags::GravitationalLightDeflection,
-        EphemerisCorrectionFlags::AnnualParallax,
-        EphemerisCorrectionFlags::DiurnalParallax,
-        EphemerisCorrectionFlags::PrecessionNutation,
-        EphemerisCorrectionFlags::EarthOrientation,
-        EphemerisCorrectionFlags::AtmosphericRefraction,
-        EphemerisCorrectionFlags::ProperMotion,
-        EphemerisCorrectionFlags::RadialVelocity,
-        EphemerisCorrectionFlags::StellarParallax,
+        EphemerisCorrectionFlags::lightTime(),
+        EphemerisCorrectionFlags::stellarAberration(),
+        EphemerisCorrectionFlags::gravitationalLightDeflection(),
+        EphemerisCorrectionFlags::annualParallax(),
+        EphemerisCorrectionFlags::diurnalParallax(),
+        EphemerisCorrectionFlags::precessionNutation(),
+        EphemerisCorrectionFlags::earthOrientation(),
+        EphemerisCorrectionFlags::atmosphericRefraction(),
+        EphemerisCorrectionFlags::properMotion(),
+        EphemerisCorrectionFlags::radialVelocity(),
+        EphemerisCorrectionFlags::stellarParallax(),
     };
 
     QStringList names;
     for (const EphemerisCorrectionFlags correction : corrections) {
-        if (hasCorrectionFlag(flags, correction)) {
+        if (skygate::ephemeris::EphemerisCorrectionFlags::has(flags, correction)) {
             names.push_back(correctionName(correction));
         }
     }
@@ -311,9 +311,9 @@ QString aliasesText(const ephemeris::CelestialBody& body)
     return aliases.join(", ");
 }
 
-QString formatEphemerisStatus(const ephemeris::EphemerisResultStatus status)
+QString formatEphemerisStatus(const ephemeris::EphemerisEngineQueryStatus::Type status)
 {
-    return titleCaseAscii(ephemeris::displayName(status));
+    return titleCaseAscii(ephemeris::EphemerisEngineQueryStatus::displayName(status));
 }
 
 QString formatEphemerisWarnings(const ephemeris::EphemerisResultMetadata& metadata)

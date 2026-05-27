@@ -1,14 +1,13 @@
-#include <QtTest>
-
+#include "ITimeSource.hpp"
 #include "SkyContextController.hpp"
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySceneModelTestSupport.hpp"
-
-#include "ITimeSource.hpp"
 #include "UtcTimeCodec.hpp"
+
+#include <QtTest>
 
 #include <chrono>
 #include <cmath>
@@ -59,14 +58,14 @@ public:
 
 [[nodiscard]] bool hasLightTime(const skygate::ephemeris::EphemerisEngineOptions& options) noexcept
 {
-    return skygate::ephemeris::hasCorrectionFlag(
-        options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+    return skygate::ephemeris::EphemerisCorrectionFlags::has(
+        options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
     );
 }
 
 [[nodiscard]] int optionTier(const skygate::ephemeris::EphemerisEngineOptions& options) noexcept
 {
-    if (options.engineKind == skygate::ephemeris::EphemerisEngineKind::Simple) {
+    if (options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::Simple) {
         return 0;
     }
     return hasLightTime(options) ? 2 : 1;
@@ -115,17 +114,17 @@ public:
 }
 
 [[nodiscard]] skygate::ephemeris::EphemerisCorrectionFlags sceneRenderCorrectionFlagsFor(
-    const skygate::ephemeris::EphemerisEngineKind kind,
+    const skygate::ephemeris::EphemerisEngineKind::Type kind,
     const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
 ) noexcept
 {
-    if (kind != skygate::ephemeris::EphemerisEngineKind::HighPrecision) {
+    if (kind != skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision) {
         return correctionFlags;
     }
 
-    return skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation
-           | skygate::ephemeris::EphemerisCorrectionFlags::EarthOrientation
-           | skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax;
+    return skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
+           | skygate::ephemeris::EphemerisCorrectionFlags::earthOrientation()
+           | skygate::ephemeris::EphemerisCorrectionFlags::diurnalParallax();
 }
 
 [[nodiscard]] const SkyRenderPoint*
@@ -182,18 +181,18 @@ class MatrixEphemerisEngine final : public skygate::ephemeris::IEphemerisEngine 
 public:
     MatrixEphemerisEngine(
         std::vector<skygate::ephemeris::CelestialBody> bodies,
-        const skygate::ephemeris::EphemerisEngineKind kind,
+        const skygate::ephemeris::EphemerisEngineKind::Type kind,
         const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
     )
         : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
     {
-        m_options.engineKind = kind;
-        m_options.correctionFlags = correctionFlags;
+        m_options.setEngineKind(kind);
+        m_options.setCorrectionFlags(correctionFlags);
     }
 
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return m_options.engineKind;
+        return m_options.engineKind();
     }
 
     [[nodiscard]] std::string_view name() const noexcept override
@@ -203,11 +202,11 @@ public:
 
     [[nodiscard]] skygate::ephemeris::EphemerisCapabilities capabilities() const noexcept override
     {
-        skygate::ephemeris::EphemerisCapabilities capabilities;
-        capabilities.engineKind = m_options.engineKind;
-        capabilities.supportedCorrections = m_options.correctionFlags;
-        capabilities.supportsCatalogStars = true;
-        capabilities.supportsTopocentricPositions = true;
+        skygate::ephemeris::EphemerisCapabilities capabilities =
+            skygate::ephemeris::EphemerisCapabilities::noCapabilities();
+
+        capabilities = capabilities | skygate::ephemeris::EphemerisCapabilities::catalogStars();
+        capabilities = capabilities | skygate::ephemeris::EphemerisCapabilities::topocentricPositions();
         return capabilities;
     }
 
@@ -384,7 +383,7 @@ struct MatrixHarness final {
 };
 
 [[nodiscard]] MatrixHarness createMatrixHarness(
-    const skygate::ephemeris::EphemerisEngineKind kind,
+    const skygate::ephemeris::EphemerisEngineKind::Type kind,
     const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags,
     const skygate::core::ITimeSource* timeSource = nullptr
 )
@@ -425,12 +424,12 @@ struct MatrixHarness final {
 
 void verifyRequestOptions(
     const skygate::ephemeris::EphemerisEngineOptions& actual,
-    const skygate::ephemeris::EphemerisEngineKind kind,
+    const skygate::ephemeris::EphemerisEngineKind::Type kind,
     const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
 )
 {
-    QCOMPARE(static_cast<std::uint8_t>(actual.engineKind), static_cast<std::uint8_t>(kind));
-    QCOMPARE(static_cast<std::uint32_t>(actual.correctionFlags), static_cast<std::uint32_t>(correctionFlags));
+    QCOMPARE(static_cast<std::uint8_t>(actual.engineKind()), static_cast<std::uint8_t>(kind));
+    QCOMPARE(static_cast<std::uint32_t>(actual.correctionFlags()), static_cast<std::uint32_t>(correctionFlags));
 }
 
 struct MatrixConsumerObservations final {
@@ -453,7 +452,7 @@ struct MatrixConsumerObservations final {
 
 void verifyConsumerMatrix(
     MatrixConsumerObservations& observations,
-    const skygate::ephemeris::EphemerisEngineKind kind,
+    const skygate::ephemeris::EphemerisEngineKind::Type kind,
     const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
 )
 {
@@ -466,9 +465,9 @@ void verifyConsumerMatrix(
     const auto initialRequestContext = controller.ephemerisRequestContext();
     verifyRequestOptions(initialRequestContext.request.options, kind, correctionFlags);
     auto renderRequest = initialRequestContext.request;
-    renderRequest.options.correctionFlags = sceneRenderCorrectionFlagsFor(kind, correctionFlags);
+    renderRequest.options.setCorrectionFlags(sceneRenderCorrectionFlagsFor(kind, correctionFlags));
     QVERIFY(engine.lastRequestOptions().has_value());
-    verifyRequestOptions(*engine.lastRequestOptions(), kind, renderRequest.options.correctionFlags);
+    verifyRequestOptions(*engine.lastRequestOptions(), kind, renderRequest.options.correctionFlags());
 
     const auto expectedFocusHorizontal = engine.expectedTargetHorizontal(initialRequestContext.request);
 
@@ -574,14 +573,14 @@ void SkyContextControllerSelectedEngineMatrixTests::consumersSwitchTogetherForSi
     MatrixConsumerObservations simpleObservations;
     verifyConsumerMatrix(
         simpleObservations,
-        skygate::ephemeris::EphemerisEngineKind::Simple,
-        skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections
+        skygate::ephemeris::EphemerisEngineKind::Type::Simple,
+        skygate::ephemeris::EphemerisCorrectionFlags::noCorrections()
     );
     MatrixConsumerObservations highPrecisionObservations;
     verifyConsumerMatrix(
         highPrecisionObservations,
-        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
     );
 
     QVERIFY(pointsDiffer(simpleObservations.targetRenderPoint, highPrecisionObservations.targetRenderPoint));
@@ -611,11 +610,12 @@ void SkyContextControllerSelectedEngineMatrixTests::consumersSwitchTogetherForSi
 void SkyContextControllerSelectedEngineMatrixTests::optionChangesAffectPositionsWithoutChangingCatalogSearchResults()
 {
     MatrixHarness astrometricHarness = createMatrixHarness(
-        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-        skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections
+        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::noCorrections()
     );
     MatrixHarness apparentHarness = createMatrixHarness(
-        skygate::ephemeris::EphemerisEngineKind::HighPrecision, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
     );
 
     auto* astrometricSearchModel =
@@ -644,14 +644,14 @@ void SkyContextControllerSelectedEngineMatrixTests::optionChangesAffectPositions
     MatrixConsumerObservations astrometricObservations;
     verifyConsumerMatrix(
         astrometricObservations,
-        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-        skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections
+        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::noCorrections()
     );
     MatrixConsumerObservations apparentObservations;
     verifyConsumerMatrix(
         apparentObservations,
-        skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,
+        skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
     );
 
     QVERIFY(pointsEqual(astrometricObservations.targetRenderPoint, apparentObservations.targetRenderPoint));

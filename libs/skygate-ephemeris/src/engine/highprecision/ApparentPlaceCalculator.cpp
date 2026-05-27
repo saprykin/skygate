@@ -1,11 +1,10 @@
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
-
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/FrameTransformer.hpp"
-#include "engine/highprecision/ObserverGeodesy.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
+#include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ObserverGeodesy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -42,13 +41,13 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
 
 [[nodiscard]] ApparentPlaceRequestMode requestModeForCorrections(const EphemerisCorrectionFlags flags) noexcept
 {
-    if (flags == EphemerisCorrectionFlags::NoCorrections) {
+    if (flags == EphemerisCorrectionFlags::noCorrections()) {
         return ApparentPlaceRequestMode::Geometric;
     }
-    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::DiurnalParallax)) {
+    if (skygate::ephemeris::EphemerisCorrectionFlags::has(flags, EphemerisCorrectionFlags::diurnalParallax())) {
         return ApparentPlaceRequestMode::Topocentric;
     }
-    if (hasCorrectionFlag(flags, EphemerisCorrectionFlags::PrecessionNutation)) {
+    if (skygate::ephemeris::EphemerisCorrectionFlags::has(flags, EphemerisCorrectionFlags::precessionNutation())) {
         return ApparentPlaceRequestMode::Apparent;
     }
 
@@ -176,8 +175,8 @@ void markMissingBatchTransformResult(
     EphemerisResultMetadata& metadata, const EphemerisCorrectionFlags unavailableCorrection
 ) noexcept
 {
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
     metadata.addWarning(EphemerisWarningCode::ComputationFailed);
     metadata.addUnavailableCorrection(unavailableCorrection);
@@ -216,7 +215,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     if (!calculatorResult.equatorial.has_value() || !isFiniteEquatorial(*calculatorResult.equatorial)) {
         return result;
     }
-    const EphemerisCorrectionFlags requestedCorrections = input.request.options.correctionFlags;
+    const EphemerisCorrectionFlags requestedCorrections = input.request.options.correctionFlags();
     const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
     const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
     if (targetFrame == CelestialReferenceFrame::Itrs) {
@@ -228,9 +227,9 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
                 return result;
             }
         } else if (m_timeScaleService == nullptr) {
-            result.metadata.status = EphemerisResultStatus::Failed;
+            result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-            result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::EarthOrientation);
+            result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::earthOrientation());
             return result;
         }
 
@@ -241,7 +240,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         );
         if (!utcConversion.isSuccess()) {
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::EarthOrientation
+                result.metadata, EphemerisCorrectionFlags::earthOrientation()
             );
             return result;
         }
@@ -258,7 +257,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         EphemerisMetadataMerger::mergeEarthOrientation(result.metadata, earthOrientationSample);
         if (!earthOrientationSample.isSuccess()) {
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::EarthOrientation
+                result.metadata, EphemerisCorrectionFlags::earthOrientation()
             );
             return result;
         }
@@ -276,7 +275,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 
         if (!transformResult.vector.has_value()) {
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::PrecessionNutation
+                result.metadata, EphemerisCorrectionFlags::precessionNutation()
             );
             return result;
         }
@@ -285,8 +284,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         EphemerisMetadataMerger::markCorrectionUnavailable(
             result.metadata,
             targetFrame == CelestialReferenceFrame::Itrs
-                ? (EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation)
-                : EphemerisCorrectionFlags::PrecessionNutation
+                ? (EphemerisCorrectionFlags::precessionNutation() | EphemerisCorrectionFlags::earthOrientation())
+                : EphemerisCorrectionFlags::precessionNutation()
         );
         return result;
     }
@@ -296,17 +295,17 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
                 ? celestialVectorFromSolarSystemVector(input.preparedRequestState->observerItrsPositionAu)
                 : celestialVectorFromSolarSystemVector(observerItrsPositionAu(input.request.context.observer));
         if (!observerPosition.has_value()) {
-            if (result.metadata.status == EphemerisResultStatus::Valid) {
-                result.metadata.status = EphemerisResultStatus::Degraded;
+            if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+                result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
             }
             result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
-            result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::DiurnalParallax);
+            result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::diurnalParallax());
         } else if (calculatorResult.observerRelativePositionAu.has_value()) {
             outputVector = subtractVector(outputVector, *observerPosition);
-            result.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+            result.metadata.appliedCorrections |= EphemerisCorrectionFlags::diurnalParallax();
         } else {
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::DiurnalParallax
+                result.metadata, EphemerisCorrectionFlags::diurnalParallax()
             );
         }
     }
@@ -324,12 +323,14 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
             equatorialVector = *gcrsTransformResult.vector;
         } else {
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::EarthOrientation
+                result.metadata, EphemerisCorrectionFlags::earthOrientation()
             );
         }
 
         if (equatorialVector.has_value()
-            && hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::PrecessionNutation)) {
+            && skygate::ephemeris::EphemerisCorrectionFlags::has(
+                requestedCorrections, EphemerisCorrectionFlags::precessionNutation()
+            )) {
             CelestialFrameTransformResult apparentEquatorialTransformResult =
                 m_frameTransformer->transformCelestialVector({
                     .sourceFrame = CelestialReferenceFrame::Gcrs,
@@ -344,7 +345,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
                 equatorialVector = *apparentEquatorialTransformResult.vector;
             } else {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::PrecessionNutation
+                    result.metadata, EphemerisCorrectionFlags::precessionNutation()
                 );
             }
         }
@@ -354,7 +355,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         equatorial.has_value()) {
         result.equatorial = *equatorial;
     } else {
-        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         return result;
     }
@@ -365,18 +366,20 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
             horizontal.has_value()) {
             result.horizontal = *horizontal;
         } else {
-            if (result.metadata.status == EphemerisResultStatus::Valid) {
-                result.metadata.status = EphemerisResultStatus::Degraded;
+            if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+                result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
             }
             result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
         }
     }
 
-    if (input.request.options.enableAtmosphericRefraction
-        && hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction)) {
+    if (input.request.options.enableAtmosphericRefraction()
+        && skygate::ephemeris::EphemerisCorrectionFlags::has(
+            requestedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        )) {
         if (m_atmosphericRefractionCalculator == nullptr) {
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::AtmosphericRefraction
+                result.metadata, EphemerisCorrectionFlags::atmosphericRefraction()
             );
         } else {
             result = m_atmosphericRefractionCalculator->apply(input, result);
@@ -393,13 +396,15 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
     std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState
 ) const
 {
-    const EphemerisCorrectionFlags requestedCorrections = request.options.correctionFlags;
+    const EphemerisCorrectionFlags requestedCorrections = request.options.correctionFlags();
     const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
     const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
     const bool isTopocentric = targetFrame == CelestialReferenceFrame::Itrs;
     const bool requestsAtmosphericRefraction =
-        request.options.enableAtmosphericRefraction
-        && hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction);
+        request.options.enableAtmosphericRefraction()
+        && skygate::ephemeris::EphemerisCorrectionFlags::has(
+            requestedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        );
 
     EphemerisResultMetadata topocentricMetadata;
     bool topocentricRequestWideStateAvailable = true;
@@ -408,9 +413,9 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             topocentricMetadata = preparedRequestState->topocentricMetadata;
             topocentricRequestWideStateAvailable = preparedRequestState->topocentricStateAvailable;
         } else if (m_timeScaleService == nullptr) {
-            topocentricMetadata.status = EphemerisResultStatus::Failed;
+            topocentricMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
             topocentricMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
-            topocentricMetadata.addUnavailableCorrection(EphemerisCorrectionFlags::EarthOrientation);
+            topocentricMetadata.addUnavailableCorrection(EphemerisCorrectionFlags::earthOrientation());
             topocentricRequestWideStateAvailable = false;
         } else {
             const TimeScaleConversionResult utcConversion = m_timeScaleService->convert(request.epoch, TimeScale::Utc);
@@ -419,7 +424,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             );
             if (!utcConversion.isSuccess()) {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
+                    topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
                 );
                 topocentricRequestWideStateAvailable = false;
             } else {
@@ -435,7 +440,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                 EphemerisMetadataMerger::mergeEarthOrientation(topocentricMetadata, earthOrientationSample);
                 if (!earthOrientationSample.isSuccess()) {
                     EphemerisMetadataMerger::markCorrectionUnavailable(
-                        topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
+                        topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
                     );
                     topocentricRequestWideStateAvailable = false;
                 }
@@ -515,8 +520,8 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             EphemerisMetadataMerger::markCorrectionUnavailable(
                 results.back().result.metadata,
                 isTopocentric
-                    ? (EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation)
-                    : EphemerisCorrectionFlags::PrecessionNutation
+                    ? (EphemerisCorrectionFlags::precessionNutation() | EphemerisCorrectionFlags::earthOrientation())
+                    : EphemerisCorrectionFlags::precessionNutation()
             );
         }
     }
@@ -539,7 +544,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             EphemerisMetadataMerger::merge(result.metadata, transformResult.metadata, kTransformMetadataMergeOptions);
             if (!transformResult.vector.has_value()) {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::PrecessionNutation
+                    result.metadata, EphemerisCorrectionFlags::precessionNutation()
                 );
                 continue;
             }
@@ -547,8 +552,9 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             outputVectors[resultIndex] = *transformResult.vector;
         }
         const EphemerisCorrectionFlags unavailableCorrection =
-            isTopocentric ? (EphemerisCorrectionFlags::PrecessionNutation | EphemerisCorrectionFlags::EarthOrientation)
-                          : EphemerisCorrectionFlags::PrecessionNutation;
+            isTopocentric
+                ? (EphemerisCorrectionFlags::precessionNutation() | EphemerisCorrectionFlags::earthOrientation())
+                : EphemerisCorrectionFlags::precessionNutation();
         for (std::size_t transformIndex = transformCount; transformIndex < transformResultIndices.size();
              ++transformIndex) {
             HighPrecisionCalculatorResult& result = results[transformResultIndices[transformIndex]].result;
@@ -569,17 +575,17 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
             HighPrecisionCalculatorResult& result = results[resultIndex].result;
             if (!observerPosition.has_value()) {
-                if (result.metadata.status == EphemerisResultStatus::Valid) {
-                    result.metadata.status = EphemerisResultStatus::Degraded;
+                if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+                    result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
                 }
                 result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
-                result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::DiurnalParallax);
+                result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::diurnalParallax());
             } else if (hasObserverRelativePosition[resultIndex]) {
                 outputVectors[resultIndex] = subtractVector(*outputVectors[resultIndex], *observerPosition);
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::diurnalParallax();
             } else {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::DiurnalParallax
+                    result.metadata, EphemerisCorrectionFlags::diurnalParallax()
                 );
             }
 
@@ -589,8 +595,8 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                 horizontal.has_value()) {
                 result.horizontal = *horizontal;
             } else {
-                if (result.metadata.status == EphemerisResultStatus::Valid) {
-                    result.metadata.status = EphemerisResultStatus::Degraded;
+                if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+                    result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
                 }
                 result.metadata.addWarning(EphemerisWarningCode::MissingObserver);
             }
@@ -629,18 +635,20 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                     equatorialVectors[resultIndex] = *transformResult.vector;
                 } else {
                     EphemerisMetadataMerger::markCorrectionUnavailable(
-                        result.metadata, EphemerisCorrectionFlags::EarthOrientation
+                        result.metadata, EphemerisCorrectionFlags::earthOrientation()
                     );
                 }
             }
             for (std::size_t transformIndex = transformCount; transformIndex < gcrsResultIndices.size();
                  ++transformIndex) {
                 HighPrecisionCalculatorResult& result = results[gcrsResultIndices[transformIndex]].result;
-                markMissingBatchTransformResult(result.metadata, EphemerisCorrectionFlags::EarthOrientation);
+                markMissingBatchTransformResult(result.metadata, EphemerisCorrectionFlags::earthOrientation());
             }
         }
 
-        if (hasCorrectionFlag(requestedCorrections, EphemerisCorrectionFlags::PrecessionNutation)) {
+        if (skygate::ephemeris::EphemerisCorrectionFlags::has(
+                requestedCorrections, EphemerisCorrectionFlags::precessionNutation()
+            )) {
             std::vector<CelestialFrameVector> apparentInputs;
             std::vector<std::size_t> apparentResultIndices;
             apparentInputs.reserve(results.size());
@@ -675,14 +683,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                         equatorialVectors[resultIndex] = *transformResult.vector;
                     } else {
                         EphemerisMetadataMerger::markCorrectionUnavailable(
-                            result.metadata, EphemerisCorrectionFlags::PrecessionNutation
+                            result.metadata, EphemerisCorrectionFlags::precessionNutation()
                         );
                     }
                 }
                 for (std::size_t transformIndex = transformCount; transformIndex < apparentResultIndices.size();
                      ++transformIndex) {
                     HighPrecisionCalculatorResult& result = results[apparentResultIndices[transformIndex]].result;
-                    markMissingBatchTransformResult(result.metadata, EphemerisCorrectionFlags::PrecessionNutation);
+                    markMissingBatchTransformResult(result.metadata, EphemerisCorrectionFlags::precessionNutation());
                 }
             }
         }
@@ -699,14 +707,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             equatorial.has_value()) {
             result.equatorial = *equatorial;
         } else {
-            result.metadata.status = EphemerisResultStatus::Failed;
+            result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         }
 
         if (requestsAtmosphericRefraction) {
             if (m_atmosphericRefractionCalculator == nullptr) {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::AtmosphericRefraction
+                    result.metadata, EphemerisCorrectionFlags::atmosphericRefraction()
                 );
             } else {
                 const HighPrecisionComputationInput input{

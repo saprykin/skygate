@@ -1,12 +1,10 @@
 #include "SkyContextController.hpp"
-
 #include "SkyCatalogManager.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
-
 #include "UtcTimeCodec.hpp"
 
 #include <QDateTime>
@@ -49,13 +47,13 @@ bool SkyContextController::saveSettings() const
     snapshot.logFilePath = logFilePath();
     snapshot.ephemeris = m_ephemerisUserSettings;
     snapshot.ephemeris.engineKind = m_ephemerisEngineKind;
-    snapshot.ephemeris.correctionFlags = m_ephemerisEngineOptions.correctionFlags;
-    snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine;
-    snapshot.ephemeris.refractionEnabled = m_ephemerisEngineOptions.enableAtmosphericRefraction;
-    snapshot.ephemeris.atmosphericPressureHpa = m_ephemerisEngineOptions.atmosphericPressureHpa;
-    snapshot.ephemeris.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC;
-    snapshot.ephemeris.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity;
-    snapshot.ephemeris.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers;
+    snapshot.ephemeris.correctionFlags = m_ephemerisEngineOptions.correctionFlags();
+    snapshot.ephemeris.fallbackToSimpleEngine = m_ephemerisEngineOptions.fallbackToSimpleEngine();
+    snapshot.ephemeris.refractionEnabled = m_ephemerisEngineOptions.enableAtmosphericRefraction();
+    snapshot.ephemeris.atmosphericPressureHpa = m_ephemerisEngineOptions.atmosphericPressureHpa();
+    snapshot.ephemeris.atmosphericTemperatureC = m_ephemerisEngineOptions.atmosphericTemperatureC();
+    snapshot.ephemeris.relativeHumidity = m_ephemerisEngineOptions.relativeHumidity();
+    snapshot.ephemeris.observingWavelengthMicrometers = m_ephemerisEngineOptions.observingWavelengthMicrometers();
     snapshot.ephemerisSettingsPresent = true;
     return m_settingsStore->saveState(snapshot);
 }

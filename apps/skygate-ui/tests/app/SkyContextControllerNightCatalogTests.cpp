@@ -15,13 +15,13 @@ public:
     explicit RequestSensitiveNightEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
         : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
     {
-        m_options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        m_options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        m_options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+        m_options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     }
 
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] std::string_view name() const noexcept override
@@ -144,9 +144,9 @@ private:
 
     [[nodiscard]] bool isSelectedNightRequest(const skygate::ephemeris::EphemerisRequest& request) const noexcept
     {
-        return request.options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
-               && skygate::ephemeris::hasCorrectionFlag(
-                   request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        return request.options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
+               && skygate::ephemeris::EphemerisCorrectionFlags::has(
+                   request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
                );
     }
 
@@ -194,8 +194,8 @@ std::unique_ptr<SkyContextController> createRequestSensitiveNightController(Requ
         std::move(starCatalog), std::move(ephemerisEngine), initializationOptions, nullptr
     );
     skygate::ephemeris::EphemerisEngineOptions contextAdapterOptions;
-    contextAdapterOptions.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
-    contextAdapterOptions.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    contextAdapterOptions.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
+    contextAdapterOptions.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     engine->setOptions(contextAdapterOptions);
     configureFocusTestContext(*controller);
     return controller;
@@ -284,12 +284,12 @@ void SkyContextControllerNightCatalogTests::nightConditionsUseSelectedEngineRequ
     const auto lastRequestOptions = engine->lastRequestOptions();
     QVERIFY(lastRequestOptions.has_value());
     QCOMPARE(
-        static_cast<std::uint8_t>(lastRequestOptions->engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(lastRequestOptions->engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QVERIFY(
-        skygate::ephemeris::hasCorrectionFlag(
-            lastRequestOptions->correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            lastRequestOptions->correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
         )
     );
 }

@@ -6,12 +6,12 @@ class ThrottledLiveTestEngine final : public skygate::ephemeris::IEphemerisEngin
 public:
     ThrottledLiveTestEngine()
     {
-        m_options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        m_options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     }
 
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return m_options.engineKind;
+        return m_options.engineKind();
     }
 
     [[nodiscard]] std::string_view name() const noexcept override
@@ -21,8 +21,9 @@ public:
 
     [[nodiscard]] skygate::ephemeris::EphemerisCapabilities capabilities() const noexcept override
     {
-        skygate::ephemeris::EphemerisCapabilities capabilities;
-        capabilities.engineKind = m_options.engineKind;
+        skygate::ephemeris::EphemerisCapabilities capabilities =
+            skygate::ephemeris::EphemerisCapabilities::noCapabilities();
+
         return capabilities;
     }
 
@@ -376,7 +377,7 @@ void SkyContextControllerTimelineTests::fallbackSimpleEngineLivePlaybackUsesOneS
     QVERIFY(controller->ephemerisEngine() != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
 
     const qint64 startSeconds = controllerUtcTime(*controller).toSecsSinceEpoch();

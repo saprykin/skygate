@@ -1,12 +1,12 @@
 #pragma once
 
+#include "SkyOverlayLayerVisibility.hpp"
+#include "Types.hpp"
+
 #include <QByteArray>
 #include <QSize>
 #include <QString>
 #include <QtGlobal>
-
-#include "SkyOverlayLayerVisibility.hpp"
-#include "Types.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -14,9 +14,10 @@
 class SkySettingsStore final {
 public:
     struct EphemerisUserSettingsSnapshot final {
-        skygate::ephemeris::EphemerisEngineKind engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+        skygate::ephemeris::EphemerisEngineKind::Type engineKind =
+            skygate::ephemeris::EphemerisEngineKind::Type::Simple;
         skygate::ephemeris::EphemerisCorrectionFlags correctionFlags =
-            skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric;
+            skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric();
         QString correctionPresetId = QStringLiteral("apparent-topocentric");
         bool fallbackToSimpleEngine = true;
         bool refractionEnabled = true;

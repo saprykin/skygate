@@ -1,10 +1,9 @@
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
-
 #include "StringUtilities.hpp"
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
+#include "engine/highprecision/ICalcephKernelProvider.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -162,8 +161,8 @@ void markBarycenterFallback(
     if (requestedTargetNaifId == effectiveTargetNaifId) {
         return;
     }
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
     const bool alreadyReported = metadata.hasWarning(EphemerisWarningCode::BarycenterFallback);
     metadata.addWarning(EphemerisWarningCode::BarycenterFallback);
@@ -173,7 +172,7 @@ void markBarycenterFallback(
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult
-makeStatusResult(const EphemerisResultStatus status, const EphemerisWarningCode warningCode)
+makeStatusResult(const EphemerisEngineQueryStatus::Type status, const EphemerisWarningCode warningCode)
 {
     HighPrecisionCalculatorResult result;
     result.metadata.status = status;
@@ -291,7 +290,8 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
     if (preferFallbackTarget && fallbackTargetNaifId.has_value() && *fallbackTargetNaifId != targetNaifId) {
         const SolarSystemKernelStateResult preferredState =
             kernelProvider.computeGeometricState(epoch, *fallbackTargetNaifId, centerNaifId);
-        if (preferredState.positionAu.has_value() || preferredState.metadata.status != EphemerisResultStatus::Failed) {
+        if (preferredState.positionAu.has_value()
+            || preferredState.metadata.status != EphemerisEngineQueryStatus::Type::Failed) {
             return TargetKernelState{
                 .state = preferredState,
                 .targetNaifId = *fallbackTargetNaifId,
@@ -309,7 +309,7 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
         || *fallbackTargetNaifId == targetNaifId) {
         return result;
     }
-    if (result.state.metadata.status != EphemerisResultStatus::Failed) {
+    if (result.state.metadata.status != EphemerisEngineQueryStatus::Type::Failed) {
         return result;
     }
 
@@ -372,13 +372,15 @@ SolarSystemStateCalculator::SolarSystemStateCalculator(
 HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPrecisionComputationInput& input) const
 {
     if (!input.request.epoch.isFinite()) {
-        return makeStatusResult(EphemerisResultStatus::Failed, EphemerisWarningCode::ComputationFailed);
+        return makeStatusResult(EphemerisEngineQueryStatus::Type::Failed, EphemerisWarningCode::ComputationFailed);
     }
     if (input.request.epoch.timeScale != TimeScale::Tdb) {
-        return makeStatusResult(EphemerisResultStatus::Failed, EphemerisWarningCode::TimeScaleDataUnavailable);
+        return makeStatusResult(
+            EphemerisEngineQueryStatus::Type::Failed, EphemerisWarningCode::TimeScaleDataUnavailable
+        );
     }
     if (m_kernelProvider == nullptr) {
-        return makeStatusResult(EphemerisResultStatus::Failed, EphemerisWarningCode::MissingEphemerisData);
+        return makeStatusResult(EphemerisEngineQueryStatus::Type::Failed, EphemerisWarningCode::MissingEphemerisData);
     }
 
     const std::optional<int> targetNaifId = naifIdForBody(input.body);
@@ -386,7 +388,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     const bool preferPlanetarySystemBarycenter =
         shouldPreferPlanetarySystemBarycenter(input.body, m_preferPlanetarySystemBarycenters);
     if (!targetNaifId.has_value() || *targetNaifId == kNaifEarth) {
-        return makeStatusResult(EphemerisResultStatus::Unsupported, EphemerisWarningCode::UnsupportedBody);
+        return makeStatusResult(EphemerisEngineQueryStatus::Type::Unsupported, EphemerisWarningCode::UnsupportedBody);
     }
 
     const TargetKernelState targetKernelResult = computeTargetKernelState(
@@ -401,7 +403,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     const int effectiveTargetNaifId = targetKernelResult.targetNaifId;
     HighPrecisionCalculatorResult result;
     result.metadata = kernelResult.metadata;
-    result.metadata.appliedCorrections = EphemerisCorrectionFlags::Geometric;
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::geometric();
     if (result.metadata.dataSourceProvenance.empty()) {
         result.metadata.dataSourceProvenance = "CALCEPH geometric solar-system state";
     }
@@ -410,8 +412,8 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     );
 
     if (!kernelResult.positionAu.has_value()) {
-        if (result.metadata.status == EphemerisResultStatus::Valid) {
-            result.metadata.status = EphemerisResultStatus::Failed;
+        if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+            result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         }
         return result;
@@ -427,11 +429,13 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
         return *earthBarycentricState;
     };
 
-    if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::LightTime)) {
+    if (skygate::ephemeris::EphemerisCorrectionFlags::has(
+            input.request.options.correctionFlags(), EphemerisCorrectionFlags::lightTime()
+        )) {
         const SolarSystemKernelStateResult& earthState = observerState();
         if (!earthState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
-            EphemerisMetadataMerger::markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::LightTime);
+            EphemerisMetadataMerger::markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::lightTime());
         } else {
             EphemerisMetadataMerger::merge(
                 result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
@@ -471,23 +475,25 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             if (correctedVector.has_value()
                 && vectorDistanceAu(*correctedVector) > std::numeric_limits<double>::min()) {
                 outputVector = *correctedVector;
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::LightTime;
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::lightTime();
             } else {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::LightTime
+                    result.metadata, EphemerisCorrectionFlags::lightTime()
                 );
             }
         }
     }
 
-    if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::GravitationalLightDeflection)
+    if (skygate::ephemeris::EphemerisCorrectionFlags::has(
+            input.request.options.correctionFlags(), EphemerisCorrectionFlags::gravitationalLightDeflection()
+        )
         && effectiveTargetNaifId != kNaifSun) {
         const SolarSystemKernelStateResult sunState =
             m_kernelProvider->computeGeometricState(input.request.epoch, kNaifSun, kNaifEarth);
         if (!sunState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= sunState.metadata.warningCodeMask;
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::GravitationalLightDeflection
+                result.metadata, EphemerisCorrectionFlags::gravitationalLightDeflection()
             );
         } else {
             EphemerisMetadataMerger::merge(
@@ -497,21 +503,23 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                     applySolarGravitationalDeflection(outputVector, *sunState.positionAu);
                 deflectedVector.has_value()) {
                 outputVector = *deflectedVector;
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::GravitationalLightDeflection;
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::gravitationalLightDeflection();
             } else {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::GravitationalLightDeflection
+                    result.metadata, EphemerisCorrectionFlags::gravitationalLightDeflection()
                 );
             }
         }
     }
 
-    if (hasCorrectionFlag(input.request.options.correctionFlags, EphemerisCorrectionFlags::StellarAberration)) {
+    if (skygate::ephemeris::EphemerisCorrectionFlags::has(
+            input.request.options.correctionFlags(), EphemerisCorrectionFlags::stellarAberration()
+        )) {
         const SolarSystemKernelStateResult& earthState = observerState();
         if (!earthState.positionAu.has_value() || !earthState.velocityAuPerDay.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
             EphemerisMetadataMerger::markCorrectionUnavailable(
-                result.metadata, EphemerisCorrectionFlags::StellarAberration
+                result.metadata, EphemerisCorrectionFlags::stellarAberration()
             );
         } else {
             EphemerisMetadataMerger::merge(
@@ -521,10 +529,10 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                     applyStellarAberration(outputVector, *earthState.velocityAuPerDay);
                 aberratedVector.has_value()) {
                 outputVector = *aberratedVector;
-                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::StellarAberration;
+                result.metadata.appliedCorrections |= EphemerisCorrectionFlags::stellarAberration();
             } else {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    result.metadata, EphemerisCorrectionFlags::StellarAberration
+                    result.metadata, EphemerisCorrectionFlags::stellarAberration()
                 );
             }
         }
@@ -533,7 +541,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     result.observerRelativePositionAu = outputVector;
     result.equatorial = equatorialFromVector(outputVector);
     if (!result.equatorial.has_value()) {
-        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
     }
 
