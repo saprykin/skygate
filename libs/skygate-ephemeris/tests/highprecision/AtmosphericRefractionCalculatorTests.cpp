@@ -29,13 +29,13 @@ namespace core = skygate::core;
         .longitudeDeg = -122.4194,
         .elevationMeters = 10.0,
     };
-    request.options.engineKind = EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = EphemerisCorrectionFlags::AtmosphericRefraction;
-    request.options.enableAtmosphericRefraction = true;
-    request.options.atmosphericPressureHpa = 1010.0;
-    request.options.atmosphericTemperatureC = 10.0;
-    request.options.relativeHumidity = 0.5;
-    request.options.observingWavelengthMicrometers = 0.55;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::atmosphericRefraction());
+    request.options.setEnableAtmosphericRefraction(true);
+    request.options.setAtmosphericPressureHpa(1010.0);
+    request.options.setAtmosphericTemperatureC(10.0);
+    request.options.setRelativeHumidity(0.5);
+    request.options.setObservingWavelengthMicrometers(0.55);
     return request;
 }
 
@@ -60,7 +60,7 @@ namespace core = skygate::core;
         .altitudeDeg = altitudeDeg,
         .azimuthDeg = 180.0,
     };
-    result.metadata.status = EphemerisResultStatus::Valid;
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
     result.metadata.dataSourceProvenance = "unit-test apparent place";
     return result;
 }
@@ -70,11 +70,18 @@ void verifyRefractionUnavailable(const HighPrecisionCalculatorResult& result, co
     QVERIFY(result.horizontal.has_value());
     QCOMPARE(result.horizontal->altitudeDeg, expectedAltitudeDeg);
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+    ));
 }
 
 }  // namespace
@@ -105,9 +112,14 @@ void AtmosphericRefractionCalculatorTests::appliesRefractionWhenRequested()
     QVERIFY(result.horizontal->altitudeDeg < 45.03);
     QCOMPARE(result.horizontal->azimuthDeg, 180.0);
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
+    );
     QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 }
 
@@ -115,15 +127,18 @@ void AtmosphericRefractionCalculatorTests::leavesResultUnchangedWhenDisabled()
 {
     const AtmosphericRefractionCalculator calculator;
     EphemerisRequest request = makeRequest();
-    request.options.enableAtmosphericRefraction = false;
+    request.options.setEnableAtmosphericRefraction(false);
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult(20.0));
 
     QVERIFY(result.horizontal.has_value());
     QCOMPARE(result.horizontal->altitudeDeg, 20.0);
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+    ));
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
 }
 
@@ -138,7 +153,8 @@ void AtmosphericRefractionCalculatorTests::reportsMissingHorizontalCoordinates()
 
     QVERIFY(!result.horizontal.has_value());
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Degraded)
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 }
@@ -162,10 +178,10 @@ void AtmosphericRefractionCalculatorTests::reportsInvalidAtmosphereInputs_data()
     QTest::addColumn<double>("wavelengthMicrometers");
 
     const EphemerisRequest validRequest = makeRequest();
-    const double validPressureHpa = validRequest.options.atmosphericPressureHpa;
-    const double validTemperatureC = validRequest.options.atmosphericTemperatureC;
-    const double validRelativeHumidity = validRequest.options.relativeHumidity;
-    const double validWavelengthMicrometers = validRequest.options.observingWavelengthMicrometers;
+    const double validPressureHpa = validRequest.options.atmosphericPressureHpa();
+    const double validTemperatureC = validRequest.options.atmosphericTemperatureC();
+    const double validRelativeHumidity = validRequest.options.relativeHumidity();
+    const double validWavelengthMicrometers = validRequest.options.observingWavelengthMicrometers();
     const double nan = std::numeric_limits<double>::quiet_NaN();
 
     QTest::newRow("negative pressure") << -1.0 << validTemperatureC << validRelativeHumidity
@@ -201,10 +217,10 @@ void AtmosphericRefractionCalculatorTests::reportsInvalidAtmosphereInputs()
     QFETCH(double, relativeHumidity);
     QFETCH(double, wavelengthMicrometers);
 
-    request.options.atmosphericPressureHpa = pressureHpa;
-    request.options.atmosphericTemperatureC = temperatureC;
-    request.options.relativeHumidity = relativeHumidity;
-    request.options.observingWavelengthMicrometers = wavelengthMicrometers;
+    request.options.setAtmosphericPressureHpa(pressureHpa);
+    request.options.setAtmosphericTemperatureC(temperatureC);
+    request.options.setRelativeHumidity(relativeHumidity);
+    request.options.setObservingWavelengthMicrometers(wavelengthMicrometers);
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult(20.0));
 
@@ -221,13 +237,16 @@ void AtmosphericRefractionCalculatorTests::skipsRefractionBelowModelAltitude()
     QVERIFY(result.horizontal.has_value());
     QCOMPARE(result.horizontal->altitudeDeg, -2.0);
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
     QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(
-        !hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AtmosphericRefraction)
-    );
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.unavailableCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+    ));
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+    ));
 }
 
 void AtmosphericRefractionCalculatorTests::appliesRefractionAtModelAltitudeBoundaries()
@@ -240,7 +259,9 @@ void AtmosphericRefractionCalculatorTests::appliesRefractionAtModelAltitudeBound
     QVERIFY(minimumResult.horizontal.has_value());
     QVERIFY(minimumResult.horizontal->altitudeDeg > -1.0);
     QVERIFY(
-        hasCorrectionFlag(minimumResult.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction)
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            minimumResult.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
     );
     QVERIFY(!minimumResult.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 
@@ -248,9 +269,11 @@ void AtmosphericRefractionCalculatorTests::appliesRefractionAtModelAltitudeBound
         calculator.apply(makeInput(request), makeCalculatorResult(89.95));
     QVERIFY(clampedHighResult.horizontal.has_value());
     QVERIFY(clampedHighResult.horizontal->altitudeDeg <= 90.0);
-    QVERIFY(hasCorrectionFlag(
-        clampedHighResult.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction
-    ));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            clampedHighResult.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
+    );
     QVERIFY(!clampedHighResult.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 
     const HighPrecisionCalculatorResult zenithResult = calculator.apply(makeInput(request), makeCalculatorResult(90.0));
@@ -269,9 +292,14 @@ void AtmosphericRefractionCalculatorTests::appliesSmallCorrectionNearZenith()
     QVERIFY(result.horizontal->altitudeDeg <= 90.0);
     QVERIFY(result.horizontal->altitudeDeg < 89.001);
     QCOMPARE(
-        static_cast<std::uint8_t>(result.metadata.status), static_cast<std::uint8_t>(EphemerisResultStatus::Valid)
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AtmosphericRefraction));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
+        )
+    );
 }
 
 QTEST_APPLESS_MAIN(AtmosphericRefractionCalculatorTests)

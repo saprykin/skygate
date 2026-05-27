@@ -1,7 +1,6 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
-
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 #include "math/AngleMath.hpp"
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -22,21 +21,24 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
 
 [[nodiscard]] bool isRequested(const EphemerisRequest& request) noexcept
 {
-    return request.options.enableAtmosphericRefraction
-           && hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::AtmosphericRefraction);
+    return request.options.enableAtmosphericRefraction()
+           && skygate::ephemeris::EphemerisCorrectionFlags::has(
+               request.options.correctionFlags(), EphemerisCorrectionFlags::atmosphericRefraction()
+           );
 }
 
 [[nodiscard]] bool hasValidAtmosphere(const EphemerisEngineOptions& options) noexcept
 {
-    return std::isfinite(options.atmosphericPressureHpa) && options.atmosphericPressureHpa > kMinimumPressureHpa
-           && options.atmosphericPressureHpa <= kMaximumPressureHpa && std::isfinite(options.atmosphericTemperatureC)
-           && options.atmosphericTemperatureC >= kMinimumTemperatureC
-           && options.atmosphericTemperatureC <= kMaximumTemperatureC && std::isfinite(options.relativeHumidity)
-           && options.relativeHumidity >= kMinimumRelativeHumidity
-           && options.relativeHumidity <= kMaximumRelativeHumidity
-           && std::isfinite(options.observingWavelengthMicrometers)
-           && options.observingWavelengthMicrometers >= kMinimumWavelengthMicrometers
-           && options.observingWavelengthMicrometers <= kMaximumWavelengthMicrometers;
+    return std::isfinite(options.atmosphericPressureHpa()) && options.atmosphericPressureHpa() > kMinimumPressureHpa
+           && options.atmosphericPressureHpa() <= kMaximumPressureHpa
+           && std::isfinite(options.atmosphericTemperatureC())
+           && options.atmosphericTemperatureC() >= kMinimumTemperatureC
+           && options.atmosphericTemperatureC() <= kMaximumTemperatureC && std::isfinite(options.relativeHumidity())
+           && options.relativeHumidity() >= kMinimumRelativeHumidity
+           && options.relativeHumidity() <= kMaximumRelativeHumidity
+           && std::isfinite(options.observingWavelengthMicrometers())
+           && options.observingWavelengthMicrometers() >= kMinimumWavelengthMicrometers
+           && options.observingWavelengthMicrometers() <= kMaximumWavelengthMicrometers;
 }
 
 [[nodiscard]] bool hasModelAltitude(const double altitudeDeg) noexcept
@@ -51,17 +53,17 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
 
 void markUnavailable(EphemerisResultMetadata& metadata) noexcept
 {
-    EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::AtmosphericRefraction);
+    EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::atmosphericRefraction());
 }
 
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept
 {
-    return options.atmosphericPressureHpa / 1010.0;
+    return options.atmosphericPressureHpa() / 1010.0;
 }
 
 [[nodiscard]] double temperatureScale(const EphemerisEngineOptions& options) noexcept
 {
-    return 283.0 / (273.0 + options.atmosphericTemperatureC);
+    return 283.0 / (273.0 + options.atmosphericTemperatureC());
 }
 
 [[nodiscard]] double
@@ -103,7 +105,7 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
         result.horizontal->altitudeDeg
             + refractionCorrectionDegrees(result.horizontal->altitudeDeg, input.request.options)
     );
-    result.metadata.appliedCorrections |= EphemerisCorrectionFlags::AtmosphericRefraction;
+    result.metadata.appliedCorrections |= EphemerisCorrectionFlags::atmosphericRefraction();
     return result;
 }
 

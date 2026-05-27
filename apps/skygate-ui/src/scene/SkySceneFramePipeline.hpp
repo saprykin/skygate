@@ -8,7 +8,6 @@
 #include "SkyRenderBuilders.hpp"
 #include "Types.hpp"
 #include "UtcTimePoint.hpp"
-
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QHash>
@@ -27,7 +26,7 @@ struct SkySceneFramePipelineInput final {
     skygate::core::SkyContext skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::uint64_t catalogRevision = 0;
-    skygate::ephemeris::EphemerisEngineKind engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+    skygate::ephemeris::EphemerisEngineKind::Type engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     std::uint64_t engineOptionsRevision = 0;
     std::uint64_t ephemerisDataRevision = 0;
     std::uint64_t earthOrientationDataRevision = 0;
@@ -64,7 +63,8 @@ public:
 private:
     struct SnapshotCacheKey final {
         std::uint64_t catalogRevision = 0;
-        skygate::ephemeris::EphemerisEngineKind engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
+        skygate::ephemeris::EphemerisEngineKind::Type engineKind =
+            skygate::ephemeris::EphemerisEngineKind::Type::Simple;
         std::uint64_t engineOptionsRevision = 0;
         std::uint64_t ephemerisDataRevision = 0;
         std::uint64_t earthOrientationDataRevision = 0;

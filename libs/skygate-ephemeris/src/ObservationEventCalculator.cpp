@@ -367,7 +367,7 @@ ObservationEvent EventSearch::findCulmination(const std::vector<AltitudeSample>&
 shouldUseGuidanceEngine(const CelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
 {
     return (searchMode == SearchMode::Guided || searchMode == SearchMode::GuidedApproximate) && body != nullptr
-           && request.options.engineKind == EphemerisEngineKind::HighPrecision;
+           && request.options.engineKind() == EphemerisEngineKind::Type::HighPrecision;
 }
 
 [[nodiscard]] bool
@@ -375,7 +375,7 @@ isTrustingGuidanceModel(const CelestialBody* body, const EphemerisRequest& reque
 {
     return searchMode == SearchMode::GuidedApproximate
            || (body != nullptr && body->fixedEquatorial.has_value()
-               && request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections);
+               && request.options.correctionFlags() != EphemerisCorrectionFlags::noCorrections());
 }
 
 [[nodiscard]] bool shouldFallBackToDirect(
@@ -407,7 +407,7 @@ sampleGuidanceAltitudes(EventSearch& search, const CelestialBody& body, const Ep
 
     EphemerisRequest guidanceRequest = request;
     guidanceRequest.options = guidanceEngine->options();
-    guidanceRequest.options.engineKind = guidanceEngine->kind();
+    guidanceRequest.options.setEngineKind(guidanceEngine->kind());
 
     auto samples = search.sampleAltitudes(*guidanceEngine, guidanceRequest, 0U);
     if (samples.empty()) {

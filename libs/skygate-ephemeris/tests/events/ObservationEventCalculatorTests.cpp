@@ -1,6 +1,6 @@
-#include "ObservationEventCalculator.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
 #include "EphemerisRequestFactory.hpp"
+#include "ObservationEventCalculator.hpp"
 #include "UtcTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -164,12 +164,12 @@ public:
         ++requestSampleCount;
         sawLightTimeRequest =
             sawLightTimeRequest
-            || hasCorrectionFlag(
-                request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+            || skygate::ephemeris::EphemerisCorrectionFlags::has(
+                request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
             );
         sawNoCorrectionsRequest =
             sawNoCorrectionsRequest
-            || request.options.correctionFlags == skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+            || request.options.correctionFlags() == skygate::ephemeris::EphemerisCorrectionFlags::noCorrections();
         if (request.context.utcTime != baseUtcTime
             && (request.epoch.julianDatePart1 != baseEpoch.julianDatePart1
                 || request.epoch.julianDatePart2 != baseEpoch.julianDatePart2)) {
@@ -177,7 +177,9 @@ public:
         }
 
         const double altitudeDeg =
-            hasCorrectionFlag(request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime)
+            skygate::ephemeris::EphemerisCorrectionFlags::has(
+                request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+            )
                 ? movingAltitudeDeg(request.context.utcTime)
                 : -20.0;
         return skygate::ephemeris::CelestialBodyState{
@@ -480,8 +482,8 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
             .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
-    request.options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     engine.baseUtcTime = request.context.utcTime;
     engine.baseEpoch = request.epoch;
 
@@ -489,7 +491,7 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
 
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QCOMPARE(engine.contextSampleCount, 0);
@@ -505,8 +507,8 @@ void ObservationEventCalculatorTests::contextOverloadSeedsRequestOptionsFromEngi
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
     RequestSensitiveMovingEngine engine;
-    engine.engineOptions.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    engine.engineOptions.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
+    engine.engineOptions.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    engine.engineOptions.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     auto context = makeContext(0.0, 0.0);
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
 

@@ -56,7 +56,7 @@ public:
         std::shared_ptr<const std::vector<CelestialBody>> catalogBodies = {}
     );
 
-    [[nodiscard]] EphemerisEngineKind kind() const noexcept override;
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override;
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override;
 

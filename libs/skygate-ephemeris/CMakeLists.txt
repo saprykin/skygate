@@ -131,6 +131,11 @@ add_library(skygate-ephemeris STATIC
     src/factory/IEphemerisDiagnosticsSink.hpp
     src/engine/EphemerisEngineQueries.hpp
     src/engine/EphemerisPrecisionPolicy.hpp
+    src/EphemerisCapabilities.hpp
+    src/EphemerisCorrectionFlags.hpp
+    src/EphemerisEngineKind.hpp
+    src/EphemerisEngineOptions.hpp
+    src/EphemerisEngineQueryStatus.hpp
     src/EphemerisRequestFactory.hpp
     src/engine/IEphemerisEngine.hpp
     src/engine/highprecision/LeapSecondProvider.hpp
@@ -251,6 +256,11 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisFactoryCreationDiagnostic.cpp
     src/engine/EphemerisEngineQueries.cpp
     src/engine/EphemerisPrecisionPolicy.cpp
+    src/EphemerisCapabilities.cpp
+    src/EphemerisCorrectionFlags.cpp
+    src/EphemerisEngineKind.cpp
+    src/EphemerisEngineOptions.cpp
+    src/EphemerisEngineQueryStatus.cpp
     src/EphemerisRequestFactory.cpp
     src/MoonPhase.cpp
     src/MoonPhaseCalculator.cpp

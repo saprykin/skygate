@@ -67,9 +67,9 @@ skygate::ephemeris::ObservationEventCalculator::SearchMode observationEventSearc
 ) noexcept
 {
     if (input.ephemerisEngine != nullptr
-        && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+        && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
         && input.ephemerisRequest.has_value()
-        && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+        && input.ephemerisRequest->options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
         && !body.fixedEquatorial.has_value()) {
         return skygate::ephemeris::ObservationEventCalculator::SearchMode::GuidedApproximate;
     }
@@ -89,13 +89,14 @@ struct EphemerisInspectorMetadata final {
 bool shouldShowHighPrecisionDetails(const SkySelectionOverlayInput& input) noexcept
 {
     return input.ephemerisRequest.has_value()
-           && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+           && input.ephemerisRequest->options.engineKind()
+                  == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
 }
 
 bool shouldComputeHighPrecisionInspectorState(const SkySelectionOverlayInput& input) noexcept
 {
     return input.ephemerisEngine != nullptr
-           && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision
+           && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
            && shouldShowHighPrecisionDetails(input);
 }
 
@@ -155,10 +156,10 @@ EphemerisInspectorMetadata buildEphemerisInspectorMetadata(
 void appendEphemerisMetadataFields(
     std::vector<SkyInspectorField>& fields,
     const EphemerisInspectorMetadata& metadata,
-    const skygate::ephemeris::EphemerisResultStatus status
+    const skygate::ephemeris::EphemerisEngineQueryStatus::Type status
 )
 {
-    if (status != skygate::ephemeris::EphemerisResultStatus::Valid || !metadata.warningText.isEmpty()) {
+    if (status != skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid || !metadata.warningText.isEmpty()) {
         fields.push_back(inspectorField("Ephemeris", metadata.status, metadata.warningText));
     }
     if (!metadata.provenance.isEmpty()) {

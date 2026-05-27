@@ -1,5 +1,4 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
-
 #include "EphemerisRequestFactory.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
@@ -63,17 +62,21 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
 
 [[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
 {
-    return request.options.correctionFlags != EphemerisCorrectionFlags::NoCorrections;
+    return request.options.correctionFlags() != EphemerisCorrectionFlags::noCorrections();
 }
 
 [[nodiscard]] bool requestsAnnualParallaxState(const EphemerisRequest& request) noexcept
 {
-    return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::AnnualParallax);
+    return skygate::ephemeris::EphemerisCorrectionFlags::has(
+        request.options.correctionFlags(), EphemerisCorrectionFlags::annualParallax()
+    );
 }
 
 [[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
 {
-    return hasCorrectionFlag(request.options.correctionFlags, EphemerisCorrectionFlags::DiurnalParallax);
+    return skygate::ephemeris::EphemerisCorrectionFlags::has(
+        request.options.correctionFlags(), EphemerisCorrectionFlags::diurnalParallax()
+    );
 }
 
 [[nodiscard]] std::optional<core::EquatorialCoordinate>
@@ -96,7 +99,7 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
     const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& originalResult
 )
 {
-    if (!input.request.options.fallbackToSimpleEngine || originalResult.equatorial.has_value()
+    if (!input.request.options.fallbackToSimpleEngine() || originalResult.equatorial.has_value()
         || !originalResult.metadata.hasWarning(EphemerisWarningCode::DataOutOfRange)) {
         return std::nullopt;
     }
@@ -109,7 +112,7 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
 
     HighPrecisionCalculatorResult fallbackResult = originalResult;
     fallbackResult.equatorial = *equatorial;
-    fallbackResult.metadata.status = EphemerisResultStatus::Degraded;
+    fallbackResult.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     fallbackResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
     fallbackResult.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
     fallbackResult.metadata.dataSourceProvenance =
@@ -117,12 +120,12 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
             ? "simple solar-system fallback for out-of-range high-precision kernel"
             : fallbackResult.metadata.dataSourceProvenance
                   + "; simple solar-system fallback for out-of-range high-precision kernel";
-    fallbackResult.metadata.appliedCorrections = EphemerisCorrectionFlags::Geometric;
+    fallbackResult.metadata.appliedCorrections = EphemerisCorrectionFlags::geometric();
     if (requestsTopocentricState(input.request) && input.request.context.observer.isValid()) {
         fallbackResult.horizontal = EquatorialToHorizontalCalculator::compute(
             *equatorial, input.request.context.observer, input.request.context.utcTime
         );
-        fallbackResult.metadata.appliedCorrections |= EphemerisCorrectionFlags::DiurnalParallax;
+        fallbackResult.metadata.appliedCorrections |= EphemerisCorrectionFlags::diurnalParallax();
     }
 
     return fallbackResult;
@@ -148,13 +151,7 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
 
 [[nodiscard]] bool sameOptions(const EphemerisEngineOptions& lhs, const EphemerisEngineOptions& rhs) noexcept
 {
-    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
-           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
-           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
-           && sameDoubleIdentity(lhs.atmosphericPressureHpa, rhs.atmosphericPressureHpa)
-           && sameDoubleIdentity(lhs.atmosphericTemperatureC, rhs.atmosphericTemperatureC)
-           && sameDoubleIdentity(lhs.relativeHumidity, rhs.relativeHumidity)
-           && sameDoubleIdentity(lhs.observingWavelengthMicrometers, rhs.observingWavelengthMicrometers);
+    return lhs == rhs;
 }
 
 [[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
@@ -238,7 +235,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
         return preparedState->tdbKernelEpoch;
     }
     if (timeScaleService == nullptr) {
-        metadata.status = EphemerisResultStatus::Failed;
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
         return std::nullopt;
     }
@@ -286,12 +283,12 @@ public:
         : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end())),
           m_catalogStarAstrometryArrays(*m_bodies), m_options(engineOptions), m_dependencies(std::move(dependencies))
     {
-        m_options.engineKind = EphemerisEngineKind::HighPrecision;
+        m_options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
     }
 
-    [[nodiscard]] EphemerisEngineKind kind() const noexcept
+    [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept
     {
-        return EphemerisEngineKind::HighPrecision;
+        return EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] std::string_view name() const noexcept
@@ -301,15 +298,23 @@ public:
 
     [[nodiscard]] EphemerisCapabilities capabilities() const noexcept
     {
-        EphemerisCapabilities engineCapabilities;
-        engineCapabilities.engineKind = EphemerisEngineKind::HighPrecision;
-        engineCapabilities.supportedCorrections = m_options.correctionFlags;
-        engineCapabilities.supportsSolarSystemBodies = m_dependencies.solarSystemStateCalculator != nullptr;
-        engineCapabilities.supportsCatalogStars = m_dependencies.starAstrometryCalculator != nullptr;
-        engineCapabilities.supportsTopocentricPositions = m_dependencies.earthOrientationProvider != nullptr;
-        engineCapabilities.supportsAtmosphericRefraction = m_dependencies.atmosphericRefractionCalculator != nullptr;
-        engineCapabilities.supportsExtendedHistoricalRange = !m_dependencies.dataSetInfo.dateRanges.empty();
-        return engineCapabilities;
+        EphemerisCapabilities caps = EphemerisCapabilities::noCapabilities();
+        if (m_dependencies.solarSystemStateCalculator != nullptr) {
+            caps |= EphemerisCapabilities::solarSystemBodies();
+        }
+        if (m_dependencies.starAstrometryCalculator != nullptr) {
+            caps |= EphemerisCapabilities::catalogStars();
+        }
+        if (m_dependencies.earthOrientationProvider != nullptr) {
+            caps |= EphemerisCapabilities::topocentricPositions();
+        }
+        if (m_dependencies.atmosphericRefractionCalculator != nullptr) {
+            caps |= EphemerisCapabilities::atmosphericRefraction();
+        }
+        if (!m_dependencies.dataSetInfo.dateRanges.empty()) {
+            caps |= EphemerisCapabilities::extendedHistoricalRange();
+        }
+        return caps;
     }
 
     [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept
@@ -534,7 +539,7 @@ private:
             if (request.epoch.timeScale == TimeScale::Tdb) {
                 preparedState->tdbKernelEpoch = request.epoch.normalized();
             } else if (m_dependencies.timeScaleService == nullptr) {
-                preparedState->tdbKernelEpochMetadata.status = EphemerisResultStatus::Degraded;
+                preparedState->tdbKernelEpochMetadata.status = EphemerisEngineQueryStatus::Type::Degraded;
                 preparedState->tdbKernelEpochMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             } else {
                 const TimeScaleConversionResult conversion =
@@ -562,7 +567,7 @@ private:
             if (!utcConversion.isSuccess()) {
                 preparedState->topocentricStateAvailable = false;
                 EphemerisMetadataMerger::markCorrectionUnavailable(
-                    preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
+                    preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
                 );
             } else {
                 preparedState->earthOrientationSample = sampleEarthOrientation(
@@ -580,7 +585,7 @@ private:
                 if (!preparedState->earthOrientationSample->isSuccess()) {
                     preparedState->topocentricStateAvailable = false;
                     EphemerisMetadataMerger::markCorrectionUnavailable(
-                        preparedState->topocentricMetadata, EphemerisCorrectionFlags::EarthOrientation
+                        preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
                     );
                 }
             }
@@ -706,7 +711,7 @@ HighPrecisionEphemerisEngine::HighPrecisionEphemerisEngine(HighPrecisionEphemeri
 HighPrecisionEphemerisEngine&
 HighPrecisionEphemerisEngine::operator=(HighPrecisionEphemerisEngine&&) noexcept = default;
 
-EphemerisEngineKind HighPrecisionEphemerisEngine::kind() const noexcept
+EphemerisEngineKind::Type HighPrecisionEphemerisEngine::kind() const noexcept
 {
     return m_impl->kind();
 }

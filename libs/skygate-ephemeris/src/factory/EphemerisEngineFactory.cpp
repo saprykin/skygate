@@ -291,12 +291,12 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
 {
     EphemerisEngineFactoryResult result;
     switch (request.engineKind) {
-    case EphemerisEngineKind::Simple:
+    case EphemerisEngineKind::Type::Simple:
         result = EphemerisEngineFactoryResult::success(
             std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options)
         );
         break;
-    case EphemerisEngineKind::HighPrecision:
+    case EphemerisEngineKind::Type::HighPrecision:
         result = createHighPrecisionEngine(request);
         break;
     default:

@@ -16,9 +16,9 @@ class IEphemerisEngine {
 public:
     virtual ~IEphemerisEngine() = default;
 
-    [[nodiscard]] virtual EphemerisEngineKind kind() const noexcept
+    [[nodiscard]] virtual EphemerisEngineKind::Type kind() const noexcept
     {
-        return EphemerisEngineKind::Simple;
+        return EphemerisEngineKind::Type::Simple;
     }
 
     [[nodiscard]] virtual std::string_view name() const noexcept
@@ -28,9 +28,7 @@ public:
 
     [[nodiscard]] virtual EphemerisCapabilities capabilities() const noexcept
     {
-        EphemerisCapabilities engineCapabilities;
-        engineCapabilities.engineKind = kind();
-        return engineCapabilities;
+        return EphemerisCapabilities::noCapabilities();
     }
 
     [[nodiscard]] virtual std::span<const EphemerisDateRange> supportedDateRanges() const noexcept
@@ -46,7 +44,7 @@ public:
     [[nodiscard]] virtual EphemerisEngineOptions options() const noexcept
     {
         EphemerisEngineOptions engineOptions;
-        engineOptions.engineKind = kind();
+        engineOptions.setEngineKind(kind());
         return engineOptions;
     }
 

@@ -1,9 +1,8 @@
 #include "engine/highprecision/FrameTransformer.hpp"
-
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/ErfaAstrometry.hpp"
 #include "math/MathConstants.hpp"
 #include "math/TimeConstants.hpp"
+#include "engine/highprecision/EphemerisMetadataMerge.hpp"
+#include "engine/highprecision/ErfaAstrometry.hpp"
 
 #include <array>
 #include <cmath>
@@ -64,7 +63,7 @@ constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A cele
 [[nodiscard]] CelestialFrameTransformResult makeFailedResult(const EphemerisWarningCode warningCode)
 {
     CelestialFrameTransformResult result;
-    result.metadata.status = EphemerisResultStatus::Failed;
+    result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
     result.metadata.addWarning(warningCode);
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
     return result;
@@ -74,16 +73,16 @@ constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A cele
 {
     CelestialFrameTransformResult result;
     result.vector = request.vector;
-    result.metadata.status = EphemerisResultStatus::Valid;
-    result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
     if (request.sourceFrame != request.targetFrame) {
         CelestialFrameTransformStageMetadata stage;
         stage.sourceFrame = request.sourceFrame;
         stage.targetFrame = request.targetFrame;
         stage.applied = false;
-        stage.metadata.status = EphemerisResultStatus::Valid;
-        stage.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+        stage.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
+        stage.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
         stage.metadata.dataSourceProvenance = kFrameTransformProvenance;
         result.stages.push_back(std::move(stage));
     }
@@ -133,8 +132,8 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
 
 void addDegradedWarning(EphemerisResultMetadata& metadata, const EphemerisWarningCode warningCode) noexcept
 {
-    if (metadata.status == EphemerisResultStatus::Valid) {
-        metadata.status = EphemerisResultStatus::Degraded;
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
     metadata.addWarning(warningCode);
 }
@@ -213,7 +212,7 @@ struct FrameTransformContext {
     epochInScale(TimeScale targetScale, EphemerisResultMetadata& metadata) const
     {
         if (!request.epoch.isFinite()) {
-            metadata.status = EphemerisResultStatus::Failed;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             metadata.addWarning(EphemerisWarningCode::ComputationFailed);
             return std::nullopt;
         }
@@ -223,14 +222,14 @@ struct FrameTransformContext {
         }
 
         if (timeScaleService == nullptr) {
-            metadata.status = EphemerisResultStatus::Failed;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             return std::nullopt;
         }
 
         std::optional<TimeScaleConversionResult>* cachedConversion = conversionCacheFor(targetScale);
         if (cachedConversion == nullptr) {
-            metadata.status = EphemerisResultStatus::Failed;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             return std::nullopt;
         }
@@ -240,7 +239,7 @@ struct FrameTransformContext {
 
         const TimeScaleConversionResult& conversion = **cachedConversion;
         if (!conversion.isSuccess()) {
-            metadata.status = EphemerisResultStatus::Failed;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             return std::nullopt;
         }
@@ -270,7 +269,7 @@ struct FrameTransformContext {
         }
 
         if (!earthOrientationSample.isSuccess()) {
-            metadata.status = EphemerisResultStatus::Failed;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             return std::nullopt;
         }
@@ -282,7 +281,7 @@ struct FrameTransformContext {
     [[nodiscard]] std::optional<AstronomicalEpoch> ut1Epoch(EphemerisResultMetadata& metadata) const
     {
         if (!request.epoch.isFinite()) {
-            metadata.status = EphemerisResultStatus::Failed;
+            metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             metadata.addWarning(EphemerisWarningCode::ComputationFailed);
             return std::nullopt;
         }
@@ -332,7 +331,7 @@ celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisResul
                 }
             );
             if (!context.celestialIntermediateMatrixValue.has_value()) {
-                cachedMetadata.status = EphemerisResultStatus::Failed;
+                cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                 cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);
             }
         }
@@ -360,7 +359,7 @@ intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context
             if (earthRotationAngle.has_value()) {
                 context.earthRotationMatrixValue = earthRotationMatrix(*earthRotationAngle);
             } else {
-                cachedMetadata.status = EphemerisResultStatus::Failed;
+                cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                 cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);
             }
         }
@@ -393,11 +392,11 @@ terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context,
                     *tioLocator
                 );
                 if (!context.polarMotionMatrixValue.has_value()) {
-                    cachedMetadata.status = EphemerisResultStatus::Failed;
+                    cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                     cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);
                 }
             } else {
-                cachedMetadata.status = EphemerisResultStatus::Failed;
+                cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                 cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);
             }
         }
@@ -420,7 +419,7 @@ stageMatrix(const FrameTransformContext& context, const std::uint8_t lowerRank, 
     case 2U:
         return terrestrialIntermediateToTerrestrialMatrix(context, metadata);
     default:
-        metadata.status = EphemerisResultStatus::Failed;
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         return std::nullopt;
     }
@@ -449,14 +448,15 @@ makeStageMetadata(const CelestialReferenceFrame sourceFrame, const CelestialRefe
     CelestialFrameTransformStageMetadata stage;
     stage.sourceFrame = sourceFrame;
     stage.targetFrame = targetFrame;
-    stage.metadata.status = EphemerisResultStatus::Valid;
+    stage.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
     stage.metadata.dataSourceProvenance = kFrameTransformProvenance;
     return stage;
 }
 
 [[nodiscard]] constexpr EphemerisCorrectionFlags correctionForStage(const std::uint8_t lowerRank) noexcept
 {
-    return lowerRank == 0U ? EphemerisCorrectionFlags::PrecessionNutation : EphemerisCorrectionFlags::EarthOrientation;
+    return lowerRank == 0U ? EphemerisCorrectionFlags::precessionNutation()
+                           : EphemerisCorrectionFlags::earthOrientation();
 }
 
 [[nodiscard]] bool isGcrsLike(const CelestialReferenceFrame frame) noexcept
@@ -483,7 +483,7 @@ apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisR
                 }
             );
             if (!context.apparentEquatorAndEquinoxMatrixValue.has_value()) {
-                cachedMetadata.status = EphemerisResultStatus::Failed;
+                cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                 cachedMetadata.addWarning(EphemerisWarningCode::ComputationFailed);
             }
         }
@@ -508,8 +508,8 @@ apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisR
     }
 
     CelestialFrameTransformResult result;
-    result.metadata.status = EphemerisResultStatus::Valid;
-    result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
 
     CelestialFrameTransformStageMetadata stage = makeStageMetadata(request.sourceFrame, request.targetFrame);
@@ -522,7 +522,7 @@ apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisR
 
     result.vector = forward ? multiply(*matrix, request.vector) : multiplyTranspose(*matrix, request.vector);
     stage.applied = true;
-    stage.metadata.appliedCorrections = EphemerisCorrectionFlags::PrecessionNutation;
+    stage.metadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
     mergeStageMetadata(result.metadata, stage.metadata);
     result.stages.push_back(std::move(stage));
     return result;
@@ -544,8 +544,8 @@ transformCelestialVectorWithContext(const CelestialFrameTransformRequest& reques
     }
 
     CelestialFrameTransformResult result;
-    result.metadata.status = EphemerisResultStatus::Valid;
-    result.metadata.appliedCorrections = EphemerisCorrectionFlags::NoCorrections;
+    result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
+    result.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
 
     if (std::optional<CelestialFrameTransformResult> apparentResult =

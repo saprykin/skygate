@@ -1,10 +1,10 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "math/PhysicalConstants.hpp"
 
 #include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
-#include "math/PhysicalConstants.hpp"
 
 #include <algorithm>
 #include <array>
@@ -365,7 +365,7 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
     result.metadata.dataSourceProvenance = "CALCEPH solar-system kernel";
 
     if (epoch.timeScale != TimeScale::Tdb) {
-        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
         return result;
     }
@@ -373,8 +373,8 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
     const CalcephKernelProviderStatus epochStatus = statusForEpoch(epoch);
     if (epochStatus != CalcephKernelProviderStatus::Ready) {
         result.metadata.status = epochStatus == CalcephKernelProviderStatus::OutOfRange
-                                     ? EphemerisResultStatus::OutOfRange
-                                     : EphemerisResultStatus::Failed;
+                                     ? EphemerisEngineQueryStatus::Type::OutOfRange
+                                     : EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(
             epochStatus == CalcephKernelProviderStatus::OutOfRange ? EphemerisWarningCode::DataOutOfRange
                                                                    : EphemerisWarningCode::MissingEphemerisData
@@ -392,12 +392,12 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
     result.positionAu = kernelState.positionAu;
     result.velocityAuPerDay = kernelState.velocityAuPerDay;
     if (!result.positionAu.has_value()) {
-        result.metadata.status = EphemerisResultStatus::Failed;
+        result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
         return result;
     }
 
-    result.metadata.status = EphemerisResultStatus::Valid;
+    result.metadata.status = EphemerisEngineQueryStatus::Type::Valid;
     return result;
 }
 

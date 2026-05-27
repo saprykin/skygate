@@ -1,9 +1,9 @@
-#include "engine/highprecision/StarAstrometryCalculator.hpp"
+#include "math/MathConstants.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
+#include "engine/highprecision/StarAstrometryCalculator.hpp"
+#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
-#include "math/MathConstants.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -32,8 +32,8 @@ using core::MathConstants;
 {
     EphemerisRequest request;
     request.epoch = epochForYearOffset(years);
-    request.options.engineKind = EphemerisEngineKind::HighPrecision;
-    request.options.correctionFlags = flags;
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(flags);
     return request;
 }
 
@@ -186,14 +186,15 @@ public:
 
         SolarSystemKernelStateResult result;
         if (m_requireTdbEpoch && epoch.timeScale != TimeScale::Tdb) {
-            result.metadata.status = EphemerisResultStatus::Failed;
+            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
             return result;
         }
 
         result.positionAu = m_earthPositionAu;
-        result.metadata.status =
-            m_earthPositionAu.has_value() ? EphemerisResultStatus::Valid : EphemerisResultStatus::Failed;
+        result.metadata.status = m_earthPositionAu.has_value()
+                                     ? skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
+                                     : skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.dataSourceProvenance = "unit-test Earth barycentric state";
         if (!m_earthPositionAu.has_value()) {
             result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
@@ -298,8 +299,8 @@ void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEn
 {
     const CelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(
-        EphemerisCorrectionFlags::ProperMotion | EphemerisCorrectionFlags::StellarParallax
-            | EphemerisCorrectionFlags::RadialVelocity,
+        EphemerisCorrectionFlags::properMotion() | EphemerisCorrectionFlags::stellarParallax()
+            | EphemerisCorrectionFlags::radialVelocity(),
         10.0
     );
 
@@ -315,24 +316,36 @@ void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEn
         },
         0.00005
     );
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Valid);
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarParallax));
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::RadialVelocity));
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::properMotion()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarParallax()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::radialVelocity()
+        )
+    );
 }
 
 void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreDisabled()
 {
     const CelestialBody body = makeAstrometricStar();
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::NoCorrections, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::noCorrections(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
 
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Valid);
-    QCOMPARE(result.metadata.appliedCorrections, EphemerisCorrectionFlags::NoCorrections);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
+    QCOMPARE(result.metadata.appliedCorrections, EphemerisCorrectionFlags::noCorrections());
 }
 
 void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPlaneComponent()
@@ -347,7 +360,7 @@ void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPla
     body.starAstrometry->properMotionDeclinationMasPerYear = 0.0;
     body.starAstrometry->stellarParallaxMas = std::nullopt;
     body.starAstrometry->radialVelocityKmPerSecond = std::nullopt;
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::ProperMotion, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
@@ -361,15 +374,19 @@ void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPla
         },
         0.000001
     );
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Valid);
-    QVERIFY(hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.appliedCorrections, EphemerisCorrectionFlags::properMotion()
+        )
+    );
 }
 
 void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricState()
 {
     const CelestialBody body = makeAstrometricStar();
-    const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::StellarParallax, 0.0);
-    const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::stellarParallax(), 0.0);
+    const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernelProvider =
         std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
     auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
@@ -382,8 +399,12 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     QVERIFY(parallaxResult.equatorial.has_value());
     QVERIFY(parallaxResult.observerRelativePositionAu.has_value());
     QVERIFY(angularSeparationDegrees(*referenceResult.equatorial, *parallaxResult.equatorial) > 1.0e-6);
-    QCOMPARE(parallaxResult.metadata.status, EphemerisResultStatus::Valid);
-    QVERIFY(hasCorrectionFlag(parallaxResult.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
+    QCOMPARE(parallaxResult.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            parallaxResult.metadata.appliedCorrections, EphemerisCorrectionFlags::annualParallax()
+        )
+    );
     QCOMPARE(kernelProvider->callCount(), 1);
     QCOMPARE(kernelProvider->lastTargetNaifId(), 399);
     QCOMPARE(kernelProvider->lastCenterNaifId(), 0);
@@ -404,8 +425,8 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPart
     };
     const CatalogStarAstrometryArrays arrays(bodies);
     const EphemerisRequest request = makeRequest(
-        EphemerisCorrectionFlags::ProperMotion | EphemerisCorrectionFlags::StellarParallax
-            | EphemerisCorrectionFlags::RadialVelocity,
+        EphemerisCorrectionFlags::properMotion() | EphemerisCorrectionFlags::stellarParallax()
+            | EphemerisCorrectionFlags::radialVelocity(),
         10.0
     );
 
@@ -431,7 +452,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarWhenCorrectionsAreDisa
         makeFixedOnlyStar(),
     };
     const CatalogStarAstrometryArrays arrays(bodies);
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::NoCorrections, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::noCorrections(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
@@ -451,8 +472,8 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstr
     };
     const CatalogStarAstrometryArrays arrays(bodies);
     const EphemerisRequest request = makeRequest(
-        EphemerisCorrectionFlags::ProperMotion | EphemerisCorrectionFlags::StellarParallax
-            | EphemerisCorrectionFlags::RadialVelocity,
+        EphemerisCorrectionFlags::properMotion() | EphemerisCorrectionFlags::stellarParallax()
+            | EphemerisCorrectionFlags::radialVelocity(),
         10.0
     );
 
@@ -463,11 +484,23 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstr
     QCOMPARE(batchResults.size(), 1U);
     QCOMPARE(batchResults[0].bodyIndex, 0U);
     compareCalculatorResults(batchResults[0].result, singleResult);
-    QCOMPARE(singleResult.metadata.status, EphemerisResultStatus::Degraded);
+    QCOMPARE(singleResult.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
     QVERIFY(singleResult.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::ProperMotion));
-    QVERIFY(hasCorrectionFlag(singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::StellarParallax));
-    QVERIFY(hasCorrectionFlag(singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::RadialVelocity));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::properMotion()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::stellarParallax()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::radialVelocity()
+        )
+    );
 }
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrections()
@@ -479,7 +512,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
         makeFixedOnlyStar(),
     };
     const CatalogStarAstrometryArrays arrays(bodies);
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernelProvider =
         std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
     auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
@@ -502,24 +535,30 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()
 {
     const CelestialBody body = makeAstrometricStar();
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
 
     QVERIFY(result.equatorial.has_value());
     QVERIFY(!result.observerRelativePositionAu.has_value());
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AnnualParallax));
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::annualParallax()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::annualParallax()
+    ));
 }
 
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMissing()
 {
     CelestialBody body = makeAstrometricStar();
     body.starAstrometry->stellarParallaxMas = std::nullopt;
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::AnnualParallax, 0.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernelProvider =
         std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
 
@@ -528,10 +567,16 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
 
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::AnnualParallax));
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::AnnualParallax));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::annualParallax()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::annualParallax()
+    ));
     QCOMPARE(kernelProvider->callCount(), 0);
 }
 
@@ -541,25 +586,33 @@ void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsD
     body.starAstrometry->properMotionRightAscensionMasPerYear = 0.0;
     body.starAstrometry->properMotionDeclinationMasPerYear = 0.0;
     body.starAstrometry->radialVelocityKmPerSecond = 25.0;
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::RadialVelocity, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::radialVelocity(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
 
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::RadialVelocity));
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::RadialVelocity));
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::StellarParallax));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::radialVelocity()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::radialVelocity()
+    ));
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::stellarParallax()
+    ));
 }
 
 void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMotionUnavailable()
 {
     CelestialBody body = makeAstrometricStar();
     body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::ProperMotion, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
@@ -567,24 +620,30 @@ void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMot
     QVERIFY(result.equatorial.has_value());
     QVERIFY(result.equatorial->rightAscensionHours > body.fixedEquatorial->rightAscensionHours);
     QVERIFY(std::abs(result.equatorial->declinationDeg - body.fixedEquatorial->declinationDeg) < 0.00001);
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
-    QVERIFY(hasCorrectionFlag(result.metadata.unavailableCorrections, EphemerisCorrectionFlags::ProperMotion));
-    QVERIFY(!hasCorrectionFlag(result.metadata.appliedCorrections, EphemerisCorrectionFlags::ProperMotion));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::properMotion()
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        result.metadata.appliedCorrections, EphemerisCorrectionFlags::properMotion()
+    ));
 }
 
 void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested()
 {
     CelestialBody body = makeAstrometricStar();
     body.starAstrometry = std::nullopt;
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::ProperMotion, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
 
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Degraded);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
 }
 
@@ -593,13 +652,13 @@ void StarAstrometryCalculatorTests::failsWhenNoCoordinateFallbackExists()
     CelestialBody body;
     body.id = "missing-coordinate";
     body.type = CelestialBodyType::Star;
-    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::ProperMotion, 10.0);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
     const StarAstrometryCalculator calculator;
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
 
     QVERIFY(!result.equatorial.has_value());
-    QCOMPARE(result.metadata.status, EphemerisResultStatus::Failed);
+    QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed);
     QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::ComputationFailed));
 }
 

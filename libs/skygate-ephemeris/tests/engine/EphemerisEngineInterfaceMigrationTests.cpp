@@ -58,7 +58,7 @@ makeState(const skygate::ephemeris::EphemerisRequest& request, const std::uint32
         .altitudeDeg = request.context.observer.latitudeDeg,
         .azimuthDeg = request.context.observer.longitudeDeg,
     };
-    state.metadata.appliedCorrections = request.options.correctionFlags;
+    state.metadata.appliedCorrections = request.options.correctionFlags();
     return state;
 }
 
@@ -108,9 +108,9 @@ public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         skygate::ephemeris::EphemerisEngineOptions engineOptions;
-        engineOptions.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
-        engineOptions.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections;
-        engineOptions.enableAtmosphericRefraction = false;
+        engineOptions.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
+        engineOptions.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
+        engineOptions.setEnableAtmosphericRefraction(false);
         return engineOptions;
     }
 
@@ -240,23 +240,21 @@ void EphemerisEngineInterfaceMigrationTests::metadataDefaultsRemainAvailableForT
 
     QCOMPARE(
         static_cast<std::uint8_t>(engine.kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
     QVERIFY(engine.name() == std::string_view{"Ephemeris engine"});
 
     const auto capabilities = engine.capabilities();
-    QCOMPARE(
-        static_cast<std::uint8_t>(capabilities.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
-    );
-    QVERIFY(!capabilities.supportsSolarSystemBodies);
+    QVERIFY(!skygate::ephemeris::EphemerisCapabilities::has(
+        capabilities, skygate::ephemeris::EphemerisCapabilities::solarSystemBodies()
+    ));
     QVERIFY(engine.supportedDateRanges().empty());
     QVERIFY(engine.dataSetInfo().id.empty());
 
     const auto options = engine.options();
     QCOMPARE(
-        static_cast<std::uint8_t>(options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
 }
 
@@ -268,7 +266,7 @@ void EphemerisEngineInterfaceMigrationTests::requestComputeReceivesFullRequest()
     request.context = makeContext();
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1234));
     request.epoch = {.julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.75};
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
 
     const auto snapshot = engine.compute(request);
 
@@ -277,7 +275,7 @@ void EphemerisEngineInterfaceMigrationTests::requestComputeReceivesFullRequest()
     QCOMPARE(snapshot.states.size(), std::size_t{1});
     QCOMPARE(
         static_cast<std::uint32_t>(snapshot.states.front().metadata.appliedCorrections),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::LightTime)
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::lightTime())
     );
     QCOMPARE(engine.lastRequestEpoch().julianDatePart1, 2'460'000.0);
     QCOMPARE(engine.lastRequestEpoch().julianDatePart2, 0.75);
@@ -290,14 +288,14 @@ void EphemerisEngineInterfaceMigrationTests::requestBodyLookupSupportsIdAndIndex
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext();
     request.epoch = {.julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.25};
-    request.options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax;
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::diurnalParallax());
 
     const auto byId = engine.computeBodyState(request, "target");
     QVERIFY(byId.has_value());
     QCOMPARE(byId->bodyIndex, 0U);
     QCOMPARE(
         static_cast<std::uint32_t>(byId->metadata.appliedCorrections),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax)
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::diurnalParallax())
     );
 
     const auto byIndex = engine.computeBodyState(request, std::size_t{0});
@@ -318,11 +316,11 @@ void EphemerisEngineInterfaceMigrationTests::skyContextCompatibilityUsesEngineDe
     QCOMPARE(snapshot.states.size(), std::size_t{1});
     QCOMPARE(
         static_cast<std::uint32_t>(snapshot.states.front().metadata.appliedCorrections),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections())
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(engine.lastRequestOptions().correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+        static_cast<std::uint32_t>(engine.lastRequestOptions().correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections())
     );
     QCOMPARE(
         static_cast<std::uint8_t>(engine.lastRequestEpoch().timeScale),
@@ -333,7 +331,7 @@ void EphemerisEngineInterfaceMigrationTests::skyContextCompatibilityUsesEngineDe
     QVERIFY(bodyState.has_value());
     QCOMPARE(
         static_cast<std::uint32_t>(bodyState->metadata.appliedCorrections),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections())
     );
 }
 

@@ -1,5 +1,4 @@
 #include "SkySettingsSnapshotCodecs.hpp"
-
 #include "SkyContextControllerSupport.hpp"
 #include "SkyLogging.hpp"
 #include "SkySettingsValueCodecs.hpp"
@@ -181,25 +180,28 @@ SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings)
     return snapshot;
 }
 
-[[nodiscard]] QString ephemerisEngineKindToString(const EphemerisEngineKind engineKind)
+[[nodiscard]] QString ephemerisEngineKindToString(const EphemerisEngineKind::Type engineKind)
 {
     switch (engineKind) {
-    case EphemerisEngineKind::Simple:
+    case EphemerisEngineKind::Type::Simple:
         return QStringLiteral("simple");
-    case EphemerisEngineKind::HighPrecision:
+    case EphemerisEngineKind::Type::HighPrecision:
         return QStringLiteral("highPrecision");
+    case EphemerisEngineKind::Type::Last:
+        break;
     }
     return QStringLiteral("simple");
 }
 
-[[nodiscard]] EphemerisEngineKind ephemerisEngineKindFromString(const QString& text, const EphemerisEngineKind fallback)
+[[nodiscard]] EphemerisEngineKind::Type
+ephemerisEngineKindFromString(const QString& text, const EphemerisEngineKind::Type fallback)
 {
     const QString normalizedText = text.trimmed().toLower();
     if (normalizedText == QStringLiteral("simple")) {
-        return EphemerisEngineKind::Simple;
+        return EphemerisEngineKind::Type::Simple;
     }
     if (normalizedText == QStringLiteral("highprecision") || normalizedText == QStringLiteral("high-precision")) {
-        return EphemerisEngineKind::HighPrecision;
+        return EphemerisEngineKind::Type::HighPrecision;
     }
     return fallback;
 }
@@ -214,7 +216,7 @@ SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings)
 readCorrectionFlags(QSettings& settings, const QString& key, const EphemerisCorrectionFlags fallback)
 {
     constexpr std::uint32_t kSupportedCorrectionMask =
-        static_cast<std::uint32_t>(EphemerisCorrectionFlags::ApparentTopocentric);
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::apparentTopocentric());
     const qulonglong rawFlags =
         readULongLongSetting(settings, key, static_cast<qulonglong>(static_cast<std::uint32_t>(fallback)));
     if ((rawFlags & ~static_cast<qulonglong>(kSupportedCorrectionMask)) != 0ULL) {

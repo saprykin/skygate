@@ -1,15 +1,14 @@
-#include "time/CalendarTime.hpp"
 #include "SkyContextControllerTestSupport.hpp"
-
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-
-#include <cmath>
-#include <filesystem>
 
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+
+#include <cmath>
+#include <filesystem>
 
 namespace {
 
@@ -44,9 +43,9 @@ skygate::ephemeris::AstronomicalEpoch expectedUtcEpoch(
 SkySettingsStore::EphemerisUserSettingsSnapshot customEphemerisUserSettings()
 {
     SkySettingsStore::EphemerisUserSettingsSnapshot settings;
-    settings.engineKind = skygate::ephemeris::EphemerisEngineKind::Simple;
-    settings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime
-                               | skygate::ephemeris::EphemerisCorrectionFlags::StellarAberration;
+    settings.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    settings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+                               | skygate::ephemeris::EphemerisCorrectionFlags::stellarAberration();
     settings.correctionPresetId = QStringLiteral("astrometric");
     settings.fallbackToSimpleEngine = false;
     settings.refractionEnabled = false;
@@ -304,8 +303,8 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     ));
     SkySettingsStore::StateSnapshot snapshot;
     snapshot.ephemerisSettingsPresent = true;
-    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::ApparentTopocentric;
+    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    snapshot.ephemeris.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric();
     snapshot.ephemeris.refractionEnabled = true;
     QVERIFY(store.saveState(snapshot));
 
@@ -318,7 +317,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     QVERIFY(controller->ephemerisEngine() != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
@@ -343,11 +342,11 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsWithEphemerisSettin
     QVERIFY(controller->ephemerisEngine() != nullptr);
     const auto restoredOptions = controller->ephemerisEngine()->options();
     QCOMPARE(
-        static_cast<std::uint32_t>(restoredOptions.correctionFlags),
+        static_cast<std::uint32_t>(restoredOptions.correctionFlags()),
         static_cast<std::uint32_t>(snapshot->ephemeris.correctionFlags)
     );
-    QCOMPARE(restoredOptions.fallbackToSimpleEngine, snapshot->ephemeris.fallbackToSimpleEngine);
-    QCOMPARE(restoredOptions.enableAtmosphericRefraction, snapshot->ephemeris.refractionEnabled);
+    QCOMPARE(restoredOptions.fallbackToSimpleEngine(), snapshot->ephemeris.fallbackToSimpleEngine);
+    QCOMPARE(restoredOptions.enableAtmosphericRefraction(), snapshot->ephemeris.refractionEnabled);
 }
 
 void SkyContextControllerEphemerisSettingsTests::requestContextUsesSimpleEngineDefaults()
@@ -360,12 +359,12 @@ void SkyContextControllerEphemerisSettingsTests::requestContextUsesSimpleEngineD
     QCOMPARE(requestContext.request.context.utcTime, controller->skyContext().utcTime);
     QCOMPARE(requestContext.request.context.observer.latitudeDeg, controller->skyContext().observer.latitudeDeg);
     QCOMPARE(
-        static_cast<std::uint8_t>(requestContext.request.options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Simple)
+        static_cast<std::uint8_t>(requestContext.request.options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(requestContext.request.options.correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections)
+        static_cast<std::uint32_t>(requestContext.request.options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections())
     );
     compareEpoch(requestContext.request.epoch, expectedUtcEpoch(2026, 5, 14, 8, 45, 30));
     QVERIFY(requestContext.activeDataSnapshot != nullptr);
@@ -376,9 +375,9 @@ void SkyContextControllerEphemerisSettingsTests::requestContextUsesSimpleEngineD
 void SkyContextControllerEphemerisSettingsTests::requestContextCombinesRestoredSettingsObserverTimeAndDataRevision()
 {
     auto expectedSettings = customEphemerisUserSettings();
-    expectedSettings.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    expectedSettings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Apparent
-                                       | skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction;
+    expectedSettings.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    expectedSettings.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::apparent()
+                                       | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction();
     expectedSettings.refractionEnabled = true;
 
     SkySettingsStore store;
@@ -396,19 +395,19 @@ void SkyContextControllerEphemerisSettingsTests::requestContextCombinesRestoredS
     const auto requestContext = controller->ephemerisRequestContext();
 
     QCOMPARE(
-        static_cast<std::uint8_t>(requestContext.request.options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(requestContext.request.options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(requestContext.request.options.correctionFlags),
+        static_cast<std::uint32_t>(requestContext.request.options.correctionFlags()),
         static_cast<std::uint32_t>(expectedSettings.correctionFlags)
     );
-    QCOMPARE(requestContext.request.options.enableAtmosphericRefraction, expectedSettings.refractionEnabled);
-    QCOMPARE(requestContext.request.options.atmosphericPressureHpa, expectedSettings.atmosphericPressureHpa);
-    QCOMPARE(requestContext.request.options.atmosphericTemperatureC, expectedSettings.atmosphericTemperatureC);
-    QCOMPARE(requestContext.request.options.relativeHumidity, expectedSettings.relativeHumidity);
+    QCOMPARE(requestContext.request.options.enableAtmosphericRefraction(), expectedSettings.refractionEnabled);
+    QCOMPARE(requestContext.request.options.atmosphericPressureHpa(), expectedSettings.atmosphericPressureHpa);
+    QCOMPARE(requestContext.request.options.atmosphericTemperatureC(), expectedSettings.atmosphericTemperatureC);
+    QCOMPARE(requestContext.request.options.relativeHumidity(), expectedSettings.relativeHumidity);
     QCOMPARE(
-        requestContext.request.options.observingWavelengthMicrometers, expectedSettings.observingWavelengthMicrometers
+        requestContext.request.options.observingWavelengthMicrometers(), expectedSettings.observingWavelengthMicrometers
     );
     QCOMPARE(requestContext.request.context.observer.latitudeDeg, snapshot.latitudeDeg);
     QCOMPARE(requestContext.request.context.observer.longitudeDeg, snapshot.longitudeDeg);

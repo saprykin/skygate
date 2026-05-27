@@ -1,10 +1,9 @@
-#include "time/CalendarTime.hpp"
-#include <QtTest>
-
 #include "SkySceneModelTestSupport.hpp"
-
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "time/CalendarTime.hpp"
+
+#include <QtTest>
 
 #include <chrono>
 #include <memory>
@@ -19,16 +18,16 @@ namespace {
 
 class SnapshotContextEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         skygate::ephemeris::EphemerisEngineOptions options;
-        options.engineKind = kind();
-        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        options.setEngineKind(kind());
+        options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
         return options;
     }
 
@@ -191,11 +190,25 @@ void SkySceneModelFrameTests::highPrecisionSceneFrameUsesLeanRenderRequest()
     sceneModel.setViewportSize(1100.0, 760.0);
 
     QVERIFY(enginePtr->lastRequest().has_value());
-    const auto renderCorrections = enginePtr->lastRequest()->options.correctionFlags;
-    QVERIFY(!hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::LightTime));
-    QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation));
-    QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::EarthOrientation));
-    QVERIFY(hasCorrectionFlag(renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::DiurnalParallax));
+    const auto renderCorrections = enginePtr->lastRequest()->options.correctionFlags();
+    QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
+        renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+    ));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::earthOrientation()
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            renderCorrections, skygate::ephemeris::EphemerisCorrectionFlags::diurnalParallax()
+        )
+    );
 }
 
 void SkySceneModelFrameTests::degradationReasonsOnlyExposeOutOfRangeKernelSupport()

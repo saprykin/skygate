@@ -115,15 +115,15 @@ RequestCountingEphemerisEngine::RequestCountingEphemerisEngine(
 )
     : m_engine(std::move(engine)), m_options(options), m_catalogBodies(std::move(catalogBodies))
 {
-    if (m_engine != nullptr && m_options.engineKind == EphemerisEngineKind::Simple
-        && m_options.correctionFlags == EphemerisCorrectionFlags::NoCorrections) {
+    if (m_engine != nullptr && m_options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::Simple
+        && m_options.correctionFlags() == EphemerisCorrectionFlags::noCorrections()) {
         m_options = m_engine->options();
     }
 }
 
-EphemerisEngineKind RequestCountingEphemerisEngine::kind() const noexcept
+skygate::ephemeris::EphemerisEngineKind::Type RequestCountingEphemerisEngine::kind() const noexcept
 {
-    return m_options.engineKind;
+    return m_options.engineKind();
 }
 
 EphemerisEngineOptions RequestCountingEphemerisEngine::options() const noexcept
@@ -195,8 +195,8 @@ void RequestCountingEphemerisEngine::attachCatalogBodies(SkySnapshot& snapshot) 
 EphemerisEngineOptions highPrecisionLightTimeOptions() noexcept
 {
     EphemerisEngineOptions options;
-    options.engineKind = EphemerisEngineKind::HighPrecision;
-    options.correctionFlags = EphemerisCorrectionFlags::LightTime;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
     return options;
 }
 

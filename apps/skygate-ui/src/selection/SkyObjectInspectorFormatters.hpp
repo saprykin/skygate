@@ -29,7 +29,7 @@ formatObservationEvent(const ephemeris::ObservationEvent& event, const SkyTimeCo
 formatObservationCulmination(const ephemeris::ObservationEvent& culmination, const SkyTimeController* timeController);
 [[nodiscard]] QString angularSizeText(const ephemeris::DeepSkyObjectInfo& deepSkyObject);
 [[nodiscard]] QString aliasesText(const ephemeris::CelestialBody& body);
-[[nodiscard]] QString formatEphemerisStatus(ephemeris::EphemerisResultStatus status);
+[[nodiscard]] QString formatEphemerisStatus(ephemeris::EphemerisEngineQueryStatus::Type status);
 [[nodiscard]] QString formatEphemerisWarnings(const ephemeris::EphemerisResultMetadata& metadata);
 [[nodiscard]] QString formatEphemerisDateRange(const ephemeris::EphemerisDateRange& range);
 [[nodiscard]] QString formatAngularUncertaintyArcsec(double arcsec);

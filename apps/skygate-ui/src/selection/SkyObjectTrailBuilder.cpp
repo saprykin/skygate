@@ -2,7 +2,6 @@
 #include "CelestialReferenceCalculator.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
-
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "math/Geometry2d.hpp"
@@ -48,7 +47,8 @@ QColor colorWithAlpha(const QColor& color, const int alpha)
 [[nodiscard]] bool usesHighPrecisionRequest(const SkyObjectTrailInput& input) noexcept
 {
     return input.ephemerisRequest.has_value()
-           && input.ephemerisRequest->options.engineKind == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+           && input.ephemerisRequest->options.engineKind()
+                  == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
 }
 
 [[nodiscard]] bool isFixedEquatorialTrailTarget(const SkyObjectTrailInput& input) noexcept
@@ -91,12 +91,13 @@ epochsEqual(const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::eph
     const skygate::ephemeris::EphemerisEngineOptions& lhs, const skygate::ephemeris::EphemerisEngineOptions& rhs
 ) noexcept
 {
-    return lhs.engineKind == rhs.engineKind && lhs.correctionFlags == rhs.correctionFlags
-           && lhs.fallbackToSimpleEngine == rhs.fallbackToSimpleEngine
-           && lhs.enableAtmosphericRefraction == rhs.enableAtmosphericRefraction
-           && lhs.atmosphericPressureHpa == rhs.atmosphericPressureHpa
-           && lhs.atmosphericTemperatureC == rhs.atmosphericTemperatureC && lhs.relativeHumidity == rhs.relativeHumidity
-           && lhs.observingWavelengthMicrometers == rhs.observingWavelengthMicrometers;
+    return lhs.engineKind() == rhs.engineKind() && lhs.correctionFlags() == rhs.correctionFlags()
+           && lhs.fallbackToSimpleEngine() == rhs.fallbackToSimpleEngine()
+           && lhs.enableAtmosphericRefraction() == rhs.enableAtmosphericRefraction()
+           && lhs.atmosphericPressureHpa() == rhs.atmosphericPressureHpa()
+           && lhs.atmosphericTemperatureC() == rhs.atmosphericTemperatureC()
+           && lhs.relativeHumidity() == rhs.relativeHumidity()
+           && lhs.observingWavelengthMicrometers() == rhs.observingWavelengthMicrometers();
 }
 
 [[nodiscard]] bool optionalOptionsEqual(
@@ -473,7 +474,7 @@ void appendAdaptiveHighPrecisionAnchors(
 
     skygate::ephemeris::EphemerisRequest guidanceRequest = *input.ephemerisRequest;
     guidanceRequest.options = guidanceEngine->options();
-    guidanceRequest.options.engineKind = guidanceEngine->kind();
+    guidanceRequest.options.setEngineKind(guidanceEngine->kind());
     std::vector<skygate::ephemeris::BodyTrailSample> samples =
         trailCalculator.sample(*guidanceEngine, guidanceRequest, 0U, renderOptions);
     alignGuidanceTrailToSelectedState(samples, input);

@@ -1,11 +1,9 @@
 #include "SkyContextController.hpp"
-
 #include "SkyContextControllerSupport.hpp"
 #include "SkyTimeController.hpp"
+#include "math/ViewportMath.hpp"
 
 #include <QCoreApplication>
-
-#include "math/ViewportMath.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -51,7 +49,7 @@ void SkyContextController::setLive(bool live)
 
 bool SkyContextController::liveRecomputeThrottleApplies() const
 {
-    return activeEphemerisEngineKind() == skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+    return activeEphemerisEngineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
 }
 
 bool SkyContextController::liveRecomputeThrottled(const skygate::core::UtcTimePoint& nextUtc) const
@@ -317,7 +315,7 @@ void SkyContextController::tickUtcTime()
     const skygate::core::UtcTimePoint timelineUtc = m_location.utcTime();
     const bool catchingUpToCurrentUtc = m_timeline.catchingUpToCurrentUtc() && timelineUtc < currentWallUtc;
     if (catchingUpToCurrentUtc) {
-        const double elapsedSeconds = std::chrono::duration<double>(nextUtc - timelineUtc).count();
+        const double elapsedSeconds = std::max(1.0, std::chrono::duration<double>(nextUtc - timelineUtc).count());
         const double timelineAdvanceSeconds =
             elapsedSeconds * m_timeline.speedMultiplier() * static_cast<double>(m_timeline.stepSeconds());
         if (timelineAdvanceSeconds <= 0.0) {

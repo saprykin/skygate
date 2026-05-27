@@ -1,5 +1,5 @@
-#include "SkySelectionOverlayBuilder.hpp"
 #include "SkyOverlayTestSupport.hpp"
+#include "SkySelectionOverlayBuilder.hpp"
 #include "SkyTimeController.hpp"
 #include "UtcTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
@@ -86,8 +86,9 @@ public:
         }
 
         ++requestSampleCount;
-        const bool usesLightTime =
-            hasCorrectionFlag(request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime);
+        const bool usesLightTime = skygate::ephemeris::EphemerisCorrectionFlags::has(
+            request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+        );
         sawLightTimeRequest = sawLightTimeRequest || usesLightTime;
         const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(request.context.utcTime);
         const double phase = std::fmod(seconds, 86400.0) / 86400.0;
@@ -129,16 +130,16 @@ public:
 
 class NonFixedObservationProfileEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         skygate::ephemeris::EphemerisEngineOptions options;
-        options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-        options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+        options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+        options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
         return options;
     }
 
@@ -198,9 +199,9 @@ public:
 
 class HighPrecisionInspectorEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return skygate::ephemeris::EphemerisEngineKind::HighPrecision;
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
     [[nodiscard]] skygate::ephemeris::SkySnapshot
@@ -227,14 +228,14 @@ public:
         ++requestSampleCount;
         sawLightTimeRequest =
             sawLightTimeRequest
-            || hasCorrectionFlag(
-                request.options.correctionFlags, skygate::ephemeris::EphemerisCorrectionFlags::LightTime
+            || skygate::ephemeris::EphemerisCorrectionFlags::has(
+                request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
             );
         skygate::ephemeris::EphemerisResultMetadata metadata;
-        metadata.status = skygate::ephemeris::EphemerisResultStatus::Valid;
+        metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         metadata.dataSourceProvenance = "Selected-object precision fixture";
-        metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
-        metadata.finalizeCorrectionTracking(skygate::ephemeris::EphemerisCorrectionFlags::LightTime);
+        metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::lightTime();
+        metadata.finalizeCorrectionTracking(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
         return skygate::ephemeris::CelestialBodyState{
             .bodyIndex = 0U,
             .equatorial = {.rightAscensionHours = 6.5, .declinationDeg = 7.5},
@@ -417,7 +418,7 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     const SkySelectionOverlayBuilder builder;
     auto fixture = makeFixture();
     auto& metadata = fixture.snapshot.states[0].metadata;
-    metadata.status = skygate::ephemeris::EphemerisResultStatus::Degraded;
+    metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
     metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::MissingEphemerisData);
     metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::DataOutOfRange);
     metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
@@ -439,12 +440,12 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
         )
     };
     metadata.estimatedAngularUncertaintyArcsec = 0.42;
-    metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
-    metadata.addUnavailableCorrection(skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction);
+    metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::lightTime();
+    metadata.addUnavailableCorrection(skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction());
     metadata.finalizeCorrectionTracking(
-        skygate::ephemeris::EphemerisCorrectionFlags::LightTime
-        | skygate::ephemeris::EphemerisCorrectionFlags::AtmosphericRefraction
-        | skygate::ephemeris::EphemerisCorrectionFlags::PrecessionNutation
+        skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
+        | skygate::ephemeris::EphemerisCorrectionFlags::atmosphericRefraction()
+        | skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
     );
 
     auto input = makeInput(fixture);
@@ -453,9 +454,11 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
         .epoch =
             *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
-        .options = skygate::ephemeris::EphemerisEngineOptions{
-            .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-        },
+        .options = []() {
+            skygate::ephemeris::EphemerisEngineOptions opts;
+            opts.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+            return opts;
+        }(),
     };
 
     const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
@@ -487,10 +490,12 @@ void SkySelectionOverlayBuilderTests::inspectorUsesHighPrecisionStateForSelected
         .epoch =
             *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(skygate::ephemeris::CivilDateTime{}),
         .context = fixture.skyContext,
-        .options = skygate::ephemeris::EphemerisEngineOptions{
-            .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-            .correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime,
-        },
+        .options = []() {
+            skygate::ephemeris::EphemerisEngineOptions opts;
+            opts.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+            opts.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+            return opts;
+        }(),
     };
 
     const SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
@@ -555,17 +560,19 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
             }
         ),
         .context = fixture.skyContext,
-        .options = skygate::ephemeris::EphemerisEngineOptions{
-            .engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision,
-            .correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::NoCorrections,
-        },
+        .options = []() {
+            skygate::ephemeris::EphemerisEngineOptions opts;
+            opts.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+            opts.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
+            return opts;
+        }(),
     };
 
     SkySelectedObjectInspector inspector = builder.buildSelectedObjectInspectorData(input);
     QCOMPARE(overlayInspectorFieldValue(inspector, "RA / Dec"), QString("1h 00m 00s / +2d 00m 00s"));
     QCOMPARE(overlayInspectorFieldValue(inspector, "Rise"), QString("No event in next 72h"));
 
-    input.ephemerisRequest->options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::LightTime;
+    input.ephemerisRequest->options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     inspector = builder.buildSelectedObjectInspectorData(input);
 
     QCOMPARE(enginePtr->contextSampleCount, 0);

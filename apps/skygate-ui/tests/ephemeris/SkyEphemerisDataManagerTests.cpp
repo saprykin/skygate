@@ -1,15 +1,11 @@
-#include "time/CalendarTime.hpp"
-#include "SkyEphemerisDataManager.hpp"
-
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyContextController.hpp"
+#include "SkyEphemerisDataManager.hpp"
 #include "SkySettingsStore.hpp"
-
 #include "engine/IEphemerisEngine.hpp"
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
-
-#include <QtTest/QtTest>
 
 #include <QDir>
 #include <QFile>
@@ -17,6 +13,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QUrl>
+#include <QtTest/QtTest>
 
 #include <cstdint>
 #include <memory>
@@ -402,13 +399,13 @@ skygate::ephemeris::EphemerisDataManifest loadProductionManifest()
 skygate::ephemeris::EphemerisEngineOptions highPrecisionOptions()
 {
     skygate::ephemeris::EphemerisEngineOptions options;
-    options.engineKind = skygate::ephemeris::EphemerisEngineKind::HighPrecision;
-    options.correctionFlags = skygate::ephemeris::EphemerisCorrectionFlags::Geometric;
-    options.enableAtmosphericRefraction = false;
-    options.atmosphericPressureHpa = 875.0;
-    options.atmosphericTemperatureC = -4.0;
-    options.relativeHumidity = 0.4;
-    options.observingWavelengthMicrometers = 0.7;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    options.setEnableAtmosphericRefraction(false);
+    options.setAtmosphericPressureHpa(875.0);
+    options.setAtmosphericTemperatureC(-4.0);
+    options.setRelativeHumidity(0.4);
+    options.setObservingWavelengthMicrometers(0.7);
     return options;
 }
 
@@ -416,32 +413,32 @@ void verifyHighPrecisionOptions(const skygate::ephemeris::IEphemerisEngine& engi
 {
     QCOMPARE(
         static_cast<std::uint8_t>(engine.kind()),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
 
     const skygate::ephemeris::EphemerisEngineOptions options = engine.options();
     QCOMPARE(
-        static_cast<std::uint8_t>(options.engineKind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::HighPrecision)
+        static_cast<std::uint8_t>(options.engineKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     QCOMPARE(
-        static_cast<std::uint32_t>(options.correctionFlags),
-        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::Geometric)
+        static_cast<std::uint32_t>(options.correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::geometric())
     );
-    QCOMPARE(options.enableAtmosphericRefraction, false);
-    QCOMPARE(options.atmosphericPressureHpa, 875.0);
-    QCOMPARE(options.atmosphericTemperatureC, -4.0);
-    QCOMPARE(options.relativeHumidity, 0.4);
-    QCOMPARE(options.observingWavelengthMicrometers, 0.7);
+    QCOMPARE(options.enableAtmosphericRefraction(), false);
+    QCOMPARE(options.atmosphericPressureHpa(), 875.0);
+    QCOMPARE(options.atmosphericTemperatureC(), -4.0);
+    QCOMPARE(options.relativeHumidity(), 0.4);
+    QCOMPARE(options.observingWavelengthMicrometers(), 0.7);
 }
 
 class ConfiguredEphemerisEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit ConfiguredEphemerisEngine(skygate::ephemeris::EphemerisEngineOptions options) : m_options(options) {}
 
-    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind kind() const noexcept override
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
-        return m_options.engineKind;
+        return m_options.engineKind();
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override

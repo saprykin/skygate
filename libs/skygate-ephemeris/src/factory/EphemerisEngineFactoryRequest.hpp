@@ -19,7 +19,7 @@ class ICalcephKernelRuntime;
 }  // namespace highprecision
 
 struct EphemerisEngineFactoryRequest {
-    EphemerisEngineKind engineKind = EphemerisEngineKind::Simple;
+    EphemerisEngineKind::Type engineKind = EphemerisEngineKind::Type::Simple;
     std::span<const CelestialBody> catalogBodies;
     EphemerisEngineOptions options;
     const EphemerisDataSetInfo* dataSetManifest = nullptr;
