@@ -207,8 +207,8 @@ void EphemerisFallbackValidationTests::missingLongRangeKernelFallbackIsDegraded(
         .declinationDeg = -11.0,
     };
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-    calculatorResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
-    calculatorResult.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     calculatorResult.metadata.dataSourceProvenance = "missing DE441 long-range kernel; modern kernel fallback";
     calculatorResult.metadata.effectiveDataValidityRange = EphemerisDateRange{
         .id = "de440-modern",
@@ -225,8 +225,8 @@ void EphemerisFallbackValidationTests::missingLongRangeKernelFallbackIsDegraded(
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
     QCOMPARE(
         state->metadata.dataSourceProvenance, std::string{"missing DE441 long-range kernel; modern kernel fallback"}
     );
@@ -243,8 +243,8 @@ void EphemerisFallbackValidationTests::staleDataWarningsRemainVisible()
         .declinationDeg = 9.0,
     };
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
-    calculatorResult.metadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
-    calculatorResult.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::AccuracyDegraded);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
     calculatorResult.metadata.dataSourceProvenance = "stale EOP and leap-second data";
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
@@ -255,8 +255,8 @@ void EphemerisFallbackValidationTests::staleDataWarningsRemainVisible()
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QCOMPARE(state->metadata.warningCount(), std::size_t{2});
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"stale EOP and leap-second data"});
 }
@@ -273,7 +273,7 @@ void EphemerisFallbackValidationTests::unsupportedBodyReturnsStructuredWarning()
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::UnsupportedBody));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::UnsupportedBody));
     QVERIFY(!state->metadata.dataSourceProvenance.empty());
     QVERIFY(std::isnan(state->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(state->equatorial.declinationDeg));
@@ -283,7 +283,7 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-    calculatorResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
@@ -296,7 +296,7 @@ void EphemerisFallbackValidationTests::outOfRangeRequestWithoutFallbackStaysOutO
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"kernel out of range"});
     QVERIFY(std::isnan(state->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(state->equatorial.declinationDeg));
@@ -306,7 +306,7 @@ void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFal
 {
     HighPrecisionCalculatorResult calculatorResult;
     calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-    calculatorResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
@@ -320,8 +320,8 @@ void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFal
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
     QVERIFY(state->metadata.dataSourceProvenance.find("simple solar-system fallback") != std::string::npos);
     QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
@@ -348,7 +348,7 @@ void EphemerisFallbackValidationTests::failedRequestReturnsFailedStatus()
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::ComputationFailed));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
     QVERIFY(!std::isfinite(state->equatorial.rightAscensionHours));
     QVERIFY(!std::isfinite(state->equatorial.declinationDeg));
 }

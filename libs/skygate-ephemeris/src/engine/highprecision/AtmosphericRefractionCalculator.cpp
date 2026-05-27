@@ -51,7 +51,7 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
     return std::isfinite(altitudeDeg) && altitudeDeg < kMinimumModelAltitudeDeg;
 }
 
-void markUnavailable(EphemerisResultMetadata& metadata) noexcept
+void markUnavailable(EphemerisEngineQueryResult& metadata) noexcept
 {
     EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::atmosphericRefraction());
 }

@@ -377,7 +377,7 @@ void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBo
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
     SolarSystemKernelStateResult missingBodyCenter;
     missingBodyCenter.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-    missingBodyCenter.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+    missingBodyCenter.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
     provider->responses[{499, 399}] = missingBodyCenter;
     provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
     const SolarSystemStateCalculator calculator(provider);
@@ -394,7 +394,7 @@ void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBo
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
     QVERIFY(result.metadata.dataSourceProvenance.find("mars body center (499)") != std::string::npos);
     QVERIFY(result.metadata.dataSourceProvenance.find("planetary-system barycenter (4)") != std::string::npos);
 }
@@ -417,7 +417,7 @@ void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfig
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+    QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
     QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
 }
 
@@ -450,7 +450,7 @@ void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPref
             static_cast<std::uint8_t>(result.metadata.status),
             static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
         );
-        QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::BarycenterFallback));
+        QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
     }
 }
 
@@ -543,7 +543,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDr
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
     provider->responses[{499, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
     provider->responses[{399, 0}].metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-    provider->responses[{399, 0}].metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    provider->responses[{399, 0}].metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
@@ -558,8 +558,8 @@ void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDr
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::lightTime()
@@ -637,7 +637,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsW
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::stellarAberration()
@@ -694,7 +694,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWit
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
     provider->responses[{499, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
     provider->responses[{10, 399}].metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-    provider->responses[{10, 399}].metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    provider->responses[{10, 399}].metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::gravitationalLightDeflection());
@@ -708,8 +708,8 @@ void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWit
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::gravitationalLightDeflection()
@@ -735,7 +735,7 @@ void SolarSystemStateCalculatorTests::reportsUnsupportedPlanetIdsWithoutCallingK
         static_cast<std::uint8_t>(unknownPlanet.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
     );
-    QVERIFY(unknownPlanet.metadata.hasWarning(EphemerisWarningCode::UnsupportedBody));
+    QVERIFY(unknownPlanet.metadata.hasWarning(EphemerisEngineWarning::Code::UnsupportedBody));
     QCOMPARE(
         static_cast<std::uint8_t>(deepSky.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported)
@@ -752,7 +752,7 @@ void SolarSystemStateCalculatorTests::reportsMissingKernelProvider()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
     QVERIFY(!result.equatorial.has_value());
 }
 
@@ -760,7 +760,7 @@ void SolarSystemStateCalculatorTests::propagatesOutOfRangeKernelStatus()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
     provider->nextResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-    provider->nextResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+    provider->nextResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     const SolarSystemStateCalculator calculator(provider);
 
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
@@ -770,7 +770,7 @@ void SolarSystemStateCalculatorTests::propagatesOutOfRangeKernelStatus()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
     QVERIFY(!result.equatorial.has_value());
 }
 
@@ -789,7 +789,7 @@ void SolarSystemStateCalculatorTests::rejectsNonTdbEpochs()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
 QTEST_APPLESS_MAIN(SolarSystemStateCalculatorTests)

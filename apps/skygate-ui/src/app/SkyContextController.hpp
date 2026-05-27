@@ -236,7 +236,7 @@ public:
 
     struct InitializationOptions final {
         struct EphemerisFactoryInputs final {
-            const skygate::ephemeris::EphemerisDataSetInfo* dataSetManifest = nullptr;
+            const skygate::ephemeris::EphemerisDatasetInfo* dataSetManifest = nullptr;
             const skygate::ephemeris::EphemerisDataManifest* dataManifest = nullptr;
             std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
             std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
@@ -504,7 +504,7 @@ private:
     skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;
     std::uint64_t m_ephemerisOptionsRevision = 1U;
     SkySettingsStore::EphemerisUserSettingsSnapshot m_ephemerisUserSettings;
-    const skygate::ephemeris::EphemerisDataSetInfo* m_ephemerisDataSetManifest = nullptr;
+    const skygate::ephemeris::EphemerisDatasetInfo* m_ephemerisDataSetManifest = nullptr;
     const skygate::ephemeris::EphemerisDataManifest* m_ephemerisDataManifest = nullptr;
     std::optional<skygate::ephemeris::EphemerisDataManifest> m_refreshedEphemerisDataManifest;
     QString m_ephemerisUpdateResourceRoot;

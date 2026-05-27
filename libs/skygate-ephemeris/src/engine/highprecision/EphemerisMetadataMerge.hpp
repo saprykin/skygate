@@ -29,22 +29,23 @@ public:
     EphemerisMetadataMerger() = delete;
 
     static void merge(
-        EphemerisResultMetadata& target,
-        const EphemerisResultMetadata& source,
+        EphemerisEngineQueryResult& target,
+        const EphemerisEngineQueryResult& source,
         EphemerisMetadataMergeOptions options = {}
     ) noexcept;
 
     static void markCorrectionUnavailable(
-        EphemerisResultMetadata& metadata, EphemerisCorrectionFlags unavailableCorrection
+        EphemerisEngineQueryResult& metadata, EphemerisCorrectionFlags unavailableCorrection
     ) noexcept;
 
     static void mergeTimeScale(
-        EphemerisResultMetadata& metadata,
+        EphemerisEngineQueryResult& metadata,
         const TimeScaleConversionResult& conversion,
         EphemerisMetadataFailurePolicy failurePolicy = EphemerisMetadataFailurePolicy::MarkDegraded
     ) noexcept;
 
-    static void mergeEarthOrientation(EphemerisResultMetadata& metadata, const EarthOrientationSample& sample) noexcept;
+    static void
+    mergeEarthOrientation(EphemerisEngineQueryResult& metadata, const EarthOrientationSample& sample) noexcept;
 };
 
 }  // namespace skygate::ephemeris::highprecision

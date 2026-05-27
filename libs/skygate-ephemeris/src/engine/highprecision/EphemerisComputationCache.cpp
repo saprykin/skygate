@@ -173,7 +173,7 @@ void mixCatalogBody(std::uint64_t& hash, const CelestialBody& body) noexcept
     return hash;
 }
 
-[[nodiscard]] std::uint64_t hashDataSetInfo(const EphemerisDataSetInfo& dataSetInfo) noexcept
+[[nodiscard]] std::uint64_t hashDataSetInfo(const EphemerisDatasetInfo& dataSetInfo) noexcept
 {
     std::uint64_t hash = kFnvOffsetBasis;
     mixString(hash, dataSetInfo.id);
@@ -330,7 +330,7 @@ sameOptionalDeepSkyObject(const std::optional<DeepSkyObjectInfo>& lhs, const std
     return true;
 }
 
-[[nodiscard]] bool sameDataSetInfo(const EphemerisDataSetInfo& lhs, const EphemerisDataSetInfo& rhs)
+[[nodiscard]] bool sameDataSetInfo(const EphemerisDatasetInfo& lhs, const EphemerisDatasetInfo& rhs)
 {
     if (lhs.id != rhs.id || lhs.displayName != rhs.displayName || lhs.version != rhs.version
         || lhs.provenance != rhs.provenance || lhs.dateRanges.size() != rhs.dateRanges.size()) {
@@ -354,7 +354,7 @@ EphemerisComputationCache::EphemerisComputationCache(const std::size_t maxEntrie
 EphemerisComputationCache::RequestIdentity EphemerisComputationCache::makeIdentity(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 )
 {
     return RequestIdentity{
@@ -368,7 +368,7 @@ bool EphemerisComputationCache::matchesIdentity(
     const EphemerisComputationCache::RequestIdentity& identity,
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 )
 {
     return sameRequest(identity.request, request) && sameCatalogBodies(identity.catalogBodies, catalogBodies)
@@ -378,7 +378,7 @@ bool EphemerisComputationCache::matchesIdentity(
 std::optional<SkySnapshot> EphemerisComputationCache::findSnapshot(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 ) const
 {
     const std::string key = makeSnapshotKey(request, catalogBodies, dataSetInfo);
@@ -398,7 +398,7 @@ std::optional<SkySnapshot> EphemerisComputationCache::findSnapshot(
 void EphemerisComputationCache::storeSnapshot(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo,
+    const EphemerisDatasetInfo& dataSetInfo,
     const SkySnapshot& snapshot
 ) const
 {
@@ -422,7 +422,7 @@ void EphemerisComputationCache::storeSnapshot(
 std::shared_ptr<const PreparedEphemerisRequestState> EphemerisComputationCache::findPreparedRequestState(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 ) const
 {
     const std::string key = makePreparedStateKey(request, catalogBodies, dataSetInfo);
@@ -442,7 +442,7 @@ std::shared_ptr<const PreparedEphemerisRequestState> EphemerisComputationCache::
 void EphemerisComputationCache::storePreparedRequestState(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo,
+    const EphemerisDatasetInfo& dataSetInfo,
     std::shared_ptr<const PreparedEphemerisRequestState> preparedState
 ) const
 {
@@ -470,7 +470,7 @@ void EphemerisComputationCache::storePreparedRequestState(
 std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo,
+    const EphemerisDatasetInfo& dataSetInfo,
     const std::size_t bodyIndex
 ) const
 {
@@ -492,7 +492,7 @@ std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
 void EphemerisComputationCache::storeBodyState(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo,
+    const EphemerisDatasetInfo& dataSetInfo,
     const std::size_t bodyIndex,
     const CelestialBodyState& state
 ) const
@@ -529,7 +529,7 @@ void EphemerisComputationCache::clear() const
 std::string EphemerisComputationCache::makeRequestKey(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 )
 {
     std::string key;
@@ -545,7 +545,7 @@ std::string EphemerisComputationCache::makeRequestKey(
 std::string EphemerisComputationCache::makeSnapshotKey(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 )
 {
     return "snapshot|" + makeRequestKey(request, catalogBodies, dataSetInfo);
@@ -554,7 +554,7 @@ std::string EphemerisComputationCache::makeSnapshotKey(
 std::string EphemerisComputationCache::makePreparedStateKey(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo
+    const EphemerisDatasetInfo& dataSetInfo
 )
 {
     return "prepared|" + makeRequestKey(request, catalogBodies, dataSetInfo);
@@ -563,7 +563,7 @@ std::string EphemerisComputationCache::makePreparedStateKey(
 std::string EphemerisComputationCache::makeBodyStateKey(
     const EphemerisRequest& request,
     const std::vector<CelestialBody>& catalogBodies,
-    const EphemerisDataSetInfo& dataSetInfo,
+    const EphemerisDatasetInfo& dataSetInfo,
     const std::size_t bodyIndex
 )
 {

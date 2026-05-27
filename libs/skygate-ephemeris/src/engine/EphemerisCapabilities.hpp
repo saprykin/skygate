@@ -1,5 +1,7 @@
 #pragma once
 
+#include "engine/BitFlagSetOperations.hpp"
+
 #include <cstdint>
 
 namespace skygate::ephemeris {
@@ -69,13 +71,13 @@ public:
 
     [[nodiscard]] constexpr bool has(const EphemerisCapabilities capability) const noexcept
     {
-        return (*this & capability) != noCapabilities();
+        return BitFlagSetOperations<EphemerisCapabilities>::hasFlag(*this, capability);
     }
 
     [[nodiscard]] static constexpr bool
     has(const EphemerisCapabilities capabilities, const EphemerisCapabilities capability) noexcept
     {
-        return capabilities.has(capability);
+        return BitFlagSetOperations<EphemerisCapabilities>::hasFlag(capabilities, capability);
     }
 
     [[nodiscard]] static constexpr EphemerisCapabilities noCapabilities() noexcept

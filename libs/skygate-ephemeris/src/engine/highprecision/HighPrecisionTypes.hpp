@@ -2,8 +2,9 @@
 
 #include "EquatorialCoordinate.hpp"
 #include "HorizontalCoordinate.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "Types.hpp"
+#include "engine/EphemerisDatasetInfo.hpp"
+#include "engine/highprecision/EarthOrientationProvider.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -38,17 +39,17 @@ struct SolarSystemKernelVector {
 struct SolarSystemKernelStateResult {
     std::optional<SolarSystemKernelVector> positionAu;
     std::optional<SolarSystemKernelVector> velocityAuPerDay;
-    EphemerisResultMetadata metadata;
+    EphemerisEngineQueryResult metadata;
 };
 
 struct PreparedEphemerisRequestState {
-    EphemerisResultMetadata tdbKernelEpochMetadata;
+    EphemerisEngineQueryResult tdbKernelEpochMetadata;
     std::optional<AstronomicalEpoch> tdbKernelEpoch;
     std::optional<SolarSystemKernelStateResult> annualParallaxEarthState;
 
     bool topocentricStatePrepared = false;
     bool topocentricStateAvailable = true;
-    EphemerisResultMetadata topocentricMetadata;
+    EphemerisEngineQueryResult topocentricMetadata;
     std::optional<EarthOrientationSample> earthOrientationSample;
     std::optional<SolarSystemKernelVector> observerItrsPositionAu;
 };
@@ -64,7 +65,7 @@ struct HighPrecisionCalculatorResult {
     std::optional<core::EquatorialCoordinate> equatorial;
     std::optional<core::HorizontalCoordinate> horizontal;
     std::optional<SolarSystemKernelVector> observerRelativePositionAu;
-    EphemerisResultMetadata metadata;
+    EphemerisEngineQueryResult metadata;
 };
 
 struct StarAstrometryBatchResult {
@@ -83,7 +84,7 @@ struct HighPrecisionEphemerisEngineDependencies {
     std::shared_ptr<const IAtmosphericRefractionCalculator> atmosphericRefractionCalculator;
     std::shared_ptr<const IEphemerisResultBuilder> resultBuilder;
     std::shared_ptr<const IEphemerisComputationCache> computationCache;
-    EphemerisDataSetInfo dataSetInfo;
+    EphemerisDatasetInfo dataSetInfo;
 };
 
 }  // namespace skygate::ephemeris::highprecision

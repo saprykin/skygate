@@ -85,7 +85,7 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
 void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsUnavailableAndFallbackIsAllowed()
@@ -126,7 +126,7 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
     const auto state = result.engine->computeBodyState(makeContext(), std::size_t{0});
     QVERIFY(state.has_value());
     QCOMPARE(state->equatorial.rightAscensionHours, 11.25);
-    QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(state->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
 void EphemerisEngineFactorySelectionTests::failsDefaultHighPrecisionRequestWhenHighPrecisionIsUnavailable()

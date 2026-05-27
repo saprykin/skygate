@@ -316,26 +316,26 @@ QString formatEphemerisStatus(const ephemeris::EphemerisEngineQueryStatus::Type 
     return titleCaseAscii(ephemeris::EphemerisEngineQueryStatus::displayName(status));
 }
 
-QString formatEphemerisWarnings(const ephemeris::EphemerisResultMetadata& metadata)
+QString formatEphemerisWarnings(const ephemeris::EphemerisEngineQueryResult& metadata)
 {
-    using ephemeris::EphemerisWarningCode;
+    using Code = ephemeris::EphemerisEngineWarning::Code;
 
     constexpr std::array warningCodes{
-        EphemerisWarningCode::AccuracyDegraded,
-        EphemerisWarningCode::UnsupportedBody,
-        EphemerisWarningCode::DataOutOfRange,
-        EphemerisWarningCode::MissingEphemerisData,
-        EphemerisWarningCode::MissingObserver,
-        EphemerisWarningCode::TimeScaleDataUnavailable,
-        EphemerisWarningCode::CorrectionUnavailable,
-        EphemerisWarningCode::ComputationFailed,
-        EphemerisWarningCode::BarycenterFallback,
+        Code::AccuracyDegraded,
+        Code::UnsupportedBody,
+        Code::DataOutOfRange,
+        Code::MissingEphemerisData,
+        Code::MissingObserver,
+        Code::TimeScaleDataUnavailable,
+        Code::CorrectionUnavailable,
+        Code::ComputationFailed,
+        Code::BarycenterFallback,
     };
 
     QStringList warnings;
-    for (const EphemerisWarningCode code : warningCodes) {
+    for (const Code code : warningCodes) {
         if (metadata.hasWarning(code)) {
-            const std::string_view warningText = ephemeris::ephemerisWarningText(code);
+            const std::string_view warningText = ephemeris::EphemerisEngineWarning::text(code);
             warnings.push_back(QString::fromUtf8(warningText.data(), static_cast<qsizetype>(warningText.size())));
         }
     }
@@ -364,7 +364,7 @@ QString formatAngularUncertaintyArcsec(const double arcsec)
     return QString("%1 arcsec").arg(QString::number(arcsec, 'f', arcsec >= 10.0 ? 1 : 2));
 }
 
-QString formatCorrectionSummary(const ephemeris::EphemerisResultMetadata& metadata)
+QString formatCorrectionSummary(const ephemeris::EphemerisEngineQueryResult& metadata)
 {
     QStringList parts;
 

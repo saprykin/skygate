@@ -2,6 +2,8 @@
 
 #include "SkyContext.hpp"
 #include "Types.hpp"
+#include "engine/EphemerisCapabilities.hpp"
+#include "engine/EphemerisDatasetInfo.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -36,7 +38,7 @@ public:
         return {};
     }
 
-    [[nodiscard]] virtual EphemerisDataSetInfo dataSetInfo() const
+    [[nodiscard]] virtual EphemerisDatasetInfo dataSetInfo() const
     {
         return {};
     }

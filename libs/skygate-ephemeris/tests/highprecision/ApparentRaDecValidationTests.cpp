@@ -84,7 +84,7 @@ public:
 
         SolarSystemKernelStateResult result;
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
         result.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
         return result;
     }

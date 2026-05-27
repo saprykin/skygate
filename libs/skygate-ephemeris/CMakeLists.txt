@@ -131,11 +131,17 @@ add_library(skygate-ephemeris STATIC
     src/factory/IEphemerisDiagnosticsSink.hpp
     src/engine/EphemerisEngineQueries.hpp
     src/engine/EphemerisPrecisionPolicy.hpp
-    src/EphemerisCapabilities.hpp
-    src/EphemerisCorrectionFlags.hpp
-    src/EphemerisEngineKind.hpp
-    src/EphemerisEngineOptions.hpp
-    src/EphemerisEngineQueryStatus.hpp
+    src/engine/BitFlagSetOperations.hpp
+    src/engine/EphemerisCapabilities.hpp
+    src/engine/EphemerisCorrectionFlags.hpp
+    src/engine/EphemerisDateRange.hpp
+    src/engine/EphemerisDatasetInfo.hpp
+    src/engine/EphemerisEngineKind.hpp
+    src/engine/EphemerisEngineOptions.hpp
+    src/engine/EphemerisEngineQueryResult.hpp
+    src/engine/EphemerisEngineWarning.hpp
+    src/engine/EphemerisEngineQueryStatus.hpp
+    src/EphemerisRequest.hpp
     src/EphemerisRequestFactory.hpp
     src/engine/IEphemerisEngine.hpp
     src/engine/highprecision/LeapSecondProvider.hpp
@@ -256,11 +262,17 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisFactoryCreationDiagnostic.cpp
     src/engine/EphemerisEngineQueries.cpp
     src/engine/EphemerisPrecisionPolicy.cpp
-    src/EphemerisCapabilities.cpp
-    src/EphemerisCorrectionFlags.cpp
-    src/EphemerisEngineKind.cpp
-    src/EphemerisEngineOptions.cpp
-    src/EphemerisEngineQueryStatus.cpp
+    src/engine/BitFlagSetOperations.cpp
+    src/engine/EphemerisCapabilities.cpp
+    src/engine/EphemerisCorrectionFlags.cpp
+    src/engine/EphemerisDateRange.cpp
+    src/engine/EphemerisDatasetInfo.cpp
+    src/engine/EphemerisEngineKind.cpp
+    src/engine/EphemerisEngineOptions.cpp
+    src/engine/EphemerisEngineQueryResult.cpp
+    src/engine/EphemerisEngineWarning.cpp
+    src/engine/EphemerisEngineQueryStatus.cpp
+    src/EphemerisRequest.cpp
     src/EphemerisRequestFactory.cpp
     src/MoonPhase.cpp
     src/MoonPhaseCalculator.cpp

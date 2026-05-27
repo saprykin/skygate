@@ -502,9 +502,9 @@ std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionMoonGuardCatalog
     return bodies;
 }
 
-skygate::ephemeris::EphemerisDataSetInfo makeHighPrecisionGuardDataSetInfo()
+skygate::ephemeris::EphemerisDatasetInfo makeHighPrecisionGuardDataSetInfo()
 {
-    skygate::ephemeris::EphemerisDataSetInfo dataSetInfo;
+    skygate::ephemeris::EphemerisDatasetInfo dataSetInfo;
     dataSetInfo.id = "performance-guard-data";
     dataSetInfo.displayName = "Performance guard data";
     dataSetInfo.version = "1";

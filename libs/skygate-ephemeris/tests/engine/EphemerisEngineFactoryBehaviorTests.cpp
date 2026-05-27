@@ -399,7 +399,7 @@ void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueI
     const std::array bodies{makeFactoryBehaviorBody()};
     const auto opaqueOwner = std::make_shared<int>(42);
 
-    skygate::ephemeris::EphemerisDataSetInfo manifest;
+    skygate::ephemeris::EphemerisDatasetInfo manifest;
     manifest.id = "test-manifest";
     manifest.displayName = "Test Manifest";
 
@@ -729,7 +729,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(!state->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::BarycenterFallback));
+    QVERIFY(!state->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::BarycenterFallback));
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopocentricCorrectionPath()

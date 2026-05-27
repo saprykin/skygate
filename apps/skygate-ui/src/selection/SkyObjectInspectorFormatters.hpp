@@ -30,10 +30,10 @@ formatObservationCulmination(const ephemeris::ObservationEvent& culmination, con
 [[nodiscard]] QString angularSizeText(const ephemeris::DeepSkyObjectInfo& deepSkyObject);
 [[nodiscard]] QString aliasesText(const ephemeris::CelestialBody& body);
 [[nodiscard]] QString formatEphemerisStatus(ephemeris::EphemerisEngineQueryStatus::Type status);
-[[nodiscard]] QString formatEphemerisWarnings(const ephemeris::EphemerisResultMetadata& metadata);
+[[nodiscard]] QString formatEphemerisWarnings(const ephemeris::EphemerisEngineQueryResult& metadata);
 [[nodiscard]] QString formatEphemerisDateRange(const ephemeris::EphemerisDateRange& range);
 [[nodiscard]] QString formatAngularUncertaintyArcsec(double arcsec);
-[[nodiscard]] QString formatCorrectionSummary(const ephemeris::EphemerisResultMetadata& metadata);
+[[nodiscard]] QString formatCorrectionSummary(const ephemeris::EphemerisEngineQueryResult& metadata);
 [[nodiscard]] QString sourceLabelForBodyIndex(
     std::span<const std::uint8_t> sourceIds, const QStringList& sourceLabels, std::uint32_t bodyIndex
 );

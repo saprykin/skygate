@@ -379,7 +379,7 @@ void FrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
 void FrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms()
@@ -407,7 +407,7 @@ void FrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTr
             static_cast<std::uint8_t>(result.metadata.status),
             static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
         );
-        QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+        QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
         QCOMPARE(
             static_cast<std::uint32_t>(result.metadata.appliedCorrections),
             static_cast<std::uint32_t>(EphemerisCorrectionFlags::noCorrections())
@@ -685,7 +685,7 @@ void FrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed
         static_cast<std::uint8_t>(result.stages.front().metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
-    QVERIFY(result.stages.front().metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.stages.front().metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QCOMPARE(
         static_cast<std::uint32_t>(result.metadata.appliedCorrections),
         static_cast<std::uint32_t>(EphemerisCorrectionFlags::noCorrections())
@@ -710,7 +710,7 @@ void FrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientationDat
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
-    QVERIFY(!result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
 void FrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
@@ -733,7 +733,7 @@ void FrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
 void FrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationData()
@@ -756,7 +756,7 @@ void FrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationDat
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
 void FrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData()
@@ -777,7 +777,7 @@ void FrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData(
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
 QTEST_MAIN(FrameTransformerTests)

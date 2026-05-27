@@ -454,7 +454,7 @@ void validateProfileAssetReferences(const EphemerisDataManifest& manifest, std::
 }
 
 [[nodiscard]] bool parseDataSetInfo(
-    const QJsonObject& rootObject, std::vector<std::string>& diagnostics, EphemerisDataSetInfo& dataSetInfo
+    const QJsonObject& rootObject, std::vector<std::string>& diagnostics, EphemerisDatasetInfo& dataSetInfo
 )
 {
     bool valid = true;

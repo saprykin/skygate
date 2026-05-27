@@ -1,4 +1,6 @@
-#include "engine/EphemerisPrecisionPolicy.hpp"
+#include "EphemerisRequest.hpp"
+#include "engine/EphemerisCorrectionFlags.hpp"
+#include "engine/EphemerisEngineKind.hpp"
 
 #include <QtTest/QtTest>
 
@@ -17,10 +19,10 @@ void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanTopocentricCorrec
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
     request.options.setEnableAtmosphericRefraction(true);
 
-    const auto sceneRequest = skygate::ephemeris::ephemerisRequestForPrecisionPolicy(
+    const auto sceneRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
         request, skygate::ephemeris::EphemerisPrecisionPolicy::SceneRender
     );
-    const auto trailRequest = skygate::ephemeris::ephemerisRequestForPrecisionPolicy(
+    const auto trailRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
         request, skygate::ephemeris::EphemerisPrecisionPolicy::Trail
     );
 
@@ -51,7 +53,7 @@ void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveRequestedCorre
              skygate::ephemeris::EphemerisPrecisionPolicy::NightConditionsApproximate,
              skygate::ephemeris::EphemerisPrecisionPolicy::NightConditionsVerified,
          }) {
-        const auto policyRequest = skygate::ephemeris::ephemerisRequestForPrecisionPolicy(request, policy);
+        const auto policyRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(request, policy);
         QCOMPARE(
             static_cast<std::uint32_t>(policyRequest.options.correctionFlags()),
             static_cast<std::uint32_t>(request.options.correctionFlags())

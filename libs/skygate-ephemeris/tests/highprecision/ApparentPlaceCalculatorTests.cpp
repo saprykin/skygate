@@ -284,7 +284,7 @@ public:
         m_resultVector = vector;
     }
 
-    void setResultMetadata(const EphemerisResultMetadata& metadata)
+    void setResultMetadata(const EphemerisEngineQueryResult& metadata)
     {
         m_resultMetadata = metadata;
     }
@@ -309,7 +309,9 @@ private:
     mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
     mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
     std::optional<CelestialFrameVector> m_resultVector;
-    EphemerisResultMetadata m_resultMetadata = {.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid};
+    EphemerisEngineQueryResult m_resultMetadata = {
+        .status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
+    };
 };
 
 class ShortBatchFrameTransformer final : public IFrameTransformer {
@@ -345,7 +347,7 @@ private:
         const CelestialFrameVector& vector
     )
     {
-        EphemerisResultMetadata metadata;
+        EphemerisEngineQueryResult metadata;
         metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         if (sourceFrame == CelestialReferenceFrame::Gcrs
             && targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox) {
@@ -373,7 +375,7 @@ public:
         m_lastTargetFrame = request.targetFrame;
         m_lastVector = request.vector;
 
-        EphemerisResultMetadata metadata;
+        EphemerisEngineQueryResult metadata;
         metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         if (request.sourceFrame == CelestialReferenceFrame::Gcrs
             && request.targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox) {
@@ -674,7 +676,7 @@ void ApparentPlaceCalculatorTests::routesAstrometricRequestsWithUnsupportedRefra
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::atmosphericRefraction()
@@ -716,7 +718,7 @@ void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
             .z = 0.0,
         }
     );
-    EphemerisResultMetadata transformMetadata;
+    EphemerisEngineQueryResult transformMetadata;
     transformMetadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
     transformMetadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
     frameTransformer->setResultMetadata(transformMetadata);
@@ -749,10 +751,10 @@ void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
 void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecessionNutation()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
-    EphemerisResultMetadata transformMetadata;
+    EphemerisEngineQueryResult transformMetadata;
     transformMetadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
-    transformMetadata.addWarning(EphemerisWarningCode::AccuracyDegraded);
-    transformMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+    transformMetadata.addWarning(EphemerisEngineWarning::Code::AccuracyDegraded);
+    transformMetadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
     transformMetadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
     frameTransformer->setResultMetadata(transformMetadata);
 
@@ -770,8 +772,8 @@ void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecess
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()
@@ -818,8 +820,8 @@ void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataF
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()
@@ -872,8 +874,8 @@ void ApparentPlaceCalculatorTests::appliesTopocentricParallaxAndHorizontalCoordi
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
 void ApparentPlaceCalculatorTests::validatesTopocentricMoonSunPlanetAgainstHorizonsFixtures()
@@ -996,8 +998,8 @@ void ApparentPlaceCalculatorTests::reportsInvalidObserverForTopocentricRequest()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::MissingObserver));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::MissingObserver));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
         result.metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax()
     ));
@@ -1032,8 +1034,8 @@ void ApparentPlaceCalculatorTests::reportsMissingEarthOrientationForTopocentricR
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax()
@@ -1056,7 +1058,7 @@ void ApparentPlaceCalculatorTests::reportsUnavailableParallaxWhenDistanceVectorI
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
         result.metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax()
     ));
@@ -1167,7 +1169,7 @@ void ApparentPlaceCalculatorTests::appliesAtmosphericRefractionToTopocentricHori
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::AccuracyDegraded));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
 void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()
@@ -1188,7 +1190,7 @@ void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
 void ApparentPlaceCalculatorTests::degradesMissingApparentBatchTransformResults()
@@ -1226,8 +1228,8 @@ void ApparentPlaceCalculatorTests::degradesMissingApparentBatchTransformResults(
         static_cast<std::uint8_t>(results[1].result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(results[1].result.metadata.hasWarning(EphemerisWarningCode::ComputationFailed));
-    QVERIFY(results[1].result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(results[1].result.metadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(results[1].result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             results[1].result.metadata.unavailableCorrections, EphemerisCorrectionFlags::precessionNutation()

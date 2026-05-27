@@ -150,7 +150,7 @@ void appendCalcephDiagnostics(
 }
 
 void appendKernelDateRangeIfMissing(
-    EphemerisDataSetInfo& dataSetInfo, const highprecision::CalcephKernelProvider& kernelProvider
+    EphemerisDatasetInfo& dataSetInfo, const highprecision::CalcephKernelProvider& kernelProvider
 )
 {
     const std::optional<highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();

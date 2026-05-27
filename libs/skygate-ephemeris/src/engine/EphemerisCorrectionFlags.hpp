@@ -1,5 +1,7 @@
 #pragma once
 
+#include "engine/BitFlagSetOperations.hpp"
+
 #include <cstdint>
 
 namespace skygate::ephemeris {
@@ -87,24 +89,24 @@ public:
 
     [[nodiscard]] constexpr bool has(const EphemerisCorrectionFlags flag) const noexcept
     {
-        return (*this & flag) != noCorrections();
+        return BitFlagSetOperations<EphemerisCorrectionFlags>::hasFlag(*this, flag);
     }
 
     [[nodiscard]] constexpr EphemerisCorrectionFlags without(const EphemerisCorrectionFlags removedFlags) const noexcept
     {
-        return EphemerisCorrectionFlags(bits() & ~removedFlags.bits());
+        return BitFlagSetOperations<EphemerisCorrectionFlags>::withoutFlags(*this, removedFlags);
     }
 
     [[nodiscard]] static constexpr bool
     has(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags flag) noexcept
     {
-        return flags.has(flag);
+        return BitFlagSetOperations<EphemerisCorrectionFlags>::hasFlag(flags, flag);
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags
     without(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
     {
-        return flags.without(removedFlags);
+        return BitFlagSetOperations<EphemerisCorrectionFlags>::withoutFlags(flags, removedFlags);
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags noCorrections() noexcept

@@ -18,40 +18,40 @@ public:
     [[nodiscard]] std::optional<SkySnapshot> findSnapshot(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     ) const override;
 
     void storeSnapshot(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo,
+        const EphemerisDatasetInfo& dataSetInfo,
         const SkySnapshot& snapshot
     ) const override;
 
     [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState> findPreparedRequestState(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     ) const override;
 
     void storePreparedRequestState(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo,
+        const EphemerisDatasetInfo& dataSetInfo,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const override;
 
     [[nodiscard]] std::optional<CelestialBodyState> findBodyState(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo,
+        const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex
     ) const override;
 
     void storeBodyState(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo,
+        const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex,
         const CelestialBodyState& state
     ) const override;
@@ -62,7 +62,7 @@ private:
     struct RequestIdentity {
         EphemerisRequest request;
         std::vector<CelestialBody> catalogBodies;
-        EphemerisDataSetInfo dataSetInfo;
+        EphemerisDatasetInfo dataSetInfo;
     };
 
     struct SnapshotEntry {
@@ -84,35 +84,35 @@ private:
     [[nodiscard]] static RequestIdentity makeIdentity(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     );
     [[nodiscard]] static bool matchesIdentity(
         const RequestIdentity& identity,
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     );
 
     [[nodiscard]] static std::string makeRequestKey(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     );
 
     [[nodiscard]] static std::string makeSnapshotKey(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     );
     [[nodiscard]] static std::string makePreparedStateKey(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo
+        const EphemerisDatasetInfo& dataSetInfo
     );
     [[nodiscard]] static std::string makeBodyStateKey(
         const EphemerisRequest& request,
         const std::vector<CelestialBody>& catalogBodies,
-        const EphemerisDataSetInfo& dataSetInfo,
+        const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex
     );
 

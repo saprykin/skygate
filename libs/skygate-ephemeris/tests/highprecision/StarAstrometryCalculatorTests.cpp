@@ -187,7 +187,7 @@ public:
         SolarSystemKernelStateResult result;
         if (m_requireTdbEpoch && epoch.timeScale != TimeScale::Tdb) {
             result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-            result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+            result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
             return result;
         }
 
@@ -197,7 +197,7 @@ public:
                                      : skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.dataSourceProvenance = "unit-test Earth barycentric state";
         if (!m_earthPositionAu.has_value()) {
-            result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+            result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
         }
         return result;
     }
@@ -485,7 +485,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstr
     QCOMPARE(batchResults[0].bodyIndex, 0U);
     compareCalculatorResults(batchResults[0].result, singleResult);
     QCOMPARE(singleResult.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(singleResult.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(singleResult.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::properMotion()
@@ -543,7 +543,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMi
     QVERIFY(result.equatorial.has_value());
     QVERIFY(!result.observerRelativePositionAu.has_value());
     QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::annualParallax()
@@ -568,7 +568,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
     QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::annualParallax()
@@ -594,7 +594,7 @@ void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsD
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
     QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::radialVelocity()
@@ -621,7 +621,7 @@ void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMot
     QVERIFY(result.equatorial->rightAscensionHours > body.fixedEquatorial->rightAscensionHours);
     QVERIFY(std::abs(result.equatorial->declinationDeg - body.fixedEquatorial->declinationDeg) < 0.00001);
     QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.unavailableCorrections, EphemerisCorrectionFlags::properMotion()
@@ -644,7 +644,7 @@ void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenAstrometryCorrecti
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(*result.equatorial, *body.fixedEquatorial, 0.0000001);
     QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
 void StarAstrometryCalculatorTests::failsWhenNoCoordinateFallbackExists()
@@ -659,7 +659,7 @@ void StarAstrometryCalculatorTests::failsWhenNoCoordinateFallbackExists()
 
     QVERIFY(!result.equatorial.has_value());
     QCOMPARE(result.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed);
-    QVERIFY(result.metadata.hasWarning(EphemerisWarningCode::ComputationFailed));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
 }
 
 QTEST_APPLESS_MAIN(StarAstrometryCalculatorTests)
