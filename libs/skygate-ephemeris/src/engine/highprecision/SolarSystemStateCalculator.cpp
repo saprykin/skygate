@@ -137,7 +137,7 @@ shouldPreferPlanetarySystemBarycenter(const CelestialBody& body, const bool pref
            + ") served by planetary-system barycenter (" + std::to_string(effectiveTargetNaifId) + ")";
 }
 
-void appendProvenance(EphemerisResultMetadata& metadata, std::string provenance)
+void appendProvenance(EphemerisEngineQueryResult& metadata, std::string provenance)
 {
     if (provenance.empty()) {
         return;
@@ -152,7 +152,7 @@ void appendProvenance(EphemerisResultMetadata& metadata, std::string provenance)
 }
 
 void markBarycenterFallback(
-    EphemerisResultMetadata& metadata,
+    EphemerisEngineQueryResult& metadata,
     const CelestialBody& body,
     const int requestedTargetNaifId,
     const int effectiveTargetNaifId
@@ -164,15 +164,15 @@ void markBarycenterFallback(
     if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
         metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
-    const bool alreadyReported = metadata.hasWarning(EphemerisWarningCode::BarycenterFallback);
-    metadata.addWarning(EphemerisWarningCode::BarycenterFallback);
+    const bool alreadyReported = metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback);
+    metadata.addWarning(EphemerisEngineWarning::Code::BarycenterFallback);
     if (!alreadyReported) {
         appendProvenance(metadata, barycenterFallbackProvenance(body, requestedTargetNaifId, effectiveTargetNaifId));
     }
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult
-makeStatusResult(const EphemerisEngineQueryStatus::Type status, const EphemerisWarningCode warningCode)
+makeStatusResult(const EphemerisEngineQueryStatus::Type status, const EphemerisEngineWarning::Code warningCode)
 {
     HighPrecisionCalculatorResult result;
     result.metadata.status = status;
@@ -372,15 +372,19 @@ SolarSystemStateCalculator::SolarSystemStateCalculator(
 HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPrecisionComputationInput& input) const
 {
     if (!input.request.epoch.isFinite()) {
-        return makeStatusResult(EphemerisEngineQueryStatus::Type::Failed, EphemerisWarningCode::ComputationFailed);
+        return makeStatusResult(
+            EphemerisEngineQueryStatus::Type::Failed, EphemerisEngineWarning::Code::ComputationFailed
+        );
     }
     if (input.request.epoch.timeScale != TimeScale::Tdb) {
         return makeStatusResult(
-            EphemerisEngineQueryStatus::Type::Failed, EphemerisWarningCode::TimeScaleDataUnavailable
+            EphemerisEngineQueryStatus::Type::Failed, EphemerisEngineWarning::Code::TimeScaleDataUnavailable
         );
     }
     if (m_kernelProvider == nullptr) {
-        return makeStatusResult(EphemerisEngineQueryStatus::Type::Failed, EphemerisWarningCode::MissingEphemerisData);
+        return makeStatusResult(
+            EphemerisEngineQueryStatus::Type::Failed, EphemerisEngineWarning::Code::MissingEphemerisData
+        );
     }
 
     const std::optional<int> targetNaifId = naifIdForBody(input.body);
@@ -388,7 +392,9 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     const bool preferPlanetarySystemBarycenter =
         shouldPreferPlanetarySystemBarycenter(input.body, m_preferPlanetarySystemBarycenters);
     if (!targetNaifId.has_value() || *targetNaifId == kNaifEarth) {
-        return makeStatusResult(EphemerisEngineQueryStatus::Type::Unsupported, EphemerisWarningCode::UnsupportedBody);
+        return makeStatusResult(
+            EphemerisEngineQueryStatus::Type::Unsupported, EphemerisEngineWarning::Code::UnsupportedBody
+        );
     }
 
     const TargetKernelState targetKernelResult = computeTargetKernelState(
@@ -414,7 +420,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     if (!kernelResult.positionAu.has_value()) {
         if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
             result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-            result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+            result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
         }
         return result;
     }
@@ -542,7 +548,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     result.equatorial = equatorialFromVector(outputVector);
     if (!result.equatorial.has_value()) {
         result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
     }
 
     return result;

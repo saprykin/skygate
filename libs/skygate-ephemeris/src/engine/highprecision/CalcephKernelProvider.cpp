@@ -366,7 +366,7 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
 
     if (epoch.timeScale != TimeScale::Tdb) {
         result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return result;
     }
 
@@ -376,8 +376,8 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
                                      ? EphemerisEngineQueryStatus::Type::OutOfRange
                                      : EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(
-            epochStatus == CalcephKernelProviderStatus::OutOfRange ? EphemerisWarningCode::DataOutOfRange
-                                                                   : EphemerisWarningCode::MissingEphemerisData
+            epochStatus == CalcephKernelProviderStatus::OutOfRange ? EphemerisEngineWarning::Code::DataOutOfRange
+                                                                   : EphemerisEngineWarning::Code::MissingEphemerisData
         );
         return result;
     }
@@ -393,7 +393,7 @@ SolarSystemKernelStateResult CalcephKernelProvider::computeGeometricState(
     result.velocityAuPerDay = kernelState.velocityAuPerDay;
     if (!result.positionAu.has_value()) {
         result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
         return result;
     }
 

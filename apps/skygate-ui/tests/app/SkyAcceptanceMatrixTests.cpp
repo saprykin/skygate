@@ -244,9 +244,9 @@ ephemeris::EphemerisRequest acceptanceRequestWithoutSimpleFallback(const int yea
     return request;
 }
 
-QString displayText(ephemeris::EphemerisWarningCode code)
+QString displayText(ephemeris::EphemerisEngineWarning::Code code)
 {
-    const std::string_view text = ephemeris::ephemerisWarningText(code);
+    const std::string_view text = ephemeris::EphemerisEngineWarning::text(code);
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
 }
 
@@ -286,7 +286,7 @@ public:
         }
 
         result.metadata.status = ephemeris::EphemerisEngineQueryStatus::Type::Unsupported;
-        result.metadata.addWarning(ephemeris::EphemerisWarningCode::UnsupportedBody);
+        result.metadata.addWarning(ephemeris::EphemerisEngineWarning::Code::UnsupportedBody);
         return result;
     }
 };
@@ -496,8 +496,8 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
         static_cast<std::uint8_t>(outOfRangeState->metadata.status),
         static_cast<std::uint8_t>(ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
     );
-    QVERIFY(outOfRangeState->metadata.hasWarning(ephemeris::EphemerisWarningCode::DataOutOfRange));
-    QVERIFY(displayText(ephemeris::EphemerisWarningCode::DataOutOfRange).contains(QStringLiteral("outside")));
+    QVERIFY(outOfRangeState->metadata.hasWarning(ephemeris::EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(displayText(ephemeris::EphemerisEngineWarning::Code::DataOutOfRange).contains(QStringLiteral("outside")));
 
     const SkyEphemerisDataManager::StagedUpdateActivationResult result =
         manager.activateVerifiedStagedUpdateSet(activationRequest(manifest, bundledResourceRoot, m_settings.path()));

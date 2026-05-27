@@ -187,7 +187,7 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
         .julianDatePart1 = 2'600'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
     };
 
-    skygate::ephemeris::EphemerisDataSetInfo dataSet;
+    skygate::ephemeris::EphemerisDatasetInfo dataSet;
     dataSet.id = "de440s";
     dataSet.displayName = "DE440s";
     dataSet.version = "test";
@@ -436,7 +436,7 @@ void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
 
-    skygate::ephemeris::EphemerisDataSetInfo manifest;
+    skygate::ephemeris::EphemerisDatasetInfo manifest;
     manifest.id = "de440s";
     manifest.displayName = "DE440s";
 
@@ -667,24 +667,24 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
     QVERIFY(skygate::ephemeris::EphemerisEngineQueryStatus::displayName(statuses[4]) == "failed");
 
     const std::array warningCodes{
-        skygate::ephemeris::EphemerisWarningCode::AccuracyDegraded,
-        skygate::ephemeris::EphemerisWarningCode::UnsupportedBody,
-        skygate::ephemeris::EphemerisWarningCode::DataOutOfRange,
-        skygate::ephemeris::EphemerisWarningCode::ComputationFailed,
+        skygate::ephemeris::EphemerisEngineWarning::Code::AccuracyDegraded,
+        skygate::ephemeris::EphemerisEngineWarning::Code::UnsupportedBody,
+        skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange,
+        skygate::ephemeris::EphemerisEngineWarning::Code::ComputationFailed,
     };
 
-    for (const skygate::ephemeris::EphemerisWarningCode code : warningCodes) {
-        const skygate::ephemeris::EphemerisWarning warning(code);
+    for (const skygate::ephemeris::EphemerisEngineWarning::Code code : warningCodes) {
+        const skygate::ephemeris::EphemerisEngineWarning warning(code);
         QVERIFY(!warning.displayText().empty());
-        QVERIFY(!skygate::ephemeris::ephemerisWarningText(code).empty());
+        QVERIFY(!skygate::ephemeris::EphemerisEngineWarning::text(code).empty());
     }
 
-    const skygate::ephemeris::EphemerisWarning fallbackTextWarning(
-        skygate::ephemeris::EphemerisWarningCode::DataOutOfRange
+    const skygate::ephemeris::EphemerisEngineWarning fallbackTextWarning(
+        skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange
     );
     QVERIFY(!fallbackTextWarning.displayText().empty());
 
-    skygate::ephemeris::EphemerisResultMetadata metadata;
+    skygate::ephemeris::EphemerisEngineQueryResult metadata;
     QVERIFY(metadata.isSuccessful());
     QCOMPARE(
         static_cast<std::uint8_t>(metadata.status),
@@ -700,7 +700,7 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
     validityRange.displayName = "Modern kernel";
 
     metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-    metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed);
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::ComputationFailed);
     metadata.dataSourceProvenance = "test source";
     metadata.effectiveDataValidityRange = validityRange;
     metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::lightTime();
@@ -713,8 +713,8 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
 
     QVERIFY(!metadata.isSuccessful());
     QCOMPARE(metadata.warningCount(), std::size_t{2});
-    QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::ComputationFailed));
-    QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(metadata.effectiveDataValidityRange.has_value());
     QVERIFY(metadata.effectiveDataValidityRange->id == std::string{"modern"});
     QVERIFY(metadata.dataSourceProvenance == std::string{"test source"});
@@ -822,7 +822,7 @@ void EphemerisApiModelTests::simpleEngineExposesMetadataDefaults()
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineQueryStatus::Type>);
-static_assert(sizeof(skygate::ephemeris::EphemerisResultMetadata) <= 192);
+static_assert(sizeof(skygate::ephemeris::EphemerisEngineQueryResult) <= 192);
 
 QTEST_MAIN(EphemerisApiModelTests)
 

@@ -26,7 +26,7 @@ public:
     [[nodiscard]] std::string_view name() const noexcept override;
     [[nodiscard]] EphemerisCapabilities capabilities() const noexcept override;
     [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept override;
-    [[nodiscard]] EphemerisDataSetInfo dataSetInfo() const override;
+    [[nodiscard]] EphemerisDatasetInfo dataSetInfo() const override;
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
     [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override;
     [[nodiscard]] std::optional<CelestialBodyState>

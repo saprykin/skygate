@@ -21,37 +21,37 @@ constexpr std::string_view kHighPrecisionDataSourceProvenance = "High-precision 
     return state;
 }
 
-void applyDefaultProvenance(EphemerisResultMetadata& metadata)
+void applyDefaultProvenance(EphemerisEngineQueryResult& metadata)
 {
     if (metadata.dataSourceProvenance.empty()) {
         metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
     }
 }
 
-void normalizeStatusForAvailableFallback(EphemerisResultMetadata& metadata)
+void normalizeStatusForAvailableFallback(EphemerisEngineQueryResult& metadata)
 {
     if (metadata.status == EphemerisEngineQueryStatus::Type::OutOfRange) {
         metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     }
 }
 
-void normalizeMissingCoordinateStatus(EphemerisResultMetadata& metadata)
+void normalizeMissingCoordinateStatus(EphemerisEngineQueryResult& metadata)
 {
     switch (metadata.status) {
     case EphemerisEngineQueryStatus::Type::Valid:
     case EphemerisEngineQueryStatus::Type::Degraded:
         metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
         break;
     case EphemerisEngineQueryStatus::Type::OutOfRange:
-        metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
+        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
         break;
     case EphemerisEngineQueryStatus::Type::Unsupported:
-        metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
+        metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
         break;
     case EphemerisEngineQueryStatus::Type::Failed:
-        metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+        metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
         break;
     case EphemerisEngineQueryStatus::Type::Last:
         break;
@@ -87,7 +87,7 @@ CelestialBodyState EphemerisResultBuilder::buildUnsupportedState(const HighPreci
 {
     CelestialBodyState state = makeEmptyState(input.bodyIndex);
     state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
-    state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
+    state.metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
     state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
     state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
     return state;
@@ -97,7 +97,7 @@ CelestialBodyState EphemerisResultBuilder::buildFailedState(const HighPrecisionC
 {
     CelestialBodyState state = makeEmptyState(input.bodyIndex);
     state.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-    state.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+    state.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
     state.metadata.dataSourceProvenance = kHighPrecisionDataSourceProvenance;
     state.metadata.finalizeCorrectionTracking(input.request.options.correctionFlags());
     return state;

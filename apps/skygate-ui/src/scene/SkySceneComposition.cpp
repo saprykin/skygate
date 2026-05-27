@@ -131,7 +131,7 @@ std::optional<skygate::ephemeris::EphemerisRequest> trailEphemerisRequestFor(
 ) noexcept
 {
     if (selectionRequest.has_value()) {
-        return skygate::ephemeris::ephemerisRequestForPrecisionPolicy(
+        return skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
             *selectionRequest, skygate::ephemeris::EphemerisPrecisionPolicy::Trail
         );
     }

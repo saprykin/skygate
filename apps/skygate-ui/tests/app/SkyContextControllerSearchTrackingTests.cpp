@@ -42,9 +42,9 @@ public:
         return {};
     }
 
-    [[nodiscard]] skygate::ephemeris::EphemerisDataSetInfo dataSetInfo() const override
+    [[nodiscard]] skygate::ephemeris::EphemerisDatasetInfo dataSetInfo() const override
     {
-        skygate::ephemeris::EphemerisDataSetInfo info;
+        skygate::ephemeris::EphemerisDatasetInfo info;
         info.id = "request-sensitive-test";
         return info;
     }

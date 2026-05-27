@@ -132,9 +132,9 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     };
 }
 
-[[nodiscard]] EphemerisDataSetInfo makeDataSetInfo(const bool includeLongRange)
+[[nodiscard]] EphemerisDatasetInfo makeDataSetInfo(const bool includeLongRange)
 {
-    EphemerisDataSetInfo info;
+    EphemerisDatasetInfo info;
     info.id = includeLongRange ? "acceptance-with-de441" : "acceptance-modern";
     info.displayName = includeLongRange ? "Acceptance modern and DE441" : "Acceptance bundled modern";
     info.version = "2026a";
@@ -233,8 +233,8 @@ public:
 
         if (epoch.julianDatePart1 < 2'300'000.5 || epoch.julianDatePart1 > 2'700'000.5) {
             result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-            result.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
-            result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+            result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+            result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
             result.positionAu = SolarSystemKernelVector{.xAu = 1.0, .yAu = 0.0, .zAu = 0.0};
             return result;
         }
@@ -261,7 +261,7 @@ public:
         }
 
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported;
-        result.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
         return result;
     }
 
@@ -439,8 +439,8 @@ public:
         HighPrecisionCalculatorResult result;
         result.equatorial = core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-        result.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
-        result.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+        result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
         result.metadata.dataSourceProvenance = "missing DE441 long-range kernel; bundled modern fallback";
         result.metadata.effectiveDataValidityRange =
             makeRange("de440-modern", "Bundled modern range", 2'300'000.5, 2'700'000.5);
@@ -674,8 +674,8 @@ void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallba
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::DataOutOfRange));
-    QVERIFY(state->metadata.hasWarning(EphemerisWarningCode::MissingEphemerisData));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
     QCOMPARE(
         state->metadata.dataSourceProvenance, std::string{"missing DE441 long-range kernel; bundled modern fallback"}
     );

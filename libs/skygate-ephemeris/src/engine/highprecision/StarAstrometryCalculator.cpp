@@ -72,7 +72,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 {
     HighPrecisionCalculatorResult result;
     result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-    result.metadata.addWarning(EphemerisWarningCode::ComputationFailed);
+    result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
     result.metadata.dataSourceProvenance = "catalog star astrometry";
     return result;
 }
@@ -241,7 +241,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 }
 
 [[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
-    EphemerisResultMetadata& metadata,
+    EphemerisEngineQueryResult& metadata,
     const AstronomicalEpoch& epoch,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService
 ) noexcept
@@ -253,7 +253,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
         if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
             metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
         }
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return std::nullopt;
     }
 
@@ -267,7 +267,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 }
 
 [[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
-    EphemerisResultMetadata& metadata,
+    EphemerisEngineQueryResult& metadata,
     const AstronomicalEpoch& epoch,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
     const PreparedEphemerisRequestState* preparedState
@@ -297,7 +297,7 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 }
 
 void recordUnavailableRequestedFields(
-    EphemerisResultMetadata& metadata, const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags
+    EphemerisEngineQueryResult& metadata, const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags
 ) noexcept
 {
     if (skygate::ephemeris::EphemerisCorrectionFlags::has(flags, EphemerisCorrectionFlags::properMotion())
@@ -321,7 +321,7 @@ void recordUnavailableRequestedFields(
 }
 
 void recordAppliedCorrections(
-    EphemerisResultMetadata& metadata, const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags
+    EphemerisEngineQueryResult& metadata, const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags
 ) noexcept
 {
     if (skygate::ephemeris::EphemerisCorrectionFlags::has(flags, EphemerisCorrectionFlags::properMotion())

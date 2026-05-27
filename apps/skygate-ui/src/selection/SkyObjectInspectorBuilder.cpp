@@ -131,7 +131,7 @@ detailedInspectorState(const SkySelectionOverlayInput& input, const skygate::eph
 }
 
 EphemerisInspectorMetadata buildEphemerisInspectorMetadata(
-    const skygate::ephemeris::EphemerisResultMetadata& metadata, const bool includeHighPrecisionDetails
+    const skygate::ephemeris::EphemerisEngineQueryResult& metadata, const bool includeHighPrecisionDetails
 )
 {
     EphemerisInspectorMetadata result;

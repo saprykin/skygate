@@ -394,7 +394,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
     const auto& contextState = contextSnapshot.states.front();
     const auto& requestState = requestSnapshot.states.front();
     QCOMPARE(requestState.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(requestState.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(requestState.metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
     QCOMPARE(requestState.metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     QVERIFY(
         skygate::ephemeris::tests::isNear(
@@ -454,7 +454,7 @@ void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefract
     QCOMPARE(snapshot.states.size(), 1U);
     const auto& state = snapshot.states.front();
     QCOMPARE(state.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
-    QVERIFY(!state.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!state.metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
     QCOMPARE(state.metadata.requestedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     QCOMPARE(state.metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     QCOMPARE(state.metadata.skippedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
@@ -499,20 +499,24 @@ void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefau
     const auto& contextState = contextSnapshot.states.front();
     const auto& requestState = requestSnapshot.states.front();
     QCOMPARE(contextState.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
-    QVERIFY(!contextState.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(!contextState.metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
     QCOMPARE(contextState.metadata.appliedCorrections, skygate::ephemeris::EphemerisCorrectionFlags::noCorrections());
     QCOMPARE(requestState.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(requestState.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(requestState.metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable));
 
     const auto contextBodyState = engine->computeBodyState(context, "demo_star");
     QVERIFY(contextBodyState.has_value());
     QCOMPARE(contextBodyState->metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid);
-    QVERIFY(!contextBodyState->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(
+        !contextBodyState->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable)
+    );
 
     const auto requestBodyState = engine->computeBodyState(defaultRequest, "demo_star");
     QVERIFY(requestBodyState.has_value());
     QCOMPARE(requestBodyState->metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(requestBodyState->metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::CorrectionUnavailable));
+    QVERIFY(
+        requestBodyState->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::CorrectionUnavailable)
+    );
 }
 
 void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex()

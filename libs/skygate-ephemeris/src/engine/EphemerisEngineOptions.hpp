@@ -1,26 +1,24 @@
 #pragma once
 
-#include "EphemerisCorrectionFlags.hpp"
-#include "EphemerisEngineKind.hpp"
+#include "engine/EphemerisCorrectionFlags.hpp"
+#include "engine/EphemerisEngineKind.hpp"
 
 #include <cstdint>
 
 namespace skygate::ephemeris {
 
-enum class EphemerisEngineOptionKey : std::uint8_t {
-    EngineKind,
-    CorrectionFlags,
-    FallbackToSimpleEngine,
-    EnableAtmosphericRefraction,
-    AtmosphericPressureHpa,
-    AtmosphericTemperatureC,
-    RelativeHumidity,
-    ObservingWavelengthMicrometers
-};
-
 class EphemerisEngineOptions {
 public:
-    using Key = EphemerisEngineOptionKey;
+    enum class Key : std::uint8_t {
+        EngineKind,
+        CorrectionFlags,
+        FallbackToSimpleEngine,
+        EnableAtmosphericRefraction,
+        AtmosphericPressureHpa,
+        AtmosphericTemperatureC,
+        RelativeHumidity,
+        ObservingWavelengthMicrometers
+    };
 
     EphemerisEngineOptions() = default;
 

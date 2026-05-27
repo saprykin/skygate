@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include "engine/EphemerisDatasetInfo.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -101,7 +102,7 @@ struct EphemerisDataManifestProfile {
 
 struct EphemerisDataManifest {
     int schemaVersion = 1;
-    EphemerisDataSetInfo dataSetInfo;
+    EphemerisDatasetInfo dataSetInfo;
     std::vector<EphemerisDataManifestProfile> profiles;
     std::vector<EphemerisDataManifestAsset> assets;
 

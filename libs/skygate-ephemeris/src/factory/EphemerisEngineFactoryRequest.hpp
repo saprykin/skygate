@@ -22,7 +22,7 @@ struct EphemerisEngineFactoryRequest {
     EphemerisEngineKind::Type engineKind = EphemerisEngineKind::Type::Simple;
     std::span<const CelestialBody> catalogBodies;
     EphemerisEngineOptions options;
-    const EphemerisDataSetInfo* dataSetManifest = nullptr;
+    const EphemerisDatasetInfo* dataSetManifest = nullptr;
     const EphemerisDataManifest* dataManifest = nullptr;
     std::shared_ptr<const IEphemerisDataSnapshot> activeDataSnapshot;
     std::shared_ptr<const ITimeScaleService> timeScaleService;

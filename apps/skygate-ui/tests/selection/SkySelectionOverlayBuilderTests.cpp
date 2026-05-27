@@ -231,7 +231,7 @@ public:
             || skygate::ephemeris::EphemerisCorrectionFlags::has(
                 request.options.correctionFlags(), skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
             );
-        skygate::ephemeris::EphemerisResultMetadata metadata;
+        skygate::ephemeris::EphemerisEngineQueryResult metadata;
         metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         metadata.dataSourceProvenance = "Selected-object precision fixture";
         metadata.appliedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::lightTime();
@@ -419,8 +419,8 @@ void SkySelectionOverlayBuilderTests::inspectorSurfacesEphemerisMetadataAndWarni
     auto fixture = makeFixture();
     auto& metadata = fixture.snapshot.states[0].metadata;
     metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
-    metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::MissingEphemerisData);
-    metadata.addWarning(skygate::ephemeris::EphemerisWarningCode::DataOutOfRange);
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::MissingEphemerisData);
+    metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange);
     metadata.dataSourceProvenance = "JPL DE440s smoke fixture";
     metadata.effectiveDataValidityRange = skygate::ephemeris::EphemerisDateRange{
         .displayName = "DE440s short-range kernel",

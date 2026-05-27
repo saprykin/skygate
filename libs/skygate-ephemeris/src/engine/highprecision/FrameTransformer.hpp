@@ -43,12 +43,12 @@ struct CelestialFrameTransformStageMetadata {
     CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
     CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
     bool applied = false;
-    EphemerisResultMetadata metadata;
+    EphemerisEngineQueryResult metadata;
 };
 
 struct CelestialFrameTransformResult {
     std::optional<CelestialFrameVector> vector;
-    EphemerisResultMetadata metadata;
+    EphemerisEngineQueryResult metadata;
     std::vector<CelestialFrameTransformStageMetadata> stages;
 };
 

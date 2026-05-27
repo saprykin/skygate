@@ -100,7 +100,7 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
 )
 {
     if (!input.request.options.fallbackToSimpleEngine() || originalResult.equatorial.has_value()
-        || !originalResult.metadata.hasWarning(EphemerisWarningCode::DataOutOfRange)) {
+        || !originalResult.metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange)) {
         return std::nullopt;
     }
 
@@ -113,8 +113,8 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
     HighPrecisionCalculatorResult fallbackResult = originalResult;
     fallbackResult.equatorial = *equatorial;
     fallbackResult.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-    fallbackResult.metadata.addWarning(EphemerisWarningCode::DataOutOfRange);
-    fallbackResult.metadata.addWarning(EphemerisWarningCode::MissingEphemerisData);
+    fallbackResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    fallbackResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     fallbackResult.metadata.dataSourceProvenance =
         fallbackResult.metadata.dataSourceProvenance.empty()
             ? "simple solar-system fallback for out-of-range high-precision kernel"
@@ -163,7 +163,7 @@ simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint&
 }
 
 void mergeKernelEpochTimeScaleMetadata(
-    EphemerisResultMetadata& metadata, const TimeScaleConversionResult& conversion
+    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
 ) noexcept
 {
     constexpr std::uint32_t kTdbApproximationWarning =
@@ -221,7 +221,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
 }
 
 [[nodiscard]] std::optional<AstronomicalEpoch> kernelEpochForSolarSystemState(
-    EphemerisResultMetadata& metadata,
+    EphemerisEngineQueryResult& metadata,
     const EphemerisRequest& request,
     const PreparedEphemerisRequestState* preparedState,
     const std::shared_ptr<const ITimeScaleService>& timeScaleService
@@ -236,7 +236,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
     }
     if (timeScaleService == nullptr) {
         metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        metadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return std::nullopt;
     }
 
@@ -322,7 +322,7 @@ public:
         return m_dependencies.dataSetInfo.dateRanges;
     }
 
-    [[nodiscard]] EphemerisDataSetInfo dataSetInfo() const
+    [[nodiscard]] EphemerisDatasetInfo dataSetInfo() const
     {
         return m_dependencies.dataSetInfo;
     }
@@ -540,7 +540,9 @@ private:
                 preparedState->tdbKernelEpoch = request.epoch.normalized();
             } else if (m_dependencies.timeScaleService == nullptr) {
                 preparedState->tdbKernelEpochMetadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-                preparedState->tdbKernelEpochMetadata.addWarning(EphemerisWarningCode::TimeScaleDataUnavailable);
+                preparedState->tdbKernelEpochMetadata.addWarning(
+                    EphemerisEngineWarning::Code::TimeScaleDataUnavailable
+                );
             } else {
                 const TimeScaleConversionResult conversion =
                     m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Tdb);
@@ -731,7 +733,7 @@ std::span<const EphemerisDateRange> HighPrecisionEphemerisEngine::supportedDateR
     return m_impl->supportedDateRanges();
 }
 
-EphemerisDataSetInfo HighPrecisionEphemerisEngine::dataSetInfo() const
+EphemerisDatasetInfo HighPrecisionEphemerisEngine::dataSetInfo() const
 {
     return m_impl->dataSetInfo();
 }

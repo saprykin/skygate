@@ -389,7 +389,7 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
         return std::nullopt;
     }
     const auto ephemerisRequestContext = m_skyContextController->ephemerisRequestContext();
-    const auto renderEphemerisRequest = skygate::ephemeris::ephemerisRequestForPrecisionPolicy(
+    const auto renderEphemerisRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
         ephemerisRequestContext.request, skygate::ephemeris::EphemerisPrecisionPolicy::SceneRender
     );
 

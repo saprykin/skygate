@@ -515,7 +515,7 @@ void CalcephKernelProviderTests::rejectsNonTdbEpochsBeforeCallingKernel()
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
-    QVERIFY(result.metadata.hasWarning(skygate::ephemeris::EphemerisWarningCode::TimeScaleDataUnavailable));
+    QVERIFY(result.metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(!result.positionAu.has_value());
     QCOMPARE(*runtime->computeCount, 0);
 }

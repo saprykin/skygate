@@ -38,7 +38,7 @@ observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noe
     const NightConditionsCalculator::EventSearchMode eventSearchMode
 )
 {
-    const EphemerisRequest eventRequest = ephemerisRequestForPrecisionPolicy(
+    const EphemerisRequest eventRequest = EphemerisRequest::fromPrecisionPolicy(
         request,
         eventSearchMode == NightConditionsCalculator::EventSearchMode::Verified
             ? EphemerisPrecisionPolicy::NightConditionsVerified

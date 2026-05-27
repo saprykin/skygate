@@ -90,9 +90,9 @@ std::span<const EphemerisDateRange> SimpleEphemerisEngine::supportedDateRanges()
     return {};
 }
 
-EphemerisDataSetInfo SimpleEphemerisEngine::dataSetInfo() const
+EphemerisDatasetInfo SimpleEphemerisEngine::dataSetInfo() const
 {
-    EphemerisDataSetInfo info;
+    EphemerisDatasetInfo info;
     info.id = kSimpleDataSetId;
     info.displayName = kSimpleEngineName;
     info.version = kSimpleDataSetVersion;
@@ -216,11 +216,11 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
                 EquatorialToHorizontalCalculator::compute(*equatorial, context.observer, context.utcTime);
         } else {
             state.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-            state.metadata.addWarning(EphemerisWarningCode::MissingObserver);
+            state.metadata.addWarning(EphemerisEngineWarning::Code::MissingObserver);
         }
     } else {
         state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
-        state.metadata.addWarning(EphemerisWarningCode::UnsupportedBody);
+        state.metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedBody);
     }
 
     return state;
