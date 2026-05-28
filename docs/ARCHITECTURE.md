@@ -28,14 +28,21 @@ flowchart LR
 on it. `skygate-ui` composes both and owns Qt-specific behavior.
 
 ## High-Level Runtime Flow
-At startup, `apps/skygate-ui/src/main.cpp` creates a bundled star catalog,
-constructs an ephemeris engine from that catalog, and wires the UI object graph:
+At startup, `apps/skygate-ui/src/main.cpp` configures logging, loads bundled
+ephemeris-data metadata when present, registers the QML/C++ types, and wires
+the UI object graph:
 
 1. `SkyContextController` owns the mutable application state exposed to QML.
-2. `SkySceneModel` listens to the controller and derives renderable scene data.
-3. `SkyViewportItem` consumes the scene model and renders the sky with Qt Quick
+2. `SkyCatalogManager` owns active catalog state, while
+   `SkyEphemerisDataManager` owns bundled/installed high-precision data state.
+3. `SkyContextController` attempts to recreate the selected ephemeris engine
+   from the current catalog, engine settings, and active ephemeris data. If a
+   data refresh would only produce a simple fallback while a high-precision
+   engine is already active, it keeps the active high-precision engine.
+4. `SkySceneModel` listens to the controller and derives renderable scene data.
+5. `SkyViewportItem` consumes the scene model and renders the sky with Qt Quick
    scene graph nodes.
-4. QML overlays and toolbars provide interaction, labels, preferences, and
+6. QML overlays and toolbars provide interaction, labels, preferences, and
    status surfaces around the custom viewport.
 
 Normal frame production works like this:
@@ -68,8 +75,10 @@ This module is the application layer and the most stateful part of the system.
   - Owns the current `skygate::core::ObservationContext`, projection selection,
     view center/FOV, playback state, timeline settings, location source
     selection, and location status.
-  - Owns `SkySettingsStore`, `SkyCatalogManager`, and the bundled city catalog
-    model used by Preferences.
+  - Owns `SkySettingsStore`, `SkyCatalogManager`, `SkyEphemerisDataManager`,
+    and the bundled city catalog model used by Preferences.
+  - Owns the selected `IEphemerisEngine` and recreates it when catalog,
+    engine-option, or ephemeris-data state changes.
   - Owns `SkyTimeController`, the QML-facing date/time surface for display
     timezone selection, civil-time formatting, and fixed-time entry.
   - Uses a `QTimer` for live timeline updates.
@@ -127,10 +136,17 @@ scene graph code, while transient UI and chrome stay in QML.
 
 #### Catalog and settings subsystem
 - `SkyCatalogManager`
-  - Owns the active `IStarCatalog`, `IEphemerisEngine`, current catalog source
-    metadata, cached constellation references, and revision counter.
+  - Owns the active `IStarCatalog`, current catalog source metadata, cached
+    constellation references, and revision counter.
   - Restores and persists catalog cache through `SkySettingsStore`.
-  - Rebuilds the ephemeris engine whenever the catalog changes.
+  - Emits catalog changes that cause `SkyContextController` to rebuild the
+    selected ephemeris engine.
+- `SkyEphemerisDataManager`
+  - Owns bundled manifest state and installed high-precision data cache state.
+  - Reports kernel, Earth-orientation, leap-second, and Delta T status to QML.
+  - Stages and atomically activates verified ephemeris data updates.
+  - Emits data-revision changes that invalidate the selected engine and scene
+    caches.
 - `CatalogCoordinator`
   - Orchestrates the download and parse workflow.
   - Separates transport concerns from parse concerns.
@@ -217,17 +233,16 @@ computation.
 - `IStarCatalog`
   - Abstract read-only catalog interface.
 - `InMemoryStarCatalog`
-  - Current concrete catalog implementation backed by a `std::vector`.
-- `CelestialBody`
-  - Body metadata, `BaseCelestialBody::Kind`, magnitude, optional fixed
-    equatorial coordinates, optional star astrometry, and optional deep-sky
-    metadata.
+  - Current concrete catalog implementation backed by a `CelestialBodyCatalog`.
 - `BaseCelestialBody`
-  - Common id, display name, body kind, and magnitude fields shared by the
-    split body model.
+  - Polymorphic base for body metadata. It owns common id, display name, body
+    kind, and magnitude fields, and exposes virtual accessors for optional
+    fixed coordinates, star astrometry, and deep-sky metadata.
 - `OwnGalaxyCelestialBody` / `DistantCelestialBody`
-  - Narrow body views used by catalog consumers that need star/own-galaxy
-    fields or distant deep-sky fields.
+  - Concrete body storage for own-galaxy and distant objects.
+- `CelestialBodyCatalog`
+  - Owns separate concrete body vectors and a stable ordered pointer view used
+    by engines, snapshots, search, and rendering.
 
 #### Snapshot model
 - `IEphemerisEngine`
@@ -245,12 +260,13 @@ This immutable/shared snapshot shape avoids copying full body metadata into each
 frame and keeps rendering decoupled from catalog ownership.
 
 #### Engine implementation
-The current engine is `SimpleEphemerisEngine`, created through
-`createEphemerisEngine(...)`.
+Engines are created through `EphemerisEngineFactory`.
+
+The always-available engine is `SimpleEphemerisEngine`.
 
 Its responsibilities are:
 
-- keep an immutable copy of the current catalog bodies
+- keep an immutable `CelestialBodyCatalog`
 - dispatch coordinate generation by `BaseCelestialBody::Kind` and available
   fixed-equatorial catalog coordinates
 - delegate to focused calculators/lookups:
@@ -265,6 +281,25 @@ Its responsibilities are:
   `EquatorialToHorizontalCalculator`
 - centralize Julian day, J2000, obliquity, and sidereal-time helpers in
   `AstronomicalTime`
+
+When `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON`, the factory can also create
+`HighPrecisionEphemerisEngine`. That engine is a facade over focused
+high-precision providers and calculators:
+
+- `CalcephKernelProvider`
+- `SolarSystemStateCalculator`
+- `StarAstrometryCalculator`
+- `TimeScaleService`
+- `EarthOrientationProvider`
+- `FrameTransformer`
+- `ApparentPlaceCalculator`
+- `AtmosphericRefractionCalculator`
+- `EphemerisComputationCache`
+
+The factory supports strict high-precision creation or simple-engine fallback
+through `EphemerisFactoryFallbackPolicy`. `SkyContextController` owns the
+selected engine kind, correction options, refraction settings, data manager,
+and diagnostics surfaced to the UI.
 
 #### Catalog ingestion pipeline
 Catalog import supports multiple payload shapes:
@@ -284,7 +319,8 @@ The pipeline is:
 2. `CatalogLoader` routes source requests to the correct parser implementation.
 3. HYG/OpenNGC parsers share `DelimitedCatalogReader` for header, row, and
    limit handling.
-4. Parsed bodies are normalized by `CatalogBodyNormalization`.
+4. Parsed own-galaxy bodies are normalized by `CatalogBodyNormalization`;
+   distant deep-sky bodies keep parser-provided metadata.
 5. Optional selection/truncation can keep only the brightest bodies.
 6. The final catalog is materialized as `InMemoryStarCatalog`.
 
@@ -322,11 +358,11 @@ private layers: `ZipDirectoryReader` parses central-directory metadata,
 
 Private catalog implementation files are grouped by responsibility under
 `libs/skygate-ephemeris/src/catalog`: orchestration facades at the catalog root,
-data model helpers in `model/`, normalization in `normalize/`, active-catalog
-composition in `composition/`, source-specific parsers in `bundled/`, `hyg/`,
-`opengc/`, and `stellarium/`, constellation codecs in `constellation/`, and
-payload/archive IO in `io/` and `io/zip/`. Shared string helpers live directly
-under `libs/skygate-ephemeris/src`.
+normalization in `normalize/`, active-catalog composition in `composition/`,
+source-specific parsers in `bundled/`, `hyg/`, `opengc/`, and `stellarium/`,
+constellation codecs in `constellation/`, and payload/archive IO in `io/` and
+`io/zip/`. Shared string helpers live directly under
+`libs/skygate-ephemeris/src`.
 
 #### Constellation data
 Constellation lines and label anchors have one persisted/imported source:
@@ -353,7 +389,13 @@ render cache.
 - catalog revision
 - observer location
 - UTC timestamp
-- ephemeris engine identity
+- selected engine identity
+- selected request epoch
+- selected request options
+- selected engine options revision
+- ephemeris data revision
+- Earth-orientation data revision
+- leap-second data revision
 
 If only view parameters change, the expensive ephemeris compute step is skipped.
 
@@ -393,8 +435,11 @@ The concurrency model is intentionally narrow:
 - asynchronous:
   - catalog download (`QNetworkAccessManager`)
   - catalog parsing (`QThreadPool`)
+  - ephemeris data manifest/asset staging, cancellation, and verification
+    (`QNetworkAccessManager` plus staged file IO)
 - synchronous on the UI object graph:
   - ephemeris compute
+  - ephemeris data activation and engine rebuilds
   - prepared projection creation
   - render-frame construction
 - scene graph update path:
@@ -414,7 +459,7 @@ The current codebase consistently uses a small set of practical patterns.
 
 ### Strategy + factory
 - `IProjection` + `createProjection(...)`
-- `IEphemerisEngine` + `createEphemerisEngine(...)`
+- `IEphemerisEngine` + `EphemerisEngineFactory`
 - `IStarCatalog` + minimal catalog construction helpers
 
 ### Read-model / derived-state model
@@ -458,15 +503,16 @@ Update:
 Update:
 
 - `CatalogPayloadFormatDetector`
-- `CatalogPayloadFormat`
+- `CatalogSourceType`
 - `CatalogLoader` routing
 - parser implementation in `libs/skygate-ephemeris/src/catalog`
 - parser tests
 
-### Replacing the ephemeris engine
-Provide another `IEphemerisEngine` implementation and construct it in
-`SkyCatalogManager` / startup wiring. The UI layers depend only on the
-interface.
+### Replacing or adding an ephemeris engine
+Provide another `IEphemerisEngine` implementation, add an
+`EphemerisEngineKind`, and wire construction through `EphemerisEngineFactory`.
+`SkyContextController` owns engine selection and recreation; UI consumers depend
+on the interface.
 
 ### Evolving the rendering path
 The scene model already isolates render preparation from drawing. Alternate
