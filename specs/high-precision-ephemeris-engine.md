@@ -1,15 +1,16 @@
 # High-Precision Ephemeris Engine PRD
 
-Status: draft for implementation planning
+Status: implementation baseline plus remaining product requirements
 
-Last updated: 2026-05-12
+Last updated: 2026-05-28
 
 ## Purpose
 
-Skygate currently has a simple ephemeris engine that is adequate for coarse
-visual placement but not for high-precision astronomy. This document specifies
-the product and technical requirements for a new high-precision ephemeris engine
-integrated as the single source of truth for sky-object positions.
+SkyGate has a simple ephemeris engine for lightweight visual placement and a
+high-precision engine path behind `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS`.
+This document records the product and technical requirements for the
+high-precision path and separates the implemented baseline from remaining
+release-hardening work.
 
 The target is sub-arcsecond apparent RA/Dec where the underlying data supports
 it, with milliarcsecond-class internal algorithms for modern dates when
@@ -60,36 +61,46 @@ Primary references:
 
 ## Current State
 
-The existing public interface is
-`libs/skygate-ephemeris/include/skygate/ephemeris/IEphemerisEngine.hpp`.
-It exposes:
+The public include root is `libs/skygate-ephemeris/src`, following the
+repository convention that headers live beside their `.cpp` files. The public
+engine interface is `IEphemerisEngine.hpp`. It exposes engine metadata,
+capabilities, date ranges, active data-set information, options, request-based
+compute overloads, and compatibility overloads using
+`core::ObservationContext`.
 
-- `compute(const core::SkyContext&)`
-- `computeBodyState(const core::SkyContext&, std::string_view id)`
-- `computeBodyState(const core::SkyContext&, std::size_t index)`
+The simple implementation lives in `src/engine/simple/`. It supports fixed
+catalog coordinates and approximate Sun, Moon, and planet positions.
+Unsupported bodies return invalid/degraded states where appropriate.
 
-The current simple implementation is a facade over calculator classes in
-`libs/skygate-ephemeris/src/engine/*.cpp`, with
-`SimpleEphemerisEngine` in `libs/skygate-ephemeris/src/SimpleEphemerisEngine.cpp`.
-It supports fixed catalog coordinates and approximate Sun, Moon, and planet
-positions. Unsupported bodies return NaN states. Horizontal coordinates are
-computed only when observer data is valid.
+When high precision is enabled, `EphemerisEngineFactory` can create a
+`HighPrecisionEphemerisEngine` from `EphemerisEngineFactoryRequest`. The
+request wires the selected engine kind, catalog, options, data manifests,
+active data snapshot, time-scale service, Earth-orientation provider, CALCEPH
+runtime, fallback policy, and diagnostics sink.
+
+The high-precision implementation lives in `src/engine/highprecision/` and is a
+facade over CALCEPH solar-system state, star astrometry, time-scale conversion,
+Earth-orientation data, frame transforms, apparent-place corrections,
+atmospheric refraction, and computation caching.
+
+The UI owns engine selection through `SkyContextController`. Catalog state is
+owned by `SkyCatalogManager`; ephemeris data state is owned separately by
+`SkyEphemerisDataManager`. Scene cache invalidation includes selected engine
+identity, engine options, and ephemeris data revision.
+
+The app currently bundles the ephemeris data manifest as a Qt resource. Kernel,
+Earth-orientation, leap-second, and Delta T assets are described by that
+manifest and are installed/downloaded as external cache files rather than
+embedded in the resource system.
 
 Known limitations:
 
-- `core::UtcTimePoint` is second-resolution `std::chrono::system_clock`.
-- `ITimeSource` only provides `nowUtc()` and cannot expose accuracy, leap
-  seconds, UT1, TT/TDB, or clock synchronization status.
-- Astronomical time is currently derived directly from UTC epoch seconds.
-- GMST, obliquity, Sun, Moon, and planet calculations are approximate.
-- There is no supported date-range metadata or per-result degradation status.
-- There is no explicit engine kind, options model, or user preference for engine
-  selection.
-- The scene cache invalidates on catalog revision, observer, UTC time, and
-  engine pointer, but not on ephemeris data revision, EOP revision, or correction
-  option changes.
-- The catalog manager currently rebuilds the active catalog and ephemeris engine
-  together, which couples star catalog changes to ephemeris engine selection.
+- Long-range DE441-size data remains optional and cannot be bundled by default.
+- Full product validation still needs broad Horizons fixtures and
+  release-platform package smoke coverage.
+- Ancient apparent positions remain limited by Delta T, Earth rotation models,
+  historical calendar interpretation, and catalog quality.
+- Update UX and packaged data policies need continued release hardening.
 
 ## Goals
 
@@ -186,41 +197,42 @@ Every high-precision result must expose:
 - estimated angular uncertainty when available
 - correction flags actually applied
 
-The existing `CelestialBodyState` can be extended if source compatibility is
-manageable. Otherwise add a richer result type and keep adapters for the current
-engine interface during migration.
+`CelestialBodyState` carries `EphemerisEngineQueryResult` metadata with status,
+warning mask, provenance, validity range, uncertainty, and correction tracking.
 
 ## Architecture Requirements
 
 ### Source Layout
 
-Move engine implementations under dedicated subfolders:
+Engine implementations live under dedicated subfolders:
 
 - `libs/skygate-ephemeris/src/engine/simple/`
 - `libs/skygate-ephemeris/src/engine/highprecision/`
 - shared low-level helpers under `libs/skygate-ephemeris/src/engine/common/`
   only when used by both engines
 
-The public interface remains under
-`libs/skygate-ephemeris/include/skygate/ephemeris/`.
+Public headers remain under `libs/skygate-ephemeris/src`, not a separate
+`include/` tree.
 
 ### Public API
 
-Add public types under `include/skygate/ephemeris/`:
+The public API includes:
 
 - `EphemerisEngineKind`
 - `EphemerisEngineOptions`
 - `EphemerisCorrectionFlags`
 - `EphemerisCapabilities`
 - `EphemerisDateRange`
-- `EphemerisDataSetInfo`
-- `EphemerisWarning`
-- `EphemerisResultStatus`
+- `EphemerisDatasetInfo`
+- `EphemerisEngineWarning`
+- `EphemerisEngineQueryStatus`
+- `EphemerisEngineQueryResult`
+- `EphemerisPrecisionPolicy`
 - `EphemerisRequest`
 - `AstronomicalEpoch`
 - `TimeScale`
 
-Extend `IEphemerisEngine` with:
+`IEphemerisEngine` exposes:
 
 - `kind()`
 - `name()`
@@ -232,14 +244,14 @@ Extend `IEphemerisEngine` with:
 - `computeBodyState(const EphemerisRequest&, std::string_view id)`
 - `computeBodyState(const EphemerisRequest&, std::size_t index)`
 
-Keep the existing `core::SkyContext` overloads as compatibility adapters during
-the migration. They should construct a default apparent/topocentric request
-using the engine's configured options.
+The `core::ObservationContext` overloads are compatibility adapters. They
+construct a default apparent/topocentric request using the engine's configured
+options.
 
 ### Factory
 
-`EphemerisEngineFactory` must become responsible for engine kind selection and
-data wiring.
+`EphemerisEngineFactory` is responsible for engine kind selection and data
+wiring.
 
 Required creation inputs:
 
@@ -247,8 +259,10 @@ Required creation inputs:
 - catalog bodies
 - engine options
 - kernel/data-set manifest
+- active data snapshot
 - time-scale service
 - Earth-orientation provider
+- optional CALCEPH runtime
 - optional logger/diagnostics sink
 
 The factory must return a simple engine when high-precision dependencies or data
@@ -306,8 +320,15 @@ high-precision engine.
 
 ### Data Management
 
-Bundle data required for offline high-precision operation with practical
-installer size:
+`SkyEphemerisDataManager` owns bundled manifest state and installed
+ephemeris-data cache state in the UI layer. It reports kernel,
+Earth-orientation, leap-second, and Delta T status, stages verified updates,
+activates snapshots atomically, and emits data revision changes that invalidate
+engines and scene caches.
+
+Current app packages bundle the manifest. Kernel/support assets are resolved
+from external app resources or installed cache, so clean offline high-precision
+operation requires packaged external data or prior installation:
 
 - DE440 or DE440s modern kernel when package size allows modern higher accuracy
 - leap-second table
@@ -323,13 +344,14 @@ Make multi-gigabyte long-range kernels optional downloads:
 - The app must clearly show whether long-range data is installed.
 - If DE441 is not installed, dates outside the bundled kernel range must use a
   degraded fallback where possible and show a warning with tooltip text.
-- The download flow must support checksum verification, resumable or restartable
-  download behavior, atomic installation, and safe cancellation.
+- The download flow supports checksum verification, restartable staging, atomic
+  activation, and safe cancellation. Resumable range downloads are not
+  implemented yet.
 
-Data assets must be compressed with zstd and decompressed or memory-mapped into
-an application data cache before use. Do not put multi-gigabyte kernels into Qt
-resource files. Install them as external application resources and copy or
-decompress them atomically into the writable app data location on first use.
+Large data assets must not be placed in Qt resource files. Keep the manifest in
+resources, and install or download kernels/support data as external files. When
+assets are distributed as archives, use zstd-capable packaging and activate the
+verified files atomically in the writable app data location.
 
 Use Git LFS for large repository assets:
 
@@ -339,30 +361,22 @@ Use Git LFS for large repository assets:
 
 ### In-App Updates
 
-Add an application-layer `SkyEphemerisDataManager` owned by
-`SkyContextController`, parallel to `SkyCatalogManager`.
+Continue to keep ephemeris-data management separate from `SkyCatalogManager`.
+`SkyCatalogManager` is scoped to star/deep-sky catalogs and active catalog
+rebuilding; `SkyEphemerisDataManager` is the application-layer owner for
+high-precision data.
 
-Responsibilities:
-
-- report bundled and installed ephemeris data status
-- update kernels, EOP data, leap seconds, and Delta T data
-- verify checksums before activation
-- install updates atomically
-- preserve offline fallback to bundled data
-- emit revision changes that invalidate scene caches
-
-Do not overload `SkyCatalogManager`; it is currently scoped to star/deep-sky
-catalogs and active catalog rebuilding.
-
-Preferences should place ephemeris data controls in the existing Catalog page as
-a new `Ephemeris Data` group, or rename the page to `Data` if the UI grows.
+Preferences exposes a dedicated ephemeris page for engine selection,
+correction/refraction settings, planetary kernel downloads, support-data
+downloads, and cache controls.
 
 Required controls:
 
 - engine selector: `Simple`, `High precision`
 - high-precision correction options
 - refraction option and atmosphere inputs or preset
-- offline/online update mode
+- online update state is stored in settings; Preferences currently exposes
+  profile downloads, info checks, cancellation, and cache clearing
 - kernel status and update action
 - EOP/leap-second status and update action
 - clear ephemeris data cache
@@ -370,7 +384,8 @@ Required controls:
 
 ### Settings
 
-Add persistent settings:
+Current persistent settings live in
+`SkySettingsStore::EphemerisUserSettingsSnapshot`:
 
 - selected engine kind
 - high-precision correction flags
@@ -380,7 +395,7 @@ Add persistent settings:
 - online update enabled/disabled
 - ephemeris update URLs or preset
 
-Add cache metadata:
+Installed data metadata lives in `EphemerisDataCacheSnapshot`:
 
 - installed kernel path and version
 - installed EOP path and version
@@ -389,8 +404,7 @@ Add cache metadata:
 - data revision token
 - last update result
 
-Prefer new `EphemerisSettingsSnapshot` and `EphemerisDataCacheSnapshot` types
-instead of adding unrelated fields to catalog snapshots.
+Keep ephemeris settings and data-cache metadata separate from catalog snapshots.
 
 ## Performance Requirements
 
@@ -438,22 +452,20 @@ or use a clearly versioned immutable snapshot.
 
 ## Build and Dependencies
 
-Update `vcpkg.json`:
+`vcpkg.json` declares the base and high-precision dependency sets:
 
+- `zlib`
 - `calceph`
 - `zstd`
-- consider `erfa` through vcpkg overlay, system package, or vendored source if
-  no curated vcpkg port is available
+- `erfa`
 
-Update CMake:
+CMake provides:
 
-- add `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS`
-- find and link CALCEPH when high precision is enabled
-- find and link zstd for data archive handling
+- `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS`
+- CALCEPH, zstd, and ERFA linkage when high precision is enabled
 - keep simple engine builds working where high-precision dependencies are
   intentionally disabled
-- add or update vcpkg presets so Linux, macOS, and Windows can build the same
-  dependency set
+- vcpkg presets so Linux, macOS, and Windows can build the same dependency set
 
 High precision should be enabled for release builds. Developer builds may allow
 it to be disabled, but tests for high precision must be present and runnable in
@@ -504,47 +516,49 @@ UI tests must cover:
 
 ### Phase 1: API and Layout
 
-- Move simple engine implementation to `src/engine/simple/`.
-- Add engine kind/options/capability/date-range/result-status public types.
-- Extend `IEphemerisEngine` while preserving current `SkyContext` adapters.
-- Update factory to create simple or high-precision engines by request.
-- Add settings snapshots for engine selection and high-precision options.
+- Complete: simple engine implementation lives under `src/engine/simple/`.
+- Complete: engine kind/options/capability/date-range/result-status public
+  types exist.
+- Complete: `IEphemerisEngine` has request-based APIs and
+  `ObservationContext` adapters.
+- Complete: `EphemerisEngineFactory` creates simple or high-precision engines
+  by request.
+- Complete: settings snapshots cover engine selection and high-precision
+  options.
 
 ### Phase 2: Time and Data Foundations
 
-- Add `AstronomicalEpoch` and two-part Julian date support.
-- Add time-scale, leap-second, Delta T, and EOP provider interfaces.
-- Add zstd-compressed data manifest support.
-- Add `SkyEphemerisDataManager` and cache metadata.
-- Wire app settings and cache revisions into scene invalidation.
+- Complete: `AstronomicalEpoch` and two-part Julian date support exist.
+- Complete: time-scale, leap-second, Delta T, and EOP provider abstractions
+  exist.
+- Complete: data manifest and active data snapshot plumbing exists.
+- Complete: `SkyEphemerisDataManager` owns UI-layer data state.
+- Complete: app settings and data revisions participate in scene invalidation.
 
 ### Phase 3: CALCEPH Solar-System Engine
 
-- Add CALCEPH provider and kernel selection.
-- Implement geometric solar-system body states.
-- Add Horizons geometric vector fixtures.
-- Add strict and fallback engine creation paths.
+- Complete: CALCEPH provider and kernel selection are wired.
+- Complete: geometric solar-system body states are implemented.
+- Complete: strict and fallback engine creation paths exist.
+- Remaining: broaden Horizons geometric vector fixture coverage.
 
 ### Phase 4: Apparent and Topocentric Positions
 
-- Add frame transformation pipeline following IAU/IERS conventions.
-- Add light-time, aberration, gravitational deflection, parallax, and refraction
-  options.
-- Add apparent/topocentric Horizons fixtures.
-- Surface warnings and provenance in UI inspection/status.
+- Complete: frame transformation, correction options, and refraction plumbing
+  exist.
+- Complete: degraded-result reasons are surfaced through scene/model status.
+- Remaining: broaden apparent/topocentric Horizons fixtures and UI tooltips.
 
 ### Phase 5: High-Precision Stars and Performance
 
-- Add catalog-star astrometry propagation with proper motion, parallax, and
-  radial velocity.
-- Add batch full-frame computation path.
-- Tune caches for frame rendering and search.
-- Add performance benchmarks or timing tests for large catalogs.
+- Complete: catalog-star astrometry propagation is implemented.
+- Complete: computation caching is part of the high-precision facade.
+- Remaining: tune batch full-frame paths and add larger performance guards.
 
 ### Phase 6: Update UX and Packaging
 
-- Add Preferences `Ephemeris Data` controls.
-- Add kernel/EOP/leap-second update flows.
+- In progress: Preferences expose engine and ephemeris-data controls.
+- In progress: kernel/EOP/leap-second update flows and cache activation.
 - Add bundled compressed data installation to packaging.
 - Add checksum validation and atomic activation.
 - Validate macOS, Windows, and Linux release packaging.
@@ -583,8 +597,6 @@ UI tests must cover:
   expose uncertainty/degradation rather than implying modern precision.
 - Leap-second representation needs explicit UI and parsing decisions because
   Qt's normal `QTime` path cannot represent `23:59:60`.
-- CALCEPH and zstd are available in vcpkg. ERFA may require an overlay port or
-  vendoring if no curated vcpkg port is available.
-- The current Linux base build does not appear to use vcpkg. The high-precision
-  build path should either add Linux vcpkg presets or keep simple-only builds
-  explicit.
+- CALCEPH, zstd, and ERFA are available through the checked-in vcpkg manifest
+  feature.
+- Linux, macOS, and Windows have vcpkg-backed high-precision build paths.

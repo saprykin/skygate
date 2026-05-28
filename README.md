@@ -30,13 +30,17 @@ Quick UI that renders stars, constellations, the horizon, and overlay labels.
   custom coordinates
 - Bundled starter catalog plus support for downloading HYG v4.2 stars,
   OpenNGC deep-sky objects, and Stellarium constellation data
+- Selectable simple and high-precision ephemeris engines when the
+  high-precision feature is enabled
+- Bundled and installed ephemeris-data status for high-precision builds
 - Persistent settings and cached catalog data between launches
 - Configurable terminal/file logging with bounded rotating log files
 
 Ancient dates are intended for exploratory viewing. The date input uses a
-proleptic Gregorian calendar, and the current Sun, Moon, and planet formulas
-are lightweight approximations around J2000 rather than historical-astronomy
-grade ephemerides for the far past.
+proleptic Gregorian calendar. The simple engine uses lightweight formulas
+around J2000; the high-precision engine uses installed ephemeris data when
+available and reports degraded or out-of-range metadata when assumptions
+dominate.
 
 ## Repository Layout
 
@@ -55,7 +59,8 @@ grade ephemerides for the far past.
 
 - CMake 3.24 or newer
 - A C++20 compiler
-- Qt 6.5 or newer with `Core`, `Gui`, `Qml`, `Quick`, `Network`, and `Test`
+- Qt 6.5 or newer with `Core`, `Gui`, `Qml`, `Quick`, and `Network`; add
+  `Test` when building tests
 - `Qt Positioning` (optional, enables the `Current Device` location mode)
 - Zlib
 - vcpkg (recommended for release builds and high-precision dependencies)
@@ -156,7 +161,8 @@ ctest --test-dir build --output-on-failure
 
 This covers core projection and math tests, ephemeris numeric regressions,
 catalog parsing and archive handling, catalog download/cache workflow tests,
-UI controller/model tests, and a QML smoke test for the main application module.
+UI controller/model tests, packaged-app smoke checks, and QML component,
+preferences, interaction, rendering, and smoke tests.
 
 With the included `ui-debug` preset build tree, the equivalent command is:
 
@@ -164,8 +170,9 @@ With the included `ui-debug` preset build tree, the equivalent command is:
 ctest --test-dir build-make/ui-debug --output-on-failure
 ```
 
-Tests carry CTest labels such as `unit`, `integration`, `qml`, `perf`,
-`platform`, and `slow`. Use `ctest --test-dir build-make/ui-debug -LE slow
+Tests carry CTest labels such as `unit`, `integration`, `qml`,
+`highprecision`, `validation`, `acceptance`, `perf`, `platform`, `advisory`,
+and `slow`. Use `ctest --test-dir build-make/ui-debug -LE slow
 --output-on-failure` for the default non-slow suite, or `ctest --test-dir
 build-make/ui-debug -L slow --output-on-failure` for slow guard/rendering
 coverage.
@@ -236,6 +243,13 @@ vcpkg presets when you need CALCEPH-backed engine tests:
 cmake --preset core-debug-highprecision-linux-vcpkg
 cmake --build --preset core-debug-highprecision-linux-vcpkg
 ctest --preset core-debug-highprecision-linux-vcpkg
+```
+
+Release UI vcpkg presets enable high precision. For example, on macOS:
+
+```bash
+cmake --preset ui-release-macos-vcpkg
+cmake --build --preset ui-release-macos-vcpkg
 ```
 
 The shared preset file is portable and does not check in developer-specific Qt
@@ -319,10 +333,11 @@ The script configures a release UI build, installs it into an AppDir, downloads
 `linuxdeploy` plus the Qt plugin, bundles Qt/QML dependencies, and writes the
 AppImage under `dist/`. It enables high precision by default; set
 `SKYGATE_APPIMAGE_ENABLE_HIGH_PRECISION=OFF` only for an explicit simple-only
-developer package. The script forwards that opt-out to
-`SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF`. It expects CMake, Ninja, curl,
-vcpkg, standard Qt Linux build/runtime dependencies, and a Qt 6.5+ desktop
-install.
+developer package. That disables the CMake high-precision build gate. When
+`VCPKG_ROOT` is set, the script still enables the high-precision manifest
+feature so vcpkg resolves the release dependency set consistently. It expects
+CMake, Ninja, curl, vcpkg, standard Qt Linux build/runtime dependencies, and a
+Qt 6.5+ desktop install.
 The manual `Package Linux`, `Package macOS`, and `Package Windows` GitHub
 Actions workflows build the same AppImage, DMG, and Windows installer packages
 as downloadable artifacts. Manual runs produce `latest-<sha>` artifacts, and
@@ -334,8 +349,7 @@ On macOS with vcpkg-managed zlib:
 
 ```bash
 cmake --preset ui-release-macos-vcpkg
-cmake --build --preset ui-install-macos-vcpkg
-cmake --build --preset ui-package-macos-vcpkg
+cmake --build --preset ui-release-macos-vcpkg --target package-skygate-ui-dmg
 ```
 
 Release vcpkg presets enable high precision. The install/package flow uses

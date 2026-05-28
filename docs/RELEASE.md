@@ -7,6 +7,8 @@ are cut from `master` with tags named `vX.Y.Z`.
 
 - Decide the release version, for example `1.1.0`.
 - Update `SKYGATE_APP_VERSION` in `CMakeLists.txt`.
+- Treat `SKYGATE_APP_VERSION` as the release authority; the vcpkg manifest
+  version is dependency-manifest metadata unless the release policy changes.
 - Move relevant entries from `CHANGELOG.md` `[Unreleased]` into a new
   `## [X.Y.Z] - YYYY-MM-DD` section.
 - Leave a fresh empty `[Unreleased]` section for the next cycle.
@@ -22,14 +24,26 @@ cmake --build --preset core-debug-highprecision-linux-vcpkg
 ctest --preset core-debug-highprecision-linux-vcpkg
 ```
 
+- Confirm at least one release UI vcpkg preset builds with high precision
+  enabled. Release UI presets intentionally build with tests disabled; run
+  high-precision tests through a `core-debug-highprecision-*` test preset and
+  rely on package workflow smoke checks for packaged UI artifacts.
+
+```bash
+cmake --preset ui-release-macos-vcpkg
+cmake --build --preset ui-release-macos-vcpkg
+```
+
 - Run the manual `Package Linux`, `Package macOS`, and `Package Windows`
   workflows from `master` if a preflight package check is desired. Release
   packaging enables `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON` through the
   `high-precision-ephemeris` vcpkg manifest feature.
-- Download and smoke-test the manual package artifacts:
-  - Linux AppImage starts on a compatible Linux machine.
-  - macOS DMG opens and `SkyGate.app` starts.
-  - Windows MSI installs/starts on Windows.
+- Download and smoke-test the manual package artifacts, including `--version`
+  output and bundled runtime dependency checks where practical:
+  - Linux AppImage extracts and starts on a compatible Linux machine.
+  - macOS DMG mounts and `SkyGate.app` starts.
+  - Windows MSI extracts or installs on Windows and includes Qt, zlib, CALCEPH,
+    zstd, and ERFA runtime DLLs.
 
 ## Tag And Package
 
