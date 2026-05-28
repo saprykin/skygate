@@ -1,10 +1,10 @@
 #include "SkyObjectTrailBuilder.hpp"
+#include "CelestialBodyCatalog.hpp"
 #include "CelestialReferenceCalculator.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
-#include "math/Geometry2d.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 
@@ -51,6 +51,38 @@ QColor colorWithAlpha(const QColor& color, const int alpha)
                   == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
 }
 
+void copyCommonBodyFields(
+    skygate::ephemeris::BaseCelestialBody& target, const skygate::ephemeris::BaseCelestialBody& source
+)
+{
+    target.id = source.id;
+    target.displayName = source.displayName;
+    target.kind = source.kind;
+    target.visualMagnitude = source.visualMagnitude;
+}
+
+[[nodiscard]] skygate::ephemeris::CelestialBodyCatalog
+makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
+{
+    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
+        skygate::ephemeris::DistantCelestialBody distantBody;
+        copyCommonBodyFields(distantBody, body);
+        distantBody.fixedEquatorial = body.fixedEquatorialValue();
+        distantBody.deepSkyObject = body.deepSkyObjectValue();
+        return skygate::ephemeris::CelestialBodyCatalog(
+            {},
+            {std::move(distantBody)},
+            {{.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U}}
+        );
+    }
+
+    skygate::ephemeris::OwnGalaxyCelestialBody ownGalaxyBody;
+    copyCommonBodyFields(ownGalaxyBody, body);
+    ownGalaxyBody.fixedEquatorial = body.fixedEquatorialValue();
+    ownGalaxyBody.starAstrometry = body.starAstrometryValue();
+    return skygate::ephemeris::CelestialBodyCatalog({std::move(ownGalaxyBody)});
+}
+
 [[nodiscard]] bool isFixedEquatorialTrailTarget(const SkyObjectTrailInput& input) noexcept
 {
     if (!usesHighPrecisionRequest(input) || input.targetBody == nullptr || input.targetState == nullptr
@@ -58,9 +90,8 @@ QColor colorWithAlpha(const QColor& color, const int alpha)
         return false;
     }
 
-    return input.targetBody->fixedEquatorial.has_value() || input.targetBody->starAstrometry.has_value()
-           || input.targetBody->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-           || input.targetBody->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::Star;
+    return input.targetBody->fixedEquatorialValue().has_value() || input.targetBody->starAstrometryValue().has_value()
+           || input.targetBody->kind == skygate::ephemeris::BaseCelestialBody::Kind::Star;
 }
 
 [[nodiscard]] bool shouldUseGuidanceTrail(const SkyObjectTrailInput& input) noexcept
@@ -461,13 +492,9 @@ void appendAdaptiveHighPrecisionAnchors(
     const skygate::ephemeris::BodyTrailOptions& renderOptions
 )
 {
-    const std::array<skygate::ephemeris::CelestialBody, 1> bodies{*input.targetBody};
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine = std::move(
-        skygate::ephemeris::EphemerisEngineFactory::create(
-            std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
-        )
-            .engine
-    );
+    const skygate::ephemeris::CelestialBodyCatalog catalog = makeSingleBodyCatalog(*input.targetBody);
+    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
+        std::move(skygate::ephemeris::EphemerisEngineFactory::create(catalog).engine);
     if (guidanceEngine == nullptr) {
         return std::nullopt;
     }
@@ -484,7 +511,7 @@ void appendAdaptiveHighPrecisionAnchors(
 [[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample>
 sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephemeris::BodyTrailOptions& renderOptions)
 {
-    const skygate::core::SkyContext& context =
+    const skygate::core::ObservationContext& context =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     const skygate::core::EquatorialCoordinate equatorial = input.targetState->equatorial;
     const int startOffsetMinutes = -renderOptions.pastHours * 60;
@@ -605,7 +632,7 @@ void appendFutureTrailTick(
 
 SkyObjectTrailBuilder::TrailSampleCacheKey SkyObjectTrailBuilder::sampleCacheKeyFor(const SkyObjectTrailInput& input)
 {
-    const skygate::core::SkyContext& context =
+    const skygate::core::ObservationContext& context =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     return TrailSampleCacheKey{
         .ephemerisEngine = input.ephemerisEngine,
@@ -653,7 +680,7 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
     QElapsedTimer timer;
     skygate::ui::startPerformanceTimer(timer);
 
-    const skygate::core::SkyContext& context =
+    const skygate::core::ObservationContext& context =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     if (input.ephemerisEngine == nullptr || input.preparedProjection == nullptr || !context.observer.isValid()) {
         return;

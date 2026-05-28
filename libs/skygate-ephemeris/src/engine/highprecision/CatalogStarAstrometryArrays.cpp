@@ -1,4 +1,4 @@
-#include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
+#include "CatalogStarAstrometryArrays.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -7,10 +7,9 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-[[nodiscard]] bool isCatalogStarBody(const CelestialBody& body) noexcept
+[[nodiscard]] bool isCatalogStarBody(const BaseCelestialBody& body) noexcept
 {
-    return body.type == CelestialBodyType::Star || body.ephemerisSource == CelestialBodyEphemerisSource::Star
-           || body.ephemerisSource == CelestialBodyEphemerisSource::FixedEquatorial;
+    return body.kind == BaseCelestialBody::Kind::Star || body.fixedEquatorialValue().has_value();
 }
 
 [[nodiscard]] double optionalOrQuietNaN(const std::optional<double> value) noexcept
@@ -30,7 +29,7 @@ namespace {
 
 }  // namespace
 
-CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const CelestialBody> bodies)
+CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const BaseCelestialBody* const> bodies)
 {
     m_bodyIndices.reserve(bodies.size());
     m_hasCatalogAstrometry.reserve(bodies.size());
@@ -54,14 +53,16 @@ CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const C
     m_validityRanges.reserve(bodies.size());
 
     for (std::size_t bodyIndex = 0; bodyIndex < bodies.size(); ++bodyIndex) {
-        const CelestialBody& body = bodies[bodyIndex];
-        if (!isCatalogStarBody(body) || (!body.starAstrometry.has_value() && !body.fixedEquatorial.has_value())) {
+        const BaseCelestialBody& body = *bodies[bodyIndex];
+        if (!isCatalogStarBody(body)
+            || (!body.starAstrometryValue().has_value() && !body.fixedEquatorialValue().has_value())) {
             continue;
         }
 
-        const CatalogStarAstrometry* astrometry = body.starAstrometry.has_value() ? &*body.starAstrometry : nullptr;
+        const CatalogStarAstrometry* astrometry =
+            body.starAstrometryValue().has_value() ? &*body.starAstrometryValue() : nullptr;
         const core::EquatorialCoordinate referenceEquatorial =
-            astrometry != nullptr ? astrometry->referenceEquatorial : *body.fixedEquatorial;
+            astrometry != nullptr ? astrometry->referenceEquatorial : *body.fixedEquatorialValue();
         const AstronomicalEpoch referenceEpoch =
             astrometry != nullptr ? astrometry->referenceEpoch : AstronomicalEpoch{};
 
@@ -73,14 +74,14 @@ CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const C
         m_referenceEpochJulianDatePart2.push_back(referenceEpoch.julianDatePart2);
         m_referenceEpochTimeScales.push_back(referenceEpoch.timeScale);
 
-        m_hasFixedEquatorialFallback.push_back(body.fixedEquatorial.has_value() ? 1U : 0U);
+        m_hasFixedEquatorialFallback.push_back(body.fixedEquatorialValue().has_value() ? 1U : 0U);
         m_fixedRightAscensionHours.push_back(
-            body.fixedEquatorial.has_value() ? body.fixedEquatorial->rightAscensionHours
-                                             : std::numeric_limits<double>::quiet_NaN()
+            body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->rightAscensionHours
+                                                    : std::numeric_limits<double>::quiet_NaN()
         );
         m_fixedDeclinationDegrees.push_back(
-            body.fixedEquatorial.has_value() ? body.fixedEquatorial->declinationDeg
-                                             : std::numeric_limits<double>::quiet_NaN()
+            body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->declinationDeg
+                                                    : std::numeric_limits<double>::quiet_NaN()
         );
 
         const std::optional<double> properMotionRightAscension =

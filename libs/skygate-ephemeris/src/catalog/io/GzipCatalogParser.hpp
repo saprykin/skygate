@@ -4,7 +4,6 @@
 #include "catalog/ICatalogParser.hpp"
 
 #include <memory>
-#include <string>
 #include <string_view>
 
 namespace skygate::ephemeris {

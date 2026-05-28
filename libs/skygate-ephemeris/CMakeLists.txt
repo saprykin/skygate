@@ -163,8 +163,15 @@ add_library(skygate-ephemeris STATIC
     src/time/CalendarTime.hpp
     src/time/EpochCodec.hpp
     src/time/AstronomicalTime.hpp
-    src/Types.hpp
+    src/BaseCelestialBody.hpp
+    src/CelestialBodyCatalog.hpp
+    src/CelestialBodyState.hpp
+    src/DeepSkyObjectInfo.hpp
+    src/DistantCelestialBody.hpp
+    src/EphemerisSnapshot.hpp
+    src/OwnGalaxyCelestialBody.hpp
     src/StringUtilities.hpp
+    src/catalog/CatalogStarAstrometry.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
     src/catalog/CatalogBodyParseResult.hpp
     src/catalog/bundled/BundledCatalogParser.hpp
@@ -193,6 +200,14 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/zip/ZipBinaryUtilities.hpp
     src/catalog/io/zip/ZipEntryMetadata.hpp
     src/StringUtilities.cpp
+    src/BaseCelestialBody.cpp
+    src/CelestialBodyCatalog.cpp
+    src/CelestialBodyState.cpp
+    src/DeepSkyObjectInfo.cpp
+    src/DistantCelestialBody.cpp
+    src/EphemerisSnapshot.cpp
+    src/OwnGalaxyCelestialBody.cpp
+    src/catalog/CatalogStarAstrometry.cpp
     src/catalog/CatalogBodyParseResult.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
     src/catalog/CatalogIdentity.cpp

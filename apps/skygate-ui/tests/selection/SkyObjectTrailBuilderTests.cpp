@@ -1,3 +1,5 @@
+#include "CelestialBodyCatalog.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "SkyObjectTrailBuilder.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -21,7 +23,7 @@ class TrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit TrailEngine(const std::uint32_t expectedBodyIndex = 7U) : m_expectedBodyIndex(expectedBodyIndex) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -47,27 +49,28 @@ public:
         return stateForContext(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         (void)context;
         return {};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         ++m_contextBodyStateCalls;
         return stateForContext(context, bodyIndex);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    stateForContext(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const
+    stateForContext(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const
     {
         m_sawExpectedBodyIndex = m_sawExpectedBodyIndex || bodyIndex == m_expectedBodyIndex;
 
@@ -129,7 +132,7 @@ private:
 
 class CurvedHighPrecisionTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -158,20 +161,21 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         (void)context;
         return {};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, const std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
     {
         return std::nullopt;
     }
@@ -187,7 +191,7 @@ private:
 
 class CrossingTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -205,20 +209,21 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         (void)context;
         return {};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         const auto offsetMinutes = static_cast<int>(
             std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
@@ -390,18 +395,19 @@ void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialMode
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     input.ephemerisRequest = request;
 
-    const skygate::ephemeris::CelestialBody body{
-        .id = "fixed-star",
-        .displayName = "Fixed Star",
-        .type = skygate::ephemeris::CelestialBodyType::Star,
-        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Star,
-        .fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0}
-    };
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "fixed-star";
+    body.displayName = "Fixed Star";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0};
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
     const skygate::ephemeris::CelestialBodyState state{
         .bodyIndex = input.targetBodyIndex,
         .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0}
     };
-    input.targetBody = &body;
+    input.targetBody = &bodyCatalog.bodyAt(0U);
     input.targetState = &state;
 
     builder.appendTrail(frame, input);
@@ -479,15 +485,16 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
     input.ephemerisRequest = request;
 
-    const skygate::ephemeris::CelestialBody body{
-        .id = "moon",
-        .displayName = "Moon",
-        .type = skygate::ephemeris::CelestialBodyType::Moon,
-        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon
-    };
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "moon";
+    body.displayName = "Moon";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
 
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
-        std::move(skygate::ephemeris::EphemerisEngineFactory::create({body}).engine);
+        std::move(skygate::ephemeris::EphemerisEngineFactory::create(bodyCatalog).engine);
     QVERIFY(guidanceEngine != nullptr);
     skygate::ephemeris::EphemerisRequest guidanceRequest = request;
     guidanceRequest.options = guidanceEngine->options();
@@ -514,7 +521,7 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
         );
     QVERIFY(anchoredProjection.has_value());
     input.preparedProjection = &*anchoredProjection;
-    input.targetBody = &body;
+    input.targetBody = &bodyCatalog.bodyAt(0U);
     input.targetState = &state;
 
     builder.appendTrail(frame, input);

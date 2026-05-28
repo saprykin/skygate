@@ -1,6 +1,6 @@
-#include <QtTest>
-
 #include "SkySceneModelTestSupport.hpp"
+
+#include <QtTest>
 
 using skygate::ui::tests::buildDeepSkyRenderFrame;
 using skygate::ui::tests::createTestCatalog;
@@ -26,7 +26,7 @@ private slots:
 
 void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
 {
-    skygate::ephemeris::CelestialBody m31 =
+    skygate::ephemeris::DistantCelestialBody m31 =
         makeDeepSkyBody("messier_031", "M31", 3.44, {"M 31", "NGC 224", "Andromeda Galaxy"});
     m31.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 0.7123, .declinationDeg = 41.269};
 
@@ -87,14 +87,15 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
     bool sawPrimaryDso = false;
     bool sawOpenNgcM31 = false;
     for (std::size_t index = 0; index < buildResult.catalog->bodies().size(); ++index) {
-        const auto& body = buildResult.catalog->bodies()[index];
-        if (body.id == "primary_dso") {
+        const auto* body = buildResult.catalog->bodies()[index];
+        QVERIFY(body != nullptr);
+        if (body->id == "primary_dso") {
             sawPrimaryDso = true;
             QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(primarySourceIndex));
-        } else if (body.id == "open_ngc_m31") {
+        } else if (body->id == "open_ngc_m31") {
             sawOpenNgcM31 = true;
             QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(deepSkySourceIndex));
-        } else if (body.id == "messier_031") {
+        } else if (body->id == "messier_031") {
             QFAIL("Merged catalog should replace the primary M31 with the OpenNGC body");
         }
     }
@@ -105,15 +106,11 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
 
 void SkySceneModelDeepSkyTests::deepSkyObjectsRenderAndCanBeHidden()
 {
-    skygate::ephemeris::CelestialBody m31 = makeBody(
-        "messier_031",
-        "M31",
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        3.44,
-        skygate::core::EquatorialCoordinate{.rightAscensionHours = 0.7123, .declinationDeg = 41.269}
-    );
+    skygate::ephemeris::DistantCelestialBody m31 =
+        makeDeepSkyBody("messier_031", "M31", 3.44, {"M31", "Andromeda Galaxy"});
+    m31.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 0.7123, .declinationDeg = 41.269};
     m31.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = {"M31", "Andromeda Galaxy"},
         .majorAxisArcmin = 177.0,
         .minorAxisArcmin = 70.0,
@@ -146,7 +143,7 @@ void SkySceneModelDeepSkyTests::deepSkyObjectsRenderAndCanBeHidden()
 
 void SkySceneModelDeepSkyTests::denseDeepSkyLabelsAreBudgeted()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies;
     std::vector<skygate::core::HorizontalCoordinate> coordinates;
     bodies.reserve(360U);
     coordinates.reserve(360U);
@@ -176,7 +173,7 @@ void SkySceneModelDeepSkyTests::denseDeepSkyLabelsAreBudgeted()
 
 void SkySceneModelDeepSkyTests::wideDeepSkyLabelsPreferNamedObjects()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies;
     bodies.push_back(makeDeepSkyBody("messier_031", "M31", 3.44, {"M 31", "NGC 224", "Andromeda Galaxy"}));
     bodies.push_back(makeDeepSkyBody("ngc_100", "NGC 100", 4.0, {"NGC 100"}));
     bodies.push_back(makeDeepSkyBody("ngc_7000", "NGC 7000", 4.0, {"NGC 7000", "North America Nebula"}));
@@ -196,7 +193,7 @@ void SkySceneModelDeepSkyTests::wideDeepSkyLabelsPreferNamedObjects()
 
 void SkySceneModelDeepSkyTests::deepestDeepSkyZoomShowsSeparatedAnonymousLabels()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies;
     std::vector<skygate::core::HorizontalCoordinate> coordinates;
     bodies.reserve(24U);
     coordinates.reserve(24U);

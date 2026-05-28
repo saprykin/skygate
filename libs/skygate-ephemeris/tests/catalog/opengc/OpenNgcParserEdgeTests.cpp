@@ -1,5 +1,5 @@
-#include "catalog/CatalogPayloadParser.hpp"
 #include "catalog/CatalogLoader.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 
 #include <QtTest/QtTest>
 
@@ -12,20 +12,21 @@ constexpr std::string_view kHeader =
     "Name;Type;RA;Dec;Const;MajAx;MinAx;PosAng;B-Mag;V-Mag;J-Mag;H-Mag;K-Mag;SurfBr;Hubble;Cstar U-Mag;Cstar "
     "B-Mag;Cstar V-Mag;M;NGC;IC;Cstar Names;Identifiers;Common names;NED notes;OpenNGC notes\n";
 
-const skygate::ephemeris::CelestialBody*
-findBody(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string& id)
+const skygate::ephemeris::BaseCelestialBody*
+findBody(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const std::string& id)
 {
-    const auto it = std::find_if(bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::CelestialBody& body) {
-        return body.id == id;
-    });
-    return it == bodies.end() ? nullptr : &(*it);
+    const auto it =
+        std::find_if(bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->id == id;
+        });
+    return it == bodies.end() ? nullptr : *it;
 }
 
-bool hasAlias(const skygate::ephemeris::CelestialBody& body, const std::string& alias)
+bool hasAlias(const skygate::ephemeris::BaseCelestialBody& body, const std::string& alias)
 {
-    return body.deepSkyObject.has_value()
-           && std::find(body.deepSkyObject->aliases.begin(), body.deepSkyObject->aliases.end(), alias)
-                  != body.deepSkyObject->aliases.end();
+    return body.deepSkyObjectValue().has_value()
+           && std::find(body.deepSkyObjectValue()->aliases.begin(), body.deepSkyObjectValue()->aliases.end(), alias)
+                  != body.deepSkyObjectValue()->aliases.end();
 }
 
 }  // namespace
@@ -119,12 +120,27 @@ void OpenNgcParserEdgeTests::mapsSupportedObjectKinds()
     QVERIFY(result.catalog != nullptr);
     const auto bodies = result.catalog->bodies();
 
-    QVERIFY(findBody(bodies, "ngc_1")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Galaxy);
-    QVERIFY(findBody(bodies, "ngc_2")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::OpenCluster);
-    QVERIFY(findBody(bodies, "ngc_3")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::GlobularCluster);
-    QVERIFY(findBody(bodies, "ngc_4")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Nebula);
-    QVERIFY(findBody(bodies, "ngc_5")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula);
-    QVERIFY(findBody(bodies, "ngc_6")->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Asterism);
+    QVERIFY(
+        findBody(bodies, "ngc_1")->deepSkyObjectValue()->kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy
+    );
+    QVERIFY(
+        findBody(bodies, "ngc_2")->deepSkyObjectValue()->kind
+        == skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster
+    );
+    QVERIFY(
+        findBody(bodies, "ngc_3")->deepSkyObjectValue()->kind
+        == skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster
+    );
+    QVERIFY(
+        findBody(bodies, "ngc_4")->deepSkyObjectValue()->kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula
+    );
+    QVERIFY(
+        findBody(bodies, "ngc_5")->deepSkyObjectValue()->kind
+        == skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula
+    );
+    QVERIFY(
+        findBody(bodies, "ngc_6")->deepSkyObjectValue()->kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism
+    );
 }
 
 void OpenNgcParserEdgeTests::preservesValidGeometryFields()
@@ -141,20 +157,20 @@ void OpenNgcParserEdgeTests::preservesValidGeometryFields()
 
     const auto* m31 = findBody(result.catalog->bodies(), "messier_031");
     QVERIFY(m31 != nullptr);
-    QVERIFY(m31->deepSkyObject.has_value());
-    QVERIFY(m31->deepSkyObject->majorAxisArcmin.has_value());
-    QVERIFY(m31->deepSkyObject->minorAxisArcmin.has_value());
-    QVERIFY(m31->deepSkyObject->positionAngleDeg.has_value());
-    QCOMPARE(*m31->deepSkyObject->majorAxisArcmin, 177.83);
-    QCOMPARE(*m31->deepSkyObject->minorAxisArcmin, 69.66);
-    QCOMPARE(*m31->deepSkyObject->positionAngleDeg, 0.0);
+    QVERIFY(m31->deepSkyObjectValue().has_value());
+    QVERIFY(m31->deepSkyObjectValue()->majorAxisArcmin.has_value());
+    QVERIFY(m31->deepSkyObjectValue()->minorAxisArcmin.has_value());
+    QVERIFY(m31->deepSkyObjectValue()->positionAngleDeg.has_value());
+    QCOMPARE(*m31->deepSkyObjectValue()->majorAxisArcmin, 177.83);
+    QCOMPARE(*m31->deepSkyObjectValue()->minorAxisArcmin, 69.66);
+    QCOMPARE(*m31->deepSkyObjectValue()->positionAngleDeg, 0.0);
 
     const auto* ngc1 = findBody(result.catalog->bodies(), "ngc_1");
     QVERIFY(ngc1 != nullptr);
-    QVERIFY(ngc1->deepSkyObject.has_value());
-    QVERIFY(!ngc1->deepSkyObject->majorAxisArcmin.has_value());
-    QVERIFY(!ngc1->deepSkyObject->minorAxisArcmin.has_value());
-    QVERIFY(!ngc1->deepSkyObject->positionAngleDeg.has_value());
+    QVERIFY(ngc1->deepSkyObjectValue().has_value());
+    QVERIFY(!ngc1->deepSkyObjectValue()->majorAxisArcmin.has_value());
+    QVERIFY(!ngc1->deepSkyObjectValue()->minorAxisArcmin.has_value());
+    QVERIFY(!ngc1->deepSkyObjectValue()->positionAngleDeg.has_value());
 }
 
 void OpenNgcParserEdgeTests::normalizesAndDeduplicatesAliases()
@@ -177,7 +193,9 @@ void OpenNgcParserEdgeTests::normalizesAndDeduplicatesAliases()
     QVERIFY(hasAlias(*m31, "Andromeda Galaxy"));
 
     const auto duplicateCount = static_cast<int>(std::count(
-        m31->deepSkyObject->aliases.begin(), m31->deepSkyObject->aliases.end(), std::string("Andromeda Galaxy")
+        m31->deepSkyObjectValue()->aliases.begin(),
+        m31->deepSkyObjectValue()->aliases.end(),
+        std::string("Andromeda Galaxy")
     ));
     QCOMPARE(duplicateCount, 1);
 }

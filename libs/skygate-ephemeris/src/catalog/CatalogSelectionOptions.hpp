@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/CatalogSelectionMode.hpp"
+#include "CatalogSelectionMode.hpp"
 
 #include <cstddef>
 

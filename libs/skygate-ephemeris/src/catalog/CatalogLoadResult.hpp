@@ -1,8 +1,8 @@
 #pragma once
 
-#include "catalog/CatalogLoadDiagnostics.hpp"
-#include "catalog/CatalogSourceType.hpp"
-#include "catalog/IStarCatalog.hpp"
+#include "CatalogLoadDiagnostics.hpp"
+#include "CatalogSourceType.hpp"
+#include "IStarCatalog.hpp"
 
 #include <cstdint>
 #include <memory>

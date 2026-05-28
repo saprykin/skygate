@@ -1,9 +1,9 @@
 #pragma once
 
+#include "DeepSkyObjectInfo.hpp"
+
 #include <QColor>
 #include <QString>
-
-#include "Types.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -33,7 +33,7 @@ struct SkyRenderGlyph final {
     double rotationDeg = 0.0;
     double widthPx = 1.0;
     std::uint32_t bodyIndex = 0;
-    skygate::ephemeris::DeepSkyObjectKind kind = skygate::ephemeris::DeepSkyObjectKind::Unknown;
+    skygate::ephemeris::DeepSkyObjectInfo::Kind kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown;
     QColor color;
 };
 

@@ -32,9 +32,9 @@ void HygCatalogParserTests::parsesBasicRows()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 2U);
-    QVERIFY(bodies[0].id == "hip_32349");
-    QVERIFY(bodies[0].fixedEquatorial.has_value());
-    QCOMPARE(bodies[0].ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
+    QVERIFY(bodies[0]->id == "hip_32349");
+    QVERIFY(bodies[0]->fixedEquatorialValue().has_value());
+    QCOMPARE(bodies[0]->kind, skygate::ephemeris::BaseCelestialBody::Kind::Star);
 }
 
 void HygCatalogParserTests::parsesAstrometryColumns()
@@ -50,8 +50,8 @@ void HygCatalogParserTests::parsesAstrometryColumns()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].starAstrometry.has_value());
-    const auto& astrometry = *bodies[0].starAstrometry;
+    QVERIFY(bodies[0]->starAstrometryValue().has_value());
+    const auto& astrometry = *bodies[0]->starAstrometryValue();
     QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 6.7525);
     QCOMPARE(astrometry.referenceEquatorial.declinationDeg, -16.7161);
     QCOMPARE(astrometry.properMotionRightAscensionMasPerYear.value_or(0.0), -546.01);
@@ -74,8 +74,8 @@ void HygCatalogParserTests::treatsMissingDistanceSentinelAsAbsentParallax()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].starAstrometry.has_value());
-    const auto& astrometry = *bodies[0].starAstrometry;
+    QVERIFY(bodies[0]->starAstrometryValue().has_value());
+    const auto& astrometry = *bodies[0]->starAstrometryValue();
     QCOMPARE(astrometry.properMotionRightAscensionMasPerYear.value_or(0.0), 12.0);
     QCOMPARE(astrometry.properMotionDeclinationMasPerYear.value_or(0.0), -3.0);
     QCOMPARE(astrometry.radialVelocityKmPerSecond.value_or(0.0), 20.0);
@@ -124,7 +124,7 @@ void HygCatalogParserTests::supportsFallbackIdsAndQuotedFields()
     const auto* escapedQuoteBody = findBodyById(bodies, "hip_3");
     QVERIFY(escapedQuoteBody != nullptr);
     QVERIFY(escapedQuoteBody->displayName == "Quote \"Star\"");
-    QVERIFY(escapedQuoteBody->fixedEquatorial.has_value());
+    QVERIFY(escapedQuoteBody->fixedEquatorialValue().has_value());
 }
 
 void HygCatalogParserTests::keepsWholeCatalogByDefault()

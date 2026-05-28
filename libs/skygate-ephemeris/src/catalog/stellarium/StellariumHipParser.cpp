@@ -1,4 +1,4 @@
-#include "catalog/stellarium/StellariumHipParser.hpp"
+#include "StellariumHipParser.hpp"
 
 #include <QJsonObject>
 

@@ -1,7 +1,6 @@
-#include "math/SphericalGeometry.hpp"
-
-#include "math/AngleMath.hpp"
-#include "math/MathConstants.hpp"
+#include "SphericalGeometry.hpp"
+#include "AngleMath.hpp"
+#include "MathConstants.hpp"
 
 #include <cstddef>
 #include <cmath>

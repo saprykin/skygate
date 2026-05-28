@@ -1,9 +1,9 @@
 #pragma once
 
-#include "catalog/io/DelimitedCatalogReaderOptions.hpp"
-#include "catalog/io/DelimitedCatalogRow.hpp"
-#include "catalog/io/DelimitedCatalogParserOptions.hpp"
-#include "catalog/io/RowParseOutcome.hpp"
+#include "DelimitedCatalogReaderOptions.hpp"
+#include "DelimitedCatalogRow.hpp"
+#include "DelimitedCatalogParserOptions.hpp"
+#include "RowParseOutcome.hpp"
 #include "catalog/CatalogSourceRequest.hpp"
 
 #include <cstddef>

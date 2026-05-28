@@ -2,7 +2,6 @@
 
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkySceneModel.hpp"
-
 #include "catalog/CatalogFactory.hpp"
 
 #include <QtGlobal>
@@ -25,7 +24,20 @@ struct TestViewport {
 class SkySceneModelTestHarness final {
 public:
     explicit SkySceneModelTestHarness(
-        std::vector<ephemeris::CelestialBody> bodies,
+        std::vector<ephemeris::OwnGalaxyCelestialBody> bodies,
+        const TestSkyContextConfig& contextConfig = {},
+        const TestViewport& viewport = {}
+    )
+    {
+        auto starCatalog = createTestCatalog(std::move(bodies));
+        Q_ASSERT(starCatalog != nullptr);
+        auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+        Q_ASSERT(ephemerisEngine != nullptr);
+        initialize(std::move(starCatalog), std::move(ephemerisEngine), contextConfig, viewport);
+    }
+
+    explicit SkySceneModelTestHarness(
+        std::vector<ephemeris::DistantCelestialBody> bodies,
         const TestSkyContextConfig& contextConfig = {},
         const TestViewport& viewport = {}
     )
@@ -72,7 +84,7 @@ public:
         return m_controller != nullptr && m_contextConfigured;
     }
 
-    [[nodiscard]] ephemeris::SkySnapshot computeSnapshot() const
+    [[nodiscard]] ephemeris::EphemerisSnapshot computeSnapshot() const
     {
         return m_controller->ephemerisEngine()->compute(m_controller->skyContext());
     }

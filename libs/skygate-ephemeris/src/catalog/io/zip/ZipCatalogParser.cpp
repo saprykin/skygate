@@ -1,7 +1,7 @@
-#include "catalog/io/zip/ZipCatalogParser.hpp"
+#include "ZipCatalogParser.hpp"
+#include "ZipCodec.hpp"
 #include "catalog/CatalogLoadResult.hpp"
 #include "catalog/hyg/HygCatalogParser.hpp"
-#include "catalog/io/zip/ZipCodec.hpp"
 
 #include <QLoggingCategory>
 #include <QString>

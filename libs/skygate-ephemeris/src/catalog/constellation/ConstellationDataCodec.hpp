@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/constellation/ConstellationData.hpp"
+#include "ConstellationData.hpp"
 
 #include <span>
 #include <string>

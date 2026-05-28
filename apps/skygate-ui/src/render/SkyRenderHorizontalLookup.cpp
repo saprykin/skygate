@@ -22,7 +22,7 @@ SkyRenderHorizontalLookup::SkyRenderHorizontalLookup(
 }
 
 void SkyRenderHorizontalLookup::capture(
-    const skygate::ephemeris::CelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal
+    const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal
 )
 {
     if (!m_requiredBodyIds.empty() && m_requiredBodyIds.contains(body.id)) {

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "math/TimeConstants.hpp"
-#include "time/TimeScale.hpp"
+#include "TimeScale.hpp"
 
 #include <optional>
 

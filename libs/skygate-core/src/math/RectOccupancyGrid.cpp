@@ -1,6 +1,5 @@
-#include "math/RectOccupancyGrid.hpp"
-
-#include "math/Geometry2d.hpp"
+#include "RectOccupancyGrid.hpp"
+#include "Geometry2d.hpp"
 
 namespace skygate::core {
 

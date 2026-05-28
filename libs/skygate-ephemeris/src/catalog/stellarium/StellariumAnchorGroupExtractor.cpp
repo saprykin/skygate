@@ -1,7 +1,6 @@
-#include "catalog/stellarium/StellariumAnchorGroupExtractor.hpp"
-
+#include "StellariumAnchorGroupExtractor.hpp"
+#include "StellariumHipParser.hpp"
 #include "StringUtilities.hpp"
-#include "catalog/stellarium/StellariumHipParser.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>

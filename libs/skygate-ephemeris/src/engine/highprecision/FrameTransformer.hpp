@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "HighPrecisionTypes.hpp"
 
 #include <cstdint>
 #include <memory>

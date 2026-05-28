@@ -1,4 +1,4 @@
-#include "catalog/io/CompressedDataInflater.hpp"
+#include "CompressedDataInflater.hpp"
 
 #include <array>
 #include <limits>

@@ -1,5 +1,5 @@
-#include "catalog/io/DelimitedCatalogParser.hpp"
-#include "catalog/io/DelimitedCatalogReader.hpp"
+#include "DelimitedCatalogParser.hpp"
+#include "DelimitedCatalogReader.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
@@ -47,7 +47,28 @@ CatalogBodyParseResult DelimitedCatalogParser::run(
                 if (progressCallback && (parsedObjectCount % runnerOptions.progressInterval) == 0U) {
                     progressCallback(parsedObjectCount);
                 }
+                rowResult.orderedBodyIndexes.push_back(
+                    CelestialBodyCatalog::OrderEntry{
+                        .domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy,
+                        .bodyIndex = rowResult.bodies.size(),
+                    }
+                );
                 rowResult.bodies.push_back(std::move(*outcome.body));
+                return true;
+            }
+
+            if (outcome.distantBody.has_value()) {
+                ++parsedObjectCount;
+                if (progressCallback && (parsedObjectCount % runnerOptions.progressInterval) == 0U) {
+                    progressCallback(parsedObjectCount);
+                }
+                rowResult.orderedBodyIndexes.push_back(
+                    CelestialBodyCatalog::OrderEntry{
+                        .domain = CelestialBodyCatalog::BodyDomain::Distant,
+                        .bodyIndex = rowResult.distantBodies.size(),
+                    }
+                );
+                rowResult.distantBodies.push_back(std::move(*outcome.distantBody));
                 return true;
             }
 

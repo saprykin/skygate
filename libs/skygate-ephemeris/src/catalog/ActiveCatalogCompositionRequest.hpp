@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/IStarCatalog.hpp"
+#include "IStarCatalog.hpp"
 
 #include <cstddef>
 

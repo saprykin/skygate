@@ -1,9 +1,9 @@
 #pragma once
 
-#include "SkyRenderBuilders.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "SkyRenderFrame.hpp"
 #include "math/CircleHitIndex.hpp"
 #include "math/CircleHitTarget.hpp"
-#include "Types.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -11,10 +11,14 @@
 
 class SkyHitTargetIndex final {
 public:
-    void rebuild(const SkyRenderFrame& frame, const skygate::ephemeris::SkySnapshot& snapshot);
+    void rebuild(const SkyRenderFrame& frame, const skygate::ephemeris::EphemerisSnapshot& snapshot);
     void clear();
     [[nodiscard]] std::optional<std::uint32_t> bodyIndexAt(
-        double x, double y, double viewportWidth, double viewportHeight, const skygate::ephemeris::SkySnapshot& snapshot
+        double x,
+        double y,
+        double viewportWidth,
+        double viewportHeight,
+        const skygate::ephemeris::EphemerisSnapshot& snapshot
     ) const;
 
 private:

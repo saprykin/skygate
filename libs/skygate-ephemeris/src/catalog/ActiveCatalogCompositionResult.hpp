@@ -1,7 +1,7 @@
 #pragma once
 
-#include "catalog/CatalogCompositionSource.hpp"
-#include "catalog/IStarCatalog.hpp"
+#include "CatalogCompositionSource.hpp"
+#include "IStarCatalog.hpp"
 
 #include <cstddef>
 #include <memory>

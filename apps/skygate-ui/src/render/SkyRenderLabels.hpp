@@ -1,13 +1,16 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "PreparedProjection.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderFrame.hpp"
 #include "SkyTheme.hpp"
-
-#include "PreparedProjection.hpp"
 #include "math/Geometry2d.hpp"
 #include "math/RectOccupancyGrid.hpp"
-#include "Types.hpp"
 
 #include <QColor>
 
@@ -17,8 +20,9 @@
 
 namespace skygate::ui::internal {
 
-[[nodiscard]] QColor
-skyRenderLabelColorForBodyType(skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderTheme);
+[[nodiscard]] QColor skyRenderLabelColorForBodyType(
+    skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderTheme
+);
 
 [[nodiscard]] skygate::core::Rect2d skyRenderLabelBounds(double anchorX, double anchorY, std::string_view text);
 
@@ -38,7 +42,7 @@ void appendSkyRenderLabel(
 
 void appendBodyPointLabels(
     SkyRenderFrame& frame,
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     double viewportWidth,
     double viewportHeight,
     const SkyThemeRenderPalette& renderTheme,
@@ -50,7 +54,7 @@ void appendBodyPointLabels(
 
 void appendDeepSkyLabels(
     SkyRenderFrame& frame,
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const skygate::core::ProjectionParams& projectionParams,
     double viewportWidth,
     double viewportHeight,

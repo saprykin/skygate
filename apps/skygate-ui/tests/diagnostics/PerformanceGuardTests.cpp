@@ -1,3 +1,7 @@
+#include "CelestialBodyCatalog.hpp"
+#include "DeepSkyObjectInfo.hpp"
+#include "DistantCelestialBody.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "SkyContextController.hpp"
 #include "SkyHitTargetIndex.hpp"
 #include "SkyObjectSearchModel.hpp"
@@ -11,7 +15,6 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/highprecision/IStarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
@@ -55,7 +58,7 @@ constexpr qint64 kManyTrailsBudgetMs = 12000;
 
 class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -73,20 +76,21 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         (void)context;
         return {};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         const double offsetMinutes = static_cast<double>(
             std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
@@ -109,7 +113,7 @@ public:
     {
         ++m_singleCallCount;
         skygate::ephemeris::highprecision::HighPrecisionCalculatorResult result;
-        result.equatorial = input.body.fixedEquatorial;
+        result.equatorial = input.body.fixedEquatorialValue();
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
         result.metadata.dataSourceProvenance = "performance guard single fallback";
         return result;
@@ -182,7 +186,7 @@ public:
 
     [[nodiscard]] std::vector<skygate::ephemeris::highprecision::StarAstrometryBatchResult> applyBatch(
         const skygate::ephemeris::EphemerisRequest& request,
-        std::span<const skygate::ephemeris::CelestialBody> bodies,
+        std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies,
         std::span<const skygate::ephemeris::highprecision::StarAstrometryBatchResult> calculatorResults,
         std::shared_ptr<const skygate::ephemeris::highprecision::PreparedEphemerisRequestState> preparedRequestState =
             {}
@@ -373,53 +377,90 @@ void verifyHighPrecisionCounterDeltas(
     );
 }
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const double rightAscensionHours,
     const double declinationDeg
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = skygate::core::EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg
     };
-    if (type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
-        body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
-            .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
-            .aliases =
-                {"Guard Alias " + body.id,
-                 "Shared Collision Alias "
-                     + std::to_string(static_cast<int>(std::fmod(rightAscensionHours * 1000.0, 25.0)))},
-            .majorAxisArcmin = 5.0,
-            .minorAxisArcmin = 3.0,
-            .positionAngleDeg = 0.0
-        };
-    }
     return body;
 }
 
-std::vector<skygate::ephemeris::CelestialBody> makeLargeMixedCatalog()
+skygate::ephemeris::DistantCelestialBody makeDeepSkyBody(
+    std::string id,
+    std::string displayName,
+    const double visualMagnitude,
+    const double rightAscensionHours,
+    const double declinationDeg
+)
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
-    bodies.reserve(9000U);
+    skygate::ephemeris::DistantCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = visualMagnitude;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+        .rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg
+    };
+    body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
+        .aliases =
+            {"Guard Alias " + body.id,
+             "Shared Collision Alias "
+                 + std::to_string(static_cast<int>(std::fmod(rightAscensionHours * 1000.0, 25.0)))},
+        .majorAxisArcmin = 5.0,
+        .minorAxisArcmin = 3.0,
+        .positionAngleDeg = 0.0
+    };
+    return body;
+}
+
+skygate::ephemeris::CelestialBodyCatalog makeLargeMixedCatalog(const bool includeExactTarget = false)
+{
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> deepSkyBodies;
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> orderedBodyIndexes;
+    bodies.reserve(7000U);
+    deepSkyBodies.reserve(2000U);
+    orderedBodyIndexes.reserve(9000U);
     for (int index = 0; index < 7000; ++index) {
         const double rightAscensionHours = std::fmod(index * 0.017, 24.0);
         const double declinationDeg = -72.0 + static_cast<double>(index % 145);
         const double magnitude = 2.0 + static_cast<double>(index % 80) / 10.0;
+        orderedBodyIndexes.push_back(
+            {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = bodies.size()}
+        );
         bodies.push_back(makeBody(
             "guard_star_" + std::to_string(index),
             "Guard Star " + std::to_string(index),
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             magnitude,
             rightAscensionHours,
             declinationDeg
+        ));
+    }
+    if (includeExactTarget) {
+        orderedBodyIndexes.push_back(
+            {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = bodies.size()}
+        );
+        bodies.push_back(makeBody(
+            "guard_exact_target",
+            "Guard Exact Target",
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            -1.0,
+            6.0,
+            -16.0
         ));
     }
 
@@ -427,56 +468,60 @@ std::vector<skygate::ephemeris::CelestialBody> makeLargeMixedCatalog()
         const double rightAscensionHours = std::fmod(index * 0.071, 24.0);
         const double declinationDeg = -55.0 + static_cast<double>(index % 110);
         const double magnitude = 4.0 + static_cast<double>(index % 90) / 10.0;
-        bodies.push_back(makeBody(
+        orderedBodyIndexes.push_back(
+            {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = deepSkyBodies.size()}
+        );
+        deepSkyBodies.push_back(makeDeepSkyBody(
             "guard_dso_" + std::to_string(index),
             "Guard Galaxy " + std::to_string(index),
-            skygate::ephemeris::CelestialBodyType::DeepSkyObject,
             magnitude,
             rightAscensionHours,
             declinationDeg
         ));
     }
-    return bodies;
+    return skygate::ephemeris::CelestialBodyCatalog(
+        std::move(bodies), std::move(deepSkyBodies), std::move(orderedBodyIndexes)
+    );
 }
 
-skygate::ephemeris::CelestialBody makeHighPrecisionGuardBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeHighPrecisionGuardBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const double rightAscensionHours,
     const double declinationDeg
 )
 {
-    skygate::ephemeris::CelestialBody body =
+    skygate::ephemeris::OwnGalaxyCelestialBody body =
         makeBody(std::move(id), std::move(displayName), type, visualMagnitude, rightAscensionHours, declinationDeg);
-    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
     return body;
 }
 
-skygate::ephemeris::CelestialBody makeHighPrecisionMoonBody()
+skygate::ephemeris::OwnGalaxyCelestialBody makeHighPrecisionMoonBody()
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = "moon";
     body.displayName = "Moon";
-    body.type = skygate::ephemeris::CelestialBodyType::Moon;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
     body.visualMagnitude = -12.0;
-    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
     return body;
 }
 
-std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionGuardCatalog()
+std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> makeHighPrecisionGuardCatalog()
 {
     constexpr int kHygScaleStarCount = 119626;
     constexpr int kOpenNgcScaleDeepSkyCount = 13308;
 
-    std::vector<skygate::ephemeris::CelestialBody> bodies;
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies;
     bodies.reserve(static_cast<std::size_t>(kHygScaleStarCount + kOpenNgcScaleDeepSkyCount));
     for (int index = 0; index < kHygScaleStarCount; ++index) {
         bodies.push_back(makeHighPrecisionGuardBody(
             "hp_guard_star_" + std::to_string(index),
             "HP Guard Star " + std::to_string(index),
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             2.0 + static_cast<double>(index % 100) / 10.0,
             std::fmod(static_cast<double>(index) * 0.011, 24.0),
             -75.0 + static_cast<double>(index % 150)
@@ -486,7 +531,7 @@ std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionGuardCatalog()
         bodies.push_back(makeHighPrecisionGuardBody(
             "hp_guard_dso_" + std::to_string(index),
             "HP Guard Galaxy " + std::to_string(index),
-            skygate::ephemeris::CelestialBodyType::DeepSkyObject,
+            skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject,
             4.0 + static_cast<double>(index % 80) / 10.0,
             std::fmod(static_cast<double>(index) * 0.073, 24.0),
             -55.0 + static_cast<double>(index % 110)
@@ -495,9 +540,9 @@ std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionGuardCatalog()
     return bodies;
 }
 
-std::vector<skygate::ephemeris::CelestialBody> makeHighPrecisionMoonGuardCatalog()
+std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> makeHighPrecisionMoonGuardCatalog()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies = makeHighPrecisionGuardCatalog();
     bodies.insert(bodies.begin(), makeHighPrecisionMoonBody());
     return bodies;
 }
@@ -530,22 +575,22 @@ SkyContextController::InitializationOptions testInitializationOptions()
     return SkyContextController::InitializationOptions{.loadSettings = false, .initializeLocation = false};
 }
 
-skygate::ephemeris::SkySnapshot makeHitTestSnapshot(const int bodyCount)
+skygate::ephemeris::EphemerisSnapshot makeHitTestSnapshot(const int bodyCount)
 {
-    skygate::ephemeris::SkySnapshot snapshot;
-    auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
-    bodies->reserve(static_cast<std::size_t>(bodyCount));
+    skygate::ephemeris::EphemerisSnapshot snapshot;
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies;
+    bodies.reserve(static_cast<std::size_t>(bodyCount));
     for (int index = 0; index < bodyCount; ++index) {
-        bodies->push_back(makeBody(
+        bodies.push_back(makeBody(
             "hit_body_" + std::to_string(index),
             "Hit Body " + std::to_string(index),
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             5.0,
             0.0,
             0.0
         ));
     }
-    snapshot.catalogBodies = std::move(bodies);
+    snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies));
     return snapshot;
 }
 
@@ -560,7 +605,7 @@ skygate::ui::internal::SkyThemeRenderPalette makeTrailRenderTheme()
 
 void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
 {
-    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(makeLargeMixedCatalog());
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromCatalog(makeLargeMixedCatalog());
     QVERIFY(catalog != nullptr);
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
     QVERIFY(engineResult.isSuccess());
@@ -592,9 +637,10 @@ void PerformanceGuardTests::buildsLargeSceneWithinGuardrail()
 
 void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies = makeHighPrecisionGuardCatalog();
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(catalog != nullptr);
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(bodies);
 
     auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
     auto apparentPlaceCalculator = std::make_shared<GuardApparentPlaceCalculator>();
@@ -611,7 +657,7 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
     dependencies.dataSetInfo = makeHighPrecisionGuardDataSetInfo();
 
     auto engine = std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
-        bodies, options, dependencies
+        bodyCatalog, options, dependencies
     );
 
     SkyContextController::InitializationOptions initializationOptions = testInitializationOptions();
@@ -641,14 +687,15 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
         firstBuildElapsedMs, kHighPrecisionLargeSceneBuildBudgetMs, "high precision large fixed catalog scene build"
     );
 
-    skygate::ephemeris::SkySnapshot cacheSnapshot;
+    skygate::ephemeris::EphemerisSnapshot cacheSnapshot;
     cacheSnapshot.states.push_back(skygate::ephemeris::CelestialBodyState{.bodyIndex = 0U});
     timer.restart();
     computationCache->storeSnapshot(
-        controller.ephemerisRequestContext().request, bodies, dependencies.dataSetInfo, cacheSnapshot
+        controller.ephemerisRequestContext().request, bodyCatalog.bodies(), dependencies.dataSetInfo, cacheSnapshot
     );
-    const std::optional<skygate::ephemeris::SkySnapshot> cachedSnapshot =
-        computationCache->findSnapshot(controller.ephemerisRequestContext().request, bodies, dependencies.dataSetInfo);
+    const std::optional<skygate::ephemeris::EphemerisSnapshot> cachedSnapshot = computationCache->findSnapshot(
+        controller.ephemerisRequestContext().request, bodyCatalog.bodies(), dependencies.dataSetInfo
+    );
     const qint64 cacheElapsedMs = timer.elapsed();
 
     QVERIFY(cachedSnapshot.has_value());
@@ -669,9 +716,10 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
 
 void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionGuardCatalog();
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies = makeHighPrecisionGuardCatalog();
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(catalog != nullptr);
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(bodies);
 
     auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
     auto apparentPlaceCalculator = std::make_shared<GuardApparentPlaceCalculator>();
@@ -688,7 +736,7 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
     dependencies.dataSetInfo = makeHighPrecisionGuardDataSetInfo();
 
     auto engine = std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
-        bodies, options, dependencies
+        bodyCatalog, options, dependencies
     );
 
     SkyContextController::InitializationOptions initializationOptions = testInitializationOptions();
@@ -866,9 +914,10 @@ void PerformanceGuardTests::profilesHighPrecisionLargeFixedCatalogSelection()
 
 void PerformanceGuardTests::profilesHighPrecisionMoonSearchSelection()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies = makeHighPrecisionMoonGuardCatalog();
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies = makeHighPrecisionMoonGuardCatalog();
     auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(catalog != nullptr);
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(bodies);
 
     auto solarSystemCalculator = std::make_shared<GuardSolarSystemStateCalculator>();
     auto starAstrometryCalculator = std::make_shared<GuardBatchStarAstrometryCalculator>();
@@ -889,7 +938,7 @@ void PerformanceGuardTests::profilesHighPrecisionMoonSearchSelection()
     dependencies.dataSetInfo = makeHighPrecisionGuardDataSetInfo();
 
     auto engine = std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
-        bodies, options, dependencies
+        bodyCatalog, options, dependencies
     );
 
     SkyContextController::InitializationOptions initializationOptions = testInitializationOptions();
@@ -969,10 +1018,7 @@ void PerformanceGuardTests::profilesHighPrecisionMoonSearchSelection()
 
 void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies = makeLargeMixedCatalog();
-    bodies.push_back(makeBody(
-        "guard_exact_target", "Guard Exact Target", skygate::ephemeris::CelestialBodyType::Star, -1.0, 6.0, -16.0
-    ));
+    skygate::ephemeris::CelestialBodyCatalog bodyCatalog = makeLargeMixedCatalog(true);
 
     SkyObjectSearchModel model;
     const std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups{
@@ -980,7 +1026,7 @@ void PerformanceGuardTests::searchesLargeMixedCatalogWithinGuardrail()
     };
     QElapsedTimer timer;
     timer.start();
-    model.setCatalogData(bodies, anchorGroups);
+    model.setCatalogData(bodyCatalog.bodies(), anchorGroups);
     const qint64 loadElapsedMs = timer.elapsed();
     verifyElapsedBelow(loadElapsedMs, kLargeSearchLoadBudgetMs, "large search catalog load");
 

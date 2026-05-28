@@ -1,1 +1,1 @@
-#include "catalog/opengc/OpenNgcObjectMapping.hpp"
+#include "OpenNgcObjectMapping.hpp"

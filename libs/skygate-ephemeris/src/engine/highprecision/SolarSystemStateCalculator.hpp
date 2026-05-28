@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/ISolarSystemStateCalculator.hpp"
+#include "ISolarSystemStateCalculator.hpp"
 
 #include <memory>
 

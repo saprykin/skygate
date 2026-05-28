@@ -1,5 +1,5 @@
+#include "HighPrecisionTextParser.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/HighPrecisionTextParser.hpp"
 
 #include <charconv>
 #include <cmath>

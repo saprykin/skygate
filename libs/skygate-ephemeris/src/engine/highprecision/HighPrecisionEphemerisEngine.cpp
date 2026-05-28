@@ -1,17 +1,17 @@
-#include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "HighPrecisionEphemerisEngine.hpp"
+#include "BaseApparentPlaceCalculator.hpp"
+#include "EphemerisMetadataMerge.hpp"
 #include "EphemerisRequestFactory.hpp"
+#include "EphemerisResultBuilder.hpp"
+#include "IApparentPlaceCalculator.hpp"
+#include "ICalcephKernelProvider.hpp"
+#include "IEphemerisComputationCache.hpp"
+#include "IEphemerisResultBuilder.hpp"
+#include "ISolarSystemStateCalculator.hpp"
+#include "IStarAstrometryCalculator.hpp"
+#include "ObserverGeodesy.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
-#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/EphemerisResultBuilder.hpp"
-#include "engine/highprecision/IApparentPlaceCalculator.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
-#include "engine/highprecision/IEphemerisComputationCache.hpp"
-#include "engine/highprecision/IEphemerisResultBuilder.hpp"
-#include "engine/highprecision/ISolarSystemStateCalculator.hpp"
-#include "engine/highprecision/IStarAstrometryCalculator.hpp"
-#include "engine/highprecision/ObserverGeodesy.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
@@ -45,19 +45,15 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
 }
 
-[[nodiscard]] bool isSolarSystemBody(const CelestialBody& body) noexcept
+[[nodiscard]] bool isSolarSystemBody(const BaseCelestialBody& body) noexcept
 {
-    return body.ephemerisSource == CelestialBodyEphemerisSource::Sun
-           || body.ephemerisSource == CelestialBodyEphemerisSource::Moon
-           || body.ephemerisSource == CelestialBodyEphemerisSource::Planet || body.type == CelestialBodyType::Sun
-           || body.type == CelestialBodyType::Moon || body.type == CelestialBodyType::Planet;
+    return body.kind == BaseCelestialBody::Kind::Sun || body.kind == BaseCelestialBody::Kind::Moon
+           || body.kind == BaseCelestialBody::Kind::Planet;
 }
 
-[[nodiscard]] bool isCatalogStarBody(const CelestialBody& body) noexcept
+[[nodiscard]] bool isCatalogStarBody(const BaseCelestialBody& body) noexcept
 {
-    return body.ephemerisSource == CelestialBodyEphemerisSource::Star
-           || body.ephemerisSource == CelestialBodyEphemerisSource::FixedEquatorial
-           || body.type == CelestialBodyType::Star;
+    return body.kind == BaseCelestialBody::Kind::Star || body.fixedEquatorialValue().has_value();
 }
 
 [[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
@@ -80,15 +76,15 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
 }
 
 [[nodiscard]] std::optional<core::EquatorialCoordinate>
-simpleSolarSystemEquatorial(const CelestialBody& body, const core::UtcTimePoint& utcTime)
+simpleSolarSystemEquatorial(const BaseCelestialBody& body, const core::UtcTimePoint& utcTime)
 {
-    if (body.ephemerisSource == CelestialBodyEphemerisSource::Sun || body.type == CelestialBodyType::Sun) {
+    if (body.kind == BaseCelestialBody::Kind::Sun || body.kind == BaseCelestialBody::Kind::Sun) {
         return SunEquatorialCalculator{}.compute(utcTime);
     }
-    if (body.ephemerisSource == CelestialBodyEphemerisSource::Moon || body.type == CelestialBodyType::Moon) {
+    if (body.kind == BaseCelestialBody::Kind::Moon || body.kind == BaseCelestialBody::Kind::Moon) {
         return MoonEquatorialCalculator{}.compute(utcTime);
     }
-    if (body.ephemerisSource == CelestialBodyEphemerisSource::Planet || body.type == CelestialBodyType::Planet) {
+    if (body.kind == BaseCelestialBody::Kind::Planet || body.kind == BaseCelestialBody::Kind::Planet) {
         return PlanetEquatorialCalculator{}.compute(body.id, utcTime);
     }
 
@@ -252,7 +248,7 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
 [[nodiscard]] std::vector<StarAstrometryBatchResult> applyApparentPlaceBatchIfRequested(
     const HighPrecisionEphemerisEngineDependencies& dependencies,
     const EphemerisRequest& request,
-    const std::span<const CelestialBody> bodies,
+    const std::span<const BaseCelestialBody* const> bodies,
     const std::span<const StarAstrometryBatchResult> calculatorResults,
     std::shared_ptr<const PreparedEphemerisRequestState> preparedState
 )
@@ -276,12 +272,13 @@ public:
     };
 
     Impl(
-        std::span<const CelestialBody> bodies,
+        const CelestialBodyCatalog& catalog,
         EphemerisEngineOptions engineOptions,
         HighPrecisionEphemerisEngineDependencies dependencies
     )
-        : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end())),
-          m_catalogStarAstrometryArrays(*m_bodies), m_options(engineOptions), m_dependencies(std::move(dependencies))
+        : m_catalog(std::make_shared<CelestialBodyCatalog>(catalog)),
+          m_catalogStarAstrometryArrays(m_catalog->bodies()), m_options(engineOptions),
+          m_dependencies(std::move(dependencies))
     {
         m_options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
     }
@@ -332,25 +329,28 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::SkyContext& context) const noexcept
+    [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::ObservationContext& context) const noexcept
     {
         return EphemerisRequestFactory::requestFromContext(context, m_options);
     }
 
-    [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const
+    [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const
     {
         if (m_dependencies.computationCache != nullptr) {
-            if (std::optional<SkySnapshot> cachedSnapshot =
-                    m_dependencies.computationCache->findSnapshot(request, *m_bodies, m_dependencies.dataSetInfo);
+            if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
+                    request, m_catalog->bodies(), m_dependencies.dataSetInfo
+                );
                 cachedSnapshot.has_value()) {
                 return *cachedSnapshot;
             }
         }
 
         const std::shared_ptr<const PreparedEphemerisRequestState> preparedState = preparedRequestState(request);
-        SkySnapshot snapshot = computeUncached(request, preparedState);
+        EphemerisSnapshot snapshot = computeUncached(request, preparedState);
         if (m_dependencies.computationCache != nullptr) {
-            m_dependencies.computationCache->storeSnapshot(request, *m_bodies, m_dependencies.dataSetInfo, snapshot);
+            m_dependencies.computationCache->storeSnapshot(
+                request, m_catalog->bodies(), m_dependencies.dataSetInfo, snapshot
+            );
         }
         return snapshot;
     }
@@ -362,8 +362,8 @@ public:
             return std::nullopt;
         }
 
-        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            const CelestialBody& body = (*m_bodies)[bodyIndex];
+        for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
+            const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
             if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
                 if (isSolarSystemBody(body)) {
                     if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
@@ -377,15 +377,15 @@ public:
                 }
 
                 if (m_dependencies.computationCache != nullptr) {
-                    if (std::optional<SkySnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
-                            request, *m_bodies, m_dependencies.dataSetInfo
+                    if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
+                            request, m_catalog->bodies(), m_dependencies.dataSetInfo
                         );
                         cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
                         return cachedSnapshot->states[bodyIndex];
                     }
                     if (std::optional<CelestialBodyState> cachedBodyState =
                             m_dependencies.computationCache->findBodyState(
-                                request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex
+                                request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex
                             );
                         cachedBodyState.has_value()) {
                         return cachedBodyState;
@@ -394,7 +394,7 @@ public:
                 CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
                 if (m_dependencies.computationCache != nullptr) {
                     m_dependencies.computationCache->storeBodyState(
-                        request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex, state
+                        request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex, state
                     );
                 }
                 return state;
@@ -407,11 +407,11 @@ public:
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
     {
-        if (bodyIndex >= m_bodies->size() || bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
+        if (bodyIndex >= m_catalog->size() || bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
             return std::nullopt;
         }
 
-        const CelestialBody& body = (*m_bodies)[bodyIndex];
+        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
         if (isSolarSystemBody(body)) {
             if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
                 cachedState.has_value()) {
@@ -423,13 +423,14 @@ public:
         }
 
         if (m_dependencies.computationCache != nullptr) {
-            if (std::optional<SkySnapshot> cachedSnapshot =
-                    m_dependencies.computationCache->findSnapshot(request, *m_bodies, m_dependencies.dataSetInfo);
+            if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
+                    request, m_catalog->bodies(), m_dependencies.dataSetInfo
+                );
                 cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
                 return cachedSnapshot->states[bodyIndex];
             }
             if (std::optional<CelestialBodyState> cachedBodyState = m_dependencies.computationCache->findBodyState(
-                    request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex
+                    request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex
                 );
                 cachedBodyState.has_value()) {
                 return cachedBodyState;
@@ -439,55 +440,56 @@ public:
         CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
         if (m_dependencies.computationCache != nullptr) {
             m_dependencies.computationCache->storeBodyState(
-                request, *m_bodies, m_dependencies.dataSetInfo, bodyIndex, state
+                request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex, state
             );
         }
         return state;
     }
 
 private:
-    [[nodiscard]] SkySnapshot computeUncached(
+    [[nodiscard]] EphemerisSnapshot computeUncached(
         const EphemerisRequest& request, std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const
     {
-        SkySnapshot snapshot;
+        EphemerisSnapshot snapshot;
         snapshot.context = request.context;
-        snapshot.catalogBodies = m_bodies;
-        snapshot.states.resize(m_bodies->size());
+        snapshot.catalogBodies = m_catalog;
+        snapshot.states.resize(m_catalog->size());
 
         const IEphemerisResultBuilder& builder = resultBuilder(m_dependencies);
         if (!hasValidEpoch(request.epoch)) {
-            for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+            for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
                 const HighPrecisionComputationInput input{
                     .request = request,
-                    .body = (*m_bodies)[bodyIndex],
+                    .body = m_catalog->bodyAt(bodyIndex),
                     .preparedRequestState = preparedState,
                     .bodyIndex = bodyIndex,
                 };
                 snapshot.states[bodyIndex] = builder.buildFailedState(input);
-                if (isSolarSystemBody((*m_bodies)[bodyIndex])) {
+                if (isSolarSystemBody(m_catalog->bodyAt(bodyIndex))) {
                     storeDirectBodyState(request, bodyIndex, snapshot.states[bodyIndex]);
                 }
             }
             return snapshot;
         }
 
-        std::vector<std::uint8_t> batchFilledStates(m_bodies->size(), 0U);
+        std::vector<std::uint8_t> batchFilledStates(m_catalog->size(), 0U);
         const IStarAstrometryCalculator* starAstrometryCalculator = m_dependencies.starAstrometryCalculator.get();
         if (starAstrometryCalculator != nullptr && !m_catalogStarAstrometryArrays.empty()) {
             const std::vector<StarAstrometryBatchResult> batchResults =
                 starAstrometryCalculator->calculateBatch(request, m_catalogStarAstrometryArrays, preparedState);
-            const std::vector<StarAstrometryBatchResult> apparentBatchResults =
-                applyApparentPlaceBatchIfRequested(m_dependencies, request, *m_bodies, batchResults, preparedState);
+            const std::vector<StarAstrometryBatchResult> apparentBatchResults = applyApparentPlaceBatchIfRequested(
+                m_dependencies, request, m_catalog->bodies(), batchResults, preparedState
+            );
             for (const StarAstrometryBatchResult& batchResult : apparentBatchResults) {
-                if (batchResult.bodyIndex >= m_bodies->size()
+                if (batchResult.bodyIndex >= m_catalog->size()
                     || batchResult.bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
                     continue;
                 }
 
                 const HighPrecisionComputationInput input{
                     .request = request,
-                    .body = (*m_bodies)[batchResult.bodyIndex],
+                    .body = m_catalog->bodyAt(batchResult.bodyIndex),
                     .preparedRequestState = preparedState,
                     .bodyIndex = batchResult.bodyIndex,
                 };
@@ -496,12 +498,12 @@ private:
             }
         }
 
-        for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
+        for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
             if (batchFilledStates[bodyIndex] != 0U) {
                 continue;
             }
             snapshot.states[bodyIndex] = computeStateForBody(request, bodyIndex, preparedState);
-            if (isSolarSystemBody((*m_bodies)[bodyIndex])) {
+            if (isSolarSystemBody(m_catalog->bodyAt(bodyIndex))) {
                 storeDirectBodyState(request, bodyIndex, snapshot.states[bodyIndex]);
             }
         }
@@ -515,7 +517,7 @@ private:
         if (m_dependencies.computationCache != nullptr) {
             if (std::shared_ptr<const PreparedEphemerisRequestState> cachedState =
                     m_dependencies.computationCache->findPreparedRequestState(
-                        request, *m_bodies, m_dependencies.dataSetInfo
+                        request, m_catalog->bodies(), m_dependencies.dataSetInfo
                     );
                 cachedState != nullptr) {
                 return cachedState;
@@ -525,7 +527,7 @@ private:
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState = buildPreparedRequestState(request);
         if (m_dependencies.computationCache != nullptr) {
             m_dependencies.computationCache->storePreparedRequestState(
-                request, *m_bodies, m_dependencies.dataSetInfo, preparedState
+                request, m_catalog->bodies(), m_dependencies.dataSetInfo, preparedState
             );
         }
         return preparedState;
@@ -636,7 +638,7 @@ private:
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const
     {
-        const CelestialBody& body = (*m_bodies)[bodyIndex];
+        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
         const HighPrecisionComputationInput input{
             .request = request,
             .body = body,
@@ -689,7 +691,7 @@ private:
         return builder.buildUnsupportedState(input);
     }
 
-    std::shared_ptr<const std::vector<CelestialBody>> m_bodies;
+    std::shared_ptr<const CelestialBodyCatalog> m_catalog;
     CatalogStarAstrometryArrays m_catalogStarAstrometryArrays;
     EphemerisEngineOptions m_options;
     HighPrecisionEphemerisEngineDependencies m_dependencies;
@@ -699,11 +701,11 @@ private:
 
 // Public interface delegates
 HighPrecisionEphemerisEngine::HighPrecisionEphemerisEngine(
-    const std::span<const CelestialBody> bodies,
+    const CelestialBodyCatalog& catalog,
     EphemerisEngineOptions engineOptions,
     HighPrecisionEphemerisEngineDependencies dependencies
 )
-    : m_impl(std::make_unique<Impl>(bodies, engineOptions, std::move(dependencies)))
+    : m_impl(std::make_unique<Impl>(catalog, engineOptions, std::move(dependencies)))
 {
 }
 
@@ -743,7 +745,7 @@ EphemerisEngineOptions HighPrecisionEphemerisEngine::options() const noexcept
     return m_impl->options();
 }
 
-SkySnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& request) const
+EphemerisSnapshot HighPrecisionEphemerisEngine::compute(const EphemerisRequest& request) const
 {
     return m_impl->compute(request);
 }
@@ -760,19 +762,21 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
     return m_impl->computeBodyState(request, bodyIndex);
 }
 
-SkySnapshot HighPrecisionEphemerisEngine::compute(const core::SkyContext& context) const
+EphemerisSnapshot HighPrecisionEphemerisEngine::compute(const core::ObservationContext& context) const
 {
     return m_impl->compute(m_impl->makeCompatibilityRequest(context));
 }
 
-std::optional<CelestialBodyState>
-HighPrecisionEphemerisEngine::computeBodyState(const core::SkyContext& context, const std::string_view bodyId) const
+std::optional<CelestialBodyState> HighPrecisionEphemerisEngine::computeBodyState(
+    const core::ObservationContext& context, const std::string_view bodyId
+) const
 {
     return m_impl->computeBodyState(m_impl->makeCompatibilityRequest(context), bodyId);
 }
 
-std::optional<CelestialBodyState>
-HighPrecisionEphemerisEngine::computeBodyState(const core::SkyContext& context, const std::uint32_t bodyIndex) const
+std::optional<CelestialBodyState> HighPrecisionEphemerisEngine::computeBodyState(
+    const core::ObservationContext& context, const std::uint32_t bodyIndex
+) const
 {
     return m_impl->computeBodyState(m_impl->makeCompatibilityRequest(context), static_cast<std::size_t>(bodyIndex));
 }

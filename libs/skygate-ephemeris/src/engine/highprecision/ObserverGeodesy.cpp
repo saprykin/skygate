@@ -1,4 +1,4 @@
-#include "engine/highprecision/ObserverGeodesy.hpp"
+#include "ObserverGeodesy.hpp"
 
 #include "math/AngleMath.hpp"
 #include "math/PhysicalConstants.hpp"

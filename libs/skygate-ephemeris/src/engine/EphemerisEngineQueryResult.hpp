@@ -1,9 +1,9 @@
 #pragma once
 
-#include "engine/EphemerisCorrectionFlags.hpp"
-#include "engine/EphemerisDateRange.hpp"
-#include "engine/EphemerisEngineQueryStatus.hpp"
-#include "engine/EphemerisEngineWarning.hpp"
+#include "EphemerisCorrectionFlags.hpp"
+#include "EphemerisDateRange.hpp"
+#include "EphemerisEngineQueryStatus.hpp"
+#include "EphemerisEngineWarning.hpp"
 
 #include <bit>
 #include <cstddef>

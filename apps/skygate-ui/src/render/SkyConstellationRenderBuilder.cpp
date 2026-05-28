@@ -1,8 +1,6 @@
 #include "SkyConstellationRenderBuilder.hpp"
-
 #include "SkyContextControllerSupport.hpp"
 #include "SkyRenderLabels.hpp"
-
 #include "math/ProjectedPolylineBuilder.hpp"
 
 #include <algorithm>
@@ -112,7 +110,7 @@ void SkyConstellationRenderBuilder::appendLabels(
             labelX,
             labelY,
             anchorGroup.first,
-            skyRenderLabelColorForBodyType(skygate::ephemeris::CelestialBodyType::Constellation, renderTheme)
+            skyRenderLabelColorForBodyType(skygate::ephemeris::BaseCelestialBody::Kind::Constellation, renderTheme)
         );
         labelGrid.add(bounds);
     }

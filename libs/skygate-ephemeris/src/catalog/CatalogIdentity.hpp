@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.hpp"
+#include "BaseCelestialBody.hpp"
 
 #include <cstddef>
 #include <span>
@@ -10,10 +10,10 @@ namespace skygate::ephemeris {
 
 class CatalogIdentity final {
 public:
-    [[nodiscard]] static bool containsBodyId(std::span<const CelestialBody> bodies, std::string_view id);
-    [[nodiscard]] static bool sharesDeepSkyAlias(const CelestialBody& lhs, const CelestialBody& rhs);
-    [[nodiscard]] static bool isAnalyticSolarSystemBody(const CelestialBody& body) noexcept;
-    [[nodiscard]] static std::size_t countDeepSkyObjects(std::span<const CelestialBody> bodies);
+    [[nodiscard]] static bool containsBodyId(std::span<const BaseCelestialBody* const> bodies, std::string_view id);
+    [[nodiscard]] static bool sharesDeepSkyAlias(const BaseCelestialBody& lhs, const BaseCelestialBody& rhs);
+    [[nodiscard]] static bool isAnalyticSolarSystemBody(const BaseCelestialBody& body) noexcept;
+    [[nodiscard]] static std::size_t countDeepSkyObjects(std::span<const BaseCelestialBody* const> bodies);
 };
 
 }  // namespace skygate::ephemeris

@@ -1,9 +1,8 @@
-#include "engine/simple/SimpleEphemerisEngine.hpp"
+#include "SimpleEphemerisEngine.hpp"
 #include "EphemerisRequestFactory.hpp"
+#include "EquatorialToHorizontalCalculator.hpp"
 #include "StringUtilities.hpp"
-#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 
-#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -40,7 +39,7 @@ void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngi
     state.metadata.finalizeCorrectionTracking(options.correctionFlags());
 }
 
-void markUnsupportedSimpleOptions(SkySnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
+void markUnsupportedSimpleOptions(EphemerisSnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
 {
     if (!requestsUnsupportedSimpleOptions(options)) {
         return;
@@ -61,10 +60,8 @@ simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions) noe
 
 }  // namespace
 
-SimpleEphemerisEngine::SimpleEphemerisEngine(
-    std::span<const CelestialBody> bodies, EphemerisEngineOptions engineOptions
-)
-    : m_bodies(std::make_shared<const std::vector<CelestialBody>>(bodies.begin(), bodies.end())),
+SimpleEphemerisEngine::SimpleEphemerisEngine(const CelestialBodyCatalog& catalog, EphemerisEngineOptions engineOptions)
+    : m_catalog(std::make_shared<CelestialBodyCatalog>(catalog)),
       m_options(simpleEngineOptionsFromRequest(engineOptions))
 {
 }
@@ -105,9 +102,9 @@ EphemerisEngineOptions SimpleEphemerisEngine::options() const noexcept
     return m_options;
 }
 
-SkySnapshot SimpleEphemerisEngine::compute(const EphemerisRequest& request) const
+EphemerisSnapshot SimpleEphemerisEngine::compute(const EphemerisRequest& request) const
 {
-    SkySnapshot snapshot = computeSnapshot(EphemerisRequestFactory::contextFromRequest(request));
+    EphemerisSnapshot snapshot = computeSnapshot(EphemerisRequestFactory::contextFromRequest(request));
     markUnsupportedSimpleOptions(snapshot, request.options);
     return snapshot;
 }
@@ -126,25 +123,26 @@ SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const s
 std::optional<CelestialBodyState>
 SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
 {
-    if (bodyIndex >= m_bodies->size()) {
+    if (bodyIndex >= m_catalog->size()) {
         return std::nullopt;
     }
 
-    CelestialBodyState state =
-        computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, EphemerisRequestFactory::contextFromRequest(request));
+    CelestialBodyState state = computeStateForBody(
+        m_catalog->bodyAt(bodyIndex), bodyIndex, EphemerisRequestFactory::contextFromRequest(request)
+    );
     markUnsupportedSimpleOptions(state, request.options);
     return state;
 }
 
-SkySnapshot SimpleEphemerisEngine::compute(const core::SkyContext& context) const
+EphemerisSnapshot SimpleEphemerisEngine::compute(const core::ObservationContext& context) const
 {
-    SkySnapshot snapshot = computeSnapshot(context);
+    EphemerisSnapshot snapshot = computeSnapshot(context);
     markUnsupportedSimpleOptions(snapshot, options());
     return snapshot;
 }
 
 std::optional<CelestialBodyState>
-SimpleEphemerisEngine::computeBodyState(const core::SkyContext& context, const std::string_view bodyId) const
+SimpleEphemerisEngine::computeBodyState(const core::ObservationContext& context, const std::string_view bodyId) const
 {
     std::optional<CelestialBodyState> state = computeBodyStateById(context, bodyId);
     if (state.has_value()) {
@@ -154,41 +152,42 @@ SimpleEphemerisEngine::computeBodyState(const core::SkyContext& context, const s
 }
 
 std::optional<CelestialBodyState>
-SimpleEphemerisEngine::computeBodyState(const core::SkyContext& context, const std::uint32_t bodyIndex) const
+SimpleEphemerisEngine::computeBodyState(const core::ObservationContext& context, const std::uint32_t bodyIndex) const
 {
-    if (bodyIndex >= m_bodies->size()) {
+    if (bodyIndex >= m_catalog->size()) {
         return std::nullopt;
     }
 
-    CelestialBodyState state = computeStateForBody((*m_bodies)[bodyIndex], bodyIndex, context);
+    CelestialBodyState state = computeStateForBody(m_catalog->bodyAt(bodyIndex), bodyIndex, context);
     markUnsupportedSimpleOptions(state, options());
     return state;
 }
 
-SkySnapshot SimpleEphemerisEngine::computeSnapshot(const core::SkyContext& context) const
+EphemerisSnapshot SimpleEphemerisEngine::computeSnapshot(const core::ObservationContext& context) const
 {
-    SkySnapshot snapshot;
+    EphemerisSnapshot snapshot;
     snapshot.context = context;
-    snapshot.catalogBodies = m_bodies;
+    snapshot.catalogBodies = m_catalog;
 
-    snapshot.states.reserve(m_bodies->size());
-    for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-        const CelestialBody& body = (*m_bodies)[bodyIndex];
+    snapshot.states.reserve(m_catalog->size());
+    for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
+        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
         snapshot.states.push_back(computeStateForBody(body, bodyIndex, context));
     }
 
     return snapshot;
 }
 
-std::optional<CelestialBodyState>
-SimpleEphemerisEngine::computeBodyStateById(const core::SkyContext& context, const std::string_view bodyId) const
+std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyStateById(
+    const core::ObservationContext& context, const std::string_view bodyId
+) const
 {
     if (bodyId.empty()) {
         return std::nullopt;
     }
 
-    for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-        const CelestialBody& body = (*m_bodies)[bodyIndex];
+    for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
+        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
         if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
             return computeStateForBody(body, bodyIndex, context);
         }
@@ -198,7 +197,7 @@ SimpleEphemerisEngine::computeBodyStateById(const core::SkyContext& context, con
 }
 
 CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
-    const CelestialBody& body, const std::size_t bodyIndex, const core::SkyContext& context
+    const BaseCelestialBody& body, const std::size_t bodyIndex, const core::ObservationContext& context
 ) const
 {
     CelestialBodyState state;
@@ -227,26 +226,22 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
 }
 
 std::optional<core::EquatorialCoordinate>
-SimpleEphemerisEngine::computeEquatorial(const CelestialBody& body, const core::UtcTimePoint& utcTime) const
+SimpleEphemerisEngine::computeEquatorial(const BaseCelestialBody& body, const core::UtcTimePoint& utcTime) const
 {
-    if (body.fixedEquatorial.has_value()) {
-        return body.fixedEquatorial;
+    if (body.fixedEquatorialValue().has_value()) {
+        return body.fixedEquatorialValue();
     }
 
-    switch (body.ephemerisSource) {
-    case CelestialBodyEphemerisSource::FixedEquatorial:
-        break;
-    case CelestialBodyEphemerisSource::Sun:
+    switch (body.kind) {
+    case BaseCelestialBody::Kind::Sun:
         return m_sunCalculator.compute(utcTime);
-    case CelestialBodyEphemerisSource::Moon:
+    case BaseCelestialBody::Kind::Moon:
         return m_moonCalculator.compute(utcTime);
-    case CelestialBodyEphemerisSource::Planet:
+    case BaseCelestialBody::Kind::Planet:
         return m_planetCalculator.compute(body.id, utcTime);
-    case CelestialBodyEphemerisSource::Star:
-        break;
-    case CelestialBodyEphemerisSource::Constellation:
-        break;
-    case CelestialBodyEphemerisSource::Unresolved:
+    case BaseCelestialBody::Kind::Star:
+    case BaseCelestialBody::Kind::Constellation:
+    case BaseCelestialBody::Kind::DeepSkyObject:
         break;
     }
 

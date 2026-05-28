@@ -1,6 +1,5 @@
-#include "catalog/SkyCatalogRuntime.hpp"
-
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/SkyCatalogRuntime.hpp"
 
 #include <QtTest/QtTest>
 
@@ -9,13 +8,14 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeFixedBody(std::string id, std::string displayName, const double magnitude = 1.0)
+skygate::ephemeris::OwnGalaxyCelestialBody
+makeFixedBody(std::string id, std::string displayName, const double magnitude = 1.0)
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = skygate::ephemeris::CelestialBodyType::Star;
-    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
     body.visualMagnitude = magnitude;
     body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     return body;

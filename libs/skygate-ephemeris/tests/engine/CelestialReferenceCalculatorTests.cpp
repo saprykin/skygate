@@ -79,14 +79,17 @@ void CelestialReferenceCalculatorTests::circumpolarBoundaryDeclinationFollowsHem
 
 void CelestialReferenceCalculatorTests::constellationAnchorCentroidAveragesAnchorVectors()
 {
-    auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-        std::vector<skygate::ephemeris::CelestialBody>{
-            skygate::ephemeris::CelestialBody{.id = "hip_1", .displayName = "HIP 1"},
-            skygate::ephemeris::CelestialBody{.id = "hip_2", .displayName = "HIP 2"}
-        }
+    skygate::ephemeris::OwnGalaxyCelestialBody firstBody;
+    firstBody.id = "hip_1";
+    firstBody.displayName = "HIP 1";
+    skygate::ephemeris::OwnGalaxyCelestialBody secondBody;
+    secondBody.id = "hip_2";
+    secondBody.displayName = "HIP 2";
+    auto bodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{firstBody, secondBody}
     );
 
-    skygate::ephemeris::SkySnapshot snapshot;
+    skygate::ephemeris::EphemerisSnapshot snapshot;
     snapshot.catalogBodies = bodies;
     snapshot.states = {
         skygate::ephemeris::CelestialBodyState{

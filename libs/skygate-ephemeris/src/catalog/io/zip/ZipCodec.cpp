@@ -1,8 +1,7 @@
-#include "catalog/io/zip/ZipCodec.hpp"
-
+#include "ZipCodec.hpp"
+#include "ZipDirectoryReader.hpp"
+#include "ZipEntryExtractor.hpp"
 #include "catalog/io/CatalogZipEntrySelector.hpp"
-#include "catalog/io/zip/ZipDirectoryReader.hpp"
-#include "catalog/io/zip/ZipEntryExtractor.hpp"
 
 #include <span>
 

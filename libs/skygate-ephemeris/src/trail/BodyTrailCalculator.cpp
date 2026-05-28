@@ -32,7 +32,7 @@ namespace {
 
 std::vector<BodyTrailSample> BodyTrailCalculator::sample(
     const IEphemerisEngine& engine,
-    const core::SkyContext& context,
+    const core::ObservationContext& context,
     const std::uint32_t bodyIndex,
     const BodyTrailOptions& options
 ) const
@@ -47,7 +47,7 @@ std::vector<BodyTrailSample> BodyTrailCalculator::sample(
 
     for (int offsetMinutes = startOffsetMinutes; offsetMinutes <= endOffsetMinutes;
          offsetMinutes += options.sampleStepMinutes) {
-        core::SkyContext sampleContext = context;
+        core::ObservationContext sampleContext = context;
         sampleContext.utcTime += std::chrono::minutes(offsetMinutes);
 
         BodyTrailSample sample{.offsetMinutes = offsetMinutes, .horizontal = std::nullopt};

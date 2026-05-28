@@ -1,7 +1,6 @@
-#include "catalog/stellarium/StellariumConstellationParser.hpp"
-
-#include "catalog/stellarium/StellariumAnchorGroupExtractor.hpp"
-#include "catalog/stellarium/StellariumLineRefExtractor.hpp"
+#include "StellariumConstellationParser.hpp"
+#include "StellariumAnchorGroupExtractor.hpp"
+#include "StellariumLineRefExtractor.hpp"
 
 #include <QByteArray>
 #include <QJsonArray>

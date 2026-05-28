@@ -1,6 +1,6 @@
 #pragma once
 
-#include "math/CircleHitTarget.hpp"
+#include "CircleHitTarget.hpp"
 
 #include <cstdint>
 #include <optional>

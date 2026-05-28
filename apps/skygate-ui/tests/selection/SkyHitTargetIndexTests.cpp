@@ -1,3 +1,4 @@
+#include "CelestialBodyCatalog.hpp"
 #include "SkyHitTargetIndex.hpp"
 
 #include <QtTest/QtTest>
@@ -9,18 +10,18 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(std::string id, std::string displayName)
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(std::string id, std::string displayName)
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
     return body;
 }
 
-skygate::ephemeris::SkySnapshot makeSnapshot(std::vector<skygate::ephemeris::CelestialBody> bodies)
+skygate::ephemeris::EphemerisSnapshot makeSnapshot(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
 {
-    skygate::ephemeris::SkySnapshot snapshot;
-    snapshot.catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
+    skygate::ephemeris::EphemerisSnapshot snapshot;
+    snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies));
     return snapshot;
 }
 

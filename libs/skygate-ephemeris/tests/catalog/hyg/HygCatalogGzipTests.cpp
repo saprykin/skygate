@@ -32,11 +32,11 @@ void HygCatalogGzipTests::parsesValidGzipCatalog()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].id == "hip_42");
-    QVERIFY(bodies[0].fixedEquatorial.has_value());
-    if (bodies[0].fixedEquatorial.has_value()) {
-        QVERIFY(skygate::ephemeris::tests::isNear(bodies[0].fixedEquatorial->rightAscensionHours, 1.25, 1e-8));
-        QVERIFY(skygate::ephemeris::tests::isNear(bodies[0].fixedEquatorial->declinationDeg, -2.5, 1e-8));
+    QVERIFY(bodies[0]->id == "hip_42");
+    QVERIFY(bodies[0]->fixedEquatorialValue().has_value());
+    if (bodies[0]->fixedEquatorialValue().has_value()) {
+        QVERIFY(skygate::ephemeris::tests::isNear(bodies[0]->fixedEquatorialValue()->rightAscensionHours, 1.25, 1e-8));
+        QVERIFY(skygate::ephemeris::tests::isNear(bodies[0]->fixedEquatorialValue()->declinationDeg, -2.5, 1e-8));
     }
 }
 

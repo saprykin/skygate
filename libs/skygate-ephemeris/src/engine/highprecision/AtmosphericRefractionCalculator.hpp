@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
+#include "IAtmosphericRefractionCalculator.hpp"
 
 namespace skygate::ephemeris::highprecision {
 

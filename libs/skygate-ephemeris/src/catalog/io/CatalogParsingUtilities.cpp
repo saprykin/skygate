@@ -1,4 +1,4 @@
-#include "catalog/io/CatalogParsingUtilities.hpp"
+#include "CatalogParsingUtilities.hpp"
 
 #include <QByteArray>
 #include <QStringList>

@@ -1,7 +1,5 @@
 #include "SkySelectionMarkerBuilder.hpp"
-
 #include "SkySceneShared.hpp"
-
 #include "math/AngleMath.hpp"
 #include "math/SphericalGeometry.hpp"
 
@@ -24,7 +22,7 @@ bool hasSelectionInputs(const SkySelectionOverlayInput& input)
 }
 
 std::optional<QPointF> selectedBodyPoint(
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const QHash<QString, std::size_t>& stateIndexByBodyId,
     const skygate::core::PreparedProjection& preparedProjection,
     const QString& targetId
@@ -49,7 +47,7 @@ std::optional<QPointF> selectedBodyPoint(
 }
 
 std::optional<QPointF> selectedConstellationPoint(
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const QHash<QString, std::size_t>& stateIndexByBodyId,
     const skygate::core::PreparedProjection& preparedProjection,
     const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,

@@ -1,13 +1,11 @@
+#include "NightConditionsCalculator.hpp"
 #include "SkyContextController.hpp"
-
 #include "SkyContextControllerSupport.hpp"
 #include "SkyNightConditionsAdapter.hpp"
 #include "SkyTimeController.hpp"
-#include "NightConditionsCalculator.hpp"
 
 #include <QDateTime>
 
-#include <cmath>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -15,10 +13,10 @@
 namespace {
 
 [[nodiscard]] std::optional<std::uint32_t>
-bodyIndexById(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string_view bodyId)
+bodyIndexById(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const std::string_view bodyId)
 {
     for (std::size_t index = 0; index < bodies.size(); ++index) {
-        if (bodies[index].id == bodyId) {
+        if (bodies[index]->id == bodyId) {
             return static_cast<std::uint32_t>(index);
         }
     }
@@ -27,7 +25,9 @@ bodyIndexById(const std::span<const skygate::ephemeris::CelestialBody> bodies, c
 
 class NightConditionsDataBuilder final {
 public:
-    NightConditionsDataBuilder(const skygate::core::SkyContext& context, const SkyTimeController* timeController)
+    NightConditionsDataBuilder(
+        const skygate::core::ObservationContext& context, const SkyTimeController* timeController
+    )
         : m_context(context), m_timeController(timeController)
     {
     }
@@ -111,7 +111,7 @@ private:
     }
 
 private:
-    const skygate::core::SkyContext& m_context;
+    const skygate::core::ObservationContext& m_context;
     const SkyTimeController* m_timeController = nullptr;
 };
 
@@ -153,7 +153,7 @@ void SkyContextController::refreshNightConditions()
         const skygate::ephemeris::NightConditionsCalculator calculator;
         const auto requestContext = ephemerisRequestContext();
         nextData = dataBuilder.conditionsData(calculator.compute(
-            *engine, requestContext.request, *sunIndex, &bodies[*sunIndex], *moonIndex, &bodies[*moonIndex]
+            *engine, requestContext.request, *sunIndex, bodies[*sunIndex], *moonIndex, bodies[*moonIndex]
         ));
     }
     const QVariantMap nextConditions = adapter.nightConditions(nextData);

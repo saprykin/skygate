@@ -10,8 +10,8 @@ namespace {
 
 class RequestSensitiveEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit RequestSensitiveEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
-        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+    explicit RequestSensitiveEngine(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+        : m_bodies(std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies)))
     {
         m_options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
         m_options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
@@ -54,7 +54,7 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestComputeCount;
@@ -82,20 +82,21 @@ public:
         return snapshot.states[bodyIndex];
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         ++m_contextComputeCount;
         return makeSnapshot(context, 12.0, 34.0);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::string_view bodyId) const override
     {
         return findState(compute(context), bodyId);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         const auto snapshot = compute(context);
         if (bodyIndex >= snapshot.states.size()) {
@@ -115,10 +116,11 @@ public:
     }
 
 private:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
-    makeSnapshot(const skygate::core::SkyContext& context, const double altitudeDeg, const double azimuthDeg) const
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot makeSnapshot(
+        const skygate::core::ObservationContext& context, const double altitudeDeg, const double azimuthDeg
+    ) const
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = m_bodies;
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
@@ -133,7 +135,7 @@ private:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    findState(const skygate::ephemeris::SkySnapshot& snapshot, const std::string_view bodyId) const
+    findState(const skygate::ephemeris::EphemerisSnapshot& snapshot, const std::string_view bodyId) const
     {
         for (const auto& state : snapshot.states) {
             if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
@@ -143,7 +145,7 @@ private:
         return std::nullopt;
     }
 
-    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> m_bodies;
     skygate::ephemeris::EphemerisEngineOptions m_options;
     mutable int m_requestComputeCount = 0;
     mutable int m_contextComputeCount = 0;
@@ -151,8 +153,8 @@ private:
 
 class BodyLookupCountingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit BodyLookupCountingEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
-        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+    explicit BodyLookupCountingEngine(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+        : m_bodies(std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies)))
     {
     }
 
@@ -169,7 +171,7 @@ public:
         return options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestComputeCount;
@@ -180,7 +182,7 @@ public:
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
     {
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            if ((*m_bodies)[bodyIndex].id == bodyId) {
+            if (m_bodies->bodyAt(bodyIndex).id == bodyId) {
                 return computeBodyState(request, bodyIndex);
             }
         }
@@ -201,17 +203,18 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         ++m_contextComputeCount;
         return makeSnapshot(context);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, const std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext&, const std::string_view bodyId) const override
     {
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            if ((*m_bodies)[bodyIndex].id == bodyId) {
+            if (m_bodies->bodyAt(bodyIndex).id == bodyId) {
                 return computeBodyState(skygate::ephemeris::EphemerisRequest{}, bodyIndex);
             }
         }
@@ -219,7 +222,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t bodyIndex) const override
     {
         return computeBodyState(skygate::ephemeris::EphemerisRequest{}, static_cast<std::size_t>(bodyIndex));
     }
@@ -240,9 +243,10 @@ public:
     }
 
 private:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot makeSnapshot(const skygate::core::SkyContext& context) const
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    makeSnapshot(const skygate::core::ObservationContext& context) const
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = m_bodies;
         snapshot.states.reserve(m_bodies->size());
@@ -257,7 +261,7 @@ private:
         return snapshot;
     }
 
-    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> m_bodies;
     mutable int m_requestComputeCount = 0;
     mutable int m_contextComputeCount = 0;
     mutable int m_requestBodyStateCount = 0;
@@ -267,10 +271,10 @@ std::unique_ptr<SkyContextController> createRequestSensitiveController(
     RequestSensitiveEngine*& engine, const skygate::core::ITimeSource* timeSource = nullptr
 )
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies{makeBody(
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies{makeBody(
         "demo_target",
         "Demo Target",
-        skygate::ephemeris::CelestialBodyType::Star,
+        skygate::ephemeris::BaseCelestialBody::Kind::Star,
         1.0,
         skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
     )};
@@ -343,7 +347,7 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetCentersBodyResult
         makeBody(
             "demo_target",
             "Demo Target",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             1.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
@@ -383,10 +387,10 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSelectedEngin
 
 void SkyContextControllerSearchTrackingTests::focusSearchTargetUsesSingleBodyLookupForMoon()
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies{
-        makeBody("moon", "Moon", skygate::ephemeris::CelestialBodyType::Moon, -12.0)
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies{
+        makeBody("moon", "Moon", skygate::ephemeris::BaseCelestialBody::Kind::Moon, -12.0)
     };
-    bodies.front().ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Moon;
+    bodies.front().kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
     auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     QVERIFY(starCatalog != nullptr);
 
@@ -625,14 +629,14 @@ void SkyContextControllerSearchTrackingTests::focusSearchTargetClearsTrackingFor
         makeBody(
             "tracked_target",
             "Tracked Target",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             1.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
         makeBody(
             "search_target",
             "Search Target",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             1.2,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 8.5, .declinationDeg = 12.5}
         ),
@@ -679,7 +683,7 @@ void SkyContextControllerSearchTrackingTests::collapsingSearchToolbarClearsSelec
         makeBody(
             "demo_target",
             "Demo Target",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             1.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),

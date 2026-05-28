@@ -1,5 +1,4 @@
-#include "catalog/io/CatalogPayloadFormatDetector.hpp"
-
+#include "CatalogPayloadFormatDetector.hpp"
 #include "StringUtilities.hpp"
 
 #include <cstddef>

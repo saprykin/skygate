@@ -1,1 +1,1 @@
-#include "catalog/io/RowParseOutcome.hpp"
+#include "RowParseOutcome.hpp"

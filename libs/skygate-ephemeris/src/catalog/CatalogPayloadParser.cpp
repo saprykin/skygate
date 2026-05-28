@@ -1,5 +1,5 @@
-#include "catalog/CatalogPayloadParser.hpp"
-#include "catalog/CatalogLoader.hpp"
+#include "CatalogPayloadParser.hpp"
+#include "CatalogLoader.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 
 #include <QLoggingCategory>

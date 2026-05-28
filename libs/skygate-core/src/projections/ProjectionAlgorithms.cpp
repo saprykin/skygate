@@ -1,5 +1,4 @@
 #include "ProjectionAlgorithms.hpp"
-
 #include "ProjectionPipeline.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"

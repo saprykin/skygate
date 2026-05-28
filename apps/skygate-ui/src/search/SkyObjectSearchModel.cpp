@@ -25,27 +25,27 @@ QString compactedKey(const QString& value)
     return compacted;
 }
 
-QString celestialBodyTypeText(const skygate::ephemeris::CelestialBodyType type)
+QString celestialBodyTypeText(const skygate::ephemeris::BaseCelestialBody::Kind type)
 {
     switch (type) {
-    case skygate::ephemeris::CelestialBodyType::Sun:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
         return "Sun";
-    case skygate::ephemeris::CelestialBodyType::Moon:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
         return "Moon";
-    case skygate::ephemeris::CelestialBodyType::Planet:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
         return "Planet";
-    case skygate::ephemeris::CelestialBodyType::Star:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
         return "Star";
-    case skygate::ephemeris::CelestialBodyType::Constellation:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
         return "Constellation";
-    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
+    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
         return "Deep sky";
     }
 
     return "Object";
 }
 
-bool shouldShowBodyId(const skygate::ephemeris::CelestialBody& body)
+bool shouldShowBodyId(const skygate::ephemeris::BaseCelestialBody& body)
 {
     if (body.id.empty()) {
         return false;
@@ -61,32 +61,32 @@ bool shouldShowBodyId(const skygate::ephemeris::CelestialBody& body)
     return false;
 }
 
-QString bodyDetailText(const skygate::ephemeris::CelestialBody& body)
+QString bodyDetailText(const skygate::ephemeris::BaseCelestialBody& body)
 {
-    const QString typeText = celestialBodyTypeText(body.type);
-    if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject) {
+    const QString typeText = celestialBodyTypeText(body.kind);
+    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject) {
         QString detailText = typeText;
-        if (body.deepSkyObject.has_value()) {
-            switch (body.deepSkyObject->kind) {
-            case skygate::ephemeris::DeepSkyObjectKind::Galaxy:
+        if (body.deepSkyObjectValue().has_value()) {
+            switch (body.deepSkyObjectValue()->kind) {
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
                 detailText = "Deep sky • Galaxy";
                 break;
-            case skygate::ephemeris::DeepSkyObjectKind::OpenCluster:
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
                 detailText = "Deep sky • Open cluster";
                 break;
-            case skygate::ephemeris::DeepSkyObjectKind::GlobularCluster:
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
                 detailText = "Deep sky • Globular cluster";
                 break;
-            case skygate::ephemeris::DeepSkyObjectKind::Nebula:
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula:
                 detailText = "Deep sky • Nebula";
                 break;
-            case skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula:
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
                 detailText = "Deep sky • Planetary nebula";
                 break;
-            case skygate::ephemeris::DeepSkyObjectKind::Asterism:
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism:
                 detailText = "Deep sky • Asterism";
                 break;
-            case skygate::ephemeris::DeepSkyObjectKind::Unknown:
+            case skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown:
                 break;
             }
         }
@@ -168,7 +168,7 @@ void SkyObjectSearchModel::setFilterText(const QString& filterText)
 }
 
 void SkyObjectSearchModel::setCatalogData(
-    const std::span<const skygate::ephemeris::CelestialBody> bodies,
+    const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies,
     const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
 )
 {
@@ -179,12 +179,12 @@ void SkyObjectSearchModel::setCatalogData(
 
     QHash<QString, bool> availableBodyIds;
     availableBodyIds.reserve(static_cast<int>(bodies.size()));
-    for (const auto& body : bodies) {
-        if (body.id.empty()) {
+    for (const skygate::ephemeris::BaseCelestialBody* body : bodies) {
+        if (body == nullptr || body->id.empty()) {
             continue;
         }
 
-        availableBodyIds.insert(normalizedKey(QString::fromStdString(body.id)), true);
+        availableBodyIds.insert(normalizedKey(QString::fromStdString(body->id)), true);
     }
 
     QHash<QString, int> sourceIndexByDisplayKey;
@@ -231,7 +231,12 @@ void SkyObjectSearchModel::setCatalogData(
         }
     };
 
-    for (const auto& body : bodies) {
+    for (const skygate::ephemeris::BaseCelestialBody* bodyPointer : bodies) {
+        if (bodyPointer == nullptr) {
+            continue;
+        }
+        const skygate::ephemeris::BaseCelestialBody& body = *bodyPointer;
+
         if (body.displayName.empty() || body.id.empty()) {
             continue;
         }
@@ -249,11 +254,12 @@ void SkyObjectSearchModel::setCatalogData(
             }
         );
 
-        if (body.type != skygate::ephemeris::CelestialBodyType::DeepSkyObject || !body.deepSkyObject.has_value()) {
+        if (body.kind != skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject
+            || !body.deepSkyObjectValue().has_value()) {
             continue;
         }
 
-        for (const std::string& alias : body.deepSkyObject->aliases) {
+        for (const std::string& alias : body.deepSkyObjectValue()->aliases) {
             if (alias.empty() || alias == body.displayName) {
                 continue;
             }

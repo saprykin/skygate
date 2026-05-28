@@ -1,4 +1,4 @@
-#include "catalog/io/zip/ZipEntryMetadata.hpp"
+#include "ZipEntryMetadata.hpp"
 
 namespace skygate::ephemeris {
 

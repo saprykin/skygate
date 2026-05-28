@@ -1,6 +1,5 @@
-#include "catalog/io/zip/ZipDirectoryReader.hpp"
-
-#include "catalog/io/zip/ZipBinaryUtilities.hpp"
+#include "ZipDirectoryReader.hpp"
+#include "ZipBinaryUtilities.hpp"
 
 #include <cstddef>
 #include <cstdint>

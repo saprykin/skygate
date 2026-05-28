@@ -32,19 +32,20 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return snapshotFor(request.context);
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         return snapshotFor(context);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override
     {
         Q_UNUSED(context);
         Q_UNUSED(bodyId);
@@ -52,7 +53,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override
     {
         Q_UNUSED(context);
         Q_UNUSED(bodyIndex);
@@ -60,9 +61,10 @@ public:
     }
 
 private:
-    [[nodiscard]] static skygate::ephemeris::SkySnapshot snapshotFor(const skygate::core::SkyContext& context)
+    [[nodiscard]] static skygate::ephemeris::EphemerisSnapshot
+    snapshotFor(const skygate::core::ObservationContext& context)
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         return snapshot;
     }

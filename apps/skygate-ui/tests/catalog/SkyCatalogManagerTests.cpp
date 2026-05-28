@@ -1,15 +1,14 @@
-#include "SkyCatalogManager.hpp"
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyCatalogManager.hpp"
 #include "SkySettingsStore.hpp"
-
-#include <QtTest/QtTest>
 
 #include <QFile>
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <QUrl>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 
@@ -31,8 +30,8 @@ bool catalogContainsDisplayName(const skygate::ephemeris::IStarCatalog* catalog,
     }
 
     const auto bodies = catalog->bodies();
-    return std::any_of(bodies.begin(), bodies.end(), [&displayName](const skygate::ephemeris::CelestialBody& body) {
-        return QString::fromStdString(body.displayName) == displayName;
+    return std::any_of(bodies.begin(), bodies.end(), [&displayName](const skygate::ephemeris::BaseCelestialBody* body) {
+        return body != nullptr && QString::fromStdString(body->displayName) == displayName;
     });
 }
 

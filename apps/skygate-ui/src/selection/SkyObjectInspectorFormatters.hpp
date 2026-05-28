@@ -1,10 +1,12 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "DeepSkyObjectInfo.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "HorizontalCoordinate.hpp"
 #include "ObservationEvent.hpp"
-#include "Types.hpp"
 #include "UtcTimePoint.hpp"
+#include "engine/EphemerisEngineQueryResult.hpp"
 
 #include <QString>
 #include <QStringList>
@@ -16,7 +18,7 @@ class SkyTimeController;
 
 namespace skygate::ui::internal {
 
-[[nodiscard]] QString celestialBodyTypeText(const ephemeris::CelestialBody& body);
+[[nodiscard]] QString celestialBodyTypeText(const ephemeris::BaseCelestialBody& body);
 [[nodiscard]] QString formatFiniteNumber(double value, int precision);
 [[nodiscard]] QString formatMagnitude(double value);
 [[nodiscard]] QString formatHorizontalCoordinate(const core::HorizontalCoordinate& horizontal);
@@ -28,7 +30,7 @@ formatObservationEvent(const ephemeris::ObservationEvent& event, const SkyTimeCo
 [[nodiscard]] QString
 formatObservationCulmination(const ephemeris::ObservationEvent& culmination, const SkyTimeController* timeController);
 [[nodiscard]] QString angularSizeText(const ephemeris::DeepSkyObjectInfo& deepSkyObject);
-[[nodiscard]] QString aliasesText(const ephemeris::CelestialBody& body);
+[[nodiscard]] QString aliasesText(const ephemeris::BaseCelestialBody& body);
 [[nodiscard]] QString formatEphemerisStatus(ephemeris::EphemerisEngineQueryStatus::Type status);
 [[nodiscard]] QString formatEphemerisWarnings(const ephemeris::EphemerisEngineQueryResult& metadata);
 [[nodiscard]] QString formatEphemerisDateRange(const ephemeris::EphemerisDateRange& range);

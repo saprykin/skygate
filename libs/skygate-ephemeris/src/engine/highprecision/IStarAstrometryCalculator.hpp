@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "CatalogStarAstrometryArrays.hpp"
+#include "HighPrecisionTypes.hpp"
 
 #include <cstddef>
 #include <memory>

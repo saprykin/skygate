@@ -1,10 +1,11 @@
-#include "engine/highprecision/ApparentPlaceCalculator.hpp"
+#include "ApparentPlaceCalculator.hpp"
+#include "EarthOrientationProvider.hpp"
+#include "EphemerisMetadataMerge.hpp"
+#include "FrameTransformer.hpp"
+#include "ObserverGeodesy.hpp"
+
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/FrameTransformer.hpp"
-#include "engine/highprecision/ObserverGeodesy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -391,7 +392,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 
 std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
     const EphemerisRequest& request,
-    const std::span<const CelestialBody> bodies,
+    const std::span<const BaseCelestialBody* const> bodies,
     const std::span<const StarAstrometryBatchResult> calculatorResults,
     std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState
 ) const
@@ -719,7 +720,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             } else {
                 const HighPrecisionComputationInput input{
                     .request = request,
-                    .body = bodies[results[resultIndex].bodyIndex],
+                    .body = *bodies[results[resultIndex].bodyIndex],
                     .preparedRequestState = preparedRequestState,
                     .bodyIndex = results[resultIndex].bodyIndex,
                 };

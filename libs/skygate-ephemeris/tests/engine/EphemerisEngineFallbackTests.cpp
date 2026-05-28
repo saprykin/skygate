@@ -15,26 +15,32 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = fixedEquatorial;
     return body;
 }
 
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog>
+makeCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+{
+    return std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies));
+}
+
 class SnapshotOnlyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -52,19 +58,20 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-            std::vector<skygate::ephemeris::CelestialBody>{makeBody(
+        auto bodies = makeCatalog(
+            std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{makeBody(
                 "HIP_42",
                 "HIP 42",
-                skygate::ephemeris::CelestialBodyType::Star,
+                skygate::ephemeris::BaseCelestialBody::Kind::Star,
                 1.0,
                 skygate::core::EquatorialCoordinate{.rightAscensionHours = 2.0, .declinationDeg = 3.0}
             )}
         );
 
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = std::move(bodies);
         snapshot.states.push_back(
@@ -78,13 +85,13 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::string_view bodyId) const override
     {
         return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(*this, context, bodyId);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(*this, context, bodyIndex);
     }
@@ -107,26 +114,29 @@ private slots:
 void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePriority()
 {
     const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeBody("sun", "SunById", skygate::ephemeris::CelestialBodyType::Star, 0.0),
-        makeBody("moon", "MoonById", skygate::ephemeris::CelestialBodyType::Planet, 0.0),
+        makeBody("sun", "SunById", skygate::ephemeris::BaseCelestialBody::Kind::Star, 0.0),
+        makeBody("moon", "MoonById", skygate::ephemeris::BaseCelestialBody::Kind::Planet, 0.0),
         makeBody(
             "fixed_sun",
             "Fixed Sun",
-            skygate::ephemeris::CelestialBodyType::Sun,
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun,
             0.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),
-        makeBody("unknown_star", "Unknown Star", skygate::ephemeris::CelestialBodyType::Star, 0.0),
-        makeBody("planet_x", "Planet X", skygate::ephemeris::CelestialBodyType::Planet, 0.0),
+        makeBody("unknown_star", "Unknown Star", skygate::ephemeris::BaseCelestialBody::Kind::Star, 0.0),
+        makeBody("planet_x", "Planet X", skygate::ephemeris::BaseCelestialBody::Kind::Planet, 0.0),
         makeBody(
             "orion",
             "Orion",
-            skygate::ephemeris::CelestialBodyType::Constellation,
+            skygate::ephemeris::BaseCelestialBody::Kind::Constellation,
             1.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 5.5833, .declinationDeg = 5.0}
         ),
         makeBody(
-            "unknown_constellation", "Unknown Constellation", skygate::ephemeris::CelestialBodyType::Constellation, 1.0
+            "unknown_constellation",
+            "Unknown Constellation",
+            skygate::ephemeris::BaseCelestialBody::Kind::Constellation,
+            1.0
         ),
     });
     QVERIFY(catalog != nullptr);
@@ -136,7 +146,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 10.0;
     context.observer.longitudeDeg = 20.0;
     context.observer.elevationMeters = 5.0;
@@ -172,10 +182,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(isNear(fixedSun->equatorial.declinationDeg, 2.5, 1e-8));
 
     QVERIFY(unknownStar != nullptr);
-    QCOMPARE(
-        snapshot.bodyAt(unknownStar->bodyIndex).ephemerisSource,
-        skygate::ephemeris::CelestialBodyEphemerisSource::Unresolved
-    );
+    QCOMPARE(snapshot.bodyAt(unknownStar->bodyIndex).kind, skygate::ephemeris::BaseCelestialBody::Kind::Star);
     QVERIFY(std::isnan(unknownStar->equatorial.rightAscensionHours));
     QVERIFY(std::isnan(unknownStar->equatorial.declinationDeg));
     QVERIFY(unknownStar->metadata.status == skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported);
@@ -191,16 +198,13 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
     QVERIFY(std::isnan(planetX->equatorial.declinationDeg));
 
     QVERIFY(orion != nullptr);
-    QVERIFY(
-        bodies[orion->bodyIndex].ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-    );
+    QVERIFY(bodies[orion->bodyIndex]->kind == skygate::ephemeris::BaseCelestialBody::Kind::Constellation);
     QVERIFY(isNear(orion->equatorial.rightAscensionHours, 5.5833, 1e-4));
     QVERIFY(isNear(orion->equatorial.declinationDeg, 5.0, 1e-4));
 
     QVERIFY(unknownConstellation != nullptr);
     QVERIFY(
-        bodies[unknownConstellation->bodyIndex].ephemerisSource
-        == skygate::ephemeris::CelestialBodyEphemerisSource::Unresolved
+        bodies[unknownConstellation->bodyIndex]->kind == skygate::ephemeris::BaseCelestialBody::Kind::Constellation
     );
     QVERIFY(std::isnan(unknownConstellation->equatorial.rightAscensionHours));
     QVERIFY(unknownConstellation->metadata.status == skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported);
@@ -209,7 +213,7 @@ void EphemerisEngineFallbackTests::usesFallbackBodyLookupAndFixedCoordinatePrior
 void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupCaseInsensitive()
 {
     const SnapshotOnlyEngine engine;
-    const skygate::core::SkyContext context;
+    const skygate::core::ObservationContext context;
 
     const auto state = engine.computeBodyState(context, "hip_42");
     QVERIFY(state.has_value());
@@ -221,17 +225,17 @@ void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupCaseInsensitive()
 
 void EphemerisEngineFallbackTests::keepsExplicitSnapshotLookupBehaviorForEmptyIds()
 {
-    auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-        std::vector<skygate::ephemeris::CelestialBody>{makeBody(
+    auto bodies = makeCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{makeBody(
             "",
             "Unnamed",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             1.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 7.0}
         )}
     );
 
-    skygate::ephemeris::SkySnapshot snapshot;
+    skygate::ephemeris::EphemerisSnapshot snapshot;
     snapshot.catalogBodies = std::move(bodies);
     snapshot.states.push_back(
         skygate::ephemeris::CelestialBodyState{
@@ -248,7 +252,7 @@ void EphemerisEngineFallbackTests::keepsExplicitSnapshotLookupBehaviorForEmptyId
 void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupByIndex()
 {
     const SnapshotOnlyEngine engine;
-    const skygate::core::SkyContext context;
+    const skygate::core::ObservationContext context;
 
     const auto state = engine.computeBodyState(context, 0U);
     QVERIFY(state.has_value());
@@ -261,7 +265,7 @@ void EphemerisEngineFallbackTests::usesExplicitSnapshotLookupByIndex()
 void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver()
 {
     const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, 0.0),
+        makeBody("sun", "Sun", skygate::ephemeris::BaseCelestialBody::Kind::Sun, 0.0),
     });
     QVERIFY(catalog != nullptr);
 
@@ -270,7 +274,7 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 120.0;
     context.observer.longitudeDeg = 10.0;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1710000000));
@@ -292,21 +296,21 @@ void EphemerisEngineFallbackTests::skipsHorizontalCoordinatesForInvalidObserver(
 
 void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatch()
 {
-    skygate::ephemeris::CelestialBody body = makeBody(
+    skygate::ephemeris::OwnGalaxyCelestialBody body = makeBody(
         "mars",
         "Fixed Mars",
-        skygate::ephemeris::CelestialBodyType::Planet,
+        skygate::ephemeris::BaseCelestialBody::Kind::Planet,
         0.0,
         skygate::core::EquatorialCoordinate{.rightAscensionHours = 3.25, .declinationDeg = -12.5}
     );
-    body.ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Planet;
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 10.0;
     context.observer.longitudeDeg = 20.0;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1710000000));
 
-    const std::vector<skygate::ephemeris::CelestialBody> bodies{body};
+    const std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies{body};
     auto directEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(bodies);
     QVERIFY(directEngineResult.isSuccess());
     const auto& directEngine = directEngineResult.engine;
@@ -319,7 +323,7 @@ void EphemerisEngineFallbackTests::fixedCoordinatesOverrideExplicitSourceDispatc
 
     const auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({body});
     QVERIFY(catalog != nullptr);
-    QCOMPARE(catalog->bodies()[0].ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
+    QCOMPARE(catalog->bodies()[0]->kind, skygate::ephemeris::BaseCelestialBody::Kind::Planet);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*catalog);
     QVERIFY(engineResult.isSuccess());

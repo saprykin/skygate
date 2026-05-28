@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "HighPrecisionTypes.hpp"
 
 #include <memory>
 #include <span>
@@ -17,7 +17,7 @@ public:
 
     [[nodiscard]] virtual std::vector<StarAstrometryBatchResult> applyBatch(
         const EphemerisRequest& request,
-        std::span<const CelestialBody> bodies,
+        std::span<const BaseCelestialBody* const> bodies,
         std::span<const StarAstrometryBatchResult> calculatorResults,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
     ) const = 0;

@@ -34,7 +34,7 @@ void OpenNgcObjectMapperTests::mapsMessierObjectsAndAliases()
 
     QCOMPARE(mapping.id, std::string("messier_031"));
     QCOMPARE(mapping.displayName, std::string("M31"));
-    QCOMPARE(mapping.kind, DeepSkyObjectKind::Galaxy);
+    QCOMPARE(mapping.kind, DeepSkyObjectInfo::Kind::Galaxy);
     QVERIFY(std::find(mapping.aliases.begin(), mapping.aliases.end(), "M 31") != mapping.aliases.end());
     QVERIFY(std::find(mapping.aliases.begin(), mapping.aliases.end(), "NGC 224") != mapping.aliases.end());
     QVERIFY(std::find(mapping.aliases.begin(), mapping.aliases.end(), "Andromeda Galaxy") != mapping.aliases.end());

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "time/AstronomicalEpoch.hpp"
-#include "time/CivilDateTime.hpp"
+#include "AstronomicalEpoch.hpp"
+#include "CivilDateTime.hpp"
 
 #include <cstdint>
 #include <optional>

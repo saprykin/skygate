@@ -1,1 +1,1 @@
-#include "catalog/composition/CatalogAugmentationResult.hpp"
+#include "CatalogAugmentationResult.hpp"

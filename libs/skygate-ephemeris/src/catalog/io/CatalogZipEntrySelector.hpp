@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/io/zip/ZipEntryMetadata.hpp"
+#include "zip/ZipEntryMetadata.hpp"
 
 #include <span>
 

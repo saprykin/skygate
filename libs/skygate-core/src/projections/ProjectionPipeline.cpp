@@ -1,5 +1,4 @@
 #include "ProjectionPipeline.hpp"
-
 #include "math/MathConstants.hpp"
 
 #include <algorithm>

@@ -1,9 +1,8 @@
 #pragma once
 
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
-
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "EphemerisDataManifest.hpp"
+#include "EphemerisDataSnapshot.hpp"
+#include "ICalcephKernelProvider.hpp"
 
 #include <cstdint>
 #include <filesystem>

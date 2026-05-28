@@ -1,8 +1,6 @@
-#include "SkyContextController.hpp"
-
 #include "ConstellationReferenceCalculator.hpp"
+#include "SkyContextController.hpp"
 #include "SkyPerformanceLogging.hpp"
-#include "SkyTimeController.hpp"
 
 #include <QElapsedTimer>
 
@@ -27,7 +25,7 @@ bool hasFiniteHorizontal(const skygate::core::HorizontalCoordinate& horizontal)
 }
 
 const skygate::ephemeris::CelestialBodyState*
-findBodyStateById(const skygate::ephemeris::SkySnapshot& snapshot, const QString& targetId)
+findBodyStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const QString& targetId)
 {
     const QString normalizedTargetId = normalizedLookupKey(targetId);
     for (const auto& state : snapshot.states) {
@@ -148,7 +146,7 @@ bool SkyContextController::trackSearchTarget(const QString& targetKind, const QS
         return false;
     }
 
-    skygate::core::SkyContext trackingContext = m_location.context();
+    skygate::core::ObservationContext trackingContext = m_location.context();
     const auto requestContext = ephemerisRequestContextFor(trackingContext);
     const auto snapshot = engine->compute(requestContext.request);
     const auto* bodyState = findBodyStateById(snapshot, targetId);

@@ -1,7 +1,10 @@
 #pragma once
 
-#include "Types.hpp"
-
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QAbstractListModel>
@@ -35,7 +38,7 @@ public:
     [[nodiscard]] QString filterText() const;
     void setFilterText(const QString& filterText);
     void setCatalogData(
-        std::span<const skygate::ephemeris::CelestialBody> bodies,
+        std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies,
         std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
     );
 

@@ -4,14 +4,13 @@
 
 namespace skygate::ephemeris::tests {
 
-[[nodiscard]] CelestialBody
+[[nodiscard]] OwnGalaxyCelestialBody
 makeFixedAltitudeBody(std::string id, const double rightAscensionHours, const double declinationDeg)
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = body.id;
-    body.type = CelestialBodyType::Star;
-    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.kind = BaseCelestialBody::Kind::Star;
     body.fixedEquatorial = skygate::core::EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours,
         .declinationDeg = declinationDeg,
@@ -34,15 +33,15 @@ FixedAltitudeEngine::FixedAltitudeEngine(const double altitudeDeg)
 FixedAltitudeEngine::FixedAltitudeEngine(std::vector<FixedAltitudeBody> bodies)
     : m_bodies(std::make_shared<const std::vector<FixedAltitudeBody>>(std::move(bodies)))
 {
-    std::vector<CelestialBody> catalogBodies;
+    std::vector<OwnGalaxyCelestialBody> catalogBodies;
     catalogBodies.reserve(m_bodies->size());
     for (const FixedAltitudeBody& fixedBody : *m_bodies) {
         catalogBodies.push_back(fixedBody.body);
     }
-    m_catalogBodies = std::make_shared<const std::vector<CelestialBody>>(std::move(catalogBodies));
+    m_catalogBodies = std::make_shared<const CelestialBodyCatalog>(std::move(catalogBodies));
 }
 
-SkySnapshot FixedAltitudeEngine::compute(const EphemerisRequest& request) const
+EphemerisSnapshot FixedAltitudeEngine::compute(const EphemerisRequest& request) const
 {
     return compute(request.context);
 }
@@ -59,9 +58,9 @@ FixedAltitudeEngine::computeBodyState(const EphemerisRequest& request, const std
     return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
 }
 
-SkySnapshot FixedAltitudeEngine::compute(const skygate::core::SkyContext& context) const
+EphemerisSnapshot FixedAltitudeEngine::compute(const skygate::core::ObservationContext& context) const
 {
-    SkySnapshot snapshot;
+    EphemerisSnapshot snapshot;
     snapshot.context = context;
     snapshot.catalogBodies = m_catalogBodies;
     snapshot.states.reserve(m_bodies->size());
@@ -72,7 +71,7 @@ SkySnapshot FixedAltitudeEngine::compute(const skygate::core::SkyContext& contex
 }
 
 std::optional<CelestialBodyState>
-FixedAltitudeEngine::computeBodyState(const skygate::core::SkyContext&, const std::string_view bodyId) const
+FixedAltitudeEngine::computeBodyState(const skygate::core::ObservationContext&, const std::string_view bodyId) const
 {
     for (std::uint32_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
         if ((*m_bodies)[bodyIndex].body.id == bodyId) {
@@ -83,7 +82,7 @@ FixedAltitudeEngine::computeBodyState(const skygate::core::SkyContext&, const st
 }
 
 std::optional<CelestialBodyState>
-FixedAltitudeEngine::computeBodyState(const skygate::core::SkyContext&, const std::uint32_t bodyIndex) const
+FixedAltitudeEngine::computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t bodyIndex) const
 {
     if (bodyIndex >= m_bodies->size()) {
         return std::nullopt;
@@ -111,7 +110,7 @@ CelestialBodyState FixedAltitudeEngine::stateFor(const std::uint32_t bodyIndex) 
 RequestCountingEphemerisEngine::RequestCountingEphemerisEngine(
     std::unique_ptr<IEphemerisEngine> engine,
     EphemerisEngineOptions options,
-    std::shared_ptr<const std::vector<CelestialBody>> catalogBodies
+    std::shared_ptr<const CelestialBodyCatalog> catalogBodies
 )
     : m_engine(std::move(engine)), m_options(options), m_catalogBodies(std::move(catalogBodies))
 {
@@ -131,9 +130,9 @@ EphemerisEngineOptions RequestCountingEphemerisEngine::options() const noexcept
     return m_options;
 }
 
-SkySnapshot RequestCountingEphemerisEngine::compute(const EphemerisRequest& request) const
+EphemerisSnapshot RequestCountingEphemerisEngine::compute(const EphemerisRequest& request) const
 {
-    SkySnapshot snapshot = m_engine->compute(request);
+    EphemerisSnapshot snapshot = m_engine->compute(request);
     attachCatalogBodies(snapshot);
     return snapshot;
 }
@@ -152,15 +151,15 @@ RequestCountingEphemerisEngine::computeBodyState(const EphemerisRequest& request
     return m_engine->computeBodyState(request, bodyIndex);
 }
 
-SkySnapshot RequestCountingEphemerisEngine::compute(const skygate::core::SkyContext& context) const
+EphemerisSnapshot RequestCountingEphemerisEngine::compute(const skygate::core::ObservationContext& context) const
 {
-    SkySnapshot snapshot = m_engine->compute(context);
+    EphemerisSnapshot snapshot = m_engine->compute(context);
     attachCatalogBodies(snapshot);
     return snapshot;
 }
 
 std::optional<CelestialBodyState> RequestCountingEphemerisEngine::computeBodyState(
-    const skygate::core::SkyContext& context, const std::string_view bodyId
+    const skygate::core::ObservationContext& context, const std::string_view bodyId
 ) const
 {
     ++m_contextSampleCount;
@@ -168,7 +167,7 @@ std::optional<CelestialBodyState> RequestCountingEphemerisEngine::computeBodySta
 }
 
 std::optional<CelestialBodyState> RequestCountingEphemerisEngine::computeBodyState(
-    const skygate::core::SkyContext& context, const std::uint32_t bodyIndex
+    const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
 ) const
 {
     ++m_contextSampleCount;
@@ -185,7 +184,7 @@ int RequestCountingEphemerisEngine::contextSampleCount() const noexcept
     return m_contextSampleCount;
 }
 
-void RequestCountingEphemerisEngine::attachCatalogBodies(SkySnapshot& snapshot) const
+void RequestCountingEphemerisEngine::attachCatalogBodies(EphemerisSnapshot& snapshot) const
 {
     if (m_catalogBodies != nullptr) {
         snapshot.catalogBodies = m_catalogBodies;

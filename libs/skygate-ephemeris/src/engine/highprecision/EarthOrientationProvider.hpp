@@ -1,7 +1,9 @@
 #pragma once
 
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
-#include "Types.hpp"
+#include "EphemerisDataSnapshot.hpp"
+#include "engine/EphemerisDateRange.hpp"
+#include "time/AstronomicalEpoch.hpp"
+#include "time/CivilDateTime.hpp"
 
 #include <cstdint>
 #include <memory>

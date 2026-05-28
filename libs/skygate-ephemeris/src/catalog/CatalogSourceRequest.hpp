@@ -1,7 +1,7 @@
 #pragma once
 
-#include "catalog/CatalogSelectionOptions.hpp"
-#include "catalog/CatalogSourceType.hpp"
+#include "CatalogSelectionOptions.hpp"
+#include "CatalogSourceType.hpp"
 
 #include <cstddef>
 #include <functional>

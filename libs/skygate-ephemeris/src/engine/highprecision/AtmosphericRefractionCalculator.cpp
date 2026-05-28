@@ -1,6 +1,6 @@
-#include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
+#include "AtmosphericRefractionCalculator.hpp"
+#include "EphemerisMetadataMerge.hpp"
 #include "math/AngleMath.hpp"
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
 
 #include <algorithm>
 #include <cmath>

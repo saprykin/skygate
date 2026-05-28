@@ -1,14 +1,19 @@
-#include "catalog/InMemoryStarCatalog.hpp"
+#include "InMemoryStarCatalog.hpp"
 
 #include <utility>
 
 namespace skygate::ephemeris {
 
-InMemoryStarCatalog::InMemoryStarCatalog(std::vector<CelestialBody> bodies) : m_bodies(std::move(bodies)) {}
+InMemoryStarCatalog::InMemoryStarCatalog(CelestialBodyCatalog catalog) : m_catalog(std::move(catalog)) {}
 
-std::span<const CelestialBody> InMemoryStarCatalog::bodies() const
+const CelestialBodyCatalog& InMemoryStarCatalog::catalog() const noexcept
 {
-    return m_bodies;
+    return m_catalog;
+}
+
+std::span<const BaseCelestialBody* const> InMemoryStarCatalog::bodies() const
+{
+    return m_catalog.bodies();
 }
 
 }  // namespace skygate::ephemeris

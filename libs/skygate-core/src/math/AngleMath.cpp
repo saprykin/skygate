@@ -1,6 +1,5 @@
-#include "math/AngleMath.hpp"
-
-#include "math/MathConstants.hpp"
+#include "AngleMath.hpp"
+#include "MathConstants.hpp"
 
 #include <cmath>
 

@@ -1,6 +1,5 @@
-#include "catalog/io/DelimitedCatalogRow.hpp"
-
-#include "catalog/io/CsvRowTokenizer.hpp"
+#include "DelimitedCatalogRow.hpp"
+#include "CsvRowTokenizer.hpp"
 
 #include <utility>
 

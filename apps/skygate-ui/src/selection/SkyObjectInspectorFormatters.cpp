@@ -12,42 +12,39 @@
 
 namespace skygate::ui::internal {
 
-QString celestialBodyTypeText(const ephemeris::CelestialBody& body)
+QString celestialBodyTypeText(const ephemeris::BaseCelestialBody& body)
 {
-    using ephemeris::CelestialBodyType;
-    using ephemeris::DeepSkyObjectKind;
-
-    if (body.type == CelestialBodyType::DeepSkyObject && body.deepSkyObject.has_value()) {
-        switch (body.deepSkyObject->kind) {
-        case DeepSkyObjectKind::Galaxy:
+    if (body.kind == ephemeris::BaseCelestialBody::Kind::DeepSkyObject && body.deepSkyObjectValue().has_value()) {
+        switch (body.deepSkyObjectValue()->kind) {
+        case ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
             return "Galaxy";
-        case DeepSkyObjectKind::OpenCluster:
+        case ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
             return "Open cluster";
-        case DeepSkyObjectKind::GlobularCluster:
+        case ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
             return "Globular cluster";
-        case DeepSkyObjectKind::Nebula:
+        case ephemeris::DeepSkyObjectInfo::Kind::Nebula:
             return "Nebula";
-        case DeepSkyObjectKind::PlanetaryNebula:
+        case ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
             return "Planetary nebula";
-        case DeepSkyObjectKind::Asterism:
+        case ephemeris::DeepSkyObjectInfo::Kind::Asterism:
             return "Asterism";
-        case DeepSkyObjectKind::Unknown:
+        case ephemeris::DeepSkyObjectInfo::Kind::Unknown:
             return "Deep sky object";
         }
     }
 
-    switch (body.type) {
-    case CelestialBodyType::Sun:
+    switch (body.kind) {
+    case ephemeris::BaseCelestialBody::Kind::Sun:
         return "Sun";
-    case CelestialBodyType::Moon:
+    case ephemeris::BaseCelestialBody::Kind::Moon:
         return "Moon";
-    case CelestialBodyType::Planet:
+    case ephemeris::BaseCelestialBody::Kind::Planet:
         return "Planet";
-    case CelestialBodyType::Star:
+    case ephemeris::BaseCelestialBody::Kind::Star:
         return "Star";
-    case CelestialBodyType::Constellation:
+    case ephemeris::BaseCelestialBody::Kind::Constellation:
         return "Constellation";
-    case CelestialBodyType::DeepSkyObject:
+    case ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
         return "Deep sky object";
     }
 
@@ -290,15 +287,15 @@ QString angularSizeText(const ephemeris::DeepSkyObjectInfo& deepSkyObject)
     return {};
 }
 
-QString aliasesText(const ephemeris::CelestialBody& body)
+QString aliasesText(const ephemeris::BaseCelestialBody& body)
 {
-    if (!body.deepSkyObject.has_value()) {
+    if (!body.deepSkyObjectValue().has_value()) {
         return {};
     }
 
     QStringList aliases;
     const QString displayName = QString::fromStdString(body.displayName);
-    for (const std::string& alias : body.deepSkyObject->aliases) {
+    for (const std::string& alias : body.deepSkyObjectValue()->aliases) {
         const QString aliasText = QString::fromStdString(alias).trimmed();
         if (aliasText.isEmpty() || aliasText.compare(displayName, Qt::CaseInsensitive) == 0
             || aliases.contains(aliasText, Qt::CaseInsensitive)) {

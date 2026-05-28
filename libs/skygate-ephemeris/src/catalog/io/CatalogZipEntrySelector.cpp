@@ -1,5 +1,4 @@
-#include "catalog/io/CatalogZipEntrySelector.hpp"
-
+#include "CatalogZipEntrySelector.hpp"
 #include "StringUtilities.hpp"
 
 #include <string_view>

@@ -1,4 +1,7 @@
 #include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
+#include "CelestialBodyCatalog.hpp"
+#include "DistantCelestialBody.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 
 #include <QtTest/QtTest>
 
@@ -6,7 +9,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <vector>
+#include <span>
 
 namespace {
 
@@ -23,13 +26,12 @@ namespace core = skygate::core;
     };
 }
 
-[[nodiscard]] CelestialBody makeAstrometricStar()
+[[nodiscard]] OwnGalaxyCelestialBody makeAstrometricStar()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "astrometric-star";
     body.displayName = "Astrometric Star";
-    body.type = CelestialBodyType::Star;
-    body.ephemerisSource = CelestialBodyEphemerisSource::Star;
+    body.kind = BaseCelestialBody::Kind::Star;
     body.fixedEquatorial = core::EquatorialCoordinate{
         .rightAscensionHours = 10.0,
         .declinationDeg = 20.0,
@@ -59,9 +61,9 @@ namespace core = skygate::core;
     return body;
 }
 
-[[nodiscard]] CelestialBody makePartialAstrometricStar()
+[[nodiscard]] OwnGalaxyCelestialBody makePartialAstrometricStar()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.id = "partial-star";
     body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
     body.starAstrometry->stellarParallaxMas = std::nullopt;
@@ -70,13 +72,12 @@ namespace core = skygate::core;
     return body;
 }
 
-[[nodiscard]] CelestialBody makeFixedOnlyStar()
+[[nodiscard]] OwnGalaxyCelestialBody makeFixedOnlyStar()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "fixed-star";
     body.displayName = "Fixed Star";
-    body.type = CelestialBodyType::Star;
-    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.kind = BaseCelestialBody::Kind::Star;
     body.fixedEquatorial = core::EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = -15.0,
@@ -84,36 +85,40 @@ namespace core = skygate::core;
     return body;
 }
 
-[[nodiscard]] CelestialBody makePlanet()
+[[nodiscard]] OwnGalaxyCelestialBody makePlanet()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "mars";
     body.displayName = "Mars";
-    body.type = CelestialBodyType::Planet;
-    body.ephemerisSource = CelestialBodyEphemerisSource::Planet;
+    body.kind = BaseCelestialBody::Kind::Planet;
     return body;
 }
 
-[[nodiscard]] CelestialBody makeFixedDeepSkyObject()
+[[nodiscard]] DistantCelestialBody makeFixedDeepSkyObject()
 {
-    CelestialBody body;
+    DistantCelestialBody body;
     body.id = "messier-31";
     body.displayName = "M31";
-    body.type = CelestialBodyType::DeepSkyObject;
-    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.kind = BaseCelestialBody::Kind::DeepSkyObject;
     body.fixedEquatorial = core::EquatorialCoordinate{
         .rightAscensionHours = 0.7,
         .declinationDeg = 41.3,
     };
     body.deepSkyObject = DeepSkyObjectInfo{
-        .kind = DeepSkyObjectKind::Galaxy,
+        .kind = DeepSkyObjectInfo::Kind::Galaxy,
     };
     return body;
 }
 
-[[nodiscard]] CelestialBody makeStarWithInvalidNumericAstrometry()
+[[nodiscard]] CatalogStarAstrometryArrays makeArrays(const std::vector<OwnGalaxyCelestialBody>& bodies)
 {
-    CelestialBody body = makeAstrometricStar();
+    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    return CatalogStarAstrometryArrays(catalog.bodies());
+}
+
+[[nodiscard]] OwnGalaxyCelestialBody makeStarWithInvalidNumericAstrometry()
+{
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.id = "invalid-astrometry-star";
     body.starAstrometry->properMotionRightAscensionMasPerYear = std::numeric_limits<double>::quiet_NaN();
     body.starAstrometry->properMotionDeclinationMasPerYear = std::numeric_limits<double>::infinity();
@@ -136,14 +141,14 @@ private slots:
 
 void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialAndFixedStars()
 {
-    const std::vector<CelestialBody> bodies{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
         makePlanet(),
         makeAstrometricStar(),
         makePartialAstrometricStar(),
         makeFixedOnlyStar(),
     };
 
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CatalogStarAstrometryArrays arrays = makeArrays(bodies);
 
     QCOMPARE(arrays.size(), 3U);
     QVERIFY(!arrays.empty());
@@ -208,12 +213,19 @@ void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialA
 
 void CatalogStarAstrometryArraysTests::batchesFixedCoordinateNonStarBodies()
 {
-    const std::vector<CelestialBody> bodies{
-        makeFixedDeepSkyObject(),
-        makeFixedOnlyStar(),
-    };
-
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CelestialBodyCatalog catalog(
+        std::vector<OwnGalaxyCelestialBody>{
+            makeFixedOnlyStar(),
+        },
+        std::vector<DistantCelestialBody>{
+            makeFixedDeepSkyObject(),
+        },
+        std::vector<CelestialBodyCatalog::OrderEntry>{
+            {.domain = CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U},
+            {.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 0U},
+        }
+    );
+    const CatalogStarAstrometryArrays arrays(catalog.bodies());
 
     QCOMPARE(arrays.size(), 2U);
     QCOMPARE(arrays.bodyIndices()[0], 0U);
@@ -228,11 +240,11 @@ void CatalogStarAstrometryArraysTests::batchesFixedCoordinateNonStarBodies()
 
 void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
 {
-    const std::vector<CelestialBody> bodies{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
         makeStarWithInvalidNumericAstrometry(),
     };
 
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CatalogStarAstrometryArrays arrays = makeArrays(bodies);
 
     QCOMPARE(arrays.size(), 1U);
     QCOMPARE(arrays.hasProperMotionRightAscensionMask()[0], std::uint8_t{0});
@@ -253,10 +265,10 @@ void CatalogStarAstrometryArraysTests::copiesCatalogDataAndSurvivesSourceLifetim
 {
     CatalogStarAstrometryArrays arrays;
     {
-        std::vector<CelestialBody> bodies{
+        std::vector<OwnGalaxyCelestialBody> bodies{
             makeAstrometricStar(),
         };
-        arrays = CatalogStarAstrometryArrays(bodies);
+        arrays = makeArrays(bodies);
         bodies[0].starAstrometry->referenceEquatorial.rightAscensionHours = 1.0;
         bodies[0].fixedEquatorial->declinationDeg = 88.0;
         bodies.clear();

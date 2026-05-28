@@ -1,24 +1,21 @@
 #pragma once
 
-#include <QtTest>
-
+#include "ITimeSource.hpp"
+#include "SettingsTestFixture.hpp"
 #include "SkyContextController.hpp"
 #include "SkyLogging.hpp"
 #include "SkyOverlayLayerSettings.hpp"
-#include "SettingsTestFixture.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
-
-#include "ITimeSource.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QTimeZone>
-
+#include <QtTest>
 #if SKYGATE_HAS_POSITIONING
 #include <QGeoCoordinate>
 #include <QGeoPositionInfo>
@@ -61,18 +58,18 @@ private:
     QDateTime m_nowUtc;
 };
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = fixedEquatorial;
     return body;
@@ -170,7 +167,7 @@ QDateTime controllerUtcTime(const SkyContextController& controller)
 }
 
 const skygate::ephemeris::CelestialBodyState*
-findStateById(const skygate::ephemeris::SkySnapshot& snapshot, const std::string& bodyId)
+findStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const std::string& bodyId)
 {
     for (const auto& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {
@@ -200,7 +197,7 @@ std::unique_ptr<SkyContextController> createSingleBodyController(
         makeBody(
             id,
             displayName,
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             1.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.5, .declinationDeg = 2.5}
         ),

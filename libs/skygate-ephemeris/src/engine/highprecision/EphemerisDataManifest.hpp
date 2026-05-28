@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Types.hpp"
 #include "engine/EphemerisDatasetInfo.hpp"
+#include "engine/EphemerisDateRange.hpp"
 
 #include <cstdint>
 #include <optional>

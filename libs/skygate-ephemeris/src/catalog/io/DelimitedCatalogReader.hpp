@@ -1,7 +1,7 @@
 #pragma once
 
-#include "catalog/io/DelimitedCatalogReaderOptions.hpp"
-#include "catalog/io/DelimitedCatalogRow.hpp"
+#include "DelimitedCatalogReaderOptions.hpp"
+#include "DelimitedCatalogRow.hpp"
 
 #include <string_view>
 

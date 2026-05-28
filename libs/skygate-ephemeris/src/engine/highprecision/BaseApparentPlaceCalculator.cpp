@@ -1,4 +1,4 @@
-#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
+#include "BaseApparentPlaceCalculator.hpp"
 
 #include <QtGlobal>
 
@@ -8,7 +8,7 @@ namespace skygate::ephemeris::highprecision {
 
 std::vector<StarAstrometryBatchResult> BaseApparentPlaceCalculator::applyBatch(
     const EphemerisRequest& request,
-    std::span<const CelestialBody> bodies,
+    std::span<const BaseCelestialBody* const> bodies,
     std::span<const StarAstrometryBatchResult> calculatorResults,
     std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState
 ) const
@@ -22,7 +22,7 @@ std::vector<StarAstrometryBatchResult> BaseApparentPlaceCalculator::applyBatch(
         }
         const HighPrecisionComputationInput input{
             .request = request,
-            .body = bodies[calculatorResult.bodyIndex],
+            .body = *bodies[calculatorResult.bodyIndex],
             .preparedRequestState = preparedRequestState,
             .bodyIndex = calculatorResult.bodyIndex,
         };

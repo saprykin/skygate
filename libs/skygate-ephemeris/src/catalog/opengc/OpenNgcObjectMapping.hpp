@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.hpp"
+#include "DeepSkyObjectInfo.hpp"
 
 #include <string>
 #include <vector>
@@ -10,7 +10,7 @@ namespace skygate::ephemeris {
 struct OpenNgcObjectMapping final {
     std::string id;
     std::string displayName;
-    DeepSkyObjectKind kind = DeepSkyObjectKind::Unknown;
+    DeepSkyObjectInfo::Kind kind = DeepSkyObjectInfo::Kind::Unknown;
     std::vector<std::string> aliases;
 };
 

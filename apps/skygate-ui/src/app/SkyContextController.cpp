@@ -907,7 +907,7 @@ bool SkyContextController::catalogProcessing() const noexcept
     return m_catalogManager != nullptr && m_catalogManager->catalogProcessing();
 }
 
-const skygate::core::SkyContext& SkyContextController::skyContext() const noexcept
+const skygate::core::ObservationContext& SkyContextController::skyContext() const noexcept
 {
     return m_location.context();
 }
@@ -944,7 +944,7 @@ SkyContextController::EphemerisRequestContext SkyContextController::ephemerisReq
 }
 
 SkyContextController::EphemerisRequestContext
-SkyContextController::ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const
+SkyContextController::ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const
 {
     EphemerisRequestContext context;
     context.request.context = skyContext;
@@ -985,10 +985,11 @@ SkyContextController::ephemerisRequestContextFor(const skygate::core::SkyContext
     return context;
 }
 
-std::span<const skygate::ephemeris::CelestialBody> SkyContextController::catalogBodies() const noexcept
+std::span<const skygate::ephemeris::BaseCelestialBody* const> SkyContextController::catalogBodies() const noexcept
 {
     const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
-    return starCatalog != nullptr ? starCatalog->bodies() : std::span<const skygate::ephemeris::CelestialBody>{};
+    return starCatalog != nullptr ? starCatalog->bodies()
+                                  : std::span<const skygate::ephemeris::BaseCelestialBody* const>{};
 }
 
 void SkyContextController::rebuildEphemerisEngine()
@@ -1002,7 +1003,10 @@ void SkyContextController::rebuildEphemerisEngine()
             : EphemerisProviderBundle{};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = m_ephemerisEngineKind;
-    request.catalogBodies = catalogBodies();
+    const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
+    if (starCatalog != nullptr) {
+        request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(starCatalog->catalog());
+    }
     request.options = m_ephemerisEngineOptions;
     request.options.setEngineKind(m_ephemerisEngineKind);
     const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();

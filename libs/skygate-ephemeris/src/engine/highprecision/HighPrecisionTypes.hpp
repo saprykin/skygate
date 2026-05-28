@@ -1,17 +1,17 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "EarthOrientationProvider.hpp"
+#include "EphemerisRequest.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "HorizontalCoordinate.hpp"
-#include "Types.hpp"
 #include "engine/EphemerisDatasetInfo.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/EphemerisEngineQueryResult.hpp"
+#include "time/AstronomicalEpoch.hpp"
 
 #include <cstddef>
 #include <memory>
 #include <optional>
-#include <span>
-#include <string_view>
-#include <vector>
 
 namespace skygate::ephemeris {
 class ITimeScaleService;
@@ -56,7 +56,7 @@ struct PreparedEphemerisRequestState {
 
 struct HighPrecisionComputationInput {
     const EphemerisRequest& request;
-    const CelestialBody& body;
+    const BaseCelestialBody& body;
     std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState;
     std::size_t bodyIndex = 0U;
 };

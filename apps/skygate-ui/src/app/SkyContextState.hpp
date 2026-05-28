@@ -1,12 +1,9 @@
 #pragma once
 
-#include "SkyContextControllerSupport.hpp"
-
 #include "IProjection.hpp"
+#include "ObservationContext.hpp"
 #include "ProjectionType.hpp"
-#include "SkyContext.hpp"
-#include "ProjectionType.hpp"
-#include "SkyContext.hpp"
+#include "SkyContextControllerSupport.hpp"
 #include "math/ViewportMath.hpp"
 
 #include <QString>
@@ -36,7 +33,7 @@ struct SkyViewState final {
 };
 
 struct SkyLocationState final {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     SkyContextLocationSource source = SkyContextLocationSourceCodec::defaultSource();
     QString statusText;
     QString selectedCityId;

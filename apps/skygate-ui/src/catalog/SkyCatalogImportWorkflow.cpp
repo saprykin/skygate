@@ -1,7 +1,5 @@
 #include "SkyCatalogImportWorkflow.hpp"
-
 #include "CatalogCoordinator.hpp"
-
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QLoggingCategory>
@@ -16,11 +14,11 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
-std::size_t countDeepSkyObjects(const std::span<const skygate::ephemeris::CelestialBody> bodies)
+std::size_t countDeepSkyObjects(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies)
 {
     return static_cast<std::size_t>(
-        std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::CelestialBody& body) {
-            return body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject;
+        std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
         })
     );
 }

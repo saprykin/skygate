@@ -1,8 +1,7 @@
 #pragma once
 
-#include "math/LineSegment2d.hpp"
-#include "math/Rect2d.hpp"
-#include "math/Vector2d.hpp"
+#include "Rect2d.hpp"
+#include "Vector2d.hpp"
 
 #include <cstdint>
 #include <optional>

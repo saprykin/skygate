@@ -1,6 +1,6 @@
 #pragma once
 
-#include "math/Rect2d.hpp"
+#include "Rect2d.hpp"
 
 #include <cstdint>
 #include <unordered_map>

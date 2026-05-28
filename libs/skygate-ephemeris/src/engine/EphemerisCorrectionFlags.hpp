@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/BitFlagSetOperations.hpp"
+#include "BitFlagSetOperations.hpp"
 
 #include <cstdint>
 

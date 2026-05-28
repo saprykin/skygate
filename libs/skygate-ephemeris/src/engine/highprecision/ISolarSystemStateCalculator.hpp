@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "HighPrecisionTypes.hpp"
 
 namespace skygate::ephemeris::highprecision {
 

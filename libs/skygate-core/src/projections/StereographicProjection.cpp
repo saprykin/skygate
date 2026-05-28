@@ -1,5 +1,4 @@
-#include "projections/StereographicProjection.hpp"
-
+#include "StereographicProjection.hpp"
 #include "ProjectionAlgorithms.hpp"
 
 namespace skygate::core {

@@ -1,1 +1,1 @@
-#include "catalog/composition/DeepSkyCatalogMergeResult.hpp"
+#include "DeepSkyCatalogMergeResult.hpp"

@@ -1,5 +1,4 @@
 #include "PreparedProjection.hpp"
-
 #include "projections/ProjectionAlgorithms.hpp"
 
 namespace skygate::core {

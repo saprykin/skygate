@@ -1,5 +1,4 @@
 #include "SkyRenderBuilders.hpp"
-
 #include "SkyConstellationRenderBuilder.hpp"
 #include "SkyRenderBodyBuilder.hpp"
 #include "SkyRenderHorizontalLookup.hpp"
@@ -12,7 +11,7 @@
 using namespace skygate::ui::internal;
 
 SkyRenderFrame SkyRenderFrameBuilder::buildFrame(
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const skygate::core::PreparedProjection& projection,
     const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs,
     const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups,

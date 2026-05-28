@@ -5,7 +5,7 @@
 
 namespace skygate::core {
 
-struct SkyContext {
+struct ObservationContext {
     GeoLocation observer;
     UtcTimePoint utcTime{};
 };

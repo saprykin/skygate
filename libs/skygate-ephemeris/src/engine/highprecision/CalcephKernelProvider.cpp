@@ -1,4 +1,4 @@
-#include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "CalcephKernelProvider.hpp"
 #include "math/PhysicalConstants.hpp"
 
 #include <QByteArrayView>
@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <string>

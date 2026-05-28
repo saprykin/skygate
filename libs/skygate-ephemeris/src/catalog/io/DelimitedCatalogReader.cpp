@@ -1,5 +1,5 @@
-#include "catalog/io/DelimitedCatalogReader.hpp"
-#include "catalog/io/CsvRowTokenizer.hpp"
+#include "DelimitedCatalogReader.hpp"
+#include "CsvRowTokenizer.hpp"
 #include "StringUtilities.hpp"
 
 #include <algorithm>

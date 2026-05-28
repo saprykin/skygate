@@ -1,5 +1,5 @@
-#include "time/AstronomicalTime.hpp"
-#include "time/EpochCodec.hpp"
+#include "AstronomicalTime.hpp"
+#include "EpochCodec.hpp"
 #include "math/AngleMath.hpp"
 #include "math/TimeConstants.hpp"
 

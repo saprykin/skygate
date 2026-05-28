@@ -1,4 +1,4 @@
-#include "catalog/constellation/ConstellationDataCodec.hpp"
+#include "ConstellationDataCodec.hpp"
 #include "StringUtilities.hpp"
 
 #include <algorithm>

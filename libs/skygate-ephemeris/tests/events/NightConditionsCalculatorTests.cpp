@@ -1,6 +1,6 @@
-#include "NightConditionsCalculator.hpp"
 #include "EphemerisEngineTestDoubles.hpp"
 #include "EphemerisRequestFactory.hpp"
+#include "NightConditionsCalculator.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
@@ -23,27 +23,27 @@ namespace {
     return skygate::core::UtcTimePoint(std::chrono::seconds(seconds));
 }
 
-[[nodiscard]] skygate::core::SkyContext makeZurichContext()
+[[nodiscard]] skygate::core::ObservationContext makeZurichContext()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
     context.utcTime = utcFromUnixSeconds(1'711'024'800);  // 2024-03-21 12:00:00 UTC
     return context;
 }
 
-[[nodiscard]] skygate::core::SkyContext makePolarSummerContext()
+[[nodiscard]] skygate::core::ObservationContext makePolarSummerContext()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer = {.latitudeDeg = 80.0, .longitudeDeg = 0.0, .elevationMeters = 0.0};
     context.utcTime = utcFromUnixSeconds(1'719'576'000);  // 2024-06-30 12:00:00 UTC
     return context;
 }
 
 [[nodiscard]] std::optional<std::uint32_t>
-bodyIndexById(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string_view bodyId)
+bodyIndexById(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const std::string_view bodyId)
 {
     for (std::size_t index = 0; index < bodies.size(); ++index) {
-        if (bodies[index].id == bodyId) {
+        if (bodies[index] != nullptr && bodies[index]->id == bodyId) {
             return static_cast<std::uint32_t>(index);
         }
     }
@@ -73,7 +73,26 @@ struct TestRig final {
     return rig;
 }
 
-[[nodiscard]] std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> makeSunMoonBodies()
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody
+toOwnGalaxyBody(const skygate::ephemeris::BaseCelestialBody& body)
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody ownGalaxyBody;
+    ownGalaxyBody.id = body.id;
+    ownGalaxyBody.displayName = body.displayName;
+    ownGalaxyBody.kind = body.kind;
+    ownGalaxyBody.visualMagnitude = body.visualMagnitude;
+    ownGalaxyBody.fixedEquatorial = body.fixedEquatorialValue();
+    ownGalaxyBody.starAstrometry = body.starAstrometryValue();
+    return ownGalaxyBody;
+}
+
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog>
+makeCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+{
+    return std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies));
+}
+
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> makeSunMoonBodies()
 {
     auto catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     Q_ASSERT(catalog != nullptr);
@@ -81,8 +100,8 @@ struct TestRig final {
     const auto moonIndex = bodyIndexById(catalog->bodies(), "moon");
     Q_ASSERT(sunIndex.has_value());
     Q_ASSERT(moonIndex.has_value());
-    return std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-        std::vector<skygate::ephemeris::CelestialBody>{catalog->bodies()[*sunIndex], catalog->bodies()[*moonIndex]}
+    return makeCatalog(
+        {toOwnGalaxyBody(*catalog->bodies()[*sunIndex]), toOwnGalaxyBody(*catalog->bodies()[*moonIndex])}
     );
 }
 
@@ -92,11 +111,9 @@ struct TestRig final {
 }
 
 [[nodiscard]] skygate::ephemeris::tests::RequestCountingEphemerisEngine
-makeGuidedNightEngine(std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> bodies)
+makeGuidedNightEngine(std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> bodies)
 {
-    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(*bodies);
-    Q_ASSERT(catalog != nullptr);
-    auto engine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
+    auto engine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*bodies).engine);
     Q_ASSERT(engine != nullptr);
     return skygate::ephemeris::tests::RequestCountingEphemerisEngine(
         std::move(engine), skygate::ephemeris::tests::highPrecisionLightTimeOptions(), std::move(bodies)
@@ -266,12 +283,10 @@ void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTi
 
 void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventSearch()
 {
-    const auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-        std::vector<skygate::ephemeris::CelestialBody>{
-            skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
-            skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
-        }
-    );
+    const auto bodies = makeCatalog({
+        skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
+        skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
+    });
     const auto approximateEngine = makeGuidedNightEngine(bodies);
     const auto verifiedEngine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
@@ -281,14 +296,14 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
         );
 
     const auto approximateConditions =
-        calculator.compute(approximateEngine, request, 0U, &(*bodies)[0], 1U, &(*bodies)[1]);
+        calculator.compute(approximateEngine, request, 0U, &bodies->bodyAt(0), 1U, &bodies->bodyAt(1));
     const auto verifiedConditions = calculator.compute(
         verifiedEngine,
         request,
         0U,
-        &(*bodies)[0],
+        &bodies->bodyAt(0),
         1U,
-        &(*bodies)[1],
+        &bodies->bodyAt(1),
         skygate::ephemeris::NightConditionsCalculator::EventSearchMode::Verified
     );
 
@@ -312,14 +327,14 @@ void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSim
         );
 
     const auto approximateConditions =
-        calculator.compute(approximateEngine, request, 0U, &(*bodies)[0], 1U, &(*bodies)[1]);
+        calculator.compute(approximateEngine, request, 0U, &bodies->bodyAt(0), 1U, &bodies->bodyAt(1));
     const auto verifiedConditions = calculator.compute(
         verifiedEngine,
         request,
         0U,
-        &(*bodies)[0],
+        &bodies->bodyAt(0),
         1U,
-        &(*bodies)[1],
+        &bodies->bodyAt(1),
         skygate::ephemeris::NightConditionsCalculator::EventSearchMode::Verified
     );
 
@@ -333,12 +348,10 @@ void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSim
 
 void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSelectedEngineSamples()
 {
-    const auto bodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-        std::vector<skygate::ephemeris::CelestialBody>{
-            skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
-            skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
-        }
-    );
+    const auto bodies = makeCatalog({
+        skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
+        skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
+    });
     const auto engine = makeGuidedNightEngine(bodies);
     const skygate::ephemeris::NightConditionsCalculator calculator;
     const skygate::ephemeris::EphemerisRequest request =
@@ -348,9 +361,9 @@ void NightConditionsCalculatorTests::verifiedHighPrecisionNightConditionsUseSele
         engine,
         request,
         0U,
-        &(*bodies)[0],
+        &bodies->bodyAt(0),
         1U,
-        &(*bodies)[1],
+        &bodies->bodyAt(1),
         skygate::ephemeris::NightConditionsCalculator::EventSearchMode::Verified
     );
 

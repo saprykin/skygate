@@ -1,4 +1,4 @@
-#include "engine/EphemerisEngineOptions.hpp"
+#include "EphemerisEngineOptions.hpp"
 
 namespace skygate::ephemeris {
 

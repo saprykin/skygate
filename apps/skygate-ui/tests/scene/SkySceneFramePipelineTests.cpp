@@ -1,10 +1,10 @@
+#include "CelestialBodyCatalog.hpp"
 #include "SkySceneFramePipeline.hpp"
 #include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
 #include <QtTest/QtTest>
 
-#include <cmath>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -18,7 +18,7 @@ class CountingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit CountingEngine(std::string bodyId = "target") : m_bodyId(std::move(bodyId)) {}
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestComputeCount;
@@ -47,7 +47,8 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         ++m_contextComputeCount;
         return makeSnapshot(context, m_simpleAltitudeDeg, m_baseAzimuthDeg);
@@ -69,31 +70,32 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::string_view bodyId) const override
     {
         return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(*this, context, bodyId);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(*this, context, bodyIndex);
     }
 
 private:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
-    makeSnapshot(const skygate::core::SkyContext& context, const double altitudeDeg, const double azimuthDeg) const
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot makeSnapshot(
+        const skygate::core::ObservationContext& context, const double altitudeDeg, const double azimuthDeg
+    ) const
     {
-        skygate::ephemeris::CelestialBody body;
+        skygate::ephemeris::OwnGalaxyCelestialBody body;
         body.id = m_bodyId;
         body.displayName = "Target";
         body.visualMagnitude = 1.0;
 
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
-        auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
-        bodies->push_back(std::move(body));
-        snapshot.catalogBodies = std::move(bodies);
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies;
+        bodies.push_back(std::move(body));
+        snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies));
         snapshot.states.push_back(
             skygate::ephemeris::CelestialBodyState{
                 .bodyIndex = 0U, .horizontal = {.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg}

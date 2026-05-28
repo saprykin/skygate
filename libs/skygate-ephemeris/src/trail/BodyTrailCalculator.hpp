@@ -1,9 +1,9 @@
 #pragma once
 
-#include "SkyContext.hpp"
+#include "BodyTrailOptions.hpp"
+#include "BodyTrailSample.hpp"
+#include "ObservationContext.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "trail/BodyTrailOptions.hpp"
-#include "trail/BodyTrailSample.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -14,7 +14,7 @@ class BodyTrailCalculator final {
 public:
     [[nodiscard]] std::vector<BodyTrailSample> sample(
         const IEphemerisEngine& engine,
-        const core::SkyContext& context,
+        const core::ObservationContext& context,
         std::uint32_t bodyIndex,
         const BodyTrailOptions& options = {}
     ) const;

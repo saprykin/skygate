@@ -1,5 +1,4 @@
 #include "SkyViewportItem.hpp"
-
 #include "SkyContextController.hpp"
 #include "SkySceneModel.hpp"
 #include "SkyViewportGeometry.hpp"
@@ -131,7 +130,7 @@ void SkyViewportItem::synchronizeRenderData()
             nextRenderData->renderTheme = controller->renderTheme();
             nextRenderData->overlayLayers = controller->overlayLayerVisibility();
             const auto referenceOverlayContext = m_skySceneModel->referenceOverlayContext();
-            const skygate::core::SkyContext skyContext =
+            const skygate::core::ObservationContext skyContext =
                 referenceOverlayContext.has_value() ? *referenceOverlayContext : controller->skyContext();
             nextRenderData->observer = skyContext.observer;
             nextRenderData->utcTime = skyContext.utcTime;

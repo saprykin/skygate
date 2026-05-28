@@ -1,5 +1,4 @@
-#include "projections/AzimuthalEquidistantProjection.hpp"
-
+#include "AzimuthalEquidistantProjection.hpp"
 #include "ProjectionAlgorithms.hpp"
 
 namespace skygate::core {

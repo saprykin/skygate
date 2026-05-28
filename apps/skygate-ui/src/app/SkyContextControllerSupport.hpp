@@ -1,9 +1,13 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "ObservationContext.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "ProjectionType.hpp"
-#include "SkyContext.hpp"
 #include "SkyTheme.hpp"
-#include "Types.hpp"
 #include "UtcTimePoint.hpp"
 
 #include <QByteArray>
@@ -118,7 +122,7 @@ class SkyContextRenderStyle final {
 public:
     [[nodiscard]] static double pointSizeForMagnitude(double magnitude);
     [[nodiscard]] static QColor
-    colorForBodyType(skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderPalette);
+    colorForBodyType(skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderPalette);
     [[nodiscard]] static QColor constellationLineColor(const SkyThemeRenderPalette& renderPalette);
 };
 

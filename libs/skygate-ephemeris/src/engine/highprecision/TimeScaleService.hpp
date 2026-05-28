@@ -1,9 +1,11 @@
 #pragma once
 
-#include "engine/highprecision/DeltaTProvider.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
-#include "engine/highprecision/LeapSecondProvider.hpp"
-#include "Types.hpp"
+#include "DeltaTProvider.hpp"
+#include "EarthOrientationProvider.hpp"
+#include "LeapSecondProvider.hpp"
+#include "time/AstronomicalEpoch.hpp"
+#include "time/CivilDateTime.hpp"
+#include "time/TimeScale.hpp"
 
 #include <cstdint>
 #include <memory>

@@ -1,6 +1,8 @@
 #include "ObservationEventCalculator.hpp"
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyCatalog.hpp"
+#include "CelestialBodyState.hpp"
 #include "EphemerisRequestFactory.hpp"
-#include "Types.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -93,7 +95,7 @@ public:
         const IEphemerisEngine& ephemerisEngine,
         const EphemerisRequest& request,
         std::uint32_t bodyIndex,
-        const CelestialBody* body,
+        const BaseCelestialBody* body,
         double crossingAltitudeDeg
     ) noexcept
         : m_ephemerisEngine(ephemerisEngine), m_request(request), m_bodyIndex(bodyIndex), m_body(body),
@@ -140,7 +142,7 @@ private:
     const IEphemerisEngine& m_ephemerisEngine;
     const EphemerisRequest& m_request;
     std::uint32_t m_bodyIndex;
-    const CelestialBody* m_body;
+    const BaseCelestialBody* m_body;
     double m_crossingAltitudeDeg;
 };
 
@@ -176,11 +178,11 @@ std::vector<AltitudeSample> EventSearch::sampleAltitudes(
 
 std::optional<ObservationEventStatus> EventSearch::fixedHorizonStatus() const noexcept
 {
-    if (m_body == nullptr || !m_body->fixedEquatorial.has_value()) {
+    if (m_body == nullptr || !m_body->fixedEquatorialValue().has_value()) {
         return std::nullopt;
     }
 
-    const core::EquatorialCoordinate& equatorial = *m_body->fixedEquatorial;
+    const core::EquatorialCoordinate& equatorial = *m_body->fixedEquatorialValue();
     if (!equatorial.isFinite()) {
         return std::nullopt;
     }
@@ -364,29 +366,32 @@ ObservationEvent EventSearch::findCulmination(const std::vector<AltitudeSample>&
 }
 
 [[nodiscard]] bool
-shouldUseGuidanceEngine(const CelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
+shouldUseGuidanceEngine(const BaseCelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
 {
     return (searchMode == SearchMode::Guided || searchMode == SearchMode::GuidedApproximate) && body != nullptr
            && request.options.engineKind() == EphemerisEngineKind::Type::HighPrecision;
 }
 
 [[nodiscard]] bool
-isTrustingGuidanceModel(const CelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
+isTrustingGuidanceModel(const BaseCelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
 {
     return searchMode == SearchMode::GuidedApproximate
-           || (body != nullptr && body->fixedEquatorial.has_value()
+           || (body != nullptr && body->fixedEquatorialValue().has_value()
                && request.options.correctionFlags() != EphemerisCorrectionFlags::noCorrections());
 }
 
 [[nodiscard]] bool shouldFallBackToDirect(
-    SearchMode searchMode, const CelestialBody* body, const ObservationEvent& nextRise, const ObservationEvent& nextSet
+    SearchMode searchMode,
+    const BaseCelestialBody* body,
+    const ObservationEvent& nextRise,
+    const ObservationEvent& nextSet
 ) noexcept
 {
     if (searchMode == SearchMode::GuidedApproximate) {
         return false;
     }
 
-    const bool fixedBody = body != nullptr && body->fixedEquatorial.has_value();
+    const bool fixedBody = body != nullptr && body->fixedEquatorialValue().has_value();
     const bool unresolved =
         nextRise.status == ObservationEventStatus::Unresolved || nextSet.status == ObservationEventStatus::Unresolved;
     const bool nonFixedMiss = !fixedBody
@@ -396,10 +401,11 @@ isTrustingGuidanceModel(const CelestialBody* body, const EphemerisRequest& reque
 }
 
 [[nodiscard]] std::optional<std::vector<AltitudeSample>>
-sampleGuidanceAltitudes(EventSearch& search, const CelestialBody& body, const EphemerisRequest& request)
+sampleGuidanceAltitudes(EventSearch& search, const BaseCelestialBody& body, const EphemerisRequest& request)
 {
-    const std::array<CelestialBody, 1> bodies{body};
-    auto factoryResult = EphemerisEngineFactory::create(std::span<const CelestialBody>{bodies.data(), bodies.size()});
+    const std::array<const BaseCelestialBody*, 1> bodies{&body};
+    auto factoryResult =
+        EphemerisEngineFactory::create(CelestialBodyCatalog(std::span<const BaseCelestialBody* const>{bodies}));
     std::unique_ptr<IEphemerisEngine> guidanceEngine = std::move(factoryResult.engine);
     if (guidanceEngine == nullptr) {
         return std::nullopt;
@@ -423,12 +429,12 @@ ObservationEventSummary ObservationEventCalculator::compute(
     const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
-    const CelestialBody* body,
+    const BaseCelestialBody* body,
     const double crossingAltitudeDeg,
     const SearchMode searchMode
 ) const
 {
-    const core::SkyContext& context = request.context;
+    const core::ObservationContext& context = request.context;
     if (!context.observer.isValid() || !std::isfinite(crossingAltitudeDeg)) {
         return EventSearch::invalidSummary();
     }

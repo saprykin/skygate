@@ -1,10 +1,12 @@
 #pragma once
 
+#include "CelestialBodyCatalog.hpp"
 #include "EphemerisFactoryFallbackPolicy.hpp"
-#include "engine/IEphemerisEngine.hpp"
+#include "engine/EphemerisDatasetInfo.hpp"
+#include "engine/EphemerisEngineKind.hpp"
+#include "engine/EphemerisEngineOptions.hpp"
 
 #include <memory>
-#include <span>
 
 namespace skygate::ephemeris {
 
@@ -20,7 +22,7 @@ class ICalcephKernelRuntime;
 
 struct EphemerisEngineFactoryRequest {
     EphemerisEngineKind::Type engineKind = EphemerisEngineKind::Type::Simple;
-    std::span<const CelestialBody> catalogBodies;
+    std::shared_ptr<const CelestialBodyCatalog> catalog;
     EphemerisEngineOptions options;
     const EphemerisDatasetInfo* dataSetManifest = nullptr;
     const EphemerisDataManifest* dataManifest = nullptr;

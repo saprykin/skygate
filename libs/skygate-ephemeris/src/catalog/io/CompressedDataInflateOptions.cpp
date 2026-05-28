@@ -1,1 +1,1 @@
-#include "catalog/io/CompressedDataInflateOptions.hpp"
+#include "CompressedDataInflateOptions.hpp"

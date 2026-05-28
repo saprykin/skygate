@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -20,29 +21,33 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 namespace core = skygate::core;
 
-[[nodiscard]] CelestialBody makeSunBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
 {
-    return {
-        .id = "sun",
-        .displayName = "Sun",
-        .type = CelestialBodyType::Sun,
-        .ephemerisSource = CelestialBodyEphemerisSource::Sun,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "sun";
+    body.displayName = "Sun";
+    body.kind = BaseCelestialBody::Kind::Sun;
+    return body;
 }
 
-[[nodiscard]] CelestialBody makeUnsupportedBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeUnsupportedBody()
 {
-    return {
-        .id = "unsupported",
-        .displayName = "Unsupported",
-        .type = CelestialBodyType::DeepSkyObject,
-        .ephemerisSource = CelestialBodyEphemerisSource::Unresolved,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "unsupported";
+    body.displayName = "Unsupported";
+    body.kind = BaseCelestialBody::Kind::Constellation;
+    return body;
 }
 
-[[nodiscard]] core::SkyContext makeContext()
+template <typename BodyRange>
+[[nodiscard]] CelestialBodyCatalog makeCatalog(const BodyRange& bodies)
 {
-    core::SkyContext context;
+    return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+}
+
+[[nodiscard]] core::ObservationContext makeContext()
+{
+    core::ObservationContext context;
     context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
@@ -110,7 +115,9 @@ private:
 {
     const std::array bodies{makeSunBody()};
     auto calculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
-    return HighPrecisionEphemerisEngine(bodies, makeRequest().options, makeDependencies(std::move(calculator)));
+    return HighPrecisionEphemerisEngine(
+        makeCatalog(bodies), makeRequest().options, makeDependencies(std::move(calculator))
+    );
 }
 
 }  // namespace
@@ -264,7 +271,7 @@ void EphemerisFallbackValidationTests::staleDataWarningsRemainVisible()
 void EphemerisFallbackValidationTests::unsupportedBodyReturnsStructuredWarning()
 {
     const std::array bodies{makeUnsupportedBody()};
-    const HighPrecisionEphemerisEngine engine(bodies, makeRequest().options, makeDependencies());
+    const HighPrecisionEphemerisEngine engine(makeCatalog(bodies), makeRequest().options, makeDependencies());
 
     const auto state = engine.computeBodyState(makeRequest(), "unsupported");
 

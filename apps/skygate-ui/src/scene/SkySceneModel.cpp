@@ -1,9 +1,10 @@
 #include "SkySceneModel.hpp"
+#include "BaseCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
 #include "SkyContextController.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyQtTimeCodec.hpp"
 #include "SkyTimeController.hpp"
-#include "Types.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "time/CalendarTime.hpp"
@@ -310,7 +311,7 @@ std::optional<skygate::core::PreparedProjection> SkySceneModel::preparedProjecti
     return m_sceneFrame.preparedProjection;
 }
 
-std::optional<skygate::core::SkyContext> SkySceneModel::referenceOverlayContext() const
+std::optional<skygate::core::ObservationContext> SkySceneModel::referenceOverlayContext() const
 {
     if (m_sceneFrame.snapshot == nullptr) {
         return std::nullopt;
