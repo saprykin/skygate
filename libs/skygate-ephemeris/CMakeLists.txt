@@ -316,9 +316,9 @@ target_include_directories(skygate-ephemeris
 
 target_link_libraries(skygate-ephemeris
     PUBLIC
+        Qt6::Core
         skygate::core
     PRIVATE
-        Qt6::Core
         ZLIB::ZLIB
 )
 
