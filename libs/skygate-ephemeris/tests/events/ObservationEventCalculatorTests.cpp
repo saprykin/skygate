@@ -437,6 +437,7 @@ void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()
     const auto summary = calculator.compute(engine, request, 0U, nullptr, 0.0, SearchMode::Guided);
 
     QVERIFY(engine.sampleCount > 300);
+    QVERIFY(engine.sampleCount < 500);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
