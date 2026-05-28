@@ -311,7 +311,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         }
     }
 
-    std::optional<CelestialFrameVector> equatorialVector = outputVector;
+    std::optional<CelestialFrameVector> equatorialVector =
+        targetFrame == CelestialReferenceFrame::Itrs ? std::nullopt : std::optional<CelestialFrameVector>{outputVector};
     if (targetFrame == CelestialReferenceFrame::Itrs) {
         CelestialFrameTransformResult gcrsTransformResult = m_frameTransformer->transformCelestialVector({
             .sourceFrame = CelestialReferenceFrame::Itrs,
@@ -352,13 +353,15 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         }
     }
 
-    if (const std::optional<core::EquatorialCoordinate> equatorial = equatorialFromVector(*equatorialVector);
-        equatorial.has_value()) {
-        result.equatorial = *equatorial;
-    } else {
-        result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-        return result;
+    if (equatorialVector.has_value()) {
+        if (const std::optional<core::EquatorialCoordinate> equatorial = equatorialFromVector(*equatorialVector);
+            equatorial.has_value()) {
+            result.equatorial = *equatorial;
+        } else {
+            result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+            result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+            return result;
+        }
     }
 
     if (targetFrame == CelestialReferenceFrame::Itrs) {
@@ -563,7 +566,8 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         }
     }
 
-    std::vector<std::optional<CelestialFrameVector>> equatorialVectors = outputVectors;
+    std::vector<std::optional<CelestialFrameVector>> equatorialVectors =
+        isTopocentric ? std::vector<std::optional<CelestialFrameVector>>(outputVectors.size()) : outputVectors;
     if (isTopocentric) {
         const std::optional<CelestialFrameVector> observerPosition =
             preparedRequestState != nullptr && preparedRequestState->topocentricStatePrepared
@@ -590,7 +594,6 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                 );
             }
 
-            equatorialVectors[resultIndex] = outputVectors[resultIndex];
             if (const std::optional<core::HorizontalCoordinate> horizontal =
                     horizontalFromItrsVector(*outputVectors[resultIndex], request.context.observer);
                 horizontal.has_value()) {

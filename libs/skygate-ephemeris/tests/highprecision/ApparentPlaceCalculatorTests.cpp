@@ -359,6 +359,42 @@ private:
     mutable int m_batchCallCount = 0;
 };
 
+class FailingTopocentricEquatorialFrameTransformer final : public IFrameTransformer {
+public:
+    [[nodiscard]] CelestialFrameTransformResult
+    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
+    {
+        ++m_callCount;
+        EphemerisEngineQueryResult metadata;
+        metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+        if (request.sourceFrame == CelestialReferenceFrame::Itrs
+            && request.targetFrame == CelestialReferenceFrame::Gcrs) {
+            metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
+            metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+            return {
+                .vector = std::nullopt,
+                .metadata = metadata,
+            };
+        }
+        if (request.sourceFrame != request.targetFrame) {
+            metadata.appliedCorrections = EphemerisCorrectionFlags::earthOrientation();
+        }
+
+        return {
+            .vector = request.vector,
+            .metadata = metadata,
+        };
+    }
+
+    [[nodiscard]] int callCount() const noexcept
+    {
+        return m_callCount;
+    }
+
+private:
+    mutable int m_callCount = 0;
+};
+
 class PassThroughFrameTransformer final : public IFrameTransformer {
 public:
     [[nodiscard]] CelestialFrameTransformResult
@@ -584,6 +620,8 @@ private slots:
     void validatesTopocentricMoonSunPlanetAgainstHorizonsFixtures();
     void reportsInvalidObserverForTopocentricRequest();
     void reportsMissingEarthOrientationForTopocentricRequest();
+    void preservesInputEquatorialWhenTopocentricEquatorialTransformFails();
+    void preservesInputEquatorialWhenBatchTopocentricEquatorialTransformFails();
     void reportsUnavailableParallaxWhenDistanceVectorIsMissing();
     void leavesApparentRequestGeocentricWhenParallaxIsDisabled();
     void changesTopocentricPositionWhenObserverElevationChanges();
@@ -1033,6 +1071,83 @@ void ApparentPlaceCalculatorTests::reportsMissingEarthOrientationForTopocentricR
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             result.metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax()
+        )
+    );
+}
+
+void ApparentPlaceCalculatorTests::preservesInputEquatorialWhenTopocentricEquatorialTransformFails()
+{
+    auto frameTransformer = std::make_shared<FailingTopocentricEquatorialFrameTransformer>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
+    const ApparentPlaceCalculator calculator(frameTransformer, timeScaleService, nullptr);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::topocentric());
+
+    const HighPrecisionCalculatorResult result = calculator.apply(
+        makeInput(request),
+        makeSolarSystemCalculatorResult(
+            SolarSystemKernelVector{
+                .xAu = 0.0,
+                .yAu = 1.0,
+                .zAu = 0.0,
+            }
+        )
+    );
+
+    QCOMPARE(frameTransformer->callCount(), 2);
+    QVERIFY(result.equatorial.has_value());
+    QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(result.equatorial->declinationDeg, 0.0);
+    QVERIFY(result.horizontal.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            result.metadata.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation()
+        )
+    );
+}
+
+void ApparentPlaceCalculatorTests::preservesInputEquatorialWhenBatchTopocentricEquatorialTransformFails()
+{
+    auto frameTransformer = std::make_shared<FailingTopocentricEquatorialFrameTransformer>();
+    auto timeScaleService = std::make_shared<ValidUtcTimeScaleService>();
+    const ApparentPlaceCalculator calculator(frameTransformer, timeScaleService, nullptr);
+    const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::topocentric());
+    const std::vector<OwnGalaxyCelestialBody> bodies = {makeBody()};
+    const CelestialBodyCatalog catalog(bodies);
+    const std::vector<StarAstrometryBatchResult> calculatorResults = {
+        {
+            .bodyIndex = 0U,
+            .result = makeSolarSystemCalculatorResult(
+                SolarSystemKernelVector{
+                    .xAu = 0.0,
+                    .yAu = 1.0,
+                    .zAu = 0.0,
+                }
+            ),
+        },
+    };
+
+    const std::vector<StarAstrometryBatchResult> results =
+        calculator.applyBatch(request, catalog.bodies(), calculatorResults, nullptr);
+
+    QCOMPARE(frameTransformer->callCount(), 2);
+    QCOMPARE(results.size(), 1U);
+    QVERIFY(results[0].result.equatorial.has_value());
+    QCOMPARE(results[0].result.equatorial->rightAscensionHours, 0.0);
+    QCOMPARE(results[0].result.equatorial->declinationDeg, 0.0);
+    QVERIFY(results[0].result.horizontal.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(results[0].result.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(results[0].result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(
+        skygate::ephemeris::EphemerisCorrectionFlags::has(
+            results[0].result.metadata.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation()
         )
     );
 }
