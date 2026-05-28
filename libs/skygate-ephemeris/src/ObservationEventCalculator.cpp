@@ -23,8 +23,8 @@ namespace {
 
 constexpr int kSampleStepSeconds = 10 * 60;
 constexpr int kSearchHorizonSeconds = 72 * 60 * 60;
-constexpr int kRefinementToleranceSeconds = 1;
-constexpr int kGuidedRefinementToleranceSeconds = 60;
+constexpr auto kRefinementTolerance = std::chrono::seconds(1);
+constexpr auto kGuidedRefinementTolerance = std::chrono::seconds(60);
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;
 
 struct AltitudeSample final {
@@ -134,7 +134,10 @@ private:
     originalAltitudeBracket(const AltitudeSample& previous, const AltitudeSample& next);
 
     [[nodiscard]] core::UtcTimePoint refinedCrossingTime(
-        const AltitudeSample& previous, const AltitudeSample& next, bool rising, int refinementToleranceSeconds
+        const AltitudeSample& previous,
+        const AltitudeSample& next,
+        bool rising,
+        core::UtcTimePoint::duration refinementTolerance
     );
 
     [[nodiscard]] AltitudeSample refinedMaximum(const core::UtcTimePoint& startUtc, const core::UtcTimePoint& endUtc);
@@ -216,13 +219,16 @@ EventSearch::originalAltitudeBracket(const AltitudeSample& previous, const Altit
 }
 
 core::UtcTimePoint EventSearch::refinedCrossingTime(
-    const AltitudeSample& previous, const AltitudeSample& next, const bool rising, const int refinementToleranceSeconds
+    const AltitudeSample& previous,
+    const AltitudeSample& next,
+    const bool rising,
+    const core::UtcTimePoint::duration refinementTolerance
 )
 {
     core::UtcTimePoint low = previous.utcTime;
     core::UtcTimePoint high = next.utcTime;
 
-    while ((high - low).count() > refinementToleranceSeconds) {
+    while (high - low > refinementTolerance) {
         const auto midpointOffset = (high - low) / 2;
         const core::UtcTimePoint midpoint = low + midpointOffset;
         const auto midpointAltitude = altitudeAt(midpoint);
@@ -282,8 +288,7 @@ ObservationEvent EventSearch::findCrossing(
                                 previous,
                                 next,
                                 rising,
-                                sampleRole == SampleRole::Guidance ? kGuidedRefinementToleranceSeconds
-                                                                   : kRefinementToleranceSeconds
+                                sampleRole == SampleRole::Guidance ? kGuidedRefinementTolerance : kRefinementTolerance
                             );
 
         return ObservationEvent{
