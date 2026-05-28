@@ -60,19 +60,6 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     endif()
 endfunction()
 
-function(add_skygate_disabled_highprecision_test target_name reason)
-    add_test(
-        NAME ${target_name}
-        COMMAND "${CMAKE_COMMAND}" -E echo "SKIP: ${reason}"
-    )
-    set_tests_properties(${target_name}
-        PROPERTIES
-            LABELS "unit;highprecision;validation"
-            SKIP_REGULAR_EXPRESSION "^SKIP:"
-            TIMEOUT 30
-    )
-endfunction()
-
 set(SKYGATE_SIMPLE_ENGINE_ISOLATION_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/simple/SimpleEphemerisEngine.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/simple/SimpleEphemerisEngine.cpp"
@@ -168,103 +155,100 @@ add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-factory-behavior-tests
     engine/EphemerisEngineFactoryBehaviorTests.cpp
 )
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-highprecision-engine-tests
-    highprecision/HighPrecisionEphemerisEngineTests.cpp
-    LABELS "unit;highprecision"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-apparent-place-calculator-tests
-    highprecision/ApparentPlaceCalculatorTests.cpp
-    LABELS "unit;highprecision;validation;apparent;topocentric;corrections"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-atmospheric-refraction-calculator-tests
-    highprecision/AtmosphericRefractionCalculatorTests.cpp
-    LABELS "unit;highprecision;validation;apparent;topocentric;refraction"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-apparent-radec-validation-tests
-    highprecision/ApparentRaDecValidationTests.cpp
-    LABELS "unit;highprecision;validation;apparent"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-fallback-validation-tests
-    highprecision/EphemerisFallbackValidationTests.cpp
-    LABELS "unit;highprecision;validation;fallback"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-acceptance-matrix-tests
-    highprecision/EphemerisAcceptanceMatrixTests.cpp
-    LABELS "unit;highprecision;validation;acceptance"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-star-astrometry-calculator-tests
-    highprecision/StarAstrometryCalculatorTests.cpp
-    LABELS "unit;highprecision;validation;stellar-astrometry"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-catalog-star-astrometry-arrays-tests
-    highprecision/CatalogStarAstrometryArraysTests.cpp
-    LABELS "unit;highprecision;stellar-astrometry;performance"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-calceph-kernel-provider-tests
-    highprecision/CalcephKernelProviderTests.cpp
-    LABELS "unit;highprecision;validation;kernel"
-)
+
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-highprecision-engine-tests
+        highprecision/HighPrecisionEphemerisEngineTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-place-calculator-tests
+        highprecision/ApparentPlaceCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;apparent;topocentric;corrections"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-atmospheric-refraction-calculator-tests
+        highprecision/AtmosphericRefractionCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;apparent;topocentric;refraction"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-apparent-radec-validation-tests
+        highprecision/ApparentRaDecValidationTests.cpp
+        LABELS "unit;highprecision;validation;apparent"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-fallback-validation-tests
+        highprecision/EphemerisFallbackValidationTests.cpp
+        LABELS "unit;highprecision;validation;fallback"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-acceptance-matrix-tests
+        highprecision/EphemerisAcceptanceMatrixTests.cpp
+        LABELS "unit;highprecision;validation;acceptance"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-star-astrometry-calculator-tests
+        highprecision/StarAstrometryCalculatorTests.cpp
+        LABELS "unit;highprecision;validation;stellar-astrometry"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-catalog-star-astrometry-arrays-tests
+        highprecision/CatalogStarAstrometryArraysTests.cpp
+        LABELS "unit;highprecision;stellar-astrometry;performance"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-calceph-kernel-provider-tests
+        highprecision/CalcephKernelProviderTests.cpp
+        LABELS "unit;highprecision;validation;kernel"
+    )
     add_skygate_ephemeris_qtest(
         skygate-ephemeris-solar-system-state-calculator-tests
         highprecision/SolarSystemStateCalculatorTests.cpp
         LABELS "unit;highprecision;validation;geometric"
     )
-else()
-    add_skygate_disabled_highprecision_test(
-        skygate-ephemeris-solar-system-state-calculator-tests
-        "geometric solar-system validation requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON"
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-fixture-support-tests
+        highprecision/EphemerisFixtureSupportTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-observer-geodesy-tests
+        highprecision/ObserverGeodesyTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-data-manifest-tests
+        highprecision/EphemerisDataManifestTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-data-activation-tests
+        highprecision/EphemerisDataActivationTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-delta-t-provider-tests
+        highprecision/DeltaTProviderTests.cpp
+        LABELS "unit;highprecision;validation;time-eop"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-earth-orientation-provider-tests
+        highprecision/EarthOrientationProviderTests.cpp
+        LABELS "unit;highprecision;validation;time-eop"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-leap-second-provider-tests
+        highprecision/LeapSecondProviderTests.cpp
+        LABELS "unit;highprecision;validation;time-eop"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-time-scale-service-tests
+        highprecision/TimeScaleServiceTests.cpp
+        LABELS "unit;highprecision;validation;time-eop"
     )
 endif()
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-fixture-support-tests
-    highprecision/EphemerisFixtureSupportTests.cpp
-    LABELS "unit;highprecision"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-observer-geodesy-tests
-    highprecision/ObserverGeodesyTests.cpp
-    LABELS "unit;highprecision"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-data-manifest-tests
-    highprecision/EphemerisDataManifestTests.cpp
-    LABELS "unit;highprecision"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-data-activation-tests
-    highprecision/EphemerisDataActivationTests.cpp
-    LABELS "unit;highprecision"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-delta-t-provider-tests
-    highprecision/DeltaTProviderTests.cpp
-    LABELS "unit;highprecision;validation;time-eop"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-earth-orientation-provider-tests
-    highprecision/EarthOrientationProviderTests.cpp
-    LABELS "unit;highprecision;validation;time-eop"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-leap-second-provider-tests
-    highprecision/LeapSecondProviderTests.cpp
-    LABELS "unit;highprecision;validation;time-eop"
-)
-add_skygate_ephemeris_qtest(
-    skygate-ephemeris-time-scale-service-tests
-    highprecision/TimeScaleServiceTests.cpp
-    LABELS "unit;highprecision;validation;time-eop"
-)
+
 add_executable(skygate-ephemeris-public-header-macro-compat-tests
     engine/PublicHeaderMacroCompatTests.cpp
     engine/PublicHeaderLegacyAliasTests.cpp
