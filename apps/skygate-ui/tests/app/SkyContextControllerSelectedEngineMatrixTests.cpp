@@ -30,13 +30,13 @@ public:
     }
 };
 
-[[nodiscard]] std::vector<skygate::ephemeris::CelestialBody> matrixBodies()
+[[nodiscard]] std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> matrixBodies()
 {
     return {
-        skygate::ui::tests::makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, -26.7),
-        skygate::ui::tests::makeBody("moon", "Moon", skygate::ephemeris::CelestialBodyType::Moon, -12.0),
+        skygate::ui::tests::makeBody("sun", "Sun", skygate::ephemeris::BaseCelestialBody::Kind::Sun, -26.7),
+        skygate::ui::tests::makeBody("moon", "Moon", skygate::ephemeris::BaseCelestialBody::Kind::Moon, -12.0),
         skygate::ui::tests::makeFixedBody(
-            std::string(kTargetId), "Matrix Target", skygate::ephemeris::CelestialBodyType::Star, 1.0, 4.0, 12.0
+            std::string(kTargetId), "Matrix Target", skygate::ephemeris::BaseCelestialBody::Kind::Star, 1.0, 4.0, 12.0
         ),
     };
 }
@@ -180,11 +180,11 @@ renderPointForBodyIndex(const SkySceneModel& sceneModel, const std::uint32_t bod
 class MatrixEphemerisEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     MatrixEphemerisEngine(
-        std::vector<skygate::ephemeris::CelestialBody> bodies,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies,
         const skygate::ephemeris::EphemerisEngineKind::Type kind,
         const skygate::ephemeris::EphemerisCorrectionFlags correctionFlags
     )
-        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+        : m_bodies(std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies)))
     {
         m_options.setEngineKind(kind);
         m_options.setCorrectionFlags(correctionFlags);
@@ -215,13 +215,13 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         ++m_requestSnapshotCount;
         m_lastRequestOptions = request.options;
 
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = request.context;
         snapshot.context.observer.longitudeDeg += expectedLongitudeOffset(request.options);
         snapshot.catalogBodies = m_bodies;
@@ -235,7 +235,7 @@ public:
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
     {
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            if ((*m_bodies)[bodyIndex].id == bodyId) {
+            if (m_bodies->bodyAt(bodyIndex).id == bodyId) {
                 return computeBodyState(request, bodyIndex);
             }
         }
@@ -253,7 +253,8 @@ public:
         return stateFor(request, bodyIndex);
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
         ++m_contextSnapshotCount;
         skygate::ephemeris::EphemerisRequest request;
@@ -263,7 +264,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::string_view bodyId) const override
     {
         ++m_contextBodyStateCount;
         skygate::ephemeris::EphemerisRequest request;
@@ -273,7 +274,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         ++m_contextBodyStateCount;
         skygate::ephemeris::EphemerisRequest request;
@@ -367,7 +368,7 @@ private:
         };
     }
 
-    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> m_bodies;
     skygate::ephemeris::EphemerisEngineOptions m_options;
     mutable int m_requestSnapshotCount = 0;
     mutable int m_requestBodyStateCount = 0;

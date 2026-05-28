@@ -90,7 +90,7 @@ std::optional<SkySceneFramePipelineResult> SkySceneFramePipeline::rebuild(
         return std::nullopt;
     }
 
-    const skygate::core::SkyContext& snapshotContext =
+    const skygate::core::ObservationContext& snapshotContext =
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     const SnapshotCacheKey snapshotKey{
         .catalogRevision = input.catalogRevision,

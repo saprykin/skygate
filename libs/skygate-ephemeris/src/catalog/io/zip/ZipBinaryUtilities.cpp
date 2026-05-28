@@ -1,1 +1,1 @@
-#include "catalog/io/zip/ZipBinaryUtilities.hpp"
+#include "ZipBinaryUtilities.hpp"

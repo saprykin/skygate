@@ -1,9 +1,13 @@
 #pragma once
 
-#include "SkyContext.hpp"
-#include "Types.hpp"
-#include "engine/EphemerisCapabilities.hpp"
-#include "engine/EphemerisDatasetInfo.hpp"
+#include "CelestialBodyState.hpp"
+#include "EphemerisCapabilities.hpp"
+#include "EphemerisDatasetInfo.hpp"
+#include "EphemerisEngineKind.hpp"
+#include "EphemerisEngineOptions.hpp"
+#include "EphemerisRequest.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "ObservationContext.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -50,7 +54,7 @@ public:
         return engineOptions;
     }
 
-    [[nodiscard]] virtual SkySnapshot compute(const EphemerisRequest& request) const
+    [[nodiscard]] virtual EphemerisSnapshot compute(const EphemerisRequest& request) const
     {
         return compute(request.context);
     }
@@ -71,12 +75,12 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] virtual SkySnapshot compute(const core::SkyContext& context) const = 0;
+    [[nodiscard]] virtual EphemerisSnapshot compute(const core::ObservationContext& context) const = 0;
     [[nodiscard]] virtual std::optional<CelestialBodyState>
-    computeBodyState(const core::SkyContext& context, std::string_view bodyId) const = 0;
+    computeBodyState(const core::ObservationContext& context, std::string_view bodyId) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState>
-    computeBodyState(const core::SkyContext& context, std::uint32_t bodyIndex) const = 0;
+    computeBodyState(const core::ObservationContext& context, std::uint32_t bodyIndex) const = 0;
 };
 
 }  // namespace skygate::ephemeris

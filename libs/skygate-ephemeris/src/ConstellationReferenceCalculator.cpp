@@ -11,7 +11,7 @@
 namespace skygate::ephemeris {
 
 std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::anchorCentroid(
-    const SkySnapshot& snapshot,
+    const EphemerisSnapshot& snapshot,
     const std::span<const ConstellationAnchorGroup> anchorGroups,
     const std::string_view labelName
 )

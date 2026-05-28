@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephemeris::SkySnapshot& snapshot)
+void SkyHitTargetIndex::rebuild(const SkyRenderFrame& frame, const skygate::ephemeris::EphemerisSnapshot& snapshot)
 {
     m_targets.clear();
     m_targets.reserve(frame.points.size() + frame.glyphs.size());
@@ -50,7 +50,7 @@ std::optional<std::uint32_t> SkyHitTargetIndex::bodyIndexAt(
     const double y,
     const double viewportWidth,
     const double viewportHeight,
-    const skygate::ephemeris::SkySnapshot& snapshot
+    const skygate::ephemeris::EphemerisSnapshot& snapshot
 ) const
 {
     if (viewportWidth <= 0.0 || viewportHeight <= 0.0 || m_targets.empty() || snapshot.catalogBodies == nullptr) {

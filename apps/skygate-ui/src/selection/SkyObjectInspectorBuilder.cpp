@@ -28,13 +28,13 @@ bool hasSelectionInputs(const SkySelectionOverlayInput& input)
 }
 
 skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
-    const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body, std::uint32_t bodyIndex
+    const SkySelectionOverlayInput& input, const skygate::ephemeris::BaseCelestialBody& body, std::uint32_t bodyIndex
 );
 
 void appendObservationEventFields(
     std::vector<SkyInspectorField>& fields,
     const SkySelectionOverlayInput& input,
-    const skygate::ephemeris::CelestialBody& body,
+    const skygate::ephemeris::BaseCelestialBody& body,
     const std::uint32_t bodyIndex
 )
 {
@@ -63,14 +63,14 @@ void appendObservationEventFields(
 }
 
 skygate::ephemeris::ObservationEventCalculator::SearchMode observationEventSearchModeForInspector(
-    const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body
+    const SkySelectionOverlayInput& input, const skygate::ephemeris::BaseCelestialBody& body
 ) noexcept
 {
     if (input.ephemerisEngine != nullptr
         && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
         && input.ephemerisRequest.has_value()
         && input.ephemerisRequest->options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-        && !body.fixedEquatorial.has_value()) {
+        && !body.fixedEquatorialValue().has_value()) {
         return skygate::ephemeris::ObservationEventCalculator::SearchMode::GuidedApproximate;
     }
 
@@ -101,7 +101,9 @@ bool shouldComputeHighPrecisionInspectorState(const SkySelectionOverlayInput& in
 }
 
 skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
-    const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBody& body, const std::uint32_t bodyIndex
+    const SkySelectionOverlayInput& input,
+    const skygate::ephemeris::BaseCelestialBody& body,
+    const std::uint32_t bodyIndex
 )
 {
     const skygate::ephemeris::ObservationEventCalculator calculator;
@@ -237,8 +239,8 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     appendEphemerisMetadataFields(fields, ephemerisMetadata, state.metadata.status);
     appendObservationEventFields(fields, input, body, sceneState.bodyIndex);
 
-    if (body.deepSkyObject.has_value()) {
-        const QString sizeText = skygate::ui::internal::angularSizeText(*body.deepSkyObject);
+    if (body.deepSkyObjectValue().has_value()) {
+        const QString sizeText = skygate::ui::internal::angularSizeText(*body.deepSkyObjectValue());
         if (!sizeText.isEmpty()) {
             fields.push_back(inspectorField("Angular size", sizeText));
         }

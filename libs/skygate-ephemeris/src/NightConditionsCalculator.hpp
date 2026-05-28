@@ -6,7 +6,7 @@
 
 namespace skygate::ephemeris {
 
-struct CelestialBody;
+class BaseCelestialBody;
 struct EphemerisRequest;
 class IEphemerisEngine;
 
@@ -21,9 +21,9 @@ public:
         const IEphemerisEngine& ephemerisEngine,
         const EphemerisRequest& request,
         std::uint32_t sunBodyIndex,
-        const CelestialBody* sunBody,
+        const BaseCelestialBody* sunBody,
         std::uint32_t moonBodyIndex,
-        const CelestialBody* moonBody,
+        const BaseCelestialBody* moonBody,
         EventSearchMode eventSearchMode = EventSearchMode::Approximate
     ) const;
 };

@@ -4,6 +4,7 @@
 #include <QtTest/QtTest>
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -12,55 +13,84 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
-    const skygate::ephemeris::CelestialBodyEphemerisSource source
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
+    const skygate::ephemeris::BaseCelestialBody::Kind source
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
-    body.ephemerisSource = source;
-    if (source == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial) {
+    body.kind = type;
+    if (source == skygate::ephemeris::BaseCelestialBody::Kind::Star) {
         body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     }
     return body;
 }
 
-skygate::ephemeris::CelestialBody
+skygate::ephemeris::DistantCelestialBody
 makeDeepSkyObject(std::string id, std::string displayName, std::vector<std::string> aliases)
 {
-    auto body = makeBody(
-        std::move(id),
-        std::move(displayName),
-        skygate::ephemeris::CelestialBodyType::DeepSkyObject,
-        skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-    );
+    skygate::ephemeris::DistantCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy, .aliases = std::move(aliases)
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy, .aliases = std::move(aliases)
     };
     return body;
 }
 
+std::unique_ptr<skygate::ephemeris::IStarCatalog> createCatalog(
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies,
+    std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies
+)
+{
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.reserve(ownGalaxyBodies.size() + distantBodies.size());
+    for (std::size_t index = 0; index < ownGalaxyBodies.size(); ++index) {
+        order.push_back(
+            skygate::ephemeris::CelestialBodyCatalog::OrderEntry{
+                .domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy,
+                .bodyIndex = index,
+            }
+        );
+    }
+    for (std::size_t index = 0; index < distantBodies.size(); ++index) {
+        order.push_back(
+            skygate::ephemeris::CelestialBodyCatalog::OrderEntry{
+                .domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant,
+                .bodyIndex = index,
+            }
+        );
+    }
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
+        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(order)
+    );
+}
+
 std::optional<std::size_t>
-bodyIndexById(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string& id)
+bodyIndexById(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const std::string& id)
 {
     for (std::size_t index = 0; index < bodies.size(); ++index) {
-        if (bodies[index].id == id) {
+        if (bodies[index] != nullptr && bodies[index]->id == id) {
             return index;
         }
     }
     return std::nullopt;
 }
 
-std::size_t countBodiesById(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string& id)
+std::size_t
+countBodiesById(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const std::string& id)
 {
-    return static_cast<std::size_t>(std::count_if(
-        bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::CelestialBody& body) { return body.id == id; }
-    ));
+    return static_cast<std::size_t>(
+        std::count_if(bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->id == id;
+        })
+    );
 }
 
 }  // namespace
@@ -88,14 +118,14 @@ void CatalogComposerTests::tagsPrimaryAndBuiltInSources()
         makeBody(
             "sun",
             "Sun",
-            skygate::ephemeris::CelestialBodyType::Sun,
-            skygate::ephemeris::CelestialBodyEphemerisSource::Sun
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun,
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun
         ),
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -115,18 +145,16 @@ void CatalogComposerTests::tagsPrimaryAndBuiltInSources()
 
 void CatalogComposerTests::replacesPrimaryDeepSkyAliasWithDownloadedObject()
 {
-    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeBody(
+    auto sourceCatalog = createCatalog(
+        {makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-        ),
-        makeDeepSkyObject("messier_031", "M31", {"M31", "NGC 224"}),
-    });
-    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeDeepSkyObject("open_ngc_m31", "OpenNGC M31", {"M 31", "NGC0224"}),
-    });
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
+        )},
+        {makeDeepSkyObject("messier_031", "M31", {"M31", "NGC 224"})}
+    );
+    auto deepSkyCatalog = createCatalog({}, {makeDeepSkyObject("open_ngc_m31", "OpenNGC M31", {"M 31", "NGC0224"})});
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
@@ -144,18 +172,16 @@ void CatalogComposerTests::replacesPrimaryDeepSkyAliasWithDownloadedObject()
 
 void CatalogComposerTests::replacesDeepSkyObjectsByNormalizedPrimaryIdentity()
 {
-    auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeBody(
+    auto sourceCatalog = createCatalog(
+        {makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-        ),
-        makeDeepSkyObject("ngc_224", "Primary M31", {}),
-    });
-    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeDeepSkyObject("open_ngc_m31", "OpenNGC M31", {"NGC 224"}),
-    });
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
+        )},
+        {makeDeepSkyObject("ngc_224", "Primary M31", {})}
+    );
+    auto deepSkyCatalog = createCatalog({}, {makeDeepSkyObject("open_ngc_m31", "OpenNGC M31", {"NGC 224"})});
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
@@ -174,8 +200,8 @@ void CatalogComposerTests::bundledFallbackAddsDeepSkySourceKinds()
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -204,20 +230,20 @@ void CatalogComposerTests::doesNotDuplicatePrimarySolarSystemBodies()
         makeBody(
             "sun",
             "Sun",
-            skygate::ephemeris::CelestialBodyType::Sun,
-            skygate::ephemeris::CelestialBodyEphemerisSource::Sun
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun,
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun
         ),
         makeBody(
             "moon",
             "Moon",
-            skygate::ephemeris::CelestialBodyType::Moon,
-            skygate::ephemeris::CelestialBodyEphemerisSource::Moon
+            skygate::ephemeris::BaseCelestialBody::Kind::Moon,
+            skygate::ephemeris::BaseCelestialBody::Kind::Moon
         ),
         makeBody(
             "mars",
             "Mars",
-            skygate::ephemeris::CelestialBodyType::Planet,
-            skygate::ephemeris::CelestialBodyEphemerisSource::Planet
+            skygate::ephemeris::BaseCelestialBody::Kind::Planet,
+            skygate::ephemeris::BaseCelestialBody::Kind::Planet
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -236,8 +262,8 @@ void CatalogComposerTests::addsBundledBrightStarsWhenSourceHasNoStars()
         makeBody(
             "orion",
             "Orion",
-            skygate::ephemeris::CelestialBodyType::Constellation,
-            skygate::ephemeris::CelestialBodyEphemerisSource::Constellation
+            skygate::ephemeris::BaseCelestialBody::Kind::Constellation,
+            skygate::ephemeris::BaseCelestialBody::Kind::Constellation
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -256,8 +282,8 @@ void CatalogComposerTests::doesNotAddBundledBrightStarsWhenSourceHasStars()
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -274,8 +300,8 @@ void CatalogComposerTests::usesCurrentConstellationCountWhenLarger()
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -294,19 +320,19 @@ void CatalogComposerTests::ignoresNonDeepSkyRowsFromDeepSkyCatalog()
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
-    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeBody(
+    auto deepSkyCatalog = createCatalog(
+        {makeBody(
             "hip_bad",
             "Not Deep Sky",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
-        ),
-        makeDeepSkyObject("ngc_1", "NGC 1", {"NGC 1"}),
-    });
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
+        )},
+        {makeDeepSkyObject("ngc_1", "NGC 1", {"NGC 1"})}
+    );
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 
@@ -325,8 +351,8 @@ void CatalogComposerTests::bundledFallbackCanBeDisabled()
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
     QVERIFY(sourceCatalog != nullptr);
@@ -355,13 +381,11 @@ void CatalogComposerTests::preservesKnownDeepSkyObjectCountWhenProvided()
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
-    auto deepSkyCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeDeepSkyObject("ngc_1", "NGC 1", {"NGC 1"}),
-    });
+    auto deepSkyCatalog = createCatalog({}, {makeDeepSkyObject("ngc_1", "NGC 1", {"NGC 1"})});
     QVERIFY(sourceCatalog != nullptr);
     QVERIFY(deepSkyCatalog != nullptr);
 

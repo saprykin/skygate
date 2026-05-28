@@ -7,7 +7,6 @@
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
-#include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -20,6 +19,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -38,39 +38,42 @@ constexpr int kNaifSolarSystemBarycenter = 0;
 constexpr double kCoordinateTolerance = 1.0e-9;
 constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d1114de63b7cf39eded66afc08e8f98";
 
-[[nodiscard]] CelestialBody makeMarsBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeMarsBody()
 {
-    return {
-        .id = "mars",
-        .displayName = "Mars",
-        .type = CelestialBodyType::Planet,
-        .ephemerisSource = CelestialBodyEphemerisSource::Planet,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
-[[nodiscard]] CelestialBody makeJupiterBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeJupiterBody()
 {
-    return {
-        .id = "jupiter",
-        .displayName = "Jupiter",
-        .type = CelestialBodyType::Planet,
-        .ephemerisSource = CelestialBodyEphemerisSource::Planet,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "jupiter";
+    body.displayName = "Jupiter";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
-[[nodiscard]] CelestialBody makeUnsupportedBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeUnsupportedBody()
 {
-    return {
-        .id = "ngc-test",
-        .displayName = "NGC Test",
-        .type = CelestialBodyType::DeepSkyObject,
-        .ephemerisSource = CelestialBodyEphemerisSource::Unresolved,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "unsupported-test";
+    body.displayName = "Unsupported Test";
+    body.kind = BaseCelestialBody::Kind::Constellation;
+    return body;
 }
 
-[[nodiscard]] core::SkyContext makeContext()
+template <typename BodyRange>
+[[nodiscard]] std::shared_ptr<const CelestialBodyCatalog> makeCatalogHandle(const BodyRange& bodies)
 {
-    core::SkyContext context;
+    return std::make_shared<const CelestialBodyCatalog>(std::span<const OwnGalaxyCelestialBody>{bodies});
+}
+
+[[nodiscard]] core::ObservationContext makeContext()
+{
+    core::ObservationContext context;
     context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
@@ -449,7 +452,7 @@ public:
 };
 
 [[nodiscard]] HighPrecisionEphemerisEngine makeHighPrecisionEngine(
-    std::vector<CelestialBody> bodies,
+    std::vector<OwnGalaxyCelestialBody> bodies,
     EphemerisEngineOptions options,
     HighPrecisionEphemerisEngineDependencies dependencies
 )
@@ -457,7 +460,7 @@ public:
     if (dependencies.dataSetInfo.id.empty()) {
         dependencies.dataSetInfo = makeDataSetInfo(false);
     }
-    return HighPrecisionEphemerisEngine(bodies, options, std::move(dependencies));
+    return HighPrecisionEphemerisEngine(CelestialBodyCatalog(std::move(bodies)), options, std::move(dependencies));
 }
 
 }  // namespace
@@ -482,7 +485,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
 
     EphemerisEngineFactoryRequest simpleRequest;
     simpleRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    simpleRequest.catalogBodies = bodies;
+    simpleRequest.catalog = makeCatalogHandle(bodies);
     simpleRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
     const EphemerisEngineFactoryResult simpleResult = skygate::ephemeris::EphemerisEngineFactory::create(simpleRequest);
     QVERIFY(simpleResult.isSuccess());
@@ -494,7 +497,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
 
     EphemerisEngineFactoryRequest strictRequest;
     strictRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    strictRequest.catalogBodies = bodies;
+    strictRequest.catalog = makeCatalogHandle(bodies);
     strictRequest.options = makeOptions(EphemerisCorrectionFlags::apparentTopocentric());
     strictRequest.fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
@@ -788,17 +791,17 @@ void EphemerisAcceptanceMatrixTests::fullFrameComputationCacheAvoidsPerObjectRec
     );
 
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::geometric());
-    const SkySnapshot firstSnapshot = engine.compute(request);
+    const EphemerisSnapshot firstSnapshot = engine.compute(request);
     QCOMPARE(firstSnapshot.states.size(), std::size_t{3});
     QCOMPARE(calculator->callCount(), 2);
 
-    const SkySnapshot cachedSnapshot = engine.compute(request);
+    const EphemerisSnapshot cachedSnapshot = engine.compute(request);
     QCOMPARE(cachedSnapshot.states.size(), std::size_t{3});
     QCOMPARE(calculator->callCount(), 2);
 
     EphemerisRequest changedOptionsRequest = request;
     changedOptionsRequest.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
-    const SkySnapshot changedOptionsSnapshot = engine.compute(changedOptionsRequest);
+    const EphemerisSnapshot changedOptionsSnapshot = engine.compute(changedOptionsRequest);
     QCOMPARE(changedOptionsSnapshot.states.size(), std::size_t{3});
     QCOMPARE(calculator->callCount(), 4);
 }

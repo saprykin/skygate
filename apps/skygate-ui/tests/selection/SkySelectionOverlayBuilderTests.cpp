@@ -1,3 +1,5 @@
+#include "CelestialBodyCatalog.hpp"
+#include "DistantCelestialBody.hpp"
 #include "SkyOverlayTestSupport.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 #include "SkyTimeController.hpp"
@@ -24,26 +26,31 @@ using skygate::ui::tests::overlayInspectorFieldValue;
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type = skygate::ephemeris::CelestialBodyType::Star
+    const skygate::ephemeris::BaseCelestialBody::Kind type = skygate::ephemeris::BaseCelestialBody::Kind::Star
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = 2.34;
     body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 23.9998, .declinationDeg = -12.5};
     return body;
 }
 
-skygate::ephemeris::CelestialBody makeDeepSkyBody()
+skygate::ephemeris::DistantCelestialBody makeDeepSkyBody()
 {
-    auto body = makeBody("messier_031", "M31", skygate::ephemeris::CelestialBodyType::DeepSkyObject);
+    skygate::ephemeris::DistantCelestialBody body;
+    body.id = "messier_031";
+    body.displayName = "M31";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = 2.34;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 23.9998, .declinationDeg = -12.5};
     body.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
-        .kind = skygate::ephemeris::DeepSkyObjectKind::Galaxy,
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = {"M31", "Andromeda Galaxy", "andromeda galaxy", "NGC 224"},
         .majorAxisArcmin = 190.0,
         .minorAxisArcmin = 60.0
@@ -52,22 +59,22 @@ skygate::ephemeris::CelestialBody makeDeepSkyBody()
 }
 
 struct OverlayFixture final {
-    skygate::ephemeris::SkySnapshot snapshot;
+    skygate::ephemeris::EphemerisSnapshot snapshot;
     QHash<QString, std::size_t> stateIndexByBodyId;
     std::optional<skygate::core::PreparedProjection> projection;
     std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
     std::vector<std::uint8_t> sourceIds;
     QStringList sourceLabels;
-    skygate::core::SkyContext skyContext;
+    skygate::core::ObservationContext skyContext;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine;
 };
 
 class RequestOnlyObservationEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = request.context;
         return snapshot;
     }
@@ -102,22 +109,23 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         return snapshot;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         ++contextSampleCount;
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -143,10 +151,10 @@ public:
         return options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = request.context;
         return snapshot;
     }
@@ -172,22 +180,23 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         return snapshot;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         ++contextSampleCount;
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -204,10 +213,10 @@ public:
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = request.context;
         return snapshot;
     }
@@ -244,22 +253,23 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         return snapshot;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         ++contextSampleCount;
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -273,18 +283,31 @@ public:
 OverlayFixture makeFixture()
 {
     OverlayFixture fixture;
-    auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
-    bodies->push_back(makeBody("selected", "Selected"));
-    bodies->push_back(makeBody("tracked", "Tracked"));
-    bodies->push_back(makeBody("search", "Search"));
-    bodies->push_back(makeDeepSkyBody());
-    bodies->push_back(makeBody("circumpolar", "Circumpolar"));
-    bodies->back().fixedEquatorial =
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies;
+    std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies;
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> orderedBodyIndexes;
+    ownGalaxyBodies.push_back(makeBody("selected", "Selected"));
+    ownGalaxyBodies.push_back(makeBody("tracked", "Tracked"));
+    ownGalaxyBodies.push_back(makeBody("search", "Search"));
+    distantBodies.push_back(makeDeepSkyBody());
+    ownGalaxyBodies.push_back(makeBody("circumpolar", "Circumpolar"));
+    ownGalaxyBodies.back().fixedEquatorial =
         skygate::core::EquatorialCoordinate{.rightAscensionHours = 4.0, .declinationDeg = 80.0};
-    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(*bodies);
+    orderedBodyIndexes = {
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 0U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 1U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 2U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U},
+        {.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 3U},
+    };
+    auto bodyCatalog = skygate::ephemeris::CelestialBodyCatalog(
+        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(orderedBodyIndexes)
+    );
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromCatalog(bodyCatalog);
     Q_ASSERT(catalog != nullptr);
     fixture.ephemerisEngine = std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
-    fixture.snapshot.catalogBodies = bodies;
+    fixture.snapshot.catalogBodies =
+        std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodyCatalog));
     fixture.snapshot.states = {
         {.bodyIndex = 0U,
          .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
@@ -543,10 +566,11 @@ void SkySelectionOverlayBuilderTests::inspectorObservationEventsUseRequestOption
     auto engine = std::make_unique<RequestOnlyObservationEngine>();
     const auto* enginePtr = engine.get();
     fixture.ephemerisEngine = std::move(engine);
-    auto mutableBodies =
-        std::const_pointer_cast<std::vector<skygate::ephemeris::CelestialBody>>(fixture.snapshot.catalogBodies);
-    QVERIFY(mutableBodies != nullptr);
-    mutableBodies->at(0).fixedEquatorial.reset();
+    auto selectedBody = makeBody("selected", "Selected");
+    selectedBody.fixedEquatorial.reset();
+    fixture.snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(selectedBody)}
+    );
     fixture.skyContext.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
     auto input = makeInput(fixture);
     input.selectedObjectTargetId = "selected";
@@ -586,13 +610,11 @@ void SkySelectionOverlayBuilderTests::inspectorAvoidsSynchronousHighPrecisionEve
 {
     const SkySelectionOverlayBuilder builder;
     auto fixture = makeFixture();
-    auto bodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(*fixture.snapshot.catalogBodies);
-    (*bodies)[0].id = "mars";
-    (*bodies)[0].displayName = "Mars";
-    (*bodies)[0].type = skygate::ephemeris::CelestialBodyType::Planet;
-    (*bodies)[0].ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet;
-    (*bodies)[0].fixedEquatorial.reset();
-    fixture.snapshot.catalogBodies = bodies;
+    auto mars = makeBody("mars", "Mars", skygate::ephemeris::BaseCelestialBody::Kind::Planet);
+    mars.fixedEquatorial.reset();
+    fixture.snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(mars)}
+    );
     fixture.stateIndexByBodyId.clear();
     fixture.stateIndexByBodyId.insert(QStringLiteral("mars"), 0U);
 

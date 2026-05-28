@@ -1,7 +1,7 @@
 #pragma once
 
-#include "catalog/ActiveCatalogCompositionRequest.hpp"
-#include "catalog/ActiveCatalogCompositionResult.hpp"
+#include "ActiveCatalogCompositionRequest.hpp"
+#include "ActiveCatalogCompositionResult.hpp"
 
 namespace skygate::ephemeris {
 

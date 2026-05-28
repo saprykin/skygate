@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/opengc/OpenNgcObjectMapping.hpp"
+#include "OpenNgcObjectMapping.hpp"
 
 #include <QString>
 

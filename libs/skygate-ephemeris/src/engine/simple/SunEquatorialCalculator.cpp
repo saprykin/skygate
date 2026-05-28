@@ -1,5 +1,5 @@
-#include "engine/simple/SunEquatorialCalculator.hpp"
-#include "engine/simple/EclipticToEquatorialCalculator.hpp"
+#include "SunEquatorialCalculator.hpp"
+#include "EclipticToEquatorialCalculator.hpp"
 #include "math/AngleMath.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "time/EpochCodec.hpp"

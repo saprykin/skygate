@@ -1,8 +1,7 @@
 #pragma once
 
+#include "EphemerisSnapshot.hpp"
 #include "HorizontalCoordinate.hpp"
-#include "Types.hpp"
-
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <optional>
@@ -14,7 +13,9 @@ namespace skygate::ephemeris {
 class ConstellationReferenceCalculator final {
 public:
     [[nodiscard]] static std::optional<core::HorizontalCoordinate> anchorCentroid(
-        const SkySnapshot& snapshot, std::span<const ConstellationAnchorGroup> anchorGroups, std::string_view labelName
+        const EphemerisSnapshot& snapshot,
+        std::span<const ConstellationAnchorGroup> anchorGroups,
+        std::string_view labelName
     );
 };
 

@@ -10,7 +10,7 @@ add_library(skygate-core STATIC
     src/ProjectionStatus.hpp
     src/ProjectionType.hpp
     src/ScreenPoint.hpp
-    src/SkyContext.hpp
+    src/ObservationContext.hpp
     src/SystemTimeSource.hpp
     src/UtcTimeCodec.hpp
     src/UtcTimePoint.hpp
@@ -38,7 +38,7 @@ add_library(skygate-core STATIC
     src/PreparedProjection.cpp
     src/ProjectionParams.cpp
     src/ScreenPoint.cpp
-    src/SkyContext.cpp
+    src/ObservationContext.cpp
     src/SystemTimeSource.cpp
     src/UtcTimeCodec.cpp
     src/math/AngleMath.cpp

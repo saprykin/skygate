@@ -1,4 +1,4 @@
-#include "engine/highprecision/ErfaAstrometry.hpp"
+#include "ErfaAstrometry.hpp"
 
 #include <cmath>
 

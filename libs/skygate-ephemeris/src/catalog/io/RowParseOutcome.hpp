@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Types.hpp"
+#include "DistantCelestialBody.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 
 #include <QString>
 
@@ -9,7 +10,8 @@
 namespace skygate::ephemeris {
 
 struct RowParseOutcome {
-    std::optional<CelestialBody> body;
+    std::optional<OwnGalaxyCelestialBody> body;
+    std::optional<DistantCelestialBody> distantBody;
     int invalidCategoryIndex = -1;
     QString invalidSample;
 };

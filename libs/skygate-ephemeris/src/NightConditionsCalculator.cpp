@@ -1,7 +1,8 @@
 #include "NightConditionsCalculator.hpp"
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
 #include "MoonPhaseCalculator.hpp"
 #include "ObservationEventCalculator.hpp"
-#include "Types.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
@@ -33,7 +34,7 @@ observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noe
     const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
     const std::uint32_t bodyIndex,
-    const CelestialBody* body,
+    const BaseCelestialBody* body,
     const double crossingAltitudeDeg,
     const NightConditionsCalculator::EventSearchMode eventSearchMode
 )
@@ -55,9 +56,9 @@ NightConditions NightConditionsCalculator::compute(
     const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
     const std::uint32_t sunBodyIndex,
-    const CelestialBody* sunBody,
+    const BaseCelestialBody* sunBody,
     const std::uint32_t moonBodyIndex,
-    const CelestialBody* moonBody,
+    const BaseCelestialBody* moonBody,
     const EventSearchMode eventSearchMode
 ) const
 {
@@ -73,7 +74,7 @@ NightConditions NightConditionsCalculator::compute(
     conditions.moonrise = unavailableEvent();
     conditions.moonset = unavailableEvent();
 
-    const core::SkyContext& context = request.context;
+    const core::ObservationContext& context = request.context;
     if (!context.observer.isValid()) {
         return conditions;
     }

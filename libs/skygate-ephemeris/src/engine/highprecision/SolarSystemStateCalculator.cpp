@@ -1,9 +1,9 @@
-#include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "SolarSystemStateCalculator.hpp"
+#include "EphemerisMetadataMerge.hpp"
+#include "ICalcephKernelProvider.hpp"
 #include "StringUtilities.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -31,15 +31,15 @@ struct TargetKernelState {
     int requestedTargetNaifId = 0;
 };
 
-[[nodiscard]] std::optional<int> naifIdForBody(const CelestialBody& body) noexcept
+[[nodiscard]] std::optional<int> naifIdForBody(const BaseCelestialBody& body) noexcept
 {
-    if (body.ephemerisSource == CelestialBodyEphemerisSource::Sun || body.type == CelestialBodyType::Sun) {
+    if (body.kind == BaseCelestialBody::Kind::Sun) {
         return kNaifSun;
     }
-    if (body.ephemerisSource == CelestialBodyEphemerisSource::Moon || body.type == CelestialBodyType::Moon) {
+    if (body.kind == BaseCelestialBody::Kind::Moon) {
         return 301;
     }
-    if (body.ephemerisSource != CelestialBodyEphemerisSource::Planet && body.type != CelestialBodyType::Planet) {
+    if (body.kind != BaseCelestialBody::Kind::Planet) {
         return std::nullopt;
     }
 
@@ -71,9 +71,9 @@ struct TargetKernelState {
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<int> planetarySystemBarycenterNaifIdForBody(const CelestialBody& body) noexcept
+[[nodiscard]] std::optional<int> planetarySystemBarycenterNaifIdForBody(const BaseCelestialBody& body) noexcept
 {
-    if (body.ephemerisSource != CelestialBodyEphemerisSource::Planet && body.type != CelestialBodyType::Planet) {
+    if (body.kind != BaseCelestialBody::Kind::Planet) {
         return std::nullopt;
     }
 
@@ -105,19 +105,20 @@ struct TargetKernelState {
     return std::nullopt;
 }
 
-[[nodiscard]] bool de440sHasPlanetBodyCenter(const CelestialBody& body) noexcept
+[[nodiscard]] bool de440sHasPlanetBodyCenter(const BaseCelestialBody& body) noexcept
 {
     return StringUtilities::equalsIgnoreAsciiCase(body.id, "mercury")
            || StringUtilities::equalsIgnoreAsciiCase(body.id, "venus");
 }
 
-[[nodiscard]] bool
-shouldPreferPlanetarySystemBarycenter(const CelestialBody& body, const bool preferPlanetarySystemBarycenters) noexcept
+[[nodiscard]] bool shouldPreferPlanetarySystemBarycenter(
+    const BaseCelestialBody& body, const bool preferPlanetarySystemBarycenters
+) noexcept
 {
     if (!preferPlanetarySystemBarycenters) {
         return false;
     }
-    if (body.ephemerisSource != CelestialBodyEphemerisSource::Planet && body.type != CelestialBodyType::Planet) {
+    if (body.kind != BaseCelestialBody::Kind::Planet) {
         return false;
     }
 
@@ -125,7 +126,7 @@ shouldPreferPlanetarySystemBarycenter(const CelestialBody& body, const bool pref
 }
 
 [[nodiscard]] std::string barycenterFallbackProvenance(
-    const CelestialBody& body, const int requestedTargetNaifId, const int effectiveTargetNaifId
+    const BaseCelestialBody& body, const int requestedTargetNaifId, const int effectiveTargetNaifId
 )
 {
     std::string bodyName = body.id.empty() ? body.displayName : body.id;
@@ -153,7 +154,7 @@ void appendProvenance(EphemerisEngineQueryResult& metadata, std::string provenan
 
 void markBarycenterFallback(
     EphemerisEngineQueryResult& metadata,
-    const CelestialBody& body,
+    const BaseCelestialBody& body,
     const int requestedTargetNaifId,
     const int effectiveTargetNaifId
 )

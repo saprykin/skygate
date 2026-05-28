@@ -1,10 +1,10 @@
 #pragma once
 
-#include "catalog/CatalogLoadResult.hpp"
-#include "catalog/CatalogParseRequest.hpp"
-#include "catalog/CatalogSelectionOptions.hpp"
-#include "catalog/CatalogSourceType.hpp"
-#include "catalog/IStarCatalog.hpp"
+#include "CatalogLoadResult.hpp"
+#include "CatalogParseRequest.hpp"
+#include "CatalogSelectionOptions.hpp"
+#include "CatalogSourceType.hpp"
+#include "IStarCatalog.hpp"
 
 #include <memory>
 #include <string_view>

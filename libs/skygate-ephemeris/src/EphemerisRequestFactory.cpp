@@ -9,9 +9,9 @@ namespace skygate::ephemeris {
 
 using core::TimeConstants;
 
-core::SkyContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
+core::ObservationContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
 {
-    core::SkyContext context = request.context;
+    core::ObservationContext context = request.context;
     if (request.epoch.timeScale == TimeScale::Utc && request.epoch.hasExplicit()) {
         context.utcTime = EpochCodec::utcTimeFromEpoch(request.epoch);
     }
@@ -20,7 +20,7 @@ core::SkyContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequ
 }
 
 EphemerisRequest EphemerisRequestFactory::requestFromContext(
-    const core::SkyContext& context, const EphemerisEngineOptions& options
+    const core::ObservationContext& context, const EphemerisEngineOptions& options
 ) noexcept
 {
     return EphemerisRequest{

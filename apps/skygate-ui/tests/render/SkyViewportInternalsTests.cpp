@@ -1,12 +1,10 @@
 #include "SkyViewportGeometry.hpp"
 #include "SkyViewportSceneGraph.hpp"
-
-#include <QtTest/QtTest>
-
 #include "math/ViewportMath.hpp"
 
 #include <QSGFlatColorMaterial>
 #include <QSGGeometryNode>
+#include <QtTest/QtTest>
 
 #include <algorithm>
 #include <optional>
@@ -86,7 +84,7 @@ void SkyViewportInternalsTests::geometryAppendsFrameLinesAndDeepSkyGlyphSegments
          .radiusYPx = 6.0,
          .rotationDeg = 0.0,
          .widthPx = 1.5,
-         .kind = skygate::ephemeris::DeepSkyObjectKind::GlobularCluster,
+         .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster,
          .color = QColor("#fedcba")}
     };
 

@@ -1,16 +1,13 @@
 #pragma once
 
-#include "EphemerisFactoryCreationDiagnosticCode.hpp"
-#include "EphemerisFactoryCreationDiagnosticSeverity.hpp"
-#include "EphemerisFactoryCreationStatus.hpp"
-#include "EphemerisFactoryFallbackPolicy.hpp"
 #include "EphemerisEngineFactoryRequest.hpp"
 #include "EphemerisEngineFactoryResult.hpp"
+#include "EphemerisFactoryCreationDiagnosticCode.hpp"
+#include "EphemerisFactoryCreationStatus.hpp"
+#include "EphemerisFactoryFallbackPolicy.hpp"
 #include "catalog/IStarCatalog.hpp"
-#include "engine/IEphemerisEngine.hpp"
 
 #include <initializer_list>
-#include <memory>
 #include <span>
 #include <string_view>
 
@@ -27,8 +24,9 @@ public:
     [[nodiscard]] static EphemerisEngineFactoryResult create(const EphemerisEngineFactoryRequest& request);
     [[nodiscard]] static EphemerisEngineFactoryResult create();
     [[nodiscard]] static EphemerisEngineFactoryResult create(const IStarCatalog& catalog);
-    [[nodiscard]] static EphemerisEngineFactoryResult create(std::initializer_list<CelestialBody> bodies);
-    [[nodiscard]] static EphemerisEngineFactoryResult create(std::span<const CelestialBody> bodies);
+    [[nodiscard]] static EphemerisEngineFactoryResult create(std::initializer_list<OwnGalaxyCelestialBody> bodies);
+    [[nodiscard]] static EphemerisEngineFactoryResult create(std::span<const OwnGalaxyCelestialBody> bodies);
+    [[nodiscard]] static EphemerisEngineFactoryResult create(const CelestialBodyCatalog& catalog);
 
     EphemerisEngineFactory() = delete;
 };

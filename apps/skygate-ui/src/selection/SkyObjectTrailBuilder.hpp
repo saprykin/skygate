@@ -1,10 +1,14 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
 #include "EquatorialCoordinate.hpp"
+#include "ObservationContext.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyContext.hpp"
 #include "SkyRenderBuilders.hpp"
-#include "Types.hpp"
 #include "trail/BodyTrailCalculator.hpp"
 
 #include <cstdint>
@@ -18,9 +22,9 @@ class IEphemerisEngine;
 struct SkyObjectTrailInput final {
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
-    const skygate::ephemeris::CelestialBody* targetBody = nullptr;
+    const skygate::ephemeris::BaseCelestialBody* targetBody = nullptr;
     const skygate::ephemeris::CelestialBodyState* targetState = nullptr;
-    skygate::core::SkyContext skyContext;
+    skygate::core::ObservationContext skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
     std::uint32_t targetBodyIndex = 0;
@@ -35,7 +39,7 @@ public:
 private:
     struct TrailSampleCacheKey final {
         const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
-        skygate::core::SkyContext context;
+        skygate::core::ObservationContext context;
         std::optional<skygate::ephemeris::AstronomicalEpoch> requestEpoch;
         std::optional<skygate::ephemeris::EphemerisEngineOptions> requestOptions;
         std::optional<skygate::core::EquatorialCoordinate> targetEquatorial;

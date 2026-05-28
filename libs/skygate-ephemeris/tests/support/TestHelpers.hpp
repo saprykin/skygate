@@ -1,6 +1,10 @@
 #pragma once
 
-#include "Types.hpp"
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 
 #include <cmath>
 #include <span>
@@ -13,18 +17,19 @@ namespace skygate::ephemeris::tests {
     return std::abs(value - expected) <= tolerance;
 }
 
-[[nodiscard]] inline const CelestialBody*
-findBodyById(const std::span<const CelestialBody> bodies, const std::string_view id)
+[[nodiscard]] inline const BaseCelestialBody*
+findBodyById(const std::span<const BaseCelestialBody* const> bodies, const std::string_view id)
 {
-    for (const CelestialBody& body : bodies) {
-        if (body.id == id) {
-            return &body;
+    for (const BaseCelestialBody* body : bodies) {
+        if (body != nullptr && body->id == id) {
+            return body;
         }
     }
     return nullptr;
 }
 
-[[nodiscard]] inline const CelestialBodyState* findStateById(const SkySnapshot& snapshot, const std::string_view id)
+[[nodiscard]] inline const CelestialBodyState*
+findStateById(const EphemerisSnapshot& snapshot, const std::string_view id)
 {
     for (const CelestialBodyState& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == id) {

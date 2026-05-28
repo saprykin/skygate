@@ -1,8 +1,8 @@
+#include "catalog/CatalogFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "engine/simple/EclipticToEquatorialCalculator.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
-#include "catalog/CatalogFactory.hpp"
 
 #include <QtTest/QtTest>
 
@@ -19,7 +19,7 @@ namespace {
 }
 
 const skygate::ephemeris::CelestialBodyState*
-findStateById(const skygate::ephemeris::SkySnapshot& snapshot, const std::string_view id)
+findStateById(const skygate::ephemeris::EphemerisSnapshot& snapshot, const std::string_view id)
 {
     if (snapshot.catalogBodies == nullptr) {
         return nullptr;
@@ -29,7 +29,7 @@ findStateById(const skygate::ephemeris::SkySnapshot& snapshot, const std::string
         if (state.bodyIndex >= snapshot.catalogBodies->size()) {
             continue;
         }
-        if (snapshot.catalogBodies->at(state.bodyIndex).id == id) {
+        if (snapshot.catalogBodies->bodyAt(state.bodyIndex).id == id) {
             return &state;
         }
     }
@@ -73,7 +73,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximation()
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 0.0;
     context.observer.longitudeDeg = 0.0;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -171,7 +171,7 @@ void EphemerisRegressionTests::solarSystemBodiesMatchGoldenApproximationAcrossCo
     }};
 
     for (const ExpectedContext& expectedContext : expectedContexts) {
-        skygate::core::SkyContext context;
+        skygate::core::ObservationContext context;
         context.observer.latitudeDeg = expectedContext.latitudeDeg;
         context.observer.longitudeDeg = expectedContext.longitudeDeg;
         context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(expectedContext.epochSeconds));
@@ -203,7 +203,7 @@ void EphemerisRegressionTests::solarSystemBodiesStayNearExternalReferenceValues(
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 0.0;
     context.observer.longitudeDeg = 0.0;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));

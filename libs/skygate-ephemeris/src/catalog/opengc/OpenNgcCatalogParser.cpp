@@ -1,7 +1,7 @@
-#include "catalog/opengc/OpenNgcCatalogParser.hpp"
+#include "OpenNgcCatalogParser.hpp"
+#include "OpenNgcObjectMapper.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
-#include "catalog/opengc/OpenNgcObjectMapper.hpp"
 
 #include <QString>
 
@@ -96,10 +96,10 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
 
             const auto visualMagnitude =
                 CatalogParsingUtilities::parseFiniteDouble(row.decodeColumn(QStringLiteral("V-Mag")));
-            CelestialBody body;
+            DistantCelestialBody body;
             body.id = std::move(mapping.id);
             body.displayName = std::move(mapping.displayName);
-            body.type = CelestialBodyType::DeepSkyObject;
+            body.kind = BaseCelestialBody::Kind::DeepSkyObject;
             body.visualMagnitude = visualMagnitude.value_or(std::numeric_limits<double>::quiet_NaN());
             body.fixedEquatorial =
                 core::EquatorialCoordinate{.rightAscensionHours = *raHours, .declinationDeg = *decDeg};
@@ -114,7 +114,7 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
                     CatalogParsingUtilities::parseNonNegativeDouble(row.decodeColumn(QStringLiteral("PosAng"))),
             };
 
-            return RowParseOutcome{.body = std::move(body)};
+            return RowParseOutcome{.distantBody = std::move(body)};
         },
         progressCallback
     );

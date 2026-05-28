@@ -1,3 +1,4 @@
+#include "CelestialBodyCatalog.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyContextController.hpp"
@@ -446,22 +447,23 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
-        snapshot.catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>();
+        snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>();
         return snapshot;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
     {
         return std::nullopt;
     }

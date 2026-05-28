@@ -1,4 +1,6 @@
+#include "CelestialBodyCatalog.hpp"
 #include "EphemerisFixtureSupport.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/FrameTransformer.hpp"
@@ -32,7 +34,7 @@ namespace core = skygate::core;
 constexpr double kSecondsPerDay = 86'400.0;
 
 struct TopocentricFixtureCase {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     SolarSystemKernelVector inputGcrsPositionAu;
     EphemerisRaDecExpectation expectedEquatorial;
     core::HorizontalCoordinate expectedHorizontal;
@@ -60,9 +62,9 @@ struct TopocentricFixture {
     );
 }
 
-[[nodiscard]] core::SkyContext makeContext()
+[[nodiscard]] core::ObservationContext makeContext()
 {
-    core::SkyContext context;
+    core::ObservationContext context;
     context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
@@ -87,46 +89,38 @@ struct TopocentricFixture {
     return request;
 }
 
-[[nodiscard]] CelestialBody makeBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeBody()
 {
-    return {
-        .id = "sun",
-        .displayName = "Sun",
-        .type = CelestialBodyType::Sun,
-        .ephemerisSource = CelestialBodyEphemerisSource::Sun,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "sun";
+    body.displayName = "Sun";
+    body.kind = BaseCelestialBody::Kind::Sun;
+    return body;
 }
 
-[[nodiscard]] CelestialBody makeBody(const QString& id, const QString& bodyType)
+[[nodiscard]] OwnGalaxyCelestialBody makeBody(const QString& id, const QString& bodyType)
 {
+    OwnGalaxyCelestialBody body;
+    body.id = id.toStdString();
     if (bodyType == QStringLiteral("sun")) {
-        return {
-            .id = id.toStdString(),
-            .displayName = "Sun",
-            .type = CelestialBodyType::Sun,
-            .ephemerisSource = CelestialBodyEphemerisSource::Sun,
-        };
+        body.displayName = "Sun";
+        body.kind = BaseCelestialBody::Kind::Sun;
+        return body;
     }
     if (bodyType == QStringLiteral("moon")) {
-        return {
-            .id = id.toStdString(),
-            .displayName = "Moon",
-            .type = CelestialBodyType::Moon,
-            .ephemerisSource = CelestialBodyEphemerisSource::Moon,
-        };
+        body.displayName = "Moon";
+        body.kind = BaseCelestialBody::Kind::Moon;
+        return body;
     }
 
-    return {
-        .id = id.toStdString(),
-        .displayName = id.toStdString(),
-        .type = CelestialBodyType::Planet,
-        .ephemerisSource = CelestialBodyEphemerisSource::Planet,
-    };
+    body.displayName = body.id;
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
 [[nodiscard]] HighPrecisionComputationInput makeInput(const EphemerisRequest& request)
 {
-    static const CelestialBody kBody = makeBody();
+    static const OwnGalaxyCelestialBody kBody = makeBody();
     return {
         .request = request,
         .body = kBody,
@@ -134,7 +128,7 @@ struct TopocentricFixture {
     };
 }
 
-[[nodiscard]] HighPrecisionComputationInput makeInput(const EphemerisRequest& request, const CelestialBody& body)
+[[nodiscard]] HighPrecisionComputationInput makeInput(const EphemerisRequest& request, const BaseCelestialBody& body)
 {
     return {
         .request = request,
@@ -1198,7 +1192,8 @@ void ApparentPlaceCalculatorTests::degradesMissingApparentBatchTransformResults(
     auto frameTransformer = std::make_shared<ShortBatchFrameTransformer>();
     const ApparentPlaceCalculator calculator(frameTransformer, nullptr, nullptr);
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::precessionNutation());
-    const std::vector<CelestialBody> bodies = {makeBody(), makeBody()};
+    const std::vector<OwnGalaxyCelestialBody> bodies = {makeBody(), makeBody()};
+    const CelestialBodyCatalog catalog(bodies);
     const std::vector<StarAstrometryBatchResult> calculatorResults = {
         {
             .bodyIndex = 0U,
@@ -1211,7 +1206,7 @@ void ApparentPlaceCalculatorTests::degradesMissingApparentBatchTransformResults(
     };
 
     const std::vector<StarAstrometryBatchResult> results =
-        calculator.applyBatch(request, bodies, calculatorResults, nullptr);
+        calculator.applyBatch(request, catalog.bodies(), calculatorResults, nullptr);
 
     QCOMPARE(frameTransformer->batchCallCount(), 1);
     QCOMPARE(results.size(), 2U);

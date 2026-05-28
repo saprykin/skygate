@@ -1,11 +1,10 @@
-#include "TestHelpers.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogLoader.hpp"
 
 #include <QtTest/QtTest>
 
-#include <cstddef>
 #include <algorithm>
+#include <cstddef>
 #include <span>
 #include <string>
 
@@ -30,14 +29,16 @@ void CatalogFactoryTests::loadsBundledCatalogBySourceType()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 119U);
-    const auto messier31It =
-        std::find_if(bodies.begin(), bodies.end(), [](const auto& body) { return body.id == "messier_031"; });
+    const auto messier31It = std::find_if(bodies.begin(), bodies.end(), [](const auto* body) {
+        return body != nullptr && body->id == "messier_031";
+    });
     QVERIFY(messier31It != bodies.end());
-    QVERIFY(messier31It->displayName == "M31");
-    QVERIFY(messier31It->type == skygate::ephemeris::CelestialBodyType::DeepSkyObject);
-    QVERIFY(messier31It->fixedEquatorial.has_value());
-    QVERIFY(messier31It->deepSkyObject.has_value());
-    QVERIFY(messier31It->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Galaxy);
+    const skygate::ephemeris::BaseCelestialBody& messier31 = **messier31It;
+    QVERIFY(messier31.displayName == "M31");
+    QVERIFY(messier31.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject);
+    QVERIFY(messier31.fixedEquatorialValue().has_value());
+    QVERIFY(messier31.deepSkyObjectValue().has_value());
+    QVERIFY(messier31.deepSkyObjectValue()->kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy);
 }
 
 void CatalogFactoryTests::loadsHygCatalogBySourceRequest()
@@ -55,8 +56,8 @@ void CatalogFactoryTests::loadsHygCatalogBySourceRequest()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].id == "hip_11");
-    QVERIFY(bodies[0].fixedEquatorial.has_value());
+    QVERIFY(bodies[0]->id == "hip_11");
+    QVERIFY(bodies[0]->fixedEquatorialValue().has_value());
 }
 
 void CatalogFactoryTests::loadsHygCatalogBySourceTypeWithProgress()

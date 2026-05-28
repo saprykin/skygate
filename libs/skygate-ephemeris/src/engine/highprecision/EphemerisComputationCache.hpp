@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/IEphemerisComputationCache.hpp"
+#include "IEphemerisComputationCache.hpp"
 
 #include <cstddef>
 #include <deque>
@@ -15,42 +15,42 @@ class EphemerisComputationCache final : public IEphemerisComputationCache {
 public:
     explicit EphemerisComputationCache(std::size_t maxEntries = 8U);
 
-    [[nodiscard]] std::optional<SkySnapshot> findSnapshot(
+    [[nodiscard]] std::optional<EphemerisSnapshot> findSnapshot(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     ) const override;
 
     void storeSnapshot(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
-        const SkySnapshot& snapshot
+        const EphemerisSnapshot& snapshot
     ) const override;
 
     [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState> findPreparedRequestState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     ) const override;
 
     void storePreparedRequestState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const override;
 
     [[nodiscard]] std::optional<CelestialBodyState> findBodyState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex
     ) const override;
 
     void storeBodyState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex,
         const CelestialBodyState& state
@@ -61,13 +61,13 @@ public:
 private:
     struct RequestIdentity {
         EphemerisRequest request;
-        std::vector<CelestialBody> catalogBodies;
+        CelestialBodyCatalog catalog;
         EphemerisDatasetInfo dataSetInfo;
     };
 
     struct SnapshotEntry {
         RequestIdentity identity;
-        SkySnapshot snapshot;
+        EphemerisSnapshot snapshot;
     };
 
     struct PreparedStateEntry {
@@ -83,35 +83,35 @@ private:
 
     [[nodiscard]] static RequestIdentity makeIdentity(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     );
     [[nodiscard]] static bool matchesIdentity(
         const RequestIdentity& identity,
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     );
 
     [[nodiscard]] static std::string makeRequestKey(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     );
 
     [[nodiscard]] static std::string makeSnapshotKey(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     );
     [[nodiscard]] static std::string makePreparedStateKey(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     );
     [[nodiscard]] static std::string makeBodyStateKey(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex
     );

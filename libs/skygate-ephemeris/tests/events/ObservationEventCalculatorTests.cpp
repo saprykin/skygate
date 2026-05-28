@@ -21,39 +21,42 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
-skygate::core::SkyContext makeContext(const double latitudeDeg = 47.0, const double longitudeDeg = 8.0)
+skygate::core::ObservationContext makeContext(const double latitudeDeg = 47.0, const double longitudeDeg = 8.0)
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer = {.latitudeDeg = latitudeDeg, .longitudeDeg = longitudeDeg, .elevationMeters = 400.0};
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
     return context;
 }
 
-skygate::ephemeris::CelestialBody makeFixedBody(const skygate::core::EquatorialCoordinate& equatorial)
+skygate::ephemeris::OwnGalaxyCelestialBody makeFixedBody(const skygate::core::EquatorialCoordinate& equatorial)
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = "target";
     body.displayName = "Target";
-    body.type = skygate::ephemeris::CelestialBodyType::Star;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
     body.visualMagnitude = 1.0;
     body.fixedEquatorial = equatorial;
     return body;
 }
 
 skygate::ephemeris::EphemerisRequest
-makeRequest(const skygate::core::SkyContext& context, const skygate::ephemeris::IEphemerisEngine& engine)
+makeRequest(const skygate::core::ObservationContext& context, const skygate::ephemeris::IEphemerisEngine& engine)
 {
     return skygate::ephemeris::EphemerisRequestFactory::requestFromContext(context, engine.options());
 }
 
-std::unique_ptr<skygate::ephemeris::IEphemerisEngine> makeEngineForBody(const skygate::ephemeris::CelestialBody& body)
+std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+makeEngineForBody(const skygate::ephemeris::OwnGalaxyCelestialBody& body)
 {
-    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({body});
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{body}
+    );
     Q_ASSERT(catalog != nullptr);
     return std::move(skygate::ephemeris::EphemerisEngineFactory::create(*catalog).engine);
 }
 
-double currentLocalSiderealHours(const skygate::core::SkyContext& context)
+double currentLocalSiderealHours(const skygate::core::ObservationContext& context)
 {
     return skygate::core::AngleMath::normalizeHours(
         skygate::core::AngleMath::normalizeDegrees(
@@ -66,7 +69,7 @@ double currentLocalSiderealHours(const skygate::core::SkyContext& context)
 
 void verifyCrossingAltitude(
     const skygate::ephemeris::IEphemerisEngine& engine,
-    skygate::core::SkyContext context,
+    skygate::core::ObservationContext context,
     const skygate::core::UtcTimePoint& utcTime,
     const double expectedAltitudeDeg = 0.0
 )
@@ -79,7 +82,7 @@ void verifyCrossingAltitude(
 
 class MovingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -97,25 +100,26 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
-        snapshot.catalogBodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-            std::vector<skygate::ephemeris::CelestialBody>{makeFixedBody({})}
+        snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+            std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{makeFixedBody({})}
         );
         snapshot.states.push_back(*computeBodyState(context, 0U));
         return snapshot;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         if (bodyIndex != 0U) {
             return std::nullopt;
@@ -136,13 +140,13 @@ public:
 
 class RequestSensitiveMovingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = request.context;
-        snapshot.catalogBodies = std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(
-            std::vector<skygate::ephemeris::CelestialBody>{makeFixedBody({})}
+        snapshot.catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+            std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{makeFixedBody({})}
         );
         snapshot.states.push_back(*computeBodyState(request, std::size_t{0U}));
         return snapshot;
@@ -189,22 +193,23 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         return snapshot;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         ++contextSampleCount;
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -389,10 +394,10 @@ void ObservationEventCalculatorTests::invalidAndUnresolvedInputsReturnExplicitSt
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::InvalidInput);
 
     context = makeContext();
-    skygate::ephemeris::CelestialBody unresolved;
+    skygate::ephemeris::OwnGalaxyCelestialBody unresolved;
     unresolved.id = "unresolved";
     unresolved.displayName = "Unresolved";
-    unresolved.type = skygate::ephemeris::CelestialBodyType::DeepSkyObject;
+    unresolved.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
     engine = makeEngineForBody(unresolved);
     request = makeRequest(context, *engine);
     summary = calculator.compute(*engine, request, 0U, nullptr, 0.0, SearchMode::Guided);

@@ -1,6 +1,6 @@
 #include "HorizontalCoordinate.hpp"
+#include "ObservationContext.hpp"
 #include "ProjectionParams.hpp"
-#include "SkyContext.hpp"
 #include "SystemTimeSource.hpp"
 #include "UtcTimeCodec.hpp"
 
@@ -26,7 +26,7 @@ private slots:
 
 void CoreTypesTests::defaultSkyContextStartsAtEpoch()
 {
-    const skygate::core::SkyContext context;
+    const skygate::core::ObservationContext context;
     QCOMPARE(static_cast<qint64>(context.utcTime.time_since_epoch().count()), 0);
 }
 

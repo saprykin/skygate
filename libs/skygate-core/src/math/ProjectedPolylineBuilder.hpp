@@ -1,7 +1,7 @@
 #pragma once
 
+#include "LineSegment2d.hpp"
 #include "PreparedProjection.hpp"
-#include "math/LineSegment2d.hpp"
 
 #include <span>
 #include <vector>

@@ -1,11 +1,9 @@
-#include "SkySceneComposition.hpp"
-
-#include <QtTest/QtTest>
-
-#include "math/ViewportMath.hpp"
 #include "CelestialReferenceCalculator.hpp"
+#include "SkySceneComposition.hpp"
+#include "math/ViewportMath.hpp"
 
 #include <QHash>
+#include <QtTest/QtTest>
 
 #include <chrono>
 #include <optional>
@@ -46,7 +44,7 @@ SkySceneFramePipelineResult makeFrameResult(
     const bool updated,
     const std::uint64_t renderFrameGeneration,
     const skygate::core::PreparedProjection& projection,
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const SkyRenderFrame& frame,
     const QHash<QString, std::size_t>& stateIndexByBodyId
 )
@@ -96,7 +94,7 @@ void SkySceneCompositionTests::rebuildCopiesFrameLabelsIntoOverlayItems()
     SkySceneFrameData sceneFrame;
     sceneFrame.preparedProjection = projection;
 
-    const skygate::ephemeris::SkySnapshot snapshot;
+    const skygate::ephemeris::EphemerisSnapshot snapshot;
     const QHash<QString, std::size_t> stateIndexByBodyId;
     const SkyRenderFrame frame = makeFrame("Vega", QColor("#ffffff"));
     const auto result = composer.rebuild(
@@ -121,7 +119,7 @@ void SkySceneCompositionTests::unchangedCompositionKeyAvoidsWork()
     SkySceneFrameData sceneFrame;
     sceneFrame.preparedProjection = projection;
 
-    const skygate::ephemeris::SkySnapshot snapshot;
+    const skygate::ephemeris::EphemerisSnapshot snapshot;
     const QHash<QString, std::size_t> stateIndexByBodyId;
     const SkyRenderFrame frame = makeFrame("Original", QColor("#ffffff"));
     const SkySceneCompositionInput input = makeInput();
@@ -149,7 +147,7 @@ void SkySceneCompositionTests::selectionOnlyKeyChangePreservesFrameContent()
     SkySceneFrameData sceneFrame;
     sceneFrame.preparedProjection = projection;
 
-    const skygate::ephemeris::SkySnapshot snapshot;
+    const skygate::ephemeris::EphemerisSnapshot snapshot;
     const QHash<QString, std::size_t> stateIndexByBodyId;
     const SkyRenderFrame firstFrame = makeFrame("First", QColor("#ffffff"));
     const SkyRenderFrame replacementFrame = makeFrame("Replacement", QColor("#ff00ff"));
@@ -188,7 +186,7 @@ void SkySceneCompositionTests::referenceOverlayLabelsUseResolvedRequestContextWi
             SkySceneFrameData sceneFrame;
             sceneFrame.preparedProjection = projection;
 
-            skygate::ephemeris::SkySnapshot snapshot;
+            skygate::ephemeris::EphemerisSnapshot snapshot;
             snapshot.context.observer = observer;
             snapshot.context.utcTime = utcTime;
             const QHash<QString, std::size_t> stateIndexByBodyId;
@@ -250,7 +248,7 @@ void SkySceneCompositionTests::referenceOverlayLabelsUseSnapshotContextWhenItDif
     SkySceneFrameData sceneFrame;
     sceneFrame.preparedProjection = projection;
 
-    skygate::ephemeris::SkySnapshot snapshot;
+    skygate::ephemeris::EphemerisSnapshot snapshot;
     snapshot.context.observer = resolvedObserver;
     snapshot.context.utcTime = resolvedUtcTime;
 
@@ -278,7 +276,7 @@ void SkySceneCompositionTests::resetForcesNextCompositionToRebuild()
     SkySceneFrameData sceneFrame;
     sceneFrame.preparedProjection = projection;
 
-    const skygate::ephemeris::SkySnapshot snapshot;
+    const skygate::ephemeris::EphemerisSnapshot snapshot;
     const QHash<QString, std::size_t> stateIndexByBodyId;
     const SkyRenderFrame frame = makeFrame("Reset", QColor("#ffffff"));
     const SkySceneCompositionInput input = makeInput();

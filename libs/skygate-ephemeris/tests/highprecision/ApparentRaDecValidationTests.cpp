@@ -1,3 +1,4 @@
+#include "OwnGalaxyCelestialBody.hpp"
 #include "EphemerisFixtureSupport.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
@@ -34,17 +35,16 @@ using skygate::ephemeris::tests::loadRaDecFixture;
     return QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/apparent_solar_system_mars_smoke.json");
 }
 
-[[nodiscard]] CelestialBody makeMarsBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeMarsBody()
 {
-    return {
-        .id = "mars",
-        .displayName = "Mars",
-        .type = CelestialBodyType::Planet,
-        .ephemerisSource = CelestialBodyEphemerisSource::Planet,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
-[[nodiscard]] HighPrecisionComputationInput makeInput(const CelestialBody& body, const EphemerisRequest& request)
+[[nodiscard]] HighPrecisionComputationInput makeInput(const BaseCelestialBody& body, const EphemerisRequest& request)
 {
     return {
         .request = request,
@@ -234,8 +234,9 @@ void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizon
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::apparent());
     request.options.setEnableAtmosphericRefraction(false);
 
-    const CelestialBody mars = makeMarsBody();
-    const HighPrecisionComputationInput input = makeInput(mars, request);
+    const OwnGalaxyCelestialBody mars = makeMarsBody();
+    const BaseCelestialBody marsCatalogBody(mars);
+    const HighPrecisionComputationInput input = makeInput(marsCatalogBody, request);
     const SolarSystemStateCalculator solarSystemCalculator(fixture.provider);
     const auto timeScaleService = std::make_shared<SameInstantTimeScaleService>();
     const auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService);

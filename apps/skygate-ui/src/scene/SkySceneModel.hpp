@@ -1,18 +1,17 @@
 #pragma once
 
+#include "ObservationContext.hpp"
+#include "PreparedProjection.hpp"
+#include "SkyHitTargetIndex.hpp"
+#include "SkySceneComposition.hpp"
+#include "SkySceneOverlayAdapter.hpp"
+
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
-
-#include "SkyHitTargetIndex.hpp"
-#include "SkySceneComposition.hpp"
-#include "SkySceneOverlayAdapter.hpp"
-
-#include "PreparedProjection.hpp"
-#include "SkyContext.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -57,7 +56,7 @@ public:
     Q_INVOKABLE void moveSelectedObjectInspector(double x, double y);
 
     [[nodiscard]] std::optional<skygate::core::PreparedProjection> preparedProjection() const;
-    [[nodiscard]] std::optional<skygate::core::SkyContext> referenceOverlayContext() const;
+    [[nodiscard]] std::optional<skygate::core::ObservationContext> referenceOverlayContext() const;
     [[nodiscard]] std::span<const SkyRenderPoint> renderPointSpan() const;
     [[nodiscard]] std::span<const SkyRenderLine> renderLineSpan() const;
     [[nodiscard]] std::span<const SkyRenderGlyph> renderGlyphSpan() const;

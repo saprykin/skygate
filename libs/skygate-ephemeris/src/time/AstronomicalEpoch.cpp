@@ -1,4 +1,5 @@
-#include "time/AstronomicalEpoch.hpp"
+#include "AstronomicalEpoch.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <cmath>
 
@@ -46,7 +47,8 @@ AstronomicalEpoch AstronomicalEpoch::addMinutes(const int offsetMinutes) const n
 {
     return AstronomicalEpoch{
         .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 = julianDatePart2 + static_cast<double>(offsetMinutes) / core::TimeConstants::kMinutesPerDay,
+        .julianDatePart2 =
+            julianDatePart2 + static_cast<double>(offsetMinutes) / skygate::core::TimeConstants::kMinutesPerDay,
         .timeScale = timeScale
     }
         .normalized();

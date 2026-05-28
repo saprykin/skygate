@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "EphemerisDataManifest.hpp"
 
 #include <cstdint>
 #include <filesystem>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/io/CompressedDataInflateOptions.hpp"
+#include "CompressedDataInflateOptions.hpp"
 
 #include <optional>
 #include <string>

@@ -1,19 +1,18 @@
 #pragma once
 
-#include <QtTest>
-
+#include "CelestialReferenceCalculator.hpp"
 #include "SkyContextController.hpp"
 #include "SkyEphemerisTestSupport.hpp"
 #include "SkyOverlayLayerSettings.hpp"
 #include "SkyRenderBuilders.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySceneModelTestHarness.hpp"
-#include "SkyTimeController.hpp"
 #include "SkyTheme.hpp"
+#include "SkyTimeController.hpp"
 #include "catalog/SkyActiveCatalogBuilder.hpp"
-
 #include "math/ViewportMath.hpp"
-#include "CelestialReferenceCalculator.hpp"
+
+#include <QtTest>
 
 #include <algorithm>
 #include <cmath>
@@ -72,13 +71,20 @@ inline QString inspectorFieldValue(const QVariantMap& inspector, const QString& 
 }
 
 inline SkyRenderFrame buildDeepSkyRenderFrame(
-    std::vector<skygate::ephemeris::CelestialBody> bodies,
+    std::vector<skygate::ephemeris::DistantCelestialBody> bodies,
     std::vector<skygate::core::HorizontalCoordinate> horizontalCoordinates,
     const double fovDeg
 )
 {
-    skygate::ephemeris::SkySnapshot snapshot;
-    auto catalogBodies = std::make_shared<std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies));
+    skygate::ephemeris::EphemerisSnapshot snapshot;
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.reserve(bodies.size());
+    for (std::uint32_t index = 0U; index < bodies.size(); ++index) {
+        order.push_back({.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = index});
+    }
+    auto catalogBodies = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{}, std::move(bodies), std::move(order)
+    );
     snapshot.catalogBodies = catalogBodies;
     for (std::uint32_t index = 0; index < catalogBodies->size(); ++index) {
         snapshot.states.push_back(

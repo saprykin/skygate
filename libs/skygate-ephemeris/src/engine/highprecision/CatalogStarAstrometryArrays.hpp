@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.hpp"
+#include "BaseCelestialBody.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -13,7 +13,7 @@ namespace skygate::ephemeris::highprecision {
 class CatalogStarAstrometryArrays final {
 public:
     CatalogStarAstrometryArrays() = default;
-    explicit CatalogStarAstrometryArrays(std::span<const CelestialBody> bodies);
+    explicit CatalogStarAstrometryArrays(std::span<const BaseCelestialBody* const> bodies);
 
     [[nodiscard]] std::size_t size() const noexcept;
     [[nodiscard]] bool empty() const noexcept;

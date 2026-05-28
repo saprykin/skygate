@@ -37,12 +37,12 @@ QColor cardinalColor(const double azimuthDeg, const skygate::ui::internal::SkyTh
 }
 
 struct TrailTargetPointers final {
-    const skygate::ephemeris::CelestialBody* body = nullptr;
+    const skygate::ephemeris::BaseCelestialBody* body = nullptr;
     const skygate::ephemeris::CelestialBodyState* state = nullptr;
 };
 
 [[nodiscard]] TrailTargetPointers
-trailTargetPointers(const skygate::ephemeris::SkySnapshot* snapshot, const std::uint32_t bodyIndex) noexcept
+trailTargetPointers(const skygate::ephemeris::EphemerisSnapshot* snapshot, const std::uint32_t bodyIndex) noexcept
 {
     if (snapshot == nullptr || bodyIndex >= snapshot->bodies().size()) {
         return {};

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "catalog/CatalogBodyParseResult.hpp"
-#include "catalog/CatalogSourceRequest.hpp"
+#include "CatalogBodyParseResult.hpp"
+#include "CatalogSourceRequest.hpp"
 
 #include <string_view>
 

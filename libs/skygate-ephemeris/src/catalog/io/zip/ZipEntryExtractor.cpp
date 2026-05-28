@@ -1,7 +1,6 @@
-#include "catalog/io/zip/ZipEntryExtractor.hpp"
-
+#include "ZipEntryExtractor.hpp"
+#include "ZipBinaryUtilities.hpp"
 #include "catalog/io/CompressedDataInflater.hpp"
-#include "catalog/io/zip/ZipBinaryUtilities.hpp"
 
 #include <cstddef>
 #include <cstdint>

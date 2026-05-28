@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 
 #include <vector>
 
@@ -8,8 +8,8 @@ namespace skygate::ephemeris {
 
 class CatalogBodyNormalization final {
 public:
-    static void apply(CelestialBody& body);
-    static void apply(std::vector<CelestialBody>& bodies);
+    static void apply(OwnGalaxyCelestialBody& body);
+    static void apply(std::vector<OwnGalaxyCelestialBody>& bodies);
 };
 
 }  // namespace skygate::ephemeris

@@ -1,8 +1,8 @@
 #include "SkyRenderLabels.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cctype>
+#include <cmath>
 #include <string>
 #include <utility>
 
@@ -30,7 +30,7 @@ struct DeepSkyLabelCandidate final {
            && text.at(prefix.size()) == ' ';
 }
 
-[[nodiscard]] bool isMessierObject(const skygate::ephemeris::CelestialBody& body)
+[[nodiscard]] bool isMessierObject(const skygate::ephemeris::BaseCelestialBody& body)
 {
     if (body.id.starts_with("messier_")) {
         return true;
@@ -55,20 +55,20 @@ struct DeepSkyLabelCandidate final {
            || startsWithCatalogPrefix(alias, "PK");
 }
 
-[[nodiscard]] bool hasCommonNameAlias(const skygate::ephemeris::CelestialBody& body)
+[[nodiscard]] bool hasCommonNameAlias(const skygate::ephemeris::BaseCelestialBody& body)
 {
-    if (!body.deepSkyObject.has_value()) {
+    if (!body.deepSkyObjectValue().has_value()) {
         return false;
     }
 
     return std::any_of(
-        body.deepSkyObject->aliases.begin(), body.deepSkyObject->aliases.end(), [](const std::string& alias) {
-            return !alias.empty() && !isGenericCatalogAlias(alias);
-        }
+        body.deepSkyObjectValue()->aliases.begin(),
+        body.deepSkyObjectValue()->aliases.end(),
+        [](const std::string& alias) { return !alias.empty() && !isGenericCatalogAlias(alias); }
     );
 }
 
-[[nodiscard]] bool shouldConsiderDeepSkyLabel(const skygate::ephemeris::CelestialBody& body, const double fovDeg)
+[[nodiscard]] bool shouldConsiderDeepSkyLabel(const skygate::ephemeris::BaseCelestialBody& body, const double fovDeg)
 {
     if (isMessierObject(body) || hasCommonNameAlias(body)) {
         return true;
@@ -104,7 +104,7 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
 }
 
 [[nodiscard]] double deepSkyLabelScore(
-    const skygate::ephemeris::CelestialBody& body,
+    const skygate::ephemeris::BaseCelestialBody& body,
     const SkyRenderGlyph& glyph,
     const double viewportWidth,
     const double viewportHeight
@@ -121,8 +121,8 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
         score += std::clamp(14.0 - body.visualMagnitude, 0.0, 16.0) * 12.0;
     }
 
-    if (body.deepSkyObject.has_value()) {
-        score += std::clamp(body.deepSkyObject->majorAxisArcmin.value_or(0.0), 0.0, 120.0) * 0.75;
+    if (body.deepSkyObjectValue().has_value()) {
+        score += std::clamp(body.deepSkyObjectValue()->majorAxisArcmin.value_or(0.0), 0.0, 120.0) * 0.75;
     }
 
     const double centerX = viewportWidth * 0.5;
@@ -139,21 +139,21 @@ deepSkyLabelBudget(const double fovDeg, const double viewportWidth, const double
 namespace skygate::ui::internal {
 
 QColor skyRenderLabelColorForBodyType(
-    const skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderTheme
+    const skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderTheme
 )
 {
     switch (type) {
-    case skygate::ephemeris::CelestialBodyType::Sun:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
         return renderTheme.labelSun;
-    case skygate::ephemeris::CelestialBodyType::Moon:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
         return renderTheme.labelMoon;
-    case skygate::ephemeris::CelestialBodyType::Planet:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
         return renderTheme.labelPlanet;
-    case skygate::ephemeris::CelestialBodyType::Constellation:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
         return renderTheme.labelConstellation;
-    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
+    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
         return renderTheme.labelDeepSkyObject;
-    case skygate::ephemeris::CelestialBodyType::Star:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
         break;
     }
 
@@ -208,7 +208,7 @@ double skyRenderDeepSkyHitRadius(const SkyRenderGlyph& glyph)
 
 void appendBodyPointLabels(
     SkyRenderFrame& frame,
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const double viewportWidth,
     const double viewportHeight,
     const SkyThemeRenderPalette& renderTheme,
@@ -220,10 +220,10 @@ void appendBodyPointLabels(
 {
     for (const auto& point : frame.points) {
         const auto& body = snapshot.bodyAt(point.bodyIndex);
-        const bool isConstellationLabel = body.type == skygate::ephemeris::CelestialBodyType::Constellation;
-        const bool isSolarSystemLabel = body.type == skygate::ephemeris::CelestialBodyType::Planet
-                                        || body.type == skygate::ephemeris::CelestialBodyType::Sun
-                                        || body.type == skygate::ephemeris::CelestialBodyType::Moon;
+        const bool isConstellationLabel = body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Constellation;
+        const bool isSolarSystemLabel = body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Planet
+                                        || body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Sun
+                                        || body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Moon;
         if ((!isConstellationLabel || !overlayLayers.constellationLabels)
             && (!isSolarSystemLabel || !overlayLayers.solarSystemLabels)) {
             continue;
@@ -240,7 +240,7 @@ void appendBodyPointLabels(
 
         const skygate::core::Rect2d bounds = skyRenderLabelBounds(point.x, point.y, body.displayName);
         appendSkyRenderLabel(
-            frame.labels, point.x, point.y, body.displayName, skyRenderLabelColorForBodyType(body.type, renderTheme)
+            frame.labels, point.x, point.y, body.displayName, skyRenderLabelColorForBodyType(body.kind, renderTheme)
         );
         labelGrid.add(bounds);
     }
@@ -248,7 +248,7 @@ void appendBodyPointLabels(
 
 void appendDeepSkyLabels(
     SkyRenderFrame& frame,
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const skygate::core::ProjectionParams& projectionParams,
     const double viewportWidth,
     const double viewportHeight,
@@ -324,7 +324,7 @@ void appendDeepSkyLabels(
             glyph.x,
             glyph.y - skyRenderDeepSkyHitRadius(glyph),
             body.displayName,
-            skyRenderLabelColorForBodyType(body.type, renderTheme)
+            skyRenderLabelColorForBodyType(body.kind, renderTheme)
         );
         ++acceptedCount;
     }

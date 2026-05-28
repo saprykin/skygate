@@ -1,5 +1,4 @@
 #include "HorizontalCoordinate.hpp"
-
 #include "math/AngleMath.hpp"
 
 #include <cmath>

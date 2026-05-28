@@ -1,13 +1,12 @@
 #pragma once
 
-#include "ObservationEvent.hpp"
 #include "ObservationEventSummary.hpp"
 
 #include <cstdint>
 
 namespace skygate::ephemeris {
 
-struct CelestialBody;
+class BaseCelestialBody;
 struct EphemerisRequest;
 class IEphemerisEngine;
 
@@ -23,7 +22,7 @@ public:
         const IEphemerisEngine& ephemerisEngine,
         const EphemerisRequest& request,
         std::uint32_t bodyIndex,
-        const CelestialBody* body,
+        const BaseCelestialBody* body,
         double crossingAltitudeDeg,
         SearchMode searchMode
     ) const;

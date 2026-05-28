@@ -1,4 +1,4 @@
-#include "engine/highprecision/EphemerisResultBuilder.hpp"
+#include "EphemerisResultBuilder.hpp"
 
 #include <cstddef>
 #include <cstdint>

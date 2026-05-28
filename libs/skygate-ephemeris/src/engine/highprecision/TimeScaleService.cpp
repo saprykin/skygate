@@ -1,4 +1,4 @@
-#include "engine/highprecision/TimeScaleService.hpp"
+#include "TimeScaleService.hpp"
 #include "time/CalendarTime.hpp"
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
@@ -10,7 +10,6 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <string>
 #include <utility>

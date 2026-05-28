@@ -1,10 +1,10 @@
-#include "engine/highprecision/StarAstrometryCalculator.hpp"
+#include "StarAstrometryCalculator.hpp"
+#include "EphemerisMetadataMerge.hpp"
+#include "ICalcephKernelProvider.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/TimeConstants.hpp"
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 
 #include <cmath>
 #include <limits>
@@ -472,8 +472,8 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
 {
     return calculateStarAstrometry(
         input.request,
-        input.body.starAstrometry,
-        input.body.fixedEquatorial,
+        input.body.starAstrometryValue(),
+        input.body.fixedEquatorialValue(),
         m_kernelProvider,
         m_timeScaleService,
         input.preparedRequestState.get()

@@ -1,8 +1,6 @@
 #include "SkyContextDomainControllers.hpp"
-
-#include "SkyContextControllerSupport.hpp"
-
 #include "ProjectionFactory.hpp"
+#include "SkyContextControllerSupport.hpp"
 #include "math/ViewportMath.hpp"
 
 #include <algorithm>
@@ -198,7 +196,7 @@ bool SkyViewController::setProjectionType(const skygate::core::ProjectionType pr
     return true;
 }
 
-const skygate::core::SkyContext& SkyLocationController::context() const noexcept
+const skygate::core::ObservationContext& SkyLocationController::context() const noexcept
 {
     return m_state.context;
 }

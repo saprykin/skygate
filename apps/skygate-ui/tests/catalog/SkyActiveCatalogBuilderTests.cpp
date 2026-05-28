@@ -1,5 +1,5 @@
-#include "catalog/SkyActiveCatalogBuilder.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/SkyActiveCatalogBuilder.hpp"
 
 #include <QtTest/QtTest>
 
@@ -8,21 +8,20 @@
 
 namespace {
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
-    const skygate::ephemeris::CelestialBodyEphemerisSource source,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
+    const skygate::ephemeris::BaseCelestialBody::Kind source,
     const double magnitude = 1.0
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
-    body.ephemerisSource = source;
+    body.kind = type;
     body.visualMagnitude = magnitude;
-    if (source == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial) {
+    if (source == skygate::ephemeris::BaseCelestialBody::Kind::Star) {
         body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     }
     return body;
@@ -43,14 +42,14 @@ void SkyActiveCatalogBuilderTests::assignsSourceIdsAndFallbackLabels()
         makeBody(
             "sun",
             "Sun",
-            skygate::ephemeris::CelestialBodyType::Sun,
-            skygate::ephemeris::CelestialBodyEphemerisSource::Sun
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun,
+            skygate::ephemeris::BaseCelestialBody::Kind::Sun
         ),
         makeBody(
             "hip_1",
             "HIP 1",
-            skygate::ephemeris::CelestialBodyType::Star,
-            skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star
         ),
     });
     QVERIFY(sourceCatalog != nullptr);

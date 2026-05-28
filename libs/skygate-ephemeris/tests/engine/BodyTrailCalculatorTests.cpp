@@ -15,7 +15,7 @@ namespace {
 
 class FakeTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
         return compute(request.context);
@@ -33,19 +33,20 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        return skygate::ephemeris::SkySnapshot{.context = context};
+        return skygate::ephemeris::EphemerisSnapshot{.context = context};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
     {
         const auto offset =
             std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count();
@@ -74,10 +75,10 @@ public:
         std::size_t bodyIndex = 0U;
     };
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
-        return skygate::ephemeris::SkySnapshot{.context = request.context};
+        return skygate::ephemeris::EphemerisSnapshot{.context = request.context};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
@@ -102,20 +103,21 @@ public:
         };
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        return skygate::ephemeris::SkySnapshot{.context = context};
+        return skygate::ephemeris::EphemerisSnapshot{.context = context};
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
     {
         m_usedContextPath = true;
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
     {
         m_usedContextPath = true;
         return std::nullopt;
@@ -156,7 +158,7 @@ void BodyTrailCalculatorTests::samplesOffsetsAndPreservesInvalidGaps()
     const skygate::ephemeris::BodyTrailCalculator calculator;
     const auto samples = calculator.sample(
         engine,
-        skygate::core::SkyContext{},
+        skygate::core::ObservationContext{},
         7U,
         skygate::ephemeris::BodyTrailOptions{.pastHours = 1, .futureHours = 1, .sampleStepMinutes = 30}
     );
@@ -180,7 +182,7 @@ void BodyTrailCalculatorTests::samplesCurrentInstantForZeroWindow()
     const skygate::ephemeris::BodyTrailCalculator calculator;
     const auto samples = calculator.sample(
         engine,
-        skygate::core::SkyContext{},
+        skygate::core::ObservationContext{},
         7U,
         skygate::ephemeris::BodyTrailOptions{.pastHours = 0, .futureHours = 0, .sampleStepMinutes = 30}
     );
@@ -194,7 +196,7 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
 {
     class MissingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
     public:
-        [[nodiscard]] skygate::ephemeris::SkySnapshot
+        [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
         compute(const skygate::ephemeris::EphemerisRequest& request) const override
         {
             return compute(request.context);
@@ -213,19 +215,20 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
             return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
         }
 
-        [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+        [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+        compute(const skygate::core::ObservationContext& context) const override
         {
-            return skygate::ephemeris::SkySnapshot{.context = context};
+            return skygate::ephemeris::EphemerisSnapshot{.context = context};
         }
 
         [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-        computeBodyState(const skygate::core::SkyContext&, std::string_view) const override
+        computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
         {
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-        computeBodyState(const skygate::core::SkyContext&, std::uint32_t) const override
+        computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
         {
             return std::nullopt;
         }
@@ -235,7 +238,7 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
     const skygate::ephemeris::BodyTrailCalculator calculator;
     const auto samples = calculator.sample(
         engine,
-        skygate::core::SkyContext{},
+        skygate::core::ObservationContext{},
         99U,
         skygate::ephemeris::BodyTrailOptions{.pastHours = 1, .futureHours = 0, .sampleStepMinutes = 30}
     );
@@ -255,7 +258,7 @@ void BodyTrailCalculatorTests::stopsBeforeEndWhenStepDoesNotDivideWindow()
     const skygate::ephemeris::BodyTrailCalculator calculator;
     const auto samples = calculator.sample(
         engine,
-        skygate::core::SkyContext{},
+        skygate::core::ObservationContext{},
         7U,
         skygate::ephemeris::BodyTrailOptions{.pastHours = 1, .futureHours = 0, .sampleStepMinutes = 40}
     );
@@ -314,7 +317,7 @@ void BodyTrailCalculatorTests::rejectsInvalidOptions()
     const skygate::ephemeris::BodyTrailCalculator calculator;
     const auto samples = calculator.sample(
         engine,
-        skygate::core::SkyContext{},
+        skygate::core::ObservationContext{},
         7U,
         skygate::ephemeris::BodyTrailOptions{.pastHours = 1, .futureHours = 1, .sampleStepMinutes = 0}
     );

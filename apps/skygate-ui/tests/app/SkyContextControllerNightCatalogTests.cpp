@@ -12,8 +12,8 @@ namespace {
 
 class RequestSensitiveNightEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
-    explicit RequestSensitiveNightEngine(std::vector<skygate::ephemeris::CelestialBody> bodies)
-        : m_bodies(std::make_shared<const std::vector<skygate::ephemeris::CelestialBody>>(std::move(bodies)))
+    explicit RequestSensitiveNightEngine(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+        : m_bodies(std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(std::move(bodies)))
     {
         m_options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
         m_options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
@@ -39,10 +39,10 @@ public:
         m_options = options;
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = request.context;
         snapshot.catalogBodies = m_bodies;
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
@@ -55,7 +55,7 @@ public:
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view bodyId) const override
     {
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            if ((*m_bodies)[bodyIndex].id == bodyId) {
+            if (m_bodies->bodyAt(bodyIndex).id == bodyId) {
                 return computeBodyState(request, bodyIndex);
             }
         }
@@ -78,9 +78,10 @@ public:
         return stateFor(bodyIndex, requestAltitude(bodyIndex, request), 150.0);
     }
 
-    [[nodiscard]] skygate::ephemeris::SkySnapshot compute(const skygate::core::SkyContext& context) const override
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
     {
-        skygate::ephemeris::SkySnapshot snapshot;
+        skygate::ephemeris::EphemerisSnapshot snapshot;
         snapshot.context = context;
         snapshot.catalogBodies = m_bodies;
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
@@ -90,10 +91,10 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext& context, const std::string_view bodyId) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::string_view bodyId) const override
     {
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            if ((*m_bodies)[bodyIndex].id == bodyId) {
+            if (m_bodies->bodyAt(bodyIndex).id == bodyId) {
                 return computeBodyState(context, static_cast<std::uint32_t>(bodyIndex));
             }
         }
@@ -101,7 +102,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::SkyContext&, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t bodyIndex) const override
     {
         ++m_contextBodyStateCount;
         if (bodyIndex >= m_bodies->size()) {
@@ -168,7 +169,7 @@ private:
         return 55.0 * std::sin(std::numbers::pi_v<double> * 2.0 * (dayFraction + phase));
     }
 
-    std::shared_ptr<const std::vector<skygate::ephemeris::CelestialBody>> m_bodies;
+    std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> m_bodies;
     skygate::ephemeris::EphemerisEngineOptions m_options;
     mutable int m_requestBodyStateCount = 0;
     mutable int m_contextBodyStateCount = 0;
@@ -178,9 +179,9 @@ private:
 
 std::unique_ptr<SkyContextController> createRequestSensitiveNightController(RequestSensitiveNightEngine*& engine)
 {
-    std::vector<skygate::ephemeris::CelestialBody> bodies{
-        makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, -26.7),
-        makeBody("moon", "Moon", skygate::ephemeris::CelestialBodyType::Moon, -12.0),
+    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies{
+        makeBody("sun", "Sun", skygate::ephemeris::BaseCelestialBody::Kind::Sun, -26.7),
+        makeBody("moon", "Moon", skygate::ephemeris::BaseCelestialBody::Kind::Moon, -12.0),
     };
     auto starCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(bodies);
     Q_ASSERT(starCatalog != nullptr);

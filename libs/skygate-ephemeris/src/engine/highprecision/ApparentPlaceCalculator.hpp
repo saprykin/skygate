@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/highprecision/IApparentPlaceCalculator.hpp"
-#include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
+#include "IApparentPlaceCalculator.hpp"
+#include "IAtmosphericRefractionCalculator.hpp"
 
 #include <memory>
 
@@ -21,7 +21,7 @@ public:
     ) const override;
     [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
         const EphemerisRequest& request,
-        std::span<const CelestialBody> bodies,
+        std::span<const BaseCelestialBody* const> bodies,
         std::span<const StarAstrometryBatchResult> calculatorResults,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
     ) const override;

@@ -1,9 +1,8 @@
-#include "math/ProjectedPolylineBuilder.hpp"
-
-#include "math/AngleMath.hpp"
-#include "math/Geometry2d.hpp"
-#include "math/MathConstants.hpp"
-#include "math/SphericalGeometry.hpp"
+#include "ProjectedPolylineBuilder.hpp"
+#include "AngleMath.hpp"
+#include "Geometry2d.hpp"
+#include "MathConstants.hpp"
+#include "SphericalGeometry.hpp"
 
 #include <algorithm>
 #include <cmath>

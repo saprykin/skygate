@@ -1,4 +1,4 @@
-#include "engine/highprecision/EphemerisMetadataMerge.hpp"
+#include "EphemerisMetadataMerge.hpp"
 
 namespace skygate::ephemeris::highprecision {
 namespace {

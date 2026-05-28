@@ -4,7 +4,6 @@
 
 #include <QtTest/QtTest>
 
-#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -60,18 +59,23 @@ namespace {
         return false;
     }
 
-    for (const skygate::ephemeris::CelestialBody& body : result.catalog->bodies()) {
+    for (const skygate::ephemeris::BaseCelestialBody* bodyPointer : result.catalog->bodies()) {
+        if (bodyPointer == nullptr) {
+            return false;
+        }
+        const skygate::ephemeris::BaseCelestialBody& body = *bodyPointer;
+
         if (body.id.empty() || body.displayName.empty()) {
             return false;
         }
         if (!std::isfinite(body.visualMagnitude)) {
             return false;
         }
-        if (!body.fixedEquatorial.has_value()) {
+        if (!body.fixedEquatorialValue().has_value()) {
             return false;
         }
-        if (!std::isfinite(body.fixedEquatorial->rightAscensionHours)
-            || !std::isfinite(body.fixedEquatorial->declinationDeg)) {
+        if (!std::isfinite(body.fixedEquatorialValue()->rightAscensionHours)
+            || !std::isfinite(body.fixedEquatorialValue()->declinationDeg)) {
             return false;
         }
     }

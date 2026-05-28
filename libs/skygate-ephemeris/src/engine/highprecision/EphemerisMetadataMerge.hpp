@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/highprecision/EarthOrientationProvider.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
-#include "Types.hpp"
+#include "EarthOrientationProvider.hpp"
+#include "TimeScaleService.hpp"
+#include "engine/EphemerisEngineQueryResult.hpp"
 
 namespace skygate::ephemeris::highprecision {
 

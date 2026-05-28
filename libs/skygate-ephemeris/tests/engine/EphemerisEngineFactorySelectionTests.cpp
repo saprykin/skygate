@@ -6,26 +6,36 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <span>
 #include <string>
 
 namespace {
 
-[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryBody()
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryBody()
 {
-    return {
-        .id = "factory-target",
-        .displayName = "Factory Target",
-        .type = skygate::ephemeris::CelestialBodyType::Star,
-        .fixedEquatorial = skygate::core::EquatorialCoordinate{
-            .rightAscensionHours = 11.25,
-            .declinationDeg = -6.5,
-        },
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "factory-target";
+    body.displayName = "Factory Target";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+        .rightAscensionHours = 11.25,
+        .declinationDeg = -6.5,
     };
+    return body;
 }
 
-[[nodiscard]] skygate::core::SkyContext makeContext()
+template <typename BodyRange>
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> makeCatalogHandle(const BodyRange& bodies)
 {
-    skygate::core::SkyContext context;
+    return std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
+    );
+}
+
+[[nodiscard]] skygate::core::ObservationContext makeContext()
+{
+    skygate::core::ObservationContext context;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
@@ -53,7 +63,7 @@ void EphemerisEngineFactorySelectionTests::createsRequestedSimpleEngineWithCatal
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
     request.options.setEnableAtmosphericRefraction(true);
@@ -94,7 +104,7 @@ void EphemerisEngineFactorySelectionTests::fallsBackToSimpleWhenHighPrecisionIsU
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
@@ -135,7 +145,7 @@ void EphemerisEngineFactorySelectionTests::failsDefaultHighPrecisionRequestWhenH
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
@@ -163,7 +173,7 @@ void EphemerisEngineFactorySelectionTests::failsStrictHighPrecisionRequestWhenHi
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
 

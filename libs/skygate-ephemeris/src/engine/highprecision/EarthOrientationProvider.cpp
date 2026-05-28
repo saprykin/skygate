@@ -1,4 +1,4 @@
-#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "EarthOrientationProvider.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>

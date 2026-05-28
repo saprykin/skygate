@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/IEphemerisResultBuilder.hpp"
+#include "IEphemerisResultBuilder.hpp"
 
 namespace skygate::ephemeris::highprecision {
 

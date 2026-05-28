@@ -1,4 +1,4 @@
-#include "catalog/hyg/HygCatalogParser.hpp"
+#include "HygCatalogParser.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 
@@ -111,8 +111,8 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             const QString bayerFlamsteed = row.decodeColumn(QStringLiteral("bf"));
             const QString hip = row.decodeColumn(QStringLiteral("hip"));
 
-            CelestialBody body;
-            body.type = CelestialBodyType::Star;
+            OwnGalaxyCelestialBody body;
+            body.kind = BaseCelestialBody::Kind::Star;
             body.visualMagnitude = *magnitude;
             body.fixedEquatorial =
                 core::EquatorialCoordinate{.rightAscensionHours = *raHours, .declinationDeg = *decDeg};

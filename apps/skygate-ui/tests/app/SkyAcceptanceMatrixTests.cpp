@@ -14,7 +14,6 @@
 #include <QTemporaryDir>
 #include <QtTest/QtTest>
 
-#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -202,14 +201,13 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
     return request;
 }
 
-ephemeris::CelestialBody acceptanceMarsBody()
+ephemeris::OwnGalaxyCelestialBody acceptanceMarsBody()
 {
-    return ephemeris::CelestialBody{
-        .id = "mars",
-        .displayName = "Mars",
-        .type = ephemeris::CelestialBodyType::Planet,
-        .ephemerisSource = ephemeris::CelestialBodyEphemerisSource::Planet,
-    };
+    ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.kind = ephemeris::BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
 ephemeris::AstronomicalEpoch acceptanceEpoch(const int year)
@@ -364,10 +362,11 @@ ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEngine(
     const ephemeris::EphemerisDataManifest& manifest
 )
 {
-    const std::array bodies{acceptanceMarsBody()};
     ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = std::make_shared<const ephemeris::CelestialBodyCatalog>(
+        std::vector<ephemeris::OwnGalaxyCelestialBody>{acceptanceMarsBody()}
+    );
     request.options.setEngineKind(ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(ephemeris::EphemerisCorrectionFlags::geometric());
     request.dataManifest = &manifest;

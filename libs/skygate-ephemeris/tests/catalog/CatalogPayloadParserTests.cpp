@@ -81,31 +81,37 @@ void CatalogPayloadParserTests::parsesOpenNgcPayload()
     const auto bodies = parseResult.catalog->bodies();
     QCOMPARE(bodies.size(), 2U);
 
-    const auto m31It = std::find_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::CelestialBody& body) {
-        return body.id == "messier_031";
-    });
+    const auto m31It =
+        std::find_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->id == "messier_031";
+        });
     QVERIFY(m31It != bodies.end());
-    QCOMPARE(m31It->displayName, std::string("M31"));
-    QVERIFY(m31It->type == skygate::ephemeris::CelestialBodyType::DeepSkyObject);
-    QVERIFY(m31It->ephemerisSource == skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
-    QVERIFY(m31It->deepSkyObject.has_value());
-    QVERIFY(m31It->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::Galaxy);
-    QVERIFY(m31It->deepSkyObject->majorAxisArcmin.has_value());
-    QCOMPARE(*m31It->deepSkyObject->majorAxisArcmin, 177.83);
+    const skygate::ephemeris::BaseCelestialBody& m31 = **m31It;
+    QCOMPARE(m31.displayName, std::string("M31"));
+    QVERIFY(m31.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject);
+    QVERIFY(m31.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject);
+    QVERIFY(m31.deepSkyObjectValue().has_value());
+    QVERIFY(m31.deepSkyObjectValue()->kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy);
+    QVERIFY(m31.deepSkyObjectValue()->majorAxisArcmin.has_value());
+    QCOMPARE(*m31.deepSkyObjectValue()->majorAxisArcmin, 177.83);
     QVERIFY(
         std::find(
-            m31It->deepSkyObject->aliases.begin(), m31It->deepSkyObject->aliases.end(), std::string("Andromeda Galaxy")
+            m31.deepSkyObjectValue()->aliases.begin(),
+            m31.deepSkyObjectValue()->aliases.end(),
+            std::string("Andromeda Galaxy")
         )
-        != m31It->deepSkyObject->aliases.end()
+        != m31.deepSkyObjectValue()->aliases.end()
     );
 
-    const auto m57It = std::find_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::CelestialBody& body) {
-        return body.id == "messier_057";
-    });
+    const auto m57It =
+        std::find_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->id == "messier_057";
+        });
     QVERIFY(m57It != bodies.end());
+    const skygate::ephemeris::BaseCelestialBody& m57 = **m57It;
     QVERIFY(
-        m57It->deepSkyObject.has_value()
-        && m57It->deepSkyObject->kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula
+        m57.deepSkyObjectValue().has_value()
+        && m57.deepSkyObjectValue()->kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula
     );
 }
 
@@ -126,7 +132,7 @@ void CatalogPayloadParserTests::parsesHygGzipPayload()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].id == "hip_42");
+    QVERIFY(bodies[0]->id == "hip_42");
 }
 
 void CatalogPayloadParserTests::parsesHygZipPayload()
@@ -153,7 +159,7 @@ void CatalogPayloadParserTests::parsesHygZipPayload()
 
     const auto bodies = catalog->bodies();
     QVERIFY(bodies.size() == 1U);
-    QVERIFY(bodies[0].id == "hip_42");
+    QVERIFY(bodies[0]->id == "hip_42");
 }
 
 void CatalogPayloadParserTests::rejectsInvalidArchivePayloads()

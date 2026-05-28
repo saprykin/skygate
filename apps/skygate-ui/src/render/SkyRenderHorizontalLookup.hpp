@@ -1,8 +1,11 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
 #include "HorizontalCoordinate.hpp"
-#include "Types.hpp"
-
+#include "OwnGalaxyCelestialBody.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <span>
@@ -20,7 +23,8 @@ public:
         std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups
     );
 
-    void capture(const skygate::ephemeris::CelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal);
+    void
+    capture(const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::HorizontalCoordinate& horizontal);
 
     [[nodiscard]] const skygate::core::HorizontalCoordinate* findHorizontal(std::string_view bodyId) const;
 

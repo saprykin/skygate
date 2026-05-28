@@ -1,7 +1,6 @@
-#include "catalog/opengc/OpenNgcObjectMapper.hpp"
-
-#include "catalog/io/CatalogParsingUtilities.hpp"
+#include "OpenNgcObjectMapper.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QRegularExpression>
 #include <QStringList>
@@ -79,28 +78,28 @@ void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& te
     }
 }
 
-DeepSkyObjectKind kindFromOpenNgcType(QString typeText)
+DeepSkyObjectInfo::Kind kindFromOpenNgcType(QString typeText)
 {
     typeText = typeText.trimmed();
     if (typeText == "G" || typeText == "GGroup" || typeText == "GPair" || typeText == "GTrpl") {
-        return DeepSkyObjectKind::Galaxy;
+        return DeepSkyObjectInfo::Kind::Galaxy;
     }
     if (typeText == "OCl" || typeText == "Cl+N") {
-        return DeepSkyObjectKind::OpenCluster;
+        return DeepSkyObjectInfo::Kind::OpenCluster;
     }
     if (typeText == "GCl") {
-        return DeepSkyObjectKind::GlobularCluster;
+        return DeepSkyObjectInfo::Kind::GlobularCluster;
     }
     if (typeText == "PN") {
-        return DeepSkyObjectKind::PlanetaryNebula;
+        return DeepSkyObjectInfo::Kind::PlanetaryNebula;
     }
     if (typeText == "Neb" || typeText == "HII" || typeText == "EmN" || typeText == "RfN" || typeText == "SNR") {
-        return DeepSkyObjectKind::Nebula;
+        return DeepSkyObjectInfo::Kind::Nebula;
     }
     if (typeText == "*Ass") {
-        return DeepSkyObjectKind::Asterism;
+        return DeepSkyObjectInfo::Kind::Asterism;
     }
-    return DeepSkyObjectKind::Unknown;
+    return DeepSkyObjectInfo::Kind::Unknown;
 }
 
 }  // namespace

@@ -1,6 +1,5 @@
-#include "math/CircleHitIndex.hpp"
-
-#include "math/Geometry2d.hpp"
+#include "CircleHitIndex.hpp"
+#include "Geometry2d.hpp"
 
 #include <cmath>
 #include <limits>

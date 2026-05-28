@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/EphemerisCorrectionFlags.hpp"
-#include "engine/EphemerisEngineKind.hpp"
+#include "EphemerisCorrectionFlags.hpp"
+#include "EphemerisEngineKind.hpp"
 
 #include <cstdint>
 

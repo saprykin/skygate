@@ -1,3 +1,5 @@
+#include "CelestialBodyCatalog.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "math/MathConstants.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
@@ -37,13 +39,12 @@ using core::MathConstants;
     return request;
 }
 
-[[nodiscard]] CelestialBody makeAstrometricStar()
+[[nodiscard]] OwnGalaxyCelestialBody makeAstrometricStar()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "test-star";
     body.displayName = "Test Star";
-    body.type = CelestialBodyType::Star;
-    body.ephemerisSource = CelestialBodyEphemerisSource::Star;
+    body.kind = BaseCelestialBody::Kind::Star;
     body.fixedEquatorial = core::EquatorialCoordinate{
         .rightAscensionHours = 10.0,
         .declinationDeg = 20.0,
@@ -59,9 +60,9 @@ using core::MathConstants;
     return body;
 }
 
-[[nodiscard]] CelestialBody makePartialAstrometricStar()
+[[nodiscard]] OwnGalaxyCelestialBody makePartialAstrometricStar()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.id = "partial-star";
     body.displayName = "Partial Star";
     body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
@@ -70,13 +71,12 @@ using core::MathConstants;
     return body;
 }
 
-[[nodiscard]] CelestialBody makeFixedOnlyStar()
+[[nodiscard]] OwnGalaxyCelestialBody makeFixedOnlyStar()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "fixed-star";
     body.displayName = "Fixed Star";
-    body.type = CelestialBodyType::Star;
-    body.ephemerisSource = CelestialBodyEphemerisSource::FixedEquatorial;
+    body.kind = BaseCelestialBody::Kind::Star;
     body.fixedEquatorial = core::EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = -15.0,
@@ -84,9 +84,9 @@ using core::MathConstants;
     return body;
 }
 
-[[nodiscard]] CelestialBody makeStarWithInvalidOptionalAstrometry()
+[[nodiscard]] OwnGalaxyCelestialBody makeStarWithInvalidOptionalAstrometry()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.id = "invalid-optional-star";
     body.displayName = "Invalid Optional Star";
     body.starAstrometry->properMotionRightAscensionMasPerYear = std::numeric_limits<double>::quiet_NaN();
@@ -96,23 +96,35 @@ using core::MathConstants;
     return body;
 }
 
-[[nodiscard]] CelestialBody makePlanet()
+[[nodiscard]] OwnGalaxyCelestialBody makePlanet()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "mars";
     body.displayName = "Mars";
-    body.type = CelestialBodyType::Planet;
-    body.ephemerisSource = CelestialBodyEphemerisSource::Planet;
+    body.kind = BaseCelestialBody::Kind::Planet;
     return body;
 }
 
-[[nodiscard]] HighPrecisionComputationInput makeInput(const CelestialBody& body, const EphemerisRequest& request)
+[[nodiscard]] CelestialBodyCatalog makeCatalog(const std::vector<OwnGalaxyCelestialBody>& bodies)
+{
+    return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+}
+
+[[nodiscard]] HighPrecisionComputationInput makeInput(const BaseCelestialBody& body, const EphemerisRequest& request)
 {
     return {
         .request = request,
         .body = body,
         .bodyIndex = 0U,
     };
+}
+
+[[nodiscard]] HighPrecisionComputationInput
+makeInput(const OwnGalaxyCelestialBody& body, const EphemerisRequest& request)
+{
+    static thread_local CelestialBodyCatalog catalog;
+    catalog = CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>{body});
+    return makeInput(catalog.bodyAt(0), request);
 }
 
 [[nodiscard]] double angularDifferenceDegrees(const double lhs, const double rhs) noexcept
@@ -297,7 +309,7 @@ private slots:
 
 void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEnabled()
 {
-    const CelestialBody body = makeAstrometricStar();
+    const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(
         EphemerisCorrectionFlags::properMotion() | EphemerisCorrectionFlags::stellarParallax()
             | EphemerisCorrectionFlags::radialVelocity(),
@@ -336,7 +348,7 @@ void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEn
 
 void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreDisabled()
 {
-    const CelestialBody body = makeAstrometricStar();
+    const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::noCorrections(), 10.0);
 
     const StarAstrometryCalculator calculator;
@@ -350,7 +362,7 @@ void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreD
 
 void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPlaneComponent()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.fixedEquatorial = core::EquatorialCoordinate{
         .rightAscensionHours = 10.0,
         .declinationDeg = 60.0,
@@ -384,7 +396,7 @@ void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPla
 
 void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricState()
 {
-    const CelestialBody body = makeAstrometricStar();
+    const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::stellarParallax(), 0.0);
     const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernelProvider =
@@ -417,13 +429,13 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPartialAndFixedStars()
 {
-    const std::vector<CelestialBody> bodies{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
         makePlanet(),
         makeAstrometricStar(),
         makePartialAstrometricStar(),
         makeFixedOnlyStar(),
     };
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(
         EphemerisCorrectionFlags::properMotion() | EphemerisCorrectionFlags::stellarParallax()
             | EphemerisCorrectionFlags::radialVelocity(),
@@ -446,12 +458,12 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPart
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarWhenCorrectionsAreDisabled()
 {
-    const std::vector<CelestialBody> bodies{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
         makeAstrometricStar(),
         makePartialAstrometricStar(),
         makeFixedOnlyStar(),
     };
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::noCorrections(), 10.0);
 
     const StarAstrometryCalculator calculator;
@@ -467,10 +479,10 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarWhenCorrectionsAreDisa
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstrometry()
 {
-    const std::vector<CelestialBody> bodies{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
         makeStarWithInvalidOptionalAstrometry(),
     };
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(
         EphemerisCorrectionFlags::properMotion() | EphemerisCorrectionFlags::stellarParallax()
             | EphemerisCorrectionFlags::radialVelocity(),
@@ -505,13 +517,13 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstr
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrections()
 {
-    const std::vector<CelestialBody> bodies{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
         makeAstrometricStar(),
         makeAstrometricStar(),
         makePartialAstrometricStar(),
         makeFixedOnlyStar(),
     };
-    const CatalogStarAstrometryArrays arrays(bodies);
+    const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernelProvider =
         std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
@@ -534,7 +546,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
 
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()
 {
-    const CelestialBody body = makeAstrometricStar();
+    const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
 
     const StarAstrometryCalculator calculator;
@@ -556,7 +568,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMi
 
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMissing()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->stellarParallaxMas = std::nullopt;
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
     auto kernelProvider =
@@ -582,7 +594,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
 
 void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsDisabled()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->properMotionRightAscensionMasPerYear = 0.0;
     body.starAstrometry->properMotionDeclinationMasPerYear = 0.0;
     body.starAstrometry->radialVelocityKmPerSecond = 25.0;
@@ -610,7 +622,7 @@ void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsD
 
 void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMotionUnavailable()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->properMotionDeclinationMasPerYear = std::nullopt;
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
@@ -634,7 +646,7 @@ void StarAstrometryCalculatorTests::degradesPartialAstrometryAndReportsProperMot
 
 void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenAstrometryCorrectionsAreRequested()
 {
-    CelestialBody body = makeAstrometricStar();
+    OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry = std::nullopt;
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
@@ -649,9 +661,9 @@ void StarAstrometryCalculatorTests::degradesFixedOnlyStarsWhenAstrometryCorrecti
 
 void StarAstrometryCalculatorTests::failsWhenNoCoordinateFallbackExists()
 {
-    CelestialBody body;
+    OwnGalaxyCelestialBody body;
     body.id = "missing-coordinate";
-    body.type = CelestialBodyType::Star;
+    body.kind = BaseCelestialBody::Kind::Star;
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::properMotion(), 10.0);
 
     const StarAstrometryCalculator calculator;

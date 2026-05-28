@@ -1,12 +1,14 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "ObservationContext.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
-#include "SkyContext.hpp"
 #include "SkySceneOverlayData.hpp"
-#include "Types.hpp"
-
 #include "engine/IEphemerisEngine.hpp"
-
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QHash>
@@ -20,12 +22,12 @@
 class SkyTimeController;
 
 struct SkySelectionOverlayInput final {
-    const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
+    const skygate::ephemeris::EphemerisSnapshot* snapshot = nullptr;
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
     const SkyTimeController* timeController = nullptr;
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
     const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
-    std::optional<skygate::core::SkyContext> skyContext;
+    std::optional<skygate::core::ObservationContext> skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::span<const skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
     std::span<const std::uint8_t> catalogSourceIds;

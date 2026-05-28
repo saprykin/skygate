@@ -1,6 +1,6 @@
 #pragma once
 
-#include "time/AstronomicalEpoch.hpp"
+#include "AstronomicalEpoch.hpp"
 #include "UtcTimePoint.hpp"
 
 namespace skygate::ephemeris {

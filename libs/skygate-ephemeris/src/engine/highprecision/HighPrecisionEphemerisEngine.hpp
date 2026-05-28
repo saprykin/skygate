@@ -1,7 +1,7 @@
 #pragma once
 
+#include "HighPrecisionTypes.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "engine/highprecision/HighPrecisionTypes.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -14,7 +14,7 @@ namespace skygate::ephemeris::highprecision {
 class HighPrecisionEphemerisEngine final : public IEphemerisEngine {
 public:
     HighPrecisionEphemerisEngine(
-        std::span<const CelestialBody> bodies,
+        const CelestialBodyCatalog& catalog,
         EphemerisEngineOptions engineOptions,
         HighPrecisionEphemerisEngineDependencies dependencies
     );
@@ -33,17 +33,17 @@ public:
     [[nodiscard]] EphemerisDatasetInfo dataSetInfo() const override;
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
 
-    [[nodiscard]] SkySnapshot compute(const EphemerisRequest& request) const override;
+    [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, std::string_view bodyId) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const override;
 
-    [[nodiscard]] SkySnapshot compute(const core::SkyContext& context) const override;
+    [[nodiscard]] EphemerisSnapshot compute(const core::ObservationContext& context) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const core::SkyContext& context, std::string_view bodyId) const override;
+    computeBodyState(const core::ObservationContext& context, std::string_view bodyId) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const core::SkyContext& context, std::uint32_t bodyIndex) const override;
+    computeBodyState(const core::ObservationContext& context, std::uint32_t bodyIndex) const override;
 
 private:
     class Impl;

@@ -1,4 +1,4 @@
-#include "catalog/io/CsvRowTokenizer.hpp"
+#include "CsvRowTokenizer.hpp"
 
 #include <QtGlobal>
 

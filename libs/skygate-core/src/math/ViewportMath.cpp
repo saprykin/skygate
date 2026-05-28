@@ -1,6 +1,5 @@
-#include "math/ViewportMath.hpp"
-
-#include "math/AngleMath.hpp"
+#include "ViewportMath.hpp"
+#include "AngleMath.hpp"
 
 #include <algorithm>
 

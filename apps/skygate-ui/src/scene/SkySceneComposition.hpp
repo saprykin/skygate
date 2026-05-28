@@ -1,15 +1,18 @@
 #pragma once
 
-#include <QString>
-#include <QStringList>
-
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "PreparedProjection.hpp"
 #include "SkyObjectTrailBuilder.hpp"
 #include "SkySceneFramePipeline.hpp"
 #include "SkySceneOverlayData.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 
-#include "PreparedProjection.hpp"
-#include "Types.hpp"
+#include <QString>
+#include <QStringList>
 
 #include <cstdint>
 #include <optional>
@@ -20,7 +23,7 @@ class SkyTimeController;
 
 struct SkySceneFrameData final {
     std::optional<skygate::core::PreparedProjection> preparedProjection;
-    const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
+    const skygate::ephemeris::EphemerisSnapshot* snapshot = nullptr;
     SkyRenderFrame frame;
     std::vector<SkyOverlayItem> overlayItems;
     SkySelectionMarker selectionMarker;

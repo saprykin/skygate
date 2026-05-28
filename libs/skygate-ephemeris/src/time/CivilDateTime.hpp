@@ -1,6 +1,6 @@
 #pragma once
 
-#include "time/TimeScale.hpp"
+#include "TimeScale.hpp"
 
 #include <cstdint>
 #include <optional>

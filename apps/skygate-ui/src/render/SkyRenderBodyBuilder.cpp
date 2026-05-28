@@ -1,7 +1,5 @@
 #include "SkyRenderBodyBuilder.hpp"
-
 #include "SkyContextControllerSupport.hpp"
-
 #include "math/Geometry2d.hpp"
 
 #include <algorithm>
@@ -68,7 +66,7 @@ struct DecimatedStarPoint final {
 }
 
 [[nodiscard]] SkyRenderPoint makeRenderPoint(
-    const skygate::ephemeris::CelestialBody& body,
+    const skygate::ephemeris::BaseCelestialBody& body,
     const std::uint32_t bodyIndex,
     const skygate::core::ScreenPoint& projected,
     const skygate::ui::internal::SkyThemeRenderPalette& renderTheme
@@ -79,10 +77,10 @@ struct DecimatedStarPoint final {
     point.y = projected.y;
     point.bodyIndex = bodyIndex;
     point.sizePx = skygate::ui::internal::SkyContextRenderStyle::pointSizeForMagnitude(body.visualMagnitude);
-    if (body.type == skygate::ephemeris::CelestialBodyType::Constellation) {
+    if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Constellation) {
         point.sizePx = std::max(point.sizePx, 3.0);
     }
-    point.color = skygate::ui::internal::SkyContextRenderStyle::colorForBodyType(body.type, renderTheme);
+    point.color = skygate::ui::internal::SkyContextRenderStyle::colorForBodyType(body.kind, renderTheme);
     return point;
 }
 
@@ -101,7 +99,7 @@ struct DecimatedStarPoint final {
 }
 
 [[nodiscard]] bool shouldRenderDeepSkyObject(
-    const skygate::ephemeris::CelestialBody& body,
+    const skygate::ephemeris::BaseCelestialBody& body,
     const skygate::core::ProjectionParams& projectionParams,
     const double magnitudeCutoff,
     const SkyOverlayLayerVisibility& overlayLayers
@@ -119,7 +117,7 @@ struct DecimatedStarPoint final {
 }
 
 [[nodiscard]] SkyRenderGlyph makeRenderGlyph(
-    const skygate::ephemeris::CelestialBody& body,
+    const skygate::ephemeris::BaseCelestialBody& body,
     const std::uint32_t bodyIndex,
     const skygate::core::ScreenPoint& projected,
     const skygate::core::ProjectionParams& projectionParams,
@@ -127,7 +125,7 @@ struct DecimatedStarPoint final {
 )
 {
     const skygate::ephemeris::DeepSkyObjectInfo defaultInfo;
-    const auto& info = body.deepSkyObject.has_value() ? *body.deepSkyObject : defaultInfo;
+    const auto& info = body.deepSkyObjectValue().has_value() ? *body.deepSkyObjectValue() : defaultInfo;
     const double pixelsPerDeg = std::min(projectionParams.viewportWidth, projectionParams.viewportHeight)
                                 / std::max(1.0, projectionParams.fovDeg);
     const double majorArcmin = info.majorAxisArcmin.value_or(10.0);
@@ -142,29 +140,29 @@ struct DecimatedStarPoint final {
     glyph.kind = info.kind;
     glyph.radiusXPx = std::clamp(radiusX, 4.5, 44.0);
     glyph.radiusYPx = std::clamp(radiusY, 4.0, 32.0);
-    if (info.kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula) {
+    if (info.kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula) {
         glyph.radiusXPx = std::clamp(radiusX, 5.0, 12.0);
         glyph.radiusYPx = glyph.radiusXPx;
     }
     glyph.rotationDeg = info.positionAngleDeg.value_or(0.0);
     glyph.widthPx = 1.25;
-    glyph.color = skygate::ui::internal::SkyContextRenderStyle::colorForBodyType(body.type, renderTheme);
+    glyph.color = skygate::ui::internal::SkyContextRenderStyle::colorForBodyType(body.kind, renderTheme);
     return glyph;
 }
 
 [[nodiscard]] double deepSkyGlyphMarginPx(
-    const skygate::ephemeris::CelestialBody& body, const skygate::core::ProjectionParams& projectionParams
+    const skygate::ephemeris::BaseCelestialBody& body, const skygate::core::ProjectionParams& projectionParams
 )
 {
     const skygate::ephemeris::DeepSkyObjectInfo defaultInfo;
-    const auto& info = body.deepSkyObject.has_value() ? *body.deepSkyObject : defaultInfo;
+    const auto& info = body.deepSkyObjectValue().has_value() ? *body.deepSkyObjectValue() : defaultInfo;
     const double pixelsPerDeg = std::min(projectionParams.viewportWidth, projectionParams.viewportHeight)
                                 / std::max(1.0, projectionParams.fovDeg);
     const double majorArcmin = info.majorAxisArcmin.value_or(10.0);
     const double minorArcmin = info.minorAxisArcmin.value_or(majorArcmin);
     double radiusX = std::clamp(((majorArcmin / 60.0) * pixelsPerDeg) * 0.5, 4.5, 44.0);
     double radiusY = std::clamp(((minorArcmin / 60.0) * pixelsPerDeg) * 0.5, 4.0, 32.0);
-    if (info.kind == skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula) {
+    if (info.kind == skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula) {
         radiusX = std::clamp(((majorArcmin / 60.0) * pixelsPerDeg) * 0.5, 5.0, 12.0);
         radiusY = radiusX;
     }
@@ -179,7 +177,7 @@ namespace skygate::ui::internal {
 void SkyRenderBodyBuilder::appendBodies(
     SkyRenderFrame& frame,
     SkyRenderHorizontalLookup* horizontalLookup,
-    const skygate::ephemeris::SkySnapshot& snapshot,
+    const skygate::ephemeris::EphemerisSnapshot& snapshot,
     const skygate::core::PreparedProjection& projection,
     const double magnitudeCutoff,
     const double viewportWidth,
@@ -209,16 +207,16 @@ void SkyRenderBodyBuilder::appendBodies(
             horizontalLookup->capture(body, state.horizontal);
         }
 
-        if (body.type == skygate::ephemeris::CelestialBodyType::Star && body.visualMagnitude > magnitudeCutoff) {
+        if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Star && body.visualMagnitude > magnitudeCutoff) {
             continue;
         }
 
-        if (body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject
+        if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject
             && !shouldRenderDeepSkyObject(body, projection.params(), magnitudeCutoff, overlayLayers)) {
             continue;
         }
 
-        const bool isDeepSkyObject = body.type == skygate::ephemeris::CelestialBodyType::DeepSkyObject;
+        const bool isDeepSkyObject = body.kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
         const auto projected =
             isDeepSkyObject
                 ? projection.projectWithMargin(state.horizontal, deepSkyGlyphMarginPx(body, projection.params()))
@@ -232,7 +230,7 @@ void SkyRenderBodyBuilder::appendBodies(
             continue;
         }
 
-        if (body.type == skygate::ephemeris::CelestialBodyType::Star && starCellSizePx > 0.0) {
+        if (body.kind == skygate::ephemeris::BaseCelestialBody::Kind::Star && starCellSizePx > 0.0) {
             const std::uint64_t cellKey = screenCellKey(projected.x, projected.y, starCellSizePx);
             const double cellCenterDistanceSquared =
                 distanceToCellCenterSquared(projected.x, projected.y, starCellSizePx);

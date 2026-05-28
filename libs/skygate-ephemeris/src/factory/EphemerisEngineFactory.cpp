@@ -255,7 +255,9 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
 
             return EphemerisEngineFactoryResult::success(
                 std::make_unique<highprecision::HighPrecisionEphemerisEngine>(
-                    request.catalogBodies, request.options, std::move(dependencies)
+                    request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{},
+                    request.options,
+                    std::move(dependencies)
                 )
             );
         }
@@ -263,7 +265,9 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
 
     if (EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy)) {
         return EphemerisEngineFactoryResult::success(
-            std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options),
+            std::make_unique<SimpleEphemerisEngine>(
+                request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{}, request.options
+            ),
             EphemerisFactoryCreationStatus::CreatedSimpleFallback,
             withSeverity(std::move(diagnostics), EphemerisFactoryCreationDiagnosticSeverity::Warning)
         );
@@ -293,7 +297,9 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
     switch (request.engineKind) {
     case EphemerisEngineKind::Type::Simple:
         result = EphemerisEngineFactoryResult::success(
-            std::make_unique<SimpleEphemerisEngine>(request.catalogBodies, request.options)
+            std::make_unique<SimpleEphemerisEngine>(
+                request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{}, request.options
+            )
         );
         break;
     case EphemerisEngineKind::Type::HighPrecision:
@@ -317,18 +323,23 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create()
 
 EphemerisEngineFactoryResult EphemerisEngineFactory::create(const IStarCatalog& catalog)
 {
-    return create(catalog.bodies());
+    return create(catalog.catalog());
 }
 
-EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::initializer_list<CelestialBody> bodies)
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::initializer_list<OwnGalaxyCelestialBody> bodies)
 {
-    return create(std::span<const CelestialBody>{bodies.begin(), bodies.size()});
+    return create(std::span<const OwnGalaxyCelestialBody>{bodies.begin(), bodies.size()});
 }
 
-EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::span<const CelestialBody> bodies)
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::span<const OwnGalaxyCelestialBody> bodies)
+{
+    return create(CelestialBodyCatalog(std::vector<OwnGalaxyCelestialBody>{bodies.begin(), bodies.end()}));
+}
+
+EphemerisEngineFactoryResult EphemerisEngineFactory::create(const CelestialBodyCatalog& catalog)
 {
     EphemerisEngineFactoryRequest request;
-    request.catalogBodies = bodies;
+    request.catalog = std::make_shared<CelestialBodyCatalog>(catalog);
     request.options = simpleEphemerisEngineDefaultOptions();
     return create(request);
 }

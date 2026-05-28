@@ -1,1 +1,1 @@
-#include "catalog/CatalogCompositionSource.hpp"
+#include "CatalogCompositionSource.hpp"

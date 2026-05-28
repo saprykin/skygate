@@ -1,6 +1,7 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "CelestialBodyState.hpp"
+#include "HighPrecisionTypes.hpp"
 
 namespace skygate::ephemeris::highprecision {
 

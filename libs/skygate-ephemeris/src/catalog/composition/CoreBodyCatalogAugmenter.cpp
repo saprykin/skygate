@@ -1,7 +1,7 @@
-#include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
-
-#include "catalog/CatalogIdentity.hpp"
+#include "CoreBodyCatalogAugmenter.hpp"
+#include "StringUtilities.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/CatalogIdentity.hpp"
 
 #include <algorithm>
 #include <array>
@@ -30,31 +30,54 @@ constexpr std::array<BundledBrightStar, 8> kBundledBrightStars{{
     {"betelgeuse", "Betelgeuse", 5.9195, 7.4071, 0.42},
 }};
 
-bool isSunOrMoonType(const CelestialBodyType type)
+bool isSunOrMoonType(const BaseCelestialBody::Kind type)
 {
-    return type == CelestialBodyType::Sun || type == CelestialBodyType::Moon;
+    return type == BaseCelestialBody::Kind::Sun || type == BaseCelestialBody::Kind::Moon;
 }
 
-CatalogCompositionSource sourceKindForBody(const CelestialBody& body)
+CatalogCompositionSource sourceKindForBody(const BaseCelestialBody& body)
 {
     return CatalogIdentity::isAnalyticSolarSystemBody(body) ? CatalogCompositionSource::BuiltInEphemeris
                                                             : CatalogCompositionSource::Primary;
 }
 
+OwnGalaxyCelestialBody toOwnGalaxyBody(const BaseCelestialBody& body)
+{
+    OwnGalaxyCelestialBody ownGalaxyBody;
+    ownGalaxyBody.id = body.id;
+    ownGalaxyBody.displayName = body.displayName;
+    ownGalaxyBody.kind = body.kind;
+    ownGalaxyBody.visualMagnitude = body.visualMagnitude;
+    ownGalaxyBody.fixedEquatorial = body.fixedEquatorialValue();
+    ownGalaxyBody.starAstrometry = body.starAstrometryValue();
+    return ownGalaxyBody;
+}
+
+bool containsBodyId(const std::span<const OwnGalaxyCelestialBody> bodies, const std::string_view id)
+{
+    return std::any_of(bodies.begin(), bodies.end(), [id](const OwnGalaxyCelestialBody& body) {
+        return StringUtilities::equalsIgnoreAsciiCase(body.id, id);
+    });
+}
+
 }  // namespace
 
-CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<const CelestialBody> bodies)
+CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<const BaseCelestialBody* const> bodies)
 {
     CatalogAugmentationResult result;
-    result.bodies.assign(bodies.begin(), bodies.end());
+    result.bodies.reserve(bodies.size());
     result.sourceKinds.reserve(result.bodies.size());
-    for (const CelestialBody& body : result.bodies) {
-        result.sourceKinds.push_back(sourceKindForBody(body));
+    for (const BaseCelestialBody* body : bodies) {
+        if (body == nullptr || body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
+            continue;
+        }
+        result.bodies.push_back(toOwnGalaxyBody(*body));
+        result.sourceKinds.push_back(sourceKindForBody(*body));
     }
 
     const std::size_t starCount = static_cast<std::size_t>(
-        std::count_if(result.bodies.begin(), result.bodies.end(), [](const CelestialBody& body) {
-            return body.type == CelestialBodyType::Star;
+        std::count_if(result.bodies.begin(), result.bodies.end(), [](const OwnGalaxyCelestialBody& body) {
+            return body.kind == BaseCelestialBody::Kind::Star;
         })
     );
 
@@ -63,34 +86,38 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
         return result;
     }
 
-    for (const CelestialBody& body : bundledCatalog->bodies()) {
-        if (!isSunOrMoonType(body.type) && body.type != CelestialBodyType::Planet
-            && body.type != CelestialBodyType::DeepSkyObject) {
+    for (const BaseCelestialBody* body : bundledCatalog->bodies()) {
+        if (body == nullptr) {
             continue;
         }
 
-        if (body.type == CelestialBodyType::DeepSkyObject) {
+        if (!isSunOrMoonType(body->kind) && body->kind != BaseCelestialBody::Kind::Planet
+            && body->kind != BaseCelestialBody::Kind::DeepSkyObject) {
             continue;
         }
 
-        if (CatalogIdentity::containsBodyId(result.bodies, body.id)) {
+        if (body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
             continue;
         }
 
-        result.sourceKinds.push_back(sourceKindForBody(body));
-        result.bodies.push_back(body);
+        if (containsBodyId(result.bodies, body->id)) {
+            continue;
+        }
+
+        result.sourceKinds.push_back(sourceKindForBody(*body));
+        result.bodies.push_back(toOwnGalaxyBody(*body));
     }
 
     if (starCount == 0U) {
         for (const BundledBrightStar& star : kBundledBrightStars) {
-            if (CatalogIdentity::containsBodyId(result.bodies, star.id)) {
+            if (containsBodyId(result.bodies, star.id)) {
                 continue;
             }
 
-            CelestialBody body;
+            OwnGalaxyCelestialBody body;
             body.id = star.id;
             body.displayName = star.displayName;
-            body.type = CelestialBodyType::Star;
+            body.kind = BaseCelestialBody::Kind::Star;
             body.visualMagnitude = star.visualMagnitude;
             body.fixedEquatorial = core::EquatorialCoordinate{
                 .rightAscensionHours = star.rightAscensionHours, .declinationDeg = star.declinationDeg

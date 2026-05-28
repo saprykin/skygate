@@ -8,7 +8,6 @@
 
 #include <chrono>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <string>
 
@@ -17,18 +16,18 @@ namespace {
 constexpr double kSecondsPerDay = 86'400.0;
 constexpr double kUnixEpochJulianDay = 2'440'587.5;
 
-skygate::ephemeris::CelestialBody makeBody(
+skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const skygate::ephemeris::CelestialBodyType type,
+    const skygate::ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
 )
 {
-    skygate::ephemeris::CelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = fixedEquatorial;
     return body;
@@ -75,7 +74,7 @@ void EphemerisEngineBaselineTests::computesFiniteSolarSystemCoordinates()
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.observer.elevationMeters = 16.0;
@@ -154,7 +153,7 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
@@ -181,7 +180,7 @@ void EphemerisEngineBaselineTests::movingBodiesChangeAcrossDays()
 void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates()
 {
     const auto sourceCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({
-        makeBody("sun", "Sun", skygate::ephemeris::CelestialBodyType::Sun, -26.74),
+        makeBody("sun", "Sun", skygate::ephemeris::BaseCelestialBody::Kind::Sun, -26.74),
     });
     QVERIFY(sourceCatalog != nullptr);
 
@@ -191,14 +190,14 @@ void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates(
     using namespace skygate::ephemeris::tests;
     const auto* siriusBody = findBodyById(activeCatalog.catalog->bodies(), "sirius");
     QVERIFY(siriusBody != nullptr);
-    QCOMPARE(siriusBody->ephemerisSource, skygate::ephemeris::CelestialBodyEphemerisSource::FixedEquatorial);
+    QCOMPARE(siriusBody->kind, skygate::ephemeris::BaseCelestialBody::Kind::Star);
 
     auto engineResult = skygate::ephemeris::EphemerisEngineFactory::create(*activeCatalog.catalog);
     QVERIFY(engineResult.isSuccess());
     const auto& engine = engineResult.engine;
     QVERIFY(engine != nullptr);
 
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
@@ -212,7 +211,7 @@ void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates(
 
 void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinates()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
@@ -227,7 +226,7 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 12.5, .declinationDeg = -30.0}
         ),
@@ -246,7 +245,7 @@ void EphemerisEngineBaselineTests::supportsNullCatalogAndImportedFixedCoordinate
 
 void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAndIndex()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1704067200));
@@ -255,7 +254,7 @@ void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAnd
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{.rightAscensionHours = 12.5, .declinationDeg = -30.0}
         ),
@@ -281,7 +280,7 @@ void EphemerisEngineBaselineTests::computesSingleBodyStateByCaseInsensitiveIdAnd
 
 void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextPath()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -290,7 +289,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = 12.5,
@@ -351,7 +350,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotComputeMatchesSkyContextP
 
 void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleOptions()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -360,7 +359,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = 12.5,
@@ -418,7 +417,7 @@ void EphemerisEngineBaselineTests::requestBasedSnapshotReportsUnsupportedSimpleO
 
 void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefractionEnabledStaysValid()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -427,7 +426,7 @@ void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefract
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = 12.5,
@@ -463,7 +462,7 @@ void EphemerisEngineBaselineTests::requestWithNoCorrectionsAndAtmosphericRefract
 
 void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefaultOptions()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -472,7 +471,7 @@ void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefau
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = 12.5,
@@ -521,7 +520,7 @@ void EphemerisEngineBaselineTests::skyContextCompatibilityPathAppliesEngineDefau
 
 void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveIdAndIndex()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -530,7 +529,7 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = 12.5,
@@ -591,7 +590,7 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateByCaseInsensitiveI
 
 void EphemerisEngineBaselineTests::requestBasedSingleBodyStateReturnsNulloptForMissingIdAndIndex()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer.latitudeDeg = 37.7749;
     context.observer.longitudeDeg = -122.4194;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
@@ -600,7 +599,7 @@ void EphemerisEngineBaselineTests::requestBasedSingleBodyStateReturnsNulloptForM
         makeBody(
             "demo_star",
             "Demo Star",
-            skygate::ephemeris::CelestialBodyType::Star,
+            skygate::ephemeris::BaseCelestialBody::Kind::Star,
             4.0,
             skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = 12.5,

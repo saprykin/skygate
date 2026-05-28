@@ -1,13 +1,13 @@
-#include "engine/EphemerisEngineQueries.hpp"
+#include "EphemerisEngineQueries.hpp"
 #include "StringUtilities.hpp"
 
 namespace skygate::ephemeris {
 
 std::optional<CelestialBodyState>
-EphemerisEngineQueries::findBodyStateById(const SkySnapshot& snapshot, const std::string_view bodyId)
+EphemerisEngineQueries::findBodyStateById(const EphemerisSnapshot& snapshot, const std::string_view bodyId)
 {
     for (const CelestialBodyState& state : snapshot.states) {
-        const CelestialBody& body = snapshot.bodyAt(state.bodyIndex);
+        const BaseCelestialBody& body = snapshot.bodyAt(state.bodyIndex);
         if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
             return state;
         }
@@ -17,7 +17,7 @@ EphemerisEngineQueries::findBodyStateById(const SkySnapshot& snapshot, const std
 }
 
 std::optional<CelestialBodyState>
-EphemerisEngineQueries::findBodyStateByIndex(const SkySnapshot& snapshot, const std::uint32_t bodyIndex)
+EphemerisEngineQueries::findBodyStateByIndex(const EphemerisSnapshot& snapshot, const std::uint32_t bodyIndex)
 {
     for (const CelestialBodyState& state : snapshot.states) {
         if (state.bodyIndex == bodyIndex) {
@@ -29,14 +29,14 @@ EphemerisEngineQueries::findBodyStateByIndex(const SkySnapshot& snapshot, const 
 }
 
 std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateById(
-    const IEphemerisEngine& engine, const core::SkyContext& context, const std::string_view bodyId
+    const IEphemerisEngine& engine, const core::ObservationContext& context, const std::string_view bodyId
 )
 {
     return findBodyStateById(engine.compute(context), bodyId);
 }
 
 std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateByIndex(
-    const IEphemerisEngine& engine, const core::SkyContext& context, const std::uint32_t bodyIndex
+    const IEphemerisEngine& engine, const core::ObservationContext& context, const std::uint32_t bodyIndex
 )
 {
     return findBodyStateByIndex(engine.compute(context), bodyIndex);

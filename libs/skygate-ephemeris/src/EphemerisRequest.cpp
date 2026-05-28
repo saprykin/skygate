@@ -1,5 +1,4 @@
 #include "EphemerisRequest.hpp"
-
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 

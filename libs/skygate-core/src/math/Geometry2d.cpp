@@ -1,7 +1,6 @@
-#include "math/Geometry2d.hpp"
-
-#include "math/AngleMath.hpp"
-#include "math/MathConstants.hpp"
+#include "Geometry2d.hpp"
+#include "AngleMath.hpp"
+#include "MathConstants.hpp"
 
 #include <cmath>
 

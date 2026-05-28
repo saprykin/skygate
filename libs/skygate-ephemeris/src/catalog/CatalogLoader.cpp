@@ -1,20 +1,75 @@
-#include "catalog/CatalogLoader.hpp"
+#include "CatalogLoader.hpp"
+#include "CatalogBodyParseResult.hpp"
+#include "CatalogFactory.hpp"
+#include "ICatalogParser.hpp"
 #include "catalog/bundled/BundledCatalogParser.hpp"
-#include "catalog/CatalogBodyParseResult.hpp"
-#include "catalog/CatalogFactory.hpp"
 #include "catalog/hyg/HygCatalogParser.hpp"
-#include "catalog/ICatalogParser.hpp"
 #include "catalog/io/GzipCatalogParser.hpp"
-#include "catalog/io/zip/ZipCatalogParser.hpp"
+#include "catalog/normalize/CatalogBodyNormalization.hpp"
 #include "catalog/opengc/OpenNgcCatalogParser.hpp"
+#include "catalog/io/zip/ZipCatalogParser.hpp"
 
 #include <algorithm>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
 namespace {
+
+[[nodiscard]] std::unique_ptr<IStarCatalog>
+createCatalogFromSelectedBodies(const std::span<const BaseCelestialBody* const> selectedBodies)
+{
+    std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
+    std::vector<DistantCelestialBody> distantBodies;
+    std::vector<CelestialBodyCatalog::OrderEntry> orderedBodyIndexes;
+    ownGalaxyBodies.reserve(selectedBodies.size());
+    distantBodies.reserve(selectedBodies.size());
+    orderedBodyIndexes.reserve(selectedBodies.size());
+
+    for (const BaseCelestialBody* body : selectedBodies) {
+        if (body == nullptr) {
+            continue;
+        }
+
+        if (body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
+            DistantCelestialBody distantBody;
+            distantBody.id = body->id;
+            distantBody.displayName = body->displayName;
+            distantBody.kind = body->kind;
+            distantBody.visualMagnitude = body->visualMagnitude;
+            distantBody.fixedEquatorial = body->fixedEquatorialValue();
+            distantBody.deepSkyObject = body->deepSkyObjectValue();
+            orderedBodyIndexes.push_back(
+                CelestialBodyCatalog::OrderEntry{
+                    .domain = CelestialBodyCatalog::BodyDomain::Distant,
+                    .bodyIndex = distantBodies.size(),
+                }
+            );
+            distantBodies.push_back(std::move(distantBody));
+        } else {
+            OwnGalaxyCelestialBody ownGalaxyBody;
+            ownGalaxyBody.id = body->id;
+            ownGalaxyBody.displayName = body->displayName;
+            ownGalaxyBody.kind = body->kind;
+            ownGalaxyBody.visualMagnitude = body->visualMagnitude;
+            ownGalaxyBody.fixedEquatorial = body->fixedEquatorialValue();
+            ownGalaxyBody.starAstrometry = body->starAstrometryValue();
+            orderedBodyIndexes.push_back(
+                CelestialBodyCatalog::OrderEntry{
+                    .domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy,
+                    .bodyIndex = ownGalaxyBodies.size(),
+                }
+            );
+            ownGalaxyBodies.push_back(std::move(ownGalaxyBody));
+        }
+    }
+
+    return CatalogFactory::createStarCatalogFromBodies(
+        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(orderedBodyIndexes)
+    );
+}
 
 CatalogLoadResult
 finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionOptions& selectionOptions)
@@ -27,20 +82,38 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
         return result;
     }
 
-    std::vector<CelestialBody> bodies = std::move(parsedBodies.bodies);
-    const std::size_t parsedBodyCount = bodies.size();
+    std::vector<OwnGalaxyCelestialBody> bodies = std::move(parsedBodies.bodies);
+    std::vector<DistantCelestialBody> distantBodies = std::move(parsedBodies.distantBodies);
+    const std::size_t parsedBodyCount = bodies.size() + distantBodies.size();
     if (selectionOptions.isEnabled() && selectionOptions.mode == CatalogSelectionMode::BrightestByVisualMagnitude
-        && selectionOptions.maxBodyCount < bodies.size()) {
-        std::stable_sort(bodies.begin(), bodies.end(), [](const CelestialBody& lhs, const CelestialBody& rhs) {
-            return lhs.visualMagnitude < rhs.visualMagnitude;
-        });
-        bodies.resize(selectionOptions.maxBodyCount);
+        && selectionOptions.maxBodyCount < parsedBodyCount) {
+        CatalogBodyNormalization::apply(bodies);
+        CelestialBodyCatalog sourceCatalog(
+            std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
+        );
+        std::vector<const BaseCelestialBody*> selectedBodies;
+        selectedBodies.reserve(sourceCatalog.size());
+        for (const BaseCelestialBody* body : sourceCatalog.bodies()) {
+            selectedBodies.push_back(body);
+        }
+        std::stable_sort(
+            selectedBodies.begin(),
+            selectedBodies.end(),
+            [](const BaseCelestialBody* lhs, const BaseCelestialBody* rhs) {
+                return lhs->visualMagnitude < rhs->visualMagnitude;
+            }
+        );
+        selectedBodies.resize(selectionOptions.maxBodyCount);
+        result.catalog = createCatalogFromSelectedBodies(selectedBodies);
+    } else {
+        result.catalog = CatalogFactory::createStarCatalogFromBodies(
+            std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
+        );
     }
 
     result.diagnostics.parsedBodyCount = parsedBodyCount;
-    result.diagnostics.selectedBodyCount = bodies.size();
-    result.diagnostics.truncatedBodyCount = parsedBodyCount - bodies.size();
-    result.catalog = CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
+    result.diagnostics.selectedBodyCount = result.catalog != nullptr ? result.catalog->bodies().size() : 0U;
+    result.diagnostics.truncatedBodyCount = parsedBodyCount - result.diagnostics.selectedBodyCount;
     if (result.catalog == nullptr) {
         result.errorCode = CatalogLoadResult::ErrorCode::NoBodies;
         result.errorDetail = "Catalog contains no bodies.";

@@ -1,16 +1,17 @@
 #pragma once
 
-#include "SkyContext.hpp"
-#include "Types.hpp"
+#include "EphemerisRequest.hpp"
+#include "ObservationContext.hpp"
 #include "UtcTimePoint.hpp"
+#include "engine/EphemerisEngineOptions.hpp"
 
 namespace skygate::ephemeris {
 
 class EphemerisRequestFactory final {
 public:
-    [[nodiscard]] static core::SkyContext contextFromRequest(const EphemerisRequest& request) noexcept;
+    [[nodiscard]] static core::ObservationContext contextFromRequest(const EphemerisRequest& request) noexcept;
     [[nodiscard]] static EphemerisRequest
-    requestFromContext(const core::SkyContext& context, const EphemerisEngineOptions& options) noexcept;
+    requestFromContext(const core::ObservationContext& context, const EphemerisEngineOptions& options) noexcept;
     [[nodiscard]] static EphemerisRequest
     atUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& utcTime) noexcept;
 };

@@ -1,5 +1,4 @@
-#include "projections/PerspectiveProjection.hpp"
-
+#include "PerspectiveProjection.hpp"
 #include "ProjectionAlgorithms.hpp"
 
 namespace skygate::core {

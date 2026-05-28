@@ -1,3 +1,5 @@
+#include "CelestialBodyCatalog.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
@@ -39,43 +41,50 @@ using skygate::core::PhysicalConstants;
     return request;
 }
 
-[[nodiscard]] CelestialBody makePlanetBody(std::string id)
+[[nodiscard]] OwnGalaxyCelestialBody makePlanetBody(std::string id)
 {
-    return {
-        .id = std::move(id),
-        .displayName = "Planet",
-        .type = CelestialBodyType::Planet,
-        .ephemerisSource = CelestialBodyEphemerisSource::Planet,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = "Planet";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
-[[nodiscard]] CelestialBody makeSunBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
 {
-    return {
-        .id = "sun",
-        .displayName = "Sun",
-        .type = CelestialBodyType::Sun,
-        .ephemerisSource = CelestialBodyEphemerisSource::Sun,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "sun";
+    body.displayName = "Sun";
+    body.kind = BaseCelestialBody::Kind::Sun;
+    return body;
 }
 
-[[nodiscard]] CelestialBody makeDeepSkyBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeDeepSkyBody()
 {
-    return {
-        .id = "m31",
-        .displayName = "M31",
-        .type = CelestialBodyType::DeepSkyObject,
-        .ephemerisSource = CelestialBodyEphemerisSource::Unresolved,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "m31";
+    body.displayName = "M31";
+    body.kind = BaseCelestialBody::Kind::DeepSkyObject;
+    return body;
 }
 
-[[nodiscard]] HighPrecisionComputationInput makeInput(const CelestialBody& body, const EphemerisRequest& request)
+[[nodiscard]] HighPrecisionComputationInput makeInput(const BaseCelestialBody& body, const EphemerisRequest& request)
 {
     return {
         .request = request,
         .body = body,
         .bodyIndex = 4U,
     };
+}
+
+[[nodiscard]] HighPrecisionCalculatorResult calculateBody(
+    const SolarSystemStateCalculator& calculator, OwnGalaxyCelestialBody body, const EphemerisRequest& request
+)
+{
+    std::vector<OwnGalaxyCelestialBody> bodies;
+    bodies.push_back(std::move(body));
+    const CelestialBodyCatalog catalog(std::move(bodies));
+    return calculator.calculate(makeInput(catalog.bodyAt(0U), request));
 }
 
 class FakeCalcephKernelProvider final : public ICalcephKernelProvider {
@@ -295,10 +304,10 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
     provider->nextResult = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 1.0});
     const SolarSystemStateCalculator calculator(provider);
-    const CelestialBody mars = makePlanetBody("mars");
+    const OwnGalaxyCelestialBody mars = makePlanetBody("mars");
     const EphemerisRequest request = makeRequest();
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(mars, request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, mars, request);
 
     QCOMPARE(provider->callCount, 1);
     QCOMPARE(provider->lastTargetNaifId, 499);
@@ -330,7 +339,7 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstHorizonsSmoke
     EphemerisRequest request = makeRequest();
     request.epoch = fixture.epoch;
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QCOMPARE(provider->lastTargetNaifId, fixture.targetNaifId);
     QCOMPARE(provider->lastCenterNaifId, fixture.centerNaifId);
@@ -349,7 +358,7 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
     const EphemerisRequest request = makeRequest();
 
     struct Case {
-        CelestialBody body;
+        OwnGalaxyCelestialBody body;
         int naifId = 0;
     };
     const std::array cases{
@@ -364,7 +373,7 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
     };
 
     for (const Case& item : cases) {
-        const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(item.body, request));
+        const HighPrecisionCalculatorResult result = calculateBody(calculator, item.body, request);
 
         QVERIFY(result.equatorial.has_value());
         QCOMPARE(provider->lastTargetNaifId, item.naifId);
@@ -382,7 +391,7 @@ void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBo
     provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
     const SolarSystemStateCalculator calculator(provider);
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
 
     QCOMPARE(provider->callCount, 2);
     QCOMPARE(provider->calls[0].targetNaifId, 499);
@@ -406,7 +415,7 @@ void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfig
     provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
     const SolarSystemStateCalculator calculator(provider, true);
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
 
     QCOMPARE(provider->callCount, 1);
     QCOMPARE(provider->lastTargetNaifId, 4);
@@ -440,7 +449,7 @@ void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPref
         const SolarSystemStateCalculator calculator(provider, true);
 
         const HighPrecisionCalculatorResult result =
-            calculator.calculate(makeInput(makePlanetBody(std::string{item.id}), makeRequest()));
+            calculateBody(calculator, makePlanetBody(std::string{item.id}), makeRequest());
 
         QCOMPARE(provider->callCount, 1);
         QCOMPARE(provider->lastTargetNaifId, item.bodyCenterNaifId);
@@ -464,7 +473,7 @@ void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTarg
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QVERIFY(provider->callCount >= 3);
     QCOMPARE(provider->calls.front().targetNaifId, 499);
@@ -511,7 +520,7 @@ void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixtu
     request.epoch = fixture.receiveEpoch;
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QCOMPARE(provider->callCount, 2 + static_cast<int>(fixture.retardedTargetStates.size()));
     QCOMPARE(provider->calls[0].targetNaifId, fixture.targetNaifId);
@@ -548,7 +557,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDr
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QCOMPARE(provider->callCount, 2);
     QVERIFY(result.equatorial.has_value());
@@ -582,7 +591,7 @@ void SolarSystemStateCalculatorTests::appliesStellarAberrationFromEarthVelocity(
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::stellarAberration());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QVERIFY(result.equatorial.has_value());
     QVERIFY(result.equatorial->rightAscensionHours > 0.0);
@@ -609,7 +618,7 @@ void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
     );
     const SolarSystemStateCalculator calculator(provider);
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
 
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
@@ -628,7 +637,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsW
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::stellarAberration());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
@@ -657,7 +666,7 @@ void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::gravitationalLightDeflection());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QVERIFY(result.equatorial.has_value());
     QVERIFY(result.equatorial->rightAscensionHours > (0.1 * 12.0 / MathConstants::kPi));
@@ -680,7 +689,7 @@ void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhen
     provider->responses[{10, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
     const SolarSystemStateCalculator calculator(provider);
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
 
     QVERIFY(result.equatorial.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - (0.1 * 12.0 / MathConstants::kPi)) < 1.0e-12);
@@ -699,7 +708,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWit
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::gravitationalLightDeflection());
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QVERIFY(result.equatorial.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
@@ -727,8 +736,8 @@ void SolarSystemStateCalculatorTests::reportsUnsupportedPlanetIdsWithoutCallingK
     const SolarSystemStateCalculator calculator(provider);
 
     const HighPrecisionCalculatorResult unknownPlanet =
-        calculator.calculate(makeInput(makePlanetBody("planet_x"), makeRequest()));
-    const HighPrecisionCalculatorResult deepSky = calculator.calculate(makeInput(makeDeepSkyBody(), makeRequest()));
+        calculateBody(calculator, makePlanetBody("planet_x"), makeRequest());
+    const HighPrecisionCalculatorResult deepSky = calculateBody(calculator, makeDeepSkyBody(), makeRequest());
 
     QCOMPARE(provider->callCount, 0);
     QCOMPARE(
@@ -746,7 +755,7 @@ void SolarSystemStateCalculatorTests::reportsMissingKernelProvider()
 {
     const SolarSystemStateCalculator calculator(nullptr);
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
@@ -763,7 +772,7 @@ void SolarSystemStateCalculatorTests::propagatesOutOfRangeKernelStatus()
     provider->nextResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     const SolarSystemStateCalculator calculator(provider);
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), makeRequest()));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
 
     QCOMPARE(provider->callCount, 1);
     QCOMPARE(
@@ -782,7 +791,7 @@ void SolarSystemStateCalculatorTests::rejectsNonTdbEpochs()
     EphemerisRequest request = makeRequest();
     request.epoch.timeScale = TimeScale::Utc;
 
-    const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(makePlanetBody("mars"), request));
+    const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 
     QCOMPARE(provider->callCount, 0);
     QCOMPARE(

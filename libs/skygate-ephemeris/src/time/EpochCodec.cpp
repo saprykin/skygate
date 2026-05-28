@@ -1,6 +1,6 @@
-#include "time/EpochCodec.hpp"
-#include "math/TimeConstants.hpp"
+#include "EpochCodec.hpp"
 #include "UtcTimeCodec.hpp"
+#include "math/TimeConstants.hpp"
 
 #include <cmath>
 #include <cstdint>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "SkyContextController.hpp"
 #include "EquatorialCoordinate.hpp"
-#include "SkyContext.hpp"
+#include "ObservationContext.hpp"
+#include "SkyContextController.hpp"
 #include "SkyTimeController.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/IStarCatalog.hpp"
@@ -31,27 +31,27 @@ struct TestSkyContextConfig {
     bool applyUtcDateTime = true;
 };
 
-[[nodiscard]] inline ephemeris::CelestialBody makeBody(
+[[nodiscard]] inline ephemeris::OwnGalaxyCelestialBody makeBody(
     std::string id,
     std::string displayName,
-    const ephemeris::CelestialBodyType type,
+    const ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const std::optional<core::EquatorialCoordinate>& fixedEquatorial = std::nullopt
 )
 {
-    ephemeris::CelestialBody body;
+    ephemeris::OwnGalaxyCelestialBody body;
     body.id = std::move(id);
     body.displayName = std::move(displayName);
-    body.type = type;
+    body.kind = type;
     body.visualMagnitude = visualMagnitude;
     body.fixedEquatorial = fixedEquatorial;
     return body;
 }
 
-[[nodiscard]] inline ephemeris::CelestialBody makeFixedBody(
+[[nodiscard]] inline ephemeris::OwnGalaxyCelestialBody makeFixedBody(
     std::string id,
     std::string displayName,
-    const ephemeris::CelestialBodyType type,
+    const ephemeris::BaseCelestialBody::Kind type,
     const double visualMagnitude,
     const double rightAscensionHours,
     const double declinationDeg
@@ -66,14 +66,17 @@ struct TestSkyContextConfig {
     );
 }
 
-[[nodiscard]] inline ephemeris::CelestialBody makeDeepSkyBody(
+[[nodiscard]] inline ephemeris::DistantCelestialBody makeDeepSkyBody(
     std::string id, std::string displayName, const double visualMagnitude, std::vector<std::string> aliases = {}
 )
 {
-    ephemeris::CelestialBody body =
-        makeBody(std::move(id), std::move(displayName), ephemeris::CelestialBodyType::DeepSkyObject, visualMagnitude);
+    ephemeris::DistantCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = std::move(displayName);
+    body.kind = ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    body.visualMagnitude = visualMagnitude;
     body.deepSkyObject = ephemeris::DeepSkyObjectInfo{
-        .kind = ephemeris::DeepSkyObjectKind::Galaxy,
+        .kind = ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = std::move(aliases),
         .majorAxisArcmin = 8.0,
         .minorAxisArcmin = 4.0,
@@ -91,9 +94,20 @@ struct TestSkyContextConfig {
 }
 
 [[nodiscard]] inline std::unique_ptr<ephemeris::IStarCatalog>
-createTestCatalog(std::vector<ephemeris::CelestialBody> bodies)
+createTestCatalog(std::vector<ephemeris::OwnGalaxyCelestialBody> bodies)
 {
     return ephemeris::CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
+}
+
+[[nodiscard]] inline std::unique_ptr<ephemeris::IStarCatalog>
+createTestCatalog(std::vector<ephemeris::DistantCelestialBody> bodies)
+{
+    std::vector<ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.reserve(bodies.size());
+    for (std::uint32_t index = 0U; index < bodies.size(); ++index) {
+        order.push_back({.domain = ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = index});
+    }
+    return ephemeris::CatalogFactory::createStarCatalogFromBodies({}, std::move(bodies), std::move(order));
 }
 
 [[nodiscard]] inline std::unique_ptr<ephemeris::IEphemerisEngine>
@@ -114,7 +128,23 @@ createTestEphemerisEngine(const ephemeris::IStarCatalog& starCatalog)
 }
 
 [[nodiscard]] inline std::unique_ptr<SkyContextController>
-createTestController(std::vector<ephemeris::CelestialBody> bodies, const bool loadSettings = false)
+createTestController(std::vector<ephemeris::OwnGalaxyCelestialBody> bodies, const bool loadSettings = false)
+{
+    auto starCatalog = createTestCatalog(std::move(bodies));
+    if (starCatalog == nullptr) {
+        return nullptr;
+    }
+
+    auto ephemerisEngine = createTestEphemerisEngine(*starCatalog);
+    if (ephemerisEngine == nullptr) {
+        return nullptr;
+    }
+
+    return createTestController(std::move(starCatalog), std::move(ephemerisEngine), loadSettings);
+}
+
+[[nodiscard]] inline std::unique_ptr<SkyContextController>
+createTestController(std::vector<ephemeris::DistantCelestialBody> bodies, const bool loadSettings = false)
 {
     auto starCatalog = createTestCatalog(std::move(bodies));
     if (starCatalog == nullptr) {
@@ -147,7 +177,7 @@ inline bool configureTestSkyContext(SkyContextController& controller, const Test
 }
 
 [[nodiscard]] inline std::optional<ephemeris::CelestialBodyState>
-findBodyStateById(const ephemeris::SkySnapshot& snapshot, const std::string& bodyId)
+findBodyStateById(const ephemeris::EphemerisSnapshot& snapshot, const std::string& bodyId)
 {
     for (const ephemeris::CelestialBodyState& state : snapshot.states) {
         if (snapshot.bodyAt(state.bodyIndex).id == bodyId) {

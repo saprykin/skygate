@@ -26,42 +26,48 @@
 
 namespace {
 
-[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryBehaviorBody()
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryBehaviorBody()
 {
-    return {
-        .id = "factory-behavior-target",
-        .displayName = "Factory Behavior Target",
-        .type = skygate::ephemeris::CelestialBodyType::Star,
-        .fixedEquatorial = skygate::core::EquatorialCoordinate{
-            .rightAscensionHours = 5.25,
-            .declinationDeg = -12.75,
-        },
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "factory-behavior-target";
+    body.displayName = "Factory Behavior Target";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+        .rightAscensionHours = 5.25,
+        .declinationDeg = -12.75,
     };
+    return body;
 }
 
-[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryBehaviorSun()
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryBehaviorSun()
 {
-    return {
-        .id = "sun",
-        .displayName = "Sun",
-        .type = skygate::ephemeris::CelestialBodyType::Sun,
-        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Sun,
-    };
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "sun";
+    body.displayName = "Sun";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Sun;
+    return body;
 }
 
-[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryBehaviorMars()
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryBehaviorMars()
 {
-    return {
-        .id = "mars",
-        .displayName = "Mars",
-        .type = skygate::ephemeris::CelestialBodyType::Planet,
-        .ephemerisSource = skygate::ephemeris::CelestialBodyEphemerisSource::Planet,
-    };
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
-[[nodiscard]] skygate::core::SkyContext makeContext()
+template <typename BodyRange>
+[[nodiscard]] std::shared_ptr<const skygate::ephemeris::CelestialBodyCatalog> makeCatalogHandle(const BodyRange& bodies)
 {
-    skygate::core::SkyContext context;
+    return std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
+    );
+}
+
+[[nodiscard]] skygate::core::ObservationContext makeContext()
+{
+    skygate::core::ObservationContext context;
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
@@ -79,15 +85,23 @@ template <typename Opaque>
 
 class TestStarCatalog final : public skygate::ephemeris::IStarCatalog {
 public:
-    explicit TestStarCatalog(std::vector<skygate::ephemeris::CelestialBody> bodies) : m_bodies(std::move(bodies)) {}
-
-    [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> bodies() const override
+    explicit TestStarCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+        : m_catalog(std::move(bodies))
     {
-        return m_bodies;
+    }
+
+    [[nodiscard]] const skygate::ephemeris::CelestialBodyCatalog& catalog() const noexcept override
+    {
+        return m_catalog;
+    }
+
+    [[nodiscard]] std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies() const override
+    {
+        return m_catalog.bodies();
     }
 
 private:
-    std::vector<skygate::ephemeris::CelestialBody> m_bodies;
+    skygate::ephemeris::CelestialBodyCatalog m_catalog;
 };
 
 class TestEphemerisDataSnapshot final : public skygate::ephemeris::IEphemerisDataSnapshot {
@@ -405,7 +419,7 @@ void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueI
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
     request.dataSetManifest = &manifest;
@@ -419,8 +433,9 @@ void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueI
         static_cast<std::uint8_t>(request.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
-    QCOMPARE(request.catalogBodies.size(), std::size_t{1});
-    QVERIFY(request.catalogBodies.front().id == std::string{"factory-behavior-target"});
+    QVERIFY(request.catalog != nullptr);
+    QCOMPARE(request.catalog->size(), std::size_t{1});
+    QVERIFY(request.catalog->bodyAt(0).id == std::string{"factory-behavior-target"});
     QCOMPARE(
         static_cast<std::uint32_t>(request.options.correctionFlags()),
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric())
@@ -497,9 +512,10 @@ void EphemerisEngineFactoryBehaviorTests::compatibilityOverloadsCreateSimpleEngi
     QVERIFY(initializerState.has_value());
     QCOMPARE(initializerState->bodyIndex, 0U);
 
-    auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(
-        std::span<const skygate::ephemeris::CelestialBody>{bodies.data(), bodies.size()}
+    const skygate::ephemeris::CelestialBodyCatalog spanCatalog(
+        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
     );
+    auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(spanCatalog);
     QVERIFY(spanEngineResult.isSuccess());
     const auto& spanEngine = spanEngineResult.engine;
     const auto spanState = spanEngine->computeBodyState(context, std::size_t{0});
@@ -523,7 +539,7 @@ void EphemerisEngineFactoryBehaviorTests::simpleRequestCreatesRequestedEngineWit
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::Simple);
     request.options.setCorrectionFlags(
         skygate::ephemeris::EphemerisCorrectionFlags::lightTime()
@@ -563,7 +579,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     const std::array bodies{makeFactoryBehaviorSun()};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     const skygate::ephemeris::EphemerisDataManifest manifest =
@@ -641,7 +657,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelW
     const std::array bodies{makeFactoryBehaviorSun()};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     const skygate::ephemeris::EphemerisDataManifest manifest =
@@ -691,7 +707,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
     const std::array bodies{makeFactoryBehaviorMars()};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.dataManifest = &manifest;
@@ -743,7 +759,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopoc
     const std::array bodies{makeFactoryBehaviorSun()};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalogBodies = bodies;
+    request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
     request.options.setEnableAtmosphericRefraction(false);
@@ -793,7 +809,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
 
     skygate::ephemeris::EphemerisEngineFactoryRequest fallbackRequest;
     fallbackRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    fallbackRequest.catalogBodies = bodies;
+    fallbackRequest.catalog = makeCatalogHandle(bodies);
     fallbackRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     fallbackRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;

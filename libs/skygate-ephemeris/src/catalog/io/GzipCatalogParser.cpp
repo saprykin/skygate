@@ -1,6 +1,6 @@
-#include "catalog/io/GzipCatalogParser.hpp"
+#include "GzipCatalogParser.hpp"
+#include "CompressedDataInflater.hpp"
 #include "catalog/CatalogLoadResult.hpp"
-#include "catalog/io/CompressedDataInflater.hpp"
 
 #include <QLoggingCategory>
 #include <QString>

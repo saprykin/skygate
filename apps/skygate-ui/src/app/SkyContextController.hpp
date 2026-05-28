@@ -1,8 +1,13 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
 #include "GeoLocation.hpp"
+#include "ObservationContext.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "ProjectionType.hpp"
-#include "SkyContext.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "SkyContextDomainControllers.hpp"
 #include "SkyLiveClock.hpp"
@@ -10,7 +15,6 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 #include "SystemTimeSource.hpp"
-#include "Types.hpp"
 #include "UtcTimePoint.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "engine/IEphemerisEngine.hpp"
@@ -330,7 +334,7 @@ public:
     [[nodiscard]] QString trackedTargetDisplayText() const;
     [[nodiscard]] QVariantMap nightConditions() const;
     [[nodiscard]] QString nightConditionsIconKind() const;
-    [[nodiscard]] const skygate::core::SkyContext& skyContext() const noexcept;
+    [[nodiscard]] const skygate::core::ObservationContext& skyContext() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] double viewFieldOfViewDeg() const noexcept;
     [[nodiscard]] skygate::core::ProjectionType projectionType() const noexcept;
@@ -341,7 +345,7 @@ public:
     activeEphemerisDataSnapshot() const noexcept;
     [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContext() const;
-    [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> catalogBodies() const noexcept;
+    [[nodiscard]] std::span<const skygate::ephemeris::BaseCelestialBody* const> catalogBodies() const noexcept;
     [[nodiscard]] QStringList catalogSourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
@@ -473,7 +477,8 @@ private:
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type activeEphemerisEngineKind() const noexcept;
-    [[nodiscard]] EphemerisRequestContext ephemerisRequestContextFor(const skygate::core::SkyContext& skyContext) const;
+    [[nodiscard]] EphemerisRequestContext
+    ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
     void setEphemerisDataOperationStatusText(QString statusText);
     void setEphemerisDataUpdateProgress(double progress) noexcept;

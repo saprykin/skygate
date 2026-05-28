@@ -43,10 +43,10 @@ std::string_view payloadView(const QByteArray& payload)
     return std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()));
 }
 
-bool containsBody(const std::span<const skygate::ephemeris::CelestialBody> bodies, const std::string& id)
+bool containsBody(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies, const std::string& id)
 {
-    return std::any_of(bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::CelestialBody& body) {
-        return body.id == id;
+    return std::any_of(bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::BaseCelestialBody* body) {
+        return body != nullptr && body->id == id;
     });
 }
 

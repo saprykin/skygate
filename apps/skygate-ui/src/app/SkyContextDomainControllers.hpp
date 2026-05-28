@@ -1,14 +1,9 @@
 #pragma once
 
+#include "GeoLocation.hpp"
+#include "ObservationContext.hpp"
+#include "ProjectionType.hpp"
 #include "SkyContextState.hpp"
-
-#include "GeoLocation.hpp"
-#include "ProjectionType.hpp"
-#include "SkyContext.hpp"
-#include "UtcTimePoint.hpp"
-#include "GeoLocation.hpp"
-#include "ProjectionType.hpp"
-#include "SkyContext.hpp"
 #include "UtcTimePoint.hpp"
 
 #include <QString>
@@ -65,7 +60,7 @@ private:
 
 class SkyLocationController final {
 public:
-    [[nodiscard]] const skygate::core::SkyContext& context() const noexcept;
+    [[nodiscard]] const skygate::core::ObservationContext& context() const noexcept;
     [[nodiscard]] skygate::core::GeoLocation observer() const noexcept;
     [[nodiscard]] skygate::core::UtcTimePoint utcTime() const noexcept;
     [[nodiscard]] SkyContextLocationSource source() const noexcept;

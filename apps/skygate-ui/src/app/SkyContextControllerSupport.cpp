@@ -1,6 +1,6 @@
 #include "SkyContextControllerSupport.hpp"
-
 #include "SkyQtTimeCodec.hpp"
+#include "catalog/constellation/ConstellationDataCodec.hpp"
 
 #include <QDate>
 #include <QDir>
@@ -8,8 +8,6 @@
 #include <QStandardPaths>
 #include <QTime>
 #include <QTimeZone>
-
-#include "catalog/constellation/ConstellationDataCodec.hpp"
 
 #include <algorithm>
 
@@ -261,21 +259,21 @@ double SkyContextRenderStyle::pointSizeForMagnitude(const double magnitude)
 }
 
 QColor SkyContextRenderStyle::colorForBodyType(
-    const skygate::ephemeris::CelestialBodyType type, const SkyThemeRenderPalette& renderPalette
+    const skygate::ephemeris::BaseCelestialBody::Kind type, const SkyThemeRenderPalette& renderPalette
 )
 {
     switch (type) {
-    case skygate::ephemeris::CelestialBodyType::Sun:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
         return renderPalette.bodySun;
-    case skygate::ephemeris::CelestialBodyType::Moon:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
         return renderPalette.bodyMoon;
-    case skygate::ephemeris::CelestialBodyType::Planet:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
         return renderPalette.bodyPlanet;
-    case skygate::ephemeris::CelestialBodyType::Star:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
         return renderPalette.bodyStar;
-    case skygate::ephemeris::CelestialBodyType::Constellation:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
         return renderPalette.bodyConstellation;
-    case skygate::ephemeris::CelestialBodyType::DeepSkyObject:
+    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
         return renderPalette.bodyDeepSkyObject;
     }
 

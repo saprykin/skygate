@@ -1,11 +1,11 @@
 #pragma once
 
-#include "engine/highprecision/HighPrecisionTypes.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "HighPrecisionTypes.hpp"
 
 #include <cstddef>
 #include <memory>
 #include <optional>
-#include <vector>
 
 namespace skygate::ephemeris::highprecision {
 
@@ -13,42 +13,42 @@ class IEphemerisComputationCache {
 public:
     virtual ~IEphemerisComputationCache() = default;
 
-    [[nodiscard]] virtual std::optional<SkySnapshot> findSnapshot(
+    [[nodiscard]] virtual std::optional<EphemerisSnapshot> findSnapshot(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     ) const = 0;
 
     virtual void storeSnapshot(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
-        const SkySnapshot& snapshot
+        const EphemerisSnapshot& snapshot
     ) const = 0;
 
     [[nodiscard]] virtual std::shared_ptr<const PreparedEphemerisRequestState> findPreparedRequestState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo
     ) const = 0;
 
     virtual void storePreparedRequestState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState> findBodyState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex
     ) const = 0;
 
     virtual void storeBodyState(
         const EphemerisRequest& request,
-        const std::vector<CelestialBody>& catalogBodies,
+        std::span<const BaseCelestialBody* const> catalogBodies,
         const EphemerisDatasetInfo& dataSetInfo,
         std::size_t bodyIndex,
         const CelestialBodyState& state

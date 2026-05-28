@@ -1,12 +1,10 @@
 #include "SkyViewportGeometry.hpp"
-
+#include "CelestialReferenceCalculator.hpp"
 #include "math/Geometry2d.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
-#include "CelestialReferenceCalculator.hpp"
 
 #include <algorithm>
 #include <array>
-#include <optional>
 #include <utility>
 
 namespace {
@@ -175,27 +173,27 @@ void appendDeepSkyGlyph(
 )
 {
     switch (glyph.kind) {
-    case skygate::ephemeris::DeepSkyObjectKind::Galaxy:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
         appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
         appendGlyphCircle(lineSegments, glyph, 0.58, 0.58);
         break;
-    case skygate::ephemeris::DeepSkyObjectKind::OpenCluster:
-    case skygate::ephemeris::DeepSkyObjectKind::Asterism:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism:
         appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
         break;
-    case skygate::ephemeris::DeepSkyObjectKind::GlobularCluster:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
         appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
         appendGlyphCross(lineSegments, glyph, 0.62);
         break;
-    case skygate::ephemeris::DeepSkyObjectKind::Nebula:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula:
         appendGlyphDiamond(lineSegments, glyph);
         appendGlyphCircle(lineSegments, glyph, 0.68, 0.68);
         break;
-    case skygate::ephemeris::DeepSkyObjectKind::PlanetaryNebula:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
         appendGlyphCircle(lineSegments, glyph, 1.0, 1.0);
         appendGlyphCross(lineSegments, glyph, 1.0);
         break;
-    case skygate::ephemeris::DeepSkyObjectKind::Unknown:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown:
         appendGlyphDiamond(lineSegments, glyph);
         break;
     }

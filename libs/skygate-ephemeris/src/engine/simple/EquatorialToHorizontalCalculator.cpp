@@ -1,4 +1,4 @@
-#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
+#include "EquatorialToHorizontalCalculator.hpp"
 #include "math/AngleMath.hpp"
 #include "time/AstronomicalTime.hpp"
 

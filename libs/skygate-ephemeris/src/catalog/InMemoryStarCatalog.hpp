@@ -1,20 +1,20 @@
 #pragma once
 
-#include "catalog/IStarCatalog.hpp"
+#include "IStarCatalog.hpp"
 
 #include <span>
-#include <vector>
 
 namespace skygate::ephemeris {
 
 class InMemoryStarCatalog final : public IStarCatalog {
 public:
-    explicit InMemoryStarCatalog(std::vector<CelestialBody> bodies);
+    explicit InMemoryStarCatalog(CelestialBodyCatalog catalog);
 
-    [[nodiscard]] std::span<const CelestialBody> bodies() const override;
+    [[nodiscard]] const CelestialBodyCatalog& catalog() const noexcept override;
+    [[nodiscard]] std::span<const BaseCelestialBody* const> bodies() const override;
 
 private:
-    std::vector<CelestialBody> m_bodies;
+    CelestialBodyCatalog m_catalog;
 };
 
 }  // namespace skygate::ephemeris

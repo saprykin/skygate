@@ -1,1 +1,1 @@
-#include "catalog/io/DelimitedCatalogParserOptions.hpp"
+#include "DelimitedCatalogParserOptions.hpp"

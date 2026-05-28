@@ -1,4 +1,4 @@
-#include "math/LinePattern.hpp"
+#include "LinePattern.hpp"
 
 #include <algorithm>
 #include <cmath>

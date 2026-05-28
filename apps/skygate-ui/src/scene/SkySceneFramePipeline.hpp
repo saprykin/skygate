@@ -1,13 +1,20 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisRequest.hpp"
+#include "EphemerisSnapshot.hpp"
 #include "GeoLocation.hpp"
+#include "ObservationContext.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "PreparedProjection.hpp"
 #include "ProjectionType.hpp"
-#include "SkyContext.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderBuilders.hpp"
-#include "Types.hpp"
 #include "UtcTimePoint.hpp"
+#include "engine/EphemerisEngineKind.hpp"
+#include "engine/EphemerisEngineOptions.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QHash>
@@ -23,7 +30,7 @@ class IEphemerisEngine;
 
 struct SkySceneFramePipelineInput final {
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
-    skygate::core::SkyContext skyContext;
+    skygate::core::ObservationContext skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::uint64_t catalogRevision = 0;
     skygate::ephemeris::EphemerisEngineKind::Type engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
@@ -48,7 +55,7 @@ struct SkySceneFramePipelineResult final {
     std::uint64_t snapshotGeneration = 0;
     std::uint64_t renderFrameGeneration = 0;
     const skygate::core::PreparedProjection* preparedProjection = nullptr;
-    const skygate::ephemeris::SkySnapshot* snapshot = nullptr;
+    const skygate::ephemeris::EphemerisSnapshot* snapshot = nullptr;
     const SkyRenderFrame* frame = nullptr;
     const QHash<QString, std::size_t>* stateIndexByBodyId = nullptr;
 };
@@ -96,7 +103,7 @@ private:
     std::optional<SnapshotCacheKey> m_snapshotCacheKey;
     std::optional<RenderFrameKey> m_renderFrameKey;
     std::optional<skygate::core::PreparedProjection> m_preparedProjection;
-    skygate::ephemeris::SkySnapshot m_snapshot;
+    skygate::ephemeris::EphemerisSnapshot m_snapshot;
     SkyRenderFrame m_frame;
     QHash<QString, std::size_t> m_stateIndexByBodyId;
     std::uint64_t m_snapshotGeneration = 0;

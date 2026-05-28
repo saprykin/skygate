@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SkyContext.hpp"
+#include "ObservationContext.hpp"
 #include "engine/EphemerisEngineOptions.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "time/AstronomicalEpoch.hpp"
@@ -9,7 +9,7 @@ namespace skygate::ephemeris {
 
 struct EphemerisRequest {
     AstronomicalEpoch epoch;
-    core::SkyContext context;
+    core::ObservationContext context;
     EphemerisEngineOptions options;
 
     [[nodiscard]] static EphemerisRequest

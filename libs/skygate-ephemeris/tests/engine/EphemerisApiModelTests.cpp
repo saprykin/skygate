@@ -1,5 +1,8 @@
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
 #include "EphemerisRequestFactory.hpp"
-#include "Types.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "UtcTimeCodec.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/AstronomicalEpoch.hpp"
@@ -12,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -21,30 +25,38 @@
 
 namespace {
 
-[[nodiscard]] skygate::ephemeris::CelestialBody makeFactoryTestBody()
+[[nodiscard]] skygate::ephemeris::OwnGalaxyCelestialBody makeFactoryTestBody()
 {
-    return {
-        .id = "vega",
-        .displayName = "Vega",
-        .type = skygate::ephemeris::CelestialBodyType::Star,
-        .fixedEquatorial = skygate::core::EquatorialCoordinate{
-            .rightAscensionHours = 18.6156,
-            .declinationDeg = 38.7837,
-        },
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "vega";
+    body.displayName = "Vega";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+        .rightAscensionHours = 18.6156,
+        .declinationDeg = 38.7837,
     };
+    return body;
 }
 
 class TestStarCatalog final : public skygate::ephemeris::IStarCatalog {
 public:
-    explicit TestStarCatalog(std::vector<skygate::ephemeris::CelestialBody> bodies) : m_bodies(std::move(bodies)) {}
-
-    [[nodiscard]] std::span<const skygate::ephemeris::CelestialBody> bodies() const override
+    explicit TestStarCatalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> bodies)
+        : m_catalog(std::move(bodies))
     {
-        return m_bodies;
+    }
+
+    [[nodiscard]] const skygate::ephemeris::CelestialBodyCatalog& catalog() const noexcept override
+    {
+        return m_catalog;
+    }
+
+    [[nodiscard]] std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies() const override
+    {
+        return m_catalog.bodies();
     }
 
 private:
-    std::vector<skygate::ephemeris::CelestialBody> m_bodies;
+    skygate::ephemeris::CelestialBodyCatalog m_catalog;
 };
 
 }  // namespace
@@ -204,7 +216,7 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
 
 void EphemerisApiModelTests::constructsRequestsWithFactory()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
     context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
 
@@ -252,7 +264,7 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
 
 void EphemerisApiModelTests::constructsCatalogStarAstrometryModel()
 {
-    skygate::ephemeris::CelestialBody body = makeFactoryTestBody();
+    skygate::ephemeris::OwnGalaxyCelestialBody body = makeFactoryTestBody();
     body.starAstrometry = skygate::ephemeris::CatalogStarAstrometry{
         .referenceEquatorial = *body.fixedEquatorial,
         .referenceEpoch =
@@ -403,7 +415,7 @@ void EphemerisApiModelTests::constructsFactoryRequestDefaults()
         static_cast<std::uint8_t>(request.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
-    QCOMPARE(request.catalogBodies.size(), std::size_t{0});
+    QVERIFY(request.catalog == nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(request.options.engineKind()),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
@@ -424,13 +436,16 @@ void EphemerisApiModelTests::constructsFactoryRequestDefaults()
 
 void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
 {
-    const std::array bodies{makeFactoryTestBody()};
+    auto catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{makeFactoryTestBody()}
+    );
 
     skygate::ephemeris::EphemerisEngineFactoryRequest simpleRequest;
-    simpleRequest.catalogBodies = bodies;
+    simpleRequest.catalog = catalog;
 
-    QCOMPARE(simpleRequest.catalogBodies.size(), std::size_t{1});
-    QVERIFY(simpleRequest.catalogBodies.front().id == std::string{"vega"});
+    QVERIFY(simpleRequest.catalog != nullptr);
+    QCOMPARE(simpleRequest.catalog->size(), std::size_t{1});
+    QVERIFY(simpleRequest.catalog->bodyAt(0).id == std::string{"vega"});
     QCOMPARE(
         static_cast<std::uint8_t>(simpleRequest.engineKind),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
@@ -442,7 +457,7 @@ void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
 
     skygate::ephemeris::EphemerisEngineFactoryRequest highPrecisionRequest;
     highPrecisionRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    highPrecisionRequest.catalogBodies = bodies;
+    highPrecisionRequest.catalog = catalog;
     highPrecisionRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     highPrecisionRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     highPrecisionRequest.dataSetManifest = &manifest;
@@ -578,7 +593,7 @@ void EphemerisApiModelTests::constructsFactoryResultAndCreationDiagnostics()
 
 void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
 {
-    skygate::core::SkyContext context;
+    skygate::core::ObservationContext context;
     context.observer = {
         .latitudeDeg = 37.7749,
         .longitudeDeg = -122.4194,
@@ -607,12 +622,10 @@ void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
     QVERIFY(emptyBraceEngine->compute(context).states.empty());
 
     const std::array bodies{makeFactoryTestBody()};
-    auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(
-        std::span<const skygate::ephemeris::CelestialBody>{
-            bodies.data(),
-            bodies.size(),
-        }
+    const skygate::ephemeris::CelestialBodyCatalog spanCatalog(
+        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
     );
+    auto spanEngineResult = skygate::ephemeris::EphemerisEngineFactory::create(spanCatalog);
     QVERIFY(spanEngineResult.isSuccess());
     const auto& spanEngine = spanEngineResult.engine;
 
@@ -634,7 +647,9 @@ void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
     QCOMPARE(catalogState->equatorial.declinationDeg, spanState->equatorial.declinationDeg);
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
-    request.catalogBodies = bodies;
+    request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::span<const skygate::ephemeris::OwnGalaxyCelestialBody>{bodies}
+    );
     const auto requestResult = skygate::ephemeris::EphemerisEngineFactory::create(request);
     QVERIFY(requestResult.isSuccess());
     QVERIFY(requestResult.engine != nullptr);

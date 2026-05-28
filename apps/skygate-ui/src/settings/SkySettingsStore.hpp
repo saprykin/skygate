@@ -1,7 +1,13 @@
 #pragma once
 
+#include "BaseCelestialBody.hpp"
+#include "CelestialBodyState.hpp"
+#include "DistantCelestialBody.hpp"
+#include "EphemerisSnapshot.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
-#include "Types.hpp"
+#include "engine/EphemerisCorrectionFlags.hpp"
+#include "engine/EphemerisEngineKind.hpp"
 
 #include <QByteArray>
 #include <QSize>

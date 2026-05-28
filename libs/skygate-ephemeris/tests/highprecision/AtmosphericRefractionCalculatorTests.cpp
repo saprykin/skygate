@@ -1,3 +1,4 @@
+#include "OwnGalaxyCelestialBody.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 
 #include <QtTest/QtTest>
@@ -11,14 +12,13 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 namespace core = skygate::core;
 
-[[nodiscard]] CelestialBody makeBody()
+[[nodiscard]] OwnGalaxyCelestialBody makeBody()
 {
-    return {
-        .id = "mars",
-        .displayName = "Mars",
-        .type = CelestialBodyType::Planet,
-        .ephemerisSource = CelestialBodyEphemerisSource::Planet,
-    };
+    OwnGalaxyCelestialBody body;
+    body.id = "mars";
+    body.displayName = "Mars";
+    body.kind = BaseCelestialBody::Kind::Planet;
+    return body;
 }
 
 [[nodiscard]] EphemerisRequest makeRequest()
@@ -41,7 +41,7 @@ namespace core = skygate::core;
 
 [[nodiscard]] HighPrecisionComputationInput makeInput(const EphemerisRequest& request)
 {
-    static const CelestialBody kBody = makeBody();
+    static const OwnGalaxyCelestialBody kBody = makeBody();
     return {
         .request = request,
         .body = kBody,

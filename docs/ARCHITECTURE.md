@@ -65,9 +65,9 @@ This module is the application layer and the most stateful part of the system.
 - `SkyContextController`
   - Primary QML-facing controller (`QObject` with `Q_PROPERTY` and
     `Q_INVOKABLE` API).
-  - Owns the current `skygate::core::SkyContext`, projection selection, view
-    center/FOV, playback state, timeline settings, location source selection,
-    and location status.
+  - Owns the current `skygate::core::ObservationContext`, projection selection,
+    view center/FOV, playback state, timeline settings, location source
+    selection, and location status.
   - Owns `SkySettingsStore`, `SkyCatalogManager`, and the bundled city catalog
     model used by Preferences.
   - Owns `SkyTimeController`, the QML-facing date/time surface for display
@@ -80,7 +80,7 @@ This module is the application layer and the most stateful part of the system.
   - Read-model / derived-state layer between controller state and rendering.
   - Listens to `SkyContextController::skyContextChanged()`.
   - Produces:
-    - cached `skygate::ephemeris::SkySnapshot`
+    - cached `skygate::ephemeris::EphemerisSnapshot`
     - cached `skygate::core::PreparedProjection`
     - `SkyRenderFrame` with projected points, constellation segments,
       deep-sky glyphs, and labels
@@ -164,7 +164,7 @@ This module provides stable, UI-independent core types and projection logic.
 - `UtcTimePoint`
 - `EquatorialCoordinate`
 - `HorizontalCoordinate`
-- `SkyContext`
+- `ObservationContext`
 - `ProjectionType`
 - `ProjectionParams`
 - `ScreenPoint`
@@ -219,20 +219,24 @@ computation.
 - `InMemoryStarCatalog`
   - Current concrete catalog implementation backed by a `std::vector`.
 - `CelestialBody`
-  - Body metadata, type, magnitude, optional fixed equatorial coordinates, and
-    optional deep-sky metadata for Messier objects.
-- `CelestialBodyEphemerisSource`
-  - Explicit dispatch key describing how runtime coordinates should be
-    produced.
+  - Body metadata, `BaseCelestialBody::Kind`, magnitude, optional fixed
+    equatorial coordinates, optional star astrometry, and optional deep-sky
+    metadata.
+- `BaseCelestialBody`
+  - Common id, display name, body kind, and magnitude fields shared by the
+    split body model.
+- `OwnGalaxyCelestialBody` / `DistantCelestialBody`
+  - Narrow body views used by catalog consumers that need star/own-galaxy
+    fields or distant deep-sky fields.
 
 #### Snapshot model
 - `IEphemerisEngine`
-  - Pure interface for computing a `SkySnapshot` from a `core::SkyContext`
-    and resolving individual body states.
+  - Pure interface for computing an `EphemerisSnapshot` from a
+    `core::ObservationContext` and resolving individual body states.
 - `EphemerisEngineQueries`
   - Explicit fallback helper for implementations that resolve a body by
     scanning a computed snapshot.
-- `SkySnapshot`
+- `EphemerisSnapshot`
   - Current context
   - shared immutable catalog body vector
   - per-frame body states that reference catalog bodies by index
@@ -247,7 +251,8 @@ The current engine is `SimpleEphemerisEngine`, created through
 Its responsibilities are:
 
 - keep an immutable copy of the current catalog bodies
-- dispatch coordinate generation by `CelestialBodyEphemerisSource`
+- dispatch coordinate generation by `BaseCelestialBody::Kind` and available
+  fixed-equatorial catalog coordinates
 - delegate to focused calculators/lookups:
   - `SunEquatorialCalculator`
   - `MoonEquatorialCalculator`
@@ -343,7 +348,7 @@ The current application uses several lightweight caches instead of a global
 render cache.
 
 ### Snapshot cache
-`SkySceneModel` caches `SkySnapshot` by:
+`SkySceneModel` caches `EphemerisSnapshot` by:
 
 - catalog revision
 - observer location
@@ -422,7 +427,7 @@ The current codebase consistently uses a small set of practical patterns.
 - download and parsing are delegated to focused services.
 
 ### Immutable snapshot pattern
-- `SkySnapshot` shares immutable catalog bodies and stores per-frame state
+- `EphemerisSnapshot` shares immutable catalog bodies and stores per-frame state
   separately.
 
 ### Builder / pipeline pattern

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/CatalogBodyParseResult.hpp"
+#include "catalog/CatalogLoadResult.hpp"
 
 #include <QChar>
 #include <QString>
