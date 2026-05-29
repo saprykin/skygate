@@ -9,38 +9,24 @@ extern "C" {
 #endif
 
 namespace skygate::ephemeris::highprecision {
+namespace {
 
-std::optional<JulianDateParts> calendarDateToJulianDate(const int year, const int month, const int day) noexcept
+[[nodiscard]] bool epochInScaleIsFinite(const AstronomicalEpoch& epoch, const TimeScale timeScale) noexcept
 {
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    double day1 = 0.0;
-    double day2 = 0.0;
-    const int status = eraCal2jd(year, month, day, &day1, &day2);
-    if (status != 0) {
-        return std::nullopt;
-    }
-
-    return JulianDateParts{
-        .day1 = day1,
-        .day2 = day2,
-    };
-#else
-    static_cast<void>(year);
-    static_cast<void>(month);
-    static_cast<void>(day);
-    return std::nullopt;
-#endif
+    return epoch.timeScale == timeScale && epoch.isFinite();
 }
 
-std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const JulianDateParts terrestrialTime) noexcept
+}  // namespace
+
+std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
 {
-    if (!std::isfinite(terrestrialTime.day1) || !std::isfinite(terrestrialTime.day2)) {
+    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
     }
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     double matrix[3][3] = {};
-    eraC2i06a(terrestrialTime.day1, terrestrialTime.day2, matrix);
+    eraC2i06a(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2, matrix);
 
     return Matrix3x3{
         std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
@@ -52,15 +38,15 @@ std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const JulianDateParts 
 #endif
 }
 
-std::optional<Matrix3x3> precessionNutationMatrix06A(const JulianDateParts terrestrialTime) noexcept
+std::optional<Matrix3x3> precessionNutationMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
 {
-    if (!std::isfinite(terrestrialTime.day1) || !std::isfinite(terrestrialTime.day2)) {
+    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
     }
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     double matrix[3][3] = {};
-    eraPnm06a(terrestrialTime.day1, terrestrialTime.day2, matrix);
+    eraPnm06a(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2, matrix);
 
     return Matrix3x3{
         std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
@@ -72,30 +58,28 @@ std::optional<Matrix3x3> precessionNutationMatrix06A(const JulianDateParts terre
 #endif
 }
 
-std::optional<double> earthRotationAngle00(const JulianDateParts universalTime1) noexcept
+std::optional<double> earthRotationAngle00(const AstronomicalEpoch& universalTime1) noexcept
 {
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    if (!std::isfinite(universalTime1.day1) || !std::isfinite(universalTime1.day2)) {
+    if (!epochInScaleIsFinite(universalTime1, TimeScale::Ut1)) {
         return std::nullopt;
     }
 
-    return eraEra00(universalTime1.day1, universalTime1.day2);
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    return eraEra00(universalTime1.julianDatePart1, universalTime1.julianDatePart2);
 #else
-    static_cast<void>(universalTime1);
     return std::nullopt;
 #endif
 }
 
-std::optional<double> tioLocatorS00(const JulianDateParts terrestrialTime) noexcept
+std::optional<double> tioLocatorS00(const AstronomicalEpoch& terrestrialTime) noexcept
 {
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    if (!std::isfinite(terrestrialTime.day1) || !std::isfinite(terrestrialTime.day2)) {
+    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
     }
 
-    return eraSp00(terrestrialTime.day1, terrestrialTime.day2);
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    return eraSp00(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2);
 #else
-    static_cast<void>(terrestrialTime);
     return std::nullopt;
 #endif
 }
@@ -126,30 +110,29 @@ std::optional<Matrix3x3> polarMotionMatrix00(
 }
 
 std::optional<double> tdbMinusTtSeconds(
-    const JulianDateParts terrestrialTime,
+    const AstronomicalEpoch& terrestrialTime,
     const double ut1FractionOfDay,
     const double eastLongitudeRadians,
     const double distanceFromSpinAxisKm,
     const double distanceNorthOfEquatorialPlaneKm
 ) noexcept
 {
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    if (!std::isfinite(terrestrialTime.day1) || !std::isfinite(terrestrialTime.day2) || !std::isfinite(ut1FractionOfDay)
+    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt) || !std::isfinite(ut1FractionOfDay)
         || !std::isfinite(eastLongitudeRadians) || !std::isfinite(distanceFromSpinAxisKm)
         || !std::isfinite(distanceNorthOfEquatorialPlaneKm)) {
         return std::nullopt;
     }
 
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     return eraDtdb(
-        terrestrialTime.day1,
-        terrestrialTime.day2,
+        terrestrialTime.julianDatePart1,
+        terrestrialTime.julianDatePart2,
         ut1FractionOfDay,
         eastLongitudeRadians,
         distanceFromSpinAxisKm,
         distanceNorthOfEquatorialPlaneKm
     );
 #else
-    static_cast<void>(terrestrialTime);
     static_cast<void>(ut1FractionOfDay);
     static_cast<void>(eastLongitudeRadians);
     static_cast<void>(distanceFromSpinAxisKm);

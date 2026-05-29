@@ -6,22 +6,33 @@ class HighPrecisionErfaSmokeTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void convertsGregorianCalendarDateToJulianDate();
-    void rejectsInvalidCalendarDate();
+    void rejectsWrongTimeScaleForTerrestrialTime();
+    void rejectsWrongTimeScaleForUniversalTime1();
 };
 
-void HighPrecisionErfaSmokeTests::convertsGregorianCalendarDateToJulianDate()
+void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForTerrestrialTime()
 {
-    const auto julianDate = skygate::ephemeris::highprecision::calendarDateToJulianDate(2000, 1, 1);
+    const skygate::ephemeris::AstronomicalEpoch utcEpoch{
+        .julianDatePart1 = 2400000.5,
+        .julianDatePart2 = 51544.0,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    };
 
-    QVERIFY(julianDate.has_value());
-    QCOMPARE(julianDate->day1, 2400000.5);
-    QCOMPARE(julianDate->day2, 51544.0);
+    QVERIFY(!skygate::ephemeris::highprecision::celestialToIntermediateMatrix06A(utcEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::precessionNutationMatrix06A(utcEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::tioLocatorS00(utcEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::tdbMinusTtSeconds(utcEpoch, 0.0).has_value());
 }
 
-void HighPrecisionErfaSmokeTests::rejectsInvalidCalendarDate()
+void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForUniversalTime1()
 {
-    QVERIFY(!skygate::ephemeris::highprecision::calendarDateToJulianDate(2000, 2, 30).has_value());
+    const skygate::ephemeris::AstronomicalEpoch ttEpoch{
+        .julianDatePart1 = 2400000.5,
+        .julianDatePart2 = 51544.0,
+        .timeScale = skygate::ephemeris::TimeScale::Tt,
+    };
+
+    QVERIFY(!skygate::ephemeris::highprecision::earthRotationAngle00(ttEpoch).has_value());
 }
 
 QTEST_MAIN(HighPrecisionErfaSmokeTests)
