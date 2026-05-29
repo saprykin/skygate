@@ -18,7 +18,8 @@ namespace {
 
 }  // namespace
 
-std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
+std::optional<Matrix3x3>
+ErfaAstrometry::celestialToIntermediateMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
 {
     if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
@@ -38,7 +39,7 @@ std::optional<Matrix3x3> celestialToIntermediateMatrix06A(const AstronomicalEpoc
 #endif
 }
 
-std::optional<Matrix3x3> precessionNutationMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
+std::optional<Matrix3x3> ErfaAstrometry::precessionNutationMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
 {
     if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
@@ -58,7 +59,7 @@ std::optional<Matrix3x3> precessionNutationMatrix06A(const AstronomicalEpoch& te
 #endif
 }
 
-std::optional<double> earthRotationAngle00(const AstronomicalEpoch& universalTime1) noexcept
+std::optional<double> ErfaAstrometry::earthRotationAngle00(const AstronomicalEpoch& universalTime1) noexcept
 {
     if (!epochInScaleIsFinite(universalTime1, TimeScale::Ut1)) {
         return std::nullopt;
@@ -71,7 +72,7 @@ std::optional<double> earthRotationAngle00(const AstronomicalEpoch& universalTim
 #endif
 }
 
-std::optional<double> tioLocatorS00(const AstronomicalEpoch& terrestrialTime) noexcept
+std::optional<double> ErfaAstrometry::tioLocatorS00(const AstronomicalEpoch& terrestrialTime) noexcept
 {
     if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
@@ -84,7 +85,7 @@ std::optional<double> tioLocatorS00(const AstronomicalEpoch& terrestrialTime) no
 #endif
 }
 
-std::optional<Matrix3x3> polarMotionMatrix00(
+std::optional<Matrix3x3> ErfaAstrometry::polarMotionMatrix00(
     const double polarMotionXRadians, const double polarMotionYRadians, const double tioLocatorRadians
 ) noexcept
 {
@@ -109,7 +110,7 @@ std::optional<Matrix3x3> polarMotionMatrix00(
 #endif
 }
 
-std::optional<double> tdbMinusTtSeconds(
+std::optional<double> ErfaAstrometry::tdbMinusTtSeconds(
     const AstronomicalEpoch& terrestrialTime,
     const double ut1FractionOfDay,
     const double eastLongitudeRadians,
