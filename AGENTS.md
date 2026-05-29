@@ -43,6 +43,11 @@ repository.
 - Local variables/parameters: `camelCase`.
 - Constants: `kPascalCase`.
 - Avoid macros unless necessary.
+- Do not create aliases for project namespaces.
+- Do not use partially qualified project namespaces such as `core::Type` or
+  `ephemeris::Type`. Use the full `skygate::...::Type` name, or use an
+  explicit `using namespace skygate::...` or `using skygate::...::Type`
+  declaration and then refer to the type unqualified.
 - Setters are prefixed with `set`, for example `setLatitude(double latitude)`.
 - Getters use the property name directly, for example `latitude() const`.
 - Boolean getters may use `is`/`has` when clearer, for example
