@@ -83,8 +83,9 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
 [[nodiscard]] std::optional<double> tdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
 {
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    const std::optional<double> erfaResult =
-        skygate::ephemeris::highprecision::tdbMinusTtSeconds(terrestrialTime, fractionalDay(terrestrialTime));
+    const std::optional<double> erfaResult = skygate::ephemeris::highprecision::ErfaAstrometry::tdbMinusTtSeconds(
+        terrestrialTime, fractionalDay(terrestrialTime)
+    );
     if (erfaResult.has_value()) {
         return erfaResult;
     }

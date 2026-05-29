@@ -322,7 +322,7 @@ celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisEngin
         EphemerisEngineQueryResult cachedMetadata;
         const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, cachedMetadata);
         if (ttEpoch.has_value()) {
-            context.celestialIntermediateMatrixValue = celestialToIntermediateMatrix06A(*ttEpoch);
+            context.celestialIntermediateMatrixValue = ErfaAstrometry::celestialToIntermediateMatrix06A(*ttEpoch);
             if (!context.celestialIntermediateMatrixValue.has_value()) {
                 cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                 cachedMetadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
@@ -343,7 +343,7 @@ intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context
         EphemerisEngineQueryResult cachedMetadata;
         const std::optional<AstronomicalEpoch> ut1Epoch = context.ut1Epoch(cachedMetadata);
         if (ut1Epoch.has_value()) {
-            const std::optional<double> earthRotationAngle = earthRotationAngle00(*ut1Epoch);
+            const std::optional<double> earthRotationAngle = ErfaAstrometry::earthRotationAngle00(*ut1Epoch);
             if (earthRotationAngle.has_value()) {
                 context.earthRotationMatrixValue = earthRotationMatrix(*earthRotationAngle);
             } else {
@@ -367,9 +367,9 @@ terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context,
         const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, cachedMetadata);
         const std::optional<EarthOrientationSample> earthOrientationSample = context.earthOrientation(cachedMetadata);
         if (ttEpoch.has_value() && earthOrientationSample.has_value()) {
-            const std::optional<double> tioLocator = tioLocatorS00(*ttEpoch);
+            const std::optional<double> tioLocator = ErfaAstrometry::tioLocatorS00(*ttEpoch);
             if (tioLocator.has_value()) {
-                context.polarMotionMatrixValue = polarMotionMatrix00(
+                context.polarMotionMatrixValue = ErfaAstrometry::polarMotionMatrix00(
                     earthOrientationSample->polarMotionXArcseconds * MathConstants::kArcsecondsToRadians,
                     earthOrientationSample->polarMotionYArcseconds * MathConstants::kArcsecondsToRadians,
                     *tioLocator
@@ -459,7 +459,7 @@ apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisE
         EphemerisEngineQueryResult cachedMetadata;
         const std::optional<AstronomicalEpoch> ttEpoch = context.epochInScale(TimeScale::Tt, cachedMetadata);
         if (ttEpoch.has_value()) {
-            context.apparentEquatorAndEquinoxMatrixValue = precessionNutationMatrix06A(*ttEpoch);
+            context.apparentEquatorAndEquinoxMatrixValue = ErfaAstrometry::precessionNutationMatrix06A(*ttEpoch);
             if (!context.apparentEquatorAndEquinoxMatrixValue.has_value()) {
                 cachedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
                 cachedMetadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);

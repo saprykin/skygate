@@ -18,10 +18,10 @@ void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForTerrestrialTime()
         .timeScale = skygate::ephemeris::TimeScale::Utc,
     };
 
-    QVERIFY(!skygate::ephemeris::highprecision::celestialToIntermediateMatrix06A(utcEpoch).has_value());
-    QVERIFY(!skygate::ephemeris::highprecision::precessionNutationMatrix06A(utcEpoch).has_value());
-    QVERIFY(!skygate::ephemeris::highprecision::tioLocatorS00(utcEpoch).has_value());
-    QVERIFY(!skygate::ephemeris::highprecision::tdbMinusTtSeconds(utcEpoch, 0.0).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::celestialToIntermediateMatrix06A(utcEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::precessionNutationMatrix06A(utcEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::tioLocatorS00(utcEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::tdbMinusTtSeconds(utcEpoch, 0.0).has_value());
 }
 
 void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForUniversalTime1()
@@ -32,7 +32,7 @@ void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForUniversalTime1()
         .timeScale = skygate::ephemeris::TimeScale::Tt,
     };
 
-    QVERIFY(!skygate::ephemeris::highprecision::earthRotationAngle00(ttEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::earthRotationAngle00(ttEpoch).has_value());
 }
 
 QTEST_MAIN(HighPrecisionErfaSmokeTests)
