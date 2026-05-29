@@ -9,11 +9,12 @@ namespace skygate::ephemeris {
 
 class EphemerisRequestFactory final {
 public:
-    [[nodiscard]] static core::ObservationContext contextFromRequest(const EphemerisRequest& request) noexcept;
+    [[nodiscard]] static skygate::core::ObservationContext contextFromRequest(const EphemerisRequest& request) noexcept;
+    [[nodiscard]] static EphemerisRequest requestFromContext(
+        const skygate::core::ObservationContext& context, const EphemerisEngineOptions& options
+    ) noexcept;
     [[nodiscard]] static EphemerisRequest
-    requestFromContext(const core::ObservationContext& context, const EphemerisEngineOptions& options) noexcept;
-    [[nodiscard]] static EphemerisRequest
-    atUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& utcTime) noexcept;
+    atUtcTime(const EphemerisRequest& baseRequest, const skygate::core::UtcTimePoint& utcTime) noexcept;
 };
 
 }  // namespace skygate::ephemeris

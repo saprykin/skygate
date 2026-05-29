@@ -4,6 +4,7 @@
 #include "StringUtilities.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
+#include "math/Vector3d.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -19,10 +20,9 @@ namespace {
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 constexpr int kNaifSun = 10;
-namespace core = skygate::core;
 
-using core::MathConstants;
-using core::PhysicalConstants;
+using skygate::core::MathConstants;
+using skygate::core::PhysicalConstants;
 constexpr int kLightTimeIterationCount = 3;
 
 struct TargetKernelState {
@@ -182,91 +182,42 @@ makeStatusResult(const EphemerisEngineQueryStatus::Type status, const EphemerisE
     return result;
 }
 
-[[nodiscard]] std::optional<core::EquatorialCoordinate>
-equatorialFromVector(const SolarSystemKernelVector& vector) noexcept
+[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
+equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
 {
-    if (!std::isfinite(vector.xAu) || !std::isfinite(vector.yAu) || !std::isfinite(vector.zAu)) {
+    if (!vector.isFinite()) {
         return std::nullopt;
     }
 
-    const double xyDistance = std::hypot(vector.xAu, vector.yAu);
-    const double distance = std::hypot(xyDistance, vector.zAu);
+    const double xyDistance = std::hypot(vector.x, vector.y);
+    const double distance = vector.length();
     if (distance <= std::numeric_limits<double>::min()) {
         return std::nullopt;
     }
 
-    double rightAscensionHours = std::atan2(vector.yAu, vector.xAu) * MathConstants::kHoursPerRadian;
+    double rightAscensionHours = std::atan2(vector.y, vector.x) * MathConstants::kHoursPerRadian;
     if (rightAscensionHours < 0.0) {
         rightAscensionHours += 24.0;
     }
 
-    return core::EquatorialCoordinate{
+    return skygate::core::EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = std::atan2(vector.zAu, xyDistance) * MathConstants::kRadiansToDegrees,
+        .declinationDeg = std::atan2(vector.z, xyDistance) * MathConstants::kRadiansToDegrees,
     };
 }
 
-[[nodiscard]] double vectorDistanceAu(const SolarSystemKernelVector& vector) noexcept
-{
-    return std::hypot(std::hypot(vector.xAu, vector.yAu), vector.zAu);
-}
-
-[[nodiscard]] SolarSystemKernelVector scaleVector(const SolarSystemKernelVector& vector, const double scale) noexcept
-{
-    return {
-        .xAu = vector.xAu * scale,
-        .yAu = vector.yAu * scale,
-        .zAu = vector.zAu * scale,
-    };
-}
-
-[[nodiscard]] SolarSystemKernelVector
-addVectors(const SolarSystemKernelVector& lhs, const SolarSystemKernelVector& rhs) noexcept
-{
-    return {
-        .xAu = lhs.xAu + rhs.xAu,
-        .yAu = lhs.yAu + rhs.yAu,
-        .zAu = lhs.zAu + rhs.zAu,
-    };
-}
-
-[[nodiscard]] SolarSystemKernelVector
-relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVector& center) noexcept
-{
-    return {
-        .xAu = target.xAu - center.xAu,
-        .yAu = target.yAu - center.yAu,
-        .zAu = target.zAu - center.zAu,
-    };
-}
-
-[[nodiscard]] double dotProduct(const SolarSystemKernelVector& lhs, const SolarSystemKernelVector& rhs) noexcept
-{
-    return lhs.xAu * rhs.xAu + lhs.yAu * rhs.yAu + lhs.zAu * rhs.zAu;
-}
-
-[[nodiscard]] std::optional<SolarSystemKernelVector> unitVector(const SolarSystemKernelVector& vector) noexcept
-{
-    const double distance = vectorDistanceAu(vector);
-    if (!std::isfinite(distance) || distance <= std::numeric_limits<double>::min()) {
-        return std::nullopt;
-    }
-
-    return scaleVector(vector, 1.0 / distance);
-}
-
-[[nodiscard]] std::optional<SolarSystemKernelVector> withDirectionPreservingDistance(
-    const SolarSystemKernelVector& vector, const SolarSystemKernelVector& direction
+[[nodiscard]] std::optional<skygate::core::Vector3d> withDirectionPreservingDistance(
+    const skygate::core::Vector3d& vector, const skygate::core::Vector3d& direction
 ) noexcept
 {
-    const double distance = vectorDistanceAu(vector);
-    const std::optional<SolarSystemKernelVector> normalizedDirection = unitVector(direction);
+    const double distance = vector.length();
+    const std::optional<skygate::core::Vector3d> normalizedDirection = direction.normalized();
     if (!std::isfinite(distance) || distance <= std::numeric_limits<double>::min()
         || !normalizedDirection.has_value()) {
         return std::nullopt;
     }
 
-    return scaleVector(*normalizedDirection, distance);
+    return *normalizedDirection * distance;
 }
 
 [[nodiscard]] AstronomicalEpoch retardedEpoch(const AstronomicalEpoch& epoch, const double lightTimeDays) noexcept
@@ -325,40 +276,36 @@ relativeVector(const SolarSystemKernelVector& target, const SolarSystemKernelVec
     return result;
 }
 
-[[nodiscard]] std::optional<SolarSystemKernelVector>
-applyStellarAberration(const SolarSystemKernelVector& vector, const SolarSystemKernelVector& observerVelocityAuPerDay)
+[[nodiscard]] std::optional<skygate::core::Vector3d>
+applyStellarAberration(const skygate::core::Vector3d& vector, const skygate::core::Vector3d& observerVelocityAuPerDay)
 {
-    const std::optional<SolarSystemKernelVector> direction = unitVector(vector);
+    const std::optional<skygate::core::Vector3d> direction = vector.normalized();
     if (!direction.has_value()) {
         return std::nullopt;
     }
 
-    const SolarSystemKernelVector beta =
-        scaleVector(observerVelocityAuPerDay, 1.0 / PhysicalConstants::kSpeedOfLightAuPerDay);
-    const double directionDotBeta = dotProduct(*direction, beta);
-    const SolarSystemKernelVector transverseBeta = relativeVector(beta, scaleVector(*direction, directionDotBeta));
-    return withDirectionPreservingDistance(vector, addVectors(*direction, transverseBeta));
+    const skygate::core::Vector3d beta = observerVelocityAuPerDay * (1.0 / PhysicalConstants::kSpeedOfLightAuPerDay);
+    const double directionDotBeta = direction->dot(beta);
+    const skygate::core::Vector3d transverseBeta = beta - (*direction * directionDotBeta);
+    return withDirectionPreservingDistance(vector, *direction + transverseBeta);
 }
 
-[[nodiscard]] std::optional<SolarSystemKernelVector>
-applySolarGravitationalDeflection(const SolarSystemKernelVector& vector, const SolarSystemKernelVector& sunVector)
+[[nodiscard]] std::optional<skygate::core::Vector3d>
+applySolarGravitationalDeflection(const skygate::core::Vector3d& vector, const skygate::core::Vector3d& sunVector)
 {
-    const std::optional<SolarSystemKernelVector> targetDirection = unitVector(vector);
-    const std::optional<SolarSystemKernelVector> sunDirection = unitVector(sunVector);
-    const double observerSunDistanceAu = vectorDistanceAu(sunVector);
+    const std::optional<skygate::core::Vector3d> targetDirection = vector.normalized();
+    const std::optional<skygate::core::Vector3d> sunDirection = sunVector.normalized();
+    const double observerSunDistanceAu = sunVector.length();
     if (!targetDirection.has_value() || !sunDirection.has_value() || !std::isfinite(observerSunDistanceAu)
         || observerSunDistanceAu <= std::numeric_limits<double>::min()) {
         return std::nullopt;
     }
 
-    const double cosineElongation = std::clamp(dotProduct(*targetDirection, *sunDirection), -1.0, 1.0);
+    const double cosineElongation = std::clamp(targetDirection->dot(*sunDirection), -1.0, 1.0);
     const double denominator = std::max(1.0 - cosineElongation, 1.0e-12);
     const double deflectionScale = PhysicalConstants::kSolarSchwarzschildRadiusAu / observerSunDistanceAu / denominator;
-    const SolarSystemKernelVector awayFromSun =
-        relativeVector(scaleVector(*targetDirection, cosineElongation), *sunDirection);
-    return withDirectionPreservingDistance(
-        vector, addVectors(*targetDirection, scaleVector(awayFromSun, deflectionScale))
-    );
+    const skygate::core::Vector3d awayFromSun = (*targetDirection * cosineElongation) - *sunDirection;
+    return withDirectionPreservingDistance(vector, *targetDirection + (awayFromSun * deflectionScale));
 }
 
 }  // namespace
@@ -426,7 +373,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
         return result;
     }
 
-    SolarSystemKernelVector outputVector = *kernelResult.positionAu;
+    skygate::core::Vector3d outputVector = *kernelResult.positionAu;
     std::optional<SolarSystemKernelStateResult> earthBarycentricState;
     const auto observerState = [&]() -> const SolarSystemKernelStateResult& {
         if (!earthBarycentricState.has_value()) {
@@ -447,8 +394,8 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             EphemerisMetadataMerger::merge(
                 result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
             );
-            double lightTimeDays = vectorDistanceAu(outputVector) / PhysicalConstants::kSpeedOfLightAuPerDay;
-            std::optional<SolarSystemKernelVector> correctedVector;
+            double lightTimeDays = outputVector.length() / PhysicalConstants::kSpeedOfLightAuPerDay;
+            std::optional<skygate::core::Vector3d> correctedVector;
             for (int iteration = 0; iteration < kLightTimeIterationCount; ++iteration) {
                 const AstronomicalEpoch targetEpoch = retardedEpoch(input.request.epoch, lightTimeDays);
                 const TargetKernelState retardedTargetState = computeTargetKernelState(
@@ -475,12 +422,11 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                     retardedTargetState.requestedTargetNaifId,
                     retardedTargetState.targetNaifId
                 );
-                correctedVector = relativeVector(*targetState.positionAu, *earthState.positionAu);
-                lightTimeDays = vectorDistanceAu(*correctedVector) / PhysicalConstants::kSpeedOfLightAuPerDay;
+                correctedVector = *targetState.positionAu - *earthState.positionAu;
+                lightTimeDays = correctedVector->length() / PhysicalConstants::kSpeedOfLightAuPerDay;
             }
 
-            if (correctedVector.has_value()
-                && vectorDistanceAu(*correctedVector) > std::numeric_limits<double>::min()) {
+            if (correctedVector.has_value() && correctedVector->length() > std::numeric_limits<double>::min()) {
                 outputVector = *correctedVector;
                 result.metadata.appliedCorrections |= EphemerisCorrectionFlags::lightTime();
             } else {
@@ -506,7 +452,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             EphemerisMetadataMerger::merge(
                 result.metadata, sunState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
             );
-            if (const std::optional<SolarSystemKernelVector> deflectedVector =
+            if (const std::optional<skygate::core::Vector3d> deflectedVector =
                     applySolarGravitationalDeflection(outputVector, *sunState.positionAu);
                 deflectedVector.has_value()) {
                 outputVector = *deflectedVector;
@@ -532,7 +478,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             EphemerisMetadataMerger::merge(
                 result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
             );
-            if (const std::optional<SolarSystemKernelVector> aberratedVector =
+            if (const std::optional<skygate::core::Vector3d> aberratedVector =
                     applyStellarAberration(outputVector, *earthState.velocityAuPerDay);
                 aberratedVector.has_value()) {
                 outputVector = *aberratedVector;

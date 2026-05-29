@@ -8,20 +8,20 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-using core::PhysicalConstants;
+using skygate::core::PhysicalConstants;
 constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
 constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 
 }  // namespace
 
-std::optional<SolarSystemKernelVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept
+std::optional<skygate::core::Vector3d> observerItrsPositionAu(const skygate::core::GeoLocation& observer) noexcept
 {
     if (!observer.isValid()) {
         return std::nullopt;
     }
 
-    const double latitudeRad = core::AngleMath::toRadians(observer.latitudeDeg);
-    const double longitudeRad = core::AngleMath::toRadians(observer.longitudeDeg);
+    const double latitudeRad = skygate::core::AngleMath::toRadians(observer.latitudeDeg);
+    const double longitudeRad = skygate::core::AngleMath::toRadians(observer.longitudeDeg);
     const double sinLatitude = std::sin(latitudeRad);
     const double cosLatitude = std::cos(latitudeRad);
     const double sinLongitude = std::sin(longitudeRad);
@@ -35,10 +35,10 @@ std::optional<SolarSystemKernelVector> observerItrsPositionAu(const core::GeoLoc
     const double zMeters =
         (primeVerticalRadius * (1.0 - firstEccentricitySquared) + observer.elevationMeters) * sinLatitude;
 
-    return SolarSystemKernelVector{
-        .xAu = xMeters / PhysicalConstants::kAstronomicalUnitMeters,
-        .yAu = yMeters / PhysicalConstants::kAstronomicalUnitMeters,
-        .zAu = zMeters / PhysicalConstants::kAstronomicalUnitMeters,
+    return skygate::core::Vector3d{
+        .x = xMeters / PhysicalConstants::kAstronomicalUnitMeters,
+        .y = yMeters / PhysicalConstants::kAstronomicalUnitMeters,
+        .z = zMeters / PhysicalConstants::kAstronomicalUnitMeters,
     };
 }
 

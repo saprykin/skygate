@@ -3,7 +3,7 @@
 #include "ProjectionParams.hpp"
 #include "ProjectionType.hpp"
 #include "ScreenPoint.hpp"
-#include "math/SphericalGeometry.hpp"
+#include "math/Vector3d.hpp"
 
 #include <optional>
 
@@ -22,9 +22,9 @@ public:
 private:
     ProjectionType m_projectionType = ProjectionType::Stereographic;
     ProjectionParams m_params;
-    SphericalGeometry::Vector3d m_center;
-    SphericalGeometry::Vector3d m_right;
-    SphericalGeometry::Vector3d m_up;
+    Vector3d m_center;
+    Vector3d m_right;
+    Vector3d m_up;
     double m_circularMaxRadius = 0.0;
     double m_rectHalfWidth = 0.0;
     double m_rectHalfHeight = 0.0;

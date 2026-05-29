@@ -17,9 +17,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-namespace core = skygate::core;
-
-using core::MathConstants;
+using namespace skygate::core;
 
 [[nodiscard]] AstronomicalEpoch epochForYearOffset(const double years) noexcept
 {
@@ -45,7 +43,7 @@ using core::MathConstants;
     body.id = "test-star";
     body.displayName = "Test Star";
     body.kind = BaseCelestialBody::Kind::Star;
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = 10.0,
         .declinationDeg = 20.0,
     };
@@ -77,7 +75,7 @@ using core::MathConstants;
     body.id = "fixed-star";
     body.displayName = "Fixed Star";
     body.kind = BaseCelestialBody::Kind::Star;
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = -15.0,
     };
@@ -137,7 +135,7 @@ makeInput(const OwnGalaxyCelestialBody& body, const EphemerisRequest& request)
 }
 
 void compareCoordinates(
-    const core::EquatorialCoordinate& actual, const core::EquatorialCoordinate& expected, const double toleranceDegrees
+    const EquatorialCoordinate& actual, const EquatorialCoordinate& expected, const double toleranceDegrees
 )
 {
     QVERIFY(
@@ -147,8 +145,7 @@ void compareCoordinates(
     QVERIFY(std::abs(actual.declinationDeg - expected.declinationDeg) <= toleranceDegrees);
 }
 
-[[nodiscard]] double
-angularSeparationDegrees(const core::EquatorialCoordinate& lhs, const core::EquatorialCoordinate& rhs) noexcept
+[[nodiscard]] double angularSeparationDegrees(const EquatorialCoordinate& lhs, const EquatorialCoordinate& rhs) noexcept
 {
     const double lhsRaRad = lhs.rightAscensionHours * 15.0 * MathConstants::kPi / 180.0;
     const double rhsRaRad = rhs.rightAscensionHours * 15.0 * MathConstants::kPi / 180.0;
@@ -169,9 +166,9 @@ void compareCalculatorResults(
     }
     QCOMPARE(actual.observerRelativePositionAu.has_value(), expected.observerRelativePositionAu.has_value());
     if (actual.observerRelativePositionAu.has_value() && expected.observerRelativePositionAu.has_value()) {
-        QCOMPARE(actual.observerRelativePositionAu->xAu, expected.observerRelativePositionAu->xAu);
-        QCOMPARE(actual.observerRelativePositionAu->yAu, expected.observerRelativePositionAu->yAu);
-        QCOMPARE(actual.observerRelativePositionAu->zAu, expected.observerRelativePositionAu->zAu);
+        QCOMPARE(actual.observerRelativePositionAu->x, expected.observerRelativePositionAu->x);
+        QCOMPARE(actual.observerRelativePositionAu->y, expected.observerRelativePositionAu->y);
+        QCOMPARE(actual.observerRelativePositionAu->z, expected.observerRelativePositionAu->z);
     }
     QCOMPARE(actual.metadata.status, expected.metadata.status);
     QCOMPARE(actual.metadata.appliedCorrections, expected.metadata.appliedCorrections);
@@ -181,9 +178,7 @@ void compareCalculatorResults(
 
 class FixedEarthKernelProvider final : public ICalcephKernelProvider {
 public:
-    explicit FixedEarthKernelProvider(
-        std::optional<SolarSystemKernelVector> earthPositionAu, const bool requireTdbEpoch = false
-    )
+    explicit FixedEarthKernelProvider(std::optional<Vector3d> earthPositionAu, const bool requireTdbEpoch = false)
         : m_earthPositionAu(earthPositionAu), m_requireTdbEpoch(requireTdbEpoch)
     {
     }
@@ -235,7 +230,7 @@ public:
     }
 
 private:
-    std::optional<SolarSystemKernelVector> m_earthPositionAu;
+    std::optional<Vector3d> m_earthPositionAu;
     bool m_requireTdbEpoch = false;
     mutable int m_callCount = 0;
     mutable int m_lastTargetNaifId = 0;
@@ -322,7 +317,7 @@ void StarAstrometryCalculatorTests::propagatesFullAstrometryWhenCorrectionsAreEn
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(
         *result.equatorial,
-        core::EquatorialCoordinate{
+        EquatorialCoordinate{
             .rightAscensionHours = 10.0029557,
             .declinationDeg = 19.9799945,
         },
@@ -363,7 +358,7 @@ void StarAstrometryCalculatorTests::leavesReferenceCoordinateWhenCorrectionsAreD
 void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPlaneComponent()
 {
     OwnGalaxyCelestialBody body = makeAstrometricStar();
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = 10.0,
         .declinationDeg = 60.0,
     };
@@ -380,7 +375,7 @@ void StarAstrometryCalculatorTests::treatsRightAscensionProperMotionAsTangentPla
     QVERIFY(result.equatorial.has_value());
     compareCoordinates(
         *result.equatorial,
-        core::EquatorialCoordinate{
+        EquatorialCoordinate{
             .rightAscensionHours = 10.0066667,
             .declinationDeg = 59.9999622,
         },
@@ -399,8 +394,7 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::stellarParallax(), 0.0);
     const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
-    auto kernelProvider =
-        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
+    auto kernelProvider = std::make_shared<FixedEarthKernelProvider>(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
     auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
 
     const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
@@ -525,8 +519,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
     };
     const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
-    auto kernelProvider =
-        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0}, true);
+    auto kernelProvider = std::make_shared<FixedEarthKernelProvider>(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
     auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
 
     const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
@@ -571,8 +564,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->stellarParallaxMas = std::nullopt;
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
-    auto kernelProvider =
-        std::make_shared<FixedEarthKernelProvider>(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    auto kernelProvider = std::make_shared<FixedEarthKernelProvider>(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0});
 
     const StarAstrometryCalculator calculator(kernelProvider);
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));

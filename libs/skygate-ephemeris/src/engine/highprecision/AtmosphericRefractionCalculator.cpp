@@ -72,7 +72,7 @@ refractionCorrectionDegrees(const double altitudeDeg, const EphemerisEngineOptio
     const double modelAltitudeDeg = std::clamp(altitudeDeg, kMinimumModelAltitudeDeg, kMaximumModelAltitudeDeg);
     const double refractionArgumentDeg = modelAltitudeDeg + 10.3 / (modelAltitudeDeg + 5.11);
     const double refractionArcminutes = pressureScale(options) * temperatureScale(options) * 1.02
-                                        / std::tan(core::AngleMath::toRadians(refractionArgumentDeg));
+                                        / std::tan(skygate::core::AngleMath::toRadians(refractionArgumentDeg));
     return refractionArcminutes / 60.0;
 }
 

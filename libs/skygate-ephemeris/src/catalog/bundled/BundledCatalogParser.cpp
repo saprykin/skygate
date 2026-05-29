@@ -1198,7 +1198,7 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
         body.displayName = std::string(entry.displayName);
         body.kind = BaseCelestialBody::Kind::DeepSkyObject;
         body.visualMagnitude = entry.visualMagnitude;
-        body.fixedEquatorial = core::EquatorialCoordinate{
+        body.fixedEquatorial = skygate::core::EquatorialCoordinate{
             .rightAscensionHours = entry.rightAscensionHours, .declinationDeg = entry.declinationDeg
         };
         body.deepSkyObject = DeepSkyObjectInfo{

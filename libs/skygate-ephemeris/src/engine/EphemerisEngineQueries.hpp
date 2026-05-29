@@ -20,11 +20,11 @@ public:
     findBodyStateByIndex(const EphemerisSnapshot& snapshot, std::uint32_t bodyIndex);
 
     [[nodiscard]] static std::optional<CelestialBodyState> computeBodyStateById(
-        const IEphemerisEngine& engine, const core::ObservationContext& context, std::string_view bodyId
+        const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, std::string_view bodyId
     );
 
     [[nodiscard]] static std::optional<CelestialBodyState> computeBodyStateByIndex(
-        const IEphemerisEngine& engine, const core::ObservationContext& context, std::uint32_t bodyIndex
+        const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, std::uint32_t bodyIndex
     );
 };
 

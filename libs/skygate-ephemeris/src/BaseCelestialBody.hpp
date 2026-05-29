@@ -23,10 +23,11 @@ public:
 
     virtual ~BaseCelestialBody();
 
-    [[nodiscard]] virtual const std::optional<core::EquatorialCoordinate>& fixedEquatorialValue() const noexcept;
+    [[nodiscard]] virtual const std::optional<skygate::core::EquatorialCoordinate>&
+    fixedEquatorialValue() const noexcept;
     [[nodiscard]] virtual const std::optional<CatalogStarAstrometry>& starAstrometryValue() const noexcept;
     [[nodiscard]] virtual const std::optional<DeepSkyObjectInfo>& deepSkyObjectValue() const noexcept;
-    [[nodiscard]] virtual const core::EquatorialCoordinate* fixedEquatorialCoordinate() const noexcept;
+    [[nodiscard]] virtual const skygate::core::EquatorialCoordinate* fixedEquatorialCoordinate() const noexcept;
     [[nodiscard]] virtual const CatalogStarAstrometry* catalogStarAstrometry() const noexcept;
     [[nodiscard]] virtual const DeepSkyObjectInfo* deepSkyObjectInfo() const noexcept;
 

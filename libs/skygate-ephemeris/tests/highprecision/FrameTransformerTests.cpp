@@ -18,6 +18,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
+using namespace skygate::core;
 
 constexpr double kTolerance = 1.0e-14;
 
@@ -57,7 +58,7 @@ constexpr double kTolerance = 1.0e-14;
     };
 }
 
-void compareVector(const CelestialFrameVector& actual, const CelestialFrameVector& expected, const double tolerance)
+void compareVector(const Vector3d& actual, const Vector3d& expected, const double tolerance)
 {
     QVERIFY(std::abs(actual.x - expected.x) <= tolerance);
     QVERIFY(std::abs(actual.y - expected.y) <= tolerance);

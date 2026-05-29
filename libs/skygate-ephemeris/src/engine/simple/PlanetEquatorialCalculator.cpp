@@ -58,8 +58,9 @@ constexpr std::array<PlanetApproximateOrbit, 7> kPlanetApproximateOrbits = {{
 
 }  // namespace
 
-std::optional<core::EquatorialCoordinate>
-PlanetEquatorialCalculator::compute(const std::string_view bodyId, const core::UtcTimePoint& utcTime) const noexcept
+std::optional<skygate::core::EquatorialCoordinate> PlanetEquatorialCalculator::compute(
+    const std::string_view bodyId, const skygate::core::UtcTimePoint& utcTime
+) const noexcept
 {
     const double daysSinceJ2000 = EpochCodec::daysSinceJ2000(utcTime);
     const double obliquityDeg = AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
@@ -69,12 +70,12 @@ PlanetEquatorialCalculator::compute(const std::string_view bodyId, const core::U
             continue;
         }
 
-        const double eclipticLongitudeDeg = core::AngleMath::normalizeDegrees(
+        const double eclipticLongitudeDeg = skygate::core::AngleMath::normalizeDegrees(
             planet.meanLongitudeDegAtJ2000 + planet.meanMotionDegPerDay * daysSinceJ2000
         );
         const double eclipticLatitudeDeg =
             planet.latitudeAmplitudeDeg
-            * std::sin(core::AngleMath::toRadians(eclipticLongitudeDeg + planet.latitudePhaseDeg));
+            * std::sin(skygate::core::AngleMath::toRadians(eclipticLongitudeDeg + planet.latitudePhaseDeg));
 
         return EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, eclipticLatitudeDeg, obliquityDeg);
     }

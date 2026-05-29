@@ -60,7 +60,7 @@ public:
         ++*m_closeCount;
     }
 
-    [[nodiscard]] std::optional<skygate::ephemeris::highprecision::SolarSystemKernelVector> computeGeometricState(
+    [[nodiscard]] std::optional<skygate::core::Vector3d> computeGeometricState(
         const skygate::ephemeris::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
     ) const override
     {
@@ -69,10 +69,10 @@ public:
         static_cast<void>(centerNaifId);
 
         ++*m_computeCount;
-        return skygate::ephemeris::highprecision::SolarSystemKernelVector{
-            .xAu = 1.0,
-            .yAu = 2.0,
-            .zAu = 3.0,
+        return skygate::core::Vector3d{
+            .x = 1.0,
+            .y = 2.0,
+            .z = 3.0,
         };
     }
 

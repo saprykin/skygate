@@ -2,6 +2,7 @@
 #include "StringUtilities.hpp"
 #include "math/AngleMath.hpp"
 #include "math/SphericalGeometry.hpp"
+#include "math/Vector3d.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,7 +11,7 @@
 
 namespace skygate::ephemeris {
 
-std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::anchorCentroid(
+std::optional<skygate::core::HorizontalCoordinate> ConstellationReferenceCalculator::anchorCentroid(
     const EphemerisSnapshot& snapshot,
     const std::span<const ConstellationAnchorGroup> anchorGroups,
     const std::string_view labelName
@@ -30,14 +31,14 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::anch
         return std::nullopt;
     }
 
-    std::unordered_map<std::string, core::HorizontalCoordinate> horizontalByBodyId;
+    std::unordered_map<std::string, skygate::core::HorizontalCoordinate> horizontalByBodyId;
     horizontalByBodyId.reserve(snapshot.states.size());
     for (const auto& state : snapshot.states) {
         const auto& body = snapshot.bodyAt(state.bodyIndex);
         horizontalByBodyId.insert({StringUtilities::normalizedLookupKey(body.id), state.horizontal});
     }
 
-    core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
+    skygate::core::Vector3d sum;
     int validAnchorCount = 0;
     for (const std::string& hipId : anchorGroupIt->second) {
         const auto horizontalIt = horizontalByBodyId.find(StringUtilities::normalizedLookupKey(hipId));
@@ -45,10 +46,8 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::anch
             continue;
         }
 
-        const auto vector = core::SphericalGeometry::horizontalToUnitVector(horizontalIt->second);
-        sum[0] += vector[0];
-        sum[1] += vector[1];
-        sum[2] += vector[2];
+        const auto vector = skygate::core::SphericalGeometry::horizontalToUnitVector(horizontalIt->second);
+        sum += vector;
         ++validAnchorCount;
     }
 
@@ -56,15 +55,15 @@ std::optional<core::HorizontalCoordinate> ConstellationReferenceCalculator::anch
         return std::nullopt;
     }
 
-    const auto normalizedVector = core::SphericalGeometry::normalize(sum);
-    if (core::SphericalGeometry::length(normalizedVector) <= 0.0) {
+    const auto normalizedVector = sum.normalized();
+    if (!normalizedVector.has_value()) {
         return std::nullopt;
     }
 
-    return core::HorizontalCoordinate{
-        .altitudeDeg = core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector[2], -1.0, 1.0))),
-        .azimuthDeg = core::AngleMath::normalizeDegrees(
-            core::AngleMath::toDegrees(std::atan2(normalizedVector[0], normalizedVector[1]))
+    return skygate::core::HorizontalCoordinate{
+        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector->z, -1.0, 1.0))),
+        .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
+            skygate::core::AngleMath::toDegrees(std::atan2(normalizedVector->x, normalizedVector->y))
         )
     };
 }

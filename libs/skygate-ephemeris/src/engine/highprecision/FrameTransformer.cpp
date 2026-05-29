@@ -14,16 +14,14 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-namespace core = skygate::core;
-
-using core::MathConstants;
-using core::TimeConstants;
+using skygate::core::MathConstants;
+using skygate::core::TimeConstants;
 
 constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A celestial and terrestrial frame transform";
 
-[[nodiscard]] bool isFiniteVector(const CelestialFrameVector& vector) noexcept
+[[nodiscard]] bool isFiniteVector(const skygate::core::Vector3d& vector) noexcept
 {
-    return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z);
+    return vector.isFinite();
 }
 
 [[nodiscard]] std::uint8_t frameRank(const CelestialReferenceFrame frame) noexcept
@@ -89,7 +87,7 @@ constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A cele
     return result;
 }
 
-[[nodiscard]] CelestialFrameVector multiply(const Matrix3x3& matrix, const CelestialFrameVector& vector) noexcept
+[[nodiscard]] skygate::core::Vector3d multiply(const Matrix3x3& matrix, const skygate::core::Vector3d& vector) noexcept
 {
     return {
         .x = matrix[0][0] * vector.x + matrix[0][1] * vector.y + matrix[0][2] * vector.z,
@@ -98,8 +96,8 @@ constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A cele
     };
 }
 
-[[nodiscard]] CelestialFrameVector
-multiplyTranspose(const Matrix3x3& matrix, const CelestialFrameVector& vector) noexcept
+[[nodiscard]] skygate::core::Vector3d
+multiplyTranspose(const Matrix3x3& matrix, const skygate::core::Vector3d& vector) noexcept
 {
     return {
         .x = matrix[0][0] * vector.x + matrix[1][0] * vector.y + matrix[2][0] * vector.z,
@@ -560,7 +558,7 @@ transformCelestialVectorWithContext(const CelestialFrameTransformRequest& reques
         return makeFailedResult(EphemerisEngineWarning::Code::CorrectionUnavailable);
     }
 
-    CelestialFrameVector transformed = request.vector;
+    skygate::core::Vector3d transformed = request.vector;
     if (sourceRank < targetRank) {
         for (std::uint8_t lowerRank = sourceRank; lowerRank < targetRank; ++lowerRank) {
             const CelestialReferenceFrame stageSourceFrame =
@@ -650,7 +648,7 @@ ErfaFrameTransformer::transformCelestialVectors(const CelestialFrameBatchTransfo
         .timeScaleService = m_timeScaleService.get(),
         .earthOrientationProvider = m_earthOrientationProvider.get(),
     };
-    for (const CelestialFrameVector& vector : request.vectors) {
+    for (const skygate::core::Vector3d& vector : request.vectors) {
         results.push_back(transformCelestialVectorWithContext(
             CelestialFrameTransformRequest{
                 .sourceFrame = request.sourceFrame,

@@ -1,25 +1,17 @@
 #include "ApparentPlaceCalculator.hpp"
+#include "CelestialFrameMath.hpp"
 #include "EarthOrientationProvider.hpp"
 #include "EphemerisMetadataMerge.hpp"
 #include "FrameTransformer.hpp"
 #include "ObserverGeodesy.hpp"
 
-#include "math/AngleMath.hpp"
-#include "math/MathConstants.hpp"
-
-#include <algorithm>
-#include <cmath>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <utility>
 
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-namespace core = skygate::core;
-
-using core::MathConstants;
 constexpr EphemerisMetadataMergeOptions kTransformMetadataMergeOptions{
     .statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly,
     .mergeCorrections = true,
@@ -34,11 +26,6 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     Apparent,
     Topocentric
 };
-
-[[nodiscard]] bool isFiniteEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
-{
-    return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg);
-}
 
 [[nodiscard]] ApparentPlaceRequestMode requestModeForCorrections(const EphemerisCorrectionFlags flags) noexcept
 {
@@ -70,108 +57,6 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     return CelestialReferenceFrame::Gcrs;
 }
 
-[[nodiscard]] CelestialFrameVector vectorFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
-{
-    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
-    const double declinationRad = core::AngleMath::toRadians(coordinate.declinationDeg);
-    const double cosDeclination = std::cos(declinationRad);
-    return {
-        .x = cosDeclination * std::cos(rightAscensionRad),
-        .y = cosDeclination * std::sin(rightAscensionRad),
-        .z = std::sin(declinationRad),
-    };
-}
-
-[[nodiscard]] bool isFiniteSolarSystemVector(const SolarSystemKernelVector& vector) noexcept
-{
-    return std::isfinite(vector.xAu) && std::isfinite(vector.yAu) && std::isfinite(vector.zAu);
-}
-
-[[nodiscard]] CelestialFrameVector celestialVectorFromSolarSystemVector(const SolarSystemKernelVector& vector) noexcept
-{
-    return {
-        .x = vector.xAu,
-        .y = vector.yAu,
-        .z = vector.zAu,
-    };
-}
-
-[[nodiscard]] std::optional<CelestialFrameVector>
-celestialVectorFromSolarSystemVector(const std::optional<SolarSystemKernelVector>& vector) noexcept
-{
-    if (!vector.has_value()) {
-        return std::nullopt;
-    }
-    return celestialVectorFromSolarSystemVector(*vector);
-}
-
-[[nodiscard]] CelestialFrameVector
-subtractVector(const CelestialFrameVector& lhs, const CelestialFrameVector& rhs) noexcept
-{
-    return {
-        .x = lhs.x - rhs.x,
-        .y = lhs.y - rhs.y,
-        .z = lhs.z - rhs.z,
-    };
-}
-
-[[nodiscard]] std::optional<core::EquatorialCoordinate>
-equatorialFromVector(const CelestialFrameVector& vector) noexcept
-{
-    if (!std::isfinite(vector.x) || !std::isfinite(vector.y) || !std::isfinite(vector.z)) {
-        return std::nullopt;
-    }
-
-    const double xyDistance = std::hypot(vector.x, vector.y);
-    const double distance = std::hypot(xyDistance, vector.z);
-    if (distance <= std::numeric_limits<double>::min()) {
-        return std::nullopt;
-    }
-
-    double rightAscensionHours = std::atan2(vector.y, vector.x) * MathConstants::kHoursPerRadian;
-    if (rightAscensionHours < 0.0) {
-        rightAscensionHours += 24.0;
-    }
-
-    return core::EquatorialCoordinate{
-        .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = core::AngleMath::toDegrees(std::atan2(vector.z, xyDistance)),
-    };
-}
-
-[[nodiscard]] std::optional<core::HorizontalCoordinate>
-horizontalFromItrsVector(const CelestialFrameVector& vector, const core::GeoLocation& observer) noexcept
-{
-    if (!observer.isValid()) {
-        return std::nullopt;
-    }
-    if (!std::isfinite(vector.x) || !std::isfinite(vector.y) || !std::isfinite(vector.z)) {
-        return std::nullopt;
-    }
-
-    const double latitudeRad = core::AngleMath::toRadians(observer.latitudeDeg);
-    const double longitudeRad = core::AngleMath::toRadians(observer.longitudeDeg);
-    const double sinLatitude = std::sin(latitudeRad);
-    const double cosLatitude = std::cos(latitudeRad);
-    const double sinLongitude = std::sin(longitudeRad);
-    const double cosLongitude = std::cos(longitudeRad);
-
-    const double east = -sinLongitude * vector.x + cosLongitude * vector.y;
-    const double north =
-        -sinLatitude * cosLongitude * vector.x - sinLatitude * sinLongitude * vector.y + cosLatitude * vector.z;
-    const double up =
-        cosLatitude * cosLongitude * vector.x + cosLatitude * sinLongitude * vector.y + sinLatitude * vector.z;
-    const double length = std::hypot(std::hypot(east, north), up);
-    if (length <= std::numeric_limits<double>::min()) {
-        return std::nullopt;
-    }
-
-    return core::HorizontalCoordinate{
-        .altitudeDeg = core::AngleMath::toDegrees(std::asin(std::clamp(up / length, -1.0, 1.0))),
-        .azimuthDeg = core::AngleMath::normalizeDegrees(core::AngleMath::toDegrees(std::atan2(east, north))),
-    };
-}
-
 void markMissingBatchTransformResult(
     EphemerisEngineQueryResult& metadata, const EphemerisCorrectionFlags unavailableCorrection
 ) noexcept
@@ -183,15 +68,15 @@ void markMissingBatchTransformResult(
     metadata.addUnavailableCorrection(unavailableCorrection);
 }
 
-[[nodiscard]] CelestialFrameVector
+[[nodiscard]] skygate::core::Vector3d
 computationVectorFromCalculatorResult(const HighPrecisionCalculatorResult& calculatorResult) noexcept
 {
     if (calculatorResult.observerRelativePositionAu.has_value()
-        && isFiniteSolarSystemVector(*calculatorResult.observerRelativePositionAu)) {
-        return celestialVectorFromSolarSystemVector(*calculatorResult.observerRelativePositionAu);
+        && calculatorResult.observerRelativePositionAu->isFinite()) {
+        return *calculatorResult.observerRelativePositionAu;
     }
 
-    return vectorFromEquatorial(*calculatorResult.equatorial);
+    return CelestialFrameMath::fromEquatorial(*calculatorResult.equatorial);
 }
 
 }  // namespace
@@ -213,7 +98,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 ) const
 {
     HighPrecisionCalculatorResult result = calculatorResult;
-    if (!calculatorResult.equatorial.has_value() || !isFiniteEquatorial(*calculatorResult.equatorial)) {
+    if (!calculatorResult.equatorial.has_value() || !calculatorResult.equatorial->isFinite()) {
         return result;
     }
     const EphemerisCorrectionFlags requestedCorrections = input.request.options.correctionFlags();
@@ -264,7 +149,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         }
     }
 
-    CelestialFrameVector outputVector = computationVectorFromCalculatorResult(calculatorResult);
+    skygate::core::Vector3d outputVector = computationVectorFromCalculatorResult(calculatorResult);
     if (m_frameTransformer != nullptr) {
         CelestialFrameTransformResult transformResult = m_frameTransformer->transformCelestialVector({
             .sourceFrame = CelestialReferenceFrame::Gcrs,
@@ -291,10 +176,10 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         return result;
     }
     if (targetFrame == CelestialReferenceFrame::Itrs) {
-        const std::optional<CelestialFrameVector> observerPosition =
+        const std::optional<skygate::core::Vector3d> observerPosition =
             input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared
-                ? celestialVectorFromSolarSystemVector(input.preparedRequestState->observerItrsPositionAu)
-                : celestialVectorFromSolarSystemVector(observerItrsPositionAu(input.request.context.observer));
+                ? input.preparedRequestState->observerItrsPositionAu
+                : observerItrsPositionAu(input.request.context.observer);
         if (!observerPosition.has_value()) {
             if (result.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
                 result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
@@ -302,7 +187,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
             result.metadata.addWarning(EphemerisEngineWarning::Code::MissingObserver);
             result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::diurnalParallax());
         } else if (calculatorResult.observerRelativePositionAu.has_value()) {
-            outputVector = subtractVector(outputVector, *observerPosition);
+            outputVector -= *observerPosition;
             result.metadata.appliedCorrections |= EphemerisCorrectionFlags::diurnalParallax();
         } else {
             EphemerisMetadataMerger::markCorrectionUnavailable(
@@ -311,8 +196,9 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         }
     }
 
-    std::optional<CelestialFrameVector> equatorialVector =
-        targetFrame == CelestialReferenceFrame::Itrs ? std::nullopt : std::optional<CelestialFrameVector>{outputVector};
+    std::optional<skygate::core::Vector3d> equatorialVector =
+        targetFrame == CelestialReferenceFrame::Itrs ? std::nullopt
+                                                     : std::optional<skygate::core::Vector3d>{outputVector};
     if (targetFrame == CelestialReferenceFrame::Itrs) {
         CelestialFrameTransformResult gcrsTransformResult = m_frameTransformer->transformCelestialVector({
             .sourceFrame = CelestialReferenceFrame::Itrs,
@@ -354,7 +240,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     }
 
     if (equatorialVector.has_value()) {
-        if (const std::optional<core::EquatorialCoordinate> equatorial = equatorialFromVector(*equatorialVector);
+        if (const std::optional<skygate::core::EquatorialCoordinate> equatorial =
+                CelestialFrameMath::toEquatorial(*equatorialVector);
             equatorial.has_value()) {
             result.equatorial = *equatorial;
         } else {
@@ -365,8 +252,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     }
 
     if (targetFrame == CelestialReferenceFrame::Itrs) {
-        if (const std::optional<core::HorizontalCoordinate> horizontal =
-                horizontalFromItrsVector(outputVector, input.request.context.observer);
+        if (const std::optional<skygate::core::HorizontalCoordinate> horizontal =
+                CelestialFrameMath::horizontalFromItrsVector(outputVector, input.request.context.observer);
             horizontal.has_value()) {
             result.horizontal = *horizontal;
         } else {
@@ -454,11 +341,11 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
     std::vector<StarAstrometryBatchResult> results;
     results.reserve(calculatorResults.size());
-    std::vector<std::optional<CelestialFrameVector>> outputVectors;
+    std::vector<std::optional<skygate::core::Vector3d>> outputVectors;
     outputVectors.reserve(calculatorResults.size());
     std::vector<bool> hasObserverRelativePosition;
     hasObserverRelativePosition.reserve(calculatorResults.size());
-    std::vector<CelestialFrameVector> transformInputs;
+    std::vector<skygate::core::Vector3d> transformInputs;
     transformInputs.reserve(calculatorResults.size());
     std::vector<std::size_t> transformResultIndices;
     transformResultIndices.reserve(calculatorResults.size());
@@ -469,8 +356,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         }
 
         HighPrecisionCalculatorResult result = calculatorResult.result;
-        if (!calculatorResult.result.equatorial.has_value()
-            || !isFiniteEquatorial(*calculatorResult.result.equatorial)) {
+        if (!calculatorResult.result.equatorial.has_value() || !calculatorResult.result.equatorial->isFinite()) {
             results.push_back(
                 StarAstrometryBatchResult{
                     .bodyIndex = calculatorResult.bodyIndex,
@@ -496,7 +382,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             }
         }
 
-        CelestialFrameVector outputVector = computationVectorFromCalculatorResult(calculatorResult.result);
+        skygate::core::Vector3d outputVector = computationVectorFromCalculatorResult(calculatorResult.result);
         if (targetFrame == CelestialReferenceFrame::Gcrs) {
             results.push_back(
                 StarAstrometryBatchResult{
@@ -566,13 +452,13 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         }
     }
 
-    std::vector<std::optional<CelestialFrameVector>> equatorialVectors =
-        isTopocentric ? std::vector<std::optional<CelestialFrameVector>>(outputVectors.size()) : outputVectors;
+    std::vector<std::optional<skygate::core::Vector3d>> equatorialVectors =
+        isTopocentric ? std::vector<std::optional<skygate::core::Vector3d>>(outputVectors.size()) : outputVectors;
     if (isTopocentric) {
-        const std::optional<CelestialFrameVector> observerPosition =
+        const std::optional<skygate::core::Vector3d> observerPosition =
             preparedRequestState != nullptr && preparedRequestState->topocentricStatePrepared
-                ? celestialVectorFromSolarSystemVector(preparedRequestState->observerItrsPositionAu)
-                : celestialVectorFromSolarSystemVector(observerItrsPositionAu(request.context.observer));
+                ? preparedRequestState->observerItrsPositionAu
+                : observerItrsPositionAu(request.context.observer);
         for (std::size_t resultIndex = 0U; resultIndex < results.size(); ++resultIndex) {
             if (!outputVectors[resultIndex].has_value()) {
                 continue;
@@ -586,7 +472,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                 result.metadata.addWarning(EphemerisEngineWarning::Code::MissingObserver);
                 result.metadata.addUnavailableCorrection(EphemerisCorrectionFlags::diurnalParallax());
             } else if (hasObserverRelativePosition[resultIndex]) {
-                outputVectors[resultIndex] = subtractVector(*outputVectors[resultIndex], *observerPosition);
+                outputVectors[resultIndex] = *outputVectors[resultIndex] - *observerPosition;
                 result.metadata.appliedCorrections |= EphemerisCorrectionFlags::diurnalParallax();
             } else {
                 EphemerisMetadataMerger::markCorrectionUnavailable(
@@ -594,8 +480,8 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
                 );
             }
 
-            if (const std::optional<core::HorizontalCoordinate> horizontal =
-                    horizontalFromItrsVector(*outputVectors[resultIndex], request.context.observer);
+            if (const std::optional<skygate::core::HorizontalCoordinate> horizontal =
+                    CelestialFrameMath::horizontalFromItrsVector(*outputVectors[resultIndex], request.context.observer);
                 horizontal.has_value()) {
                 result.horizontal = *horizontal;
             } else {
@@ -606,7 +492,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             }
         }
 
-        std::vector<CelestialFrameVector> gcrsInputs;
+        std::vector<skygate::core::Vector3d> gcrsInputs;
         std::vector<std::size_t> gcrsResultIndices;
         gcrsInputs.reserve(results.size());
         gcrsResultIndices.reserve(results.size());
@@ -653,7 +539,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         if (skygate::ephemeris::EphemerisCorrectionFlags::has(
                 requestedCorrections, EphemerisCorrectionFlags::precessionNutation()
             )) {
-            std::vector<CelestialFrameVector> apparentInputs;
+            std::vector<skygate::core::Vector3d> apparentInputs;
             std::vector<std::size_t> apparentResultIndices;
             apparentInputs.reserve(results.size());
             apparentResultIndices.reserve(results.size());
@@ -706,8 +592,8 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
             continue;
         }
 
-        if (const std::optional<core::EquatorialCoordinate> equatorial =
-                equatorialFromVector(*equatorialVectors[resultIndex]);
+        if (const std::optional<skygate::core::EquatorialCoordinate> equatorial =
+                CelestialFrameMath::toEquatorial(*equatorialVectors[resultIndex]);
             equatorial.has_value()) {
             result.equatorial = *equatorial;
         } else {

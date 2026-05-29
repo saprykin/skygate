@@ -10,8 +10,8 @@ namespace skygate::ephemeris {
 
 struct CelestialBodyState {
     std::uint32_t bodyIndex = 0;
-    core::EquatorialCoordinate equatorial;
-    core::HorizontalCoordinate horizontal;
+    skygate::core::EquatorialCoordinate equatorial;
+    skygate::core::HorizontalCoordinate horizontal;
     EphemerisEngineQueryResult metadata;
 };
 

@@ -19,7 +19,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-namespace core = skygate::core;
+using namespace skygate::core;
 
 [[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
 {
@@ -45,10 +45,10 @@ template <typename BodyRange>
     return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
 }
 
-[[nodiscard]] core::ObservationContext makeContext()
+[[nodiscard]] ObservationContext makeContext()
 {
-    core::ObservationContext context;
-    context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+    ObservationContext context;
+    context.utcTime = UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
         .longitudeDeg = -122.4194,
@@ -209,7 +209,7 @@ void EphemerisFallbackValidationTests::strictHighPrecisionUnavailableProducesErr
 void EphemerisFallbackValidationTests::missingLongRangeKernelFallbackIsDegraded()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 7.5,
         .declinationDeg = -11.0,
     };
@@ -245,7 +245,7 @@ void EphemerisFallbackValidationTests::missingLongRangeKernelFallbackIsDegraded(
 void EphemerisFallbackValidationTests::staleDataWarningsRemainVisible()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 8.0,
         .declinationDeg = 9.0,
     };
@@ -339,7 +339,7 @@ void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFal
 void EphemerisFallbackValidationTests::failedRequestReturnsFailedStatus()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 1.0,
         .declinationDeg = 2.0,
     };

@@ -13,7 +13,7 @@
 namespace skygate::ephemeris {
 
 struct EphemerisSnapshot {
-    core::ObservationContext context;
+    skygate::core::ObservationContext context;
     std::shared_ptr<const CelestialBodyCatalog> catalogBodies;
     std::vector<CelestialBodyState> states;
 

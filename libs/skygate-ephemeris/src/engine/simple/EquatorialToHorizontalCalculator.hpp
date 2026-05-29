@@ -9,10 +9,10 @@ namespace skygate::ephemeris {
 
 class EquatorialToHorizontalCalculator final {
 public:
-    [[nodiscard]] static core::HorizontalCoordinate compute(
-        const core::EquatorialCoordinate& equatorial,
-        const core::GeoLocation& observer,
-        const core::UtcTimePoint& utcTime
+    [[nodiscard]] static skygate::core::HorizontalCoordinate compute(
+        const skygate::core::EquatorialCoordinate& equatorial,
+        const skygate::core::GeoLocation& observer,
+        const skygate::core::UtcTimePoint& utcTime
     ) noexcept;
 };
 

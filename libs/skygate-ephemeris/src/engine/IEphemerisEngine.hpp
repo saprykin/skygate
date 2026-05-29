@@ -75,12 +75,12 @@ public:
         return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
-    [[nodiscard]] virtual EphemerisSnapshot compute(const core::ObservationContext& context) const = 0;
+    [[nodiscard]] virtual EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const = 0;
     [[nodiscard]] virtual std::optional<CelestialBodyState>
-    computeBodyState(const core::ObservationContext& context, std::string_view bodyId) const = 0;
+    computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState>
-    computeBodyState(const core::ObservationContext& context, std::uint32_t bodyIndex) const = 0;
+    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const = 0;
 };
 
 }  // namespace skygate::ephemeris

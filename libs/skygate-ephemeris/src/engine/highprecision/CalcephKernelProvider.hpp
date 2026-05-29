@@ -74,7 +74,7 @@ class ICalcephKernelHandle {
 public:
     virtual ~ICalcephKernelHandle() = default;
 
-    [[nodiscard]] virtual std::optional<SolarSystemKernelVector>
+    [[nodiscard]] virtual std::optional<skygate::core::Vector3d>
     computeGeometricState(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const
     {
         static_cast<void>(epoch);

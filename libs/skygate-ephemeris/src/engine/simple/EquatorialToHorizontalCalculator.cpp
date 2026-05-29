@@ -6,18 +6,20 @@
 
 namespace skygate::ephemeris {
 
-core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
-    const core::EquatorialCoordinate& equatorial, const core::GeoLocation& observer, const core::UtcTimePoint& utcTime
+skygate::core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
+    const skygate::core::EquatorialCoordinate& equatorial,
+    const skygate::core::GeoLocation& observer,
+    const skygate::core::UtcTimePoint& utcTime
 ) noexcept
 {
     const double gmstDeg = AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
-    const double localSiderealDeg = core::AngleMath::normalizeDegrees(gmstDeg + observer.longitudeDeg);
+    const double localSiderealDeg = skygate::core::AngleMath::normalizeDegrees(gmstDeg + observer.longitudeDeg);
     const double hourAngleDeg =
-        core::AngleMath::normalizeDegreesSigned(localSiderealDeg - equatorial.rightAscensionHours * 15.0);
+        skygate::core::AngleMath::normalizeDegreesSigned(localSiderealDeg - equatorial.rightAscensionHours * 15.0);
 
-    const double hourAngleRad = core::AngleMath::toRadians(hourAngleDeg);
-    const double declinationRad = core::AngleMath::toRadians(equatorial.declinationDeg);
-    const double latitudeRad = core::AngleMath::toRadians(observer.latitudeDeg);
+    const double hourAngleRad = skygate::core::AngleMath::toRadians(hourAngleDeg);
+    const double declinationRad = skygate::core::AngleMath::toRadians(equatorial.declinationDeg);
+    const double latitudeRad = skygate::core::AngleMath::toRadians(observer.latitudeDeg);
 
     const double x = std::cos(declinationRad) * std::cos(hourAngleRad);
     const double y = std::cos(declinationRad) * std::sin(hourAngleRad);
@@ -27,10 +29,10 @@ core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
     const double yHor = y;
     const double zHor = x * std::cos(latitudeRad) + z * std::sin(latitudeRad);
 
-    core::HorizontalCoordinate horizontal;
-    horizontal.altitudeDeg = core::AngleMath::toDegrees(std::asin(zHor));
+    skygate::core::HorizontalCoordinate horizontal;
+    horizontal.altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(zHor));
     horizontal.azimuthDeg =
-        core::AngleMath::normalizeDegrees(core::AngleMath::toDegrees(std::atan2(yHor, xHor)) + 180.0);
+        skygate::core::AngleMath::normalizeDegrees(skygate::core::AngleMath::toDegrees(std::atan2(yHor, xHor)) + 180.0);
     return horizontal;
 }
 

@@ -27,9 +27,7 @@
 
 namespace {
 
-namespace core = skygate::core;
-namespace ephemeris = skygate::ephemeris;
-namespace highprecision = skygate::ephemeris::highprecision;
+using namespace skygate::core;
 
 constexpr std::string_view kPayload = "SkyGate acceptance ephemeris update\n";
 constexpr std::string_view kPayloadSha256 = "bc12fcf669402a46ba2bd1b56aa2392d93e79ef535dd79ae056e4222c0410ffd";
@@ -49,28 +47,28 @@ bool writeFile(const QString& path, const QByteArray& contents)
     return file.write(contents) == contents.size();
 }
 
-ephemeris::EphemerisDateRange
+skygate::ephemeris::EphemerisDateRange
 acceptanceRange(std::string id, std::string displayName, const int startYear, const int endYear)
 {
-    const auto start = ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        ephemeris::CivilDateTime{
+    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
             .astronomicalYear = startYear,
             .month = 1,
             .day = 1,
-            .timeScale = ephemeris::TimeScale::Utc,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
-    const auto end = ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        ephemeris::CivilDateTime{
+    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::ephemeris::CivilDateTime{
             .astronomicalYear = endYear,
             .month = 1,
             .day = 1,
-            .timeScale = ephemeris::TimeScale::Utc,
+            .timeScale = skygate::ephemeris::TimeScale::Utc,
         }
     );
     Q_ASSERT(start.has_value());
     Q_ASSERT(end.has_value());
-    return ephemeris::EphemerisDateRange{
+    return skygate::ephemeris::EphemerisDateRange{
         .id = std::move(id),
         .displayName = std::move(displayName),
         .start = *start,
@@ -78,28 +76,28 @@ acceptanceRange(std::string id, std::string displayName, const int startYear, co
     };
 }
 
-ephemeris::EphemerisDateRange acceptanceDE440sShortRangeRange()
+skygate::ephemeris::EphemerisDateRange acceptanceDE440sShortRangeRange()
 {
     return acceptanceRange("acceptance-de440s-short-range", "Acceptance DE440s short range", 2000, 2050);
 }
 
-ephemeris::EphemerisDateRange acceptanceLongRange()
+skygate::ephemeris::EphemerisDateRange acceptanceLongRange()
 {
     return acceptanceRange("acceptance-long-range", "Acceptance long range", -13200, 13200);
 }
 
-ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
+skygate::ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
     std::string id,
     std::string profileId,
     std::string version,
     std::string relativePath,
-    ephemeris::EphemerisDateRange validityRange,
+    skygate::ephemeris::EphemerisDateRange validityRange,
     const bool optional
 )
 {
-    return ephemeris::EphemerisDataManifestAsset{
+    return skygate::ephemeris::EphemerisDataManifestAsset{
         .id = std::move(id),
-        .kind = ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+        .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
         .profileId = std::move(profileId),
         .version = std::move(version),
         .sourceUrl = "https://example.invalid/ephemeris.bsp",
@@ -107,7 +105,7 @@ ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
         .checksum = {.algorithm = "sha256", .value = std::string{kPayloadSha256}},
         .compression =
             {
-                .kind = ephemeris::EphemerisDataManifestCompressionKind::None,
+                .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
                 .uncompressedSizeBytes = kPayload.size(),
             },
         .validityRange = std::move(validityRange),
@@ -115,9 +113,9 @@ ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
     };
 }
 
-ephemeris::EphemerisDataManifest acceptanceManifest()
+skygate::ephemeris::EphemerisDataManifest acceptanceManifest()
 {
-    ephemeris::EphemerisDataManifest manifest;
+    skygate::ephemeris::EphemerisDataManifest manifest;
     manifest.dataSetInfo.id = "acceptance-data";
     manifest.dataSetInfo.displayName = "Acceptance data";
     manifest.dataSetInfo.version = "2026a";
@@ -125,7 +123,7 @@ ephemeris::EphemerisDataManifest acceptanceManifest()
     manifest.dataSetInfo.dateRanges.push_back(acceptanceDE440sShortRangeRange());
     manifest.dataSetInfo.dateRanges.push_back(acceptanceLongRange());
     manifest.profiles.push_back(
-        ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifestProfile{
             .id = "de440s-short-range",
             .displayName = "DE440sShortRange",
             .bundled = true,
@@ -134,7 +132,7 @@ ephemeris::EphemerisDataManifest acceptanceManifest()
         }
     );
     manifest.profiles.push_back(
-        ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifestProfile{
             .id = "de441-long-range",
             .displayName = "DE441 long range",
             .bundled = false,
@@ -156,27 +154,29 @@ ephemeris::EphemerisDataManifest acceptanceManifest()
     return manifest;
 }
 
-void writeStagedAsset(const QTemporaryDir& root, const ephemeris::EphemerisDataManifestAsset& asset)
+void writeStagedAsset(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifestAsset& asset)
 {
     const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
     QVERIFY(writeFile(root.path() + QStringLiteral("/") + QString::fromStdString(asset.relativePath), payload));
 }
 
 void writeStagedAssetsForProfile(
-    const QTemporaryDir& root, const ephemeris::EphemerisDataManifest& manifest, const std::string_view profileId
+    const QTemporaryDir& root,
+    const skygate::ephemeris::EphemerisDataManifest& manifest,
+    const std::string_view profileId
 )
 {
-    const ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId);
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId);
     Q_ASSERT(profile != nullptr);
     for (const std::string& assetId : profile->assetIds) {
-        const ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
         Q_ASSERT(asset != nullptr);
         writeStagedAsset(root, *asset);
     }
 }
 
 SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
-    const ephemeris::EphemerisDataManifest& manifest,
+    const skygate::ephemeris::EphemerisDataManifest& manifest,
     const QTemporaryDir& stagedRoot,
     const QString& writableCacheRoot,
     const QString& profileId = QStringLiteral("de440s-short-range")
@@ -188,10 +188,10 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
     request.stagedResourceRoot = stagedRoot.path();
     request.writableCacheRoot = writableCacheRoot;
     request.revisionToken = QStringLiteral("acceptance-%1-rev").arg(profileId);
-    const ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId.toStdString());
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId.toStdString());
     Q_ASSERT(profile != nullptr);
     for (const std::string& assetId : profile->assetIds) {
-        const ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
         Q_ASSERT(asset != nullptr);
         request.requiredKinds.push_back(asset->kind);
         auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
@@ -201,54 +201,55 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
     return request;
 }
 
-ephemeris::OwnGalaxyCelestialBody acceptanceMarsBody()
+skygate::ephemeris::OwnGalaxyCelestialBody acceptanceMarsBody()
 {
-    ephemeris::OwnGalaxyCelestialBody body;
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
     body.id = "mars";
     body.displayName = "Mars";
-    body.kind = ephemeris::BaseCelestialBody::Kind::Planet;
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Planet;
     return body;
 }
 
-ephemeris::AstronomicalEpoch acceptanceEpoch(const int year)
+skygate::ephemeris::AstronomicalEpoch acceptanceEpoch(const int year)
 {
-    std::optional<ephemeris::AstronomicalEpoch> epoch = ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        ephemeris::CivilDateTime{
-            .astronomicalYear = year,
-            .month = 1,
-            .day = 1,
-            .timeScale = ephemeris::TimeScale::Tdb,
-        }
-    );
+    std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
+        skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::ephemeris::CivilDateTime{
+                .astronomicalYear = year,
+                .month = 1,
+                .day = 1,
+                .timeScale = skygate::ephemeris::TimeScale::Tdb,
+            }
+        );
     Q_ASSERT(epoch.has_value());
-    epoch->timeScale = ephemeris::TimeScale::Tdb;
+    epoch->timeScale = skygate::ephemeris::TimeScale::Tdb;
     return *epoch;
 }
 
-ephemeris::EphemerisRequest acceptanceRequest(const int year)
+skygate::ephemeris::EphemerisRequest acceptanceRequest(const int year)
 {
-    ephemeris::EphemerisRequest request;
+    skygate::ephemeris::EphemerisRequest request;
     request.epoch = acceptanceEpoch(year);
-    request.context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
-    request.options.setEngineKind(ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.options.setCorrectionFlags(ephemeris::EphemerisCorrectionFlags::geometric());
+    request.context.utcTime = UtcTimePoint(std::chrono::seconds(1'704'067'200));
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     return request;
 }
 
-ephemeris::EphemerisRequest acceptanceRequestWithoutSimpleFallback(const int year)
+skygate::ephemeris::EphemerisRequest acceptanceRequestWithoutSimpleFallback(const int year)
 {
-    ephemeris::EphemerisRequest request = acceptanceRequest(year);
+    skygate::ephemeris::EphemerisRequest request = acceptanceRequest(year);
     request.options.setFallbackToSimpleEngine(false);
     return request;
 }
 
-QString displayText(ephemeris::EphemerisEngineWarning::Code code)
+QString displayText(skygate::ephemeris::EphemerisEngineWarning::Code code)
 {
-    const std::string_view text = ephemeris::EphemerisEngineWarning::text(code);
+    const std::string_view text = skygate::ephemeris::EphemerisEngineWarning::text(code);
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
 }
 
-QByteArray factoryDiagnostics(const ephemeris::EphemerisEngineFactoryResult& result)
+QByteArray factoryDiagnostics(const skygate::ephemeris::EphemerisEngineFactoryResult& result)
 {
     if (result.diagnostics.empty()) {
         return {};
@@ -258,45 +259,46 @@ QByteArray factoryDiagnostics(const ephemeris::EphemerisEngineFactoryResult& res
     return QByteArray(text.data(), static_cast<qsizetype>(text.size()));
 }
 
-class AcceptanceCalcephKernelHandle final : public highprecision::ICalcephKernelHandle {
+class AcceptanceCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
 public:
-    [[nodiscard]] highprecision::SolarSystemKernelStateResult computeGeometricStateWithVelocity(
-        const ephemeris::AstronomicalEpoch&, const int targetNaifId, const int centerNaifId
+    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult computeGeometricStateWithVelocity(
+        const skygate::ephemeris::AstronomicalEpoch&, const int targetNaifId, const int centerNaifId
     ) const override
     {
-        highprecision::SolarSystemKernelStateResult result;
+        skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
         if (targetNaifId == 499 && centerNaifId == 399) {
-            result.positionAu = highprecision::SolarSystemKernelVector{.xAu = 1.0, .yAu = 1.0, .zAu = 0.1};
+            result.positionAu = Vector3d{.x = 1.0, .y = 1.0, .z = 0.1};
             return result;
         }
         if (targetNaifId == 399 && centerNaifId == 0) {
-            result.positionAu = highprecision::SolarSystemKernelVector{.xAu = 0.5, .yAu = 0.0, .zAu = 0.0};
-            result.velocityAuPerDay = highprecision::SolarSystemKernelVector{.xAu = 0.0, .yAu = 0.01, .zAu = 0.0};
+            result.positionAu = Vector3d{.x = 0.5, .y = 0.0, .z = 0.0};
+            result.velocityAuPerDay = Vector3d{.x = 0.0, .y = 0.01, .z = 0.0};
             return result;
         }
         if (targetNaifId == 499 && centerNaifId == 0) {
-            result.positionAu = highprecision::SolarSystemKernelVector{.xAu = 1.5, .yAu = 1.0, .zAu = 0.1};
+            result.positionAu = Vector3d{.x = 1.5, .y = 1.0, .z = 0.1};
             return result;
         }
         if (targetNaifId == 10 && centerNaifId == 399) {
-            result.positionAu = highprecision::SolarSystemKernelVector{.xAu = -1.0, .yAu = 0.0, .zAu = 0.0};
+            result.positionAu = Vector3d{.x = -1.0, .y = 0.0, .z = 0.0};
             return result;
         }
 
-        result.metadata.status = ephemeris::EphemerisEngineQueryStatus::Type::Unsupported;
-        result.metadata.addWarning(ephemeris::EphemerisEngineWarning::Code::UnsupportedBody);
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported;
+        result.metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::UnsupportedBody);
         return result;
     }
 };
 
-class AcceptanceCalcephKernelRuntime final : public highprecision::ICalcephKernelRuntime {
+class AcceptanceCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
 public:
     [[nodiscard]] bool isAvailable() const noexcept override
     {
         return true;
     }
 
-    [[nodiscard]] highprecision::CalcephKernelOpenResult openKernel(const std::filesystem::path& path) const override
+    [[nodiscard]] skygate::ephemeris::highprecision::CalcephKernelOpenResult
+    openKernel(const std::filesystem::path& path) const override
     {
         if (!QFileInfo::exists(QString::fromStdString(path.generic_string()))) {
             return {.diagnostic = "Acceptance kernel file is missing."};
@@ -306,85 +308,86 @@ public:
     }
 };
 
-class AcceptanceTimeScaleService final : public ephemeris::ITimeScaleService {
+class AcceptanceTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
 public:
-    [[nodiscard]] ephemeris::TimeScaleConversionResult
-    convert(const ephemeris::AstronomicalEpoch& epoch, const ephemeris::TimeScale targetScale) const override
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convert(
+        const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::TimeScale targetScale
+    ) const override
     {
-        ephemeris::TimeScaleConversionResult result;
+        skygate::ephemeris::TimeScaleConversionResult result;
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        result.status = ephemeris::TimeScaleConversionStatus::Valid;
+        result.status = skygate::ephemeris::TimeScaleConversionStatus::Valid;
         return result;
     }
 
-    [[nodiscard]] ephemeris::TimeScaleConversionResult convertCivilDateTime(
-        const ephemeris::CivilDateTime& dateTime, const ephemeris::TimeScale targetScale
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convertCivilDateTime(
+        const skygate::ephemeris::CivilDateTime& dateTime, const skygate::ephemeris::TimeScale targetScale
     ) const override
     {
-        ephemeris::TimeScaleConversionResult result;
-        const std::optional<ephemeris::AstronomicalEpoch> epoch =
-            ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
-        result.epoch = epoch.value_or(ephemeris::AstronomicalEpoch{});
+        skygate::ephemeris::TimeScaleConversionResult result;
+        const std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
+            skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        result.epoch = epoch.value_or(skygate::ephemeris::AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
-        result.status = epoch.has_value() ? ephemeris::TimeScaleConversionStatus::Valid
-                                          : ephemeris::TimeScaleConversionStatus::Failed;
+        result.status = epoch.has_value() ? skygate::ephemeris::TimeScaleConversionStatus::Valid
+                                          : skygate::ephemeris::TimeScaleConversionStatus::Failed;
         return result;
     }
 };
 
-class AcceptanceEarthOrientationProvider final : public ephemeris::IEarthOrientationProvider {
+class AcceptanceEarthOrientationProvider final : public skygate::ephemeris::IEarthOrientationProvider {
 public:
     AcceptanceEarthOrientationProvider()
     {
-        m_dataInfo.status = ephemeris::EarthOrientationDataStatus::Available;
+        m_dataInfo.status = skygate::ephemeris::EarthOrientationDataStatus::Available;
         m_dataInfo.version = "acceptance-eop";
         m_dataInfo.provenance = "acceptance test";
     }
 
-    [[nodiscard]] const ephemeris::EarthOrientationDataInfo& dataInfo() const noexcept override
+    [[nodiscard]] const skygate::ephemeris::EarthOrientationDataInfo& dataInfo() const noexcept override
     {
         return m_dataInfo;
     }
 
-    [[nodiscard]] std::span<const ephemeris::EarthOrientationTableEntry> entries() const noexcept override
+    [[nodiscard]] std::span<const skygate::ephemeris::EarthOrientationTableEntry> entries() const noexcept override
     {
         return m_entries;
     }
 
 private:
-    ephemeris::EarthOrientationDataInfo m_dataInfo;
-    std::vector<ephemeris::EarthOrientationTableEntry> m_entries;
+    skygate::ephemeris::EarthOrientationDataInfo m_dataInfo;
+    std::vector<skygate::ephemeris::EarthOrientationTableEntry> m_entries;
 };
 
-ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEngine(
-    std::shared_ptr<const ephemeris::IEphemerisDataSnapshot> activeDataSnapshot,
-    const ephemeris::EphemerisDataManifest& manifest
+skygate::ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEngine(
+    std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot,
+    const skygate::ephemeris::EphemerisDataManifest& manifest
 )
 {
-    ephemeris::EphemerisEngineFactoryRequest request;
-    request.engineKind = ephemeris::EphemerisEngineKind::Type::HighPrecision;
-    request.catalog = std::make_shared<const ephemeris::CelestialBodyCatalog>(
-        std::vector<ephemeris::OwnGalaxyCelestialBody>{acceptanceMarsBody()}
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{acceptanceMarsBody()}
     );
-    request.options.setEngineKind(ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.options.setCorrectionFlags(ephemeris::EphemerisCorrectionFlags::geometric());
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.dataManifest = &manifest;
     request.activeDataSnapshot = std::move(activeDataSnapshot);
     request.timeScaleService = std::make_shared<AcceptanceTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<AcceptanceEarthOrientationProvider>();
     request.calcephKernelRuntime = std::make_shared<AcceptanceCalcephKernelRuntime>();
-    request.fallbackPolicy = ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
-    return ephemeris::EphemerisEngineFactory::create(request);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    return skygate::ephemeris::EphemerisEngineFactory::create(request);
 }
 
-void verifyDE440sShortRangeBodyState(const ephemeris::IEphemerisEngine& engine)
+void verifyDE440sShortRangeBodyState(const skygate::ephemeris::IEphemerisEngine& engine)
 {
     const auto state = engine.computeBodyState(acceptanceRequest(2024), "mars");
     QVERIFY(state.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
     QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
@@ -466,7 +469,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     QCOMPARE(manager.statusText(), QString("Ephemeris data: Bundled fallback"));
     QVERIFY(!manager.usingInstalledData());
 
-    const ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
+    const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir bundledResourceRoot;
     QVERIFY(bundledResourceRoot.isValid());
     writeStagedAssetsForProfile(bundledResourceRoot, manifest, "de440s-short-range");
@@ -478,13 +481,13 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     QVERIFY(cleanInstallSnapshot->solarSystemKernelAsset("de440s-kernel").has_value());
     QVERIFY(!cleanInstallSnapshot->solarSystemKernelAsset("de441-kernel").has_value());
 
-    ephemeris::EphemerisEngineFactoryResult cleanInstallEngineResult =
+    skygate::ephemeris::EphemerisEngineFactoryResult cleanInstallEngineResult =
         createAcceptanceHighPrecisionEngine(cleanInstallSnapshot, manifest);
     QVERIFY2(cleanInstallEngineResult.isSuccess(), factoryDiagnostics(cleanInstallEngineResult).constData());
     QVERIFY(cleanInstallEngineResult.engine != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(cleanInstallEngineResult.engine->kind()),
-        static_cast<std::uint8_t>(ephemeris::EphemerisEngineKind::Type::HighPrecision)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
     verifyDE440sShortRangeBodyState(*cleanInstallEngineResult.engine);
 
@@ -493,10 +496,11 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     QVERIFY(outOfRangeState.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(outOfRangeState->metadata.status),
-        static_cast<std::uint8_t>(ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange)
     );
-    QVERIFY(outOfRangeState->metadata.hasWarning(ephemeris::EphemerisEngineWarning::Code::DataOutOfRange));
-    QVERIFY(displayText(ephemeris::EphemerisEngineWarning::Code::DataOutOfRange).contains(QStringLiteral("outside")));
+    QVERIFY(outOfRangeState->metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(displayText(skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange)
+                .contains(QStringLiteral("outside")));
 
     const SkyEphemerisDataManager::StagedUpdateActivationResult result =
         manager.activateVerifiedStagedUpdateSet(activationRequest(manifest, bundledResourceRoot, m_settings.path()));
@@ -512,7 +516,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     QVERIFY(installedSnapshot->solarSystemKernelAsset("de440s-kernel").has_value());
     QVERIFY(!installedSnapshot->solarSystemKernelAsset("de441-kernel").has_value());
 
-    ephemeris::EphemerisEngineFactoryResult installedEngineResult =
+    skygate::ephemeris::EphemerisEngineFactoryResult installedEngineResult =
         createAcceptanceHighPrecisionEngine(installedSnapshot, manifest);
     QVERIFY2(installedEngineResult.isSuccess(), factoryDiagnostics(installedEngineResult).constData());
     QVERIFY(installedEngineResult.engine != nullptr);
@@ -526,7 +530,7 @@ void SkyAcceptanceMatrixTests::cleanInstallOfflineDE440sShortRangeDataActivatesA
     QVERIFY(bundledFallbackSnapshot != nullptr);
     QVERIFY(bundledFallbackSnapshot->solarSystemKernelAsset("de440s-kernel").has_value());
 
-    ephemeris::EphemerisEngineFactoryResult bundledFallbackEngineResult =
+    skygate::ephemeris::EphemerisEngineFactoryResult bundledFallbackEngineResult =
         createAcceptanceHighPrecisionEngine(bundledFallbackSnapshot, manifest);
     QVERIFY2(bundledFallbackEngineResult.isSuccess(), factoryDiagnostics(bundledFallbackEngineResult).constData());
     QVERIFY(bundledFallbackEngineResult.engine != nullptr);
@@ -538,7 +542,7 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Ker
     SkySettingsStore store;
     SkyEphemerisDataManager manager(&store);
 
-    const ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
+    const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir bundledResourceRoot;
     QVERIFY(bundledResourceRoot.isValid());
     writeStagedAssetsForProfile(bundledResourceRoot, manifest, "de441-long-range");
@@ -561,20 +565,20 @@ void SkyAcceptanceMatrixTests::optionalLongRangeProfileActivationSelectsDe441Ker
     QCOMPARE(QString::fromStdString(de441Kernel->profileId), QString("de441-long-range"));
     QCOMPARE(QString::fromStdString(de441Kernel->version), QString("acceptance-de441-kernel"));
 
-    ephemeris::EphemerisEngineFactoryResult longRangeEngineResult =
+    skygate::ephemeris::EphemerisEngineFactoryResult longRangeEngineResult =
         createAcceptanceHighPrecisionEngine(snapshot, manifest);
     QVERIFY2(longRangeEngineResult.isSuccess(), factoryDiagnostics(longRangeEngineResult).constData());
     QVERIFY(longRangeEngineResult.engine != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(longRangeEngineResult.engine->kind()),
-        static_cast<std::uint8_t>(ephemeris::EphemerisEngineKind::Type::HighPrecision)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
 
     const auto state = longRangeEngineResult.engine->computeBodyState(acceptanceRequest(-1000), "mars");
     QVERIFY(state.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
     );
     QVERIFY(state->metadata.effectiveDataValidityRange.has_value());
     QCOMPARE(state->metadata.effectiveDataValidityRange->id, std::string{"acceptance-long-range"});
@@ -588,7 +592,7 @@ void SkyAcceptanceMatrixTests::ephemerisDataUpdateLeavesCatalogStateUnchanged()
     const SkySettingsStore::CatalogCacheSnapshot catalogSnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot();
     QVERIFY(store.saveCatalogCache(catalogSnapshot));
 
-    const ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
+    const skygate::ephemeris::EphemerisDataManifest manifest = acceptanceManifest();
     QTemporaryDir stagedRoot;
     QVERIFY(stagedRoot.isValid());
     writeStagedAssetsForProfile(stagedRoot, manifest, "de440s-short-range");

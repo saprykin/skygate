@@ -119,7 +119,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
             body.displayName = star.displayName;
             body.kind = BaseCelestialBody::Kind::Star;
             body.visualMagnitude = star.visualMagnitude;
-            body.fixedEquatorial = core::EquatorialCoordinate{
+            body.fixedEquatorial = skygate::core::EquatorialCoordinate{
                 .rightAscensionHours = star.rightAscensionHours, .declinationDeg = star.declinationDeg
             };
 

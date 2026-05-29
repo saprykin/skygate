@@ -134,15 +134,16 @@ SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const s
     return state;
 }
 
-EphemerisSnapshot SimpleEphemerisEngine::compute(const core::ObservationContext& context) const
+EphemerisSnapshot SimpleEphemerisEngine::compute(const skygate::core::ObservationContext& context) const
 {
     EphemerisSnapshot snapshot = computeSnapshot(context);
     markUnsupportedSimpleOptions(snapshot, options());
     return snapshot;
 }
 
-std::optional<CelestialBodyState>
-SimpleEphemerisEngine::computeBodyState(const core::ObservationContext& context, const std::string_view bodyId) const
+std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyState(
+    const skygate::core::ObservationContext& context, const std::string_view bodyId
+) const
 {
     std::optional<CelestialBodyState> state = computeBodyStateById(context, bodyId);
     if (state.has_value()) {
@@ -151,8 +152,9 @@ SimpleEphemerisEngine::computeBodyState(const core::ObservationContext& context,
     return state;
 }
 
-std::optional<CelestialBodyState>
-SimpleEphemerisEngine::computeBodyState(const core::ObservationContext& context, const std::uint32_t bodyIndex) const
+std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyState(
+    const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
+) const
 {
     if (bodyIndex >= m_catalog->size()) {
         return std::nullopt;
@@ -163,7 +165,7 @@ SimpleEphemerisEngine::computeBodyState(const core::ObservationContext& context,
     return state;
 }
 
-EphemerisSnapshot SimpleEphemerisEngine::computeSnapshot(const core::ObservationContext& context) const
+EphemerisSnapshot SimpleEphemerisEngine::computeSnapshot(const skygate::core::ObservationContext& context) const
 {
     EphemerisSnapshot snapshot;
     snapshot.context = context;
@@ -179,7 +181,7 @@ EphemerisSnapshot SimpleEphemerisEngine::computeSnapshot(const core::Observation
 }
 
 std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyStateById(
-    const core::ObservationContext& context, const std::string_view bodyId
+    const skygate::core::ObservationContext& context, const std::string_view bodyId
 ) const
 {
     if (bodyId.empty()) {
@@ -197,7 +199,7 @@ std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyStateById(
 }
 
 CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
-    const BaseCelestialBody& body, const std::size_t bodyIndex, const core::ObservationContext& context
+    const BaseCelestialBody& body, const std::size_t bodyIndex, const skygate::core::ObservationContext& context
 ) const
 {
     CelestialBodyState state;
@@ -225,8 +227,9 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
     return state;
 }
 
-std::optional<core::EquatorialCoordinate>
-SimpleEphemerisEngine::computeEquatorial(const BaseCelestialBody& body, const core::UtcTimePoint& utcTime) const
+std::optional<skygate::core::EquatorialCoordinate> SimpleEphemerisEngine::computeEquatorial(
+    const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime
+) const
 {
     if (body.fixedEquatorialValue().has_value()) {
         return body.fixedEquatorialValue();

@@ -9,10 +9,12 @@
 
 namespace skygate::ephemeris {
 
-using core::TimeConstants;
+using skygate::core::TimeConstants;
 
-core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
-    const double eclipticLongitudeDeg, const core::GeoLocation& observer, const core::UtcTimePoint& utcTime
+skygate::core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
+    const double eclipticLongitudeDeg,
+    const skygate::core::GeoLocation& observer,
+    const skygate::core::UtcTimePoint& utcTime
 ) noexcept
 {
     const double obliquityDeg = AstronomicalTime::meanObliquityDeg(EpochCodec::daysSinceJ2000(utcTime));
@@ -21,26 +23,28 @@ core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
     );
 }
 
-core::HorizontalCoordinate CelestialReferenceCalculator::equatorialPoint(
+skygate::core::HorizontalCoordinate CelestialReferenceCalculator::equatorialPoint(
     const double rightAscensionHours,
     const double declinationDeg,
-    const core::GeoLocation& observer,
-    const core::UtcTimePoint& utcTime
+    const skygate::core::GeoLocation& observer,
+    const skygate::core::UtcTimePoint& utcTime
 ) noexcept
 {
     return EquatorialToHorizontalCalculator::compute(
-        core::EquatorialCoordinate{.rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg},
+        skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = rightAscensionHours, .declinationDeg = declinationDeg
+        },
         observer,
         utcTime
     );
 }
 
-core::HorizontalCoordinate CelestialReferenceCalculator::declinationCirclePoint(
+skygate::core::HorizontalCoordinate CelestialReferenceCalculator::declinationCirclePoint(
     const int sampleIndex,
     const int sampleCount,
     const double declinationDeg,
-    const core::GeoLocation& observer,
-    const core::UtcTimePoint& utcTime
+    const skygate::core::GeoLocation& observer,
+    const skygate::core::UtcTimePoint& utcTime
 ) noexcept
 {
     if (sampleCount <= 0) {
@@ -52,7 +56,8 @@ core::HorizontalCoordinate CelestialReferenceCalculator::declinationCirclePoint(
     return equatorialPoint(rightAscensionHours, declinationDeg, observer, utcTime);
 }
 
-double CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(const core::GeoLocation& observer) noexcept
+double
+CelestialReferenceCalculator::circumpolarBoundaryDeclinationDeg(const skygate::core::GeoLocation& observer) noexcept
 {
     return (observer.latitudeDeg >= 0.0 ? 1.0 : -1.0) * (90.0 - std::abs(observer.latitudeDeg));
 }

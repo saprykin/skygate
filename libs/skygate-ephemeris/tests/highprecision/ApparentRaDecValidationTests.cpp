@@ -25,6 +25,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
+using namespace skygate::core;
 using skygate::ephemeris::tests::angularSeparationDegrees;
 using skygate::ephemeris::tests::EphemerisRaDecExpectation;
 using skygate::ephemeris::tests::EphemerisRaDecFixture;
@@ -132,13 +133,13 @@ struct ApparentValidationFixture {
     std::shared_ptr<FixtureCalcephKernelProvider> provider;
 };
 
-[[nodiscard]] SolarSystemKernelVector parseVector(const QJsonArray& array)
+[[nodiscard]] Vector3d parseVector(const QJsonArray& array)
 {
     Q_ASSERT(array.size() == 3);
     return {
-        .xAu = array.at(0).toDouble(),
-        .yAu = array.at(1).toDouble(),
-        .zAu = array.at(2).toDouble(),
+        .x = array.at(0).toDouble(),
+        .y = array.at(1).toDouble(),
+        .z = array.at(2).toDouble(),
     };
 }
 

@@ -75,8 +75,8 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
     );
 }
 
-[[nodiscard]] std::optional<core::EquatorialCoordinate>
-simpleSolarSystemEquatorial(const BaseCelestialBody& body, const core::UtcTimePoint& utcTime)
+[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
+simpleSolarSystemEquatorial(const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime)
 {
     if (body.kind == BaseCelestialBody::Kind::Sun || body.kind == BaseCelestialBody::Kind::Sun) {
         return SunEquatorialCalculator{}.compute(utcTime);
@@ -100,7 +100,7 @@ simpleSolarSystemEquatorial(const BaseCelestialBody& body, const core::UtcTimePo
         return std::nullopt;
     }
 
-    const std::optional<core::EquatorialCoordinate> equatorial =
+    const std::optional<skygate::core::EquatorialCoordinate> equatorial =
         simpleSolarSystemEquatorial(input.body, input.request.context.utcTime);
     if (!equatorial.has_value()) {
         return std::nullopt;
@@ -138,7 +138,7 @@ simpleSolarSystemEquatorial(const BaseCelestialBody& body, const core::UtcTimePo
            && sameDoubleIdentity(lhs.julianDatePart2, rhs.julianDatePart2) && lhs.timeScale == rhs.timeScale;
 }
 
-[[nodiscard]] bool sameObserver(const core::GeoLocation& lhs, const core::GeoLocation& rhs) noexcept
+[[nodiscard]] bool sameObserver(const skygate::core::GeoLocation& lhs, const skygate::core::GeoLocation& rhs) noexcept
 {
     return sameDoubleIdentity(lhs.latitudeDeg, rhs.latitudeDeg)
            && sameDoubleIdentity(lhs.longitudeDeg, rhs.longitudeDeg)
@@ -153,8 +153,8 @@ simpleSolarSystemEquatorial(const BaseCelestialBody& body, const core::UtcTimePo
 [[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
 {
     return sameEpoch(lhs.epoch, rhs.epoch)
-           && core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
-                  == core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
+           && skygate::core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
+                  == skygate::core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
            && sameObserver(lhs.context.observer, rhs.context.observer) && sameOptions(lhs.options, rhs.options);
 }
 
@@ -329,7 +329,8 @@ public:
         return m_options;
     }
 
-    [[nodiscard]] EphemerisRequest makeCompatibilityRequest(const core::ObservationContext& context) const noexcept
+    [[nodiscard]] EphemerisRequest
+    makeCompatibilityRequest(const skygate::core::ObservationContext& context) const noexcept
     {
         return EphemerisRequestFactory::requestFromContext(context, m_options);
     }
@@ -762,20 +763,20 @@ HighPrecisionEphemerisEngine::computeBodyState(const EphemerisRequest& request, 
     return m_impl->computeBodyState(request, bodyIndex);
 }
 
-EphemerisSnapshot HighPrecisionEphemerisEngine::compute(const core::ObservationContext& context) const
+EphemerisSnapshot HighPrecisionEphemerisEngine::compute(const skygate::core::ObservationContext& context) const
 {
     return m_impl->compute(m_impl->makeCompatibilityRequest(context));
 }
 
 std::optional<CelestialBodyState> HighPrecisionEphemerisEngine::computeBodyState(
-    const core::ObservationContext& context, const std::string_view bodyId
+    const skygate::core::ObservationContext& context, const std::string_view bodyId
 ) const
 {
     return m_impl->computeBodyState(m_impl->makeCompatibilityRequest(context), bodyId);
 }
 
 std::optional<CelestialBodyState> HighPrecisionEphemerisEngine::computeBodyState(
-    const core::ObservationContext& context, const std::uint32_t bodyIndex
+    const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
 ) const
 {
     return m_impl->computeBodyState(m_impl->makeCompatibilityRequest(context), static_cast<std::size_t>(bodyIndex));

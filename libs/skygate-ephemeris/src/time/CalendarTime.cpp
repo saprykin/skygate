@@ -9,7 +9,7 @@
 
 namespace skygate::ephemeris {
 
-using core::TimeConstants;
+using skygate::core::TimeConstants;
 
 bool CalendarTime::isGregorianLeapYear(const int astronomicalYear) noexcept
 {

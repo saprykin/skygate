@@ -14,8 +14,8 @@ namespace {
 {
     const AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
-    const double daysSinceKnownNewMoon = julianDay - core::TimeConstants::kJulianDateKnownNewMoon;
-    double fraction = std::fmod(daysSinceKnownNewMoon / core::PhysicalConstants::kSynodicMonthDays, 1.0);
+    const double daysSinceKnownNewMoon = julianDay - skygate::core::TimeConstants::kJulianDateKnownNewMoon;
+    double fraction = std::fmod(daysSinceKnownNewMoon / skygate::core::PhysicalConstants::kSynodicMonthDays, 1.0);
     if (fraction < 0.0) {
         fraction += 1.0;
     }
@@ -24,7 +24,7 @@ namespace {
 
 [[nodiscard]] double moonIlluminationPercent(const double lunarCycleFraction) noexcept
 {
-    return std::clamp((1.0 - std::cos(core::MathConstants::kTwoPi * lunarCycleFraction)) * 50.0, 0.0, 100.0);
+    return std::clamp((1.0 - std::cos(skygate::core::MathConstants::kTwoPi * lunarCycleFraction)) * 50.0, 0.0, 100.0);
 }
 
 [[nodiscard]] std::string moonPhaseName(const double lunarCycleFraction)

@@ -2,7 +2,7 @@
 
 namespace skygate::ephemeris {
 
-const std::optional<core::EquatorialCoordinate>& DistantCelestialBody::fixedEquatorialValue() const noexcept
+const std::optional<skygate::core::EquatorialCoordinate>& DistantCelestialBody::fixedEquatorialValue() const noexcept
 {
     return fixedEquatorial;
 }

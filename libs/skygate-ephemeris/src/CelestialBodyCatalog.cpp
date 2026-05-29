@@ -15,7 +15,7 @@ namespace {
     ownGalaxyBody.displayName = body.displayName;
     ownGalaxyBody.kind = body.kind;
     ownGalaxyBody.visualMagnitude = body.visualMagnitude;
-    if (const core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
+    if (const skygate::core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
         ownGalaxyBody.fixedEquatorial = *fixedEquatorial;
     }
     if (const CatalogStarAstrometry* starAstrometry = body.catalogStarAstrometry()) {
@@ -31,7 +31,7 @@ namespace {
     distantBody.displayName = body.displayName;
     distantBody.kind = body.kind;
     distantBody.visualMagnitude = body.visualMagnitude;
-    if (const core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
+    if (const skygate::core::EquatorialCoordinate* fixedEquatorial = body.fixedEquatorialCoordinate()) {
         distantBody.fixedEquatorial = *fixedEquatorial;
     }
     if (const DeepSkyObjectInfo* deepSkyObject = body.deepSkyObjectInfo()) {

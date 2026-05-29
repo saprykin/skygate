@@ -2,6 +2,7 @@
 #include "ProjectionPipeline.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
+#include "math/SphericalGeometry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -91,26 +92,25 @@ ScreenPoint ProjectionAlgorithms::project(
         return ProjectionPipeline::invalidCoordinatePoint();
     }
 
-    const SphericalGeometry::Vector3d target =
-        SphericalGeometry::horizontalToUnitVector(coordinate.normalizedAzimuth());
+    const Vector3d target = SphericalGeometry::horizontalToUnitVector(coordinate.normalizedAzimuth());
 
     switch (frame.projectionType) {
     case ProjectionType::Stereographic: {
-        const double centerDotTarget = std::clamp(SphericalGeometry::dot(target, frame.center), -1.0, 1.0);
+        const double centerDotTarget = std::clamp(target.dot(frame.center), -1.0, 1.0);
         const double denominator = 1.0 + centerDotTarget;
         if (denominator <= 0.0) {
             return ProjectionPipeline::culledPoint();
         }
 
-        double projectedX = 2.0 * SphericalGeometry::dot(target, frame.right) / denominator;
-        double projectedY = 2.0 * SphericalGeometry::dot(target, frame.up) / denominator;
+        double projectedX = 2.0 * target.dot(frame.right) / denominator;
+        double projectedY = 2.0 * target.dot(frame.up) / denominator;
         applyRoll(projectedX, projectedY, frame.params.rollDeg);
         return ProjectionPipeline::finishCircular(
             projectedX, projectedY, frame.params, frame.circularMaxRadius, marginPx
         );
     }
     case ProjectionType::AzimuthalEquidistant: {
-        const double cosAngularDistance = std::clamp(SphericalGeometry::dot(target, frame.center), -1.0, 1.0);
+        const double cosAngularDistance = std::clamp(target.dot(frame.center), -1.0, 1.0);
         const double angularDistance = std::acos(cosAngularDistance);
         if (!isFinite(angularDistance)) {
             return ProjectionPipeline::invalidParametersPoint();
@@ -125,8 +125,8 @@ ScreenPoint ProjectionAlgorithms::project(
             }
 
             const double scale = angularDistance / sinAngularDistance;
-            projectedX = scale * SphericalGeometry::dot(target, frame.right);
-            projectedY = scale * SphericalGeometry::dot(target, frame.up);
+            projectedX = scale * target.dot(frame.right);
+            projectedY = scale * target.dot(frame.up);
         }
 
         applyRoll(projectedX, projectedY, frame.params.rollDeg);
@@ -135,13 +135,13 @@ ScreenPoint ProjectionAlgorithms::project(
         );
     }
     case ProjectionType::Perspective: {
-        const double forward = SphericalGeometry::dot(target, frame.center);
+        const double forward = target.dot(frame.center);
         if (forward <= MathConstants::kEpsilon) {
             return ProjectionPipeline::culledPoint();
         }
 
-        double projectedX = SphericalGeometry::dot(target, frame.right) / forward;
-        double projectedY = SphericalGeometry::dot(target, frame.up) / forward;
+        double projectedX = target.dot(frame.right) / forward;
+        double projectedY = target.dot(frame.up) / forward;
         applyRoll(projectedX, projectedY, frame.params.rollDeg);
         return ProjectionPipeline::finishRectangular(
             projectedX, projectedY, frame.params, frame.rectHalfWidth, frame.rectHalfHeight, marginPx

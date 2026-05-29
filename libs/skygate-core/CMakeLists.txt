@@ -28,6 +28,7 @@ add_library(skygate-core STATIC
     src/math/RectOccupancyGrid.hpp
     src/math/SphericalGeometry.hpp
     src/math/Vector2d.hpp
+    src/math/Vector3d.hpp
     src/math/ViewportMath.hpp
     src/projections/AzimuthalEquidistantProjection.hpp
     src/projections/PerspectiveProjection.hpp
@@ -52,6 +53,7 @@ add_library(skygate-core STATIC
     src/math/RectOccupancyGrid.cpp
     src/math/SphericalGeometry.cpp
     src/math/Vector2d.cpp
+    src/math/Vector3d.cpp
     src/math/ViewportMath.cpp
     src/ProjectionFactory.cpp
     src/projections/ProjectionAlgorithms.cpp

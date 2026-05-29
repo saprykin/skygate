@@ -28,7 +28,7 @@ constexpr auto kGuidedRefinementTolerance = std::chrono::seconds(60);
 constexpr double kAltitudeClassificationToleranceDeg = 1e-9;
 
 struct AltitudeSample final {
-    core::UtcTimePoint utcTime;
+    skygate::core::UtcTimePoint utcTime;
     double altitudeDeg = std::numeric_limits<double>::quiet_NaN();
 };
 
@@ -59,7 +59,7 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, double 
                   : isSetBracket(previous, next, crossingAltitudeDeg);
 }
 
-[[nodiscard]] core::UtcTimePoint interpolatedCrossingTime(
+[[nodiscard]] skygate::core::UtcTimePoint interpolatedCrossingTime(
     const AltitudeSample& previous, const AltitudeSample& next, double crossingAltitudeDeg
 ) noexcept
 {
@@ -71,7 +71,7 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, double 
     const double fraction = std::clamp((crossingAltitudeDeg - previous.altitudeDeg) / altitudeSpanDeg, 0.0, 1.0);
     const auto span = next.utcTime - previous.utcTime;
     return previous.utcTime
-           + std::chrono::duration_cast<core::UtcTimePoint::duration>(
+           + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(
                std::chrono::duration<double>(static_cast<double>(span.count()) * fraction)
            );
 }
@@ -128,19 +128,20 @@ public:
     }
 
 private:
-    [[nodiscard]] std::optional<double> altitudeAt(const core::UtcTimePoint& utcTime);
+    [[nodiscard]] std::optional<double> altitudeAt(const skygate::core::UtcTimePoint& utcTime);
 
     [[nodiscard]] std::optional<std::array<AltitudeSample, 2>>
     originalAltitudeBracket(const AltitudeSample& previous, const AltitudeSample& next);
 
-    [[nodiscard]] core::UtcTimePoint refinedCrossingTime(
+    [[nodiscard]] skygate::core::UtcTimePoint refinedCrossingTime(
         const AltitudeSample& previous,
         const AltitudeSample& next,
         bool rising,
-        core::UtcTimePoint::duration refinementTolerance
+        skygate::core::UtcTimePoint::duration refinementTolerance
     );
 
-    [[nodiscard]] AltitudeSample refinedMaximum(const core::UtcTimePoint& startUtc, const core::UtcTimePoint& endUtc);
+    [[nodiscard]] AltitudeSample
+    refinedMaximum(const skygate::core::UtcTimePoint& startUtc, const skygate::core::UtcTimePoint& endUtc);
 
     const IEphemerisEngine& m_ephemerisEngine;
     const EphemerisRequest& m_request;
@@ -149,7 +150,7 @@ private:
     double m_crossingAltitudeDeg;
 };
 
-std::optional<double> EventSearch::altitudeAt(const core::UtcTimePoint& utcTime)
+std::optional<double> EventSearch::altitudeAt(const skygate::core::UtcTimePoint& utcTime)
 {
     const auto request = EphemerisRequestFactory::atUtcTime(m_request, utcTime);
     const auto state = m_ephemerisEngine.computeBodyState(request, static_cast<std::size_t>(m_bodyIndex));
@@ -167,7 +168,7 @@ std::vector<AltitudeSample> EventSearch::sampleAltitudes(
     samples.reserve((kSearchHorizonSeconds / kSampleStepSeconds) + 1);
 
     for (int offsetSeconds = 0; offsetSeconds <= kSearchHorizonSeconds; offsetSeconds += kSampleStepSeconds) {
-        const core::UtcTimePoint utcTime = request.context.utcTime + std::chrono::seconds(offsetSeconds);
+        const skygate::core::UtcTimePoint utcTime = request.context.utcTime + std::chrono::seconds(offsetSeconds);
         const auto sampleRequest = EphemerisRequestFactory::atUtcTime(request, utcTime);
         const auto state = engine.computeBodyState(sampleRequest, static_cast<std::size_t>(bodyIndex));
         if (!state.has_value() || !state->horizontal.isFinite()) {
@@ -185,7 +186,7 @@ std::optional<ObservationEventStatus> EventSearch::fixedHorizonStatus() const no
         return std::nullopt;
     }
 
-    const core::EquatorialCoordinate& equatorial = *m_body->fixedEquatorialValue();
+    const skygate::core::EquatorialCoordinate& equatorial = *m_body->fixedEquatorialValue();
     if (!equatorial.isFinite()) {
         return std::nullopt;
     }
@@ -218,19 +219,19 @@ EventSearch::originalAltitudeBracket(const AltitudeSample& previous, const Altit
     };
 }
 
-core::UtcTimePoint EventSearch::refinedCrossingTime(
+skygate::core::UtcTimePoint EventSearch::refinedCrossingTime(
     const AltitudeSample& previous,
     const AltitudeSample& next,
     const bool rising,
-    const core::UtcTimePoint::duration refinementTolerance
+    const skygate::core::UtcTimePoint::duration refinementTolerance
 )
 {
-    core::UtcTimePoint low = previous.utcTime;
-    core::UtcTimePoint high = next.utcTime;
+    skygate::core::UtcTimePoint low = previous.utcTime;
+    skygate::core::UtcTimePoint high = next.utcTime;
 
     while (high - low > refinementTolerance) {
         const auto midpointOffset = (high - low) / 2;
-        const core::UtcTimePoint midpoint = low + midpointOffset;
+        const skygate::core::UtcTimePoint midpoint = low + midpointOffset;
         const auto midpointAltitude = altitudeAt(midpoint);
         if (!midpointAltitude.has_value()) {
             break;
@@ -282,7 +283,7 @@ ObservationEvent EventSearch::findCrossing(
             next = (*originalBracket)[1];
         }
 
-        const core::UtcTimePoint crossingUtcTime =
+        const skygate::core::UtcTimePoint crossingUtcTime =
             trustGuidance ? interpolatedCrossingTime(previous, next, m_crossingAltitudeDeg)
                           : refinedCrossingTime(
                                 previous,
@@ -305,17 +306,18 @@ ObservationEvent EventSearch::findCrossing(
     return ObservationEvent{.status = unavailableCrossingStatus(samples, provenFixedStatus)};
 }
 
-AltitudeSample EventSearch::refinedMaximum(const core::UtcTimePoint& startUtc, const core::UtcTimePoint& endUtc)
+AltitudeSample
+EventSearch::refinedMaximum(const skygate::core::UtcTimePoint& startUtc, const skygate::core::UtcTimePoint& endUtc)
 {
-    auto lowSeconds = core::UtcTimeCodec::toEpochSecondsFloor(startUtc);
-    auto highSeconds = core::UtcTimeCodec::toEpochSecondsFloor(endUtc);
+    auto lowSeconds = skygate::core::UtcTimeCodec::toEpochSecondsFloor(startUtc);
+    auto highSeconds = skygate::core::UtcTimeCodec::toEpochSecondsFloor(endUtc);
 
     while (highSeconds - lowSeconds > 3) {
         const auto spanSeconds = highSeconds - lowSeconds;
         const auto firstSeconds = lowSeconds + spanSeconds / 3;
         const auto secondSeconds = highSeconds - spanSeconds / 3;
-        const core::UtcTimePoint firstUtc = core::UtcTimeCodec::fromEpochSeconds(firstSeconds);
-        const core::UtcTimePoint secondUtc = core::UtcTimeCodec::fromEpochSeconds(secondSeconds);
+        const skygate::core::UtcTimePoint firstUtc = skygate::core::UtcTimeCodec::fromEpochSeconds(firstSeconds);
+        const skygate::core::UtcTimePoint secondUtc = skygate::core::UtcTimeCodec::fromEpochSeconds(secondSeconds);
         const auto firstAltitude = altitudeAt(firstUtc);
         const auto secondAltitude = altitudeAt(secondUtc);
         if (!firstAltitude.has_value() || !secondAltitude.has_value()) {
@@ -331,7 +333,7 @@ AltitudeSample EventSearch::refinedMaximum(const core::UtcTimePoint& startUtc, c
 
     AltitudeSample best{.utcTime = startUtc, .altitudeDeg = -std::numeric_limits<double>::infinity()};
     for (auto seconds = lowSeconds; seconds <= highSeconds; ++seconds) {
-        const core::UtcTimePoint utcTime = core::UtcTimeCodec::fromEpochSeconds(seconds);
+        const skygate::core::UtcTimePoint utcTime = skygate::core::UtcTimeCodec::fromEpochSeconds(seconds);
         const auto altitude = altitudeAt(utcTime);
         if (altitude.has_value() && *altitude > best.altitudeDeg) {
             best.utcTime = utcTime;
@@ -439,7 +441,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     const SearchMode searchMode
 ) const
 {
-    const core::ObservationContext& context = request.context;
+    const skygate::core::ObservationContext& context = request.context;
     if (!context.observer.isValid() || !std::isfinite(crossingAltitudeDeg)) {
         return EventSearch::invalidSummary();
     }
