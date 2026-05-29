@@ -20,6 +20,7 @@ add_library(skygate-core STATIC
     src/math/Geometry2d.hpp
     src/math/LineSegment2d.hpp
     src/math/LinePattern.hpp
+    src/math/Matrix3x3.hpp
     src/math/MathConstants.hpp
     src/math/TimeConstants.hpp
     src/math/PhysicalConstants.hpp
@@ -48,6 +49,7 @@ add_library(skygate-core STATIC
     src/math/Geometry2d.cpp
     src/math/LineSegment2d.cpp
     src/math/LinePattern.cpp
+    src/math/Matrix3x3.cpp
     src/math/ProjectedPolylineBuilder.cpp
     src/math/Rect2d.cpp
     src/math/RectOccupancyGrid.cpp

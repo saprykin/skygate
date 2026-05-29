@@ -16,9 +16,20 @@ namespace {
     return epoch.timeScale == timeScale && epoch.isFinite();
 }
 
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+[[nodiscard]] skygate::core::Matrix3x3 matrixFromErfaRows(const double matrix[3][3]) noexcept
+{
+    return {
+        {.x = matrix[0][0], .y = matrix[0][1], .z = matrix[0][2]},
+        {.x = matrix[1][0], .y = matrix[1][1], .z = matrix[1][2]},
+        {.x = matrix[2][0], .y = matrix[2][1], .z = matrix[2][2]},
+    };
+}
+#endif
+
 }  // namespace
 
-std::optional<Matrix3x3>
+std::optional<skygate::core::Matrix3x3>
 ErfaAstrometry::celestialToIntermediateMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
 {
     if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
@@ -29,17 +40,14 @@ ErfaAstrometry::celestialToIntermediateMatrix06A(const AstronomicalEpoch& terres
     double matrix[3][3] = {};
     eraC2i06a(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2, matrix);
 
-    return Matrix3x3{
-        std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
-        std::array<double, 3>{matrix[1][0], matrix[1][1], matrix[1][2]},
-        std::array<double, 3>{matrix[2][0], matrix[2][1], matrix[2][2]},
-    };
+    return matrixFromErfaRows(matrix);
 #else
     return std::nullopt;
 #endif
 }
 
-std::optional<Matrix3x3> ErfaAstrometry::precessionNutationMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
+std::optional<skygate::core::Matrix3x3>
+ErfaAstrometry::precessionNutationMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
 {
     if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
         return std::nullopt;
@@ -49,11 +57,7 @@ std::optional<Matrix3x3> ErfaAstrometry::precessionNutationMatrix06A(const Astro
     double matrix[3][3] = {};
     eraPnm06a(terrestrialTime.julianDatePart1, terrestrialTime.julianDatePart2, matrix);
 
-    return Matrix3x3{
-        std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
-        std::array<double, 3>{matrix[1][0], matrix[1][1], matrix[1][2]},
-        std::array<double, 3>{matrix[2][0], matrix[2][1], matrix[2][2]},
-    };
+    return matrixFromErfaRows(matrix);
 #else
     return std::nullopt;
 #endif
@@ -85,7 +89,7 @@ std::optional<double> ErfaAstrometry::tioLocatorS00(const AstronomicalEpoch& ter
 #endif
 }
 
-std::optional<Matrix3x3> ErfaAstrometry::polarMotionMatrix00(
+std::optional<skygate::core::Matrix3x3> ErfaAstrometry::polarMotionMatrix00(
     const double polarMotionXRadians, const double polarMotionYRadians, const double tioLocatorRadians
 ) noexcept
 {
@@ -97,11 +101,7 @@ std::optional<Matrix3x3> ErfaAstrometry::polarMotionMatrix00(
 
     double matrix[3][3] = {};
     eraPom00(polarMotionXRadians, polarMotionYRadians, tioLocatorRadians, matrix);
-    return Matrix3x3{
-        std::array<double, 3>{matrix[0][0], matrix[0][1], matrix[0][2]},
-        std::array<double, 3>{matrix[1][0], matrix[1][1], matrix[1][2]},
-        std::array<double, 3>{matrix[2][0], matrix[2][1], matrix[2][2]},
-    };
+    return matrixFromErfaRows(matrix);
 #else
     static_cast<void>(polarMotionXRadians);
     static_cast<void>(polarMotionYRadians);

@@ -2,9 +2,9 @@
 #include "EphemerisMetadataMerge.hpp"
 #include "ErfaAstrometry.hpp"
 #include "math/MathConstants.hpp"
+#include "math/Matrix3x3.hpp"
 #include "math/TimeConstants.hpp"
 
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -87,25 +87,6 @@ constexpr std::string_view kFrameTransformProvenance = "ERFA IAU 2006/2000A cele
     return result;
 }
 
-[[nodiscard]] skygate::core::Vector3d multiply(const Matrix3x3& matrix, const skygate::core::Vector3d& vector) noexcept
-{
-    return {
-        .x = matrix[0][0] * vector.x + matrix[0][1] * vector.y + matrix[0][2] * vector.z,
-        .y = matrix[1][0] * vector.x + matrix[1][1] * vector.y + matrix[1][2] * vector.z,
-        .z = matrix[2][0] * vector.x + matrix[2][1] * vector.y + matrix[2][2] * vector.z,
-    };
-}
-
-[[nodiscard]] skygate::core::Vector3d
-multiplyTranspose(const Matrix3x3& matrix, const skygate::core::Vector3d& vector) noexcept
-{
-    return {
-        .x = matrix[0][0] * vector.x + matrix[1][0] * vector.y + matrix[2][0] * vector.z,
-        .y = matrix[0][1] * vector.x + matrix[1][1] * vector.y + matrix[2][1] * vector.z,
-        .z = matrix[0][2] * vector.x + matrix[1][2] * vector.y + matrix[2][2] * vector.z,
-    };
-}
-
 [[nodiscard]] AstronomicalEpoch
 addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
 {
@@ -117,14 +98,14 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
         .normalized();
 }
 
-[[nodiscard]] Matrix3x3 earthRotationMatrix(const double earthRotationAngle) noexcept
+[[nodiscard]] skygate::core::Matrix3x3 earthRotationMatrix(const double earthRotationAngle) noexcept
 {
     const double sine = std::sin(earthRotationAngle);
     const double cosine = std::cos(earthRotationAngle);
-    return Matrix3x3{
-        std::array<double, 3>{cosine, sine, 0.0},
-        std::array<double, 3>{-sine, cosine, 0.0},
-        std::array<double, 3>{0.0, 0.0, 1.0},
+    return {
+        {.x = cosine, .y = sine, .z = 0.0},
+        {.x = -sine, .y = cosine, .z = 0.0},
+        {.x = 0.0, .y = 0.0, .z = 1.0},
     };
 }
 
@@ -194,16 +175,16 @@ struct FrameTransformContext {
     mutable bool earthOrientationSampleComputed = false;
     mutable EarthOrientationSample earthOrientationSample;
     mutable bool celestialIntermediateMatrixComputed = false;
-    mutable std::optional<Matrix3x3> celestialIntermediateMatrixValue;
+    mutable std::optional<skygate::core::Matrix3x3> celestialIntermediateMatrixValue;
     mutable EphemerisEngineQueryResult celestialIntermediateMatrixMetadata;
     mutable bool earthRotationMatrixComputed = false;
-    mutable std::optional<Matrix3x3> earthRotationMatrixValue;
+    mutable std::optional<skygate::core::Matrix3x3> earthRotationMatrixValue;
     mutable EphemerisEngineQueryResult earthRotationMatrixMetadata;
     mutable bool polarMotionMatrixComputed = false;
-    mutable std::optional<Matrix3x3> polarMotionMatrixValue;
+    mutable std::optional<skygate::core::Matrix3x3> polarMotionMatrixValue;
     mutable EphemerisEngineQueryResult polarMotionMatrixMetadata;
     mutable bool apparentEquatorAndEquinoxMatrixComputed = false;
-    mutable std::optional<Matrix3x3> apparentEquatorAndEquinoxMatrixValue;
+    mutable std::optional<skygate::core::Matrix3x3> apparentEquatorAndEquinoxMatrixValue;
     mutable EphemerisEngineQueryResult apparentEquatorAndEquinoxMatrixMetadata;
 
     [[nodiscard]] std::optional<AstronomicalEpoch>
@@ -315,7 +296,7 @@ private:
     }
 };
 
-[[nodiscard]] std::optional<Matrix3x3>
+[[nodiscard]] std::optional<skygate::core::Matrix3x3>
 celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisEngineQueryResult& metadata)
 {
     if (!context.celestialIntermediateMatrixComputed) {
@@ -336,7 +317,7 @@ celestialIntermediateMatrix(const FrameTransformContext& context, EphemerisEngin
     return context.celestialIntermediateMatrixValue;
 }
 
-[[nodiscard]] std::optional<Matrix3x3>
+[[nodiscard]] std::optional<skygate::core::Matrix3x3>
 intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context, EphemerisEngineQueryResult& metadata)
 {
     if (!context.earthRotationMatrixComputed) {
@@ -359,7 +340,7 @@ intermediateToTerrestrialIntermediateMatrix(const FrameTransformContext& context
     return context.earthRotationMatrixValue;
 }
 
-[[nodiscard]] std::optional<Matrix3x3>
+[[nodiscard]] std::optional<skygate::core::Matrix3x3>
 terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context, EphemerisEngineQueryResult& metadata)
 {
     if (!context.polarMotionMatrixComputed) {
@@ -391,7 +372,7 @@ terrestrialIntermediateToTerrestrialMatrix(const FrameTransformContext& context,
     return context.polarMotionMatrixValue;
 }
 
-[[nodiscard]] std::optional<Matrix3x3>
+[[nodiscard]] std::optional<skygate::core::Matrix3x3>
 stageMatrix(const FrameTransformContext& context, const std::uint8_t lowerRank, EphemerisEngineQueryResult& metadata)
 {
     switch (lowerRank) {
@@ -452,7 +433,7 @@ makeStageMetadata(const CelestialReferenceFrame sourceFrame, const CelestialRefe
     return frame == CelestialReferenceFrame::TrueEquatorAndEquinox;
 }
 
-[[nodiscard]] std::optional<Matrix3x3>
+[[nodiscard]] std::optional<skygate::core::Matrix3x3>
 apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisEngineQueryResult& metadata)
 {
     if (!context.apparentEquatorAndEquinoxMatrixComputed) {
@@ -491,14 +472,14 @@ apparentEquatorAndEquinoxMatrix(const FrameTransformContext& context, EphemerisE
     result.metadata.dataSourceProvenance = kFrameTransformProvenance;
 
     CelestialFrameTransformStageMetadata stage = makeStageMetadata(request.sourceFrame, request.targetFrame);
-    const std::optional<Matrix3x3> matrix = apparentEquatorAndEquinoxMatrix(context, stage.metadata);
+    const std::optional<skygate::core::Matrix3x3> matrix = apparentEquatorAndEquinoxMatrix(context, stage.metadata);
     if (!matrix.has_value()) {
         mergeStageMetadata(result.metadata, stage.metadata);
         result.stages.push_back(std::move(stage));
         return result;
     }
 
-    result.vector = forward ? multiply(*matrix, request.vector) : multiplyTranspose(*matrix, request.vector);
+    result.vector = forward ? matrix->multiplied(request.vector) : matrix->transposeMultiplied(request.vector);
     stage.applied = true;
     stage.metadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
     mergeStageMetadata(result.metadata, stage.metadata);
@@ -547,14 +528,14 @@ transformCelestialVectorWithContext(const CelestialFrameTransformRequest& reques
             const CelestialReferenceFrame stageTargetFrame =
                 upperRank == targetRank ? request.targetFrame : frameForRank(upperRank);
             CelestialFrameTransformStageMetadata stage = makeStageMetadata(stageSourceFrame, stageTargetFrame);
-            const std::optional<Matrix3x3> matrix = stageMatrix(context, lowerRank, stage.metadata);
+            const std::optional<skygate::core::Matrix3x3> matrix = stageMatrix(context, lowerRank, stage.metadata);
             if (!matrix.has_value()) {
                 mergeStageMetadata(result.metadata, stage.metadata);
                 result.stages.push_back(std::move(stage));
                 return result;
             }
 
-            transformed = multiply(*matrix, transformed);
+            transformed = matrix->multiplied(transformed);
             stage.applied = true;
             stage.metadata.appliedCorrections = correctionForStage(lowerRank);
             mergeStageMetadata(result.metadata, stage.metadata);
@@ -568,14 +549,14 @@ transformCelestialVectorWithContext(const CelestialFrameTransformRequest& reques
             const CelestialReferenceFrame stageTargetFrame =
                 stageLowerRank == targetRank ? request.targetFrame : frameForRank(stageLowerRank);
             CelestialFrameTransformStageMetadata stage = makeStageMetadata(stageSourceFrame, stageTargetFrame);
-            const std::optional<Matrix3x3> matrix = stageMatrix(context, stageLowerRank, stage.metadata);
+            const std::optional<skygate::core::Matrix3x3> matrix = stageMatrix(context, stageLowerRank, stage.metadata);
             if (!matrix.has_value()) {
                 mergeStageMetadata(result.metadata, stage.metadata);
                 result.stages.push_back(std::move(stage));
                 return result;
             }
 
-            transformed = multiplyTranspose(*matrix, transformed);
+            transformed = matrix->transposeMultiplied(transformed);
             stage.applied = true;
             stage.metadata.appliedCorrections = correctionForStage(stageLowerRank);
             mergeStageMetadata(result.metadata, stage.metadata);
