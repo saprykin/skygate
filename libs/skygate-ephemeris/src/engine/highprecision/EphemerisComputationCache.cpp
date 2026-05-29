@@ -65,7 +65,7 @@ void mixOptions(std::uint64_t& hash, const EphemerisEngineOptions& options) noex
     mixDouble(hash, options.observingWavelengthMicrometers());
 }
 
-void mixObserver(std::uint64_t& hash, const core::GeoLocation& observer) noexcept
+void mixObserver(std::uint64_t& hash, const skygate::core::GeoLocation& observer) noexcept
 {
     mixDouble(hash, observer.latitudeDeg);
     mixDouble(hash, observer.longitudeDeg);
@@ -96,7 +96,9 @@ void mixOptionalDouble(std::uint64_t& hash, const std::optional<double>& value) 
     }
 }
 
-void mixOptionalEquatorial(std::uint64_t& hash, const std::optional<core::EquatorialCoordinate>& coordinate) noexcept
+void mixOptionalEquatorial(
+    std::uint64_t& hash, const std::optional<skygate::core::EquatorialCoordinate>& coordinate
+) noexcept
 {
     mixBool(hash, coordinate.has_value());
     if (!coordinate.has_value()) {
@@ -157,7 +159,7 @@ void mixCatalogBody(std::uint64_t& hash, const BaseCelestialBody& body) noexcept
 {
     std::uint64_t hash = kFnvOffsetBasis;
     mixEpoch(hash, request.epoch);
-    mixUint64(hash, static_cast<std::uint64_t>(core::UtcTimeCodec::toEpochMicros(request.context.utcTime)));
+    mixUint64(hash, static_cast<std::uint64_t>(skygate::core::UtcTimeCodec::toEpochMicros(request.context.utcTime)));
     mixObserver(hash, request.context.observer);
     mixOptions(hash, request.options);
     return hash;
@@ -209,7 +211,7 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
            && sameDoubleIdentity(lhs.julianDatePart2, rhs.julianDatePart2) && lhs.timeScale == rhs.timeScale;
 }
 
-[[nodiscard]] bool sameObserver(const core::GeoLocation& lhs, const core::GeoLocation& rhs) noexcept
+[[nodiscard]] bool sameObserver(const skygate::core::GeoLocation& lhs, const skygate::core::GeoLocation& rhs) noexcept
 {
     return sameDoubleIdentity(lhs.latitudeDeg, rhs.latitudeDeg)
            && sameDoubleIdentity(lhs.longitudeDeg, rhs.longitudeDeg)
@@ -230,8 +232,8 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
 [[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
 {
     return sameEpoch(lhs.epoch, rhs.epoch)
-           && core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
-                  == core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
+           && skygate::core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
+                  == skygate::core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
            && sameObserver(lhs.context.observer, rhs.context.observer) && sameOptions(lhs.options, rhs.options);
 }
 
@@ -260,7 +262,8 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
 }
 
 [[nodiscard]] bool sameOptionalEquatorial(
-    const std::optional<core::EquatorialCoordinate>& lhs, const std::optional<core::EquatorialCoordinate>& rhs
+    const std::optional<skygate::core::EquatorialCoordinate>& lhs,
+    const std::optional<skygate::core::EquatorialCoordinate>& rhs
 ) noexcept
 {
     if (lhs.has_value() != rhs.has_value()) {

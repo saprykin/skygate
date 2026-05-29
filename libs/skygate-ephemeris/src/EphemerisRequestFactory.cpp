@@ -7,11 +7,11 @@
 
 namespace skygate::ephemeris {
 
-using core::TimeConstants;
+using skygate::core::TimeConstants;
 
-core::ObservationContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
+skygate::core::ObservationContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
 {
-    core::ObservationContext context = request.context;
+    skygate::core::ObservationContext context = request.context;
     if (request.epoch.timeScale == TimeScale::Utc && request.epoch.hasExplicit()) {
         context.utcTime = EpochCodec::utcTimeFromEpoch(request.epoch);
     }
@@ -20,7 +20,7 @@ core::ObservationContext EphemerisRequestFactory::contextFromRequest(const Ephem
 }
 
 EphemerisRequest EphemerisRequestFactory::requestFromContext(
-    const core::ObservationContext& context, const EphemerisEngineOptions& options
+    const skygate::core::ObservationContext& context, const EphemerisEngineOptions& options
 ) noexcept
 {
     return EphemerisRequest{
@@ -30,8 +30,9 @@ EphemerisRequest EphemerisRequestFactory::requestFromContext(
     };
 }
 
-EphemerisRequest
-EphemerisRequestFactory::atUtcTime(const EphemerisRequest& baseRequest, const core::UtcTimePoint& utcTime) noexcept
+EphemerisRequest EphemerisRequestFactory::atUtcTime(
+    const EphemerisRequest& baseRequest, const skygate::core::UtcTimePoint& utcTime
+) noexcept
 {
     EphemerisRequest request = baseRequest;
     const double offsetSeconds = std::chrono::duration<double>(utcTime - baseRequest.context.utcTime).count();

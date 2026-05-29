@@ -8,26 +8,28 @@ namespace skygate::ephemeris {
 
 class CelestialReferenceCalculator final {
 public:
-    [[nodiscard]] static core::HorizontalCoordinate eclipticPoint(
-        double eclipticLongitudeDeg, const core::GeoLocation& observer, const core::UtcTimePoint& utcTime
+    [[nodiscard]] static skygate::core::HorizontalCoordinate eclipticPoint(
+        double eclipticLongitudeDeg,
+        const skygate::core::GeoLocation& observer,
+        const skygate::core::UtcTimePoint& utcTime
     ) noexcept;
 
-    [[nodiscard]] static core::HorizontalCoordinate equatorialPoint(
+    [[nodiscard]] static skygate::core::HorizontalCoordinate equatorialPoint(
         double rightAscensionHours,
         double declinationDeg,
-        const core::GeoLocation& observer,
-        const core::UtcTimePoint& utcTime
+        const skygate::core::GeoLocation& observer,
+        const skygate::core::UtcTimePoint& utcTime
     ) noexcept;
 
-    [[nodiscard]] static core::HorizontalCoordinate declinationCirclePoint(
+    [[nodiscard]] static skygate::core::HorizontalCoordinate declinationCirclePoint(
         int sampleIndex,
         int sampleCount,
         double declinationDeg,
-        const core::GeoLocation& observer,
-        const core::UtcTimePoint& utcTime
+        const skygate::core::GeoLocation& observer,
+        const skygate::core::UtcTimePoint& utcTime
     ) noexcept;
 
-    [[nodiscard]] static double circumpolarBoundaryDeclinationDeg(const core::GeoLocation& observer) noexcept;
+    [[nodiscard]] static double circumpolarBoundaryDeclinationDeg(const skygate::core::GeoLocation& observer) noexcept;
 };
 
 }  // namespace skygate::ephemeris

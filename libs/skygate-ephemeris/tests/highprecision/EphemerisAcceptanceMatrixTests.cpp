@@ -29,7 +29,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-namespace core = skygate::core;
+using namespace skygate::core;
 
 constexpr int kNaifEarth = 399;
 constexpr int kNaifMars = 499;
@@ -71,10 +71,10 @@ template <typename BodyRange>
     return std::make_shared<const CelestialBodyCatalog>(std::span<const OwnGalaxyCelestialBody>{bodies});
 }
 
-[[nodiscard]] core::ObservationContext makeContext()
+[[nodiscard]] ObservationContext makeContext()
 {
-    core::ObservationContext context;
-    context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+    ObservationContext context;
+    context.utcTime = UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
         .longitudeDeg = -122.4194,
@@ -238,28 +238,28 @@ public:
             result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
             result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
             result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-            result.positionAu = SolarSystemKernelVector{.xAu = 1.0, .yAu = 0.0, .zAu = 0.0};
+            result.positionAu = Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
             return result;
         }
 
         if (targetNaifId == kNaifMars && centerNaifId == kNaifEarth) {
-            result.positionAu = SolarSystemKernelVector{.xAu = 1.0, .yAu = 1.0, .zAu = 0.1};
+            result.positionAu = Vector3d{.x = 1.0, .y = 1.0, .z = 0.1};
             return result;
         }
 
         if (targetNaifId == kNaifEarth && centerNaifId == kNaifSolarSystemBarycenter) {
-            result.positionAu = SolarSystemKernelVector{.xAu = 0.5, .yAu = 0.0, .zAu = 0.0};
-            result.velocityAuPerDay = SolarSystemKernelVector{.xAu = 0.0, .yAu = 0.01, .zAu = 0.0};
+            result.positionAu = Vector3d{.x = 0.5, .y = 0.0, .z = 0.0};
+            result.velocityAuPerDay = Vector3d{.x = 0.0, .y = 0.01, .z = 0.0};
             return result;
         }
 
         if (targetNaifId == kNaifMars && centerNaifId == kNaifSolarSystemBarycenter) {
-            result.positionAu = SolarSystemKernelVector{.xAu = 1.25, .yAu = 1.0, .zAu = 0.1};
+            result.positionAu = Vector3d{.x = 1.25, .y = 1.0, .z = 0.1};
             return result;
         }
 
         if (targetNaifId == kNaifSun && centerNaifId == kNaifEarth) {
-            result.positionAu = SolarSystemKernelVector{.xAu = -1.0, .yAu = 0.0, .zAu = 0.0};
+            result.positionAu = Vector3d{.x = -1.0, .y = 0.0, .z = 0.0};
             return result;
         }
 
@@ -318,7 +318,7 @@ public:
         ++m_callCount;
 
         HighPrecisionCalculatorResult result;
-        result.equatorial = core::EquatorialCoordinate{
+        result.equatorial = EquatorialCoordinate{
             .rightAscensionHours = 3.0 + static_cast<double>(input.bodyIndex),
             .declinationDeg = -2.0 + static_cast<double>(input.bodyIndex),
         };
@@ -409,7 +409,7 @@ public:
         if (skygate::ephemeris::EphemerisCorrectionFlags::has(
                 input.request.options.correctionFlags(), EphemerisCorrectionFlags::diurnalParallax()
             )) {
-            result.horizontal = core::HorizontalCoordinate{.altitudeDeg = 42.0, .azimuthDeg = 128.0};
+            result.horizontal = HorizontalCoordinate{.altitudeDeg = 42.0, .azimuthDeg = 128.0};
         }
         return result;
     }
@@ -440,7 +440,7 @@ public:
     [[nodiscard]] HighPrecisionCalculatorResult calculate(const HighPrecisionComputationInput&) const override
     {
         HighPrecisionCalculatorResult result;
-        result.equatorial = core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
+        result.equatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
         result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
         result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);

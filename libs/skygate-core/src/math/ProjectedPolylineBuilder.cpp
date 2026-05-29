@@ -14,10 +14,9 @@ constexpr int kMaxAdaptiveSubsegments = 512;
 constexpr double kMinAngularStepDeg = 0.05;
 constexpr double kMaxAngularStepDeg = 5.0;
 
-[[nodiscard]] double
-angularDistanceRad(const SphericalGeometry::Vector3d& start, const SphericalGeometry::Vector3d& end) noexcept
+[[nodiscard]] double angularDistanceRad(const Vector3d& start, const Vector3d& end) noexcept
 {
-    return std::acos(std::clamp(SphericalGeometry::dot(start, end), -1.0, 1.0));
+    return std::acos(std::clamp(start.dot(end), -1.0, 1.0));
 }
 
 [[nodiscard]] int adaptiveSubsegmentCount(const ProjectionParams& params, const double angularDistance) noexcept
@@ -31,38 +30,19 @@ angularDistanceRad(const SphericalGeometry::Vector3d& start, const SphericalGeom
     return std::clamp(static_cast<int>(std::ceil(angularDistanceDeg / angularStepDeg)), 1, kMaxAdaptiveSubsegments);
 }
 
-[[nodiscard]] SphericalGeometry::Vector3d interpolateUnitVector(
-    const SphericalGeometry::Vector3d& start,
-    const SphericalGeometry::Vector3d& end,
-    const double angularDistance,
-    const double t
-) noexcept
+[[nodiscard]] Vector3d
+interpolateUnitVector(const Vector3d& start, const Vector3d& end, const double angularDistance, const double t) noexcept
 {
     const double sinAngularDistance = std::sin(angularDistance);
     if (!std::isfinite(sinAngularDistance) || std::abs(sinAngularDistance) <= MathConstants::kEpsilon) {
-        return SphericalGeometry::normalize(
-            {start[0] + ((end[0] - start[0]) * t),
-             start[1] + ((end[1] - start[1]) * t),
-             start[2] + ((end[2] - start[2]) * t)}
-        );
+        const Vector3d interpolated = start + ((end - start) * t);
+        return interpolated.normalized().value_or(Vector3d{});
     }
 
     const double startWeight = std::sin((1.0 - t) * angularDistance) / sinAngularDistance;
     const double endWeight = std::sin(t * angularDistance) / sinAngularDistance;
-    return SphericalGeometry::normalize(
-        {(start[0] * startWeight) + (end[0] * endWeight),
-         (start[1] * startWeight) + (end[1] * endWeight),
-         (start[2] * startWeight) + (end[2] * endWeight)}
-    );
-}
-
-[[nodiscard]] HorizontalCoordinate horizontalFromUnitVector(const SphericalGeometry::Vector3d& vector) noexcept
-{
-    const SphericalGeometry::Vector3d unit = SphericalGeometry::normalize(vector);
-    return {
-        .altitudeDeg = AngleMath::toDegrees(std::asin(std::clamp(unit[2], -1.0, 1.0))),
-        .azimuthDeg = AngleMath::normalizeDegrees(AngleMath::toDegrees(std::atan2(unit[0], unit[1])))
-    };
+    const Vector3d interpolated = (start * startWeight) + (end * endWeight);
+    return interpolated.normalized().value_or(Vector3d{});
 }
 
 void appendProjectedSegment(
@@ -88,10 +68,8 @@ void appendAdaptiveProjectedSegment(
     const double maxSegmentLengthSquared
 )
 {
-    const SphericalGeometry::Vector3d startVector =
-        SphericalGeometry::horizontalToUnitVector(startCoordinate.normalizedAzimuth());
-    const SphericalGeometry::Vector3d endVector =
-        SphericalGeometry::horizontalToUnitVector(endCoordinate.normalizedAzimuth());
+    const Vector3d startVector = SphericalGeometry::horizontalToUnitVector(startCoordinate.normalizedAzimuth());
+    const Vector3d endVector = SphericalGeometry::horizontalToUnitVector(endCoordinate.normalizedAzimuth());
     const double angularDistance = angularDistanceRad(startVector, endVector);
     const int subsegmentCount = adaptiveSubsegmentCount(projection.params(), angularDistance);
 
@@ -100,9 +78,10 @@ void appendAdaptiveProjectedSegment(
     for (int subsegmentIndex = 1; subsegmentIndex <= subsegmentCount; ++subsegmentIndex) {
         const double t = static_cast<double>(subsegmentIndex) / static_cast<double>(subsegmentCount);
         const HorizontalCoordinate coordinate =
-            subsegmentIndex == subsegmentCount
-                ? endCoordinate
-                : horizontalFromUnitVector(interpolateUnitVector(startVector, endVector, angularDistance, t));
+            subsegmentIndex == subsegmentCount ? endCoordinate
+                                               : SphericalGeometry::horizontalFromUnitVector(
+                                                     interpolateUnitVector(startVector, endVector, angularDistance, t)
+                                                 );
         const ScreenPoint point = projection.project(coordinate);
         const bool hasPoint = point.isVisible && point.isFinite();
         if (hasPreviousPoint && hasPoint) {

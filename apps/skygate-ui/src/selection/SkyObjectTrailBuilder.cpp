@@ -7,6 +7,8 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
+#include "math/SphericalGeometry.hpp"
+#include "math/Vector3d.hpp"
 
 #include <QColor>
 #include <QElapsedTimer>
@@ -167,92 +169,27 @@ equatorialEqual(const skygate::core::EquatorialCoordinate& lhs, const skygate::c
            && lhs.elevationMeters == rhs.elevationMeters;
 }
 
-[[nodiscard]] double normalizeDegrees(const double valueDeg) noexcept
+[[nodiscard]] skygate::core::Vector3d perpendicularAxis(const skygate::core::Vector3d& vector) noexcept
 {
-    double normalizedDeg = std::fmod(valueDeg, 360.0);
-    return normalizedDeg < 0.0 ? normalizedDeg + 360.0 : normalizedDeg;
-}
-
-struct UnitVector3d final {
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
-};
-
-[[nodiscard]] UnitVector3d horizontalToUnitVector(const skygate::core::HorizontalCoordinate& coordinate) noexcept
-{
-    constexpr double degreesToRadians = std::numbers::pi / 180.0;
-    const double altitudeRad = coordinate.altitudeDeg * degreesToRadians;
-    const double azimuthRad = coordinate.azimuthDeg * degreesToRadians;
-    const double cosAltitude = std::cos(altitudeRad);
-    return UnitVector3d{
-        .x = cosAltitude * std::sin(azimuthRad),
-        .y = cosAltitude * std::cos(azimuthRad),
-        .z = std::sin(altitudeRad),
-    };
-}
-
-[[nodiscard]] skygate::core::HorizontalCoordinate unitVectorToHorizontal(const UnitVector3d& vector) noexcept
-{
-    constexpr double radiansToDegrees = 180.0 / std::numbers::pi;
-    const double altitudeDeg = std::asin(std::clamp(vector.z, -1.0, 1.0)) * radiansToDegrees;
-    const double azimuthDeg = normalizeDegrees(std::atan2(vector.x, vector.y) * radiansToDegrees);
-    return skygate::core::HorizontalCoordinate{.altitudeDeg = altitudeDeg, .azimuthDeg = azimuthDeg};
-}
-
-[[nodiscard]] UnitVector3d normalized(const UnitVector3d& vector) noexcept
-{
-    const double length = std::sqrt((vector.x * vector.x) + (vector.y * vector.y) + (vector.z * vector.z));
-    if (length <= 0.0) {
-        return UnitVector3d{.x = 0.0, .y = 0.0, .z = 1.0};
+    const skygate::core::Vector3d zAxis{.x = 0.0, .y = 0.0, .z = 1.0};
+    skygate::core::Vector3d axis = vector.cross(zAxis);
+    if (axis.length() <= 1e-9) {
+        axis = vector.cross(skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0});
     }
-
-    return UnitVector3d{.x = vector.x / length, .y = vector.y / length, .z = vector.z / length};
+    return axis.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
 }
 
-[[nodiscard]] double dotProduct(const UnitVector3d& lhs, const UnitVector3d& rhs) noexcept
-{
-    return (lhs.x * rhs.x) + (lhs.y * rhs.y) + (lhs.z * rhs.z);
-}
-
-[[nodiscard]] UnitVector3d crossProduct(const UnitVector3d& lhs, const UnitVector3d& rhs) noexcept
-{
-    return UnitVector3d{
-        .x = (lhs.y * rhs.z) - (lhs.z * rhs.y),
-        .y = (lhs.z * rhs.x) - (lhs.x * rhs.z),
-        .z = (lhs.x * rhs.y) - (lhs.y * rhs.x),
-    };
-}
-
-[[nodiscard]] double vectorLength(const UnitVector3d& vector) noexcept
-{
-    return std::sqrt((vector.x * vector.x) + (vector.y * vector.y) + (vector.z * vector.z));
-}
-
-[[nodiscard]] UnitVector3d perpendicularAxis(const UnitVector3d& vector) noexcept
-{
-    const UnitVector3d zAxis{.x = 0.0, .y = 0.0, .z = 1.0};
-    UnitVector3d axis = crossProduct(vector, zAxis);
-    if (vectorLength(axis) <= 1e-9) {
-        axis = crossProduct(vector, UnitVector3d{.x = 1.0, .y = 0.0, .z = 0.0});
-    }
-    return normalized(axis);
-}
-
-[[nodiscard]] UnitVector3d
-rotatedAroundAxis(const UnitVector3d& vector, const UnitVector3d& axis, const double angleRad) noexcept
+[[nodiscard]] skygate::core::Vector3d rotatedAroundAxis(
+    const skygate::core::Vector3d& vector, const skygate::core::Vector3d& axis, const double angleRad
+) noexcept
 {
     const double cosAngle = std::cos(angleRad);
     const double sinAngle = std::sin(angleRad);
-    const UnitVector3d axisCrossVector = crossProduct(axis, vector);
-    const double axisDotVector = dotProduct(axis, vector);
-    return normalized(
-        UnitVector3d{
-            .x = (vector.x * cosAngle) + (axisCrossVector.x * sinAngle) + (axis.x * axisDotVector * (1.0 - cosAngle)),
-            .y = (vector.y * cosAngle) + (axisCrossVector.y * sinAngle) + (axis.y * axisDotVector * (1.0 - cosAngle)),
-            .z = (vector.z * cosAngle) + (axisCrossVector.z * sinAngle) + (axis.z * axisDotVector * (1.0 - cosAngle)),
-        }
-    );
+    const skygate::core::Vector3d axisCrossVector = axis.cross(vector);
+    const double axisDotVector = axis.dot(vector);
+    const skygate::core::Vector3d rotated =
+        (vector * cosAngle) + (axisCrossVector * sinAngle) + (axis * (axisDotVector * (1.0 - cosAngle)));
+    return rotated.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
 }
 
 [[nodiscard]] double angularSeparationDegrees(
@@ -260,9 +197,11 @@ rotatedAroundAxis(const UnitVector3d& vector, const UnitVector3d& axis, const do
 ) noexcept
 {
     constexpr double radiansToDegrees = 180.0 / std::numbers::pi;
-    const UnitVector3d lhsVector = horizontalToUnitVector(lhs.normalizedAzimuth());
-    const UnitVector3d rhsVector = horizontalToUnitVector(rhs.normalizedAzimuth());
-    const double dot = std::clamp(dotProduct(lhsVector, rhsVector), -1.0, 1.0);
+    const skygate::core::Vector3d lhsVector =
+        skygate::core::SphericalGeometry::horizontalToUnitVector(lhs.normalizedAzimuth());
+    const skygate::core::Vector3d rhsVector =
+        skygate::core::SphericalGeometry::horizontalToUnitVector(rhs.normalizedAzimuth());
+    const double dot = std::clamp(lhsVector.dot(rhsVector), -1.0, 1.0);
     return std::acos(dot) * radiansToDegrees;
 }
 
@@ -272,15 +211,12 @@ rotatedAroundAxis(const UnitVector3d& vector, const UnitVector3d& axis, const do
     const double fraction
 ) noexcept
 {
-    const UnitVector3d previousVector = horizontalToUnitVector(previous);
-    const UnitVector3d nextVector = horizontalToUnitVector(next);
-    return unitVectorToHorizontal(normalized(
-        UnitVector3d{
-            .x = previousVector.x + ((nextVector.x - previousVector.x) * fraction),
-            .y = previousVector.y + ((nextVector.y - previousVector.y) * fraction),
-            .z = previousVector.z + ((nextVector.z - previousVector.z) * fraction),
-        }
-    ));
+    const skygate::core::Vector3d previousVector = skygate::core::SphericalGeometry::horizontalToUnitVector(previous);
+    const skygate::core::Vector3d nextVector = skygate::core::SphericalGeometry::horizontalToUnitVector(next);
+    const skygate::core::Vector3d interpolated = previousVector + ((nextVector - previousVector) * fraction);
+    return skygate::core::SphericalGeometry::horizontalFromUnitVector(
+        interpolated.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0})
+    );
 }
 
 [[nodiscard]] std::optional<skygate::core::HorizontalCoordinate> interpolateSampleAtOffset(
@@ -364,11 +300,13 @@ void alignGuidanceTrailToSelectedState(
     }
 
     const skygate::core::HorizontalCoordinate selectedHorizontal = input.targetState->horizontal;
-    const UnitVector3d guidanceNow = normalized(horizontalToUnitVector(*presentSample->horizontal));
-    const UnitVector3d selectedNow = normalized(horizontalToUnitVector(selectedHorizontal));
-    const double dot = std::clamp(dotProduct(guidanceNow, selectedNow), -1.0, 1.0);
-    UnitVector3d axis = crossProduct(guidanceNow, selectedNow);
-    const double axisLength = vectorLength(axis);
+    const skygate::core::Vector3d guidanceNow =
+        skygate::core::SphericalGeometry::horizontalToUnitVector(*presentSample->horizontal);
+    const skygate::core::Vector3d selectedNow =
+        skygate::core::SphericalGeometry::horizontalToUnitVector(selectedHorizontal);
+    const double dot = std::clamp(guidanceNow.dot(selectedNow), -1.0, 1.0);
+    skygate::core::Vector3d axis = guidanceNow.cross(selectedNow);
+    const double axisLength = axis.length();
     double angleRad = 0.0;
     if (axisLength <= 1e-9) {
         if (dot > 0.0) {
@@ -378,14 +316,15 @@ void alignGuidanceTrailToSelectedState(
         axis = perpendicularAxis(guidanceNow);
         angleRad = std::numbers::pi;
     } else {
-        axis = normalized(axis);
+        axis = axis.normalized().value_or(skygate::core::Vector3d{.x = 0.0, .y = 0.0, .z = 1.0});
         angleRad = std::atan2(axisLength, dot);
     }
 
     for (skygate::ephemeris::BodyTrailSample& sample : samples) {
         if (sample.horizontal.has_value() && sample.horizontal->isFinite()) {
-            sample.horizontal =
-                unitVectorToHorizontal(rotatedAroundAxis(horizontalToUnitVector(*sample.horizontal), axis, angleRad));
+            sample.horizontal = skygate::core::SphericalGeometry::horizontalFromUnitVector(rotatedAroundAxis(
+                skygate::core::SphericalGeometry::horizontalToUnitVector(*sample.horizontal), axis, angleRad
+            ));
         }
     }
     presentSample->horizontal = selectedHorizontal;

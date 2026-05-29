@@ -19,24 +19,18 @@ enum class CelestialReferenceFrame : std::uint8_t {
     Itrs
 };
 
-struct CelestialFrameVector {
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
-};
-
 struct CelestialFrameTransformRequest {
     CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
     CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
     AstronomicalEpoch epoch;
-    CelestialFrameVector vector;
+    skygate::core::Vector3d vector;
 };
 
 struct CelestialFrameBatchTransformRequest {
     CelestialReferenceFrame sourceFrame = CelestialReferenceFrame::Gcrs;
     CelestialReferenceFrame targetFrame = CelestialReferenceFrame::Cirs;
     AstronomicalEpoch epoch;
-    std::span<const CelestialFrameVector> vectors;
+    std::span<const skygate::core::Vector3d> vectors;
 };
 
 struct CelestialFrameTransformStageMetadata {
@@ -47,7 +41,7 @@ struct CelestialFrameTransformStageMetadata {
 };
 
 struct CelestialFrameTransformResult {
-    std::optional<CelestialFrameVector> vector;
+    std::optional<skygate::core::Vector3d> vector;
     EphemerisEngineQueryResult metadata;
     std::vector<CelestialFrameTransformStageMetadata> stages;
 };
@@ -63,7 +57,7 @@ public:
     {
         std::vector<CelestialFrameTransformResult> results;
         results.reserve(request.vectors.size());
-        for (const CelestialFrameVector& vector : request.vectors) {
+        for (const skygate::core::Vector3d& vector : request.vectors) {
             results.push_back(transformCelestialVector(
                 CelestialFrameTransformRequest{
                     .sourceFrame = request.sourceFrame,

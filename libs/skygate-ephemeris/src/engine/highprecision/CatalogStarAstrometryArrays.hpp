@@ -24,9 +24,9 @@ public:
     [[nodiscard]] bool hasCatalogAstrometry(std::size_t arrayIndex) const noexcept;
     [[nodiscard]] bool hasFixedEquatorialFallback(std::size_t arrayIndex) const noexcept;
 
-    [[nodiscard]] core::EquatorialCoordinate referenceEquatorial(std::size_t arrayIndex) const noexcept;
+    [[nodiscard]] skygate::core::EquatorialCoordinate referenceEquatorial(std::size_t arrayIndex) const noexcept;
     [[nodiscard]] AstronomicalEpoch referenceEpoch(std::size_t arrayIndex) const noexcept;
-    [[nodiscard]] std::optional<core::EquatorialCoordinate>
+    [[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
     fixedEquatorialFallback(std::size_t arrayIndex) const noexcept;
     [[nodiscard]] std::optional<EphemerisDateRange> validityRange(std::size_t arrayIndex) const;
 

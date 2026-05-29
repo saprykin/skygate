@@ -36,7 +36,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-namespace core = skygate::core;
+using namespace skygate::core;
 
 [[nodiscard]] OwnGalaxyCelestialBody makeSunBody()
 {
@@ -63,7 +63,7 @@ makeFixedStarBody(std::string id, const double rightAscensionHours, const double
     body.id = std::move(id);
     body.displayName = body.id;
     body.kind = BaseCelestialBody::Kind::Star;
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours,
         .declinationDeg = declinationDeg,
     };
@@ -76,7 +76,7 @@ makeFixedStarBody(std::string id, const double rightAscensionHours, const double
     body.fixedEquatorial.reset();
     body.starAstrometry = CatalogStarAstrometry{
         .referenceEquatorial =
-            core::EquatorialCoordinate{
+            EquatorialCoordinate{
                 .rightAscensionHours = rightAscensionHours,
                 .declinationDeg = 10.0,
             },
@@ -109,10 +109,10 @@ template <typename BodyRange>
     return CelestialBodyCatalog(std::span<const OwnGalaxyCelestialBody>{bodies});
 }
 
-[[nodiscard]] core::ObservationContext makeContext()
+[[nodiscard]] ObservationContext makeContext()
 {
-    core::ObservationContext context;
-    context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+    ObservationContext context;
+    context.utcTime = UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
         .longitudeDeg = -122.4194,
@@ -260,7 +260,7 @@ makeEarthOrientationProvider(const std::optional<AstronomicalEpoch>& referenceEp
 )
 {
     HighPrecisionCalculatorResult result;
-    result.equatorial = core::EquatorialCoordinate{
+    result.equatorial = EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours,
         .declinationDeg = declinationDeg,
     };
@@ -366,7 +366,7 @@ public:
         results.reserve(arrays.size());
         for (std::size_t arrayIndex = 0; arrayIndex < arrays.size(); ++arrayIndex) {
             HighPrecisionCalculatorResult result;
-            result.equatorial = core::EquatorialCoordinate{
+            result.equatorial = EquatorialCoordinate{
                 .rightAscensionHours =
                     arrays.referenceRightAscensionHours()[arrayIndex] + request.epoch.julianDatePart2,
                 .declinationDeg = arrays.referenceDeclinationDegrees()[arrayIndex],
@@ -473,7 +473,7 @@ public:
         m_lastCenterNaifId = centerNaifId;
 
         SolarSystemKernelStateResult result;
-        result.positionAu = SolarSystemKernelVector{.xAu = 0.5, .yAu = 1.0, .zAu = 0.25};
+        result.positionAu = Vector3d{.x = 0.5, .y = 1.0, .z = 0.25};
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
         result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
         result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
@@ -564,7 +564,7 @@ public:
 
         std::vector<CelestialFrameTransformResult> results;
         results.reserve(request.vectors.size());
-        for (const CelestialFrameVector& vector : request.vectors) {
+        for (const Vector3d& vector : request.vectors) {
             results.push_back(transform(vector));
         }
         return results;
@@ -586,7 +586,7 @@ public:
     }
 
 private:
-    [[nodiscard]] static CelestialFrameTransformResult transform(const CelestialFrameVector& vector)
+    [[nodiscard]] static CelestialFrameTransformResult transform(const Vector3d& vector)
     {
         CelestialFrameTransformResult result;
         result.vector = vector;
@@ -813,11 +813,11 @@ private:
 [[nodiscard]] HighPrecisionCalculatorResult makeApparentPipelineInputResult()
 {
     HighPrecisionCalculatorResult result;
-    result.equatorial = core::EquatorialCoordinate{
+    result.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = 20.0,
     };
-    result.observerRelativePositionAu = SolarSystemKernelVector{.xAu = 0.75, .yAu = 0.25, .zAu = 0.5};
+    result.observerRelativePositionAu = Vector3d{.x = 0.75, .y = 0.25, .z = 0.5};
     result.metadata.dataSourceProvenance = "fixture geometric solar-system state";
     result.metadata.appliedCorrections = EphemerisCorrectionFlags::geometric();
     return result;
@@ -1655,11 +1655,11 @@ void HighPrecisionEphemerisEngineTests::returnsStructuredUnsupportedStatus()
 void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesValidMetadata()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = 5.0,
     };
-    calculatorResult.horizontal = core::HorizontalCoordinate{
+    calculatorResult.horizontal = HorizontalCoordinate{
         .altitudeDeg = 35.0,
         .azimuthDeg = 180.0,
     };
@@ -1707,7 +1707,7 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesValidMetada
 void HighPrecisionEphemerisEngineTests::defaultResultBuilderTracksRequestedAppliedSkippedAndUnavailableCorrections()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = 5.0,
     };
@@ -1761,7 +1761,7 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderTracksRequestedAppli
 void HighPrecisionEphemerisEngineTests::defaultResultBuilderTurnsOutOfRangeFallbackIntoDegradedResult()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 6.0,
         .declinationDeg = -7.0,
     };
@@ -1846,7 +1846,7 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesFailedResul
 void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesDegradedDataWarnings()
 {
     HighPrecisionCalculatorResult calculatorResult;
-    calculatorResult.equatorial = core::EquatorialCoordinate{
+    calculatorResult.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 8.0,
         .declinationDeg = 9.0,
     };

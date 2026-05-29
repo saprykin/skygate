@@ -10,7 +10,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-namespace core = skygate::core;
+using namespace skygate::core;
 
 [[nodiscard]] OwnGalaxyCelestialBody makeBody()
 {
@@ -52,11 +52,11 @@ namespace core = skygate::core;
 [[nodiscard]] HighPrecisionCalculatorResult makeCalculatorResult(const double altitudeDeg)
 {
     HighPrecisionCalculatorResult result;
-    result.equatorial = core::EquatorialCoordinate{
+    result.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = 20.0,
     };
-    result.horizontal = core::HorizontalCoordinate{
+    result.horizontal = HorizontalCoordinate{
         .altitudeDeg = altitudeDeg,
         .azimuthDeg = 180.0,
     };
@@ -163,7 +163,7 @@ void AtmosphericRefractionCalculatorTests::reportsInvalidObserverInput()
 {
     const AtmosphericRefractionCalculator calculator;
     EphemerisRequest request = makeRequest();
-    request.context.observer.latitudeDeg = core::GeoLocation::kLatitudeMaxDeg + 1.0;
+    request.context.observer.latitudeDeg = GeoLocation::kLatitudeMaxDeg + 1.0;
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult(20.0));
 

@@ -14,7 +14,7 @@ class BodyTrailCalculator final {
 public:
     [[nodiscard]] std::vector<BodyTrailSample> sample(
         const IEphemerisEngine& engine,
-        const core::ObservationContext& context,
+        const skygate::core::ObservationContext& context,
         std::uint32_t bodyIndex,
         const BodyTrailOptions& options = {}
     ) const;

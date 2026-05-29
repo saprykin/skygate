@@ -22,7 +22,7 @@ namespace {
 
 constexpr std::size_t kIoBufferBytes = 1U << 16U;
 
-using core::PhysicalConstants;
+using skygate::core::PhysicalConstants;
 
 void addDiagnostic(std::vector<std::string>& diagnostics, std::string diagnostic)
 {
@@ -132,7 +132,7 @@ public:
     CalcephRuntimeKernelHandle(const CalcephRuntimeKernelHandle&) = delete;
     CalcephRuntimeKernelHandle& operator=(const CalcephRuntimeKernelHandle&) = delete;
 
-    [[nodiscard]] std::optional<SolarSystemKernelVector>
+    [[nodiscard]] std::optional<skygate::core::Vector3d>
     computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
     {
         return computeGeometricStateWithVelocity(epoch, targetNaifId, centerNaifId).positionAu;
@@ -157,15 +157,15 @@ public:
             return state;
         }
 
-        state.positionAu = SolarSystemKernelVector{
-            .xAu = positionVelocity[0] / PhysicalConstants::kAstronomicalUnitKilometers,
-            .yAu = positionVelocity[1] / PhysicalConstants::kAstronomicalUnitKilometers,
-            .zAu = positionVelocity[2] / PhysicalConstants::kAstronomicalUnitKilometers,
+        state.positionAu = skygate::core::Vector3d{
+            .x = positionVelocity[0] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .y = positionVelocity[1] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .z = positionVelocity[2] / PhysicalConstants::kAstronomicalUnitKilometers,
         };
-        state.velocityAuPerDay = SolarSystemKernelVector{
-            .xAu = positionVelocity[3] / PhysicalConstants::kAstronomicalUnitKilometers,
-            .yAu = positionVelocity[4] / PhysicalConstants::kAstronomicalUnitKilometers,
-            .zAu = positionVelocity[5] / PhysicalConstants::kAstronomicalUnitKilometers,
+        state.velocityAuPerDay = skygate::core::Vector3d{
+            .x = positionVelocity[3] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .y = positionVelocity[4] / PhysicalConstants::kAstronomicalUnitKilometers,
+            .z = positionVelocity[5] / PhysicalConstants::kAstronomicalUnitKilometers,
         };
         return state;
     }

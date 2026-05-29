@@ -7,12 +7,13 @@
 
 namespace skygate::ephemeris {
 
-using core::TimeConstants;
+using skygate::core::TimeConstants;
 
-AstronomicalEpoch EpochCodec::epochFromUtcTime(const core::UtcTimePoint& utcTime) noexcept
+AstronomicalEpoch EpochCodec::epochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept
 {
-    const double julianDay = core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
-                             + TimeConstants::kJulianDateUnixEpoch;
+    const double julianDay =
+        skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
+        + TimeConstants::kJulianDateUnixEpoch;
     const double julianDatePart1 = std::floor(julianDay);
     return AstronomicalEpoch{
         .julianDatePart1 = julianDatePart1,
@@ -21,22 +22,22 @@ AstronomicalEpoch EpochCodec::epochFromUtcTime(const core::UtcTimePoint& utcTime
     };
 }
 
-core::UtcTimePoint EpochCodec::utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept
+skygate::core::UtcTimePoint EpochCodec::utcTimeFromEpoch(const AstronomicalEpoch& epoch) noexcept
 {
     const AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
     const double epochMicros =
         std::round((julianDay - TimeConstants::kJulianDateUnixEpoch) * TimeConstants::kMicrosecondsPerDay);
-    return core::UtcTimeCodec::fromEpochMicros(static_cast<std::int64_t>(epochMicros));
+    return skygate::core::UtcTimeCodec::fromEpochMicros(static_cast<std::int64_t>(epochMicros));
 }
 
-double EpochCodec::julianDayFromUtc(const core::UtcTimePoint& utcTime) noexcept
+double EpochCodec::julianDayFromUtc(const skygate::core::UtcTimePoint& utcTime) noexcept
 {
-    return core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
+    return skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / TimeConstants::kSecondsPerDay
            + TimeConstants::kJulianDateUnixEpoch;
 }
 
-double EpochCodec::daysSinceJ2000(const core::UtcTimePoint& utcTime) noexcept
+double EpochCodec::daysSinceJ2000(const skygate::core::UtcTimePoint& utcTime) noexcept
 {
     return julianDayFromUtc(utcTime) - TimeConstants::kJulianDateJ2000;
 }

@@ -115,7 +115,7 @@ HygCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
             body.kind = BaseCelestialBody::Kind::Star;
             body.visualMagnitude = *magnitude;
             body.fixedEquatorial =
-                core::EquatorialCoordinate{.rightAscensionHours = *raHours, .declinationDeg = *decDeg};
+                skygate::core::EquatorialCoordinate{.rightAscensionHours = *raHours, .declinationDeg = *decDeg};
 
             CatalogStarAstrometry astrometry;
             astrometry.referenceEquatorial = *body.fixedEquatorial;

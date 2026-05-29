@@ -18,10 +18,8 @@ namespace skygate::ephemeris {
 
 namespace {
 
-namespace core = skygate::core;
-
-using core::MathConstants;
-using core::TimeConstants;
+using skygate::core::MathConstants;
+using skygate::core::TimeConstants;
 
 struct OffsetLookupResult {
     std::optional<int> offsetSeconds;
@@ -85,8 +83,8 @@ addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale
 [[nodiscard]] std::optional<double> tdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
 {
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    const std::optional<double> erfaResult = highprecision::tdbMinusTtSeconds(
-        highprecision::JulianDateParts{
+    const std::optional<double> erfaResult = skygate::ephemeris::highprecision::tdbMinusTtSeconds(
+        skygate::ephemeris::highprecision::JulianDateParts{
             .day1 = terrestrialTime.julianDatePart1,
             .day2 = terrestrialTime.julianDatePart2,
         },

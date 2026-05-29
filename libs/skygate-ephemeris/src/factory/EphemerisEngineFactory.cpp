@@ -131,11 +131,11 @@ highPrecisionFailureStatus(const std::vector<EphemerisFactoryCreationDiagnostic>
 
 void appendCalcephDiagnostics(
     std::vector<EphemerisFactoryCreationDiagnostic>& diagnostics,
-    const highprecision::CalcephKernelProvider& kernelProvider
+    const skygate::ephemeris::highprecision::CalcephKernelProvider& kernelProvider
 )
 {
     const EphemerisFactoryCreationDiagnosticCode code =
-        kernelProvider.status() == highprecision::CalcephKernelProviderStatus::CalcephUnavailable
+        kernelProvider.status() == skygate::ephemeris::highprecision::CalcephKernelProviderStatus::CalcephUnavailable
             ? EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable
             : EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable;
 
@@ -150,10 +150,10 @@ void appendCalcephDiagnostics(
 }
 
 void appendKernelDateRangeIfMissing(
-    EphemerisDatasetInfo& dataSetInfo, const highprecision::CalcephKernelProvider& kernelProvider
+    EphemerisDatasetInfo& dataSetInfo, const skygate::ephemeris::highprecision::CalcephKernelProvider& kernelProvider
 )
 {
-    const std::optional<highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
+    const std::optional<skygate::ephemeris::highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
     if (!kernelInfo.has_value()) {
         return;
     }
@@ -167,10 +167,11 @@ void appendKernelDateRangeIfMissing(
     dataSetInfo.dateRanges.push_back(kernelInfo->validityRange);
 }
 
-[[nodiscard]] bool
-prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& kernelProvider) noexcept
+[[nodiscard]] bool prefersPlanetarySystemBarycenters(
+    const skygate::ephemeris::highprecision::CalcephKernelProvider& kernelProvider
+) noexcept
 {
-    const std::optional<highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
+    const std::optional<skygate::ephemeris::highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
     if (!kernelInfo.has_value()) {
         return false;
     }
@@ -215,9 +216,9 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
     }
 
     if (diagnostics.empty()) {
-        highprecision::CalcephKernelSelectionOptions kernelSelectionOptions;
+        skygate::ephemeris::highprecision::CalcephKernelSelectionOptions kernelSelectionOptions;
         kernelSelectionOptions.verifyChecksum = false;
-        auto kernelProvider = std::make_shared<highprecision::CalcephKernelProvider>(
+        auto kernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
             *request.activeDataSnapshot,
             *request.dataManifest,
             std::move(kernelSelectionOptions),
@@ -226,27 +227,32 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
         if (!kernelProvider->isReady()) {
             appendCalcephDiagnostics(diagnostics, *kernelProvider);
         } else {
-            highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
+            skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
             dependencies.calcephKernelProvider = kernelProvider;
-            dependencies.solarSystemStateCalculator = std::make_shared<highprecision::SolarSystemStateCalculator>(
-                kernelProvider, prefersPlanetarySystemBarycenters(*kernelProvider)
-            );
+            dependencies.solarSystemStateCalculator =
+                std::make_shared<skygate::ephemeris::highprecision::SolarSystemStateCalculator>(
+                    kernelProvider, prefersPlanetarySystemBarycenters(*kernelProvider)
+                );
             dependencies.starAstrometryCalculator =
-                std::make_shared<highprecision::StarAstrometryCalculator>(kernelProvider, request.timeScaleService);
+                std::make_shared<skygate::ephemeris::highprecision::StarAstrometryCalculator>(
+                    kernelProvider, request.timeScaleService
+                );
             dependencies.timeScaleService = request.timeScaleService;
             dependencies.earthOrientationProvider = request.earthOrientationProvider;
-            dependencies.frameTransformer = std::make_shared<highprecision::ErfaFrameTransformer>(
+            dependencies.frameTransformer = std::make_shared<skygate::ephemeris::highprecision::ErfaFrameTransformer>(
                 request.timeScaleService, request.earthOrientationProvider
             );
             dependencies.atmosphericRefractionCalculator =
-                std::make_shared<highprecision::AtmosphericRefractionCalculator>();
-            dependencies.apparentPlaceCalculator = std::make_shared<highprecision::ApparentPlaceCalculator>(
-                dependencies.frameTransformer,
-                request.timeScaleService,
-                request.earthOrientationProvider,
-                dependencies.atmosphericRefractionCalculator
-            );
-            dependencies.computationCache = std::make_shared<highprecision::EphemerisComputationCache>();
+                std::make_shared<skygate::ephemeris::highprecision::AtmosphericRefractionCalculator>();
+            dependencies.apparentPlaceCalculator =
+                std::make_shared<skygate::ephemeris::highprecision::ApparentPlaceCalculator>(
+                    dependencies.frameTransformer,
+                    request.timeScaleService,
+                    request.earthOrientationProvider,
+                    dependencies.atmosphericRefractionCalculator
+                );
+            dependencies.computationCache =
+                std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
             dependencies.dataSetInfo = request.dataManifest->dataSetInfo;
             if (request.dataSetManifest != nullptr) {
                 dependencies.dataSetInfo = *request.dataSetManifest;
@@ -254,7 +260,7 @@ prefersPlanetarySystemBarycenters(const highprecision::CalcephKernelProvider& ke
             appendKernelDateRangeIfMissing(dependencies.dataSetInfo, *kernelProvider);
 
             return EphemerisEngineFactoryResult::success(
-                std::make_unique<highprecision::HighPrecisionEphemerisEngine>(
+                std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(
                     request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{},
                     request.options,
                     std::move(dependencies)

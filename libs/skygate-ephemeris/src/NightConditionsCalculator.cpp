@@ -74,7 +74,7 @@ NightConditions NightConditionsCalculator::compute(
     conditions.moonrise = unavailableEvent();
     conditions.moonset = unavailableEvent();
 
-    const core::ObservationContext& context = request.context;
+    const skygate::core::ObservationContext& context = request.context;
     if (!context.observer.isValid()) {
         return conditions;
     }

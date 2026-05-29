@@ -9,7 +9,7 @@
 namespace skygate::ephemeris {
 
 struct CatalogStarAstrometry {
-    core::EquatorialCoordinate referenceEquatorial;
+    skygate::core::EquatorialCoordinate referenceEquatorial;
     AstronomicalEpoch referenceEpoch;
     // Tangent-plane RA proper motion, mu_alpha * cos(delta), in mas/year.
     std::optional<double> properMotionRightAscensionMasPerYear;

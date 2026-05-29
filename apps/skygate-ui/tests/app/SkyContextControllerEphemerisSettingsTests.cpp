@@ -76,10 +76,10 @@ bool writeFile(const QString& path, const QByteArray& contents)
 
 class TestCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
 public:
-    [[nodiscard]] std::optional<skygate::ephemeris::highprecision::SolarSystemKernelVector>
+    [[nodiscard]] std::optional<skygate::core::Vector3d>
     computeGeometricState(const skygate::ephemeris::AstronomicalEpoch&, int, int) const override
     {
-        return skygate::ephemeris::highprecision::SolarSystemKernelVector{.xAu = 1.0, .yAu = 0.0, .zAu = 0.0};
+        return skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
     }
 };
 

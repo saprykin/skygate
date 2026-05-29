@@ -24,9 +24,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-
-using skygate::core::MathConstants;
-using skygate::core::PhysicalConstants;
+using namespace skygate::core;
 
 [[nodiscard]] EphemerisRequest makeRequest()
 {
@@ -132,9 +130,8 @@ public:
     SolarSystemKernelStateResult nextResult;
 };
 
-[[nodiscard]] SolarSystemKernelStateResult makeKernelVector(
-    const SolarSystemKernelVector& vector, const std::optional<SolarSystemKernelVector>& velocity = std::nullopt
-)
+[[nodiscard]] SolarSystemKernelStateResult
+makeKernelVector(const Vector3d& vector, const std::optional<Vector3d>& velocity = std::nullopt)
 {
     SolarSystemKernelStateResult result;
     result.positionAu = vector;
@@ -148,7 +145,7 @@ struct GeometricFixture {
     int targetNaifId = 0;
     int centerNaifId = 0;
     AstronomicalEpoch epoch;
-    SolarSystemKernelVector vector;
+    Vector3d vector;
     double expectedRightAscensionHours = 0.0;
     double expectedDeclinationDeg = 0.0;
     double toleranceDeg = 0.0;
@@ -156,7 +153,7 @@ struct GeometricFixture {
 
 struct LightTimeTargetState {
     AstronomicalEpoch epoch;
-    SolarSystemKernelVector vector;
+    Vector3d vector;
 };
 
 struct LightTimeFixture {
@@ -164,8 +161,8 @@ struct LightTimeFixture {
     int earthNaifId = 0;
     int barycenterNaifId = 0;
     AstronomicalEpoch receiveEpoch;
-    SolarSystemKernelVector geometricVector;
-    SolarSystemKernelVector earthReceiveVector;
+    Vector3d geometricVector;
+    Vector3d earthReceiveVector;
     std::vector<LightTimeTargetState> retardedTargetStates;
     double expectedRightAscensionHours = 0.0;
     double expectedDeclinationDeg = 0.0;
@@ -193,9 +190,9 @@ struct LightTimeFixture {
             .epoch = {.julianDatePart1 = fields[3].toDouble(), .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
             .vector =
                 {
-                    .xAu = fields[4].toDouble(),
-                    .yAu = fields[5].toDouble(),
-                    .zAu = fields[6].toDouble(),
+                    .x = fields[4].toDouble(),
+                    .y = fields[5].toDouble(),
+                    .z = fields[6].toDouble(),
                 },
             .expectedRightAscensionHours = fields[7].toDouble(),
             .expectedDeclinationDeg = fields[8].toDouble(),
@@ -230,10 +227,10 @@ struct LightTimeFixture {
             .julianDatePart2 = 0.0,
             .timeScale = TimeScale::Tdb,
         };
-        const SolarSystemKernelVector vector{
-            .xAu = fields[5].toDouble(),
-            .yAu = fields[6].toDouble(),
-            .zAu = fields[7].toDouble(),
+        const Vector3d vector{
+            .x = fields[5].toDouble(),
+            .y = fields[6].toDouble(),
+            .z = fields[7].toDouble(),
         };
 
         if (role == QStringLiteral("geometric")) {
@@ -302,7 +299,7 @@ private slots:
 void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->nextResult = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 1.0});
+    provider->nextResult = makeKernelVector({.x = 0.0, .y = 1.0, .z = 1.0});
     const SolarSystemStateCalculator calculator(provider);
     const OwnGalaxyCelestialBody mars = makePlanetBody("mars");
     const EphemerisRequest request = makeRequest();
@@ -316,9 +313,9 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
     QVERIFY(result.observerRelativePositionAu.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
-    QCOMPARE(result.observerRelativePositionAu->xAu, 0.0);
-    QCOMPARE(result.observerRelativePositionAu->yAu, 1.0);
-    QCOMPARE(result.observerRelativePositionAu->zAu, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->x, 0.0);
+    QCOMPARE(result.observerRelativePositionAu->y, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->z, 1.0);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
@@ -353,7 +350,7 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstHorizonsSmoke
 void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->nextResult = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->nextResult = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
     const EphemerisRequest request = makeRequest();
 
@@ -388,7 +385,7 @@ void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBo
     missingBodyCenter.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
     missingBodyCenter.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
     provider->responses[{499, 399}] = missingBodyCenter;
-    provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    provider->responses[{4, 399}] = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
 
     const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
@@ -411,8 +408,8 @@ void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBo
 void SolarSystemStateCalculatorTests::prefersPlanetarySystemBarycenterWhenConfigured()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
-    provider->responses[{4, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->responses[{4, 399}] = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider, true);
 
     const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
@@ -444,8 +441,8 @@ void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPref
 
     for (const Case& item : cases) {
         const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-        provider->responses[{item.bodyCenterNaifId, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
-        provider->responses[{item.barycenterNaifId, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+        provider->responses[{item.bodyCenterNaifId, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+        provider->responses[{item.barycenterNaifId, 399}] = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
         const SolarSystemStateCalculator calculator(provider, true);
 
         const HighPrecisionCalculatorResult result =
@@ -466,9 +463,9 @@ void SolarSystemStateCalculatorTests::usesAvailableBodyCentersWhenBarycenterPref
 void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTargetAndReceiveEarth()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
-    provider->responses[{399, 0}] = makeKernelVector({.xAu = 10.0, .yAu = 0.0, .zAu = 0.0});
-    provider->responses[{499, 0}] = makeKernelVector({.xAu = 10.0, .yAu = 1.0, .zAu = 1.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->responses[{399, 0}] = makeKernelVector({.x = 10.0, .y = 0.0, .z = 0.0});
+    provider->responses[{499, 0}] = makeKernelVector({.x = 10.0, .y = 1.0, .z = 1.0});
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
@@ -490,9 +487,9 @@ void SolarSystemStateCalculatorTests::appliesLightTimeCorrectionFromRetardedTarg
     QVERIFY(result.observerRelativePositionAu.has_value());
     QVERIFY(std::abs(result.equatorial->rightAscensionHours - 6.0) < 1.0e-12);
     QVERIFY(std::abs(result.equatorial->declinationDeg - 45.0) < 1.0e-12);
-    QCOMPARE(result.observerRelativePositionAu->xAu, 0.0);
-    QCOMPARE(result.observerRelativePositionAu->yAu, 1.0);
-    QCOMPARE(result.observerRelativePositionAu->zAu, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->x, 0.0);
+    QCOMPARE(result.observerRelativePositionAu->y, 1.0);
+    QCOMPARE(result.observerRelativePositionAu->z, 1.0);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
@@ -550,7 +547,7 @@ void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixtu
 void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDroppingGeometricResult()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
     provider->responses[{399, 0}].metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
     provider->responses[{399, 0}].metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     const SolarSystemStateCalculator calculator(provider);
@@ -582,10 +579,10 @@ void SolarSystemStateCalculatorTests::reportsUnavailableLightTimeInputsWithoutDr
 void SolarSystemStateCalculatorTests::appliesStellarAberrationFromEarthVelocity()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     provider->responses[{399, 0}] = makeKernelVector(
-        {.xAu = 0.0, .yAu = 0.0, .zAu = 0.0},
-        SolarSystemKernelVector{.xAu = 0.0, .yAu = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
+        {.x = 0.0, .y = 0.0, .z = 0.0},
+        Vector3d{.x = 0.0, .y = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .z = 0.0}
     );
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
@@ -611,10 +608,10 @@ void SolarSystemStateCalculatorTests::appliesStellarAberrationFromEarthVelocity(
 void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     provider->responses[{399, 0}] = makeKernelVector(
-        {.xAu = 0.0, .yAu = 0.0, .zAu = 0.0},
-        SolarSystemKernelVector{.xAu = 0.0, .yAu = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .zAu = 0.0}
+        {.x = 0.0, .y = 0.0, .z = 0.0},
+        Vector3d{.x = 0.0, .y = PhysicalConstants::kSpeedOfLightAuPerDay * 1.0e-4, .z = 0.0}
     );
     const SolarSystemStateCalculator calculator(provider);
 
@@ -631,8 +628,8 @@ void SolarSystemStateCalculatorTests::skipsStellarAberrationWhenDisabled()
 void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsWithoutDroppingGeometricResult()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
-    provider->responses[{399, 0}] = makeKernelVector({.xAu = 0.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
+    provider->responses[{399, 0}] = makeKernelVector({.x = 0.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::stellarAberration());
@@ -660,8 +657,8 @@ void SolarSystemStateCalculatorTests::reportsUnavailableStellarAberrationInputsW
 void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = std::cos(0.1), .yAu = std::sin(0.1), .zAu = 0.0});
-    provider->responses[{10, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = std::cos(0.1), .y = std::sin(0.1), .z = 0.0});
+    provider->responses[{10, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::gravitationalLightDeflection());
@@ -685,8 +682,8 @@ void SolarSystemStateCalculatorTests::appliesSolarGravitationalLightDeflection()
 void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhenDisabled()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = std::cos(0.1), .yAu = std::sin(0.1), .zAu = 0.0});
-    provider->responses[{10, 399}] = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = std::cos(0.1), .y = std::sin(0.1), .z = 0.0});
+    provider->responses[{10, 399}] = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
 
     const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), makeRequest());
@@ -701,7 +698,7 @@ void SolarSystemStateCalculatorTests::skipsSolarGravitationalLightDeflectionWhen
 void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWithoutDroppingGeometricResult()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->responses[{499, 399}] = makeKernelVector({.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+    provider->responses[{499, 399}] = makeKernelVector({.x = 0.0, .y = 1.0, .z = 0.0});
     provider->responses[{10, 399}].metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
     provider->responses[{10, 399}].metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     const SolarSystemStateCalculator calculator(provider);
@@ -732,7 +729,7 @@ void SolarSystemStateCalculatorTests::reportsUnavailableSolarDeflectionInputsWit
 void SolarSystemStateCalculatorTests::reportsUnsupportedPlanetIdsWithoutCallingKernel()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->nextResult = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->nextResult = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
 
     const HighPrecisionCalculatorResult unknownPlanet =
@@ -786,7 +783,7 @@ void SolarSystemStateCalculatorTests::propagatesOutOfRangeKernelStatus()
 void SolarSystemStateCalculatorTests::rejectsNonTdbEpochs()
 {
     const auto provider = std::make_shared<FakeCalcephKernelProvider>();
-    provider->nextResult = makeKernelVector({.xAu = 1.0, .yAu = 0.0, .zAu = 0.0});
+    provider->nextResult = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
     request.epoch.timeScale = TimeScale::Utc;

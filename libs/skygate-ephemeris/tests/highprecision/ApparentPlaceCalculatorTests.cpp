@@ -29,15 +29,15 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using skygate::ephemeris::tests::angularSeparationDegrees;
 using skygate::ephemeris::tests::EphemerisRaDecExpectation;
-namespace core = skygate::core;
+using namespace skygate::core;
 
 constexpr double kSecondsPerDay = 86'400.0;
 
 struct TopocentricFixtureCase {
     OwnGalaxyCelestialBody body;
-    SolarSystemKernelVector inputGcrsPositionAu;
+    Vector3d inputGcrsPositionAu;
     EphemerisRaDecExpectation expectedEquatorial;
-    core::HorizontalCoordinate expectedHorizontal;
+    HorizontalCoordinate expectedHorizontal;
 };
 
 struct TopocentricFixture {
@@ -62,10 +62,10 @@ struct TopocentricFixture {
     );
 }
 
-[[nodiscard]] core::ObservationContext makeContext()
+[[nodiscard]] ObservationContext makeContext()
 {
-    core::ObservationContext context;
-    context.utcTime = core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+    ObservationContext context;
+    context.utcTime = UtcTimePoint(std::chrono::seconds(1'704'067'200));
     context.observer = {
         .latitudeDeg = 37.7749,
         .longitudeDeg = -122.4194,
@@ -140,7 +140,7 @@ struct TopocentricFixture {
 [[nodiscard]] HighPrecisionCalculatorResult makeCalculatorResult()
 {
     HighPrecisionCalculatorResult result;
-    result.equatorial = core::EquatorialCoordinate{
+    result.equatorial = EquatorialCoordinate{
         .rightAscensionHours = 0.0,
         .declinationDeg = 0.0,
     };
@@ -148,7 +148,7 @@ struct TopocentricFixture {
     return result;
 }
 
-[[nodiscard]] HighPrecisionCalculatorResult makeSolarSystemCalculatorResult(const SolarSystemKernelVector& positionAu)
+[[nodiscard]] HighPrecisionCalculatorResult makeSolarSystemCalculatorResult(const Vector3d& positionAu)
 {
     HighPrecisionCalculatorResult result = makeCalculatorResult();
     result.observerRelativePositionAu = positionAu;
@@ -169,13 +169,13 @@ struct TopocentricFixture {
     return std::abs(difference);
 }
 
-[[nodiscard]] SolarSystemKernelVector parseKernelVector(const QJsonArray& array)
+[[nodiscard]] Vector3d parseKernelVector(const QJsonArray& array)
 {
     Q_ASSERT(array.size() == 3);
     return {
-        .xAu = array.at(0).toDouble(),
-        .yAu = array.at(1).toDouble(),
-        .zAu = array.at(2).toDouble(),
+        .x = array.at(0).toDouble(),
+        .y = array.at(1).toDouble(),
+        .z = array.at(2).toDouble(),
     };
 }
 
@@ -273,7 +273,7 @@ public:
         };
     }
 
-    void setResultVector(const CelestialFrameVector& vector) noexcept
+    void setResultVector(const Vector3d& vector) noexcept
     {
         m_resultVector = vector;
     }
@@ -302,7 +302,7 @@ private:
     mutable int m_callCount = 0;
     mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
     mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
-    std::optional<CelestialFrameVector> m_resultVector;
+    std::optional<Vector3d> m_resultVector;
     EphemerisEngineQueryResult m_resultMetadata = {
         .status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
     };
@@ -336,9 +336,7 @@ public:
 
 private:
     [[nodiscard]] static CelestialFrameTransformResult transformResult(
-        const CelestialReferenceFrame sourceFrame,
-        const CelestialReferenceFrame targetFrame,
-        const CelestialFrameVector& vector
+        const CelestialReferenceFrame sourceFrame, const CelestialReferenceFrame targetFrame, const Vector3d& vector
     )
     {
         EphemerisEngineQueryResult metadata;
@@ -435,7 +433,7 @@ public:
         return m_lastTargetFrame;
     }
 
-    [[nodiscard]] CelestialFrameVector lastVector() const noexcept
+    [[nodiscard]] Vector3d lastVector() const noexcept
     {
         return m_lastVector;
     }
@@ -444,7 +442,7 @@ private:
     mutable int m_callCount = 0;
     mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
     mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
-    mutable CelestialFrameVector m_lastVector;
+    mutable Vector3d m_lastVector;
 };
 
 class ValidUtcTimeScaleService final : public ITimeScaleService {
@@ -744,7 +742,7 @@ void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
 {
     auto frameTransformer = std::make_shared<RecordingFrameTransformer>();
     frameTransformer->setResultVector(
-        CelestialFrameVector{
+        Vector3d{
             .x = 0.0,
             .y = 1.0,
             .z = 0.0,
@@ -876,10 +874,10 @@ void ApparentPlaceCalculatorTests::appliesTopocentricParallaxAndHorizontalCoordi
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
         makeSolarSystemCalculatorResult(
-            SolarSystemKernelVector{
-                .xAu = 0.0,
-                .yAu = 1.0,
-                .zAu = 0.0,
+            Vector3d{
+                .x = 0.0,
+                .y = 1.0,
+                .z = 0.0,
             }
         )
     );
@@ -1016,10 +1014,10 @@ void ApparentPlaceCalculatorTests::reportsInvalidObserverForTopocentricRequest()
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
         makeSolarSystemCalculatorResult(
-            SolarSystemKernelVector{
-                .xAu = 0.0,
-                .yAu = 1.0,
-                .zAu = 0.0,
+            Vector3d{
+                .x = 0.0,
+                .y = 1.0,
+                .z = 0.0,
             }
         )
     );
@@ -1052,10 +1050,10 @@ void ApparentPlaceCalculatorTests::reportsMissingEarthOrientationForTopocentricR
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
         makeSolarSystemCalculatorResult(
-            SolarSystemKernelVector{
-                .xAu = 0.0,
-                .yAu = 1.0,
-                .zAu = 0.0,
+            Vector3d{
+                .x = 0.0,
+                .y = 1.0,
+                .z = 0.0,
             }
         )
     );
@@ -1085,10 +1083,10 @@ void ApparentPlaceCalculatorTests::preservesInputEquatorialWhenTopocentricEquato
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
         makeSolarSystemCalculatorResult(
-            SolarSystemKernelVector{
-                .xAu = 0.0,
-                .yAu = 1.0,
-                .zAu = 0.0,
+            Vector3d{
+                .x = 0.0,
+                .y = 1.0,
+                .z = 0.0,
             }
         )
     );
@@ -1122,10 +1120,10 @@ void ApparentPlaceCalculatorTests::preservesInputEquatorialWhenBatchTopocentricE
         {
             .bodyIndex = 0U,
             .result = makeSolarSystemCalculatorResult(
-                SolarSystemKernelVector{
-                    .xAu = 0.0,
-                    .yAu = 1.0,
-                    .zAu = 0.0,
+                Vector3d{
+                    .x = 0.0,
+                    .y = 1.0,
+                    .z = 0.0,
                 }
             ),
         },
@@ -1186,7 +1184,7 @@ void ApparentPlaceCalculatorTests::leavesApparentRequestGeocentricWhenParallaxIs
         .elevationMeters = 0.0,
     };
     const HighPrecisionCalculatorResult calculatorResult =
-        makeSolarSystemCalculatorResult(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+        makeSolarSystemCalculatorResult(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0});
 
     const HighPrecisionCalculatorResult apparentResult = calculator.apply(makeInput(apparentRequest), calculatorResult);
     const HighPrecisionCalculatorResult topocentricResult =
@@ -1222,7 +1220,7 @@ void ApparentPlaceCalculatorTests::changesTopocentricPositionWhenObserverElevati
     EphemerisRequest elevatedRequest = seaLevelRequest;
     elevatedRequest.context.observer.elevationMeters = 4'200.0;
     const HighPrecisionCalculatorResult calculatorResult =
-        makeSolarSystemCalculatorResult(SolarSystemKernelVector{.xAu = 0.0, .yAu = 1.0, .zAu = 0.0});
+        makeSolarSystemCalculatorResult(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0});
 
     const HighPrecisionCalculatorResult seaLevelResult = calculator.apply(makeInput(seaLevelRequest), calculatorResult);
     const HighPrecisionCalculatorResult elevatedResult = calculator.apply(makeInput(elevatedRequest), calculatorResult);
@@ -1259,10 +1257,10 @@ void ApparentPlaceCalculatorTests::appliesAtmosphericRefractionToTopocentricHori
     const HighPrecisionCalculatorResult result = calculator.apply(
         makeInput(request),
         makeSolarSystemCalculatorResult(
-            SolarSystemKernelVector{
-                .xAu = 1.0,
-                .yAu = 0.0,
-                .zAu = 1.0,
+            Vector3d{
+                .x = 1.0,
+                .y = 0.0,
+                .z = 1.0,
             }
         )
     );

@@ -39,11 +39,11 @@ public:
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const override;
 
-    [[nodiscard]] EphemerisSnapshot compute(const core::ObservationContext& context) const override;
+    [[nodiscard]] EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const core::ObservationContext& context, std::string_view bodyId) const override;
+    computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const core::ObservationContext& context, std::uint32_t bodyIndex) const override;
+    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override;
 
 private:
     class Impl;

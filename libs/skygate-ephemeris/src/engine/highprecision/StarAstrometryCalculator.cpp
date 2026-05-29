@@ -5,6 +5,7 @@
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/TimeConstants.hpp"
+#include "math/Vector3d.hpp"
 
 #include <cmath>
 #include <limits>
@@ -15,21 +16,13 @@
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-namespace core = skygate::core;
-
-using core::MathConstants;
-using core::PhysicalConstants;
-using core::TimeConstants;
+using skygate::core::MathConstants;
+using skygate::core::PhysicalConstants;
+using skygate::core::TimeConstants;
 constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 
-struct CartesianVector {
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
-};
-
-[[nodiscard]] bool isFiniteEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
+[[nodiscard]] bool isFiniteEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
 {
     return std::isfinite(coordinate.rightAscensionHours) && std::isfinite(coordinate.declinationDeg)
            && coordinate.declinationDeg >= -90.0 && coordinate.declinationDeg <= 90.0;
@@ -77,37 +70,11 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     return result;
 }
 
-[[nodiscard]] CartesianVector addVectors(const CartesianVector& lhs, const CartesianVector& rhs) noexcept
-{
-    return {
-        .x = lhs.x + rhs.x,
-        .y = lhs.y + rhs.y,
-        .z = lhs.z + rhs.z,
-    };
-}
-
-[[nodiscard]] CartesianVector subtractVectors(const CartesianVector& lhs, const CartesianVector& rhs) noexcept
-{
-    return {
-        .x = lhs.x - rhs.x,
-        .y = lhs.y - rhs.y,
-        .z = lhs.z - rhs.z,
-    };
-}
-
-[[nodiscard]] CartesianVector scaleVector(const CartesianVector& vector, const double scale) noexcept
-{
-    return {
-        .x = vector.x * scale,
-        .y = vector.y * scale,
-        .z = vector.z * scale,
-    };
-}
-
-[[nodiscard]] CartesianVector unitVectorFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
+[[nodiscard]] skygate::core::Vector3d
+unitVectorFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
 {
     const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
-    const double declinationRad = core::AngleMath::toRadians(coordinate.declinationDeg);
+    const double declinationRad = skygate::core::AngleMath::toRadians(coordinate.declinationDeg);
     const double cosDeclination = std::cos(declinationRad);
     return {
         .x = cosDeclination * std::cos(rightAscensionRad),
@@ -116,7 +83,8 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     };
 }
 
-[[nodiscard]] CartesianVector eastBasisFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
+[[nodiscard]] skygate::core::Vector3d
+eastBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
 {
     const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
     return {
@@ -126,10 +94,11 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     };
 }
 
-[[nodiscard]] CartesianVector northBasisFromEquatorial(const core::EquatorialCoordinate& coordinate) noexcept
+[[nodiscard]] skygate::core::Vector3d
+northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
 {
     const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
-    const double declinationRad = core::AngleMath::toRadians(coordinate.declinationDeg);
+    const double declinationRad = skygate::core::AngleMath::toRadians(coordinate.declinationDeg);
     return {
         .x = -std::sin(declinationRad) * std::cos(rightAscensionRad),
         .y = -std::sin(declinationRad) * std::sin(rightAscensionRad),
@@ -137,14 +106,15 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     };
 }
 
-[[nodiscard]] std::optional<core::EquatorialCoordinate> equatorialFromVector(const CartesianVector& vector) noexcept
+[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
+equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
 {
-    if (!std::isfinite(vector.x) || !std::isfinite(vector.y) || !std::isfinite(vector.z)) {
+    if (!vector.isFinite()) {
         return std::nullopt;
     }
 
     const double xyDistance = std::hypot(vector.x, vector.y);
-    const double distance = std::hypot(xyDistance, vector.z);
+    const double distance = vector.length();
     if (distance <= std::numeric_limits<double>::min()) {
         return std::nullopt;
     }
@@ -154,9 +124,9 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
         rightAscensionHours += 24.0;
     }
 
-    return core::EquatorialCoordinate{
+    return skygate::core::EquatorialCoordinate{
         .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = core::AngleMath::toDegrees(std::atan2(vector.z, xyDistance)),
+        .declinationDeg = skygate::core::AngleMath::toDegrees(std::atan2(vector.z, xyDistance)),
     };
 }
 
@@ -170,11 +140,11 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
     return hasFiniteOptionalValue(value) ? *value : 0.0;
 }
 
-[[nodiscard]] std::optional<CartesianVector> propagatedAstrometricVector(
+[[nodiscard]] std::optional<skygate::core::Vector3d> propagatedAstrometricVector(
     const CatalogStarAstrometry& astrometry, const EphemerisCorrectionFlags flags, const double years
 ) noexcept
 {
-    const core::EquatorialCoordinate& reference = astrometry.referenceEquatorial;
+    const skygate::core::EquatorialCoordinate& reference = astrometry.referenceEquatorial;
     const double properMotionRaMasPerYear =
         skygate::ephemeris::EphemerisCorrectionFlags::has(flags, EphemerisCorrectionFlags::properMotion())
             ? finiteValueOrZero(astrometry.properMotionRightAscensionMasPerYear)
@@ -188,22 +158,17 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
             ? finiteValueOrZero(astrometry.radialVelocityKmPerSecond)
             : 0.0;
 
-    const CartesianVector referenceUnit = unitVectorFromEquatorial(reference);
-    const CartesianVector east = eastBasisFromEquatorial(reference);
-    const CartesianVector north = northBasisFromEquatorial(reference);
+    const skygate::core::Vector3d referenceUnit = unitVectorFromEquatorial(reference);
+    const skygate::core::Vector3d east = eastBasisFromEquatorial(reference);
+    const skygate::core::Vector3d north = northBasisFromEquatorial(reference);
     const double tangentialRaRadiansPerYear = properMotionRaMasPerYear * MathConstants::kMilliarcsecondsToRadians;
     const double tangentialDecRadiansPerYear = properMotionDecMasPerYear * MathConstants::kMilliarcsecondsToRadians;
     const bool needsDistance =
         hasEnabledPositiveParallax(astrometry, flags) || hasAnnualParallaxInput(astrometry, flags);
 
     if (!needsDistance) {
-        return addVectors(
-            referenceUnit,
-            addVectors(
-                scaleVector(east, tangentialRaRadiansPerYear * years),
-                scaleVector(north, tangentialDecRadiansPerYear * years)
-            )
-        );
+        return referenceUnit + (east * (tangentialRaRadiansPerYear * years))
+               + (north * (tangentialDecRadiansPerYear * years));
     }
 
     const double distanceAu = PhysicalConstants::kAuPerParsec * (1'000.0 / *astrometry.stellarParallaxMas);
@@ -211,33 +176,11 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
                                                ? radialVelocityKmPerSecond * TimeConstants::kSecondsPerJulianYear
                                                      / PhysicalConstants::kAstronomicalUnitKilometers
                                                : 0.0;
-    const CartesianVector referencePosition = scaleVector(referenceUnit, distanceAu);
-    const CartesianVector velocity = addVectors(
-        scaleVector(referenceUnit, radialVelocityAuPerYear),
-        addVectors(
-            scaleVector(east, tangentialRaRadiansPerYear * distanceAu),
-            scaleVector(north, tangentialDecRadiansPerYear * distanceAu)
-        )
-    );
-    return addVectors(referencePosition, scaleVector(velocity, years));
-}
-
-[[nodiscard]] CartesianVector cartesianFromSolarSystemVector(const SolarSystemKernelVector& vector) noexcept
-{
-    return {
-        .x = vector.xAu,
-        .y = vector.yAu,
-        .z = vector.zAu,
-    };
-}
-
-[[nodiscard]] SolarSystemKernelVector solarSystemVectorFromCartesian(const CartesianVector& vector) noexcept
-{
-    return {
-        .xAu = vector.x,
-        .yAu = vector.y,
-        .zAu = vector.z,
-    };
+    const skygate::core::Vector3d referencePosition = referenceUnit * distanceAu;
+    const skygate::core::Vector3d velocity = (referenceUnit * radialVelocityAuPerYear)
+                                             + (east * (tangentialRaRadiansPerYear * distanceAu))
+                                             + (north * (tangentialDecRadiansPerYear * distanceAu));
+    return referencePosition + (velocity * years);
 }
 
 [[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
@@ -343,14 +286,14 @@ void recordAppliedCorrections(
 [[nodiscard]] HighPrecisionCalculatorResult calculateStarAstrometry(
     const EphemerisRequest& request,
     const std::optional<CatalogStarAstrometry>& astrometry,
-    const std::optional<core::EquatorialCoordinate>& fixedEquatorial,
+    const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial,
     const std::shared_ptr<const ICalcephKernelProvider>& kernelProvider,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
     const PreparedEphemerisRequestState* preparedState = nullptr
 )
 {
     const EphemerisCorrectionFlags flags = request.options.correctionFlags();
-    const core::EquatorialCoordinate* referenceEquatorial = nullptr;
+    const skygate::core::EquatorialCoordinate* referenceEquatorial = nullptr;
     if (astrometry.has_value()) {
         referenceEquatorial = &astrometry->referenceEquatorial;
     } else if (fixedEquatorial.has_value()) {
@@ -388,7 +331,7 @@ void recordAppliedCorrections(
     }
 
     const double elapsedYears = yearsBetween(astrometry->referenceEpoch, request.epoch);
-    const std::optional<CartesianVector> propagatedVector =
+    const std::optional<skygate::core::Vector3d> propagatedVector =
         propagatedAstrometricVector(*astrometry, flags, elapsedYears);
     if (!propagatedVector.has_value()) {
         return makeFailedResult();
@@ -415,9 +358,8 @@ void recordAppliedCorrections(
                     result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
                 );
                 if (earthState.positionAu.has_value()) {
-                    const CartesianVector geocentricVector =
-                        subtractVectors(*propagatedVector, cartesianFromSolarSystemVector(*earthState.positionAu));
-                    result.observerRelativePositionAu = solarSystemVectorFromCartesian(geocentricVector);
+                    const skygate::core::Vector3d geocentricVector = *propagatedVector - *earthState.positionAu;
+                    result.observerRelativePositionAu = geocentricVector;
                     result.equatorial = equatorialFromVector(geocentricVector);
                     result.metadata.appliedCorrections |= EphemerisCorrectionFlags::annualParallax();
                 } else {
@@ -506,7 +448,8 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
 
     for (std::size_t arrayIndex = 0U; arrayIndex < arrays.size(); ++arrayIndex) {
         const std::optional<CatalogStarAstrometry> astrometry = astrometryFromArrays(arrays, arrayIndex);
-        const std::optional<core::EquatorialCoordinate> fixedEquatorial = arrays.fixedEquatorialFallback(arrayIndex);
+        const std::optional<skygate::core::EquatorialCoordinate> fixedEquatorial =
+            arrays.fixedEquatorialFallback(arrayIndex);
         results.push_back(
             StarAstrometryBatchResult{
                 .bodyIndex = arrays.bodyIndices()[arrayIndex],

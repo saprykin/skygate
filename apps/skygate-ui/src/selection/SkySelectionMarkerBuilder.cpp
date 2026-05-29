@@ -2,6 +2,7 @@
 #include "SkySceneShared.hpp"
 #include "math/AngleMath.hpp"
 #include "math/SphericalGeometry.hpp"
+#include "math/Vector3d.hpp"
 
 #include <QPointF>
 
@@ -70,7 +71,7 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    skygate::core::SphericalGeometry::Vector3d sum{0.0, 0.0, 0.0};
+    skygate::core::Vector3d sum;
     int validAnchorCount = 0;
     for (const std::string& hipId : anchorGroupIt->second) {
         const auto stateIndexIt = stateIndexByBodyId.constFind(normalizedSceneLookupKey(hipId));
@@ -84,9 +85,7 @@ std::optional<QPointF> selectedConstellationPoint(
         }
 
         const auto vector = skygate::core::SphericalGeometry::horizontalToUnitVector(horizontal);
-        sum[0] += vector[0];
-        sum[1] += vector[1];
-        sum[2] += vector[2];
+        sum += vector;
         ++validAnchorCount;
     }
 
@@ -94,15 +93,15 @@ std::optional<QPointF> selectedConstellationPoint(
         return std::nullopt;
     }
 
-    const auto normalizedVector = skygate::core::SphericalGeometry::normalize(sum);
-    if (skygate::core::SphericalGeometry::length(normalizedVector) <= 0.0) {
+    const auto normalizedVector = sum.normalized();
+    if (!normalizedVector.has_value()) {
         return std::nullopt;
     }
 
     const skygate::core::HorizontalCoordinate center{
-        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector[2], -1.0, 1.0))),
+        .altitudeDeg = skygate::core::AngleMath::toDegrees(std::asin(std::clamp(normalizedVector->z, -1.0, 1.0))),
         .azimuthDeg = skygate::core::AngleMath::normalizeDegrees(
-            skygate::core::AngleMath::toDegrees(std::atan2(normalizedVector[0], normalizedVector[1]))
+            skygate::core::AngleMath::toDegrees(std::atan2(normalizedVector->x, normalizedVector->y))
         )
     };
     const auto projected = preparedProjection.project(center);

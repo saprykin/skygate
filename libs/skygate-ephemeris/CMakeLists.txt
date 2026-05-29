@@ -41,6 +41,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CatalogStarAstrometryArrays.cpp
     src/engine/highprecision/CalcephKernelProvider.hpp
     src/engine/highprecision/CalcephKernelProvider.cpp
+    src/engine/highprecision/CelestialFrameMath.hpp
+    src/engine/highprecision/CelestialFrameMath.cpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
     src/engine/highprecision/HighPrecisionTypes.hpp

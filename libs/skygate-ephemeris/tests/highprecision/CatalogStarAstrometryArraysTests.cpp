@@ -15,7 +15,7 @@ namespace {
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
-namespace core = skygate::core;
+using namespace skygate::core;
 
 [[nodiscard]] AstronomicalEpoch referenceEpoch()
 {
@@ -32,7 +32,7 @@ namespace core = skygate::core;
     body.id = "astrometric-star";
     body.displayName = "Astrometric Star";
     body.kind = BaseCelestialBody::Kind::Star;
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = 10.0,
         .declinationDeg = 20.0,
     };
@@ -78,7 +78,7 @@ namespace core = skygate::core;
     body.id = "fixed-star";
     body.displayName = "Fixed Star";
     body.kind = BaseCelestialBody::Kind::Star;
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = 4.0,
         .declinationDeg = -15.0,
     };
@@ -100,7 +100,7 @@ namespace core = skygate::core;
     body.id = "messier-31";
     body.displayName = "M31";
     body.kind = BaseCelestialBody::Kind::DeepSkyObject;
-    body.fixedEquatorial = core::EquatorialCoordinate{
+    body.fixedEquatorial = EquatorialCoordinate{
         .rightAscensionHours = 0.7,
         .declinationDeg = 41.3,
     };

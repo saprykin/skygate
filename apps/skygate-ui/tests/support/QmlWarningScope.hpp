@@ -19,7 +19,7 @@ public:
 
     explicit QmlWarningScope(const Forwarding forwarding = Forwarding::Enabled) : m_forwarding(forwarding)
     {
-        testsupport::detail::MessageLogDispatcher::subscribe(this, &QmlWarningScope::messageHandler);
+        skygate::testsupport::detail::MessageLogDispatcher::subscribe(this, &QmlWarningScope::messageHandler);
     }
 
     QmlWarningScope(const QmlWarningScope&) = delete;
@@ -29,7 +29,7 @@ public:
 
     ~QmlWarningScope()
     {
-        testsupport::detail::MessageLogDispatcher::unsubscribe(this, &QmlWarningScope::messageHandler);
+        skygate::testsupport::detail::MessageLogDispatcher::unsubscribe(this, &QmlWarningScope::messageHandler);
     }
 
     [[nodiscard]] QStringList messages() const
@@ -39,7 +39,7 @@ public:
     }
 
 private:
-    static testsupport::detail::MessageLogDispatcher::Result
+    static skygate::testsupport::detail::MessageLogDispatcher::Result
     messageHandler(void* owner, const QtMsgType type, const QMessageLogContext& /*context*/, const QString& message)
     {
         QmlWarningScope* scope = static_cast<QmlWarningScope*>(owner);
@@ -50,9 +50,9 @@ private:
         }
 
         if (scope->m_forwarding == Forwarding::Disabled) {
-            return testsupport::detail::MessageLogDispatcher::Result::Stop;
+            return skygate::testsupport::detail::MessageLogDispatcher::Result::Stop;
         }
-        return testsupport::detail::MessageLogDispatcher::Result::Continue;
+        return skygate::testsupport::detail::MessageLogDispatcher::Result::Continue;
     }
 
 private:

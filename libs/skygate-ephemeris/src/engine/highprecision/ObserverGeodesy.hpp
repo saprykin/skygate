@@ -1,12 +1,13 @@
 #pragma once
 
-#include "HighPrecisionTypes.hpp"
 #include "GeoLocation.hpp"
+#include "HighPrecisionTypes.hpp"
 
 #include <optional>
 
 namespace skygate::ephemeris::highprecision {
 
-[[nodiscard]] std::optional<SolarSystemKernelVector> observerItrsPositionAu(const core::GeoLocation& observer) noexcept;
+[[nodiscard]] std::optional<skygate::core::Vector3d>
+observerItrsPositionAu(const skygate::core::GeoLocation& observer) noexcept;
 
 }  // namespace skygate::ephemeris::highprecision

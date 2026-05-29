@@ -61,7 +61,7 @@ CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const B
 
         const CatalogStarAstrometry* astrometry =
             body.starAstrometryValue().has_value() ? &*body.starAstrometryValue() : nullptr;
-        const core::EquatorialCoordinate referenceEquatorial =
+        const skygate::core::EquatorialCoordinate referenceEquatorial =
             astrometry != nullptr ? astrometry->referenceEquatorial : *body.fixedEquatorialValue();
         const AstronomicalEpoch referenceEpoch =
             astrometry != nullptr ? astrometry->referenceEpoch : AstronomicalEpoch{};
@@ -145,7 +145,8 @@ bool CatalogStarAstrometryArrays::hasFixedEquatorialFallback(const std::size_t a
     return hasValueAt(m_hasFixedEquatorialFallback, arrayIndex);
 }
 
-core::EquatorialCoordinate CatalogStarAstrometryArrays::referenceEquatorial(const std::size_t arrayIndex) const noexcept
+skygate::core::EquatorialCoordinate
+CatalogStarAstrometryArrays::referenceEquatorial(const std::size_t arrayIndex) const noexcept
 {
     return {
         .rightAscensionHours = m_referenceRightAscensionHours[arrayIndex],
@@ -162,14 +163,14 @@ AstronomicalEpoch CatalogStarAstrometryArrays::referenceEpoch(const std::size_t 
     };
 }
 
-std::optional<core::EquatorialCoordinate>
+std::optional<skygate::core::EquatorialCoordinate>
 CatalogStarAstrometryArrays::fixedEquatorialFallback(const std::size_t arrayIndex) const noexcept
 {
     if (!hasFixedEquatorialFallback(arrayIndex)) {
         return std::nullopt;
     }
 
-    return core::EquatorialCoordinate{
+    return skygate::core::EquatorialCoordinate{
         .rightAscensionHours = m_fixedRightAscensionHours[arrayIndex],
         .declinationDeg = m_fixedDeclinationDegrees[arrayIndex],
     };

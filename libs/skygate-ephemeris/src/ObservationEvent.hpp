@@ -9,7 +9,7 @@ namespace skygate::ephemeris {
 
 struct ObservationEvent {
     ObservationEventStatus status = ObservationEventStatus::Unresolved;
-    std::optional<core::UtcTimePoint> utcTime;
+    std::optional<skygate::core::UtcTimePoint> utcTime;
     std::optional<double> altitudeDeg;
 };
 

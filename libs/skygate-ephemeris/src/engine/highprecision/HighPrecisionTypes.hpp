@@ -7,6 +7,7 @@
 #include "HorizontalCoordinate.hpp"
 #include "engine/EphemerisDatasetInfo.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
+#include "math/Vector3d.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
 #include <cstddef>
@@ -30,15 +31,9 @@ class IFrameTransformer;
 class IEphemerisResultBuilder;
 class IEphemerisComputationCache;
 
-struct SolarSystemKernelVector {
-    double xAu = 0.0;
-    double yAu = 0.0;
-    double zAu = 0.0;
-};
-
 struct SolarSystemKernelStateResult {
-    std::optional<SolarSystemKernelVector> positionAu;
-    std::optional<SolarSystemKernelVector> velocityAuPerDay;
+    std::optional<skygate::core::Vector3d> positionAu;
+    std::optional<skygate::core::Vector3d> velocityAuPerDay;
     EphemerisEngineQueryResult metadata;
 };
 
@@ -51,7 +46,7 @@ struct PreparedEphemerisRequestState {
     bool topocentricStateAvailable = true;
     EphemerisEngineQueryResult topocentricMetadata;
     std::optional<EarthOrientationSample> earthOrientationSample;
-    std::optional<SolarSystemKernelVector> observerItrsPositionAu;
+    std::optional<skygate::core::Vector3d> observerItrsPositionAu;
 };
 
 struct HighPrecisionComputationInput {
@@ -62,9 +57,9 @@ struct HighPrecisionComputationInput {
 };
 
 struct HighPrecisionCalculatorResult {
-    std::optional<core::EquatorialCoordinate> equatorial;
-    std::optional<core::HorizontalCoordinate> horizontal;
-    std::optional<SolarSystemKernelVector> observerRelativePositionAu;
+    std::optional<skygate::core::EquatorialCoordinate> equatorial;
+    std::optional<skygate::core::HorizontalCoordinate> horizontal;
+    std::optional<skygate::core::Vector3d> observerRelativePositionAu;
     EphemerisEngineQueryResult metadata;
 };
 
