@@ -1,5 +1,5 @@
 #include "StarAstrometryCalculator.hpp"
-#include "EphemerisMetadataMerge.hpp"
+#include "EphemerisMetadataMerger.hpp"
 #include "ICalcephKernelProvider.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"

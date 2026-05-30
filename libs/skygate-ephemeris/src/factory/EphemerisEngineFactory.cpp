@@ -6,7 +6,7 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
-#include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"

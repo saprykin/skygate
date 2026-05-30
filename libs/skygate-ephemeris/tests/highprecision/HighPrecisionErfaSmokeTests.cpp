@@ -32,7 +32,7 @@ void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForUniversalTime1()
         .timeScale = skygate::ephemeris::TimeScale::Tt,
     };
 
-    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::earthRotationAngle00(ttEpoch).has_value());
+    QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::earthRotationMatrix00(ttEpoch).has_value());
 }
 
 QTEST_MAIN(HighPrecisionErfaSmokeTests)

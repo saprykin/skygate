@@ -2,7 +2,7 @@
 #include "EphemerisFixtureSupport.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
-#include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
@@ -13,6 +13,7 @@
 #include <QJsonObject>
 #include <QtTest/QtTest>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -30,6 +31,26 @@ using skygate::ephemeris::tests::angularSeparationDegrees;
 using skygate::ephemeris::tests::EphemerisRaDecExpectation;
 using skygate::ephemeris::tests::EphemerisRaDecFixture;
 using skygate::ephemeris::tests::loadRaDecFixture;
+
+[[nodiscard]] CelestialFrameTransformResult transformSingleVector(
+    const IFrameTransformer& transformer,
+    const CelestialReferenceFrame::Type sourceFrame,
+    const CelestialReferenceFrame::Type targetFrame,
+    const AstronomicalEpoch& epoch,
+    const Vector3d& vector
+)
+{
+    const std::array<Vector3d, 1U> vectors{vector};
+    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
+        CelestialFrameTransformRequest{
+            .sourceFrame = sourceFrame,
+            .targetFrame = targetFrame,
+            .epoch = epoch,
+            .vectors = vectors,
+        }
+    );
+    return results.front();
+}
 
 [[nodiscard]] QString apparentFixturePath()
 {
@@ -241,13 +262,12 @@ void ApparentRaDecValidationTests::computesGeocentricApparentRaDecAgainstHorizon
     const SolarSystemStateCalculator solarSystemCalculator(fixture.provider);
     const auto timeScaleService = std::make_shared<SameInstantTimeScaleService>();
     const auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService);
-    const CelestialFrameTransformResult availabilityResult = frameTransformer->transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
-            .epoch = fixture.requestEpoch,
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult availabilityResult = transformSingleVector(
+        *frameTransformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
+        fixture.requestEpoch,
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
     if (!availabilityResult.vector.has_value()) {
         QSKIP("ERFA-backed apparent RA/Dec validation is not available in this build.");

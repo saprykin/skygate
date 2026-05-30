@@ -4,11 +4,11 @@
 #include "engine/highprecision/DeltaTProvider.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
-#include "engine/highprecision/FrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
+#include "engine/highprecision/IFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
@@ -549,15 +549,8 @@ private:
 
 class BatchRecordingFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult
-    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
-    {
-        ++m_singleCallCount;
-        return transform(request.vector);
-    }
-
     [[nodiscard]] std::vector<CelestialFrameTransformResult>
-    transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const override
+    transform(const CelestialFrameTransformRequest& request) const override
     {
         ++m_batchCallCount;
         m_lastBatchSize = request.vectors.size();
@@ -572,7 +565,7 @@ public:
 
     [[nodiscard]] int singleCallCount() const noexcept
     {
-        return m_singleCallCount;
+        return 0;
     }
 
     [[nodiscard]] int batchCallCount() const noexcept
@@ -596,7 +589,6 @@ private:
         return result;
     }
 
-    mutable int m_singleCallCount = 0;
     mutable int m_batchCallCount = 0;
     mutable std::size_t m_lastBatchSize = 0U;
 };
@@ -776,34 +768,38 @@ public:
     {
     }
 
-    [[nodiscard]] CelestialFrameTransformResult
-    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transform(const CelestialFrameTransformRequest& request) const override
     {
-        CelestialFrameTransformResult result;
-        result.vector = request.vector;
-        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
-        result.metadata.dataSourceProvenance = "metadata frame transformer";
+        const bool usesTerrestrialFrame = CelestialReferenceFrame::isTerrestrial(request.sourceFrame)
+                                          || CelestialReferenceFrame::isTerrestrial(request.targetFrame);
 
-        const bool usesTerrestrialFrame = request.sourceFrame == CelestialReferenceFrame::Itrs
-                                          || request.targetFrame == CelestialReferenceFrame::Itrs
-                                          || request.sourceFrame == CelestialReferenceFrame::Tirs
-                                          || request.targetFrame == CelestialReferenceFrame::Tirs;
-        result.metadata.appliedCorrections = usesTerrestrialFrame ? EphemerisCorrectionFlags::earthOrientation()
-                                                                  : EphemerisCorrectionFlags::precessionNutation();
-        if (m_timeScaleService == nullptr) {
-            result.vector.reset();
-            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-            result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-            return result;
-        }
+        std::vector<CelestialFrameTransformResult> results;
+        results.reserve(request.vectors.size());
+        for (const Vector3d& vector : request.vectors) {
+            CelestialFrameTransformResult result;
+            result.vector = vector;
+            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+            result.metadata.dataSourceProvenance = "metadata frame transformer";
+            result.metadata.appliedCorrections = usesTerrestrialFrame ? EphemerisCorrectionFlags::earthOrientation()
+                                                                      : EphemerisCorrectionFlags::precessionNutation();
+            if (m_timeScaleService == nullptr) {
+                result.vector.reset();
+                result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+                result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+                results.push_back(std::move(result));
+                continue;
+            }
 
-        const TimeScaleConversionResult conversion =
-            m_timeScaleService->convert(request.epoch, usesTerrestrialFrame ? TimeScale::Ut1 : TimeScale::Tt);
-        mergeConversionMetadata(result.metadata, conversion);
-        if (!conversion.isSuccess()) {
-            result.vector.reset();
+            const TimeScaleConversionResult conversion =
+                m_timeScaleService->convert(request.epoch, usesTerrestrialFrame ? TimeScale::Ut1 : TimeScale::Tt);
+            mergeConversionMetadata(result.metadata, conversion);
+            if (!conversion.isSuccess()) {
+                result.vector.reset();
+            }
+            results.push_back(std::move(result));
         }
-        return result;
+        return results;
     }
 
 private:

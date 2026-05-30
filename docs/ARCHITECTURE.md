@@ -291,7 +291,7 @@ high-precision providers and calculators:
 - `StarAstrometryCalculator`
 - `TimeScaleService`
 - `EarthOrientationProvider`
-- `FrameTransformer`
+- `ErfaFrameTransformer`
 - `ApparentPlaceCalculator`
 - `AtmosphericRefractionCalculator`
 - `EphemerisComputationCache`

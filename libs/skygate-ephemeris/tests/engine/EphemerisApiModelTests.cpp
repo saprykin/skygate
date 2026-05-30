@@ -4,6 +4,8 @@
 #include "EphemerisSnapshot.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "UtcTimeCodec.hpp"
+#include "engine/highprecision/CelestialFrameTransformResult.hpp"
+#include "engine/highprecision/CelestialReferenceFrame.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CalendarTime.hpp"
@@ -72,6 +74,8 @@ private slots:
     void constructsRequestsWithFactory();
     void constructsCatalogStarAstrometryModel();
     void constructsAndNormalizesAstronomicalTimePrimitives();
+    void exposesCelestialReferenceFrameHelpers();
+    void constructsCelestialFrameTransformResults();
     void convertsCivilDatesAndDefinesNoYearZeroPolicy();
     void constructsFactoryRequestDefaults();
     void constructsSimpleAndHighPrecisionFactoryRequests();
@@ -315,6 +319,26 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
     );
 
+    const skygate::ephemeris::AstronomicalEpoch utcEpoch{
+        .julianDatePart1 = 2'451'545.0,
+        .julianDatePart2 = 0.25,
+        .timeScale = skygate::ephemeris::TimeScale::Utc,
+    };
+    const auto plusSeconds = utcEpoch.addSeconds(43'200.0);
+    QCOMPARE(plusSeconds.julianDatePart1, 2'451'545.0);
+    QCOMPARE(plusSeconds.julianDatePart2, 0.75);
+    QCOMPARE(
+        static_cast<std::uint8_t>(plusSeconds.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+    );
+
+    const auto plusMinutesInTai = utcEpoch.addMinutes(720.0, skygate::ephemeris::TimeScale::Tai);
+    QCOMPARE(plusMinutesInTai.julianDatePart1, 2'451'545.0);
+    QCOMPARE(plusMinutesInTai.julianDatePart2, 0.75);
+    QCOMPARE(
+        static_cast<std::uint8_t>(plusMinutesInTai.timeScale),
+        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tai)
+    );
+
     const skygate::ephemeris::CivilDateTime j2000Noon{
         .astronomicalYear = 2000,
         .month = 1,
@@ -331,6 +355,97 @@ void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
     QCOMPARE(
         static_cast<std::uint8_t>(j2000Epoch->timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
     );
+}
+
+void EphemerisApiModelTests::exposesCelestialReferenceFrameHelpers()
+{
+    using skygate::ephemeris::highprecision::CelestialReferenceFrame;
+
+    QCOMPARE(CelestialReferenceFrame::rankFromType(CelestialReferenceFrame::Type::Icrs), 0U);
+    QCOMPARE(CelestialReferenceFrame::rankFromType(CelestialReferenceFrame::Type::Gcrs), 0U);
+    QCOMPARE(CelestialReferenceFrame::rankFromType(CelestialReferenceFrame::Type::TrueEquatorAndEquinox), 1U);
+    QCOMPARE(CelestialReferenceFrame::rankFromType(CelestialReferenceFrame::Type::Cirs), 1U);
+    QCOMPARE(CelestialReferenceFrame::rankFromType(CelestialReferenceFrame::Type::Tirs), 2U);
+    QCOMPARE(CelestialReferenceFrame::rankFromType(CelestialReferenceFrame::Type::Itrs), 3U);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(CelestialReferenceFrame::typeFromRank(0U)),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(CelestialReferenceFrame::typeFromRank(1U)),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Cirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(CelestialReferenceFrame::typeFromRank(2U)),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Tirs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(CelestialReferenceFrame::typeFromRank(3U)),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Itrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(CelestialReferenceFrame::typeFromRank(99U)),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
+    );
+
+    QVERIFY(CelestialReferenceFrame::isGcrsLike(CelestialReferenceFrame::Type::Icrs));
+    QVERIFY(CelestialReferenceFrame::isGcrsLike(CelestialReferenceFrame::Type::Gcrs));
+    QVERIFY(!CelestialReferenceFrame::isGcrsLike(CelestialReferenceFrame::Type::Cirs));
+
+    QVERIFY(CelestialReferenceFrame::isTerrestrial(CelestialReferenceFrame::Type::Tirs));
+    QVERIFY(CelestialReferenceFrame::isTerrestrial(CelestialReferenceFrame::Type::Itrs));
+    QVERIFY(!CelestialReferenceFrame::isTerrestrial(CelestialReferenceFrame::Type::Cirs));
+}
+
+void EphemerisApiModelTests::constructsCelestialFrameTransformResults()
+{
+    using skygate::ephemeris::highprecision::CelestialFrameTransformResult;
+    using skygate::ephemeris::highprecision::CelestialReferenceFrame;
+
+    constexpr std::string_view kProvenance = "unit-test frame transform";
+    const skygate::core::Vector3d vector{1.0, 2.0, 3.0};
+
+    const CelestialFrameTransformResult failed = CelestialFrameTransformResult::makeFailed(
+        skygate::ephemeris::EphemerisEngineWarning::Code::ComputationFailed, kProvenance
+    );
+    QVERIFY(!failed.vector.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(failed.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
+    );
+    QVERIFY(failed.metadata.hasWarning(skygate::ephemeris::EphemerisEngineWarning::Code::ComputationFailed));
+    QCOMPARE(failed.metadata.dataSourceProvenance, std::string{kProvenance});
+    QCOMPARE(failed.stages.size(), std::size_t{0});
+
+    const CelestialFrameTransformResult sameFrameIdentity = CelestialFrameTransformResult::makeIdentity(
+        CelestialReferenceFrame::Type::Gcrs, CelestialReferenceFrame::Type::Gcrs, vector, kProvenance
+    );
+    QVERIFY(sameFrameIdentity.vector.has_value());
+    QCOMPARE(sameFrameIdentity.vector->x, vector.x);
+    QCOMPARE(sameFrameIdentity.vector->y, vector.y);
+    QCOMPARE(sameFrameIdentity.vector->z, vector.z);
+    QCOMPARE(
+        static_cast<std::uint8_t>(sameFrameIdentity.metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+    );
+    QCOMPARE(sameFrameIdentity.metadata.dataSourceProvenance, std::string{kProvenance});
+    QCOMPARE(sameFrameIdentity.stages.size(), std::size_t{0});
+
+    const CelestialFrameTransformResult crossFrameIdentity = CelestialFrameTransformResult::makeIdentity(
+        CelestialReferenceFrame::Type::Icrs, CelestialReferenceFrame::Type::Gcrs, vector, kProvenance
+    );
+    QCOMPARE(crossFrameIdentity.stages.size(), std::size_t{1});
+    QCOMPARE(
+        static_cast<std::uint8_t>(crossFrameIdentity.stages.front().sourceFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Icrs)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(crossFrameIdentity.stages.front().targetFrame),
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
+    );
+    QVERIFY(!crossFrameIdentity.stages.front().applied);
+    QCOMPARE(crossFrameIdentity.stages.front().metadata.dataSourceProvenance, std::string{kProvenance});
 }
 
 void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()

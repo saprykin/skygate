@@ -50,17 +50,6 @@ struct Ut1OffsetLookupResult {
     }
 };
 
-[[nodiscard]] AstronomicalEpoch
-addSeconds(const AstronomicalEpoch& epoch, const double seconds, const TimeScale targetScale) noexcept
-{
-    return AstronomicalEpoch{
-        .julianDatePart1 = epoch.julianDatePart1,
-        .julianDatePart2 = epoch.julianDatePart2 + seconds / TimeConstants::kSecondsPerDay,
-        .timeScale = targetScale,
-    }
-        .normalized();
-}
-
 [[nodiscard]] double epochJulianDate(const AstronomicalEpoch& epoch) noexcept
 {
     return epoch.julianDatePart1 + epoch.julianDatePart2;
@@ -155,9 +144,9 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
 
     const double key = taiEpoch.sortKey();
     const AstronomicalEpoch startTaiEpoch =
-        addSeconds(utcRange.start, static_cast<double>(*startOffsetSeconds), TimeScale::Tai);
+        utcRange.start.addSeconds(static_cast<double>(*startOffsetSeconds), TimeScale::Tai);
     const AstronomicalEpoch endTaiEpoch =
-        addSeconds(utcRange.end, static_cast<double>(*endOffsetSeconds), TimeScale::Tai);
+        utcRange.end.addSeconds(static_cast<double>(*endOffsetSeconds), TimeScale::Tai);
     return key < startTaiEpoch.sortKey() || key > endTaiEpoch.sortKey();
 }
 
@@ -258,7 +247,7 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
     std::optional<int> offset;
     for (const LeapSecondTableEntry& entry : provider->entries()) {
         const AstronomicalEpoch entryTaiEpoch =
-            addSeconds(entry.effectiveUtcEpoch, static_cast<double>(entry.taiMinusUtcSeconds), TimeScale::Tai);
+            entry.effectiveUtcEpoch.addSeconds(static_cast<double>(entry.taiMinusUtcSeconds), TimeScale::Tai);
         if (entryTaiEpoch.sortKey() > requestedKey) {
             break;
         }
@@ -489,8 +478,8 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
         return result;
     }
 
-    const AstronomicalEpoch ttEpoch = addSeconds(ut1Epoch, *estimate.deltaTSeconds, TimeScale::Tt);
-    const AstronomicalEpoch taiEpoch = addSeconds(ttEpoch, -TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai);
+    const AstronomicalEpoch ttEpoch = ut1Epoch.addSeconds(*estimate.deltaTSeconds, TimeScale::Tt);
+    const AstronomicalEpoch taiEpoch = ttEpoch.addSeconds(-TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai);
     const OffsetLookupResult taiOffset = lookupTaiOffset(leapSecondProvider, options, taiEpoch);
     if (!taiOffset.offsetSeconds.has_value()) {
         TimeScaleConversionResult result = failureResult(taiEpoch, TimeScale::Utc, taiOffset.diagnosticText);
@@ -499,7 +488,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
     }
 
     TimeScaleConversionResult result = successResult(
-        addSeconds(taiEpoch, -static_cast<double>(*taiOffset.offsetSeconds), TimeScale::Utc),
+        taiEpoch.addSeconds(-static_cast<double>(*taiOffset.offsetSeconds), TimeScale::Utc),
         TimeScaleConversionStatus::Degraded,
         sourceFailure.warningCodeMask | taiOffset.warningCodeMask,
         estimate.diagnosticText.empty() ? "UT1 conversion used Delta T fallback metadata." : estimate.diagnosticText
@@ -524,7 +513,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
         if (!lookup.ut1MinusUtcSeconds.has_value()) {
             return utcFromUt1WithDeltaT(leapSecondProvider, deltaTProvider, options, ut1Epoch, std::move(lookup));
         }
-        utcEpoch = addSeconds(ut1Epoch, -*lookup.ut1MinusUtcSeconds, TimeScale::Utc);
+        utcEpoch = ut1Epoch.addSeconds(-*lookup.ut1MinusUtcSeconds, TimeScale::Utc);
     }
 
     TimeScaleConversionResult result =
@@ -573,7 +562,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             }
 
             TimeScaleConversionResult result =
-                successResult(addSeconds(epoch, *lookup.ut1MinusUtcSeconds, TimeScale::Ut1));
+                successResult(epoch.addSeconds(*lookup.ut1MinusUtcSeconds, TimeScale::Ut1));
             mergeUt1OffsetWarnings(result, lookup);
             if (!lookup.diagnosticText.empty()) {
                 result.diagnosticText = lookup.diagnosticText;
@@ -612,7 +601,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
         const double targetOffset =
             targetScale == TimeScale::Tt ? taiOffset + TimeConstants::kTtMinusTaiSeconds : taiOffset;
         TimeScaleConversionResult result =
-            successResult(addSeconds(epoch, targetOffset, targetScale), lookup.status, lookup.warningCodeMask);
+            successResult(epoch.addSeconds(targetOffset, targetScale), lookup.status, lookup.warningCodeMask);
         if (!lookup.diagnosticText.empty()) {
             result.diagnosticText = lookup.diagnosticText;
         }
@@ -632,7 +621,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             return tdb;
         }
         if (targetScale == TimeScale::Tt) {
-            return successResult(addSeconds(epoch, TimeConstants::kTtMinusTaiSeconds, TimeScale::Tt));
+            return successResult(epoch.addSeconds(TimeConstants::kTtMinusTaiSeconds, TimeScale::Tt));
         }
         if (targetScale == TimeScale::Utc) {
             const OffsetLookupResult lookup = lookupTaiOffset(m_leapSecondProvider, m_options, epoch);
@@ -643,7 +632,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             }
 
             TimeScaleConversionResult result =
-                successResult(addSeconds(epoch, -static_cast<double>(*lookup.offsetSeconds), TimeScale::Utc));
+                successResult(epoch.addSeconds(-static_cast<double>(*lookup.offsetSeconds), TimeScale::Utc));
             mergeOffsetWarnings(result, lookup);
             if (!lookup.diagnosticText.empty()) {
                 result.diagnosticText = lookup.diagnosticText;
@@ -684,7 +673,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             }
 
             TimeScaleConversionResult result = successResult(
-                addSeconds(epoch, *tdbMinusTt, TimeScale::Tdb),
+                epoch.addSeconds(*tdbMinusTt, TimeScale::Tdb),
                 TimeScaleConversionStatus::Degraded,
                 timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
                 "TT to TDB conversion used the configured high-precision approximation."
@@ -693,10 +682,10 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             return result;
         }
         if (targetScale == TimeScale::Tai) {
-            return successResult(addSeconds(epoch, -TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai));
+            return successResult(epoch.addSeconds(-TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai));
         }
         if (targetScale == TimeScale::Utc) {
-            return convert(addSeconds(epoch, -TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai), TimeScale::Utc);
+            return convert(epoch.addSeconds(-TimeConstants::kTtMinusTaiSeconds, TimeScale::Tai), TimeScale::Utc);
         }
         break;
     case TimeScale::Tdb: {
@@ -710,7 +699,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
                 result.addWarning(TimeScaleConversionWarningCode::InvalidInput);
                 return result;
             }
-            tt = addSeconds(epoch, -*tdbMinusTt, TimeScale::Tt);
+            tt = epoch.addSeconds(-*tdbMinusTt, TimeScale::Tt);
         }
 
         TimeScaleConversionResult result = successResult(
@@ -771,7 +760,7 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
         const std::optional<AstronomicalEpoch> precedingEpoch =
             CalendarTime::astronomicalEpochFromCivilDateTime(precedingSecond);
         if (precedingEpoch.has_value()) {
-            epoch = addSeconds(*precedingEpoch, 1.0, TimeScale::Utc);
+            epoch = precedingEpoch->addSeconds(1.0, TimeScale::Utc);
         }
     }
 
@@ -825,7 +814,7 @@ LeapSecondTimeScaleService::convertCivilDateTime(const CivilDateTime& dateTime, 
     const double targetOffset =
         targetScale == TimeScale::Tai ? taiOffset : taiOffset + TimeConstants::kTtMinusTaiSeconds;
     TimeScaleConversionResult result =
-        successResult(addSeconds(*epoch, targetOffset, targetScale == TimeScale::Tdb ? TimeScale::Tt : targetScale));
+        successResult(epoch->addSeconds(targetOffset, targetScale == TimeScale::Tdb ? TimeScale::Tt : targetScale));
     mergeOffsetWarnings(result, precedingLookup);
     mergeOffsetWarnings(result, nextLookup);
     if (targetScale == TimeScale::Tdb) {

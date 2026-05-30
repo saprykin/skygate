@@ -1,6 +1,6 @@
 #include "HighPrecisionEphemerisEngine.hpp"
 #include "BaseApparentPlaceCalculator.hpp"
-#include "EphemerisMetadataMerge.hpp"
+#include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
 #include "IApparentPlaceCalculator.hpp"

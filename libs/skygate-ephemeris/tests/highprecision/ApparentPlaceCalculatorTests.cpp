@@ -3,7 +3,7 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
-#include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QFile>
@@ -13,6 +13,7 @@
 #include <QJsonParseError>
 #include <QtTest/QtTest>
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -259,18 +260,45 @@ struct TopocentricFixture {
     return fixture;
 }
 
+[[nodiscard]] CelestialFrameTransformResult transformSingleVector(
+    const IFrameTransformer& transformer,
+    const CelestialReferenceFrame::Type sourceFrame,
+    const CelestialReferenceFrame::Type targetFrame,
+    const AstronomicalEpoch& epoch,
+    const Vector3d& vector
+)
+{
+    const std::array<Vector3d, 1U> vectors{vector};
+    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
+        CelestialFrameTransformRequest{
+            .sourceFrame = sourceFrame,
+            .targetFrame = targetFrame,
+            .epoch = epoch,
+            .vectors = vectors,
+        }
+    );
+    return results.front();
+}
+
 class RecordingFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult
-    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transform(const CelestialFrameTransformRequest& request) const override
     {
-        ++m_callCount;
-        m_lastSourceFrame = request.sourceFrame;
-        m_lastTargetFrame = request.targetFrame;
-        return {
-            .vector = m_resultVector.value_or(request.vector),
-            .metadata = m_resultMetadata,
-        };
+        std::vector<CelestialFrameTransformResult> results;
+        results.reserve(request.vectors.size());
+        for (const Vector3d& vector : request.vectors) {
+            ++m_callCount;
+            m_lastSourceFrame = request.sourceFrame;
+            m_lastTargetFrame = request.targetFrame;
+            results.push_back(
+                CelestialFrameTransformResult{
+                    .vector = m_resultVector.value_or(vector),
+                    .metadata = m_resultMetadata,
+                }
+            );
+        }
+        return results;
     }
 
     void setResultVector(const Vector3d& vector) noexcept
@@ -288,20 +316,20 @@ public:
         return m_callCount;
     }
 
-    [[nodiscard]] CelestialReferenceFrame lastSourceFrame() const noexcept
+    [[nodiscard]] CelestialReferenceFrame::Type lastSourceFrame() const noexcept
     {
         return m_lastSourceFrame;
     }
 
-    [[nodiscard]] CelestialReferenceFrame lastTargetFrame() const noexcept
+    [[nodiscard]] CelestialReferenceFrame::Type lastTargetFrame() const noexcept
     {
         return m_lastTargetFrame;
     }
 
 private:
     mutable int m_callCount = 0;
-    mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
-    mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
+    mutable CelestialReferenceFrame::Type m_lastSourceFrame = CelestialReferenceFrame::Type::Icrs;
+    mutable CelestialReferenceFrame::Type m_lastTargetFrame = CelestialReferenceFrame::Type::Icrs;
     std::optional<Vector3d> m_resultVector;
     EphemerisEngineQueryResult m_resultMetadata = {
         .status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
@@ -310,14 +338,8 @@ private:
 
 class ShortBatchFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult
-    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
-    {
-        return transformResult(request.sourceFrame, request.targetFrame, request.vector);
-    }
-
     [[nodiscard]] std::vector<CelestialFrameTransformResult>
-    transformCelestialVectors(const CelestialFrameBatchTransformRequest& request) const override
+    transform(const CelestialFrameTransformRequest& request) const override
     {
         ++m_batchCallCount;
         std::vector<CelestialFrameTransformResult> results;
@@ -336,13 +358,15 @@ public:
 
 private:
     [[nodiscard]] static CelestialFrameTransformResult transformResult(
-        const CelestialReferenceFrame sourceFrame, const CelestialReferenceFrame targetFrame, const Vector3d& vector
+        const CelestialReferenceFrame::Type sourceFrame,
+        const CelestialReferenceFrame::Type targetFrame,
+        const Vector3d& vector
     )
     {
         EphemerisEngineQueryResult metadata;
         metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
-        if (sourceFrame == CelestialReferenceFrame::Gcrs
-            && targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox) {
+        if (sourceFrame == CelestialReferenceFrame::Type::Gcrs
+            && targetFrame == CelestialReferenceFrame::Type::TrueEquatorAndEquinox) {
             metadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
         } else if (sourceFrame != targetFrame) {
             metadata.appliedCorrections = EphemerisCorrectionFlags::earthOrientation();
@@ -359,29 +383,39 @@ private:
 
 class FailingTopocentricEquatorialFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult
-    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transform(const CelestialFrameTransformRequest& request) const override
     {
-        ++m_callCount;
-        EphemerisEngineQueryResult metadata;
-        metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
-        if (request.sourceFrame == CelestialReferenceFrame::Itrs
-            && request.targetFrame == CelestialReferenceFrame::Gcrs) {
-            metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
-            metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
-            return {
-                .vector = std::nullopt,
-                .metadata = metadata,
-            };
-        }
-        if (request.sourceFrame != request.targetFrame) {
-            metadata.appliedCorrections = EphemerisCorrectionFlags::earthOrientation();
-        }
+        std::vector<CelestialFrameTransformResult> results;
+        results.reserve(request.vectors.size());
+        for (const Vector3d& vector : request.vectors) {
+            ++m_callCount;
+            EphemerisEngineQueryResult metadata;
+            metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+            if (request.sourceFrame == CelestialReferenceFrame::Type::Itrs
+                && request.targetFrame == CelestialReferenceFrame::Type::Gcrs) {
+                metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded;
+                metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+                results.push_back(
+                    CelestialFrameTransformResult{
+                        .vector = std::nullopt,
+                        .metadata = metadata,
+                    }
+                );
+                continue;
+            }
+            if (request.sourceFrame != request.targetFrame) {
+                metadata.appliedCorrections = EphemerisCorrectionFlags::earthOrientation();
+            }
 
-        return {
-            .vector = request.vector,
-            .metadata = metadata,
-        };
+            results.push_back(
+                CelestialFrameTransformResult{
+                    .vector = vector,
+                    .metadata = metadata,
+                }
+            );
+        }
+        return results;
     }
 
     [[nodiscard]] int callCount() const noexcept
@@ -395,27 +429,33 @@ private:
 
 class PassThroughFrameTransformer final : public IFrameTransformer {
 public:
-    [[nodiscard]] CelestialFrameTransformResult
-    transformCelestialVector(const CelestialFrameTransformRequest& request) const override
+    [[nodiscard]] std::vector<CelestialFrameTransformResult>
+    transform(const CelestialFrameTransformRequest& request) const override
     {
-        ++m_callCount;
-        m_lastSourceFrame = request.sourceFrame;
-        m_lastTargetFrame = request.targetFrame;
-        m_lastVector = request.vector;
+        std::vector<CelestialFrameTransformResult> results;
+        results.reserve(request.vectors.size());
+        for (const Vector3d& vector : request.vectors) {
+            ++m_callCount;
+            m_lastSourceFrame = request.sourceFrame;
+            m_lastTargetFrame = request.targetFrame;
+            m_lastVector = vector;
 
-        EphemerisEngineQueryResult metadata;
-        metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
-        if (request.sourceFrame == CelestialReferenceFrame::Gcrs
-            && request.targetFrame == CelestialReferenceFrame::TrueEquatorAndEquinox) {
-            metadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
-        } else if (request.sourceFrame != request.targetFrame) {
-            metadata.appliedCorrections = EphemerisCorrectionFlags::earthOrientation();
+            EphemerisEngineQueryResult metadata;
+            metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+            if (request.sourceFrame == CelestialReferenceFrame::Type::Gcrs
+                && request.targetFrame == CelestialReferenceFrame::Type::TrueEquatorAndEquinox) {
+                metadata.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
+            } else if (request.sourceFrame != request.targetFrame) {
+                metadata.appliedCorrections = EphemerisCorrectionFlags::earthOrientation();
+            }
+            results.push_back(
+                CelestialFrameTransformResult{
+                    .vector = vector,
+                    .metadata = metadata,
+                }
+            );
         }
-
-        return {
-            .vector = request.vector,
-            .metadata = metadata,
-        };
+        return results;
     }
 
     [[nodiscard]] int callCount() const noexcept
@@ -423,12 +463,12 @@ public:
         return m_callCount;
     }
 
-    [[nodiscard]] CelestialReferenceFrame lastSourceFrame() const noexcept
+    [[nodiscard]] CelestialReferenceFrame::Type lastSourceFrame() const noexcept
     {
         return m_lastSourceFrame;
     }
 
-    [[nodiscard]] CelestialReferenceFrame lastTargetFrame() const noexcept
+    [[nodiscard]] CelestialReferenceFrame::Type lastTargetFrame() const noexcept
     {
         return m_lastTargetFrame;
     }
@@ -440,8 +480,8 @@ public:
 
 private:
     mutable int m_callCount = 0;
-    mutable CelestialReferenceFrame m_lastSourceFrame = CelestialReferenceFrame::Icrs;
-    mutable CelestialReferenceFrame m_lastTargetFrame = CelestialReferenceFrame::Icrs;
+    mutable CelestialReferenceFrame::Type m_lastSourceFrame = CelestialReferenceFrame::Type::Icrs;
+    mutable CelestialReferenceFrame::Type m_lastTargetFrame = CelestialReferenceFrame::Type::Icrs;
     mutable Vector3d m_lastVector;
 };
 
@@ -639,11 +679,11 @@ void ApparentPlaceCalculatorTests::routesGeometricRequestsToGcrs()
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastSourceFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
@@ -665,11 +705,11 @@ void ApparentPlaceCalculatorTests::routesRequestsWithoutPrecessionNutationToGcrs
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastSourceFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
@@ -693,11 +733,11 @@ void ApparentPlaceCalculatorTests::routesAstrometricRequestsWithUnsupportedRefra
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastSourceFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 0.0);
@@ -725,11 +765,11 @@ void ApparentPlaceCalculatorTests::routesApparentRequestsToTrueEquatorAndEquinox
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastSourceFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::TrueEquatorAndEquinox)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(
@@ -762,7 +802,7 @@ void ApparentPlaceCalculatorTests::appliesPrecessionNutationWhenRequested()
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::TrueEquatorAndEquinox)
     );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(result.equatorial->rightAscensionHours, 6.0);
@@ -796,7 +836,7 @@ void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecess
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::TrueEquatorAndEquinox)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
@@ -814,18 +854,16 @@ void ApparentPlaceCalculatorTests::propagatesDegradedTransformMetadataForPrecess
 void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataForPrecessionNutation()
 {
     const ErfaFrameTransformer availabilityTransformer(nullptr);
-    const CelestialFrameTransformResult availabilityResult = availabilityTransformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Cirs,
-            .epoch =
-                {
-                    .julianDatePart1 = 2'400'000.5,
-                    .julianDatePart2 = 53'736.0,
-                    .timeScale = TimeScale::Tt,
-                },
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult availabilityResult = transformSingleVector(
+        availabilityTransformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Cirs,
+        {
+            .julianDatePart1 = 2'400'000.5,
+            .julianDatePart2 = 53'736.0,
+            .timeScale = TimeScale::Tt,
+        },
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
     if (!availabilityResult.vector.has_value()) {
         QSKIP("ERFA-backed frame transforms are not available in this build.");
@@ -887,7 +925,7 @@ void ApparentPlaceCalculatorTests::appliesTopocentricParallaxAndHorizontalCoordi
     QCOMPARE(frameTransformer->callCount(), 3);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::TrueEquatorAndEquinox)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::TrueEquatorAndEquinox)
     );
     QVERIFY(result.equatorial.has_value());
     QVERIFY(result.horizontal.has_value());
@@ -930,13 +968,12 @@ void ApparentPlaceCalculatorTests::validatesTopocentricMoonSunPlanetAgainstHoriz
         fixture.polarMotionYArcseconds
     );
     auto frameTransformer = std::make_shared<ErfaFrameTransformer>(timeScaleService, earthOrientationProvider);
-    const CelestialFrameTransformResult availabilityResult = frameTransformer->transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = fixture.request.epoch,
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult availabilityResult = transformSingleVector(
+        *frameTransformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Itrs,
+        fixture.request.epoch,
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
     if (!availabilityResult.vector.has_value()) {
         QSKIP("ERFA-backed topocentric validation is not available in this build.");
@@ -1291,7 +1328,7 @@ void ApparentPlaceCalculatorTests::reportsUnavailableRefractionMode()
     QCOMPARE(frameTransformer->callCount(), 1);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),

@@ -18,7 +18,10 @@ struct AstronomicalEpoch {
     [[nodiscard]] bool isFiniteUtc() const noexcept;
     [[nodiscard]] double sortKey() const noexcept;
 
-    [[nodiscard]] AstronomicalEpoch addMinutes(int offsetMinutes) const noexcept;
+    [[nodiscard]] AstronomicalEpoch addSeconds(double offsetSeconds) const noexcept;
+    [[nodiscard]] AstronomicalEpoch addSeconds(double offsetSeconds, TimeScale resultScale) const noexcept;
+    [[nodiscard]] AstronomicalEpoch addMinutes(double offsetMinutes) const noexcept;
+    [[nodiscard]] AstronomicalEpoch addMinutes(double offsetMinutes, TimeScale resultScale) const noexcept;
 };
 
 using AstronomicalEpochResult = std::optional<AstronomicalEpoch>;

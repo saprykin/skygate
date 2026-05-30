@@ -1,10 +1,11 @@
 #include "ApparentPlaceCalculator.hpp"
 #include "CelestialFrameMath.hpp"
 #include "EarthOrientationProvider.hpp"
-#include "EphemerisMetadataMerge.hpp"
-#include "FrameTransformer.hpp"
+#include "EphemerisMetadataMerger.hpp"
+#include "IFrameTransformer.hpp"
 #include "ObserverGeodesy.hpp"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <utility>
@@ -42,19 +43,19 @@ enum class ApparentPlaceRequestMode : std::uint8_t {
     return ApparentPlaceRequestMode::Astrometric;
 }
 
-[[nodiscard]] CelestialReferenceFrame targetFrameForRequest(const ApparentPlaceRequestMode mode) noexcept
+[[nodiscard]] CelestialReferenceFrame::Type targetFrameForRequest(const ApparentPlaceRequestMode mode) noexcept
 {
     switch (mode) {
     case ApparentPlaceRequestMode::Geometric:
     case ApparentPlaceRequestMode::Astrometric:
-        return CelestialReferenceFrame::Gcrs;
+        return CelestialReferenceFrame::Type::Gcrs;
     case ApparentPlaceRequestMode::Apparent:
-        return CelestialReferenceFrame::TrueEquatorAndEquinox;
+        return CelestialReferenceFrame::Type::TrueEquatorAndEquinox;
     case ApparentPlaceRequestMode::Topocentric:
-        return CelestialReferenceFrame::Itrs;
+        return CelestialReferenceFrame::Type::Itrs;
     }
 
-    return CelestialReferenceFrame::Gcrs;
+    return CelestialReferenceFrame::Type::Gcrs;
 }
 
 void markMissingBatchTransformResult(
@@ -77,6 +78,33 @@ computationVectorFromCalculatorResult(const HighPrecisionCalculatorResult& calcu
     }
 
     return CelestialFrameMath::fromEquatorial(*calculatorResult.equatorial);
+}
+
+[[nodiscard]] CelestialFrameTransformResult transformSingleVector(
+    const IFrameTransformer& frameTransformer,
+    const CelestialReferenceFrame::Type sourceFrame,
+    const CelestialReferenceFrame::Type targetFrame,
+    const AstronomicalEpoch& epoch,
+    const skygate::core::Vector3d& vector
+)
+{
+    const std::array<skygate::core::Vector3d, 1U> vectors{vector};
+    const std::vector<CelestialFrameTransformResult> results = frameTransformer.transform(
+        CelestialFrameTransformRequest{
+            .sourceFrame = sourceFrame,
+            .targetFrame = targetFrame,
+            .epoch = epoch,
+            .vectors = vectors,
+        }
+    );
+    if (!results.empty()) {
+        return results.front();
+    }
+
+    CelestialFrameTransformResult result;
+    result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+    result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+    return result;
 }
 
 }  // namespace
@@ -103,8 +131,8 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     }
     const EphemerisCorrectionFlags requestedCorrections = input.request.options.correctionFlags();
     const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
-    const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
-    if (targetFrame == CelestialReferenceFrame::Itrs) {
+    const CelestialReferenceFrame::Type targetFrame = targetFrameForRequest(requestMode);
+    if (targetFrame == CelestialReferenceFrame::Type::Itrs) {
         if (input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared) {
             EphemerisMetadataMerger::merge(
                 result.metadata, input.preparedRequestState->topocentricMetadata, kTransformMetadataMergeOptions
@@ -151,12 +179,9 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
 
     skygate::core::Vector3d outputVector = computationVectorFromCalculatorResult(calculatorResult);
     if (m_frameTransformer != nullptr) {
-        CelestialFrameTransformResult transformResult = m_frameTransformer->transformCelestialVector({
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = targetFrame,
-            .epoch = input.request.epoch,
-            .vector = outputVector,
-        });
+        CelestialFrameTransformResult transformResult = transformSingleVector(
+            *m_frameTransformer, CelestialReferenceFrame::Type::Gcrs, targetFrame, input.request.epoch, outputVector
+        );
         EphemerisMetadataMerger::merge(result.metadata, transformResult.metadata, kTransformMetadataMergeOptions);
 
         if (!transformResult.vector.has_value()) {
@@ -166,16 +191,16 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
             return result;
         }
         outputVector = *transformResult.vector;
-    } else if (targetFrame != CelestialReferenceFrame::Gcrs) {
+    } else if (targetFrame != CelestialReferenceFrame::Type::Gcrs) {
         EphemerisMetadataMerger::markCorrectionUnavailable(
             result.metadata,
-            targetFrame == CelestialReferenceFrame::Itrs
+            targetFrame == CelestialReferenceFrame::Type::Itrs
                 ? (EphemerisCorrectionFlags::precessionNutation() | EphemerisCorrectionFlags::earthOrientation())
                 : EphemerisCorrectionFlags::precessionNutation()
         );
         return result;
     }
-    if (targetFrame == CelestialReferenceFrame::Itrs) {
+    if (targetFrame == CelestialReferenceFrame::Type::Itrs) {
         const std::optional<skygate::core::Vector3d> observerPosition =
             input.preparedRequestState != nullptr && input.preparedRequestState->topocentricStatePrepared
                 ? input.preparedRequestState->observerItrsPositionAu
@@ -197,15 +222,16 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
     }
 
     std::optional<skygate::core::Vector3d> equatorialVector =
-        targetFrame == CelestialReferenceFrame::Itrs ? std::nullopt
-                                                     : std::optional<skygate::core::Vector3d>{outputVector};
-    if (targetFrame == CelestialReferenceFrame::Itrs) {
-        CelestialFrameTransformResult gcrsTransformResult = m_frameTransformer->transformCelestialVector({
-            .sourceFrame = CelestialReferenceFrame::Itrs,
-            .targetFrame = CelestialReferenceFrame::Gcrs,
-            .epoch = input.request.epoch,
-            .vector = outputVector,
-        });
+        targetFrame == CelestialReferenceFrame::Type::Itrs ? std::nullopt
+                                                           : std::optional<skygate::core::Vector3d>{outputVector};
+    if (targetFrame == CelestialReferenceFrame::Type::Itrs) {
+        CelestialFrameTransformResult gcrsTransformResult = transformSingleVector(
+            *m_frameTransformer,
+            CelestialReferenceFrame::Type::Itrs,
+            CelestialReferenceFrame::Type::Gcrs,
+            input.request.epoch,
+            outputVector
+        );
         EphemerisMetadataMerger::merge(result.metadata, gcrsTransformResult.metadata, kTransformMetadataMergeOptions);
         if (gcrsTransformResult.vector.has_value()) {
             equatorialVector = *gcrsTransformResult.vector;
@@ -219,13 +245,13 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
             && skygate::ephemeris::EphemerisCorrectionFlags::has(
                 requestedCorrections, EphemerisCorrectionFlags::precessionNutation()
             )) {
-            CelestialFrameTransformResult apparentEquatorialTransformResult =
-                m_frameTransformer->transformCelestialVector({
-                    .sourceFrame = CelestialReferenceFrame::Gcrs,
-                    .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
-                    .epoch = input.request.epoch,
-                    .vector = *equatorialVector,
-                });
+            CelestialFrameTransformResult apparentEquatorialTransformResult = transformSingleVector(
+                *m_frameTransformer,
+                CelestialReferenceFrame::Type::Gcrs,
+                CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
+                input.request.epoch,
+                *equatorialVector
+            );
             EphemerisMetadataMerger::merge(
                 result.metadata, apparentEquatorialTransformResult.metadata, kTransformMetadataMergeOptions
             );
@@ -251,7 +277,7 @@ HighPrecisionCalculatorResult ApparentPlaceCalculator::apply(
         }
     }
 
-    if (targetFrame == CelestialReferenceFrame::Itrs) {
+    if (targetFrame == CelestialReferenceFrame::Type::Itrs) {
         if (const std::optional<skygate::core::HorizontalCoordinate> horizontal =
                 CelestialFrameMath::horizontalFromItrsVector(outputVector, input.request.context.observer);
             horizontal.has_value()) {
@@ -289,8 +315,8 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 {
     const EphemerisCorrectionFlags requestedCorrections = request.options.correctionFlags();
     const ApparentPlaceRequestMode requestMode = requestModeForCorrections(requestedCorrections);
-    const CelestialReferenceFrame targetFrame = targetFrameForRequest(requestMode);
-    const bool isTopocentric = targetFrame == CelestialReferenceFrame::Itrs;
+    const CelestialReferenceFrame::Type targetFrame = targetFrameForRequest(requestMode);
+    const bool isTopocentric = targetFrame == CelestialReferenceFrame::Type::Itrs;
     const bool requestsAtmosphericRefraction =
         request.options.enableAtmosphericRefraction()
         && skygate::ephemeris::EphemerisCorrectionFlags::has(
@@ -383,7 +409,7 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         }
 
         skygate::core::Vector3d outputVector = computationVectorFromCalculatorResult(calculatorResult.result);
-        if (targetFrame == CelestialReferenceFrame::Gcrs) {
+        if (targetFrame == CelestialReferenceFrame::Type::Gcrs) {
             results.push_back(
                 StarAstrometryBatchResult{
                     .bodyIndex = calculatorResult.bodyIndex,
@@ -417,15 +443,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
     }
 
     if (m_frameTransformer != nullptr && !transformInputs.empty()) {
-        const std::vector<CelestialFrameTransformResult> transformResults =
-            m_frameTransformer->transformCelestialVectors(
-                CelestialFrameBatchTransformRequest{
-                    .sourceFrame = CelestialReferenceFrame::Gcrs,
-                    .targetFrame = targetFrame,
-                    .epoch = request.epoch,
-                    .vectors = transformInputs,
-                }
-            );
+        const std::vector<CelestialFrameTransformResult> transformResults = m_frameTransformer->transform(
+            CelestialFrameTransformRequest{
+                .sourceFrame = CelestialReferenceFrame::Type::Gcrs,
+                .targetFrame = targetFrame,
+                .epoch = request.epoch,
+                .vectors = transformInputs,
+            }
+        );
         const std::size_t transformCount = std::min(transformResults.size(), transformResultIndices.size());
         for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
             const std::size_t resultIndex = transformResultIndices[transformIndex];
@@ -504,15 +529,14 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
         }
 
         if (m_frameTransformer != nullptr && !gcrsInputs.empty()) {
-            const std::vector<CelestialFrameTransformResult> gcrsTransformResults =
-                m_frameTransformer->transformCelestialVectors(
-                    CelestialFrameBatchTransformRequest{
-                        .sourceFrame = CelestialReferenceFrame::Itrs,
-                        .targetFrame = CelestialReferenceFrame::Gcrs,
-                        .epoch = request.epoch,
-                        .vectors = gcrsInputs,
-                    }
-                );
+            const std::vector<CelestialFrameTransformResult> gcrsTransformResults = m_frameTransformer->transform(
+                CelestialFrameTransformRequest{
+                    .sourceFrame = CelestialReferenceFrame::Type::Itrs,
+                    .targetFrame = CelestialReferenceFrame::Type::Gcrs,
+                    .epoch = request.epoch,
+                    .vectors = gcrsInputs,
+                }
+            );
             const std::size_t transformCount = std::min(gcrsTransformResults.size(), gcrsResultIndices.size());
             for (std::size_t transformIndex = 0U; transformIndex < transformCount; ++transformIndex) {
                 const std::size_t resultIndex = gcrsResultIndices[transformIndex];
@@ -552,10 +576,10 @@ std::vector<StarAstrometryBatchResult> ApparentPlaceCalculator::applyBatch(
 
             if (m_frameTransformer != nullptr && !apparentInputs.empty()) {
                 const std::vector<CelestialFrameTransformResult> apparentTransformResults =
-                    m_frameTransformer->transformCelestialVectors(
-                        CelestialFrameBatchTransformRequest{
-                            .sourceFrame = CelestialReferenceFrame::Gcrs,
-                            .targetFrame = CelestialReferenceFrame::TrueEquatorAndEquinox,
+                    m_frameTransformer->transform(
+                        CelestialFrameTransformRequest{
+                            .sourceFrame = CelestialReferenceFrame::Type::Gcrs,
+                            .targetFrame = CelestialReferenceFrame::Type::TrueEquatorAndEquinox,
                             .epoch = request.epoch,
                             .vectors = apparentInputs,
                         }

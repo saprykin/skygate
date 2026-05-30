@@ -280,7 +280,7 @@ focused calculator/provider classes:
 - `StarAstrometryCalculator`
 - `TimeScaleService`
 - `EarthOrientationProvider`
-- `FrameTransformer`
+- `ErfaFrameTransformer`
 - `ApparentPlaceCalculator`
 - `AtmosphericRefractionCalculator`
 - `EphemerisResultBuilder`
