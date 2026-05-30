@@ -21,6 +21,9 @@ repository.
 - If only the definition of a struct, class, or enum is required, still add the
   corresponding `.cpp` file and include the header. Do not add anything else to
   this companion source file.
+- Exception: pure interface classes are header-only. Do not add a companion
+  `.cpp` file for an interface that contains only virtual methods and no
+  implementation.
 
 ## Header Rules
 
@@ -101,6 +104,8 @@ Rules:
 - Prefer abstract interfaces for replaceable subsystems.
 - Interface classes should:
   - Have virtual destructors.
+  - Declare only virtual methods.
+  - Keep destructors and all methods inline or pure virtual in the header.
   - Avoid data members.
   - Be focused on a single responsibility.
 - Do not add abstraction layers without a clear need.
