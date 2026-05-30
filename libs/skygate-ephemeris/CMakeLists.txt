@@ -41,6 +41,12 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CatalogStarAstrometryArrays.cpp
     src/engine/highprecision/CalcephKernelProvider.hpp
     src/engine/highprecision/CalcephKernelProvider.cpp
+    src/engine/highprecision/CelestialFrameTransformRequest.hpp
+    src/engine/highprecision/CelestialFrameTransformRequest.cpp
+    src/engine/highprecision/CelestialFrameTransformResult.hpp
+    src/engine/highprecision/CelestialFrameTransformResult.cpp
+    src/engine/highprecision/CelestialReferenceFrame.hpp
+    src/engine/highprecision/CelestialReferenceFrame.cpp
     src/engine/highprecision/CelestialFrameMath.hpp
     src/engine/highprecision/CelestialFrameMath.cpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
@@ -51,6 +57,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ICalcephKernelProvider.hpp
     src/engine/highprecision/IEphemerisComputationCache.hpp
     src/engine/highprecision/IEphemerisResultBuilder.hpp
+    src/engine/highprecision/IFrameTransformer.hpp
     src/engine/highprecision/IStarAstrometryCalculator.hpp
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
     src/engine/highprecision/DeltaTProvider.cpp
@@ -59,14 +66,14 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/EphemerisDataManifest.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
     src/engine/highprecision/EphemerisComputationCache.cpp
-    src/engine/highprecision/EphemerisMetadataMerge.hpp
-    src/engine/highprecision/EphemerisMetadataMerge.cpp
+    src/engine/highprecision/EphemerisMetadataMerger.hpp
+    src/engine/highprecision/EphemerisMetadataMerger.cpp
     src/engine/highprecision/EphemerisResultBuilder.hpp
     src/engine/highprecision/EphemerisResultBuilder.cpp
+    src/engine/highprecision/ErfaFrameTransformer.hpp
+    src/engine/highprecision/ErfaFrameTransformer.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
-    src/engine/highprecision/FrameTransformer.hpp
-    src/engine/highprecision/FrameTransformer.cpp
     src/engine/highprecision/HighPrecisionTextParser.hpp
     src/engine/highprecision/HighPrecisionTextParser.cpp
     src/engine/highprecision/LeapSecondProvider.cpp

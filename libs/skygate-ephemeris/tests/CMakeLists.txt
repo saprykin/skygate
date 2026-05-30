@@ -104,8 +104,13 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         LABELS "unit;highprecision"
     )
     add_skygate_ephemeris_qtest(
-        skygate-ephemeris-frame-transformer-tests
-        highprecision/FrameTransformerTests.cpp
+        skygate-ephemeris-erfa-frame-transformer-tests
+        highprecision/ErfaFrameTransformerTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
+        skygate-ephemeris-metadata-merge-tests
+        highprecision/EphemerisMetadataMergeTests.cpp
         LABELS "unit;highprecision"
     )
 endif()

@@ -1,5 +1,5 @@
 #include "SolarSystemStateCalculator.hpp"
-#include "EphemerisMetadataMerge.hpp"
+#include "EphemerisMetadataMerger.hpp"
 #include "ICalcephKernelProvider.hpp"
 #include "StringUtilities.hpp"
 #include "math/MathConstants.hpp"

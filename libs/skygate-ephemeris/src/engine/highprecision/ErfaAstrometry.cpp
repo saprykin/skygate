@@ -27,6 +27,17 @@ namespace {
 }
 #endif
 
+[[nodiscard]] skygate::core::Matrix3x3 earthRotationMatrixFromAngle(const double earthRotationAngle) noexcept
+{
+    const double sine = std::sin(earthRotationAngle);
+    const double cosine = std::cos(earthRotationAngle);
+    return {
+        {.x = cosine, .y = sine, .z = 0.0},
+        {.x = -sine, .y = cosine, .z = 0.0},
+        {.x = 0.0, .y = 0.0, .z = 1.0},
+    };
+}
+
 }  // namespace
 
 std::optional<skygate::core::Matrix3x3>
@@ -63,14 +74,15 @@ ErfaAstrometry::precessionNutationMatrix06A(const AstronomicalEpoch& terrestrial
 #endif
 }
 
-std::optional<double> ErfaAstrometry::earthRotationAngle00(const AstronomicalEpoch& universalTime1) noexcept
+std::optional<skygate::core::Matrix3x3>
+ErfaAstrometry::earthRotationMatrix00(const AstronomicalEpoch& universalTime1) noexcept
 {
     if (!epochInScaleIsFinite(universalTime1, TimeScale::Ut1)) {
         return std::nullopt;
     }
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    return eraEra00(universalTime1.julianDatePart1, universalTime1.julianDatePart2);
+    return earthRotationMatrixFromAngle(eraEra00(universalTime1.julianDatePart1, universalTime1.julianDatePart2));
 #else
     return std::nullopt;
 #endif

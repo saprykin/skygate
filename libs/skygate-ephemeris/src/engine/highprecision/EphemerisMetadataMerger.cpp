@@ -1,4 +1,4 @@
-#include "EphemerisMetadataMerge.hpp"
+#include "EphemerisMetadataMerger.hpp"
 
 namespace skygate::ephemeris::highprecision {
 namespace {
@@ -26,6 +26,46 @@ void mergeStatus(
     if (source.status == EphemerisEngineQueryStatus::Type::Degraded
         && target.status == EphemerisEngineQueryStatus::Type::Valid) {
         target.status = EphemerisEngineQueryStatus::Type::Degraded;
+    }
+}
+
+void markDegraded(EphemerisEngineQueryResult& metadata) noexcept
+{
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+    }
+}
+
+void addDegradedWarning(EphemerisEngineQueryResult& metadata, const EphemerisEngineWarning::Code warningCode) noexcept
+{
+    markDegraded(metadata);
+    metadata.addWarning(warningCode);
+}
+
+void mergeTimeScaleWarningCodes(
+    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
+) noexcept
+{
+    if (conversion.hasWarning(TimeScaleConversionWarningCode::LeapSecondTableMissing)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::EarthOrientationDataMissing)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::DeltaTUnavailable)) {
+        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+    }
+    if (conversion.hasWarning(TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable)
+        || conversion.hasWarning(TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData)) {
+        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    }
+}
+
+void mergeEarthOrientationWarningCodes(
+    EphemerisEngineQueryResult& metadata, const EarthOrientationSample& sample
+) noexcept
+{
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
+        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+    }
+    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
+        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     }
 }
 
@@ -59,10 +99,15 @@ void EphemerisMetadataMerger::markCorrectionUnavailable(
     EphemerisEngineQueryResult& metadata, const EphemerisCorrectionFlags unavailableCorrection
 ) noexcept
 {
-    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-    }
+    markDegraded(metadata);
     metadata.addUnavailableCorrection(unavailableCorrection);
+}
+
+void EphemerisMetadataMerger::markCorrectionApplied(
+    EphemerisEngineQueryResult& metadata, const EphemerisCorrectionFlags appliedCorrection
+) noexcept
+{
+    metadata.appliedCorrections |= appliedCorrection;
 }
 
 void EphemerisMetadataMerger::mergeTimeScale(
@@ -74,16 +119,16 @@ void EphemerisMetadataMerger::mergeTimeScale(
     if (conversion.status == TimeScaleConversionStatus::Failed) {
         if (failurePolicy == EphemerisMetadataFailurePolicy::MarkFailed) {
             metadata.status = EphemerisEngineQueryStatus::Type::Failed;
-        } else if (metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-            metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+        } else {
+            markDegraded(metadata);
         }
         metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+        mergeTimeScaleWarningCodes(metadata, conversion);
         return;
     }
-    if (conversion.status == TimeScaleConversionStatus::Degraded
-        && metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-        metadata.addWarning(EphemerisEngineWarning::Code::AccuracyDegraded);
+    if (conversion.status == TimeScaleConversionStatus::Degraded) {
+        addDegradedWarning(metadata, EphemerisEngineWarning::Code::AccuracyDegraded);
+        mergeTimeScaleWarningCodes(metadata, conversion);
     }
 }
 
@@ -93,19 +138,13 @@ void EphemerisMetadataMerger::mergeEarthOrientation(
 {
     if (sample.status == EarthOrientationSampleStatus::Failed) {
         metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+        mergeEarthOrientationWarningCodes(metadata, sample);
         metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return;
     }
-    if (sample.status == EarthOrientationSampleStatus::Degraded
-        && metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
-        metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-        metadata.addWarning(EphemerisEngineWarning::Code::AccuracyDegraded);
-    }
-    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
-        metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-    }
-    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
-        metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    if (sample.status == EarthOrientationSampleStatus::Degraded) {
+        addDegradedWarning(metadata, EphemerisEngineWarning::Code::AccuracyDegraded);
+        mergeEarthOrientationWarningCodes(metadata, sample);
     }
 }
 

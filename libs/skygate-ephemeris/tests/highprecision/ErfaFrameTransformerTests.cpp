@@ -1,4 +1,4 @@
-#include "engine/highprecision/FrameTransformer.hpp"
+#include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -63,6 +63,26 @@ void compareVector(const Vector3d& actual, const Vector3d& expected, const doubl
     QVERIFY(std::abs(actual.x - expected.x) <= tolerance);
     QVERIFY(std::abs(actual.y - expected.y) <= tolerance);
     QVERIFY(std::abs(actual.z - expected.z) <= tolerance);
+}
+
+[[nodiscard]] CelestialFrameTransformResult transformSingleVector(
+    const IFrameTransformer& transformer,
+    const CelestialReferenceFrame::Type sourceFrame,
+    const CelestialReferenceFrame::Type targetFrame,
+    const AstronomicalEpoch& epoch,
+    const Vector3d& vector
+)
+{
+    const std::array<Vector3d, 1U> vectors{vector};
+    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
+        CelestialFrameTransformRequest{
+            .sourceFrame = sourceFrame,
+            .targetFrame = targetFrame,
+            .epoch = epoch,
+            .vectors = vectors,
+        }
+    );
+    return results.front();
 }
 
 class RecordingTimeScaleService final : public ITimeScaleService {
@@ -212,13 +232,15 @@ private:
 
 }  // namespace
 
-class FrameTransformerTests final : public QObject {
+class ErfaFrameTransformerTests final : public QObject {
     Q_OBJECT
 
 private slots:
     void transformsGcrsToCirsAgainstSofaReference();
     void roundTripsGcrsAndCirsVectors();
     void treatsIcrsAndGcrsAsIdentityCelestialAxes();
+    void returnsEmptyResultsForEmptyVectorBatch();
+    void preservesBatchResultOrder();
     void usesTimeScaleServiceForNonTtEpochs();
     void reportsMissingTimeScaleServiceForNonTtCirsTransforms();
     void rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms();
@@ -237,16 +259,15 @@ private slots:
     void degradesItrsTransformForMissingEarthOrientationData();
 };
 
-void FrameTransformerTests::transformsGcrsToCirsAgainstSofaReference()
+void ErfaFrameTransformerTests::transformsGcrsToCirsAgainstSofaReference()
 {
     const ErfaFrameTransformer transformer(nullptr);
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Cirs,
-            .epoch = sofaReferenceTtEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Cirs,
+        sofaReferenceTtEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -269,47 +290,45 @@ void FrameTransformerTests::transformsGcrsToCirsAgainstSofaReference()
     );
 }
 
-void FrameTransformerTests::roundTripsGcrsAndCirsVectors()
+void ErfaFrameTransformerTests::roundTripsGcrsAndCirsVectors()
 {
     const ErfaFrameTransformer transformer(nullptr);
-    const CelestialFrameTransformRequest gcrsToCirsRequest{
-        .sourceFrame = CelestialReferenceFrame::Gcrs,
-        .targetFrame = CelestialReferenceFrame::Cirs,
-        .epoch = sofaReferenceTtEpoch(),
-        .vector = {.x = 0.4, .y = -0.2, .z = 0.9},
-    };
+    const Vector3d gcrsVector{.x = 0.4, .y = -0.2, .z = 0.9};
 
-    const CelestialFrameTransformResult cirs = transformer.transformCelestialVector(gcrsToCirsRequest);
+    const CelestialFrameTransformResult cirs = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Cirs,
+        sofaReferenceTtEpoch(),
+        gcrsVector
+    );
     QVERIFY(cirs.vector.has_value());
 
-    const CelestialFrameTransformResult gcrs = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Cirs,
-            .targetFrame = CelestialReferenceFrame::Gcrs,
-            .epoch = sofaReferenceTtEpoch(),
-            .vector = *cirs.vector,
-        }
+    const CelestialFrameTransformResult gcrs = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Cirs,
+        CelestialReferenceFrame::Type::Gcrs,
+        sofaReferenceTtEpoch(),
+        *cirs.vector
     );
 
     QVERIFY(gcrs.vector.has_value());
-    compareVector(*gcrs.vector, gcrsToCirsRequest.vector, 2.0e-14);
+    compareVector(*gcrs.vector, gcrsVector, 2.0e-14);
 }
 
-void FrameTransformerTests::treatsIcrsAndGcrsAsIdentityCelestialAxes()
+void ErfaFrameTransformerTests::treatsIcrsAndGcrsAsIdentityCelestialAxes()
 {
     const ErfaFrameTransformer transformer(nullptr);
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Icrs,
-            .targetFrame = CelestialReferenceFrame::Gcrs,
-            .epoch =
-                {
-                    .julianDatePart1 = std::numeric_limits<double>::quiet_NaN(),
-                    .julianDatePart2 = std::numeric_limits<double>::quiet_NaN(),
-                    .timeScale = TimeScale::Utc,
-                },
-            .vector = {.x = 0.25, .y = 0.5, .z = -0.75},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Icrs,
+        CelestialReferenceFrame::Type::Gcrs,
+        {
+            .julianDatePart1 = std::numeric_limits<double>::quiet_NaN(),
+            .julianDatePart2 = std::numeric_limits<double>::quiet_NaN(),
+            .timeScale = TimeScale::Utc,
+        },
+        {.x = 0.25, .y = 0.5, .z = -0.75}
     );
 
     QVERIFY(result.vector.has_value());
@@ -322,11 +341,11 @@ void FrameTransformerTests::treatsIcrsAndGcrsAsIdentityCelestialAxes()
     QVERIFY(!result.stages.front().applied);
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.front().sourceFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Icrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Icrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.front().targetFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.front().metadata.status),
@@ -339,20 +358,65 @@ void FrameTransformerTests::treatsIcrsAndGcrsAsIdentityCelestialAxes()
     QVERIFY(!result.stages.front().metadata.dataSourceProvenance.empty());
 }
 
-void FrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
+void ErfaFrameTransformerTests::returnsEmptyResultsForEmptyVectorBatch()
+{
+    const ErfaFrameTransformer transformer(nullptr);
+
+    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
+        CelestialFrameTransformRequest{
+            .sourceFrame = CelestialReferenceFrame::Type::Gcrs,
+            .targetFrame = CelestialReferenceFrame::Type::Cirs,
+            .epoch = sofaReferenceTtEpoch(),
+            .vectors = {},
+        }
+    );
+
+    QVERIFY(results.empty());
+}
+
+void ErfaFrameTransformerTests::preservesBatchResultOrder()
+{
+    const ErfaFrameTransformer transformer(nullptr);
+    const std::array<Vector3d, 3U> vectors{{
+        {.x = 1.0, .y = 0.0, .z = 0.0},
+        {.x = 0.0, .y = 1.0, .z = 0.0},
+        {.x = 0.0, .y = 0.0, .z = 1.0},
+    }};
+
+    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
+        CelestialFrameTransformRequest{
+            .sourceFrame = CelestialReferenceFrame::Type::Icrs,
+            .targetFrame = CelestialReferenceFrame::Type::Gcrs,
+            .epoch =
+                {
+                    .julianDatePart1 = std::numeric_limits<double>::quiet_NaN(),
+                    .julianDatePart2 = std::numeric_limits<double>::quiet_NaN(),
+                    .timeScale = TimeScale::Utc,
+                },
+            .vectors = vectors,
+        }
+    );
+
+    QCOMPARE(results.size(), vectors.size());
+    for (std::size_t index = 0U; index < vectors.size(); ++index) {
+        QVERIFY(results[index].vector.has_value());
+        compareVector(*results[index].vector, vectors[index], 0.0);
+    }
+}
+
+void ErfaFrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
 {
     auto service = std::make_shared<RecordingTimeScaleService>();
     service->nextResult = validTtConversionResult();
     const ErfaFrameTransformer transformer(service);
     const AstronomicalEpoch epoch = utcEpoch();
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Cirs,
-            .epoch = epoch,
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Cirs,
+        epoch,
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -362,17 +426,16 @@ void FrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
     QCOMPARE(service->lastEpoch.julianDatePart2, epoch.julianDatePart2);
 }
 
-void FrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms()
+void ErfaFrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms()
 {
     const ErfaFrameTransformer transformer(nullptr);
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Cirs,
-            .epoch = utcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Cirs,
+        utcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(!result.vector.has_value());
@@ -383,24 +446,19 @@ void FrameTransformerTests::reportsMissingTimeScaleServiceForNonTtCirsTransforms
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
 }
 
-void FrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms()
+void ErfaFrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTransforms()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
-    const std::array<std::pair<CelestialReferenceFrame, CelestialReferenceFrame>, 4U> cases{{
-        {CelestialReferenceFrame::TrueEquatorAndEquinox, CelestialReferenceFrame::Tirs},
-        {CelestialReferenceFrame::Tirs, CelestialReferenceFrame::TrueEquatorAndEquinox},
-        {CelestialReferenceFrame::TrueEquatorAndEquinox, CelestialReferenceFrame::Itrs},
-        {CelestialReferenceFrame::Itrs, CelestialReferenceFrame::TrueEquatorAndEquinox},
+    const std::array<std::pair<CelestialReferenceFrame::Type, CelestialReferenceFrame::Type>, 4U> cases{{
+        {CelestialReferenceFrame::Type::TrueEquatorAndEquinox, CelestialReferenceFrame::Type::Tirs},
+        {CelestialReferenceFrame::Type::Tirs, CelestialReferenceFrame::Type::TrueEquatorAndEquinox},
+        {CelestialReferenceFrame::Type::TrueEquatorAndEquinox, CelestialReferenceFrame::Type::Itrs},
+        {CelestialReferenceFrame::Type::Itrs, CelestialReferenceFrame::Type::TrueEquatorAndEquinox},
     }};
 
     for (const auto& [sourceFrame, targetFrame] : cases) {
-        const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-            CelestialFrameTransformRequest{
-                .sourceFrame = sourceFrame,
-                .targetFrame = targetFrame,
-                .epoch = sofaReferenceUtcEpoch(),
-                .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-            }
+        const CelestialFrameTransformResult result = transformSingleVector(
+            transformer, sourceFrame, targetFrame, sofaReferenceUtcEpoch(), {.x = 1.0, .y = 0.0, .z = 0.0}
         );
 
         QVERIFY(!result.vector.has_value());
@@ -417,17 +475,16 @@ void FrameTransformerTests::rejectsUnsupportedTrueEquatorAndEquinoxTerrestrialTr
     }
 }
 
-void FrameTransformerTests::transformsCirsToTirsAgainstSofaReference()
+void ErfaFrameTransformerTests::transformsCirsToTirsAgainstSofaReference()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Cirs,
-            .targetFrame = CelestialReferenceFrame::Tirs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Cirs,
+        CelestialReferenceFrame::Type::Tirs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -446,17 +503,16 @@ void FrameTransformerTests::transformsCirsToTirsAgainstSofaReference()
     );
 }
 
-void FrameTransformerTests::transformsTirsToItrsAgainstSofaReference()
+void ErfaFrameTransformerTests::transformsTirsToItrsAgainstSofaReference()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Tirs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Tirs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -471,17 +527,16 @@ void FrameTransformerTests::transformsTirsToItrsAgainstSofaReference()
     );
 }
 
-void FrameTransformerTests::transformsGcrsToItrsAgainstSofaReference()
+void ErfaFrameTransformerTests::transformsGcrsToItrsAgainstSofaReference()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -502,28 +557,27 @@ void FrameTransformerTests::transformsGcrsToItrsAgainstSofaReference()
     );
 }
 
-void FrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
+void ErfaFrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
     QCOMPARE(result.stages.size(), static_cast<std::size_t>(3U));
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[0].sourceFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Gcrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Gcrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[0].targetFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Cirs)
     );
     QCOMPARE(
         static_cast<std::uint32_t>(result.stages[0].metadata.appliedCorrections),
@@ -531,11 +585,11 @@ void FrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[1].sourceFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Cirs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[1].targetFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Tirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Tirs)
     );
     QCOMPARE(
         static_cast<std::uint32_t>(result.stages[1].metadata.appliedCorrections),
@@ -543,18 +597,18 @@ void FrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[2].sourceFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Tirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Tirs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages[2].targetFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Itrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Itrs)
     );
     QCOMPARE(
         static_cast<std::uint32_t>(result.stages[2].metadata.appliedCorrections),
         static_cast<std::uint32_t>(EphemerisCorrectionFlags::earthOrientation())
     );
 
-    for (const CelestialFrameTransformStageMetadata& stage : result.stages) {
+    for (const CelestialFrameTransformResult::Stage& stage : result.stages) {
         QVERIFY(stage.applied);
         QCOMPARE(
             static_cast<std::uint8_t>(stage.metadata.status),
@@ -564,30 +618,38 @@ void FrameTransformerTests::recordsPerStageMetadataForComposedTransforms()
     }
 }
 
-void FrameTransformerTests::reusesTimeScaleConversionsAcrossComposedStages()
+void ErfaFrameTransformerTests::reusesTimeScaleConversionsAcrossComposedStages()
 {
     auto service = frameTimeScaleService();
     const ErfaFrameTransformer transformer(service, earthOrientationProvider());
+    const std::array<Vector3d, 3U> vectors{{
+        {.x = 1.0, .y = 0.0, .z = 0.0},
+        {.x = 0.0, .y = 1.0, .z = 0.0},
+        {.x = 0.0, .y = 0.0, .z = 1.0},
+    }};
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
+    const std::vector<CelestialFrameTransformResult> results = transformer.transform(
         CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
+            .sourceFrame = CelestialReferenceFrame::Type::Gcrs,
+            .targetFrame = CelestialReferenceFrame::Type::Itrs,
             .epoch =
                 {
                     .julianDatePart1 = 2'400'000.5,
                     .julianDatePart2 = 53'736.0,
                     .timeScale = TimeScale::Tai,
                 },
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
+            .vectors = vectors,
         }
     );
 
-    QVERIFY(result.vector.has_value());
+    QCOMPARE(results.size(), vectors.size());
+    for (const CelestialFrameTransformResult& result : results) {
+        QVERIFY(result.vector.has_value());
+    }
     QCOMPARE(service->convertCallCount, 2);
 }
 
-void FrameTransformerTests::reusesEarthOrientationSampleAcrossComposedTerrestrialStages()
+void ErfaFrameTransformerTests::reusesEarthOrientationSampleAcrossComposedTerrestrialStages()
 {
     auto eopProvider = std::make_shared<RecordingEarthOrientationProvider>(earthOrientationProvider());
     const TimeScaleServiceOptions options{
@@ -603,80 +665,76 @@ void FrameTransformerTests::reusesEarthOrientationSampleAcrossComposedTerrestria
     const auto service = std::make_shared<LeapSecondTimeScaleService>(leapSecondProvider(), options, eopProvider);
     const ErfaFrameTransformer transformer(service, eopProvider);
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
     QCOMPARE(eopProvider->entriesCallCount, 2);
 }
 
-void FrameTransformerTests::preservesIcrsSourceFrameInComposedStageMetadata()
+void ErfaFrameTransformerTests::preservesIcrsSourceFrameInComposedStageMetadata()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Icrs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Icrs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
     QCOMPARE(result.stages.size(), static_cast<std::size_t>(3U));
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.front().sourceFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Icrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Icrs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.front().targetFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Cirs)
     );
 }
 
-void FrameTransformerTests::preservesIcrsTargetFrameInComposedStageMetadata()
+void ErfaFrameTransformerTests::preservesIcrsTargetFrameInComposedStageMetadata()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider());
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Itrs,
-            .targetFrame = CelestialReferenceFrame::Icrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Itrs,
+        CelestialReferenceFrame::Type::Icrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
     QCOMPARE(result.stages.size(), static_cast<std::size_t>(3U));
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.back().sourceFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Cirs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Cirs)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(result.stages.back().targetFrame),
-        static_cast<std::uint8_t>(CelestialReferenceFrame::Icrs)
+        static_cast<std::uint8_t>(CelestialReferenceFrame::Type::Icrs)
     );
 }
 
-void FrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed()
+void ErfaFrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed()
 {
     const ErfaFrameTransformer transformer(nullptr);
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Gcrs,
-            .targetFrame = CelestialReferenceFrame::Cirs,
-            .epoch = utcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Gcrs,
+        CelestialReferenceFrame::Type::Cirs,
+        utcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(!result.vector.has_value());
@@ -687,23 +745,28 @@ void FrameTransformerTests::recordsUnavailableStageWhenTransformCannotBeComputed
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
     );
     QVERIFY(result.stages.front().metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
+    QVERIFY(result.stages.front().metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QCOMPARE(
         static_cast<std::uint32_t>(result.metadata.appliedCorrections),
         static_cast<std::uint32_t>(EphemerisCorrectionFlags::noCorrections())
     );
+    QCOMPARE(
+        static_cast<std::uint32_t>(result.metadata.unavailableCorrections),
+        static_cast<std::uint32_t>(EphemerisCorrectionFlags::precessionNutation())
+    );
 }
 
-void FrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientationData()
+void ErfaFrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), earthOrientationProvider(true));
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Tirs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Tirs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -714,19 +777,18 @@ void FrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientationDat
     QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
-void FrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
+void ErfaFrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(
         frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Stale)
     );
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Tirs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Tirs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -737,19 +799,18 @@ void FrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
-void FrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationData()
+void ErfaFrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(
         frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Estimated)
     );
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Tirs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Tirs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -760,17 +821,16 @@ void FrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationDat
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
 }
 
-void FrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData()
+void ErfaFrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(frameTimeScaleService(), nullptr);
 
-    const CelestialFrameTransformResult result = transformer.transformCelestialVector(
-        CelestialFrameTransformRequest{
-            .sourceFrame = CelestialReferenceFrame::Tirs,
-            .targetFrame = CelestialReferenceFrame::Itrs,
-            .epoch = sofaReferenceUtcEpoch(),
-            .vector = {.x = 1.0, .y = 0.0, .z = 0.0},
-        }
+    const CelestialFrameTransformResult result = transformSingleVector(
+        transformer,
+        CelestialReferenceFrame::Type::Tirs,
+        CelestialReferenceFrame::Type::Itrs,
+        sofaReferenceUtcEpoch(),
+        {.x = 1.0, .y = 0.0, .z = 0.0}
     );
 
     QVERIFY(result.vector.has_value());
@@ -778,9 +838,11 @@ void FrameTransformerTests::degradesItrsTransformForMissingEarthOrientationData(
         static_cast<std::uint8_t>(result.metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
+    QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
     QVERIFY(result.metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
+    QVERIFY(!result.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
 }
 
-QTEST_MAIN(FrameTransformerTests)
+QTEST_MAIN(ErfaFrameTransformerTests)
 
-#include "FrameTransformerTests.moc"
+#include "ErfaFrameTransformerTests.moc"

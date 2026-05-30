@@ -38,6 +38,9 @@ public:
         EphemerisEngineQueryResult& metadata, EphemerisCorrectionFlags unavailableCorrection
     ) noexcept;
 
+    static void
+    markCorrectionApplied(EphemerisEngineQueryResult& metadata, EphemerisCorrectionFlags appliedCorrection) noexcept;
+
     static void mergeTimeScale(
         EphemerisEngineQueryResult& metadata,
         const TimeScaleConversionResult& conversion,

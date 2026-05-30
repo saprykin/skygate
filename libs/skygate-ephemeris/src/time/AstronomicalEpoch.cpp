@@ -43,13 +43,32 @@ double AstronomicalEpoch::sortKey() const noexcept
     return normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
 }
 
-AstronomicalEpoch AstronomicalEpoch::addMinutes(const int offsetMinutes) const noexcept
+AstronomicalEpoch AstronomicalEpoch::addSeconds(const double offsetSeconds) const noexcept
+{
+    return addSeconds(offsetSeconds, timeScale);
+}
+
+AstronomicalEpoch AstronomicalEpoch::addSeconds(const double offsetSeconds, const TimeScale resultScale) const noexcept
 {
     return AstronomicalEpoch{
         .julianDatePart1 = julianDatePart1,
-        .julianDatePart2 =
-            julianDatePart2 + static_cast<double>(offsetMinutes) / skygate::core::TimeConstants::kMinutesPerDay,
-        .timeScale = timeScale
+        .julianDatePart2 = julianDatePart2 + offsetSeconds / skygate::core::TimeConstants::kSecondsPerDay,
+        .timeScale = resultScale
+    }
+        .normalized();
+}
+
+AstronomicalEpoch AstronomicalEpoch::addMinutes(const double offsetMinutes) const noexcept
+{
+    return addMinutes(offsetMinutes, timeScale);
+}
+
+AstronomicalEpoch AstronomicalEpoch::addMinutes(const double offsetMinutes, const TimeScale resultScale) const noexcept
+{
+    return AstronomicalEpoch{
+        .julianDatePart1 = julianDatePart1,
+        .julianDatePart2 = julianDatePart2 + offsetMinutes / skygate::core::TimeConstants::kMinutesPerDay,
+        .timeScale = resultScale
     }
         .normalized();
 }
