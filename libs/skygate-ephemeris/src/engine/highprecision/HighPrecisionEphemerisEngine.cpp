@@ -1,5 +1,4 @@
 #include "HighPrecisionEphemerisEngine.hpp"
-#include "BaseApparentPlaceCalculator.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
@@ -16,8 +15,6 @@
 #include "engine/simple/MoonEquatorialCalculator.hpp"
 #include "engine/simple/PlanetEquatorialCalculator.hpp"
 #include "engine/simple/SunEquatorialCalculator.hpp"
-
-#include <QtGlobal>
 
 #include <bit>
 #include <cmath>
@@ -172,24 +169,16 @@ void mergeKernelEpochTimeScaleMetadata(
     EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
 }
 
-class DefaultApparentPlaceCalculator final : public BaseApparentPlaceCalculator {
-public:
-    [[nodiscard]] HighPrecisionCalculatorResult
-    apply(const HighPrecisionComputationInput&, const HighPrecisionCalculatorResult& calculatorResult) const override
-    {
-        return calculatorResult;
-    }
-};
-
-[[nodiscard]] const IApparentPlaceCalculator&
-apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependencies)
+[[nodiscard]] HighPrecisionCalculatorResult missingApparentPlaceCalculatorResult(
+    HighPrecisionCalculatorResult calculatorResult, const EphemerisCorrectionFlags requestedCorrections
+)
 {
-    static const DefaultApparentPlaceCalculator kDefaultCalculator;
-    if (dependencies.apparentPlaceCalculator != nullptr) {
-        return *dependencies.apparentPlaceCalculator;
-    }
-
-    return kDefaultCalculator;
+    calculatorResult.equatorial.reset();
+    calculatorResult.horizontal.reset();
+    calculatorResult.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+    calculatorResult.metadata.addUnavailableCorrection(requestedCorrections);
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+    return calculatorResult;
 }
 
 [[nodiscard]] const IEphemerisResultBuilder& resultBuilder(const HighPrecisionEphemerisEngineDependencies& dependencies)
@@ -213,7 +202,11 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
         return calculatorResult;
     }
 
-    return apparentPlaceCalculator(dependencies).apply(input, calculatorResult);
+    if (dependencies.apparentPlaceCalculator == nullptr) {
+        return missingApparentPlaceCalculatorResult(calculatorResult, request.options.correctionFlags());
+    }
+
+    return dependencies.apparentPlaceCalculator->apply(input, calculatorResult);
 }
 
 [[nodiscard]] std::optional<AstronomicalEpoch> kernelEpochForSolarSystemState(
@@ -257,8 +250,25 @@ apparentPlaceCalculator(const HighPrecisionEphemerisEngineDependencies& dependen
         return {calculatorResults.begin(), calculatorResults.end()};
     }
 
-    return apparentPlaceCalculator(dependencies)
-        .applyBatch(request, bodies, calculatorResults, std::move(preparedState));
+    if (dependencies.apparentPlaceCalculator == nullptr) {
+        std::vector<StarAstrometryBatchResult> results;
+        results.reserve(calculatorResults.size());
+        for (const StarAstrometryBatchResult& calculatorResult : calculatorResults) {
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = missingApparentPlaceCalculatorResult(
+                        calculatorResult.result, request.options.correctionFlags()
+                    ),
+                }
+            );
+        }
+        return results;
+    }
+
+    return dependencies.apparentPlaceCalculator->applyBatch(
+        request, bodies, calculatorResults, std::move(preparedState)
+    );
 }
 
 }  // namespace
