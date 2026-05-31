@@ -1,10 +1,10 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
-#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/DeltaTProvider.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
@@ -515,7 +515,7 @@ private:
     mutable AstronomicalEpoch m_lastEpoch;
 };
 
-class RecordingApparentPlaceCalculator final : public BaseApparentPlaceCalculator {
+class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult apply(
         const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
@@ -532,6 +532,36 @@ public:
         return result;
     }
 
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
+        const EphemerisRequest& request,
+        std::span<const BaseCelestialBody* const> bodies,
+        std::span<const StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
+    ) const override
+    {
+        std::vector<StarAstrometryBatchResult> results;
+        results.reserve(calculatorResults.size());
+        for (const StarAstrometryBatchResult& calculatorResult : calculatorResults) {
+            if (calculatorResult.bodyIndex >= bodies.size() || bodies[calculatorResult.bodyIndex] == nullptr) {
+                continue;
+            }
+
+            const HighPrecisionComputationInput input{
+                .request = request,
+                .body = *bodies[calculatorResult.bodyIndex],
+                .preparedRequestState = preparedRequestState,
+                .bodyIndex = calculatorResult.bodyIndex,
+            };
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = apply(input, calculatorResult.result),
+                }
+            );
+        }
+        return results;
+    }
+
     [[nodiscard]] int callCount() const noexcept
     {
         return m_callCount;
@@ -546,6 +576,30 @@ private:
     mutable int m_callCount = 0;
     mutable EphemerisCorrectionFlags m_lastFlags = EphemerisCorrectionFlags::noCorrections();
 };
+
+class PassThroughApparentPlaceCalculator final : public IApparentPlaceCalculator {
+public:
+    [[nodiscard]] HighPrecisionCalculatorResult
+    apply(const HighPrecisionComputationInput&, const HighPrecisionCalculatorResult& calculatorResult) const override
+    {
+        return calculatorResult;
+    }
+
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
+        const EphemerisRequest&,
+        std::span<const BaseCelestialBody* const>,
+        std::span<const StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const PreparedEphemerisRequestState> = {}
+    ) const override
+    {
+        return {calculatorResults.begin(), calculatorResults.end()};
+    }
+};
+
+[[nodiscard]] std::shared_ptr<IApparentPlaceCalculator> makePassThroughApparentPlaceCalculator()
+{
+    return std::make_shared<PassThroughApparentPlaceCalculator>();
+}
 
 class BatchRecordingFrameTransformer final : public IFrameTransformer {
 public:
@@ -877,6 +931,7 @@ class HighPrecisionEphemerisEngineTests final : public QObject {
 private slots:
     void exposesMetadataAndCapabilities();
     void dispatchesSolarSystemAndStarBodies();
+    void failsRequestedCorrectionsWhenApparentPlaceCalculatorIsMissing();
     void usesBatchStarPathForFullFrameSnapshot();
     void batchesRepresentativeLargeCatalogWithoutSingleStarDispatch();
     void batchesRepresentativeLargeCatalogApparentPlaceTransformsOnce();
@@ -992,6 +1047,37 @@ void HighPrecisionEphemerisEngineTests::dispatchesSolarSystemAndStarBodies()
     QCOMPARE(snapshot.states[1].equatorial.declinationDeg, 42.0);
 }
 
+void HighPrecisionEphemerisEngineTests::failsRequestedCorrectionsWhenApparentPlaceCalculatorIsMissing()
+{
+    const std::array bodies{
+        makeSunBody(),
+        makeFixedStarBody("star-a", 2.0, 10.0),
+    };
+    auto solarSystemCalculator = std::make_shared<RecordingSolarSystemCalculator>();
+    auto starAstrometryCalculator = std::make_shared<BatchRecordingStarAstrometryCalculator>();
+
+    const EphemerisRequest request = makeRequest();
+    const HighPrecisionEphemerisEngine engine(
+        makeCatalog(bodies), request.options, makeDependencies(solarSystemCalculator, starAstrometryCalculator)
+    );
+
+    const EphemerisSnapshot snapshot = engine.compute(request);
+
+    QCOMPARE(snapshot.states.size(), std::size_t{2});
+    QCOMPARE(solarSystemCalculator->callCount(), 1);
+    QCOMPARE(starAstrometryCalculator->batchCallCount(), 1);
+    for (const CelestialBodyState& state : snapshot.states) {
+        QCOMPARE(
+            static_cast<std::uint8_t>(state.metadata.status),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed)
+        );
+        QVERIFY(state.metadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+        QVERIFY(state.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+        QCOMPARE(state.metadata.requestedCorrections, request.options.correctionFlags());
+        QCOMPARE(state.metadata.unavailableCorrections, request.options.correctionFlags());
+    }
+}
+
 void HighPrecisionEphemerisEngineTests::usesBatchStarPathForFullFrameSnapshot()
 {
     const std::array bodies{
@@ -1054,7 +1140,9 @@ void HighPrecisionEphemerisEngineTests::batchesRepresentativeLargeCatalogWithout
     auto starAstrometryCalculator = std::make_shared<BatchRecordingStarAstrometryCalculator>();
 
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies({}, starAstrometryCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies({}, starAstrometryCalculator, makePassThroughApparentPlaceCalculator())
     );
 
     const EphemerisSnapshot snapshot = engine.compute(makeRequest());
@@ -1141,7 +1229,7 @@ void HighPrecisionEphemerisEngineTests::reusesCachedFullFrameSnapshotsWithoutSta
     const HighPrecisionEphemerisEngine engine(
         makeCatalog(bodies),
         makeRequest().options,
-        makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator(), {}, computationCache)
     );
 
     EphemerisRequest firstRequest = makeRequest();
@@ -1180,7 +1268,7 @@ void HighPrecisionEphemerisEngineTests::reusesPreparedRequestStateAcrossSingleBo
     auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>(kernelProvider);
     auto computationCache = std::make_shared<EphemerisComputationCache>();
     HighPrecisionEphemerisEngineDependencies dependencies =
-        makeDependencies({}, starAstrometryCalculator, {}, {}, computationCache);
+        makeDependencies({}, starAstrometryCalculator, makePassThroughApparentPlaceCalculator(), {}, computationCache);
     dependencies.calcephKernelProvider = kernelProvider;
 
     const HighPrecisionEphemerisEngine engine(makeCatalog(bodies), makeRequest().options, std::move(dependencies));
@@ -1202,7 +1290,7 @@ void HighPrecisionEphemerisEngineTests::reusesCachedSingleBodyStatesWithoutFullF
     const HighPrecisionEphemerisEngine engine(
         makeCatalog(bodies),
         makeRequest().options,
-        makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator(), {}, computationCache)
     );
 
     EphemerisRequest request = makeRequest();
@@ -1240,7 +1328,7 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSingleBodyStatesByBodyInde
     const HighPrecisionEphemerisEngine engine(
         makeCatalog(bodies),
         makeRequest().options,
-        makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator(), {}, computationCache)
     );
 
     const EphemerisRequest request = makeRequest();
@@ -1269,7 +1357,7 @@ void HighPrecisionEphemerisEngineTests::servesConcurrentReadOnlyComputationsFrom
     const HighPrecisionEphemerisEngine engine(
         makeCatalog(bodies),
         makeRequest().options,
-        makeDependencies(solarSystemCalculator, {}, {}, {}, computationCache)
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator(), {}, computationCache)
     );
 
     EphemerisRequest request = makeRequest();
@@ -1480,7 +1568,9 @@ void HighPrecisionEphemerisEngineTests::fallsBackToSingleStarPathWhenBatchReturn
     auto starAstrometryCalculator = std::make_shared<RecordingStarAstrometryCalculator>();
 
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies({}, starAstrometryCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies({}, starAstrometryCalculator, makePassThroughApparentPlaceCalculator())
     );
 
     const EphemerisSnapshot snapshot = engine.compute(makeRequest());
@@ -1672,7 +1762,9 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesValidMetada
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies(solarSystemCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator())
     );
 
     const auto state = engine.computeBodyState(makeRequest(), "sun");
@@ -1714,7 +1806,9 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderTracksRequestedAppli
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies(solarSystemCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator())
     );
 
     EphemerisRequest request = makeRequest();
@@ -1768,7 +1862,9 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderTurnsOutOfRangeFallb
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies(solarSystemCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator())
     );
 
     const auto state = engine.computeBodyState(makeRequest(), std::size_t{0});
@@ -1797,7 +1893,9 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesOutOfRangeW
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), request.options, makeDependencies(solarSystemCalculator)
+        makeCatalog(bodies),
+        request.options,
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator())
     );
 
     const auto state = engine.computeBodyState(request, std::size_t{0});
@@ -1823,7 +1921,9 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesFailedResul
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies(solarSystemCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator())
     );
 
     const auto state = engine.computeBodyState(makeRequest(), std::size_t{0});
@@ -1855,7 +1955,9 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesDegradedDat
     const std::array bodies{makeSunBody()};
     auto solarSystemCalculator = std::make_shared<StaticSolarSystemCalculator>(std::move(calculatorResult));
     const HighPrecisionEphemerisEngine engine(
-        makeCatalog(bodies), makeRequest().options, makeDependencies(solarSystemCalculator)
+        makeCatalog(bodies),
+        makeRequest().options,
+        makeDependencies(solarSystemCalculator, {}, makePassThroughApparentPlaceCalculator())
     );
 
     const auto state = engine.computeBodyState(makeRequest(), std::size_t{0});

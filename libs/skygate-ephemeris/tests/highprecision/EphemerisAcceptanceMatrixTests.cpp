@@ -1,12 +1,12 @@
 #include "EphemerisFixtureSupport.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/BaseApparentPlaceCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -393,7 +393,7 @@ private:
     std::vector<EarthOrientationTableEntry> m_entries;
 };
 
-class RecordingApparentPlaceCalculator final : public BaseApparentPlaceCalculator {
+class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
 public:
     [[nodiscard]] HighPrecisionCalculatorResult apply(
         const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& calculatorResult
@@ -412,6 +412,36 @@ public:
             result.horizontal = HorizontalCoordinate{.altitudeDeg = 42.0, .azimuthDeg = 128.0};
         }
         return result;
+    }
+
+    [[nodiscard]] std::vector<StarAstrometryBatchResult> applyBatch(
+        const EphemerisRequest& request,
+        std::span<const BaseCelestialBody* const> bodies,
+        std::span<const StarAstrometryBatchResult> calculatorResults,
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedRequestState = {}
+    ) const override
+    {
+        std::vector<StarAstrometryBatchResult> results;
+        results.reserve(calculatorResults.size());
+        for (const StarAstrometryBatchResult& calculatorResult : calculatorResults) {
+            if (calculatorResult.bodyIndex >= bodies.size() || bodies[calculatorResult.bodyIndex] == nullptr) {
+                continue;
+            }
+
+            const HighPrecisionComputationInput input{
+                .request = request,
+                .body = *bodies[calculatorResult.bodyIndex],
+                .preparedRequestState = preparedRequestState,
+                .bodyIndex = calculatorResult.bodyIndex,
+            };
+            results.push_back(
+                StarAstrometryBatchResult{
+                    .bodyIndex = calculatorResult.bodyIndex,
+                    .result = apply(input, calculatorResult.result),
+                }
+            );
+        }
+        return results;
     }
 
     [[nodiscard]] int callCount() const noexcept
@@ -528,6 +558,7 @@ void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSuppor
     HighPrecisionEphemerisEngineDependencies dependencies;
     dependencies.calcephKernelProvider = kernelProvider;
     dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+    dependencies.apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
     dependencies.dataSetInfo = makeDataSetInfo(false);
 
     const HighPrecisionEphemerisEngine engine =
