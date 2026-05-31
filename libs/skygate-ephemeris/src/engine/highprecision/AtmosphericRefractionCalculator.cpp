@@ -51,11 +51,6 @@ constexpr double kMaximumWavelengthMicrometers = 100.0;
     return std::isfinite(altitudeDeg) && altitudeDeg < kMinimumModelAltitudeDeg;
 }
 
-void markUnavailable(EphemerisEngineQueryResult& metadata) noexcept
-{
-    EphemerisMetadataMerger::markCorrectionUnavailable(metadata, EphemerisCorrectionFlags::atmosphericRefraction());
-}
-
 [[nodiscard]] double pressureScale(const EphemerisEngineOptions& options) noexcept
 {
     return options.atmosphericPressureHpa() / 1010.0;
@@ -89,14 +84,18 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
 
     if (!result.horizontal.has_value() || !input.request.context.observer.isValid()
         || !hasValidAtmosphere(input.request.options)) {
-        markUnavailable(result.metadata);
+        EphemerisMetadataMerger::markCorrectionUnavailable(
+            result.metadata, EphemerisCorrectionFlags::atmosphericRefraction()
+        );
         return result;
     }
     if (isBelowModelAltitude(result.horizontal->altitudeDeg)) {
         return result;
     }
     if (!hasModelAltitude(result.horizontal->altitudeDeg)) {
-        markUnavailable(result.metadata);
+        EphemerisMetadataMerger::markCorrectionUnavailable(
+            result.metadata, EphemerisCorrectionFlags::atmosphericRefraction()
+        );
         return result;
     }
 
@@ -105,7 +104,7 @@ HighPrecisionCalculatorResult AtmosphericRefractionCalculator::apply(
         result.horizontal->altitudeDeg
             + refractionCorrectionDegrees(result.horizontal->altitudeDeg, input.request.options)
     );
-    result.metadata.appliedCorrections |= EphemerisCorrectionFlags::atmosphericRefraction();
+    EphemerisMetadataMerger::markCorrectionApplied(result.metadata, EphemerisCorrectionFlags::atmosphericRefraction());
     return result;
 }
 
