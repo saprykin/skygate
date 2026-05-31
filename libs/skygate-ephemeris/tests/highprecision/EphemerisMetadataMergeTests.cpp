@@ -16,6 +16,8 @@ private slots:
     void degradedEarthOrientationSampleMapsWarningCodes();
     void failedEarthOrientationSampleMapsWarningCodes();
     void markCorrectionUnavailableDegradesAndAddsWarning();
+    void markCorrectionFailedFailsRecoverableStatusesAndAddsWarnings();
+    void markCorrectionFailedPreservesTerminalStatusesAndAddsWarnings();
     void markCorrectionAppliedRecordsCorrection();
 };
 
@@ -113,6 +115,91 @@ void EphemerisMetadataMergeTests::markCorrectionUnavailableDegradesAndAddsWarnin
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
     QVERIFY(
         EphemerisCorrectionFlags::has(metadata.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation())
+    );
+}
+
+void EphemerisMetadataMergeTests::markCorrectionFailedFailsRecoverableStatusesAndAddsWarnings()
+{
+    EphemerisEngineQueryResult validMetadata;
+    EphemerisMetadataMerger::markCorrectionFailed(validMetadata, EphemerisCorrectionFlags::precessionNutation());
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(validMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Failed)
+    );
+    QVERIFY(validMetadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(validMetadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(
+        EphemerisCorrectionFlags::has(
+            validMetadata.unavailableCorrections, EphemerisCorrectionFlags::precessionNutation()
+        )
+    );
+
+    EphemerisEngineQueryResult degradedMetadata;
+    degradedMetadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+    EphemerisMetadataMerger::markCorrectionFailed(degradedMetadata, EphemerisCorrectionFlags::earthOrientation());
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(degradedMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Failed)
+    );
+    QVERIFY(degradedMetadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(degradedMetadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(
+        EphemerisCorrectionFlags::has(
+            degradedMetadata.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation()
+        )
+    );
+}
+
+void EphemerisMetadataMergeTests::markCorrectionFailedPreservesTerminalStatusesAndAddsWarnings()
+{
+    EphemerisEngineQueryResult outOfRangeMetadata;
+    outOfRangeMetadata.status = EphemerisEngineQueryStatus::Type::OutOfRange;
+    EphemerisMetadataMerger::markCorrectionFailed(outOfRangeMetadata, EphemerisCorrectionFlags::precessionNutation());
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(outOfRangeMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::OutOfRange)
+    );
+    QVERIFY(outOfRangeMetadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(outOfRangeMetadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(
+        EphemerisCorrectionFlags::has(
+            outOfRangeMetadata.unavailableCorrections, EphemerisCorrectionFlags::precessionNutation()
+        )
+    );
+
+    EphemerisEngineQueryResult unsupportedMetadata;
+    unsupportedMetadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
+    EphemerisMetadataMerger::markCorrectionFailed(unsupportedMetadata, EphemerisCorrectionFlags::earthOrientation());
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(unsupportedMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Unsupported)
+    );
+    QVERIFY(unsupportedMetadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(unsupportedMetadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(
+        EphemerisCorrectionFlags::has(
+            unsupportedMetadata.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation()
+        )
+    );
+
+    EphemerisEngineQueryResult failedMetadata;
+    failedMetadata.status = EphemerisEngineQueryStatus::Type::Failed;
+    EphemerisMetadataMerger::markCorrectionFailed(failedMetadata, EphemerisCorrectionFlags::precessionNutation());
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(failedMetadata.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Failed)
+    );
+    QVERIFY(failedMetadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(failedMetadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(
+        EphemerisCorrectionFlags::has(
+            failedMetadata.unavailableCorrections, EphemerisCorrectionFlags::precessionNutation()
+        )
     );
 }
 
