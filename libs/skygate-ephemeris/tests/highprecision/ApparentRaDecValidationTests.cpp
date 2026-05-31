@@ -1,9 +1,9 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "EphemerisFixtureSupport.hpp"
+#include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -15,7 +15,6 @@
 
 #include <array>
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -75,48 +74,6 @@ using skygate::ephemeris::tests::loadRaDecFixture;
     };
 }
 
-class FixtureCalcephKernelProvider final : public ICalcephKernelProvider {
-public:
-    struct Call {
-        AstronomicalEpoch epoch;
-        int targetNaifId = 0;
-        int centerNaifId = 0;
-    };
-
-    [[nodiscard]] SolarSystemKernelStateResult
-    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
-    {
-        calls.push_back({
-            .epoch = epoch,
-            .targetNaifId = targetNaifId,
-            .centerNaifId = centerNaifId,
-        });
-
-        const std::pair key{targetNaifId, centerNaifId};
-        if (const auto sequence = responseSequences.find(key); sequence != responseSequences.end()) {
-            const std::size_t index = responseSequenceIndexes[key]++;
-            if (index < sequence->second.size()) {
-                return sequence->second[index];
-            }
-            return sequence->second.back();
-        }
-        if (const auto match = responses.find(key); match != responses.end()) {
-            return match->second;
-        }
-
-        SolarSystemKernelStateResult result;
-        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-        result.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
-        return result;
-    }
-
-    mutable std::vector<Call> calls;
-    mutable std::map<std::pair<int, int>, std::size_t> responseSequenceIndexes;
-    std::map<std::pair<int, int>, SolarSystemKernelStateResult> responses;
-    std::map<std::pair<int, int>, std::vector<SolarSystemKernelStateResult>> responseSequences;
-};
-
 class SameInstantTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
@@ -151,7 +108,7 @@ public:
 struct ApparentValidationFixture {
     EphemerisRaDecFixture raDec;
     AstronomicalEpoch requestEpoch;
-    std::shared_ptr<FixtureCalcephKernelProvider> provider;
+    std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel> provider;
 };
 
 [[nodiscard]] Vector3d parseVector(const QJsonArray& array)
@@ -200,7 +157,12 @@ struct ApparentValidationFixture {
     }
     const QJsonObject root = document.object();
     const QJsonObject request = root.value(QStringLiteral("request")).toObject();
-    const auto provider = std::make_shared<FixtureCalcephKernelProvider>();
+    const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    SolarSystemKernelStateResult defaultResult;
+    defaultResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+    defaultResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    defaultResult.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
+    provider->setDefaultResult(std::move(defaultResult));
 
     const QJsonArray kernelStates = root.value(QStringLiteral("kernelStates")).toArray();
     if (kernelStates.isEmpty()) {
@@ -214,9 +176,9 @@ struct ApparentValidationFixture {
             state.value(QStringLiteral("centerNaifId")).toInt(),
         };
         if (role == QStringLiteral("target-retarded")) {
-            provider->responseSequences[key].push_back(makeKernelState(state));
+            provider->responseSequence(key.first, key.second).push_back(makeKernelState(state));
         } else {
-            provider->responses[key] = makeKernelState(state);
+            provider->response(key.first, key.second) = makeKernelState(state);
         }
     }
 

@@ -2,10 +2,12 @@
 #include "SettingsTestFixture.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkySettingsStore.hpp"
+#include "StaticCalcephKernelProvider.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QDir>
@@ -259,54 +261,98 @@ QByteArray factoryDiagnostics(const skygate::ephemeris::EphemerisEngineFactoryRe
     return QByteArray(text.data(), static_cast<qsizetype>(text.size()));
 }
 
-class AcceptanceCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
+class AcceptanceCalcephKernel final : public skygate::ephemeris::highprecision::ICalcephKernel {
 public:
-    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult computeGeometricStateWithVelocity(
-        const skygate::ephemeris::AstronomicalEpoch&, const int targetNaifId, const int centerNaifId
+    explicit AcceptanceCalcephKernel(Info info) : m_kernelInfo(std::move(info)) {}
+
+    [[nodiscard]] Status status() const noexcept override
+    {
+        return Status::Ready;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override
+    {
+        return m_diagnostics;
+    }
+
+    [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override
+    {
+        return m_kernelInfo;
+    }
+
+    [[nodiscard]] Status statusForEpoch(const skygate::ephemeris::AstronomicalEpoch& epoch) const noexcept override
+    {
+        if (!epoch.isFinite() || epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
+            || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
+            return Status::OutOfRange;
+        }
+
+        return Status::Ready;
+    }
+
+    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult compute(
+        const skygate::ephemeris::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
     ) const override
     {
         skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+        const Status epochStatus = statusForEpoch(epoch);
+        if (epochStatus != Status::Ready) {
+            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
+            result.metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::DataOutOfRange);
+            return result;
+        }
+
         if (targetNaifId == 499 && centerNaifId == 399) {
             result.positionAu = Vector3d{.x = 1.0, .y = 1.0, .z = 0.1};
-            return result;
-        }
-        if (targetNaifId == 399 && centerNaifId == 0) {
+        } else if (targetNaifId == 399 && centerNaifId == 0) {
             result.positionAu = Vector3d{.x = 0.5, .y = 0.0, .z = 0.0};
             result.velocityAuPerDay = Vector3d{.x = 0.0, .y = 0.01, .z = 0.0};
-            return result;
-        }
-        if (targetNaifId == 499 && centerNaifId == 0) {
+        } else if (targetNaifId == 499 && centerNaifId == 0) {
             result.positionAu = Vector3d{.x = 1.5, .y = 1.0, .z = 0.1};
-            return result;
-        }
-        if (targetNaifId == 10 && centerNaifId == 399) {
+        } else if (targetNaifId == 10 && centerNaifId == 399) {
             result.positionAu = Vector3d{.x = -1.0, .y = 0.0, .z = 0.0};
-            return result;
+        } else {
+            result.positionAu = Vector3d{.x = 0.75, .y = 0.25, .z = 0.1};
         }
 
-        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported;
-        result.metadata.addWarning(skygate::ephemeris::EphemerisEngineWarning::Code::UnsupportedBody);
+        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+        result.metadata.dataSourceProvenance = m_kernelInfo->provenance;
+        result.metadata.effectiveDataValidityRange = m_kernelInfo->validityRange;
         return result;
     }
+
+private:
+    std::vector<std::string> m_diagnostics;
+    std::optional<Info> m_kernelInfo;
 };
 
-class AcceptanceCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
-public:
-    [[nodiscard]] bool isAvailable() const noexcept override
-    {
-        return true;
+skygate::ephemeris::highprecision::ICalcephKernel::Info acceptanceKernelInfo(
+    const skygate::ephemeris::IEphemerisDataSnapshot& activeDataSnapshot,
+    const skygate::ephemeris::EphemerisDataManifest& manifest
+)
+{
+    std::optional<skygate::ephemeris::EphemerisKernelDataAsset> snapshotAsset =
+        activeDataSnapshot.solarSystemKernelAsset("de441-kernel");
+    if (!snapshotAsset.has_value()) {
+        snapshotAsset = activeDataSnapshot.solarSystemKernelAsset("de440s-kernel");
     }
 
-    [[nodiscard]] skygate::ephemeris::highprecision::CalcephKernelOpenResult
-    openKernel(const std::filesystem::path& path) const override
-    {
-        if (!QFileInfo::exists(QString::fromStdString(path.generic_string()))) {
-            return {.diagnostic = "Acceptance kernel file is missing."};
-        }
+    Q_ASSERT(snapshotAsset.has_value());
+    const skygate::ephemeris::EphemerisDataManifestAsset* manifestAsset = manifest.asset(snapshotAsset->id);
+    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(snapshotAsset->profileId);
+    Q_ASSERT(manifestAsset != nullptr);
+    Q_ASSERT(profile != nullptr);
 
-        return {.handle = std::make_unique<AcceptanceCalcephKernelHandle>()};
-    }
-};
+    return skygate::ephemeris::highprecision::ICalcephKernel::Info{
+        .id = snapshotAsset->id,
+        .profileId = snapshotAsset->profileId,
+        .version = snapshotAsset->version,
+        .provenance = snapshotAsset->provenance,
+        .validityRange = manifestAsset->validityRange,
+        .optional = manifestAsset->optional,
+        .longRange = profile->longRange,
+    };
+}
 
 class AcceptanceTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
 public:
@@ -373,10 +419,12 @@ skygate::ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEn
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.dataManifest = &manifest;
+    request.calcephKernelProvider = std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(
+        std::make_shared<AcceptanceCalcephKernel>(acceptanceKernelInfo(*activeDataSnapshot, manifest))
+    );
     request.activeDataSnapshot = std::move(activeDataSnapshot);
     request.timeScaleService = std::make_shared<AcceptanceTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<AcceptanceEarthOrientationProvider>();
-    request.calcephKernelRuntime = std::make_shared<AcceptanceCalcephKernelRuntime>();
     request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     return skygate::ephemeris::EphemerisEngineFactory::create(request);
 }

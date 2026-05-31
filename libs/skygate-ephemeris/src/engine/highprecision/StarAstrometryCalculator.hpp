@@ -11,7 +11,7 @@ namespace skygate::ephemeris::highprecision {
 class StarAstrometryCalculator final : public IStarAstrometryCalculator {
 public:
     explicit StarAstrometryCalculator(
-        std::shared_ptr<const ICalcephKernelProvider> kernelProvider = {},
+        std::shared_ptr<const ICalcephKernel> kernel = {},
         std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService = {}
     );
 
@@ -23,7 +23,7 @@ public:
     ) const override;
 
 private:
-    std::shared_ptr<const ICalcephKernelProvider> m_kernelProvider;
+    std::shared_ptr<const ICalcephKernel> m_kernel;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_timeScaleService;
 };
 

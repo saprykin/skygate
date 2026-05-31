@@ -1,3 +1,4 @@
+#include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/DeltaTProvider.hpp"
@@ -6,7 +7,6 @@
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
 #include "engine/highprecision/IFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
@@ -462,58 +462,26 @@ private:
     mutable std::atomic<int> m_callCount = 0;
 };
 
-class LongRangeFallbackKernelProvider final : public ICalcephKernelProvider {
-public:
-    [[nodiscard]] SolarSystemKernelStateResult
-    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
-    {
-        ++m_callCount;
-        m_lastEpoch = epoch;
-        m_lastTargetNaifId = targetNaifId;
-        m_lastCenterNaifId = centerNaifId;
+[[nodiscard]] std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel> makeLongRangeFallbackKernel()
+{
+    SolarSystemKernelStateResult result;
+    result.positionAu = Vector3d{.x = 0.5, .y = 1.0, .z = 0.25};
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
+    result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    result.metadata.dataSourceProvenance = "missing DE441 long-range kernel; modern kernel fallback";
+    result.metadata.effectiveDataValidityRange = EphemerisDateRange{
+        .id = "de440-modern",
+        .displayName = "DE440 modern range",
+        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+    };
+    result.metadata.estimatedAngularUncertaintyArcsec = 3600.0;
 
-        SolarSystemKernelStateResult result;
-        result.positionAu = Vector3d{.x = 0.5, .y = 1.0, .z = 0.25};
-        result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
-        result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
-        result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-        result.metadata.dataSourceProvenance = "missing DE441 long-range kernel; modern kernel fallback";
-        result.metadata.effectiveDataValidityRange = EphemerisDateRange{
-            .id = "de440-modern",
-            .displayName = "DE440 modern range",
-            .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-            .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        };
-        result.metadata.estimatedAngularUncertaintyArcsec = 3600.0;
-        return result;
-    }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-    [[nodiscard]] int lastTargetNaifId() const noexcept
-    {
-        return m_lastTargetNaifId;
-    }
-
-    [[nodiscard]] int lastCenterNaifId() const noexcept
-    {
-        return m_lastCenterNaifId;
-    }
-
-    [[nodiscard]] AstronomicalEpoch lastEpoch() const noexcept
-    {
-        return m_lastEpoch;
-    }
-
-private:
-    mutable int m_callCount = 0;
-    mutable int m_lastTargetNaifId = 0;
-    mutable int m_lastCenterNaifId = 0;
-    mutable AstronomicalEpoch m_lastEpoch;
-};
+    auto kernel = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    kernel->setDefaultResult(std::move(result));
+    return kernel;
+}
 
 class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {
 public:
@@ -1264,12 +1232,12 @@ void HighPrecisionEphemerisEngineTests::reusesCachedFullFrameSnapshotsWithoutSta
 void HighPrecisionEphemerisEngineTests::reusesPreparedRequestStateAcrossSingleBodyComputations()
 {
     const std::array bodies{makeAstrometricStarBody("star-a", 2.0), makeAstrometricStarBody("star-b", 5.0)};
-    auto kernelProvider = std::make_shared<LongRangeFallbackKernelProvider>();
-    auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>(kernelProvider);
+    auto kernel = makeLongRangeFallbackKernel();
+    auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>(kernel);
     auto computationCache = std::make_shared<EphemerisComputationCache>();
     HighPrecisionEphemerisEngineDependencies dependencies =
         makeDependencies({}, starAstrometryCalculator, makePassThroughApparentPlaceCalculator(), {}, computationCache);
-    dependencies.calcephKernelProvider = kernelProvider;
+    dependencies.calcephKernel = kernel;
 
     const HighPrecisionEphemerisEngine engine(makeCatalog(bodies), makeRequest().options, std::move(dependencies));
 
@@ -1278,7 +1246,7 @@ void HighPrecisionEphemerisEngineTests::reusesPreparedRequestStateAcrossSingleBo
 
     QVERIFY(firstState.has_value());
     QVERIFY(secondState.has_value());
-    QCOMPARE(kernelProvider->callCount(), 1);
+    QCOMPARE(kernel->callCount(), 1);
 }
 
 void HighPrecisionEphemerisEngineTests::reusesCachedSingleBodyStatesWithoutFullFrameSnapshots()
@@ -1978,8 +1946,8 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderPreservesDegradedDat
 void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesMissingLongRangeKernelFallback()
 {
     const std::array bodies{makeSunBody()};
-    auto kernelProvider = std::make_shared<LongRangeFallbackKernelProvider>();
-    auto solarSystemCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+    auto kernel = makeLongRangeFallbackKernel();
+    auto solarSystemCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
     const HighPrecisionEphemerisEngine engine(
         makeCatalog(bodies), makeRequest().options, makeDependencies(solarSystemCalculator)
     );
@@ -1991,12 +1959,10 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesMissingLong
     const auto state = engine.computeBodyState(request, std::size_t{0});
 
     QVERIFY(state.has_value());
-    QCOMPARE(kernelProvider->callCount(), 1);
-    QCOMPARE(kernelProvider->lastTargetNaifId(), 10);
-    QCOMPARE(kernelProvider->lastCenterNaifId(), 399);
-    QCOMPARE(
-        static_cast<std::uint8_t>(kernelProvider->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb)
-    );
+    QCOMPARE(kernel->callCount(), 1);
+    QCOMPARE(kernel->lastTargetNaifId(), 10);
+    QCOMPARE(kernel->lastCenterNaifId(), 399);
+    QCOMPARE(static_cast<std::uint8_t>(kernel->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb));
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)

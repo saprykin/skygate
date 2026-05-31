@@ -7,6 +7,7 @@
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -222,10 +223,30 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     return std::abs(lhs - rhs) <= kCoordinateTolerance;
 }
 
-class AcceptanceKernelProvider final : public ICalcephKernelProvider {
+class AcceptanceKernel final : public ICalcephKernel {
 public:
+    [[nodiscard]] Status status() const noexcept override
+    {
+        return Status::Ready;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override
+    {
+        return m_diagnostics;
+    }
+
+    [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override
+    {
+        return m_info;
+    }
+
+    [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch&) const noexcept override
+    {
+        return Status::Ready;
+    }
+
     [[nodiscard]] SolarSystemKernelStateResult
-    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
+    compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
     {
         ++m_callCount;
 
@@ -275,6 +296,8 @@ public:
 
 private:
     mutable int m_callCount = 0;
+    std::vector<std::string> m_diagnostics;
+    std::optional<Info> m_info;
 };
 
 class AcceptanceDataSnapshot final : public IEphemerisDataSnapshot {
@@ -554,10 +577,10 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
 
 void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSupportsCorrectionOptions()
 {
-    auto kernelProvider = std::make_shared<AcceptanceKernelProvider>();
+    auto kernel = std::make_shared<AcceptanceKernel>();
     HighPrecisionEphemerisEngineDependencies dependencies;
-    dependencies.calcephKernelProvider = kernelProvider;
-    dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+    dependencies.calcephKernel = kernel;
+    dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
     dependencies.apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
     dependencies.dataSetInfo = makeDataSetInfo(false);
 
@@ -591,7 +614,7 @@ void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSuppor
     QVERIFY(
         !nearlyEqual(geometricState->equatorial.rightAscensionHours, lightTimeState->equatorial.rightAscensionHours)
     );
-    QVERIFY(kernelProvider->callCount() > 1);
+    QVERIFY(kernel->callCount() > 1);
 }
 
 void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSystemRaDecWhenAvailable()
@@ -600,22 +623,21 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
     const EphemerisDataManifest manifest = makeFixtureDataManifest();
     AcceptanceDataSnapshot snapshot("de405s-kernel", "de405s-modern", kernelPath);
 
-    auto kernelProvider = std::make_shared<CalcephKernelProvider>(snapshot, manifest);
-    if (kernelProvider->status() == CalcephKernelProviderStatus::CalcephUnavailable) {
+    auto provider = std::make_shared<CalcephKernelProvider>(snapshot, manifest);
+    const std::shared_ptr<const ICalcephKernel> kernel = provider->openKernel();
+    if (kernel->status() == ICalcephKernel::Status::CalcephUnavailable) {
         QSKIP("Real CALCEPH provider acceptance row requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON.");
     }
-    const QByteArray diagnostics = kernelProvider->diagnostics().empty()
-                                       ? QByteArray{}
-                                       : QByteArray(kernelProvider->diagnostics().front().c_str());
-    if (kernelProvider->status() == CalcephKernelProviderStatus::OpenFailed
-        && diagnostics.contains("CALCEPH failed to open")) {
+    const QByteArray diagnostics =
+        kernel->diagnostics().empty() ? QByteArray{} : QByteArray(kernel->diagnostics().front().c_str());
+    if (kernel->status() == ICalcephKernel::Status::OpenFailed && diagnostics.contains("CALCEPH failed to open")) {
         QSKIP("Real CALCEPH provider acceptance row requires a kernel format supported by the linked CALCEPH.");
     }
-    QVERIFY2(kernelProvider->isReady(), diagnostics.constData());
+    QVERIFY2(kernel->status() == ICalcephKernel::Status::Ready, diagnostics.constData());
 
     HighPrecisionEphemerisEngineDependencies dependencies;
-    dependencies.calcephKernelProvider = kernelProvider;
-    dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+    dependencies.calcephKernel = kernel;
+    dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
     dependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine engine =
         makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), dependencies);
@@ -649,11 +671,11 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
     };
 
     for (const EphemerisCorrectionFlags correctionFlags : matrix) {
-        auto kernelProvider = std::make_shared<AcceptanceKernelProvider>();
+        auto kernel = std::make_shared<AcceptanceKernel>();
         auto apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
         HighPrecisionEphemerisEngineDependencies dependencies;
-        dependencies.calcephKernelProvider = kernelProvider;
-        dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernelProvider);
+        dependencies.calcephKernel = kernel;
+        dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
         dependencies.timeScaleService = std::make_shared<AcceptanceTimeScaleService>();
         dependencies.earthOrientationProvider = std::make_shared<AcceptanceEarthOrientationProvider>();
         dependencies.apparentPlaceCalculator = apparentPlaceCalculator;
@@ -723,52 +745,51 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
     const EphemerisDataManifest manifest = makeFixtureDataManifest();
     AcceptanceDataSnapshot bundledSnapshot("de405s-kernel", "de405s-modern", kernelPath);
     auto bundledKernelProvider = std::make_shared<CalcephKernelProvider>(bundledSnapshot, manifest);
-    if (bundledKernelProvider->status() == CalcephKernelProviderStatus::CalcephUnavailable) {
+    const std::shared_ptr<const ICalcephKernel> bundledKernel = bundledKernelProvider->openKernel();
+    if (bundledKernel->status() == ICalcephKernel::Status::CalcephUnavailable) {
         QSKIP("Provider-selection acceptance row requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON.");
     }
-    const QByteArray bundledDiagnostics = bundledKernelProvider->diagnostics().empty()
-                                              ? QByteArray{}
-                                              : QByteArray(bundledKernelProvider->diagnostics().front().c_str());
-    if (bundledKernelProvider->status() == CalcephKernelProviderStatus::OpenFailed
+    const QByteArray bundledDiagnostics =
+        bundledKernel->diagnostics().empty() ? QByteArray{} : QByteArray(bundledKernel->diagnostics().front().c_str());
+    if (bundledKernel->status() == ICalcephKernel::Status::OpenFailed
         && bundledDiagnostics.contains("CALCEPH failed to open")) {
         QSKIP("Provider-selection acceptance row requires a kernel format supported by the linked CALCEPH.");
     }
 
     HighPrecisionEphemerisEngineDependencies bundledDependencies;
-    bundledDependencies.calcephKernelProvider = bundledKernelProvider;
-    bundledDependencies.solarSystemStateCalculator =
-        std::make_shared<SolarSystemStateCalculator>(bundledKernelProvider);
+    bundledDependencies.calcephKernel = bundledKernel;
+    bundledDependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(bundledKernel);
     bundledDependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine bundledEngine = makeHighPrecisionEngine(
         {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), bundledDependencies
     );
 
-    QVERIFY(bundledKernelProvider->isReady());
-    QVERIFY(bundledKernelProvider->kernelInfo().has_value());
-    QCOMPARE(bundledKernelProvider->kernelInfo()->id, std::string{"de405s-kernel"});
-    QCOMPARE(bundledKernelProvider->kernelInfo()->profileId, std::string{"de405s-modern"});
-    QVERIFY(!bundledKernelProvider->kernelInfo()->longRange);
+    QVERIFY(bundledKernel->status() == ICalcephKernel::Status::Ready);
+    QVERIFY(bundledKernel->kernelInfo().has_value());
+    QCOMPARE(bundledKernel->kernelInfo()->id, std::string{"de405s-kernel"});
+    QCOMPARE(bundledKernel->kernelInfo()->profileId, std::string{"de405s-modern"});
+    QVERIFY(!bundledKernel->kernelInfo()->longRange);
 
     AcceptanceDataSnapshot longRangeSnapshot("de441-kernel", "de441-long-range", kernelPath);
-    CalcephKernelSelectionOptions selectionOptions;
+    CalcephKernelProvider::Options selectionOptions;
     selectionOptions.preferLongRange = true;
     auto longRangeKernelProvider =
         std::make_shared<CalcephKernelProvider>(longRangeSnapshot, manifest, selectionOptions);
+    const std::shared_ptr<const ICalcephKernel> longRangeKernel = longRangeKernelProvider->openKernel();
     HighPrecisionEphemerisEngineDependencies longRangeDependencies;
-    longRangeDependencies.calcephKernelProvider = longRangeKernelProvider;
-    longRangeDependencies.solarSystemStateCalculator =
-        std::make_shared<SolarSystemStateCalculator>(longRangeKernelProvider);
+    longRangeDependencies.calcephKernel = longRangeKernel;
+    longRangeDependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(longRangeKernel);
     longRangeDependencies.dataSetInfo = manifest.dataSetInfo;
     const HighPrecisionEphemerisEngine longRangeEngine = makeHighPrecisionEngine(
         {makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), longRangeDependencies
     );
 
-    QVERIFY(longRangeKernelProvider->isReady());
-    QVERIFY(longRangeKernelProvider->kernelInfo().has_value());
-    QCOMPARE(longRangeKernelProvider->kernelInfo()->id, std::string{"de441-kernel"});
-    QCOMPARE(longRangeKernelProvider->kernelInfo()->profileId, std::string{"de441-long-range"});
-    QVERIFY(longRangeKernelProvider->kernelInfo()->longRange);
-    QVERIFY(longRangeKernelProvider->kernelInfo()->optional);
+    QVERIFY(longRangeKernel->status() == ICalcephKernel::Status::Ready);
+    QVERIFY(longRangeKernel->kernelInfo().has_value());
+    QCOMPARE(longRangeKernel->kernelInfo()->id, std::string{"de441-kernel"});
+    QCOMPARE(longRangeKernel->kernelInfo()->profileId, std::string{"de441-long-range"});
+    QVERIFY(longRangeKernel->kernelInfo()->longRange);
+    QVERIFY(longRangeKernel->kernelInfo()->optional);
 
     QCOMPARE(longRangeEngine.dataSetInfo().id, std::string{"acceptance-with-de441"});
     QCOMPARE(longRangeEngine.supportedDateRanges().size(), std::size_t{2});

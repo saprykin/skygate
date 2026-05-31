@@ -540,13 +540,13 @@ void EphemerisApiModelTests::constructsFactoryRequestDefaults()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision)
     );
     QVERIFY(!skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(request.fallbackPolicy));
-    QVERIFY(request.dataSetManifest == nullptr);
+    QVERIFY(request.datasetManifest == nullptr);
     QVERIFY(request.activeDataSnapshot == nullptr);
     QVERIFY(request.timeScaleService == nullptr);
     QVERIFY(request.earthOrientationProvider == nullptr);
     QVERIFY(request.diagnosticsSink == nullptr);
     QVERIFY(request.dataManifest == nullptr);
-    QVERIFY(request.calcephKernelRuntime == nullptr);
+    QVERIFY(request.calcephKernelProvider == nullptr);
 }
 
 void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
@@ -575,7 +575,7 @@ void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
     highPrecisionRequest.catalog = catalog;
     highPrecisionRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     highPrecisionRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
-    highPrecisionRequest.dataSetManifest = &manifest;
+    highPrecisionRequest.datasetManifest = &manifest;
     highPrecisionRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
 
     QCOMPARE(
@@ -590,7 +590,7 @@ void EphemerisApiModelTests::constructsSimpleAndHighPrecisionFactoryRequests()
         static_cast<std::uint32_t>(highPrecisionRequest.options.correctionFlags()),
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparent())
     );
-    QVERIFY(highPrecisionRequest.dataSetManifest == &manifest);
+    QVERIFY(highPrecisionRequest.datasetManifest == &manifest);
     QVERIFY(
         !skygate::ephemeris::EphemerisEngineFactory::allowsSimpleEngineFallback(highPrecisionRequest.fallbackPolicy)
     );

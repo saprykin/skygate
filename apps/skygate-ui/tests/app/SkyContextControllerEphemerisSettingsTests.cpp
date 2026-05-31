@@ -1,4 +1,6 @@
+#include "StaticCalcephKernelProvider.hpp"
 #include "SkyContextControllerTestSupport.hpp"
+#include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 
@@ -9,6 +11,9 @@
 
 #include <cmath>
 #include <filesystem>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -74,32 +79,25 @@ bool writeFile(const QString& path, const QByteArray& contents)
     return file.write(contents) == contents.size();
 }
 
-class TestCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
-public:
-    [[nodiscard]] std::optional<skygate::core::Vector3d>
-    computeGeometricState(const skygate::ephemeris::AstronomicalEpoch&, int, int) const override
-    {
-        return skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
-    }
-};
+skygate::ephemeris::EphemerisDateRange testValidityRange();
 
-class TestCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
-public:
-    [[nodiscard]] bool isAvailable() const noexcept override
-    {
-        return true;
-    }
-
-    [[nodiscard]] skygate::ephemeris::highprecision::CalcephKernelOpenResult
-    openKernel(const std::filesystem::path& path) const override
-    {
-        if (!QFileInfo::exists(QString::fromStdString(path.generic_string()))) {
-            return {.diagnostic = "Test kernel file is missing."};
+[[nodiscard]] std::shared_ptr<skygate::ephemeris::highprecision::ICalcephKernelProvider> makeTestCalcephKernelProvider()
+{
+    auto kernel = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>(
+        skygate::ephemeris::highprecision::ICalcephKernel::Info{
+            .id = "de440s-kernel",
+            .profileId = "modern",
+            .version = "installed-test",
+            .provenance = "Installed test data",
+            .validityRange = testValidityRange(),
         }
-
-        return {.handle = std::make_unique<TestCalcephKernelHandle>()};
-    }
-};
+    );
+    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+    result.positionAu = skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+    kernel->setDefaultResult(std::move(result));
+    return std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(std::move(kernel));
+}
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
@@ -311,7 +309,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     const skygate::ephemeris::EphemerisDataManifest manifest = makeInstalledEphemerisManifest(kernelPayload);
     SkyContextController::InitializationOptions options = controllerInitializationOptions(true);
     options.ephemerisFactoryInputs.dataManifest = &manifest;
-    options.ephemerisFactoryInputs.calcephKernelRuntime = std::make_shared<TestCalcephKernelRuntime>();
+    options.ephemerisFactoryInputs.calcephKernelProvider = makeTestCalcephKernelProvider();
     const auto controller = createControllerWithOptions(options);
 
     QVERIFY(controller->ephemerisEngine() != nullptr);

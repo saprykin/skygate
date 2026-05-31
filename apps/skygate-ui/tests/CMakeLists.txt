@@ -18,6 +18,7 @@ function(add_skygate_ui_qtest target_name source_file)
     target_link_libraries(${target_name}
         PRIVATE
             Qt6::Test
+            skygate::ephemeris-test-support
             skygate::uiapp
             skygate::test-support
     )

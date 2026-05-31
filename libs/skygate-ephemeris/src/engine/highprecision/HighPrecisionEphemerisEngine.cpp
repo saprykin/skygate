@@ -3,7 +3,7 @@
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
 #include "IApparentPlaceCalculator.hpp"
-#include "ICalcephKernelProvider.hpp"
+#include "ICalcephKernel.hpp"
 #include "IEphemerisComputationCache.hpp"
 #include "IEphemerisResultBuilder.hpp"
 #include "ISolarSystemStateCalculator.hpp"
@@ -566,8 +566,8 @@ private:
             }
 
             if (requestsAnnualParallaxState(request) && preparedState->tdbKernelEpoch.has_value()
-                && m_dependencies.calcephKernelProvider != nullptr) {
-                preparedState->annualParallaxEarthState = m_dependencies.calcephKernelProvider->computeGeometricState(
+                && m_dependencies.calcephKernel != nullptr) {
+                preparedState->annualParallaxEarthState = m_dependencies.calcephKernel->compute(
                     *preparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter
                 );
             }

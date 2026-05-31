@@ -1,3 +1,5 @@
+#include "StaticCalcephKernelProvider.hpp"
+#include "TestCalcephKernel.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "factory/IEphemerisDiagnosticsSink.hpp"
 #include "time/CalendarTime.hpp"
@@ -248,79 +250,38 @@ private:
     std::vector<skygate::ephemeris::EphemerisFactoryCreationDiagnostic> m_diagnostics;
 };
 
-class TestCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
-public:
-    [[nodiscard]] std::optional<skygate::core::Vector3d>
-    computeGeometricState(const skygate::ephemeris::AstronomicalEpoch&, int, int) const override
-    {
-        return skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
-    }
-};
+[[nodiscard]] skygate::ephemeris::EphemerisDateRange makeKernelRange();
 
-class TestCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
-public:
-    [[nodiscard]] bool isAvailable() const noexcept override
-    {
-        return true;
-    }
+[[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::Info
+makeKernelInfo(std::string id = "kernel", std::string profileId = "modern", std::string version = "snapshot-version")
+{
+    return skygate::ephemeris::highprecision::ICalcephKernel::Info{
+        .id = std::move(id),
+        .profileId = std::move(profileId),
+        .version = std::move(version),
+        .provenance = "snapshot provenance",
+        .validityRange = makeKernelRange(),
+    };
+}
 
-    [[nodiscard]] skygate::ephemeris::highprecision::CalcephKernelOpenResult
-    openKernel(const std::filesystem::path& path) const override
-    {
-        m_openedPath = path.generic_string();
-        return {.handle = std::make_unique<TestCalcephKernelHandle>()};
-    }
+[[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult
+makeKernelResult(const skygate::ephemeris::highprecision::ICalcephKernel::Info& info)
+{
+    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+    result.positionAu = skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
+    result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
+    result.metadata.dataSourceProvenance = info.provenance;
+    result.metadata.effectiveDataValidityRange = info.validityRange;
+    return result;
+}
 
-    [[nodiscard]] std::string openedPath() const
-    {
-        return m_openedPath;
-    }
-
-private:
-    mutable std::string m_openedPath;
-};
-
-class RecordingCalcephKernelHandle final : public skygate::ephemeris::highprecision::ICalcephKernelHandle {
-public:
-    using CallLog = std::vector<std::pair<int, int>>;
-
-    explicit RecordingCalcephKernelHandle(std::shared_ptr<CallLog> calls) : m_calls(std::move(calls)) {}
-
-    [[nodiscard]] std::optional<skygate::core::Vector3d> computeGeometricState(
-        const skygate::ephemeris::AstronomicalEpoch&, const int targetNaifId, const int centerNaifId
-    ) const override
-    {
-        m_calls->emplace_back(targetNaifId, centerNaifId);
-        return skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
-    }
-
-private:
-    std::shared_ptr<CallLog> m_calls;
-};
-
-class RecordingCalcephKernelRuntime final : public skygate::ephemeris::highprecision::ICalcephKernelRuntime {
-public:
-    using CallLog = RecordingCalcephKernelHandle::CallLog;
-
-    [[nodiscard]] bool isAvailable() const noexcept override
-    {
-        return true;
-    }
-
-    [[nodiscard]] skygate::ephemeris::highprecision::CalcephKernelOpenResult
-    openKernel(const std::filesystem::path&) const override
-    {
-        return {.handle = std::make_unique<RecordingCalcephKernelHandle>(m_calls)};
-    }
-
-    [[nodiscard]] const CallLog& calls() const noexcept
-    {
-        return *m_calls;
-    }
-
-private:
-    std::shared_ptr<CallLog> m_calls = std::make_shared<CallLog>();
-};
+[[nodiscard]] std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel>
+makeReadyKernel(skygate::ephemeris::highprecision::ICalcephKernel::Info info = makeKernelInfo())
+{
+    auto kernel = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>(info);
+    kernel->setDefaultResult(makeKernelResult(info));
+    return kernel;
+}
 
 [[nodiscard]] std::string writeKernelFixture(QTemporaryDir& directory, const QByteArray& payload)
 {
@@ -401,9 +362,13 @@ private slots:
     void compatibilityOverloadsCreateSimpleEngines();
     void simpleRequestCreatesRequestedEngineWithOptions();
     void highPrecisionRequestConstructsEngineWhenDependenciesAreAvailable();
+    void highPrecisionRequestUsesDatasetManifestWithoutDataManifest();
+    void highPrecisionRequestRequiresDatasetInfoSource();
+    void highPrecisionRequestHandlesNullKernelProviderResult();
     void highPrecisionRequestOpensActiveKernelWithoutRehashingIt();
     void highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally();
     void highPrecisionRequestWiresApparentTopocentricCorrectionPath();
+    void highPrecisionDefaultProviderReportsUnavailableBuildBeforeDataErrors();
     void highPrecisionRequestFallsBackOnlyWhenAllowed();
     void invalidEngineKindReturnsStructuredInvalidRequest();
 };
@@ -422,7 +387,7 @@ void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueI
     request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
-    request.dataSetManifest = &manifest;
+    request.datasetManifest = &manifest;
     request.activeDataSnapshot = makeOpaqueHandle<skygate::ephemeris::IEphemerisDataSnapshot>(opaqueOwner);
     request.timeScaleService = makeOpaqueHandle<skygate::ephemeris::ITimeScaleService>(opaqueOwner);
     request.earthOrientationProvider = makeOpaqueHandle<skygate::ephemeris::IEarthOrientationProvider>(opaqueOwner);
@@ -440,7 +405,7 @@ void EphemerisEngineFactoryBehaviorTests::requestCarriesCatalogOptionsAndOpaqueI
         static_cast<std::uint32_t>(request.options.correctionFlags()),
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric())
     );
-    QVERIFY(request.dataSetManifest == &manifest);
+    QVERIFY(request.datasetManifest == &manifest);
     QVERIFY(request.activeDataSnapshot != nullptr);
     QVERIFY(request.timeScaleService != nullptr);
     QVERIFY(request.earthOrientationProvider != nullptr);
@@ -595,8 +560,8 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
         });
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
-    auto runtime = std::make_shared<TestCalcephKernelRuntime>();
-    request.calcephKernelRuntime = runtime;
+    auto kernelProvider = std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(makeReadyKernel());
+    request.calcephKernelProvider = kernelProvider;
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -621,7 +586,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
             result.engine->capabilities(), skygate::ephemeris::EphemerisCapabilities::topocentricPositions()
         )
     );
-    QCOMPARE(runtime->openedPath(), kernelPath);
+    QCOMPARE(kernelProvider->openCount(), 1);
 
     skygate::ephemeris::EphemerisRequest computeRequest;
     computeRequest.context = makeContext();
@@ -641,6 +606,90 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     QCOMPARE(state->equatorial.rightAscensionHours, 0.0);
     QCOMPARE(state->equatorial.declinationDeg, 0.0);
     QCOMPARE(state->metadata.dataSourceProvenance, std::string{"snapshot provenance"});
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestUsesDatasetManifestWithoutDataManifest()
+{
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisDatasetInfo datasetManifest;
+    datasetManifest.id = "injected-dataset";
+    datasetManifest.displayName = "Injected dataset";
+    datasetManifest.provenance = "injected dataset provenance";
+
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    request.catalog = makeCatalogHandle(bodies);
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.datasetManifest = &datasetManifest;
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+    request.calcephKernelProvider =
+        std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(makeReadyKernel());
+
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
+
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.engine != nullptr);
+    QVERIFY(!result.hasDiagnostics());
+    QCOMPARE(result.engine->dataSetInfo().id, std::string{"injected-dataset"});
+    QCOMPARE(result.engine->dataSetInfo().provenance, std::string{"injected dataset provenance"});
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestRequiresDatasetInfoSource()
+{
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    request.catalog = makeCatalogHandle(bodies);
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+    request.calcephKernelProvider =
+        std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(makeReadyKernel());
+
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.hasErrors());
+    QVERIFY(!result.diagnostics.empty());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(
+            skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable
+        )
+    );
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelProviderResult()
+{
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisDatasetInfo datasetManifest;
+    datasetManifest.id = "injected-dataset";
+
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    request.catalog = makeCatalogHandle(bodies);
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.datasetManifest = &datasetManifest;
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+    request.calcephKernelProvider = std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>();
+
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.hasErrors());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationStatus::FailedCreationError)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed)
+    );
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelWithoutRehashingIt()
@@ -673,15 +722,15 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestOpensActiveKernelW
         });
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
-    auto runtime = std::make_shared<TestCalcephKernelRuntime>();
-    request.calcephKernelRuntime = runtime;
+    auto kernelProvider = std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(makeReadyKernel());
+    request.calcephKernelProvider = kernelProvider;
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
     QVERIFY(!result.hasDiagnostics());
-    QCOMPARE(runtime->openedPath(), kernelPath);
+    QCOMPARE(kernelProvider->openCount(), 1);
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetaryBarycentersIntentionally()
@@ -721,8 +770,9 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
         });
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
-    auto runtime = std::make_shared<RecordingCalcephKernelRuntime>();
-    request.calcephKernelRuntime = runtime;
+    auto kernel = makeReadyKernel(makeKernelInfo("de441-kernel", "de441-long-range", "DE441"));
+    auto kernelProvider = std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(kernel);
+    request.calcephKernelProvider = kernelProvider;
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -738,9 +788,9 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
     const auto state = result.engine->computeBodyState(computeRequest, "mars");
 
     QVERIFY(state.has_value());
-    QVERIFY(!runtime->calls().empty());
-    QCOMPARE(runtime->calls().front().first, 4);
-    QCOMPARE(runtime->calls().front().second, 399);
+    QVERIFY(!kernel->calls().empty());
+    QCOMPARE(kernel->calls().front().targetNaifId, 4);
+    QCOMPARE(kernel->calls().front().centerNaifId, 399);
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
@@ -778,7 +828,8 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopoc
     auto earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
     request.timeScaleService = timeScaleService;
     request.earthOrientationProvider = earthOrientationProvider;
-    request.calcephKernelRuntime = std::make_shared<TestCalcephKernelRuntime>();
+    request.calcephKernelProvider =
+        std::make_shared<skygate::ephemeris::tests::StaticCalcephKernelProvider>(makeReadyKernel());
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -800,6 +851,53 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopoc
     QVERIFY(timeScaleService->convertCallCount() > std::size_t{0});
     QVERIFY(earthOrientationProvider->dataInfoCallCount() > std::size_t{0});
     QVERIFY(earthOrientationProvider->entriesCallCount() > std::size_t{0});
+}
+
+void EphemerisEngineFactoryBehaviorTests::highPrecisionDefaultProviderReportsUnavailableBuildBeforeDataErrors()
+{
+    const QByteArray kernelPayload("fake kernel payload");
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const std::string kernelPath = writeKernelFixture(directory, kernelPayload);
+    QVERIFY(!kernelPath.empty());
+
+    const std::array bodies{makeFactoryBehaviorSun()};
+    skygate::ephemeris::EphemerisEngineFactoryRequest request;
+    request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    request.catalog = makeCatalogHandle(bodies);
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    const skygate::ephemeris::EphemerisDataManifest manifest =
+        makeFactoryManifest(kernelPayload, static_cast<std::uint64_t>(kernelPayload.size()));
+    request.dataManifest = &manifest;
+    request.activeDataSnapshot =
+        std::make_shared<TestEphemerisDataSnapshot>(skygate::ephemeris::EphemerisKernelDataAsset{
+            .id = "kernel",
+            .profileId = "modern",
+            .version = "snapshot-version",
+            .provenance = "snapshot provenance",
+            .activePath = kernelPath,
+        });
+    request.timeScaleService = std::make_shared<TestTimeScaleService>();
+    request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
+
+    const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.hasErrors());
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(
+            skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable
+        )
+    );
+#else
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.diagnostics.front().code),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable)
+    );
+#endif
 }
 
 void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenAllowed()
