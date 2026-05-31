@@ -103,6 +103,18 @@ void EphemerisMetadataMerger::markCorrectionUnavailable(
     metadata.addUnavailableCorrection(unavailableCorrection);
 }
 
+void EphemerisMetadataMerger::markCorrectionFailed(
+    EphemerisEngineQueryResult& metadata, const EphemerisCorrectionFlags unavailableCorrection
+) noexcept
+{
+    markCorrectionUnavailable(metadata, unavailableCorrection);
+    if (metadata.status == EphemerisEngineQueryStatus::Type::Valid
+        || metadata.status == EphemerisEngineQueryStatus::Type::Degraded) {
+        metadata.status = EphemerisEngineQueryStatus::Type::Failed;
+    }
+    metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+}
+
 void EphemerisMetadataMerger::markCorrectionApplied(
     EphemerisEngineQueryResult& metadata, const EphemerisCorrectionFlags appliedCorrection
 ) noexcept

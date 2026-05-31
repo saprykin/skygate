@@ -39,6 +39,9 @@ public:
     ) noexcept;
 
     static void
+    markCorrectionFailed(EphemerisEngineQueryResult& metadata, EphemerisCorrectionFlags unavailableCorrection) noexcept;
+
+    static void
     markCorrectionApplied(EphemerisEngineQueryResult& metadata, EphemerisCorrectionFlags appliedCorrection) noexcept;
 
     static void mergeTimeScale(
