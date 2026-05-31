@@ -22,7 +22,7 @@ class IEarthOrientationProvider;
 namespace skygate::ephemeris::highprecision {
 
 // Forward declarations for interface classes referenced in dependencies.
-class ICalcephKernelProvider;
+class ICalcephKernel;
 class ISolarSystemStateCalculator;
 class IStarAstrometryCalculator;
 class IApparentPlaceCalculator;
@@ -69,7 +69,7 @@ struct StarAstrometryBatchResult {
 };
 
 struct HighPrecisionEphemerisEngineDependencies {
-    std::shared_ptr<const ICalcephKernelProvider> calcephKernelProvider;
+    std::shared_ptr<const ICalcephKernel> calcephKernel;
     std::shared_ptr<const ISolarSystemStateCalculator> solarSystemStateCalculator;
     std::shared_ptr<const IStarAstrometryCalculator> starAstrometryCalculator;
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;

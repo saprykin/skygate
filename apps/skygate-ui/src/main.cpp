@@ -331,7 +331,7 @@ int main(int argc, char* argv[])
 
     SkyContextController::InitializationOptions controllerOptions;
     if (ephemerisDataConfiguration.manifest.has_value()) {
-        controllerOptions.ephemerisFactoryInputs.dataSetManifest = &ephemerisDataConfiguration.manifest->dataSetInfo;
+        controllerOptions.ephemerisFactoryInputs.datasetManifest = &ephemerisDataConfiguration.manifest->dataSetInfo;
         controllerOptions.ephemerisFactoryInputs.dataManifest = &*ephemerisDataConfiguration.manifest;
         controllerOptions.ephemerisFactoryInputs.updateResourceRoot = ephemerisDataConfiguration.resourceRoot;
         controllerOptions.ephemerisFactoryInputs.writableCacheRoot =

@@ -6,8 +6,10 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
@@ -131,29 +133,29 @@ highPrecisionFailureStatus(const std::vector<EphemerisFactoryCreationDiagnostic>
 
 void appendCalcephDiagnostics(
     std::vector<EphemerisFactoryCreationDiagnostic>& diagnostics,
-    const skygate::ephemeris::highprecision::CalcephKernelProvider& kernelProvider
+    const skygate::ephemeris::highprecision::ICalcephKernel& kernel
 )
 {
     const EphemerisFactoryCreationDiagnosticCode code =
-        kernelProvider.status() == skygate::ephemeris::highprecision::CalcephKernelProviderStatus::CalcephUnavailable
+        kernel.status() == skygate::ephemeris::highprecision::ICalcephKernel::Status::CalcephUnavailable
             ? EphemerisFactoryCreationDiagnosticCode::HighPrecisionUnavailable
             : EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable;
 
-    if (kernelProvider.diagnostics().empty()) {
+    if (kernel.diagnostics().empty()) {
         diagnostics.push_back(makeDiagnostic(code, EphemerisFactoryCreationDiagnosticSeverity::Error));
         return;
     }
 
-    for (const std::string& diagnosticText : kernelProvider.diagnostics()) {
+    for (const std::string& diagnosticText : kernel.diagnostics()) {
         diagnostics.push_back(makeDiagnostic(code, EphemerisFactoryCreationDiagnosticSeverity::Error, diagnosticText));
     }
 }
 
 void appendKernelDateRangeIfMissing(
-    EphemerisDatasetInfo& dataSetInfo, const skygate::ephemeris::highprecision::CalcephKernelProvider& kernelProvider
+    EphemerisDatasetInfo& dataSetInfo, const skygate::ephemeris::highprecision::ICalcephKernel& kernel
 )
 {
-    const std::optional<skygate::ephemeris::highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
+    const std::optional<skygate::ephemeris::highprecision::ICalcephKernel::Info>& kernelInfo = kernel.kernelInfo();
     if (!kernelInfo.has_value()) {
         return;
     }
@@ -167,11 +169,10 @@ void appendKernelDateRangeIfMissing(
     dataSetInfo.dateRanges.push_back(kernelInfo->validityRange);
 }
 
-[[nodiscard]] bool prefersPlanetarySystemBarycenters(
-    const skygate::ephemeris::highprecision::CalcephKernelProvider& kernelProvider
-) noexcept
+[[nodiscard]] bool
+prefersPlanetarySystemBarycenters(const skygate::ephemeris::highprecision::ICalcephKernel& kernel) noexcept
 {
-    const std::optional<skygate::ephemeris::highprecision::CalcephKernelInfo>& kernelInfo = kernelProvider.kernelInfo();
+    const std::optional<skygate::ephemeris::highprecision::ICalcephKernel::Info>& kernelInfo = kernel.kernelInfo();
     if (!kernelInfo.has_value()) {
         return false;
     }
@@ -185,19 +186,27 @@ void appendKernelDateRangeIfMissing(
 [[nodiscard]] EphemerisEngineFactoryResult createHighPrecisionEngine(const EphemerisEngineFactoryRequest& request)
 {
     std::vector<EphemerisFactoryCreationDiagnostic> diagnostics;
+    const bool needsDefaultCalcephKernelProvider = request.calcephKernelProvider == nullptr;
 
-    if (request.activeDataSnapshot == nullptr) {
+    if (needsDefaultCalcephKernelProvider && request.activeDataSnapshot == nullptr) {
         diagnostics.push_back(makeDiagnostic(
             EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "An active ephemeris data snapshot is required for high-precision engine creation."
         ));
     }
-    if (request.dataManifest == nullptr) {
+    if (needsDefaultCalcephKernelProvider && request.dataManifest == nullptr) {
         diagnostics.push_back(makeDiagnostic(
             EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "An ephemeris data manifest is required for high-precision engine creation."
+        ));
+    }
+    if (request.datasetManifest == nullptr && request.dataManifest == nullptr) {
+        diagnostics.push_back(makeDiagnostic(
+            EphemerisFactoryCreationDiagnosticCode::RequiredEphemerisDataUnavailable,
+            EphemerisFactoryCreationDiagnosticSeverity::Error,
+            "An ephemeris dataset manifest is required for high-precision engine creation."
         ));
     }
     if (request.timeScaleService == nullptr) {
@@ -216,26 +225,36 @@ void appendKernelDateRangeIfMissing(
     }
 
     if (diagnostics.empty()) {
-        skygate::ephemeris::highprecision::CalcephKernelSelectionOptions kernelSelectionOptions;
-        kernelSelectionOptions.verifyChecksum = false;
-        auto kernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
-            *request.activeDataSnapshot,
-            *request.dataManifest,
-            std::move(kernelSelectionOptions),
-            request.calcephKernelRuntime
-        );
-        if (!kernelProvider->isReady()) {
-            appendCalcephDiagnostics(diagnostics, *kernelProvider);
+        std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> kernelProvider =
+            request.calcephKernelProvider;
+        if (kernelProvider == nullptr) {
+            skygate::ephemeris::highprecision::CalcephKernelProvider::Options kernelSelectionOptions;
+            kernelSelectionOptions.verifyChecksum = false;
+            kernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
+                *request.activeDataSnapshot, *request.dataManifest, std::move(kernelSelectionOptions)
+            );
+        }
+
+        const std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernel> kernel =
+            kernelProvider->openKernel();
+        if (kernel == nullptr) {
+            diagnostics.push_back(makeDiagnostic(
+                EphemerisFactoryCreationDiagnosticCode::EngineCreationFailed,
+                EphemerisFactoryCreationDiagnosticSeverity::Error,
+                "The CALCEPH kernel provider did not return a kernel."
+            ));
+        } else if (kernel->status() != skygate::ephemeris::highprecision::ICalcephKernel::Status::Ready) {
+            appendCalcephDiagnostics(diagnostics, *kernel);
         } else {
             skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
-            dependencies.calcephKernelProvider = kernelProvider;
+            dependencies.calcephKernel = kernel;
             dependencies.solarSystemStateCalculator =
                 std::make_shared<skygate::ephemeris::highprecision::SolarSystemStateCalculator>(
-                    kernelProvider, prefersPlanetarySystemBarycenters(*kernelProvider)
+                    kernel, prefersPlanetarySystemBarycenters(*kernel)
                 );
             dependencies.starAstrometryCalculator =
                 std::make_shared<skygate::ephemeris::highprecision::StarAstrometryCalculator>(
-                    kernelProvider, request.timeScaleService
+                    kernel, request.timeScaleService
                 );
             dependencies.timeScaleService = request.timeScaleService;
             dependencies.earthOrientationProvider = request.earthOrientationProvider;
@@ -253,11 +272,12 @@ void appendKernelDateRangeIfMissing(
                 );
             dependencies.computationCache =
                 std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
-            dependencies.dataSetInfo = request.dataManifest->dataSetInfo;
-            if (request.dataSetManifest != nullptr) {
-                dependencies.dataSetInfo = *request.dataSetManifest;
+            if (request.datasetManifest != nullptr) {
+                dependencies.dataSetInfo = *request.datasetManifest;
+            } else {
+                dependencies.dataSetInfo = request.dataManifest->dataSetInfo;
             }
-            appendKernelDateRangeIfMissing(dependencies.dataSetInfo, *kernelProvider);
+            appendKernelDateRangeIfMissing(dependencies.dataSetInfo, *kernel);
 
             return EphemerisEngineFactoryResult::success(
                 std::make_unique<skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine>(

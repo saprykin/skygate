@@ -1,7 +1,7 @@
 #include "CelestialBodyCatalog.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "TestCalcephKernel.hpp"
 #include "math/MathConstants.hpp"
-#include "engine/highprecision/ICalcephKernelProvider.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -176,67 +176,25 @@ void compareCalculatorResults(
     QCOMPARE(actual.metadata.warningCodeMask, expected.metadata.warningCodeMask);
 }
 
-class FixedEarthKernelProvider final : public ICalcephKernelProvider {
-public:
-    explicit FixedEarthKernelProvider(std::optional<Vector3d> earthPositionAu, const bool requireTdbEpoch = false)
-        : m_earthPositionAu(earthPositionAu), m_requireTdbEpoch(requireTdbEpoch)
-    {
+[[nodiscard]] std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel>
+makeFixedEarthKernel(std::optional<Vector3d> earthPositionAu, const bool requireTdbEpoch = false)
+{
+    SolarSystemKernelStateResult result;
+    result.positionAu = earthPositionAu;
+    result.metadata.status = earthPositionAu.has_value() ? skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
+                                                         : skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
+    result.metadata.dataSourceProvenance = "unit-test Earth barycentric state";
+    if (!earthPositionAu.has_value()) {
+        result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     }
 
-    [[nodiscard]] SolarSystemKernelStateResult
-    computeGeometricState(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
-    {
-        ++m_callCount;
-        m_lastEpoch = epoch;
-        m_lastTargetNaifId = targetNaifId;
-        m_lastCenterNaifId = centerNaifId;
-
-        SolarSystemKernelStateResult result;
-        if (m_requireTdbEpoch && epoch.timeScale != TimeScale::Tdb) {
-            result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-            result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
-            return result;
-        }
-
-        result.positionAu = m_earthPositionAu;
-        result.metadata.status = m_earthPositionAu.has_value()
-                                     ? skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
-                                     : skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
-        result.metadata.dataSourceProvenance = "unit-test Earth barycentric state";
-        if (!m_earthPositionAu.has_value()) {
-            result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-        }
-        return result;
+    auto kernel = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
+    kernel->setDefaultResult(std::move(result));
+    if (requireTdbEpoch) {
+        kernel->setRequiredTimeScale(TimeScale::Tdb);
     }
-
-    [[nodiscard]] int callCount() const noexcept
-    {
-        return m_callCount;
-    }
-
-    [[nodiscard]] int lastTargetNaifId() const noexcept
-    {
-        return m_lastTargetNaifId;
-    }
-
-    [[nodiscard]] int lastCenterNaifId() const noexcept
-    {
-        return m_lastCenterNaifId;
-    }
-
-    [[nodiscard]] AstronomicalEpoch lastEpoch() const noexcept
-    {
-        return m_lastEpoch;
-    }
-
-private:
-    std::optional<Vector3d> m_earthPositionAu;
-    bool m_requireTdbEpoch = false;
-    mutable int m_callCount = 0;
-    mutable int m_lastTargetNaifId = 0;
-    mutable int m_lastCenterNaifId = 0;
-    mutable AstronomicalEpoch m_lastEpoch;
-};
+    return kernel;
+}
 
 class FixedTdbTimeScaleService final : public ITimeScaleService {
 public:
@@ -394,10 +352,10 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     const OwnGalaxyCelestialBody body = makeAstrometricStar();
     const EphemerisRequest referenceRequest = makeRequest(EphemerisCorrectionFlags::stellarParallax(), 0.0);
     const EphemerisRequest parallaxRequest = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
-    auto kernelProvider = std::make_shared<FixedEarthKernelProvider>(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
+    auto kernel = makeFixedEarthKernel(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
     auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
 
-    const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
+    const StarAstrometryCalculator calculator(kernel, timeScaleService);
     const HighPrecisionCalculatorResult referenceResult = calculator.calculate(makeInput(body, referenceRequest));
     const HighPrecisionCalculatorResult parallaxResult = calculator.calculate(makeInput(body, parallaxRequest));
 
@@ -411,12 +369,10 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
             parallaxResult.metadata.appliedCorrections, EphemerisCorrectionFlags::annualParallax()
         )
     );
-    QCOMPARE(kernelProvider->callCount(), 1);
-    QCOMPARE(kernelProvider->lastTargetNaifId(), 399);
-    QCOMPARE(kernelProvider->lastCenterNaifId(), 0);
-    QCOMPARE(
-        static_cast<std::uint8_t>(kernelProvider->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb)
-    );
+    QCOMPARE(kernel->callCount(), 1);
+    QCOMPARE(kernel->lastTargetNaifId(), 399);
+    QCOMPARE(kernel->lastCenterNaifId(), 0);
+    QCOMPARE(static_cast<std::uint8_t>(kernel->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb));
     QCOMPARE(timeScaleService->callCount(), 1);
     QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Tdb));
 }
@@ -519,22 +475,22 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarAnnualParallaxCorrecti
     };
     const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
-    auto kernelProvider = std::make_shared<FixedEarthKernelProvider>(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
+    auto kernel = makeFixedEarthKernel(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0}, true);
     auto timeScaleService = std::make_shared<FixedTdbTimeScaleService>();
 
-    const StarAstrometryCalculator calculator(kernelProvider, timeScaleService);
+    const StarAstrometryCalculator calculator(kernel, timeScaleService);
     const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
 
     QCOMPARE(batchResults.size(), 4U);
-    QCOMPARE(kernelProvider->callCount(), 1);
+    QCOMPARE(kernel->callCount(), 1);
     QCOMPARE(timeScaleService->callCount(), 1);
     for (const StarAstrometryBatchResult& batchResult : batchResults) {
         const HighPrecisionCalculatorResult singleResult =
             calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));
         compareCalculatorResults(batchResult.result, singleResult);
     }
-    QCOMPARE(kernelProvider->lastTargetNaifId(), 399);
-    QCOMPARE(kernelProvider->lastCenterNaifId(), 0);
+    QCOMPARE(kernel->lastTargetNaifId(), 399);
+    QCOMPARE(kernel->lastCenterNaifId(), 0);
 }
 
 void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenKernelProviderIsMissing()
@@ -564,9 +520,9 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
     OwnGalaxyCelestialBody body = makeAstrometricStar();
     body.starAstrometry->stellarParallaxMas = std::nullopt;
     const EphemerisRequest request = makeRequest(EphemerisCorrectionFlags::annualParallax(), 0.0);
-    auto kernelProvider = std::make_shared<FixedEarthKernelProvider>(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0});
+    auto kernel = makeFixedEarthKernel(Vector3d{.x = 0.0, .y = 1.0, .z = 0.0});
 
-    const StarAstrometryCalculator calculator(kernelProvider);
+    const StarAstrometryCalculator calculator(kernel);
     const HighPrecisionCalculatorResult result = calculator.calculate(makeInput(body, request));
 
     QVERIFY(result.equatorial.has_value());
@@ -581,7 +537,7 @@ void StarAstrometryCalculatorTests::degradesAnnualParallaxWhenSourceParallaxIsMi
     QVERIFY(!skygate::ephemeris::EphemerisCorrectionFlags::has(
         result.metadata.appliedCorrections, EphemerisCorrectionFlags::annualParallax()
     ));
-    QCOMPARE(kernelProvider->callCount(), 0);
+    QCOMPARE(kernel->callCount(), 0);
 }
 
 void StarAstrometryCalculatorTests::degradesRadialVelocityWhenStellarParallaxIsDisabled()

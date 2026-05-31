@@ -1,5 +1,25 @@
 find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
+add_library(skygate-ephemeris-test-support STATIC
+    support/EphemerisEngineTestDoubles.cpp
+    support/StaticCalcephKernelProvider.cpp
+    support/TestCalcephKernel.cpp
+)
+add_library(skygate::ephemeris-test-support ALIAS skygate-ephemeris-test-support)
+
+target_link_libraries(skygate-ephemeris-test-support
+    PUBLIC
+        skygate::ephemeris
+        skygate::core
+)
+
+target_include_directories(skygate-ephemeris-test-support
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+)
+
+target_compile_features(skygate-ephemeris-test-support PUBLIC cxx_std_20)
+
 function(add_skygate_ephemeris_qtest target_name source_file)
     cmake_parse_arguments(
         TEST
@@ -11,7 +31,6 @@ function(add_skygate_ephemeris_qtest target_name source_file)
 
     add_executable(${target_name}
         ${source_file}
-        support/EphemerisEngineTestDoubles.cpp
     )
 
     set_target_properties(${target_name} PROPERTIES AUTOMOC ON)
@@ -20,6 +39,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
         PRIVATE
             Qt6::Test
             skygate::ephemeris
+            skygate::ephemeris-test-support
             skygate::core
             skygate::test-support
     )
@@ -33,6 +53,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     target_compile_definitions(${target_name}
         PRIVATE
             SKYGATE_EPHEMERIS_TESTDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+            $<$<BOOL:${SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS}>:SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=1>
     )
 
     add_test(

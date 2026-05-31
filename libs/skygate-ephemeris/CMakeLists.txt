@@ -37,6 +37,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/AtmosphericRefractionCalculator.cpp
     src/engine/highprecision/CatalogStarAstrometryArrays.hpp
     src/engine/highprecision/CatalogStarAstrometryArrays.cpp
+    src/engine/highprecision/CalcephKernel.hpp
+    src/engine/highprecision/CalcephKernel.cpp
     src/engine/highprecision/CalcephKernelProvider.hpp
     src/engine/highprecision/CalcephKernelProvider.cpp
     src/engine/highprecision/CelestialFrameTransformRequest.hpp
@@ -52,6 +54,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/HighPrecisionTypes.hpp
     src/engine/highprecision/IApparentPlaceCalculator.hpp
     src/engine/highprecision/IAtmosphericRefractionCalculator.hpp
+    src/engine/highprecision/ICalcephKernel.hpp
     src/engine/highprecision/ICalcephKernelProvider.hpp
     src/engine/highprecision/IEphemerisComputationCache.hpp
     src/engine/highprecision/IEphemerisResultBuilder.hpp

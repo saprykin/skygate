@@ -390,7 +390,7 @@ SkyContextController::SkyContextController(
       m_settingsStore(std::make_unique<SkySettingsStore>()),
       m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
       m_ephemerisEngine(std::move(ephemerisEngine)),
-      m_ephemerisDataSetManifest(initializationOptions.ephemerisFactoryInputs.dataSetManifest),
+      m_ephemerisDatasetManifest(initializationOptions.ephemerisFactoryInputs.datasetManifest),
       m_ephemerisDataManifest(initializationOptions.ephemerisFactoryInputs.dataManifest),
       m_ephemerisUpdateResourceRoot(initializationOptions.ephemerisFactoryInputs.updateResourceRoot),
       m_ephemerisWritableCacheRoot(
@@ -402,7 +402,7 @@ SkyContextController::SkyContextController(
       m_ephemerisEarthOrientationProvider(
           std::move(initializationOptions.ephemerisFactoryInputs.earthOrientationProvider)
       ),
-      m_ephemerisCalcephKernelRuntime(std::move(initializationOptions.ephemerisFactoryInputs.calcephKernelRuntime)),
+      m_ephemerisCalcephKernelProvider(std::move(initializationOptions.ephemerisFactoryInputs.calcephKernelProvider)),
       m_ephemerisDiagnosticsSink(initializationOptions.ephemerisFactoryInputs.diagnosticsSink),
       m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
       m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
@@ -1010,7 +1010,7 @@ void SkyContextController::rebuildEphemerisEngine()
     request.options = m_ephemerisEngineOptions;
     request.options.setEngineKind(m_ephemerisEngineKind);
     const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
-    request.dataSetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDataSetManifest;
+    request.datasetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDatasetManifest;
     request.dataManifest = dataManifest;
     request.activeDataSnapshot = activeDataSnapshot;
     request.timeScaleService =
@@ -1018,7 +1018,7 @@ void SkyContextController::rebuildEphemerisEngine()
     request.earthOrientationProvider = m_ephemerisEarthOrientationProvider != nullptr
                                            ? m_ephemerisEarthOrientationProvider
                                            : snapshotProviders.earthOrientationProvider;
-    request.calcephKernelRuntime = m_ephemerisCalcephKernelRuntime;
+    request.calcephKernelProvider = m_ephemerisCalcephKernelProvider;
     request.diagnosticsSink = m_ephemerisDiagnosticsSink;
     request.fallbackPolicy = m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
                                      && !m_ephemerisEngineOptions.fallbackToSimpleEngine()

@@ -17,19 +17,19 @@ class IEphemerisDiagnosticsSink;
 class ITimeScaleService;
 
 namespace highprecision {
-class ICalcephKernelRuntime;
+class ICalcephKernelProvider;
 }  // namespace highprecision
 
 struct EphemerisEngineFactoryRequest {
     EphemerisEngineKind::Type engineKind = EphemerisEngineKind::Type::Simple;
     std::shared_ptr<const CelestialBodyCatalog> catalog;
     EphemerisEngineOptions options;
-    const EphemerisDatasetInfo* dataSetManifest = nullptr;
+    const EphemerisDatasetInfo* datasetManifest = nullptr;
     const EphemerisDataManifest* dataManifest = nullptr;
     std::shared_ptr<const IEphemerisDataSnapshot> activeDataSnapshot;
     std::shared_ptr<const ITimeScaleService> timeScaleService;
     std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider;
-    std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelRuntime> calcephKernelRuntime;
+    std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> calcephKernelProvider;
     EphemerisFactoryFallbackPolicy fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     IEphemerisDiagnosticsSink* diagnosticsSink = nullptr;
 };

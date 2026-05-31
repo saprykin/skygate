@@ -1,6 +1,6 @@
 #include "StarAstrometryCalculator.hpp"
 #include "EphemerisMetadataMerger.hpp"
-#include "ICalcephKernelProvider.hpp"
+#include "ICalcephKernel.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
@@ -228,12 +228,12 @@ equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
 
 [[nodiscard]] SolarSystemKernelStateResult earthStateForAnnualParallax(
     const AstronomicalEpoch& kernelEpoch,
-    const std::shared_ptr<const ICalcephKernelProvider>& kernelProvider,
+    const std::shared_ptr<const ICalcephKernel>& kernel,
     const PreparedEphemerisRequestState* preparedState
 )
 {
     if (preparedState == nullptr || !preparedState->annualParallaxEarthState.has_value()) {
-        return kernelProvider->computeGeometricState(kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
+        return kernel->compute(kernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
     }
 
     return *preparedState->annualParallaxEarthState;
@@ -287,7 +287,7 @@ void recordAppliedCorrections(
     const EphemerisRequest& request,
     const std::optional<CatalogStarAstrometry>& astrometry,
     const std::optional<skygate::core::EquatorialCoordinate>& fixedEquatorial,
-    const std::shared_ptr<const ICalcephKernelProvider>& kernelProvider,
+    const std::shared_ptr<const ICalcephKernel>& kernel,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
     const PreparedEphemerisRequestState* preparedState = nullptr
 )
@@ -338,7 +338,7 @@ void recordAppliedCorrections(
     }
 
     if (hasAnnualParallaxInput(*astrometry, flags)) {
-        if (kernelProvider == nullptr) {
+        if (kernel == nullptr) {
             EphemerisMetadataMerger::markCorrectionUnavailable(
                 result.metadata, EphemerisCorrectionFlags::annualParallax()
             );
@@ -353,7 +353,7 @@ void recordAppliedCorrections(
                 result.equatorial = equatorialFromVector(*propagatedVector);
             } else {
                 const SolarSystemKernelStateResult earthState =
-                    earthStateForAnnualParallax(*kernelEpoch, kernelProvider, preparedState);
+                    earthStateForAnnualParallax(*kernelEpoch, kernel, preparedState);
                 EphemerisMetadataMerger::merge(
                     result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}
                 );
@@ -403,10 +403,10 @@ astrometryFromArrays(const CatalogStarAstrometryArrays& arrays, const std::size_
 }  // namespace
 
 StarAstrometryCalculator::StarAstrometryCalculator(
-    std::shared_ptr<const ICalcephKernelProvider> kernelProvider,
+    std::shared_ptr<const ICalcephKernel> kernel,
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService
 )
-    : m_kernelProvider(std::move(kernelProvider)), m_timeScaleService(std::move(timeScaleService))
+    : m_kernel(std::move(kernel)), m_timeScaleService(std::move(timeScaleService))
 {
 }
 
@@ -416,7 +416,7 @@ HighPrecisionCalculatorResult StarAstrometryCalculator::calculate(const HighPrec
         input.request,
         input.body.starAstrometryValue(),
         input.body.fixedEquatorialValue(),
-        m_kernelProvider,
+        m_kernel,
         m_timeScaleService,
         input.preparedRequestState.get()
     );
@@ -438,10 +438,9 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
         localPreparedState = std::make_shared<PreparedEphemerisRequestState>();
         localPreparedState->tdbKernelEpoch =
             tdbEpochForKernel(localPreparedState->tdbKernelEpochMetadata, request.epoch, m_timeScaleService);
-        if (localPreparedState->tdbKernelEpoch.has_value() && m_kernelProvider != nullptr) {
-            localPreparedState->annualParallaxEarthState = m_kernelProvider->computeGeometricState(
-                *localPreparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter
-            );
+        if (localPreparedState->tdbKernelEpoch.has_value() && m_kernel != nullptr) {
+            localPreparedState->annualParallaxEarthState =
+                m_kernel->compute(*localPreparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter);
         }
         preparedRequestState = localPreparedState;
     }
@@ -454,12 +453,7 @@ std::vector<StarAstrometryBatchResult> StarAstrometryCalculator::calculateBatch(
             StarAstrometryBatchResult{
                 .bodyIndex = arrays.bodyIndices()[arrayIndex],
                 .result = calculateStarAstrometry(
-                    request,
-                    astrometry,
-                    fixedEquatorial,
-                    m_kernelProvider,
-                    m_timeScaleService,
-                    preparedRequestState.get()
+                    request, astrometry, fixedEquatorial, m_kernel, m_timeScaleService, preparedRequestState.get()
                 ),
             }
         );
