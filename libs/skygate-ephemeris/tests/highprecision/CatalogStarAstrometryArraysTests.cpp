@@ -94,6 +94,15 @@ using namespace skygate::core;
     return body;
 }
 
+[[nodiscard]] OwnGalaxyCelestialBody makeUnsupportedConstellation()
+{
+    OwnGalaxyCelestialBody body;
+    body.id = "unanchored-constellation";
+    body.displayName = "Unanchored Constellation";
+    body.kind = BaseCelestialBody::Kind::Constellation;
+    return body;
+}
+
 [[nodiscard]] DistantCelestialBody makeFixedDeepSkyObject()
 {
     DistantCelestialBody body;
@@ -135,7 +144,9 @@ class CatalogStarAstrometryArraysTests final : public QObject {
 private slots:
     void buildsCacheFriendlyArraysFromFullPartialAndFixedStars();
     void batchesFixedCoordinateNonStarBodies();
+    void preservesMixedCatalogOrderingAndFiltersUnsupportedBodies();
     void masksOnlyUsableNumericAstrometryValues();
+    void optionalAccessorsHandleOutOfRangeIndexes();
     void copiesCatalogDataAndSurvivesSourceLifetimeChanges();
 };
 
@@ -238,6 +249,44 @@ void CatalogStarAstrometryArraysTests::batchesFixedCoordinateNonStarBodies()
     QCOMPARE(arrays.referenceEquatorial(0).declinationDeg, 41.3);
 }
 
+void CatalogStarAstrometryArraysTests::preservesMixedCatalogOrderingAndFiltersUnsupportedBodies()
+{
+    const CelestialBodyCatalog catalog(
+        std::vector<OwnGalaxyCelestialBody>{
+            makePlanet(),
+            makeUnsupportedConstellation(),
+            makeAstrometricStar(),
+            makeFixedOnlyStar(),
+        },
+        std::vector<DistantCelestialBody>{
+            makeFixedDeepSkyObject(),
+        },
+        std::vector<CelestialBodyCatalog::OrderEntry>{
+            {.domain = CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U},
+            {.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 0U},
+            {.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 1U},
+            {.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 2U},
+            {.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 3U},
+        }
+    );
+
+    const CatalogStarAstrometryArrays arrays(catalog.bodies());
+
+    QCOMPARE(arrays.size(), 3U);
+    QCOMPARE(arrays.bodyIndices()[0], 0U);
+    QCOMPARE(arrays.bodyIndices()[1], 3U);
+    QCOMPARE(arrays.bodyIndices()[2], 4U);
+    QVERIFY(!arrays.arrayIndexForBodyIndex(1U).has_value());
+    QVERIFY(!arrays.arrayIndexForBodyIndex(2U).has_value());
+    QCOMPARE(*arrays.arrayIndexForBodyIndex(3U), 1U);
+    QVERIFY(!arrays.hasCatalogAstrometry(0U));
+    QCOMPARE(arrays.referenceEquatorial(0U).rightAscensionHours, 0.7);
+    QVERIFY(arrays.hasCatalogAstrometry(1U));
+    QCOMPARE(arrays.referenceEquatorial(1U).rightAscensionHours, 10.25);
+    QVERIFY(!arrays.hasCatalogAstrometry(2U));
+    QCOMPARE(arrays.fixedEquatorialFallback(2U)->rightAscensionHours, 4.0);
+}
+
 void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
 {
     const std::vector<OwnGalaxyCelestialBody> bodies{
@@ -259,6 +308,26 @@ void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
     QVERIFY(std::isinf(arrays.properMotionDeclinationMasPerYearValues()[0]));
     QCOMPARE(arrays.stellarParallaxMasValues()[0], 0.0);
     QVERIFY(std::isinf(arrays.radialVelocityKmPerSecondValues()[0]));
+}
+
+void CatalogStarAstrometryArraysTests::optionalAccessorsHandleOutOfRangeIndexes()
+{
+    const std::vector<OwnGalaxyCelestialBody> bodies{
+        makeAstrometricStar(),
+    };
+
+    const CatalogStarAstrometryArrays arrays = makeArrays(bodies);
+    const std::size_t outOfRangeIndex = arrays.size();
+
+    QVERIFY(!arrays.hasCatalogAstrometry(outOfRangeIndex));
+    QVERIFY(!arrays.hasFixedEquatorialFallback(outOfRangeIndex));
+    QVERIFY(!arrays.arrayIndexForBodyIndex(100U).has_value());
+    QVERIFY(!arrays.fixedEquatorialFallback(outOfRangeIndex).has_value());
+    QVERIFY(!arrays.properMotionRightAscensionMasPerYear(outOfRangeIndex).has_value());
+    QVERIFY(!arrays.properMotionDeclinationMasPerYear(outOfRangeIndex).has_value());
+    QVERIFY(!arrays.stellarParallaxMas(outOfRangeIndex).has_value());
+    QVERIFY(!arrays.radialVelocityKmPerSecond(outOfRangeIndex).has_value());
+    QVERIFY(!arrays.validityRange(outOfRangeIndex).has_value());
 }
 
 void CatalogStarAstrometryArraysTests::copiesCatalogDataAndSurvivesSourceLifetimeChanges()

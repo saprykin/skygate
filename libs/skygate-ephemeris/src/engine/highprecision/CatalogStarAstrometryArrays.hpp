@@ -1,12 +1,20 @@
 #pragma once
 
-#include "BaseCelestialBody.hpp"
+#include "EquatorialCoordinate.hpp"
+#include "engine/EphemerisDateRange.hpp"
+#include "time/AstronomicalEpoch.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <vector>
+
+namespace skygate::ephemeris {
+
+class BaseCelestialBody;
+
+}  // namespace skygate::ephemeris
 
 namespace skygate::ephemeris::highprecision {
 
@@ -56,6 +64,9 @@ public:
     [[nodiscard]] std::span<const EphemerisDateRange> validityRanges() const noexcept;
 
 private:
+    void reserveColumns(std::size_t bodyCount);
+    void appendBody(std::size_t bodyIndex, const BaseCelestialBody& body);
+
     [[nodiscard]] bool hasValueAt(const std::vector<std::uint8_t>& mask, std::size_t arrayIndex) const noexcept;
     [[nodiscard]] std::optional<double> optionalValueAt(
         const std::vector<std::uint8_t>& mask, const std::vector<double>& values, std::size_t arrayIndex
