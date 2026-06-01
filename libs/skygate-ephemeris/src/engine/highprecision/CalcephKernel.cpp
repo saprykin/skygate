@@ -1,11 +1,11 @@
 #include "CalcephKernel.hpp"
-#include "math/PhysicalConstants.hpp"
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+#include "math/PhysicalConstants.hpp"
 #include <calceph.h>
+#include <array>
 #endif
 
-#include <array>
 #include <utility>
 
 namespace skygate::ephemeris::highprecision {

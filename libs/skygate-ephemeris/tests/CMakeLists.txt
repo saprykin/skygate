@@ -10,7 +10,6 @@ add_library(skygate::ephemeris-test-support ALIAS skygate-ephemeris-test-support
 target_link_libraries(skygate-ephemeris-test-support
     PUBLIC
         skygate::ephemeris
-        skygate::core
 )
 
 target_include_directories(skygate-ephemeris-test-support
@@ -38,9 +37,7 @@ function(add_skygate_ephemeris_qtest target_name source_file)
     target_link_libraries(${target_name}
         PRIVATE
             Qt6::Test
-            skygate::ephemeris
             skygate::ephemeris-test-support
-            skygate::core
             skygate::test-support
     )
 
@@ -282,7 +279,6 @@ add_executable(skygate-ephemeris-public-header-macro-compat-tests
 target_link_libraries(skygate-ephemeris-public-header-macro-compat-tests
     PRIVATE
         skygate::ephemeris
-        skygate::core
 )
 target_compile_features(skygate-ephemeris-public-header-macro-compat-tests PRIVATE cxx_std_20)
 add_test(
