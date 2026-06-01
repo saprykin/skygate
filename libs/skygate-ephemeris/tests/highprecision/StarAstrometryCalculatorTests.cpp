@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -91,6 +92,15 @@ using namespace skygate::core;
     body.starAstrometry->properMotionDeclinationMasPerYear = std::numeric_limits<double>::infinity();
     body.starAstrometry->stellarParallaxMas = std::numeric_limits<double>::quiet_NaN();
     body.starAstrometry->radialVelocityKmPerSecond = -std::numeric_limits<double>::infinity();
+    return body;
+}
+
+[[nodiscard]] OwnGalaxyCelestialBody makeStarWithZeroParallaxAstrometry()
+{
+    OwnGalaxyCelestialBody body = makeStarWithInvalidOptionalAstrometry();
+    body.id = "zero-parallax-star";
+    body.displayName = "Zero Parallax Star";
+    body.starAstrometry->stellarParallaxMas = 0.0;
     return body;
 }
 
@@ -431,6 +441,7 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstr
 {
     const std::vector<OwnGalaxyCelestialBody> bodies{
         makeStarWithInvalidOptionalAstrometry(),
+        makeStarWithZeroParallaxAstrometry(),
     };
     const CatalogStarAstrometryArrays arrays(makeCatalog(bodies).bodies());
     const EphemerisRequest request = makeRequest(
@@ -441,13 +452,23 @@ void StarAstrometryCalculatorTests::batchMatchesSingleStarForInvalidOptionalAstr
 
     const StarAstrometryCalculator calculator;
     const std::vector<StarAstrometryBatchResult> batchResults = calculator.calculateBatch(request, arrays);
-    const HighPrecisionCalculatorResult singleResult = calculator.calculate(makeInput(bodies[0], request));
 
-    QCOMPARE(batchResults.size(), 1U);
+    QCOMPARE(batchResults.size(), 2U);
     QCOMPARE(batchResults[0].bodyIndex, 0U);
-    compareCalculatorResults(batchResults[0].result, singleResult);
-    QCOMPARE(singleResult.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
-    QVERIFY(singleResult.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QCOMPARE(batchResults[1].bodyIndex, 1U);
+    QCOMPARE(arrays.hasStellarParallaxMask()[0], std::uint8_t{0});
+    QCOMPARE(arrays.hasStellarParallaxMask()[1], std::uint8_t{0});
+    QCOMPARE(arrays.stellarParallaxMasValues()[1], 0.0);
+
+    for (const StarAstrometryBatchResult& batchResult : batchResults) {
+        const HighPrecisionCalculatorResult singleResult =
+            calculator.calculate(makeInput(bodies[batchResult.bodyIndex], request));
+        compareCalculatorResults(batchResult.result, singleResult);
+        QCOMPARE(singleResult.metadata.status, skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded);
+        QVERIFY(singleResult.metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    }
+
+    const HighPrecisionCalculatorResult singleResult = calculator.calculate(makeInput(bodies[0], request));
     QVERIFY(
         skygate::ephemeris::EphemerisCorrectionFlags::has(
             singleResult.metadata.unavailableCorrections, EphemerisCorrectionFlags::properMotion()

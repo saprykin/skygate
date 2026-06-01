@@ -1,4 +1,5 @@
 #include "CatalogStarAstrometryArrays.hpp"
+#include "BaseCelestialBody.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -10,6 +11,12 @@ namespace {
 [[nodiscard]] bool isCatalogStarBody(const BaseCelestialBody& body) noexcept
 {
     return body.kind == BaseCelestialBody::Kind::Star || body.fixedEquatorialValue().has_value();
+}
+
+[[nodiscard]] bool hasAstrometryArrayInput(const BaseCelestialBody& body) noexcept
+{
+    return isCatalogStarBody(body)
+           && (body.starAstrometryValue().has_value() || body.fixedEquatorialValue().has_value());
 }
 
 [[nodiscard]] double optionalOrQuietNaN(const std::optional<double> value) noexcept
@@ -31,82 +38,89 @@ namespace {
 
 CatalogStarAstrometryArrays::CatalogStarAstrometryArrays(const std::span<const BaseCelestialBody* const> bodies)
 {
-    m_bodyIndices.reserve(bodies.size());
-    m_hasCatalogAstrometry.reserve(bodies.size());
-    m_referenceRightAscensionHours.reserve(bodies.size());
-    m_referenceDeclinationDegrees.reserve(bodies.size());
-    m_referenceEpochJulianDatePart1.reserve(bodies.size());
-    m_referenceEpochJulianDatePart2.reserve(bodies.size());
-    m_referenceEpochTimeScales.reserve(bodies.size());
-    m_hasFixedEquatorialFallback.reserve(bodies.size());
-    m_fixedRightAscensionHours.reserve(bodies.size());
-    m_fixedDeclinationDegrees.reserve(bodies.size());
-    m_hasProperMotionRightAscension.reserve(bodies.size());
-    m_properMotionRightAscensionMasPerYear.reserve(bodies.size());
-    m_hasProperMotionDeclination.reserve(bodies.size());
-    m_properMotionDeclinationMasPerYear.reserve(bodies.size());
-    m_hasStellarParallax.reserve(bodies.size());
-    m_stellarParallaxMas.reserve(bodies.size());
-    m_hasRadialVelocity.reserve(bodies.size());
-    m_radialVelocityKmPerSecond.reserve(bodies.size());
-    m_hasValidityRange.reserve(bodies.size());
-    m_validityRanges.reserve(bodies.size());
+    reserveColumns(bodies.size());
 
     for (std::size_t bodyIndex = 0; bodyIndex < bodies.size(); ++bodyIndex) {
         const BaseCelestialBody& body = *bodies[bodyIndex];
-        if (!isCatalogStarBody(body)
-            || (!body.starAstrometryValue().has_value() && !body.fixedEquatorialValue().has_value())) {
+        if (!hasAstrometryArrayInput(body)) {
             continue;
         }
 
-        const CatalogStarAstrometry* astrometry =
-            body.starAstrometryValue().has_value() ? &*body.starAstrometryValue() : nullptr;
-        const skygate::core::EquatorialCoordinate referenceEquatorial =
-            astrometry != nullptr ? astrometry->referenceEquatorial : *body.fixedEquatorialValue();
-        const AstronomicalEpoch referenceEpoch =
-            astrometry != nullptr ? astrometry->referenceEpoch : AstronomicalEpoch{};
-
-        m_bodyIndices.push_back(bodyIndex);
-        m_hasCatalogAstrometry.push_back(astrometry != nullptr ? 1U : 0U);
-        m_referenceRightAscensionHours.push_back(referenceEquatorial.rightAscensionHours);
-        m_referenceDeclinationDegrees.push_back(referenceEquatorial.declinationDeg);
-        m_referenceEpochJulianDatePart1.push_back(referenceEpoch.julianDatePart1);
-        m_referenceEpochJulianDatePart2.push_back(referenceEpoch.julianDatePart2);
-        m_referenceEpochTimeScales.push_back(referenceEpoch.timeScale);
-
-        m_hasFixedEquatorialFallback.push_back(body.fixedEquatorialValue().has_value() ? 1U : 0U);
-        m_fixedRightAscensionHours.push_back(
-            body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->rightAscensionHours
-                                                    : std::numeric_limits<double>::quiet_NaN()
-        );
-        m_fixedDeclinationDegrees.push_back(
-            body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->declinationDeg
-                                                    : std::numeric_limits<double>::quiet_NaN()
-        );
-
-        const std::optional<double> properMotionRightAscension =
-            astrometry != nullptr ? astrometry->properMotionRightAscensionMasPerYear : std::nullopt;
-        const std::optional<double> properMotionDeclination =
-            astrometry != nullptr ? astrometry->properMotionDeclinationMasPerYear : std::nullopt;
-        const std::optional<double> stellarParallax =
-            astrometry != nullptr ? astrometry->stellarParallaxMas : std::nullopt;
-        const std::optional<double> radialVelocity =
-            astrometry != nullptr ? astrometry->radialVelocityKmPerSecond : std::nullopt;
-
-        m_hasProperMotionRightAscension.push_back(finiteMaskForOptional(properMotionRightAscension));
-        m_properMotionRightAscensionMasPerYear.push_back(optionalOrQuietNaN(properMotionRightAscension));
-        m_hasProperMotionDeclination.push_back(finiteMaskForOptional(properMotionDeclination));
-        m_properMotionDeclinationMasPerYear.push_back(optionalOrQuietNaN(properMotionDeclination));
-        m_hasStellarParallax.push_back(positiveFiniteMaskForOptional(stellarParallax));
-        m_stellarParallaxMas.push_back(optionalOrQuietNaN(stellarParallax));
-        m_hasRadialVelocity.push_back(finiteMaskForOptional(radialVelocity));
-        m_radialVelocityKmPerSecond.push_back(optionalOrQuietNaN(radialVelocity));
-
-        const std::optional<EphemerisDateRange> validityRange =
-            astrometry != nullptr ? astrometry->validityRange : std::nullopt;
-        m_hasValidityRange.push_back(validityRange.has_value() ? 1U : 0U);
-        m_validityRanges.push_back(validityRange.value_or(EphemerisDateRange{}));
+        appendBody(bodyIndex, body);
     }
+}
+
+void CatalogStarAstrometryArrays::reserveColumns(const std::size_t bodyCount)
+{
+    m_bodyIndices.reserve(bodyCount);
+    m_hasCatalogAstrometry.reserve(bodyCount);
+    m_referenceRightAscensionHours.reserve(bodyCount);
+    m_referenceDeclinationDegrees.reserve(bodyCount);
+    m_referenceEpochJulianDatePart1.reserve(bodyCount);
+    m_referenceEpochJulianDatePart2.reserve(bodyCount);
+    m_referenceEpochTimeScales.reserve(bodyCount);
+    m_hasFixedEquatorialFallback.reserve(bodyCount);
+    m_fixedRightAscensionHours.reserve(bodyCount);
+    m_fixedDeclinationDegrees.reserve(bodyCount);
+    m_hasProperMotionRightAscension.reserve(bodyCount);
+    m_properMotionRightAscensionMasPerYear.reserve(bodyCount);
+    m_hasProperMotionDeclination.reserve(bodyCount);
+    m_properMotionDeclinationMasPerYear.reserve(bodyCount);
+    m_hasStellarParallax.reserve(bodyCount);
+    m_stellarParallaxMas.reserve(bodyCount);
+    m_hasRadialVelocity.reserve(bodyCount);
+    m_radialVelocityKmPerSecond.reserve(bodyCount);
+    m_hasValidityRange.reserve(bodyCount);
+    m_validityRanges.reserve(bodyCount);
+}
+
+void CatalogStarAstrometryArrays::appendBody(const std::size_t bodyIndex, const BaseCelestialBody& body)
+{
+    const CatalogStarAstrometry* astrometry =
+        body.starAstrometryValue().has_value() ? &*body.starAstrometryValue() : nullptr;
+    const skygate::core::EquatorialCoordinate referenceEquatorial =
+        astrometry != nullptr ? astrometry->referenceEquatorial : *body.fixedEquatorialValue();
+    const AstronomicalEpoch referenceEpoch = astrometry != nullptr ? astrometry->referenceEpoch : AstronomicalEpoch{};
+
+    m_bodyIndices.push_back(bodyIndex);
+    m_hasCatalogAstrometry.push_back(astrometry != nullptr ? 1U : 0U);
+    m_referenceRightAscensionHours.push_back(referenceEquatorial.rightAscensionHours);
+    m_referenceDeclinationDegrees.push_back(referenceEquatorial.declinationDeg);
+    m_referenceEpochJulianDatePart1.push_back(referenceEpoch.julianDatePart1);
+    m_referenceEpochJulianDatePart2.push_back(referenceEpoch.julianDatePart2);
+    m_referenceEpochTimeScales.push_back(referenceEpoch.timeScale);
+
+    m_hasFixedEquatorialFallback.push_back(body.fixedEquatorialValue().has_value() ? 1U : 0U);
+    m_fixedRightAscensionHours.push_back(
+        body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->rightAscensionHours
+                                                : std::numeric_limits<double>::quiet_NaN()
+    );
+    m_fixedDeclinationDegrees.push_back(
+        body.fixedEquatorialValue().has_value() ? body.fixedEquatorialValue()->declinationDeg
+                                                : std::numeric_limits<double>::quiet_NaN()
+    );
+
+    const std::optional<double> properMotionRightAscension =
+        astrometry != nullptr ? astrometry->properMotionRightAscensionMasPerYear : std::nullopt;
+    const std::optional<double> properMotionDeclination =
+        astrometry != nullptr ? astrometry->properMotionDeclinationMasPerYear : std::nullopt;
+    const std::optional<double> stellarParallax = astrometry != nullptr ? astrometry->stellarParallaxMas : std::nullopt;
+    const std::optional<double> radialVelocity =
+        astrometry != nullptr ? astrometry->radialVelocityKmPerSecond : std::nullopt;
+
+    m_hasProperMotionRightAscension.push_back(finiteMaskForOptional(properMotionRightAscension));
+    m_properMotionRightAscensionMasPerYear.push_back(optionalOrQuietNaN(properMotionRightAscension));
+    m_hasProperMotionDeclination.push_back(finiteMaskForOptional(properMotionDeclination));
+    m_properMotionDeclinationMasPerYear.push_back(optionalOrQuietNaN(properMotionDeclination));
+    m_hasStellarParallax.push_back(positiveFiniteMaskForOptional(stellarParallax));
+    m_stellarParallaxMas.push_back(optionalOrQuietNaN(stellarParallax));
+    m_hasRadialVelocity.push_back(finiteMaskForOptional(radialVelocity));
+    m_radialVelocityKmPerSecond.push_back(optionalOrQuietNaN(radialVelocity));
+
+    const std::optional<EphemerisDateRange> validityRange =
+        astrometry != nullptr ? astrometry->validityRange : std::nullopt;
+    m_hasValidityRange.push_back(validityRange.has_value() ? 1U : 0U);
+    m_validityRanges.push_back(validityRange.value_or(EphemerisDateRange{}));
 }
 
 std::size_t CatalogStarAstrometryArrays::size() const noexcept
