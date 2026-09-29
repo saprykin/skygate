@@ -1,5 +1,5 @@
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/DeltaTDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 #include "math/TimeConstants.hpp"
@@ -91,8 +91,8 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
 
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IDeltaTProvider> makeDeltaTProvider()
 {
-    const skygate::ephemeris::DeltaTDataLoadResult result =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeDeltaTAsset());
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(makeDeltaTAsset());
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }
@@ -176,7 +176,8 @@ private slots:
 
 void TimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
 {
-    const std::optional<int> oneBceAstronomicalYear = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
+    const std::optional<int> oneBceAstronomicalYear =
+        skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(oneBceAstronomicalYear.has_value());
     QCOMPARE(*oneBceAstronomicalYear, 0);
     QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);

@@ -61,7 +61,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/IFrameTransformer.hpp
     src/engine/highprecision/IStarAstrometryCalculator.hpp
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
-    src/engine/highprecision/DeltaTProvider.cpp
+    src/engine/highprecision/DeltaTDataLoader.hpp
+    src/engine/highprecision/DeltaTDataLoader.cpp
     src/engine/highprecision/EarthOrientationProvider.cpp
     src/engine/highprecision/EphemerisDataActivation.cpp
     src/engine/highprecision/EphemerisDataManifest.cpp
@@ -77,6 +78,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaAstrometry.cpp
     src/engine/highprecision/HighPrecisionTextParser.hpp
     src/engine/highprecision/HighPrecisionTextParser.cpp
+    src/engine/highprecision/ideltatprovider.hpp
     src/engine/highprecision/LeapSecondProvider.cpp
     src/engine/highprecision/ObserverGeodesy.hpp
     src/engine/highprecision/ObserverGeodesy.cpp
@@ -84,6 +86,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/SolarSystemStateCalculator.cpp
     src/engine/highprecision/StarAstrometryCalculator.hpp
     src/engine/highprecision/StarAstrometryCalculator.cpp
+    src/engine/highprecision/TableBackedDeltaTProvider.hpp
+    src/engine/highprecision/TableBackedDeltaTProvider.cpp
     src/engine/highprecision/TimeScaleService.cpp
 )
 
@@ -125,11 +129,12 @@ add_library(skygate-ephemeris STATIC
     src/catalog/constellation/ConstellationData.hpp
     src/catalog/constellation/ConstellationDataCodec.hpp
     src/ConstellationReferenceCalculator.hpp
-    src/engine/highprecision/DeltaTProvider.hpp
+    src/engine/highprecision/DeltaTDataLoader.hpp
     src/engine/highprecision/EarthOrientationProvider.hpp
     src/engine/highprecision/EphemerisDataActivation.hpp
     src/engine/highprecision/EphemerisDataManifest.hpp
     src/engine/highprecision/EphemerisDataSnapshot.hpp
+    src/engine/highprecision/ideltatprovider.hpp
     src/factory/EphemerisEngineFactory.hpp
     src/factory/EphemerisFactoryCreationDiagnosticCode.hpp
     src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp

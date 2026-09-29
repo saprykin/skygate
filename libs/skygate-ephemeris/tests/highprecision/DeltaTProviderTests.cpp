@@ -1,5 +1,5 @@
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/DeltaTDataLoader.hpp"
 
 #include <QtTest/QtTest>
 
@@ -87,24 +87,26 @@ private slots:
 void DeltaTProviderTests::loadsPresentDataFromSnapshot()
 {
     const TestEphemerisDataSnapshot snapshot(makeValidAsset());
-    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromSnapshot(snapshot);
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromSnapshot(snapshot);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.provider != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Available)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Available)
     );
     QCOMPARE(result.provider->entries().size(), std::size_t{3});
     QVERIFY(result.dataInfo.version == std::string{"2026a"});
     QVERIFY(result.dataInfo.provenance == std::string{"IERS Rapid Service plus historical model"});
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 
-    const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(2000, 1, 1));
+    const skygate::ephemeris::IDeltaTProvider::Estimate estimate =
+        result.provider->deltaTSeconds(epochForDate(2000, 1, 1));
     QVERIFY(estimate.isUsable());
     QCOMPARE(
         static_cast<std::uint8_t>(estimate.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTEstimateStatus::Available)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::EstimateStatus::Available)
     );
     QVERIFY(estimate.deltaTSeconds.has_value());
     QVERIFY(std::abs(*estimate.deltaTSeconds - 63.83) < 0.001);
@@ -118,7 +120,8 @@ void DeltaTProviderTests::loadsUsnoDeltaTData()
                     "1973  3  1  43.5648\n"
                     "2026  1  1  69.2000\n";
 
-    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromTextAsset(asset);
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.provider != nullptr);
@@ -126,7 +129,8 @@ void DeltaTProviderTests::loadsUsnoDeltaTData()
     QCOMPARE(result.provider->entries().front().effectiveUtcDate.astronomicalYear, 1973);
     QCOMPARE(result.provider->entries().front().effectiveUtcDate.month, 2);
     QCOMPARE(result.provider->entries().front().effectiveUtcDate.day, 1);
-    const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(2026, 1, 1));
+    const skygate::ephemeris::IDeltaTProvider::Estimate estimate =
+        result.provider->deltaTSeconds(epochForDate(2026, 1, 1));
     QVERIFY(estimate.isUsable());
     QVERIFY(estimate.deltaTSeconds.has_value());
     QVERIFY(std::abs(*estimate.deltaTSeconds - 69.2) < 0.001);
@@ -135,13 +139,14 @@ void DeltaTProviderTests::loadsUsnoDeltaTData()
 void DeltaTProviderTests::reportsMissingData()
 {
     const TestEphemerisDataSnapshot snapshot(std::nullopt);
-    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromSnapshot(snapshot);
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromSnapshot(snapshot);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(result.provider == nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Missing)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Missing)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 }
@@ -154,25 +159,27 @@ void DeltaTProviderTests::rejectsMalformedRows()
                     "1900-01-01,-2.72\n"
                     "not-a-date,63.83\n";
 
-    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromTextAsset(asset);
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(result.provider == nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 }
 
 void DeltaTProviderTests::exposesAncientFallbackMetadata()
 {
-    const skygate::ephemeris::DeltaTDataLoadResult result =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeValidAsset());
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(makeValidAsset());
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.dataInfo.ancientFallbackModel.has_value());
-    const skygate::ephemeris::DeltaTFallbackModelInfo& fallback = *result.dataInfo.ancientFallbackModel;
+    const skygate::ephemeris::IDeltaTProvider::DataInfo::FallbackModelInfo& fallback =
+        *result.dataInfo.ancientFallbackModel;
     QVERIFY(fallback.validityRange.id == std::string{"delta-t-ancient-fallback"});
     QVERIFY(fallback.provenance == std::string{"Morrison-Stephenson model"});
     QVERIFY(fallback.hasRepresentativeEstimate());
@@ -192,10 +199,11 @@ void DeltaTProviderTests::exposesAncientFallbackMetadata()
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
     );
 
-    const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(-5000, 1, 1));
+    const skygate::ephemeris::IDeltaTProvider::Estimate estimate =
+        result.provider->deltaTSeconds(epochForDate(-5000, 1, 1));
     QCOMPARE(
         static_cast<std::uint8_t>(estimate.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTEstimateStatus::Degraded)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::EstimateStatus::Degraded)
     );
     QVERIFY(estimate.deltaTSeconds.has_value());
     QVERIFY(estimate.estimatedUncertaintySeconds.has_value());
@@ -204,8 +212,8 @@ void DeltaTProviderTests::exposesAncientFallbackMetadata()
 
 void DeltaTProviderTests::exposesValidityRangeMetadata()
 {
-    const skygate::ephemeris::DeltaTDataLoadResult result =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeValidAsset());
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(makeValidAsset());
 
     QVERIFY(result.dataInfo.validityRange.has_value());
     QVERIFY(result.dataInfo.expiresAt.has_value());
@@ -220,17 +228,18 @@ void DeltaTProviderTests::exposesValidityRangeMetadata()
 
 void DeltaTProviderTests::returnsUnavailableBetweenLastTableRowAndExpiration()
 {
-    const skygate::ephemeris::DeltaTDataLoadResult result =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeValidAsset());
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(makeValidAsset());
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.provider != nullptr);
 
-    const skygate::ephemeris::DeltaTEstimate estimate = result.provider->deltaTSeconds(epochForDate(2026, 6, 1));
+    const skygate::ephemeris::IDeltaTProvider::Estimate estimate =
+        result.provider->deltaTSeconds(epochForDate(2026, 6, 1));
     QVERIFY(!estimate.isUsable());
     QCOMPARE(
         static_cast<std::uint8_t>(estimate.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTEstimateStatus::Unavailable)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::EstimateStatus::Unavailable)
     );
     QVERIFY(!estimate.deltaTSeconds.has_value());
     QVERIFY(!estimate.diagnosticText.empty());
@@ -247,13 +256,14 @@ void DeltaTProviderTests::rejectsAncientFallbackWithoutRepresentativeEstimate()
                     "1900-01-01,-2.72\n"
                     "2000-01-01,63.83\n";
 
-    const skygate::ephemeris::DeltaTDataLoadResult result = skygate::ephemeris::loadDeltaTDataFromTextAsset(asset);
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(result.provider == nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 }
@@ -268,14 +278,14 @@ void DeltaTProviderTests::rejectsPartialAncientFallbackRanges()
                              "1900-01-01,-2.72\n"
                              "2000-01-01,63.83\n";
 
-    const skygate::ephemeris::DeltaTDataLoadResult startOnlyResult =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(startOnlyAsset);
+    const skygate::ephemeris::DeltaTDataLoader::Result startOnlyResult =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(startOnlyAsset);
 
     QVERIFY(!startOnlyResult.isSuccess());
     QVERIFY(startOnlyResult.provider == nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(startOnlyResult.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
     );
 
     skygate::ephemeris::EphemerisTextDataAsset endOnlyAsset = makeValidAsset();
@@ -286,30 +296,30 @@ void DeltaTProviderTests::rejectsPartialAncientFallbackRanges()
                            "1900-01-01,-2.72\n"
                            "2000-01-01,63.83\n";
 
-    const skygate::ephemeris::DeltaTDataLoadResult endOnlyResult =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(endOnlyAsset);
+    const skygate::ephemeris::DeltaTDataLoader::Result endOnlyResult =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(endOnlyAsset);
 
     QVERIFY(!endOnlyResult.isSuccess());
     QVERIFY(endOnlyResult.provider == nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(endOnlyResult.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Malformed)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
     );
 }
 
 void DeltaTProviderTests::reportsStaleData()
 {
-    skygate::ephemeris::DeltaTDataLoadOptions options;
+    skygate::ephemeris::DeltaTDataLoader::Options options;
     options.referenceEpoch = epochForDate(2030, 1, 1);
 
-    const skygate::ephemeris::DeltaTDataLoadResult result =
-        skygate::ephemeris::loadDeltaTDataFromTextAsset(makeValidAsset(), options);
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(makeValidAsset(), options);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.provider != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(result.dataInfo.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::DeltaTDataStatus::Stale)
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Stale)
     );
     QVERIFY(!result.dataInfo.diagnosticText.empty());
 }

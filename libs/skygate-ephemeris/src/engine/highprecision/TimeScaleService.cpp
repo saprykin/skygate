@@ -398,7 +398,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
         return result;
     }
 
-    const DeltaTEstimate estimate = deltaTProvider->deltaTSeconds(utcEpoch);
+    const IDeltaTProvider::Estimate estimate = deltaTProvider->deltaTSeconds(utcEpoch);
     if (!estimate.isUsable() || !estimate.deltaTSeconds.has_value()) {
         result.status = TimeScaleConversionStatus::Failed;
         result.addWarning(TimeScaleConversionWarningCode::DeltaTUnavailable);
@@ -421,7 +421,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
     result.status = TimeScaleConversionStatus::Degraded;
     result.warningCodeMask |= utcOffset.warningCodeMask;
     result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
-    if (estimate.status == DeltaTEstimateStatus::Degraded) {
+    if (estimate.status == IDeltaTProvider::EstimateStatus::Degraded) {
         result.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
     }
     result.diagnosticText =
@@ -465,7 +465,7 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
 
     AstronomicalEpoch estimateEpoch = ut1Epoch;
     estimateEpoch.timeScale = TimeScale::Utc;
-    const DeltaTEstimate estimate = deltaTProvider->deltaTSeconds(estimateEpoch);
+    const IDeltaTProvider::Estimate estimate = deltaTProvider->deltaTSeconds(estimateEpoch);
     if (!estimate.isUsable() || !estimate.deltaTSeconds.has_value()) {
         TimeScaleConversionResult result = failureResult(
             ut1Epoch,

@@ -1,5 +1,6 @@
-#include "DeltaTProvider.hpp"
+#include "DeltaTDataLoader.hpp"
 #include "HighPrecisionTextParser.hpp"
+#include "TableBackedDeltaTProvider.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <algorithm>
@@ -39,8 +40,9 @@ constexpr std::string_view kAncientFallbackRangeDisplayName = "Ancient Delta T f
     return range;
 }
 
-[[nodiscard]] std::optional<std::string>
-setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackStart)
+[[nodiscard]] std::optional<std::string> setFallbackStart(
+    IDeltaTProvider::DataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackStart
+)
 {
     const std::optional<CivilDateTime> date = textParser().parseUtcDate(value);
     const std::optional<AstronomicalEpoch> epoch =
@@ -50,7 +52,8 @@ setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size
                + ".";
     }
 
-    DeltaTFallbackModelInfo fallback = info.ancientFallbackModel.value_or(DeltaTFallbackModelInfo{});
+    IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
+        info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
     fallback.validityRange.id = kAncientFallbackRangeId;
     fallback.validityRange.displayName = kAncientFallbackRangeDisplayName;
     fallback.validityRange.start = *epoch;
@@ -59,8 +62,9 @@ setFallbackStart(DeltaTDataInfo& info, const std::string& value, const std::size
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<std::string>
-setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackEnd)
+[[nodiscard]] std::optional<std::string> setFallbackEnd(
+    IDeltaTProvider::DataInfo& info, const std::string& value, const std::size_t lineNumber, bool& hasFallbackEnd
+)
 {
     const std::optional<CivilDateTime> date = textParser().parseUtcDate(value);
     const std::optional<AstronomicalEpoch> epoch =
@@ -70,7 +74,8 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
                + ".";
     }
 
-    DeltaTFallbackModelInfo fallback = info.ancientFallbackModel.value_or(DeltaTFallbackModelInfo{});
+    IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
+        info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
     fallback.validityRange.id = kAncientFallbackRangeId;
     fallback.validityRange.displayName = kAncientFallbackRangeDisplayName;
     fallback.validityRange.end = *epoch;
@@ -80,7 +85,7 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
 }
 
 [[nodiscard]] std::optional<std::string> applyMetadataLine(
-    DeltaTDataInfo& info,
+    IDeltaTProvider::DataInfo& info,
     const std::string_view line,
     const std::size_t lineNumber,
     bool& hasFallbackStart,
@@ -120,7 +125,8 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     }
     if (std::optional<std::string> value = textParser().metadataValue(line, "ancient_fallback_source");
         value.has_value()) {
-        DeltaTFallbackModelInfo fallback = info.ancientFallbackModel.value_or(DeltaTFallbackModelInfo{});
+        IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
+            info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.provenance = std::move(*value);
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
@@ -133,7 +139,8 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
                    + std::to_string(lineNumber) + ".";
         }
 
-        DeltaTFallbackModelInfo fallback = info.ancientFallbackModel.value_or(DeltaTFallbackModelInfo{});
+        IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
+            info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.representativeDeltaTSeconds = seconds;
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
@@ -146,7 +153,8 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
                    + std::to_string(lineNumber) + ".";
         }
 
-        DeltaTFallbackModelInfo fallback = info.ancientFallbackModel.value_or(DeltaTFallbackModelInfo{});
+        IDeltaTProvider::DataInfo::FallbackModelInfo fallback =
+            info.ancientFallbackModel.value_or(IDeltaTProvider::DataInfo::FallbackModelInfo{});
         fallback.estimatedUncertaintySeconds = seconds;
         info.ancientFallbackModel = std::move(fallback);
         return std::nullopt;
@@ -155,7 +163,7 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     return std::nullopt;
 }
 
-[[nodiscard]] bool parseUsnoEntryLine(std::string_view line, DeltaTTableEntry& entry) noexcept
+[[nodiscard]] bool parseUsnoEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
 {
     const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(line);
     if (columns.size() < 2U) {
@@ -207,7 +215,7 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     return true;
 }
 
-[[nodiscard]] bool parseEntryLine(std::string_view line, DeltaTTableEntry& entry) noexcept
+[[nodiscard]] bool parseEntryLine(std::string_view line, IDeltaTProvider::TableEntry& entry) noexcept
 {
     const std::size_t comma = line.find(',');
     if (comma == std::string_view::npos) {
@@ -237,136 +245,43 @@ setFallbackEnd(DeltaTDataInfo& info, const std::string& value, const std::size_t
     return textParser().startsWith(line, "effective_utc_date");
 }
 
-[[nodiscard]] DeltaTDataLoadResult
-failureResult(DeltaTDataInfo info, const DeltaTDataStatus status, std::string diagnosticText)
+[[nodiscard]] DeltaTDataLoader::Result
+failureResult(IDeltaTProvider::DataInfo info, const IDeltaTProvider::DataStatus status, std::string diagnosticText)
 {
     info.status = status;
     info.diagnosticText = std::move(diagnosticText);
 
-    DeltaTDataLoadResult result;
+    DeltaTDataLoader::Result result;
     result.dataInfo = std::move(info);
     return result;
 }
 
-[[nodiscard]] bool epochWithinRange(const AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
-{
-    if (!epoch.isFinite()) {
-        return false;
-    }
-
-    const double key = epoch.sortKey();
-    return key >= range.start.sortKey() && key <= range.end.sortKey();
-}
-
-[[nodiscard]] DeltaTEstimate unavailableEstimate(std::string diagnosticText)
-{
-    DeltaTEstimate estimate;
-    estimate.status = DeltaTEstimateStatus::Unavailable;
-    estimate.diagnosticText = std::move(diagnosticText);
-    return estimate;
-}
-
 }  // namespace
 
-TableBackedDeltaTProvider::TableBackedDeltaTProvider(DeltaTDataInfo dataInfo, std::vector<DeltaTTableEntry> entries)
-    : m_dataInfo(std::move(dataInfo)), m_entries(std::move(entries))
-{
-}
-
-const DeltaTDataInfo& TableBackedDeltaTProvider::dataInfo() const noexcept
-{
-    return m_dataInfo;
-}
-
-std::span<const DeltaTTableEntry> TableBackedDeltaTProvider::entries() const noexcept
-{
-    return m_entries;
-}
-
-DeltaTEstimate TableBackedDeltaTProvider::deltaTSeconds(const AstronomicalEpoch& epoch) const
-{
-    if (!epoch.isFinite()) {
-        return unavailableEstimate("Delta T estimate requires a finite epoch.");
-    }
-
-    if (m_entries.empty()) {
-        return unavailableEstimate("Delta T data contains no table entries.");
-    }
-
-    const double requestedEpochKey = epoch.sortKey();
-    if (requestedEpochKey >= m_entries.front().effectiveUtcEpoch.sortKey()
-        && requestedEpochKey <= m_entries.back().effectiveUtcEpoch.sortKey()) {
-        const auto upper =
-            std::ranges::lower_bound(m_entries, requestedEpochKey, {}, [](const DeltaTTableEntry& entry) {
-                return entry.effectiveUtcEpoch.sortKey();
-            });
-        if (upper == m_entries.begin()) {
-            return DeltaTEstimate{
-                .status = DeltaTEstimateStatus::Available,
-                .deltaTSeconds = upper->deltaTSeconds,
-                .diagnosticText = "Delta T estimate loaded from table.",
-                .provenance = m_dataInfo.provenance,
-            };
-        }
-        if (upper == m_entries.end()) {
-            return DeltaTEstimate{
-                .status = DeltaTEstimateStatus::Available,
-                .deltaTSeconds = m_entries.back().deltaTSeconds,
-                .diagnosticText = "Delta T estimate loaded from table.",
-                .provenance = m_dataInfo.provenance,
-            };
-        }
-
-        const DeltaTTableEntry& before = *(upper - 1);
-        const DeltaTTableEntry& after = *upper;
-        const double beforeKey = before.effectiveUtcEpoch.sortKey();
-        const double afterKey = after.effectiveUtcEpoch.sortKey();
-        const double ratio = (requestedEpochKey - beforeKey) / (afterKey - beforeKey);
-        return DeltaTEstimate{
-            .status = DeltaTEstimateStatus::Available,
-            .deltaTSeconds = before.deltaTSeconds + (after.deltaTSeconds - before.deltaTSeconds) * ratio,
-            .diagnosticText = "Delta T estimate interpolated from table.",
-            .provenance = m_dataInfo.provenance,
-        };
-    }
-
-    if (m_dataInfo.ancientFallbackModel.has_value()
-        && epochWithinRange(epoch, m_dataInfo.ancientFallbackModel->validityRange)) {
-        const DeltaTFallbackModelInfo& fallback = *m_dataInfo.ancientFallbackModel;
-        return DeltaTEstimate{
-            .status = DeltaTEstimateStatus::Degraded,
-            .deltaTSeconds = fallback.representativeDeltaTSeconds,
-            .estimatedUncertaintySeconds = fallback.estimatedUncertaintySeconds,
-            .diagnosticText = "Delta T estimate uses ancient fallback model metadata.",
-            .provenance = fallback.provenance,
-        };
-    }
-
-    return unavailableEstimate("Requested epoch is outside Delta T data coverage.");
-}
-
-DeltaTDataLoadResult
-loadDeltaTDataFromSnapshot(const IEphemerisDataSnapshot& snapshot, const DeltaTDataLoadOptions& options)
+DeltaTDataLoader::Result
+DeltaTDataLoader::loadFromSnapshot(const IEphemerisDataSnapshot& snapshot, const Options& options)
 {
     const std::optional<EphemerisTextDataAsset> asset = snapshot.deltaTDataAsset();
     if (!asset.has_value()) {
-        DeltaTDataInfo info;
+        IDeltaTProvider::DataInfo info;
         return failureResult(
-            std::move(info), DeltaTDataStatus::Missing, "Delta T data asset is missing from the data snapshot."
+            std::move(info),
+            IDeltaTProvider::DataStatus::Missing,
+            "Delta T data asset is missing from the data snapshot."
         );
     }
 
-    return loadDeltaTDataFromTextAsset(*asset, options);
+    return loadFromTextAsset(*asset, options);
 }
 
-DeltaTDataLoadResult
-loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDataLoadOptions& options)
+DeltaTDataLoader::Result
+DeltaTDataLoader::loadFromTextAsset(const EphemerisTextDataAsset& asset, const Options& options)
 {
-    DeltaTDataInfo info;
+    IDeltaTProvider::DataInfo info;
     info.version = asset.version;
     info.provenance = asset.provenance;
 
-    std::vector<DeltaTTableEntry> entries;
+    std::vector<IDeltaTProvider::TableEntry> entries;
     bool hasFallbackStart = false;
     bool hasFallbackEnd = false;
     std::string_view remaining = asset.content;
@@ -388,7 +303,9 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
             if (std::optional<std::string> diagnosticText =
                     applyMetadataLine(info, line, lineNumber, hasFallbackStart, hasFallbackEnd);
                 diagnosticText.has_value()) {
-                return failureResult(std::move(info), DeltaTDataStatus::Malformed, std::move(*diagnosticText));
+                return failureResult(
+                    std::move(info), IDeltaTProvider::DataStatus::Malformed, std::move(*diagnosticText)
+                );
             }
             continue;
         }
@@ -399,11 +316,11 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
             continue;
         }
 
-        DeltaTTableEntry entry;
+        IDeltaTProvider::TableEntry entry;
         if (!parseEntryLine(line, entry)) {
             return failureResult(
                 std::move(info),
-                DeltaTDataStatus::Malformed,
+                IDeltaTProvider::DataStatus::Malformed,
                 "Delta T data contains a malformed row at line " + std::to_string(lineNumber) + "."
             );
         }
@@ -411,31 +328,33 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
     }
 
     if (entries.empty()) {
-        return failureResult(std::move(info), DeltaTDataStatus::Malformed, "Delta T data contains no rows.");
+        return failureResult(std::move(info), IDeltaTProvider::DataStatus::Malformed, "Delta T data contains no rows.");
     }
 
-    const bool sorted = std::ranges::is_sorted(entries, {}, [](const DeltaTTableEntry& entry) {
+    const bool sorted = std::ranges::is_sorted(entries, {}, [](const IDeltaTProvider::TableEntry& entry) {
         return entry.effectiveUtcEpoch.sortKey();
     });
     if (!sorted) {
-        return failureResult(std::move(info), DeltaTDataStatus::Malformed, "Delta T rows are not sorted by UTC date.");
+        return failureResult(
+            std::move(info), IDeltaTProvider::DataStatus::Malformed, "Delta T rows are not sorted by UTC date."
+        );
     }
 
     if (info.ancientFallbackModel.has_value()) {
-        DeltaTFallbackModelInfo fallback = std::move(*info.ancientFallbackModel);
+        IDeltaTProvider::DataInfo::FallbackModelInfo fallback = std::move(*info.ancientFallbackModel);
         if (!hasFallbackStart || !hasFallbackEnd || !fallback.validityRange.start.isFinite()
             || !fallback.validityRange.end.isFinite()
             || fallback.validityRange.start.sortKey() > fallback.validityRange.end.sortKey()) {
             return failureResult(
                 std::move(info),
-                DeltaTDataStatus::Malformed,
+                IDeltaTProvider::DataStatus::Malformed,
                 "Delta T ancient fallback metadata must include a valid start and end range."
             );
         }
         if (!fallback.representativeDeltaTSeconds.has_value()) {
             return failureResult(
                 std::move(info),
-                DeltaTDataStatus::Malformed,
+                IDeltaTProvider::DataStatus::Malformed,
                 "Delta T ancient fallback metadata must include a representative estimate."
             );
         }
@@ -451,15 +370,15 @@ loadDeltaTDataFromTextAsset(const EphemerisTextDataAsset& asset, const DeltaTDat
     info.validityRange = makeRange(
         kValidityRangeId, kValidityRangeDisplayName, entries.front().effectiveUtcEpoch, entries.back().effectiveUtcEpoch
     );
-    info.status = DeltaTDataStatus::Available;
+    info.status = IDeltaTProvider::DataStatus::Available;
     info.diagnosticText = "Delta T data loaded.";
     if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFinite()
         && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
-        info.status = DeltaTDataStatus::Stale;
+        info.status = IDeltaTProvider::DataStatus::Stale;
         info.diagnosticText = "Delta T data is stale for the reference epoch.";
     }
 
-    DeltaTDataLoadResult result;
+    Result result;
     result.dataInfo = info;
     result.provider = std::make_shared<TableBackedDeltaTProvider>(std::move(info), std::move(entries));
     return result;
