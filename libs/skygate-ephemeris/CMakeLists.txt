@@ -94,7 +94,7 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaAstrometry.cpp
     src/engine/highprecision/HighPrecisionTextParser.hpp
     src/engine/highprecision/HighPrecisionTextParser.cpp
-    src/engine/highprecision/ideltatprovider.hpp
+    src/engine/highprecision/IDeltaTProvider.hpp
     src/engine/highprecision/LeapSecondProvider.cpp
     src/engine/highprecision/ObserverGeodesy.hpp
     src/engine/highprecision/ObserverGeodesy.cpp
@@ -162,7 +162,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp
     src/engine/highprecision/EphemerisDataManifest.hpp
     src/engine/highprecision/EphemerisDataSnapshot.hpp
-    src/engine/highprecision/ideltatprovider.hpp
+    src/engine/highprecision/IDeltaTProvider.hpp
     src/factory/EphemerisEngineFactory.hpp
     src/factory/EphemerisFactoryCreationDiagnosticCode.hpp
     src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp
