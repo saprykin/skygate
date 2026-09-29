@@ -201,8 +201,9 @@ namespace {
     return payload;
 }
 
-[[nodiscard]] bool
-hasDiagnosticContaining(const skygate::ephemeris::EphemerisDataManifestParseResult& result, const std::string_view text)
+[[nodiscard]] bool hasDiagnosticContaining(
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult& result, const std::string_view text
+)
 {
     return std::ranges::any_of(result.diagnostics, [text](const std::string& diagnostic) {
         return diagnostic.find(text) != std::string::npos;
@@ -213,13 +214,13 @@ hasDiagnosticContaining(const skygate::ephemeris::EphemerisDataManifestParseResu
 
 void EphemerisDataManifestTests::parsesValidManifest()
 {
-    const skygate::ephemeris::EphemerisDataManifestParseResult result =
-        skygate::ephemeris::parseEphemerisDataManifest(validManifestPayload());
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+        skygate::ephemeris::EphemerisDataManifest::parse(validManifestPayload());
 
     QVERIFY(result.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestStatus::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifest::Status::Valid)
     );
     QVERIFY(result.manifest.dataSetInfo.id == std::string{"skygate-high-precision-2026a"});
     QVERIFY(result.manifest.dataSetInfo.version == std::string{"2026a"});
@@ -232,13 +233,13 @@ void EphemerisDataManifestTests::parsesValidManifest()
 void EphemerisDataManifestTests::rejectsMalformedManifest()
 {
     for (const std::string_view payload : {"", "   \n\t", "[1, 2, 3]", "{ not-json"}) {
-        const skygate::ephemeris::EphemerisDataManifestParseResult result =
-            skygate::ephemeris::parseEphemerisDataManifest(payload);
+        const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+            skygate::ephemeris::EphemerisDataManifest::parse(payload);
 
         QVERIFY(!result.isSuccess());
         QCOMPARE(
             static_cast<std::uint8_t>(result.status),
-            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestStatus::Malformed)
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifest::Status::Malformed)
         );
         QVERIFY(!result.diagnostics.empty());
     }
@@ -253,8 +254,8 @@ void EphemerisDataManifestTests::rejectsMissingRequiredFields()
         "assets": []
     })";
 
-    const skygate::ephemeris::EphemerisDataManifestParseResult result =
-        skygate::ephemeris::parseEphemerisDataManifest(kMissingRequiredFields);
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+        skygate::ephemeris::EphemerisDataManifest::parse(kMissingRequiredFields);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(!result.diagnostics.empty());
@@ -262,36 +263,36 @@ void EphemerisDataManifestTests::rejectsMissingRequiredFields()
 
 void EphemerisDataManifestTests::parsesChecksumAndCompressionMetadata()
 {
-    const skygate::ephemeris::EphemerisDataManifestParseResult result =
-        skygate::ephemeris::parseEphemerisDataManifest(validManifestPayload());
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+        skygate::ephemeris::EphemerisDataManifest::parse(validManifestPayload());
 
     QVERIFY(result.isSuccess());
-    const skygate::ephemeris::EphemerisDataManifestAsset* kernel = result.manifest.asset("de440s-kernel");
+    const skygate::ephemeris::EphemerisDataManifest::Asset* kernel = result.manifest.asset("de440s-kernel");
     QVERIFY(kernel != nullptr);
     QVERIFY(kernel->checksum.algorithm == std::string{"sha256"});
     QVERIFY(kernel->checksum.value == std::string{"0123456789abcdef"});
     QCOMPARE(
         static_cast<std::uint8_t>(kernel->compression.kind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestCompressionKind::Zstd)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifest::CompressionKind::Zstd)
     );
     QVERIFY(kernel->compression.compressedSizeBytes.has_value());
     QVERIFY(kernel->compression.uncompressedSizeBytes.has_value());
     QCOMPARE(*kernel->compression.compressedSizeBytes, std::uint64_t{4096});
     QCOMPARE(*kernel->compression.uncompressedSizeBytes, std::uint64_t{8192});
 
-    const skygate::ephemeris::EphemerisDataManifestAsset* leapSeconds = result.manifest.asset("leap-seconds");
+    const skygate::ephemeris::EphemerisDataManifest::Asset* leapSeconds = result.manifest.asset("leap-seconds");
     QVERIFY(leapSeconds != nullptr);
     QCOMPARE(
         static_cast<std::uint8_t>(leapSeconds->compression.kind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestCompressionKind::None)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifest::CompressionKind::None)
     );
     QVERIFY(!leapSeconds->compression.compressedSizeBytes.has_value());
 }
 
 void EphemerisDataManifestTests::parsesValidityRanges()
 {
-    const skygate::ephemeris::EphemerisDataManifestParseResult result =
-        skygate::ephemeris::parseEphemerisDataManifest(validManifestPayload());
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+        skygate::ephemeris::EphemerisDataManifest::parse(validManifestPayload());
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.manifest.dataSetInfo.dateRanges.size() == 1U);
@@ -302,7 +303,7 @@ void EphemerisDataManifestTests::parsesValidityRanges()
         result.manifest.dataSetInfo.dateRanges[0].end.julianDatePart1, epochForDate(13200, 12, 31).julianDatePart1
     );
 
-    const skygate::ephemeris::EphemerisDataManifestAsset* de441 = result.manifest.asset("de441-kernel");
+    const skygate::ephemeris::EphemerisDataManifest::Asset* de441 = result.manifest.asset("de441-kernel");
     QVERIFY(de441 != nullptr);
     QCOMPARE(de441->validityRange.start.julianDatePart1, epochForDate(-13200, 1, 1).julianDatePart1);
     QCOMPARE(de441->validityRange.end.julianDatePart1, epochForDate(17191, 1, 1).julianDatePart1);
@@ -310,28 +311,28 @@ void EphemerisDataManifestTests::parsesValidityRanges()
 
 void EphemerisDataManifestTests::distinguishesModernAndOptionalDe441Profiles()
 {
-    const skygate::ephemeris::EphemerisDataManifestParseResult result =
-        skygate::ephemeris::parseEphemerisDataManifest(validManifestPayload());
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+        skygate::ephemeris::EphemerisDataManifest::parse(validManifestPayload());
 
     QVERIFY(result.isSuccess());
-    const skygate::ephemeris::EphemerisDataManifestProfile* modern = result.manifest.profile("modern");
+    const skygate::ephemeris::EphemerisDataManifest::Profile* modern = result.manifest.profile("modern");
     QVERIFY(modern != nullptr);
     QVERIFY(modern->bundled);
     QVERIFY(!modern->longRange);
     QVERIFY(std::ranges::find(modern->assetIds, "de440s-kernel") != modern->assetIds.end());
 
-    const skygate::ephemeris::EphemerisDataManifestProfile* de441 = result.manifest.profile("de441-long-range");
+    const skygate::ephemeris::EphemerisDataManifest::Profile* de441 = result.manifest.profile("de441-long-range");
     QVERIFY(de441 != nullptr);
     QVERIFY(!de441->bundled);
     QVERIFY(de441->longRange);
     QCOMPARE(de441->assetIds.size(), std::size_t{1});
 
-    const skygate::ephemeris::EphemerisDataManifestAsset* de441Kernel = result.manifest.asset(de441->assetIds[0]);
+    const skygate::ephemeris::EphemerisDataManifest::Asset* de441Kernel = result.manifest.asset(de441->assetIds[0]);
     QVERIFY(de441Kernel != nullptr);
     QVERIFY(de441Kernel->optional);
     QCOMPARE(
         static_cast<std::uint8_t>(de441Kernel->kind),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel)
     );
 }
 
@@ -376,8 +377,8 @@ void EphemerisDataManifestTests::rejectsUnknownProfileAssetReferences()
         ]
     })";
 
-    const skygate::ephemeris::EphemerisDataManifestParseResult result =
-        skygate::ephemeris::parseEphemerisDataManifest(kUnknownReference);
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+        skygate::ephemeris::EphemerisDataManifest::parse(kUnknownReference);
 
     QVERIFY(!result.isSuccess());
     QVERIFY(!result.diagnostics.empty());
@@ -397,8 +398,8 @@ void EphemerisDataManifestTests::rejectsDuplicateIds()
     };
 
     for (const std::string& payload : payloads) {
-        const skygate::ephemeris::EphemerisDataManifestParseResult result =
-            skygate::ephemeris::parseEphemerisDataManifest(payload);
+        const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+            skygate::ephemeris::EphemerisDataManifest::parse(payload);
 
         QVERIFY(!result.isSuccess());
         QVERIFY(hasDiagnosticContaining(result, "duplicate"));
@@ -414,8 +415,8 @@ void EphemerisDataManifestTests::rejectsInvalidBooleanFields()
     };
 
     for (const std::string& payload : payloads) {
-        const skygate::ephemeris::EphemerisDataManifestParseResult result =
-            skygate::ephemeris::parseEphemerisDataManifest(payload);
+        const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+            skygate::ephemeris::EphemerisDataManifest::parse(payload);
 
         QVERIFY(!result.isSuccess());
         QVERIFY(hasDiagnosticContaining(result, "boolean"));
@@ -430,8 +431,8 @@ void EphemerisDataManifestTests::rejectsUnsafeCompressionSizes()
     };
 
     for (const std::string& payload : payloads) {
-        const skygate::ephemeris::EphemerisDataManifestParseResult result =
-            skygate::ephemeris::parseEphemerisDataManifest(payload);
+        const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
+            skygate::ephemeris::EphemerisDataManifest::parse(payload);
 
         QVERIFY(!result.isSuccess());
         QVERIFY(hasDiagnosticContaining(result, "integer range"));

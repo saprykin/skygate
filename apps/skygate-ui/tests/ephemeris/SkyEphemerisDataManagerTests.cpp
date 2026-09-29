@@ -98,14 +98,14 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
     };
 }
 
-skygate::ephemeris::EphemerisDataManifestAsset stagedAsset(
+skygate::ephemeris::EphemerisDataManifest::Asset stagedAsset(
     std::string id,
-    const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
+    const skygate::ephemeris::EphemerisDataManifest::AssetKind kind,
     std::string relativePath,
     std::string profileId = "de440s-short-range"
 )
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset;
+    skygate::ephemeris::EphemerisDataManifest::Asset asset;
     asset.id = std::move(id);
     asset.kind = kind;
     asset.profileId = std::move(profileId);
@@ -113,7 +113,7 @@ skygate::ephemeris::EphemerisDataManifestAsset stagedAsset(
     asset.relativePath = std::move(relativePath);
     asset.checksum.algorithm = "sha256";
     asset.checksum.value = std::string{kPayloadSha256};
-    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None;
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None;
     asset.compression.uncompressedSizeBytes = kPayload.size();
     asset.validityRange = testValidityRange();
     return asset;
@@ -127,7 +127,7 @@ skygate::ephemeris::EphemerisDataManifest stagedManifest()
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de440s-short-range",
             .displayName = "DE440sShortRange",
             .bundled = false,
@@ -136,16 +136,16 @@ skygate::ephemeris::EphemerisDataManifest stagedManifest()
         }
     );
     manifest.assets.push_back(stagedAsset(
-        "de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+        "de440s-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
     ));
     manifest.assets.push_back(stagedAsset(
-        "leap-seconds", skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable, "time/leap-seconds.list"
+        "leap-seconds", skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable, "time/leap-seconds.list"
     ));
     manifest.assets.push_back(stagedAsset(
-        "earth-orientation", skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData, "time/eop.csv"
+        "earth-orientation", skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData, "time/eop.csv"
     ));
     manifest.assets.push_back(
-        stagedAsset("delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData, "time/delta-t.csv")
+        stagedAsset("delta-t", skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData, "time/delta-t.csv")
     );
     return manifest;
 }
@@ -158,7 +158,7 @@ skygate::ephemeris::EphemerisDataManifest longRangeStagedManifest()
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de441-long-range",
             .displayName = "DE441 long range",
             .bundled = false,
@@ -168,25 +168,25 @@ skygate::ephemeris::EphemerisDataManifest longRangeStagedManifest()
     );
     manifest.assets.push_back(stagedAsset(
         "de441-kernel",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel,
         "kernels/de441.bsp",
         "de441-long-range"
     ));
     manifest.assets.push_back(stagedAsset(
         "de441-leap-seconds",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable,
         "time/leap-seconds.list",
         "de441-long-range"
     ));
     manifest.assets.push_back(stagedAsset(
         "de441-earth-orientation",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData,
         "time/eop.csv",
         "de441-long-range"
     ));
     manifest.assets.push_back(stagedAsset(
         "de441-delta-t",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData,
         "time/delta-t.csv",
         "de441-long-range"
     ));
@@ -201,7 +201,7 @@ skygate::ephemeris::EphemerisDataManifest supportDataStagedManifest()
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "support-data",
             .displayName = "Time and Earth data",
             .bundled = false,
@@ -211,19 +211,19 @@ skygate::ephemeris::EphemerisDataManifest supportDataStagedManifest()
     );
     manifest.assets.push_back(stagedAsset(
         "support-leap-seconds",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable,
         "time/leap-seconds.list",
         "support-data"
     ));
     manifest.assets.push_back(stagedAsset(
         "support-earth-orientation",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData,
         "time/eop.csv",
         "support-data"
     ));
     manifest.assets.push_back(stagedAsset(
         "support-delta-t",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData,
         "time/delta-t.csv",
         "support-data"
     ));
@@ -238,7 +238,7 @@ skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de440s-short-range",
             .displayName = "DE440sShortRange",
             .bundled = false,
@@ -247,8 +247,8 @@ skygate::ephemeris::EphemerisDataManifest emptySingleAssetStagedManifest()
         }
     );
 
-    skygate::ephemeris::EphemerisDataManifestAsset asset = stagedAsset(
-        "de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = stagedAsset(
+        "de440s-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
     );
     asset.checksum.value = std::string{kEmptySha256};
     asset.compression.uncompressedSizeBytes = 0U;
@@ -313,7 +313,7 @@ skygate::ephemeris::EphemerisDataManifest parseSingleAssetManifest(const QString
 {
     const QString payload = singleAssetManifestJson(sourceUrl, version);
     const QByteArray bytes = payload.toUtf8();
-    skygate::ephemeris::EphemerisDataManifestParseResult result = skygate::ephemeris::parseEphemerisDataManifest(
+    skygate::ephemeris::EphemerisDataManifest::ParseResult result = skygate::ephemeris::EphemerisDataManifest::parse(
         std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size()))
     );
     if (!result.isSuccess()) {
@@ -328,7 +328,7 @@ skygate::ephemeris::EphemerisDataManifest parseSingleAssetManifest(const QString
 void writeStagedAssets(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifest& manifest)
 {
     const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
-    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
         QVERIFY(writeFile(root.path() + QStringLiteral("/") + QString::fromStdString(asset.relativePath), payload));
     }
 }
@@ -346,10 +346,10 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest stagedActivationRequest(
     request.stagedResourceRoot = stagedRoot.path();
     request.writableCacheRoot = writableCacheRoot;
     request.revisionToken = QStringLiteral("installed-rev-2");
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId.toStdString());
+    const skygate::ephemeris::EphemerisDataManifest::Profile* profile = manifest.profile(profileId.toStdString());
     Q_ASSERT(profile != nullptr);
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
         Q_ASSERT(asset != nullptr);
         request.requiredKinds.push_back(asset->kind);
         auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
@@ -382,7 +382,7 @@ skygate::ephemeris::EphemerisDataManifest loadProductionManifest()
     }
 
     const QByteArray payload = manifestFile.readAll();
-    skygate::ephemeris::EphemerisDataManifestParseResult result = skygate::ephemeris::parseEphemerisDataManifest(
+    skygate::ephemeris::EphemerisDataManifest::ParseResult result = skygate::ephemeris::EphemerisDataManifest::parse(
         std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
     );
     if (!result.isSuccess()) {
@@ -520,7 +520,7 @@ public:
     {
         Q_ASSERT(m_sourceRoot.isValid());
         Q_ASSERT(m_stagedRoot.isValid());
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = m_manifest.asset("de440s-kernel");
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = m_manifest.asset("de440s-kernel");
         Q_ASSERT(asset != nullptr);
         const QString sourcePath =
             m_sourceRoot.path() + QStringLiteral("/") + QString::fromStdString(asset->relativePath);
@@ -630,7 +630,7 @@ void SkyEphemerisDataManagerTests::productionManifestMetadataIsVerifiable()
     QVERIFY(!manifest.profiles.empty());
     QVERIFY(!manifest.assets.empty());
 
-    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
         QCOMPARE(QString::fromStdString(asset.checksum.algorithm), QString("sha256"));
         QVERIFY2(isSha256Hex(asset.checksum.value), asset.id.c_str());
         QVERIFY2(asset.compression.uncompressedSizeBytes.has_value(), asset.id.c_str());
@@ -638,9 +638,9 @@ void SkyEphemerisDataManagerTests::productionManifestMetadataIsVerifiable()
         QVERIFY2(!asset.sourceUrl.empty(), asset.id.c_str());
     }
 
-    for (const skygate::ephemeris::EphemerisDataManifestProfile& profile : manifest.profiles) {
+    for (const skygate::ephemeris::EphemerisDataManifest::Profile& profile : manifest.profiles) {
         for (const std::string& assetId : profile.assetIds) {
-            const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+            const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
             QVERIFY2(asset != nullptr, assetId.c_str());
             QCOMPARE(QString::fromStdString(asset->profileId), QString::fromStdString(profile.id));
         }
@@ -648,15 +648,15 @@ void SkyEphemerisDataManagerTests::productionManifestMetadataIsVerifiable()
 
     for (const std::string_view profileId :
          {std::string_view{"de440s-short-range"}, std::string_view{"de441-long-range"}}) {
-        const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId);
+        const skygate::ephemeris::EphemerisDataManifest::Profile* profile = manifest.profile(profileId);
         QVERIFY2(profile != nullptr, profileId.data());
         QCOMPARE(profile->assetIds.size(), std::size_t{1});
 
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(profile->assetIds.front());
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(profile->assetIds.front());
         QVERIFY2(asset != nullptr, profileId.data());
         QCOMPARE(
             static_cast<std::uint8_t>(asset->kind),
-            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel)
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel)
         );
     }
 }
@@ -1115,8 +1115,8 @@ void SkyEphemerisDataManagerTests::stagesAssetFromSourceUrl()
     const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
     QVERIFY(writeFile(sourcePath, payload));
 
-    skygate::ephemeris::EphemerisDataManifestAsset asset = stagedAsset(
-        "download-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
     );
     asset.sourceUrl = QUrl::fromLocalFile(sourcePath).toString().toStdString();
 
@@ -1162,8 +1162,8 @@ void SkyEphemerisDataManagerTests::cancellationDuringDownloadRetainsPartialStagi
     QTemporaryDir stagedRoot;
     QVERIFY(sourceRoot.isValid());
     QVERIFY(stagedRoot.isValid());
-    const skygate::ephemeris::EphemerisDataManifestAsset asset = stagedAsset(
-        "download-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    const skygate::ephemeris::EphemerisDataManifest::Asset asset = stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
     );
     const QByteArray payload(200000, 'x');
     const QString sourcePath = sourceRoot.path() + QStringLiteral("/kernels/de440s.bsp");

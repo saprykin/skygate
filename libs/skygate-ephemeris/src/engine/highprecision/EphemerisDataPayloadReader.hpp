@@ -30,7 +30,7 @@ public:
     };
 
     [[nodiscard]] static Result read(
-        EphemerisDataManifestCompressionKind compression,
+        EphemerisDataManifest::CompressionKind compression,
         QFile& sourceFile,
         QIODevice& targetFile,
         const std::function<bool()>& cancellationCallback

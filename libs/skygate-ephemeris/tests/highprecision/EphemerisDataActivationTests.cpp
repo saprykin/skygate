@@ -57,17 +57,17 @@ void writeFile(const QString& path, const QByteArray& payload)
     return iterator.hasNext();
 }
 
-[[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset makeZstdAsset()
+[[nodiscard]] skygate::ephemeris::EphemerisDataManifest::Asset makeZstdAsset()
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset;
+    skygate::ephemeris::EphemerisDataManifest::Asset asset;
     asset.id = "de440s-kernel";
-    asset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel;
+    asset.kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel;
     asset.profileId = "modern";
     asset.version = "test";
     asset.relativePath = "kernels/de440s.bsp.zst";
     asset.checksum.algorithm = "sha256";
     asset.checksum.value = std::string{kPayloadSha256};
-    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::Zstd;
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::Zstd;
     asset.compression.compressedSizeBytes = kCompressedPayload.size();
     asset.compression.uncompressedSizeBytes = kPayload.size();
     return asset;
@@ -108,22 +108,22 @@ void writeFile(const QString& path, const QByteArray& payload)
     return makeValidityRange(2000, 2100);
 }
 
-[[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset makeUncompressedAsset()
+[[nodiscard]] skygate::ephemeris::EphemerisDataManifest::Asset makeUncompressedAsset()
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     asset.relativePath = "kernels/de440s.bsp";
-    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None;
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None;
     asset.compression.compressedSizeBytes.reset();
     asset.compression.uncompressedSizeBytes = kPayload.size();
     asset.validityRange = testValidityRange();
     return asset;
 }
 
-[[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset makeUncompressedAsset(
-    std::string id, const skygate::ephemeris::EphemerisDataManifestAssetKind kind, std::string relativePath
+[[nodiscard]] skygate::ephemeris::EphemerisDataManifest::Asset makeUncompressedAsset(
+    std::string id, const skygate::ephemeris::EphemerisDataManifest::AssetKind kind, std::string relativePath
 )
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
     asset.id = std::move(id);
     asset.kind = kind;
     asset.relativePath = std::move(relativePath);
@@ -138,7 +138,7 @@ void writeFile(const QString& path, const QByteArray& payload)
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "modern",
             .displayName = "Modern",
             .bundled = false,
@@ -147,22 +147,22 @@ void writeFile(const QString& path, const QByteArray& payload)
         }
     );
     manifest.assets.push_back(makeUncompressedAsset(
-        "de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+        "de440s-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
     ));
     manifest.assets.push_back(makeUncompressedAsset(
-        "leap-seconds", skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable, "time/leap-seconds.list"
+        "leap-seconds", skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable, "time/leap-seconds.list"
     ));
     manifest.assets.push_back(makeUncompressedAsset(
-        "earth-orientation", skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData, "time/eop.csv"
+        "earth-orientation", skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData, "time/eop.csv"
     ));
     manifest.assets.push_back(makeUncompressedAsset(
-        "delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData, "time/delta-t.csv"
+        "delta-t", skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData, "time/delta-t.csv"
     ));
     return manifest;
 }
 
 [[nodiscard]] skygate::ephemeris::EphemerisDataActivationRequest makeRequest(
-    const skygate::ephemeris::EphemerisDataManifestAsset& asset,
+    const skygate::ephemeris::EphemerisDataManifest::Asset& asset,
     const QTemporaryDir& bundledRoot,
     const QTemporaryDir& cacheRoot
 )
@@ -181,7 +181,7 @@ void writeFile(const QString& path, const QByteArray& payload)
     );
 }
 
-void writeStagedAsset(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifestAsset& asset)
+void writeStagedAsset(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifest::Asset& asset)
 {
     const QString path = root.path() + QStringLiteral("/") + QString::fromStdString(asset.relativePath);
     QVERIFY(QDir().mkpath(QFileInfo(path).absolutePath()));
@@ -190,7 +190,7 @@ void writeStagedAsset(const QTemporaryDir& root, const skygate::ephemeris::Ephem
 
 void writeAllStagedAssets(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifest& manifest)
 {
-    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
         writeStagedAsset(root, asset);
     }
 }
@@ -204,16 +204,16 @@ verificationRequest(const skygate::ephemeris::EphemerisDataManifest& manifest, c
         .stagedResourceRoot = pathFromQString(stagedRoot.path()),
         .requiredKinds =
             {
-                skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
-                skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
-                skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
-                skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+                skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel,
+                skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable,
+                skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData,
+                skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData,
             },
         .expectedComponents = {
-            {"de440s-kernel", skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel},
-            {"leap-seconds", skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable},
-            {"earth-orientation", skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData},
-            {"delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData},
+            {"de440s-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel},
+            {"leap-seconds", skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable},
+            {"earth-orientation", skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData},
+            {"delta-t", skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData},
         },
     };
 
@@ -272,7 +272,7 @@ void EphemerisDataActivationTests::activatesValidZstdArchive()
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    const skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     writeFile(sourcePath(bundledRoot), compressedPayload());
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
@@ -299,7 +299,7 @@ void EphemerisDataActivationTests::rejectsCorruptZstdArchive()
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     QByteArray corruptPayload = compressedPayload();
     corruptPayload.fill('x');
     writeFile(sourcePath(bundledRoot), corruptPayload);
@@ -326,7 +326,7 @@ void EphemerisDataActivationTests::rejectsChecksumMismatch()
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     asset.checksum.value = std::string(64U, '0');
     writeFile(sourcePath(bundledRoot), compressedPayload());
 
@@ -352,7 +352,7 @@ void EphemerisDataActivationTests::rejectsExpectedSizeMismatch()
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
     asset.compression.uncompressedSizeBytes = kPayload.size() + 1U;
     writeFile(
         uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
@@ -377,7 +377,7 @@ void EphemerisDataActivationTests::preservesExistingCacheFileWhenReplacementCann
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    const skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
     writeFile(
         uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
     );
@@ -413,7 +413,7 @@ void EphemerisDataActivationTests::treatsExistingValidCacheFileAsAlreadyActive()
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    const skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     writeFile(sourcePath(bundledRoot), compressedPayload());
 
     const skygate::ephemeris::EphemerisDataActivationRequest request = makeRequest(asset, bundledRoot, cacheRoot);
@@ -444,7 +444,7 @@ void EphemerisDataActivationTests::cancelsActivationBeforeWritingCacheFile()
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    const skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
     writeFile(
         uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
     );
@@ -470,7 +470,7 @@ void EphemerisDataActivationTests::cancelsActivationAfterPayloadCopyBeforeCommit
     QVERIFY(bundledRoot.isValid());
     QVERIFY(cacheRoot.isValid());
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
-    const skygate::ephemeris::EphemerisDataManifestAsset asset = makeUncompressedAsset();
+    const skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
     writeFile(
         uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
     );
@@ -498,7 +498,7 @@ void EphemerisDataActivationTests::rejectsLargeKernelQtResourcePaths()
 {
     QTemporaryDir cacheRoot;
     QVERIFY(cacheRoot.isValid());
-    skygate::ephemeris::EphemerisDataManifestAsset asset = makeZstdAsset();
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     asset.compression.uncompressedSizeBytes = 2ULL * 1024ULL * 1024ULL * 1024ULL;
     const skygate::ephemeris::EphemerisDataActivationRequest request{
         .asset = &asset,
@@ -601,7 +601,7 @@ void EphemerisDataActivationTests::rejectsStagedUpdateWrongComponentKind()
     QTemporaryDir stagedRoot;
     QVERIFY(stagedRoot.isValid());
     skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
-    manifest.assets[0].kind = skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData;
+    manifest.assets[0].kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData;
     writeAllStagedAssets(stagedRoot, manifest);
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =

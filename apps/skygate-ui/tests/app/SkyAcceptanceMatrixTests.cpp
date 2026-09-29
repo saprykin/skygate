@@ -88,7 +88,7 @@ skygate::ephemeris::EphemerisDateRange acceptanceLongRange()
     return acceptanceRange("acceptance-long-range", "Acceptance long range", -13200, 13200);
 }
 
-skygate::ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
+skygate::ephemeris::EphemerisDataManifest::Asset acceptanceKernelAsset(
     std::string id,
     std::string profileId,
     std::string version,
@@ -97,9 +97,9 @@ skygate::ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
     const bool optional
 )
 {
-    return skygate::ephemeris::EphemerisDataManifestAsset{
+    return skygate::ephemeris::EphemerisDataManifest::Asset{
         .id = std::move(id),
-        .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+        .kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel,
         .profileId = std::move(profileId),
         .version = std::move(version),
         .sourceUrl = "https://example.invalid/ephemeris.bsp",
@@ -107,7 +107,7 @@ skygate::ephemeris::EphemerisDataManifestAsset acceptanceKernelAsset(
         .checksum = {.algorithm = "sha256", .value = std::string{kPayloadSha256}},
         .compression =
             {
-                .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
+                .kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None,
                 .uncompressedSizeBytes = kPayload.size(),
             },
         .validityRange = std::move(validityRange),
@@ -125,7 +125,7 @@ skygate::ephemeris::EphemerisDataManifest acceptanceManifest()
     manifest.dataSetInfo.dateRanges.push_back(acceptanceDE440sShortRangeRange());
     manifest.dataSetInfo.dateRanges.push_back(acceptanceLongRange());
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de440s-short-range",
             .displayName = "DE440sShortRange",
             .bundled = true,
@@ -134,7 +134,7 @@ skygate::ephemeris::EphemerisDataManifest acceptanceManifest()
         }
     );
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de441-long-range",
             .displayName = "DE441 long range",
             .bundled = false,
@@ -156,7 +156,7 @@ skygate::ephemeris::EphemerisDataManifest acceptanceManifest()
     return manifest;
 }
 
-void writeStagedAsset(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifestAsset& asset)
+void writeStagedAsset(const QTemporaryDir& root, const skygate::ephemeris::EphemerisDataManifest::Asset& asset)
 {
     const QByteArray payload(kPayload.data(), static_cast<qsizetype>(kPayload.size()));
     QVERIFY(writeFile(root.path() + QStringLiteral("/") + QString::fromStdString(asset.relativePath), payload));
@@ -168,10 +168,10 @@ void writeStagedAssetsForProfile(
     const std::string_view profileId
 )
 {
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId);
+    const skygate::ephemeris::EphemerisDataManifest::Profile* profile = manifest.profile(profileId);
     Q_ASSERT(profile != nullptr);
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
         Q_ASSERT(asset != nullptr);
         writeStagedAsset(root, *asset);
     }
@@ -190,10 +190,10 @@ SkyEphemerisDataManager::StagedUpdateActivationRequest activationRequest(
     request.stagedResourceRoot = stagedRoot.path();
     request.writableCacheRoot = writableCacheRoot;
     request.revisionToken = QStringLiteral("acceptance-%1-rev").arg(profileId);
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(profileId.toStdString());
+    const skygate::ephemeris::EphemerisDataManifest::Profile* profile = manifest.profile(profileId.toStdString());
     Q_ASSERT(profile != nullptr);
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
         Q_ASSERT(asset != nullptr);
         request.requiredKinds.push_back(asset->kind);
         auto& component = request.expectedComponents.emplace_back(asset->id, asset->kind);
@@ -338,8 +338,8 @@ skygate::ephemeris::highprecision::ICalcephKernel::Info acceptanceKernelInfo(
     }
 
     Q_ASSERT(snapshotAsset.has_value());
-    const skygate::ephemeris::EphemerisDataManifestAsset* manifestAsset = manifest.asset(snapshotAsset->id);
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile(snapshotAsset->profileId);
+    const skygate::ephemeris::EphemerisDataManifest::Asset* manifestAsset = manifest.asset(snapshotAsset->id);
+    const skygate::ephemeris::EphemerisDataManifest::Profile* profile = manifest.profile(snapshotAsset->profileId);
     Q_ASSERT(manifestAsset != nullptr);
     Q_ASSERT(profile != nullptr);
 

@@ -320,7 +320,7 @@ makeFactoryManifest(const QByteArray& payload, const std::uint64_t payloadSize)
     manifest.dataSetInfo.version = "test";
     manifest.dataSetInfo.provenance = "factory test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "modern",
             .displayName = "Modern",
             .bundled = true,
@@ -329,21 +329,21 @@ makeFactoryManifest(const QByteArray& payload, const std::uint64_t payloadSize)
         }
     );
     manifest.assets.push_back(
-        skygate::ephemeris::EphemerisDataManifestAsset{
+        skygate::ephemeris::EphemerisDataManifest::Asset{
             .id = "kernel",
-            .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+            .kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel,
             .profileId = "modern",
             .version = "de440s-test",
             .sourceUrl = "https://example.test/de440s.bsp",
             .relativePath = "de440s.bsp",
             .checksum =
-                skygate::ephemeris::EphemerisDataManifestChecksum{
+                skygate::ephemeris::EphemerisDataManifest::Checksum{
                     .algorithm = "sha256",
                     .value = QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex().toStdString(),
                 },
             .compression =
-                skygate::ephemeris::EphemerisDataManifestCompression{
-                    .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
+                skygate::ephemeris::EphemerisDataManifest::Compression{
+                    .kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None,
                     .uncompressedSizeBytes = payloadSize,
                 },
             .validityRange = makeKernelRange(),

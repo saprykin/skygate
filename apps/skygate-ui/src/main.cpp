@@ -1,30 +1,29 @@
+#include "MacDockIcon.hpp"
 #include "SkyContextController.hpp"
 #include "SkyLogging.hpp"
 #include "SkySceneModel.hpp"
 #include "SkySettingsStore.hpp"
 #include "SkyViewportItem.hpp"
-#include "MacDockIcon.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
 
-#include <QFont>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFont>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QLoggingCategory>
-#include <QQmlContext>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QSettings>
 #include <QSize>
 #include <QStandardPaths>
 #include <QSysInfo>
-#include <QWindow>
 #include <QVariantMap>
+#include <QWindow>
 #include <qqml.h>
-
-#include "factory/EphemerisEngineFactory.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "catalog/CatalogFactory.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -243,8 +242,8 @@ StartupEphemerisDataConfiguration startupEphemerisDataConfiguration()
         }
 
         const QByteArray payload = manifestFile.readAll();
-        skygate::ephemeris::EphemerisDataManifestParseResult parseResult =
-            skygate::ephemeris::parseEphemerisDataManifest(
+        skygate::ephemeris::EphemerisDataManifest::ParseResult parseResult =
+            skygate::ephemeris::EphemerisDataManifest::parse(
                 std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
             );
         if (!parseResult.isSuccess()) {

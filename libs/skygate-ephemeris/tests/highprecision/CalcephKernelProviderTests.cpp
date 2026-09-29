@@ -79,19 +79,19 @@ private:
     };
 }
 
-[[nodiscard]] skygate::ephemeris::EphemerisDataManifestAsset
+[[nodiscard]] skygate::ephemeris::EphemerisDataManifest::Asset
 makeKernelAsset(std::string id, std::string profileId, const int startYear, const int endYear)
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset;
+    skygate::ephemeris::EphemerisDataManifest::Asset asset;
     asset.id = std::move(id);
-    asset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel;
+    asset.kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel;
     asset.profileId = std::move(profileId);
     asset.version = "2026a";
     asset.sourceUrl = "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/test.bsp";
     asset.relativePath = "kernels/test.bsp";
     asset.checksum.algorithm = "sha256";
     asset.checksum.value = std::string{kPayloadSha256};
-    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None;
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None;
     asset.compression.uncompressedSizeBytes = kPayload.size();
     asset.validityRange = makeRange(asset.id + "-range", startYear, endYear);
     return asset;
@@ -106,7 +106,7 @@ makeKernelAsset(std::string id, std::string profileId, const int startYear, cons
     manifest.dataSetInfo.provenance = "unit-test";
     manifest.dataSetInfo.dateRanges.push_back(makeRange("product", -13200, 13200));
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "modern",
             .displayName = "Modern",
             .bundled = true,
@@ -115,7 +115,7 @@ makeKernelAsset(std::string id, std::string profileId, const int startYear, cons
         }
     );
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "long-range",
             .displayName = "Long range",
             .bundled = false,
@@ -124,7 +124,7 @@ makeKernelAsset(std::string id, std::string profileId, const int startYear, cons
         }
     );
     manifest.assets.push_back(makeKernelAsset("de440s-kernel", "modern", 1550, 2650));
-    skygate::ephemeris::EphemerisDataManifestAsset longRange =
+    skygate::ephemeris::EphemerisDataManifest::Asset longRange =
         makeKernelAsset("de441-kernel", "long-range", -13200, 13200);
     longRange.optional = true;
     manifest.assets.push_back(std::move(longRange));
@@ -262,9 +262,9 @@ void CalcephKernelProviderTests::reportsMissingKernelAsset()
     const QString kernelPath = writeKernel(root);
     skygate::ephemeris::EphemerisDataManifest manifest = makeManifest();
     manifest.profiles.front().assetIds = {"leap-seconds"};
-    skygate::ephemeris::EphemerisDataManifestAsset leapSecondAsset = manifest.assets.front();
+    skygate::ephemeris::EphemerisDataManifest::Asset leapSecondAsset = manifest.assets.front();
     leapSecondAsset.id = "leap-seconds";
-    leapSecondAsset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable;
+    leapSecondAsset.kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable;
     manifest.assets.push_back(std::move(leapSecondAsset));
 
     const skygate::ephemeris::highprecision::CalcephKernelProvider provider(makeSnapshot(kernelPath), manifest);

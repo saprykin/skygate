@@ -138,15 +138,15 @@ supportDataStatusText(const QString& rawStatusText, const QString& availableVers
 
 [[nodiscard]] QString supportDataVersion(
     const skygate::ephemeris::EphemerisDataManifest& manifest,
-    const skygate::ephemeris::EphemerisDataManifestAssetKind kind
+    const skygate::ephemeris::EphemerisDataManifest::AssetKind kind
 )
 {
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = manifest.profile("support-data");
+    const skygate::ephemeris::EphemerisDataManifest::Profile* profile = manifest.profile("support-data");
     if (profile == nullptr) {
         return {};
     }
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
         if (asset != nullptr && asset->kind == kind) {
             return QString::fromStdString(asset->version).trimmed();
         }
@@ -156,12 +156,13 @@ supportDataStatusText(const QString& rawStatusText, const QString& availableVers
 
 [[nodiscard]] QString profileProgressName(
     const skygate::ephemeris::EphemerisDataManifest& manifest,
-    const skygate::ephemeris::EphemerisDataManifestProfile& profile
+    const skygate::ephemeris::EphemerisDataManifest::Profile& profile
 )
 {
     for (const std::string& assetId : profile.assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = manifest.asset(assetId);
-        if (asset != nullptr && asset->kind == skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel) {
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
+        if (asset != nullptr
+            && asset->kind == skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel) {
             return QString::fromStdString(asset->version).trimmed();
         }
     }
@@ -298,7 +299,7 @@ void appendRevisionComponent(std::uint64_t& revision, const std::string_view val
 
 [[nodiscard]] std::optional<skygate::ephemeris::EphemerisDateRange> activeTextAssetRange(
     const skygate::ephemeris::EphemerisDataManifest* manifest,
-    const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
+    const skygate::ephemeris::EphemerisDataManifest::AssetKind kind,
     const QString& activeVersion
 )
 {
@@ -307,7 +308,7 @@ void appendRevisionComponent(std::uint64_t& revision, const std::string_view val
     }
 
     const std::string version = activeVersion.trimmed().toStdString();
-    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest->assets) {
+    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest->assets) {
         if (asset.kind == kind && asset.version == version) {
             return asset.validityRange;
         }
@@ -964,17 +965,17 @@ SkyContextController::ephemerisRequestContextFor(const skygate::core::Observatio
         const skygate::ephemeris::EphemerisDataManifest* manifest = activeEphemerisDataManifest();
         context.earthOrientationDataRange = activeTextAssetRange(
             manifest,
-            skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+            skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData,
             activeCache.installedEarthOrientationVersion
         );
         context.leapSecondTableRange = activeTextAssetRange(
             manifest,
-            skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+            skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable,
             activeCache.installedLeapSecondTableVersion
         );
         context.deltaTDataRange = activeTextAssetRange(
             manifest,
-            skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData,
+            skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData,
             activeCache.installedDeltaTDataVersion
         );
     }
@@ -1335,9 +1336,9 @@ bool SkyContextController::refreshEphemerisDataManifest(const QString& stagedRoo
         return false;
     }
 
-    skygate::ephemeris::EphemerisDataManifestAsset manifestAsset;
+    skygate::ephemeris::EphemerisDataManifest::Asset manifestAsset;
     manifestAsset.id = "manifest";
-    manifestAsset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData;
+    manifestAsset.kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData;
     manifestAsset.profileId = "manifest";
     manifestAsset.version = "manifest";
     manifestAsset.sourceUrl = manifestUrl.toStdString();
@@ -1369,9 +1370,10 @@ bool SkyContextController::refreshEphemerisDataManifest(const QString& stagedRoo
     }
 
     const QByteArray payload = manifestFile.readAll();
-    skygate::ephemeris::EphemerisDataManifestParseResult parseResult = skygate::ephemeris::parseEphemerisDataManifest(
-        std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
-    );
+    skygate::ephemeris::EphemerisDataManifest::ParseResult parseResult =
+        skygate::ephemeris::EphemerisDataManifest::parse(
+            std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
+        );
     if (!parseResult.isSuccess()) {
         const QString diagnostic = parseResult.diagnostics.empty()
                                        ? QStringLiteral("manifest parse failed")
@@ -1473,11 +1475,11 @@ bool SkyContextController::checkEphemerisSupportDataUpdates()
     }
 
     m_availableEarthOrientationVersion =
-        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData);
+        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData);
     m_availableLeapSecondVersion =
-        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable);
+        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable);
     m_availableDeltaTVersion =
-        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData);
+        supportDataVersion(*manifest, skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData);
     m_ephemerisSupportDataUpdateChecked = true;
     setEphemerisDataOperationStatusText({});
     emit ephemerisDataStatusTextChanged();
@@ -1571,14 +1573,14 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
     }
 
     const std::string profileId = normalizedProfileId.toStdString();
-    const skygate::ephemeris::EphemerisDataManifestProfile* profile = updateManifest->profile(profileId);
+    const skygate::ephemeris::EphemerisDataManifest::Profile* profile = updateManifest->profile(profileId);
     if (profile == nullptr) {
         return finishUpdate(false, QStringLiteral("Ephemeris data: Update profile unavailable"));
     }
 
     std::uint64_t totalExpectedBytes = 0U;
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = updateManifest->asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = updateManifest->asset(assetId);
         if (asset != nullptr && asset->compression.uncompressedSizeBytes.has_value()) {
             totalExpectedBytes += *asset->compression.uncompressedSizeBytes;
         }
@@ -1594,7 +1596,7 @@ bool SkyContextController::updateEphemerisDataProfile(const QString& profileIdTe
     request.writableCacheRoot = m_ephemerisWritableCacheRoot;
     request.revisionToken = QString::fromStdString(profile->id);
     for (const std::string& assetId : profile->assetIds) {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = updateManifest->asset(assetId);
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = updateManifest->asset(assetId);
         if (asset == nullptr) {
             return finishUpdate(false, QStringLiteral("Ephemeris data: Update profile references a missing asset"));
         }

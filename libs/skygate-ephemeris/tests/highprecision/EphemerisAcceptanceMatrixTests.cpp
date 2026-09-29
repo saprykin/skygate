@@ -157,7 +157,7 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     EphemerisDataManifest manifest;
     manifest.dataSetInfo = makeDataSetInfo(true);
     manifest.profiles.push_back(
-        EphemerisDataManifestProfile{
+        EphemerisDataManifest::Profile{
             .id = "de405s-modern",
             .displayName = "DE405s acceptance fixture",
             .bundled = true,
@@ -166,7 +166,7 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
         }
     );
     manifest.profiles.push_back(
-        EphemerisDataManifestProfile{
+        EphemerisDataManifest::Profile{
             .id = "de441-long-range",
             .displayName = "DE441 long-range acceptance profile",
             .bundled = false,
@@ -175,29 +175,29 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
         }
     );
     manifest.assets.push_back(
-        EphemerisDataManifestAsset{
+        EphemerisDataManifest::Asset{
             .id = "de405s-kernel",
-            .kind = EphemerisDataManifestAssetKind::SolarSystemKernel,
+            .kind = EphemerisDataManifest::AssetKind::SolarSystemKernel,
             .profileId = "de405s-modern",
             .version = "DE405s",
             .sourceUrl = "https://naif.jpl.nasa.gov/pub/naif/M01/kernels/spk/de405s.bsp",
             .relativePath = "ephemeris/kernels/de405s.bsp",
             .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
-            .compression = {.kind = EphemerisDataManifestCompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
+            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
             .validityRange = makeRange("de405s-modern-range", "DE405s fixture range", 2'451'544.5, 2'455'197.5),
             .optional = false,
         }
     );
     manifest.assets.push_back(
-        EphemerisDataManifestAsset{
+        EphemerisDataManifest::Asset{
             .id = "de441-kernel",
-            .kind = EphemerisDataManifestAssetKind::SolarSystemKernel,
+            .kind = EphemerisDataManifest::AssetKind::SolarSystemKernel,
             .profileId = "de441-long-range",
             .version = "DE441 fixture substitute",
             .sourceUrl = "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de441.bsp",
             .relativePath = "ephemeris/kernels/de405s.bsp",
             .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
-            .compression = {.kind = EphemerisDataManifestCompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
+            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
             .validityRange = makeRange("de441-long-range", "Optional DE441 long range", -3'100'000.5, 8'000'000.5),
             .optional = true,
         }

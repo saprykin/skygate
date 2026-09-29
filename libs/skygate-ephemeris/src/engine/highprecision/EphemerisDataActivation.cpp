@@ -51,7 +51,7 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
     return false;
 }
 
-[[nodiscard]] std::optional<std::filesystem::path> activeRelativePath(const EphemerisDataManifestAsset& asset)
+[[nodiscard]] std::optional<std::filesystem::path> activeRelativePath(const EphemerisDataManifest::Asset& asset)
 {
     if (asset.relativePath.empty()) {
         return std::nullopt;
@@ -67,7 +67,7 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
         return std::nullopt;
     }
 
-    if (asset.compression.kind == EphemerisDataManifestCompressionKind::Zstd && relativePath.extension() == ".zst") {
+    if (asset.compression.kind == EphemerisDataManifest::CompressionKind::Zstd && relativePath.extension() == ".zst") {
         relativePath.replace_extension();
     }
 
@@ -80,8 +80,8 @@ constexpr std::size_t kIoBufferBytes = 1U << 16U;
 
 [[nodiscard]] bool isLargeQtResourceKernel(const EphemerisDataActivationRequest& request)
 {
-    const EphemerisDataManifestAsset& asset = *request.asset;
-    if (request.allowQtResourceKernelAssets || asset.kind != EphemerisDataManifestAssetKind::SolarSystemKernel) {
+    const EphemerisDataManifest::Asset& asset = *request.asset;
+    if (request.allowQtResourceKernelAssets || asset.kind != EphemerisDataManifest::AssetKind::SolarSystemKernel) {
         return false;
     }
 
@@ -134,7 +134,7 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
 }
 
 [[nodiscard]] bool existingTargetIsCurrent(
-    const EphemerisDataManifestAsset& asset, const QString& targetPath, EphemerisDataActivationResult& result
+    const EphemerisDataManifest::Asset& asset, const QString& targetPath, EphemerisDataActivationResult& result
 )
 {
     const QFileInfo targetInfo(targetPath);
@@ -167,7 +167,7 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     return true;
 }
 
-[[nodiscard]] bool sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifestAsset& asset)
+[[nodiscard]] bool sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifest::Asset& asset)
 {
     return !asset.compression.compressedSizeBytes.has_value()
            || sourceInfo.size() == static_cast<qint64>(*asset.compression.compressedSizeBytes);
@@ -227,7 +227,7 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         addDiagnostic(result, "Ephemeris data activation requires a sha256 checksum for the active asset bytes.");
         return result;
     }
-    if (request.asset->compression.kind == EphemerisDataManifestCompressionKind::Zstd
+    if (request.asset->compression.kind == EphemerisDataManifest::CompressionKind::Zstd
         && !request.asset->compression.uncompressedSizeBytes.has_value()) {
         addDiagnostic(result, "zstd ephemeris data assets require an expected uncompressed size.");
         return result;

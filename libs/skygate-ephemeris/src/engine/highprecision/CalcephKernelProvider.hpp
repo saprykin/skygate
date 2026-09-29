@@ -7,7 +7,7 @@
 
 namespace skygate::ephemeris {
 class IEphemerisDataSnapshot;
-struct EphemerisDataManifest;
+class EphemerisDataManifest;
 }  // namespace skygate::ephemeris
 
 namespace skygate::ephemeris::highprecision {

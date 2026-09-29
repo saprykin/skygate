@@ -258,7 +258,7 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
 }  // namespace
 
 EphemerisDataPayloadReader::Result EphemerisDataPayloadReader::read(
-    const EphemerisDataManifestCompressionKind compression,
+    const EphemerisDataManifest::CompressionKind compression,
     QFile& sourceFile,
     QIODevice& targetFile,
     const std::function<bool()>& cancellationCallback
@@ -268,10 +268,10 @@ EphemerisDataPayloadReader::Result EphemerisDataPayloadReader::read(
     QCryptographicHash hash(QCryptographicHash::Sha256);
     bool read = false;
     switch (compression) {
-    case EphemerisDataManifestCompressionKind::None:
+    case EphemerisDataManifest::CompressionKind::None:
         read = copyUncompressedAsset(sourceFile, targetFile, hash, result.outputBytes, result, cancellationCallback);
         break;
-    case EphemerisDataManifestCompressionKind::Zstd:
+    case EphemerisDataManifest::CompressionKind::Zstd:
         read = decompressZstdAsset(sourceFile, targetFile, hash, result.outputBytes, result, cancellationCallback);
         break;
     }

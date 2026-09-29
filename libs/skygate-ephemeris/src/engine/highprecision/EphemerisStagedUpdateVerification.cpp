@@ -71,14 +71,14 @@ void markCanceled(EphemerisStagedUpdateVerificationResult& result)
     addDiagnostic(result, "Staged ephemeris update verification was canceled.");
 }
 
-[[nodiscard]] bool sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifestAsset& asset)
+[[nodiscard]] bool sourceSizeMatchesMetadata(const QFileInfo& sourceInfo, const EphemerisDataManifest::Asset& asset)
 {
     return !asset.compression.compressedSizeBytes.has_value()
            || sourceInfo.size() == static_cast<qint64>(*asset.compression.compressedSizeBytes);
 }
 
 [[nodiscard]] QString
-stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const EphemerisDataManifestAsset& asset)
+stagedSourcePath(const std::filesystem::path& stagedResourceRoot, const EphemerisDataManifest::Asset& asset)
 {
     return pathToQString(stagedResourceRoot / std::filesystem::path(asset.relativePath));
 }
@@ -100,8 +100,9 @@ validityRangeCovers(const EphemerisDateRange& availableRange, const EphemerisDat
     return availableStart <= requiredStart && requiredEnd <= availableEnd;
 }
 
-[[nodiscard]] bool
-hasKind(const std::vector<EphemerisDataManifestAssetKind>& kinds, const EphemerisDataManifestAssetKind kind) noexcept
+[[nodiscard]] bool hasKind(
+    const std::vector<EphemerisDataManifest::AssetKind>& kinds, const EphemerisDataManifest::AssetKind kind
+) noexcept
 {
     return std::find(kinds.begin(), kinds.end(), kind) != kinds.end();
 }
@@ -112,7 +113,7 @@ hasKind(const std::vector<EphemerisDataManifestAssetKind>& kinds, const Ephemeri
 }
 
 [[nodiscard]] bool
-validateAssetMetadata(const EphemerisDataManifestAsset& asset, EphemerisStagedUpdateVerificationResult& result)
+validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStagedUpdateVerificationResult& result)
 {
     bool valid = true;
     if (asset.id.empty() || asset.profileId.empty() || asset.version.empty() || asset.relativePath.empty()) {
@@ -128,7 +129,7 @@ validateAssetMetadata(const EphemerisDataManifestAsset& asset, EphemerisStagedUp
         addDiagnostic(result, "Staged ephemeris asset metadata contains an unsafe relative path.");
         valid = false;
     }
-    if (asset.compression.kind == EphemerisDataManifestCompressionKind::Zstd
+    if (asset.compression.kind == EphemerisDataManifest::CompressionKind::Zstd
         && (!asset.compression.compressedSizeBytes.has_value() || !asset.compression.uncompressedSizeBytes.has_value()
             || *asset.compression.compressedSizeBytes == 0U || *asset.compression.uncompressedSizeBytes == 0U)) {
         addDiagnostic(result, "zstd staged ephemeris assets require positive compressed and uncompressed sizes.");
@@ -166,7 +167,7 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
 }
 
 [[nodiscard]] bool verifyAssetPayload(
-    const EphemerisDataManifestAsset& asset,
+    const EphemerisDataManifest::Asset& asset,
     const QString& sourcePath,
     EphemerisStagedUpdateVerificationResult& result,
     const std::function<bool()>& cancellationCallback
@@ -248,7 +249,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
         return result;
     }
 
-    const EphemerisDataManifestProfile* profile = request.manifest->profile(request.profileId);
+    const EphemerisDataManifest::Profile* profile = request.manifest->profile(request.profileId);
     if (profile == nullptr || profile->assetIds.empty()) {
         result.status = EphemerisStagedUpdateVerificationStatus::UnsupportedProfile;
         addDiagnostic(result, "Requested ephemeris update profile is not present in the manifest.");
@@ -256,13 +257,13 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
     }
 
     std::unordered_set<std::string> seenAssetIds;
-    std::vector<EphemerisDataManifestAssetKind> presentKinds;
+    std::vector<EphemerisDataManifest::AssetKind> presentKinds;
     for (const std::string& assetId : profile->assetIds) {
         if (cancellationRequested(request.cancellationRequested)) {
             markCanceled(result);
             return result;
         }
-        const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
+        const EphemerisDataManifest::Asset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
             addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
@@ -291,7 +292,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
             markCanceled(result);
             return result;
         }
-        const EphemerisDataManifestAsset* asset = request.manifest->asset(component.assetId);
+        const EphemerisDataManifest::Asset* asset = request.manifest->asset(component.assetId);
         if (asset == nullptr || !hasAssetId(profile->assetIds, component.assetId)) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
             addDiagnostic(result, "Selected ephemeris update profile is missing an expected component.");
@@ -327,7 +328,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
         }
     }
 
-    for (const EphemerisDataManifestAssetKind kind : request.requiredKinds) {
+    for (const EphemerisDataManifest::AssetKind kind : request.requiredKinds) {
         if (cancellationRequested(request.cancellationRequested)) {
             markCanceled(result);
             return result;
@@ -344,7 +345,7 @@ EphemerisStagedUpdateVerification::verify(const EphemerisStagedUpdateVerificatio
             markCanceled(result);
             return result;
         }
-        const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
+        const EphemerisDataManifest::Asset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = EphemerisStagedUpdateVerificationStatus::IncompleteUpdateSet;
             addDiagnostic(result, "Selected ephemeris update profile references a missing manifest asset.");
