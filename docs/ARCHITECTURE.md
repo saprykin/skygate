@@ -290,11 +290,23 @@ high-precision providers and calculators:
 - `SolarSystemStateCalculator`
 - `StarAstrometryCalculator`
 - `TimeScaleService`
-- `EarthOrientationProvider`
+- `IEarthOrientationProvider`
+- `TableBackedEarthOrientationProvider`
+- `EarthOrientationDataParser`
+- `EarthOrientationDataLoader`
+- `EarthOrientationSampler`
 - `ErfaFrameTransformer`
 - `ApparentPlaceCalculator`
 - `AtmosphericRefractionCalculator`
 - `EphemerisComputationCache`
+
+Earth-orientation parsing returns validated rows and metadata without
+constructing a provider. The loader obtains snapshot assets, applies
+reference-epoch staleness, and creates an immutable table-backed provider.
+The separate sampler resolves UT1-UTC and polar motion using caller-owned
+fallback options and reports sample warnings. Provider contract types are
+nested in the interface; parsing, loading, and sampling types are nested
+in their respective classes.
 
 The factory supports strict high-precision creation or simple-engine fallback
 through `EphemerisFactoryFallbackPolicy`. `SkyContextController` owns the

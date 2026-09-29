@@ -2,8 +2,9 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
@@ -216,10 +217,10 @@ makeLeapSecondProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = 
 [[nodiscard]] std::shared_ptr<const IEarthOrientationProvider>
 makeEarthOrientationProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = std::nullopt)
 {
-    EarthOrientationDataLoadOptions options;
+    EarthOrientationDataLoader::Options options;
     options.referenceEpoch = referenceEpoch;
-    const EarthOrientationDataLoadResult result =
-        loadEarthOrientationDataFromTextAsset(makeEarthOrientationAsset(), options);
+    const EarthOrientationDataLoader::Result result =
+        EarthOrientationDataLoader::loadFromTextAsset(makeEarthOrientationAsset(), options);
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }
@@ -737,18 +738,18 @@ private:
 
 class StubEarthOrientationProvider final : public skygate::ephemeris::IEarthOrientationProvider {
 public:
-    [[nodiscard]] const EarthOrientationDataInfo& dataInfo() const noexcept override
+    [[nodiscard]] const IEarthOrientationProvider::DataInfo& dataInfo() const noexcept override
     {
         return m_dataInfo;
     }
 
-    [[nodiscard]] std::span<const EarthOrientationTableEntry> entries() const noexcept override
+    [[nodiscard]] std::span<const IEarthOrientationProvider::TableEntry> entries() const noexcept override
     {
         return {};
     }
 
 private:
-    EarthOrientationDataInfo m_dataInfo;
+    IEarthOrientationProvider::DataInfo m_dataInfo;
 };
 
 class StubAtmosphericRefractionCalculator final : public IAtmosphericRefractionCalculator {

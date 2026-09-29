@@ -58,13 +58,13 @@ void mergeTimeScaleWarningCodes(
 }
 
 void mergeEarthOrientationWarningCodes(
-    EphemerisEngineQueryResult& metadata, const EarthOrientationSample& sample
+    EphemerisEngineQueryResult& metadata, const EarthOrientationSampler::Sample& sample
 ) noexcept
 {
-    if (sample.hasWarning(EarthOrientationSampleWarningCode::MissingData)) {
+    if (sample.hasWarning(EarthOrientationSampler::Sample::WarningCode::MissingData)) {
         metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
     }
-    if (sample.hasWarning(EarthOrientationSampleWarningCode::EpochOutsideRange)) {
+    if (sample.hasWarning(EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange)) {
         metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     }
 }
@@ -145,16 +145,16 @@ void EphemerisMetadataMerger::mergeTimeScale(
 }
 
 void EphemerisMetadataMerger::mergeEarthOrientation(
-    EphemerisEngineQueryResult& metadata, const EarthOrientationSample& sample
+    EphemerisEngineQueryResult& metadata, const EarthOrientationSampler::Sample& sample
 ) noexcept
 {
-    if (sample.status == EarthOrientationSampleStatus::Failed) {
+    if (sample.status == EarthOrientationSampler::Sample::Status::Failed) {
         metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         mergeEarthOrientationWarningCodes(metadata, sample);
         metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return;
     }
-    if (sample.status == EarthOrientationSampleStatus::Degraded) {
+    if (sample.status == EarthOrientationSampler::Sample::Status::Degraded) {
         addDegradedWarning(metadata, EphemerisEngineWarning::Code::AccuracyDegraded);
         mergeEarthOrientationWarningCodes(metadata, sample);
     }

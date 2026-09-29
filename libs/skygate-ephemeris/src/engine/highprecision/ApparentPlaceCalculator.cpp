@@ -1,6 +1,6 @@
 #include "ApparentPlaceCalculator.hpp"
 #include "CelestialFrameMath.hpp"
-#include "EarthOrientationProvider.hpp"
+#include "EarthOrientationSampler.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "IFrameTransformer.hpp"
 #include "ObserverGeodesy.hpp"
@@ -261,10 +261,10 @@ private:
             return state;
         }
 
-        const EarthOrientationSample earthOrientationSample = sampleEarthOrientation(
+        const EarthOrientationSampler::Sample earthOrientationSample = EarthOrientationSampler::sample(
             m_context.earthOrientationProvider,
             utcConversion.epoch,
-            EarthOrientationSampleOptions{
+            EarthOrientationSampler::Options{
                 .allowOutOfRangeNearestSampleFallback = true,
                 .allowMissingDataZeroFallback = true,
                 .degradePredictedData = false,

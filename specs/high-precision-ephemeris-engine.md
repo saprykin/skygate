@@ -279,7 +279,11 @@ focused calculator/provider classes:
 - `SolarSystemStateCalculator`
 - `StarAstrometryCalculator`
 - `TimeScaleService`
-- `EarthOrientationProvider`
+- `IEarthOrientationProvider`
+- `TableBackedEarthOrientationProvider`
+- `EarthOrientationDataParser`
+- `EarthOrientationDataLoader`
+- `EarthOrientationSampler`
 - `ErfaFrameTransformer`
 - `ApparentPlaceCalculator`
 - `AtmosphericRefractionCalculator`
@@ -303,7 +307,12 @@ Add ephemeris-specific time types and services:
 - `TimeScaleService`: UTC, TAI, TT, TDB, UT1 conversion
 - `LeapSecondProvider`: table-backed UTC/TAI data
 - `DeltaTProvider`: historical and future Delta T estimates
-- `EarthOrientationProvider`: UT1-UTC, polar motion, EOP interpolation
+- `IEarthOrientationProvider`: immutable Earth-orientation data contract
+- `TableBackedEarthOrientationProvider`: metadata and table storage
+- `EarthOrientationDataParser`: CSV, IERS C04, and finals2000A parsing
+- `EarthOrientationDataLoader`: asset access, staleness, provider creation
+- `EarthOrientationSampler`: UT1-UTC and polar motion interpolation,
+  fallback policy, and sample warnings
 
 Reasoning:
 

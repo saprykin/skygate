@@ -1,11 +1,10 @@
 #include "TimeScaleService.hpp"
+#include "math/MathConstants.hpp"
+#include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
-
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "engine/highprecision/ErfaAstrometry.hpp"
 #endif
-#include "math/MathConstants.hpp"
-#include "math/TimeConstants.hpp"
 
 #include <array>
 #include <cmath>
@@ -313,38 +312,40 @@ void addTdbApproximationWarning(TimeScaleConversionResult& result) noexcept
 }
 
 [[nodiscard]] TimeScaleConversionWarningCode
-timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampleWarningCode code) noexcept
+timeScaleWarningFromEarthOrientationWarning(const EarthOrientationSampler::Sample::WarningCode code) noexcept
 {
     switch (code) {
-    case EarthOrientationSampleWarningCode::StaleData:
+    case EarthOrientationSampler::Sample::WarningCode::StaleData:
         return TimeScaleConversionWarningCode::EarthOrientationDataStale;
-    case EarthOrientationSampleWarningCode::PredictedData:
+    case EarthOrientationSampler::Sample::WarningCode::PredictedData:
         return TimeScaleConversionWarningCode::EarthOrientationDataPredicted;
-    case EarthOrientationSampleWarningCode::MissingData:
+    case EarthOrientationSampler::Sample::WarningCode::MissingData:
         return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
-    case EarthOrientationSampleWarningCode::EpochOutsideRange:
+    case EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange:
         return TimeScaleConversionWarningCode::EpochOutsideEarthOrientationData;
-    case EarthOrientationSampleWarningCode::InvalidInput:
+    case EarthOrientationSampler::Sample::WarningCode::InvalidInput:
         return TimeScaleConversionWarningCode::InvalidInput;
-    case EarthOrientationSampleWarningCode::EstimatedData:
+    case EarthOrientationSampler::Sample::WarningCode::EstimatedData:
         return TimeScaleConversionWarningCode::EarthOrientationDataEstimated;
     }
 
     return TimeScaleConversionWarningCode::EarthOrientationDataMissing;
 }
 
-void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const EarthOrientationSample& sample) noexcept
+void mergeEarthOrientationSampleWarnings(
+    Ut1OffsetLookupResult& result, const EarthOrientationSampler::Sample& sample
+) noexcept
 {
     constexpr std::array kSampleWarningCodes{
-        EarthOrientationSampleWarningCode::StaleData,
-        EarthOrientationSampleWarningCode::PredictedData,
-        EarthOrientationSampleWarningCode::MissingData,
-        EarthOrientationSampleWarningCode::EpochOutsideRange,
-        EarthOrientationSampleWarningCode::InvalidInput,
-        EarthOrientationSampleWarningCode::EstimatedData,
+        EarthOrientationSampler::Sample::WarningCode::StaleData,
+        EarthOrientationSampler::Sample::WarningCode::PredictedData,
+        EarthOrientationSampler::Sample::WarningCode::MissingData,
+        EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange,
+        EarthOrientationSampler::Sample::WarningCode::InvalidInput,
+        EarthOrientationSampler::Sample::WarningCode::EstimatedData,
     };
 
-    for (const EarthOrientationSampleWarningCode sampleCode : kSampleWarningCodes) {
+    for (const EarthOrientationSampler::Sample::WarningCode sampleCode : kSampleWarningCodes) {
         if (sample.hasWarning(sampleCode)) {
             result.addWarning(timeScaleWarningFromEarthOrientationWarning(sampleCode));
         }
@@ -357,8 +358,8 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
     const AstronomicalEpoch& utcEpoch
 )
 {
-    const EarthOrientationSample sample =
-        sampleEarthOrientation(earthOrientationProvider, utcEpoch, options.earthOrientationSampleOptions);
+    const EarthOrientationSampler::Sample sample =
+        EarthOrientationSampler::sample(earthOrientationProvider, utcEpoch, options.earthOrientationSampleOptions);
 
     Ut1OffsetLookupResult result;
     result.diagnosticText = sample.diagnosticText;
@@ -369,8 +370,9 @@ void mergeEarthOrientationSampleWarnings(Ut1OffsetLookupResult& result, const Ea
     }
 
     result.ut1MinusUtcSeconds = sample.ut1MinusUtcSeconds;
-    result.status = sample.status == EarthOrientationSampleStatus::Degraded ? TimeScaleConversionStatus::Degraded
-                                                                            : TimeScaleConversionStatus::Valid;
+    result.status = sample.status == EarthOrientationSampler::Sample::Status::Degraded
+                        ? TimeScaleConversionStatus::Degraded
+                        : TimeScaleConversionStatus::Valid;
     return result;
 }
 

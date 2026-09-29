@@ -1,5 +1,6 @@
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -129,13 +130,13 @@ public:
     {
     }
 
-    [[nodiscard]] const EarthOrientationDataInfo& dataInfo() const noexcept override
+    [[nodiscard]] const IEarthOrientationProvider::DataInfo& dataInfo() const noexcept override
     {
         ++dataInfoCallCount;
         return m_provider->dataInfo();
     }
 
-    [[nodiscard]] std::span<const EarthOrientationTableEntry> entries() const noexcept override
+    [[nodiscard]] std::span<const IEarthOrientationProvider::TableEntry> entries() const noexcept override
     {
         ++entriesCallCount;
         return m_provider->entries();
@@ -177,17 +178,17 @@ private:
 
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider(
     const bool predicted = false,
-    const EarthOrientationDataStatus status = EarthOrientationDataStatus::Available,
+    const IEarthOrientationProvider::DataStatus status = IEarthOrientationProvider::DataStatus::Available,
     const bool estimated = false
 )
 {
-    EarthOrientationDataInfo info;
+    IEarthOrientationProvider::DataInfo info;
     info.version = "unit-test-eop";
     info.provenance = "SOFA t_erfa_c polar-motion fixture";
     info.status = status;
     info.diagnosticText = "Earth-orientation data loaded.";
 
-    EarthOrientationTableEntry entry;
+    IEarthOrientationProvider::TableEntry entry;
     entry.effectiveUtcEpoch = sofaReferenceUtcEpoch();
     entry.ut1MinusUtcSeconds = 0.0;
     entry.polarMotionXArcseconds = 0.05260995057240829;
@@ -196,7 +197,7 @@ private:
     entry.estimated = estimated;
 
     return std::make_shared<TableBackedEarthOrientationProvider>(
-        std::move(info), std::vector<EarthOrientationTableEntry>{entry}
+        std::move(info), std::vector<IEarthOrientationProvider::TableEntry>{entry}
     );
 }
 
@@ -780,7 +781,7 @@ void ErfaFrameTransformerTests::acceptsItrsTransformWithPredictedEarthOrientatio
 void ErfaFrameTransformerTests::degradesItrsTransformForStaleEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(
-        frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Stale)
+        frameTimeScaleService(), earthOrientationProvider(false, IEarthOrientationProvider::DataStatus::Stale)
     );
 
     const CelestialFrameTransformResult result = transformSingleVector(
@@ -802,7 +803,7 @@ void ErfaFrameTransformerTests::degradesItrsTransformForStaleEarthOrientationDat
 void ErfaFrameTransformerTests::degradesItrsTransformForEstimatedEarthOrientationData()
 {
     const ErfaFrameTransformer transformer(
-        frameTimeScaleService(), earthOrientationProvider(false, EarthOrientationDataStatus::Estimated)
+        frameTimeScaleService(), earthOrientationProvider(false, IEarthOrientationProvider::DataStatus::Estimated)
     );
 
     const CelestialFrameTransformResult result = transformSingleVector(

@@ -63,7 +63,15 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
     src/engine/highprecision/DeltaTDataLoader.hpp
     src/engine/highprecision/DeltaTDataLoader.cpp
-    src/engine/highprecision/EarthOrientationProvider.cpp
+    src/engine/highprecision/IEarthOrientationProvider.hpp
+    src/engine/highprecision/TableBackedEarthOrientationProvider.hpp
+    src/engine/highprecision/TableBackedEarthOrientationProvider.cpp
+    src/engine/highprecision/EarthOrientationDataParser.hpp
+    src/engine/highprecision/EarthOrientationDataParser.cpp
+    src/engine/highprecision/EarthOrientationDataLoader.hpp
+    src/engine/highprecision/EarthOrientationDataLoader.cpp
+    src/engine/highprecision/EarthOrientationSampler.hpp
+    src/engine/highprecision/EarthOrientationSampler.cpp
     src/engine/highprecision/EphemerisDataActivation.cpp
     src/engine/highprecision/EphemerisDataManifest.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
@@ -130,7 +138,11 @@ add_library(skygate-ephemeris STATIC
     src/catalog/constellation/ConstellationDataCodec.hpp
     src/ConstellationReferenceCalculator.hpp
     src/engine/highprecision/DeltaTDataLoader.hpp
-    src/engine/highprecision/EarthOrientationProvider.hpp
+    src/engine/highprecision/IEarthOrientationProvider.hpp
+    src/engine/highprecision/EarthOrientationDataParser.hpp
+    src/engine/highprecision/EarthOrientationDataLoader.hpp
+    src/engine/highprecision/EarthOrientationSampler.hpp
+    src/engine/highprecision/TableBackedEarthOrientationProvider.hpp
     src/engine/highprecision/EphemerisDataActivation.hpp
     src/engine/highprecision/EphemerisDataManifest.hpp
     src/engine/highprecision/EphemerisDataSnapshot.hpp

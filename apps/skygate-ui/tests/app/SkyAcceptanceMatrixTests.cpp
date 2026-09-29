@@ -6,8 +6,8 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/IEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QDir>
@@ -386,24 +386,25 @@ class AcceptanceEarthOrientationProvider final : public skygate::ephemeris::IEar
 public:
     AcceptanceEarthOrientationProvider()
     {
-        m_dataInfo.status = skygate::ephemeris::EarthOrientationDataStatus::Available;
+        m_dataInfo.status = skygate::ephemeris::IEarthOrientationProvider::DataStatus::Available;
         m_dataInfo.version = "acceptance-eop";
         m_dataInfo.provenance = "acceptance test";
     }
 
-    [[nodiscard]] const skygate::ephemeris::EarthOrientationDataInfo& dataInfo() const noexcept override
+    [[nodiscard]] const skygate::ephemeris::IEarthOrientationProvider::DataInfo& dataInfo() const noexcept override
     {
         return m_dataInfo;
     }
 
-    [[nodiscard]] std::span<const skygate::ephemeris::EarthOrientationTableEntry> entries() const noexcept override
+    [[nodiscard]] std::span<const skygate::ephemeris::IEarthOrientationProvider::TableEntry>
+    entries() const noexcept override
     {
         return m_entries;
     }
 
 private:
-    skygate::ephemeris::EarthOrientationDataInfo m_dataInfo;
-    std::vector<skygate::ephemeris::EarthOrientationTableEntry> m_entries;
+    skygate::ephemeris::IEarthOrientationProvider::DataInfo m_dataInfo;
+    std::vector<skygate::ephemeris::IEarthOrientationProvider::TableEntry> m_entries;
 };
 
 skygate::ephemeris::EphemerisEngineFactoryResult createAcceptanceHighPrecisionEngine(
