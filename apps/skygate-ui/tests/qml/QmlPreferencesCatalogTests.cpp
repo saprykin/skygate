@@ -1,6 +1,5 @@
-#include "time/CalendarTime.hpp"
 #include "QmlPreferencesTestSupport.hpp"
-
+#include "time/CalendarTime.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 
 #include <QFileInfo>
@@ -42,31 +41,31 @@ skygate::ephemeris::EphemerisDateRange testValidityRange()
     };
 }
 
-skygate::ephemeris::EphemerisDataManifestAsset
+skygate::ephemeris::EphemerisDataManifest::Asset
 emptyKernelAsset(std::string id, std::string profileId, std::string version, std::string relativePath)
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset;
+    skygate::ephemeris::EphemerisDataManifest::Asset asset;
     asset.id = std::move(id);
-    asset.kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel;
+    asset.kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel;
     asset.profileId = std::move(profileId);
     asset.version = std::move(version);
     asset.relativePath = std::move(relativePath);
     asset.checksum.algorithm = "sha256";
     asset.checksum.value = std::string{kEmptySha256};
-    asset.compression.kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None;
+    asset.compression.kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None;
     asset.compression.uncompressedSizeBytes = 0U;
     asset.validityRange = testValidityRange();
     return asset;
 }
 
-skygate::ephemeris::EphemerisDataManifestAsset emptyDataAsset(
+skygate::ephemeris::EphemerisDataManifest::Asset emptyDataAsset(
     std::string id,
-    const skygate::ephemeris::EphemerisDataManifestAssetKind kind,
+    const skygate::ephemeris::EphemerisDataManifest::AssetKind kind,
     std::string version,
     std::string relativePath
 )
 {
-    skygate::ephemeris::EphemerisDataManifestAsset asset =
+    skygate::ephemeris::EphemerisDataManifest::Asset asset =
         emptyKernelAsset(std::move(id), "support-data", std::move(version), std::move(relativePath));
     asset.kind = kind;
     return asset;
@@ -106,7 +105,7 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
 {
     skygate::ephemeris::EphemerisDataManifest manifest;
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de440s-short-range",
             .displayName = "DE440sShortRange",
             .bundled = true,
@@ -115,7 +114,7 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
         }
     );
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de441-long-range",
             .displayName = "DE441 long range",
             .bundled = false,
@@ -124,7 +123,7 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
         }
     );
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "support-data",
             .displayName = "Time and Earth data",
             .bundled = false,
@@ -140,18 +139,21 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
     );
     manifest.assets.push_back(emptyDataAsset(
         "support-earth-orientation",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::EarthOrientationData,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::EarthOrientationData,
         "2026-05-07",
         "time/eop.txt"
     ));
     manifest.assets.push_back(emptyDataAsset(
         "support-leap-seconds",
-        skygate::ephemeris::EphemerisDataManifestAssetKind::LeapSecondTable,
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::LeapSecondTable,
         "2026a",
         "time/leap-seconds.list"
     ));
     manifest.assets.push_back(emptyDataAsset(
-        "support-delta-t", skygate::ephemeris::EphemerisDataManifestAssetKind::DeltaTData, "2026a", "time/delta-t.data"
+        "support-delta-t",
+        skygate::ephemeris::EphemerisDataManifest::AssetKind::DeltaTData,
+        "2026a",
+        "time/delta-t.data"
     ));
     return manifest;
 }
@@ -159,7 +161,7 @@ skygate::ephemeris::EphemerisDataManifest minimalUpdateManifest()
 skygate::ephemeris::EphemerisDataManifest supportDataUpdateManifest()
 {
     skygate::ephemeris::EphemerisDataManifest manifest = minimalUpdateManifest();
-    for (skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+    for (skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
         if (asset.id == "support-earth-orientation") {
             asset.version = "2026-06-01";
         } else if (asset.id == "support-leap-seconds" || asset.id == "support-delta-t") {
@@ -171,7 +173,7 @@ skygate::ephemeris::EphemerisDataManifest supportDataUpdateManifest()
 
 bool writeStagedEphemerisAssets(const QString& root, const skygate::ephemeris::EphemerisDataManifest& manifest)
 {
-    for (const skygate::ephemeris::EphemerisDataManifestAsset& asset : manifest.assets) {
+    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
         if (!writeFile(root + QLatin1Char('/') + QString::fromStdString(asset.relativePath), QByteArray{})) {
             return false;
         }

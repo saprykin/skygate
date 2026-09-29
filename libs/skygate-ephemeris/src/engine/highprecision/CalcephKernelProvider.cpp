@@ -84,7 +84,7 @@ public:
 #if !defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         return failedKernel(Status::CalcephUnavailable, "CALCEPH support is not enabled in this build.");
 #else
-        const EphemerisDataManifestProfile* profile = selectProfile();
+        const EphemerisDataManifest::Profile* profile = selectProfile();
         if (profile == nullptr) {
             return failedKernel(
                 Status::MissingManifestProfile,
@@ -92,7 +92,7 @@ public:
             );
         }
 
-        const EphemerisDataManifestAsset* manifestAsset = selectKernelAsset(*profile);
+        const EphemerisDataManifest::Asset* manifestAsset = selectKernelAsset(*profile);
         if (manifestAsset == nullptr) {
             return failedKernel(
                 Status::MissingKernelAsset,
@@ -108,8 +108,8 @@ public:
 
         std::optional<EphemerisKernelDataAsset> snapshotAsset = snapshotKernelForProfile(*manifestAsset, *profile);
         if (!snapshotAsset.has_value() && !hasExplicitKernelSelection()) {
-            for (const EphemerisDataManifestProfile& candidateProfile : m_manifest.profiles) {
-                const EphemerisDataManifestAsset* candidateAsset = selectKernelAsset(candidateProfile);
+            for (const EphemerisDataManifest::Profile& candidateProfile : m_manifest.profiles) {
+                const EphemerisDataManifest::Asset* candidateAsset = selectKernelAsset(candidateProfile);
                 if (candidateAsset == nullptr) {
                     continue;
                 }
@@ -180,8 +180,8 @@ public:
     collectKernelAssets(const IEphemerisDataSnapshot& snapshot) const
     {
         std::vector<EphemerisKernelDataAsset> assets;
-        for (const EphemerisDataManifestAsset& manifestAsset : m_manifest.assets) {
-            if (manifestAsset.kind != EphemerisDataManifestAssetKind::SolarSystemKernel) {
+        for (const EphemerisDataManifest::Asset& manifestAsset : m_manifest.assets) {
+            if (manifestAsset.kind != EphemerisDataManifest::AssetKind::SolarSystemKernel) {
                 continue;
             }
 
@@ -240,7 +240,7 @@ public:
         return hash.result().toHex().toStdString() == expectedHexDigest;
     }
 
-    [[nodiscard]] const EphemerisDataManifestProfile* selectProfile() const noexcept
+    [[nodiscard]] const EphemerisDataManifest::Profile* selectProfile() const noexcept
     {
         if (!m_options.preferredProfileId.empty()) {
             return m_manifest.profile(m_options.preferredProfileId);
@@ -248,7 +248,7 @@ public:
 
         if (m_options.preferLongRange) {
             const auto match =
-                std::ranges::find_if(m_manifest.profiles, [](const EphemerisDataManifestProfile& profile) {
+                std::ranges::find_if(m_manifest.profiles, [](const EphemerisDataManifest::Profile& profile) {
                     return profile.longRange;
                 });
             if (match != m_manifest.profiles.end()) {
@@ -257,7 +257,7 @@ public:
         }
 
         const auto bundledShortRange =
-            std::ranges::find_if(m_manifest.profiles, [](const EphemerisDataManifestProfile& profile) {
+            std::ranges::find_if(m_manifest.profiles, [](const EphemerisDataManifest::Profile& profile) {
                 return profile.bundled && !profile.longRange;
             });
         if (bundledShortRange != m_manifest.profiles.end()) {
@@ -272,12 +272,12 @@ public:
         return !m_options.preferredProfileId.empty() || m_options.preferLongRange;
     }
 
-    [[nodiscard]] const EphemerisDataManifestAsset*
-    selectKernelAsset(const EphemerisDataManifestProfile& profile) const noexcept
+    [[nodiscard]] const EphemerisDataManifest::Asset*
+    selectKernelAsset(const EphemerisDataManifest::Profile& profile) const noexcept
     {
         for (const std::string& assetId : profile.assetIds) {
-            const EphemerisDataManifestAsset* asset = m_manifest.asset(assetId);
-            if (asset != nullptr && asset->kind == EphemerisDataManifestAssetKind::SolarSystemKernel) {
+            const EphemerisDataManifest::Asset* asset = m_manifest.asset(assetId);
+            if (asset != nullptr && asset->kind == EphemerisDataManifest::AssetKind::SolarSystemKernel) {
                 return asset;
             }
         }
@@ -285,8 +285,9 @@ public:
         return nullptr;
     }
 
-    [[nodiscard]] std::optional<EphemerisKernelDataAsset>
-    snapshotKernelForProfile(const EphemerisDataManifestAsset& asset, const EphemerisDataManifestProfile& profile) const
+    [[nodiscard]] std::optional<EphemerisKernelDataAsset> snapshotKernelForProfile(
+        const EphemerisDataManifest::Asset& asset, const EphemerisDataManifest::Profile& profile
+    ) const
     {
         const auto match =
             std::ranges::find_if(m_kernelAssets, [&asset](const EphemerisKernelDataAsset& snapshotAsset) {

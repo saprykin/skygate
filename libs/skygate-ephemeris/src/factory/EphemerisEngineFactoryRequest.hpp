@@ -11,7 +11,7 @@
 namespace skygate::ephemeris {
 
 class IEarthOrientationProvider;
-struct EphemerisDataManifest;
+class EphemerisDataManifest;
 class IEphemerisDataSnapshot;
 class IEphemerisDiagnosticsSink;
 class ITimeScaleService;

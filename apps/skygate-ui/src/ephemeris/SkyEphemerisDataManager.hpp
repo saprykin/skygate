@@ -40,7 +40,7 @@ public:
     };
 
     struct StagedUpdateDownloadRequest final {
-        const skygate::ephemeris::EphemerisDataManifestAsset* asset = nullptr;
+        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = nullptr;
         QString sourceUrl;
         QString sourceResourceRoot;
         QString stagedResourceRoot;
@@ -67,7 +67,7 @@ public:
         QString stagedResourceRoot;
         QString writableCacheRoot;
         QString revisionToken;
-        std::vector<skygate::ephemeris::EphemerisDataManifestAssetKind> requiredKinds;
+        std::vector<skygate::ephemeris::EphemerisDataManifest::AssetKind> requiredKinds;
         std::vector<skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent> expectedComponents;
         std::function<bool()> cancellationRequested;
         bool allowQtResourceKernelAssets = false;

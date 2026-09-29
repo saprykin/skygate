@@ -11,116 +11,81 @@
 
 namespace skygate::ephemeris {
 
-enum class EphemerisDataManifestStatus : std::uint8_t {
-    Valid,
-    Malformed
-};
+class EphemerisDataManifest {
+public:
+    enum class Status : std::uint8_t {
+        Valid,
+        Malformed
+    };
 
-[[nodiscard]] constexpr std::string_view displayName(const EphemerisDataManifestStatus status) noexcept
-{
-    switch (status) {
-    case EphemerisDataManifestStatus::Valid:
-        return "valid";
-    case EphemerisDataManifestStatus::Malformed:
-        return "malformed";
-    }
+    enum class AssetKind : std::uint8_t {
+        SolarSystemKernel,
+        LeapSecondTable,
+        EarthOrientationData,
+        DeltaTData
+    };
 
-    return {};
-}
+    enum class CompressionKind : std::uint8_t {
+        None,
+        Zstd
+    };
 
-enum class EphemerisDataManifestAssetKind : std::uint8_t {
-    SolarSystemKernel,
-    LeapSecondTable,
-    EarthOrientationData,
-    DeltaTData
-};
+    struct Checksum {
+        std::string algorithm;
+        std::string value;
+    };
 
-[[nodiscard]] constexpr std::string_view displayName(const EphemerisDataManifestAssetKind kind) noexcept
-{
-    switch (kind) {
-    case EphemerisDataManifestAssetKind::SolarSystemKernel:
-        return "solar-system-kernel";
-    case EphemerisDataManifestAssetKind::LeapSecondTable:
-        return "leap-second-table";
-    case EphemerisDataManifestAssetKind::EarthOrientationData:
-        return "earth-orientation-data";
-    case EphemerisDataManifestAssetKind::DeltaTData:
-        return "delta-t-data";
-    }
+    struct Compression {
+        CompressionKind kind = CompressionKind::None;
+        std::optional<std::uint64_t> compressedSizeBytes;
+        std::optional<std::uint64_t> uncompressedSizeBytes;
+    };
 
-    return {};
-}
+    struct Asset {
+        std::string id;
+        AssetKind kind = AssetKind::SolarSystemKernel;
+        std::string profileId;
+        std::string version;
+        std::string sourceUrl;
+        std::string relativePath;
+        Checksum checksum;
+        Compression compression;
+        EphemerisDateRange validityRange;
+        bool optional = false;
+    };
 
-enum class EphemerisDataManifestCompressionKind : std::uint8_t {
-    None,
-    Zstd
-};
+    struct Profile {
+        std::string id;
+        std::string displayName;
+        bool bundled = false;
+        bool longRange = false;
+        std::vector<std::string> assetIds;
+    };
 
-[[nodiscard]] constexpr std::string_view displayName(const EphemerisDataManifestCompressionKind kind) noexcept
-{
-    switch (kind) {
-    case EphemerisDataManifestCompressionKind::None:
-        return "none";
-    case EphemerisDataManifestCompressionKind::Zstd:
-        return "zstd";
-    }
+    struct ParseResult;
 
-    return {};
-}
-
-struct EphemerisDataManifestChecksum {
-    std::string algorithm;
-    std::string value;
-};
-
-struct EphemerisDataManifestCompression {
-    EphemerisDataManifestCompressionKind kind = EphemerisDataManifestCompressionKind::None;
-    std::optional<std::uint64_t> compressedSizeBytes;
-    std::optional<std::uint64_t> uncompressedSizeBytes;
-};
-
-struct EphemerisDataManifestAsset {
-    std::string id;
-    EphemerisDataManifestAssetKind kind = EphemerisDataManifestAssetKind::SolarSystemKernel;
-    std::string profileId;
-    std::string version;
-    std::string sourceUrl;
-    std::string relativePath;
-    EphemerisDataManifestChecksum checksum;
-    EphemerisDataManifestCompression compression;
-    EphemerisDateRange validityRange;
-    bool optional = false;
-};
-
-struct EphemerisDataManifestProfile {
-    std::string id;
-    std::string displayName;
-    bool bundled = false;
-    bool longRange = false;
-    std::vector<std::string> assetIds;
-};
-
-struct EphemerisDataManifest {
     int schemaVersion = 1;
     EphemerisDatasetInfo dataSetInfo;
-    std::vector<EphemerisDataManifestProfile> profiles;
-    std::vector<EphemerisDataManifestAsset> assets;
+    std::vector<Profile> profiles;
+    std::vector<Asset> assets;
 
-    [[nodiscard]] const EphemerisDataManifestProfile* profile(std::string_view id) const noexcept;
-    [[nodiscard]] const EphemerisDataManifestAsset* asset(std::string_view id) const noexcept;
+    [[nodiscard]] const Profile* profile(std::string_view id) const noexcept;
+    [[nodiscard]] const Asset* asset(std::string_view id) const noexcept;
+    [[nodiscard]] static ParseResult parse(std::string_view payload);
+
+private:
+    class Parser;
 };
 
-struct EphemerisDataManifestParseResult {
-    EphemerisDataManifestStatus status = EphemerisDataManifestStatus::Malformed;
+struct EphemerisDataManifest::ParseResult {
+    Status status = Status::Malformed;
     EphemerisDataManifest manifest;
     std::vector<std::string> diagnostics;
 
     [[nodiscard]] bool isSuccess() const noexcept
     {
-        return status == EphemerisDataManifestStatus::Valid && diagnostics.empty();
+        return status == Status::Valid && diagnostics.empty();
     }
 };
-
-[[nodiscard]] EphemerisDataManifestParseResult parseEphemerisDataManifest(std::string_view payload);
 
 }  // namespace skygate::ephemeris

@@ -1,15 +1,15 @@
 #pragma once
 
+#include "engine/highprecision/EphemerisDataManifest.hpp"
+
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 
 namespace skygate::ephemeris {
 
-struct EphemerisDataManifestAsset;
-
 struct EphemerisDataActivationRequest {
-    const EphemerisDataManifestAsset* asset = nullptr;
+    const EphemerisDataManifest::Asset* asset = nullptr;
     std::filesystem::path bundledResourceRoot;
     std::filesystem::path writableCacheRoot;
     bool allowQtResourceKernelAssets = false;

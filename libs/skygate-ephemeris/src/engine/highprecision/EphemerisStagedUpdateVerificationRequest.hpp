@@ -13,7 +13,7 @@ namespace skygate::ephemeris {
 struct EphemerisStagedUpdateVerificationRequest {
     struct ExpectedComponent {
         std::string assetId;
-        EphemerisDataManifestAssetKind kind = EphemerisDataManifestAssetKind::SolarSystemKernel;
+        EphemerisDataManifest::AssetKind kind = EphemerisDataManifest::AssetKind::SolarSystemKernel;
         std::optional<std::string> expectedVersion;
         std::optional<EphemerisDateRange> requiredValidityRange;
     };
@@ -21,7 +21,7 @@ struct EphemerisStagedUpdateVerificationRequest {
     const EphemerisDataManifest* manifest = nullptr;
     std::string profileId;
     std::filesystem::path stagedResourceRoot;
-    std::vector<EphemerisDataManifestAssetKind> requiredKinds;
+    std::vector<EphemerisDataManifest::AssetKind> requiredKinds;
     std::vector<ExpectedComponent> expectedComponents;
     std::function<bool()> cancellationRequested;
 };

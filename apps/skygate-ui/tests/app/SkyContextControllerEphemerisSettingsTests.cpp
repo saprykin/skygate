@@ -1,5 +1,5 @@
-#include "StaticCalcephKernelProvider.hpp"
 #include "SkyContextControllerTestSupport.hpp"
+#include "StaticCalcephKernelProvider.hpp"
 #include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
@@ -135,7 +135,7 @@ skygate::ephemeris::EphemerisDataManifest makeInstalledEphemerisManifest(const Q
     manifest.dataSetInfo.version = "2026a";
     manifest.dataSetInfo.provenance = "test";
     manifest.profiles.push_back(
-        skygate::ephemeris::EphemerisDataManifestProfile{
+        skygate::ephemeris::EphemerisDataManifest::Profile{
             .id = "de440s-short-range",
             .displayName = "DE440sShortRange",
             .bundled = false,
@@ -144,20 +144,20 @@ skygate::ephemeris::EphemerisDataManifest makeInstalledEphemerisManifest(const Q
         }
     );
     manifest.assets.push_back(
-        skygate::ephemeris::EphemerisDataManifestAsset{
+        skygate::ephemeris::EphemerisDataManifest::Asset{
             .id = "de440s-kernel",
-            .kind = skygate::ephemeris::EphemerisDataManifestAssetKind::SolarSystemKernel,
+            .kind = skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel,
             .profileId = "de440s-short-range",
             .version = "DE-test",
             .relativePath = "kernels/de440s.bsp",
             .checksum =
-                skygate::ephemeris::EphemerisDataManifestChecksum{
+                skygate::ephemeris::EphemerisDataManifest::Checksum{
                     .algorithm = "sha256",
                     .value = QCryptographicHash::hash(kernelPayload, QCryptographicHash::Sha256).toHex().toStdString(),
                 },
             .compression =
-                skygate::ephemeris::EphemerisDataManifestCompression{
-                    .kind = skygate::ephemeris::EphemerisDataManifestCompressionKind::None,
+                skygate::ephemeris::EphemerisDataManifest::Compression{
+                    .kind = skygate::ephemeris::EphemerisDataManifest::CompressionKind::None,
                     .uncompressedSizeBytes = static_cast<std::uint64_t>(kernelPayload.size()),
                 },
             .validityRange = testValidityRange(),

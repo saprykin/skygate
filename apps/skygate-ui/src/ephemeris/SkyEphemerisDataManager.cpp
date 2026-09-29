@@ -31,9 +31,6 @@ Q_LOGGING_CATEGORY(skygateEphemerisDataLog, "skygate.ephemeris.data")
 using EphemerisDataCacheSnapshot = SkySettingsStore::EphemerisDataCacheSnapshot;
 using skygate::ephemeris::EphemerisDataActivationRequest;
 using skygate::ephemeris::EphemerisDataManifest;
-using skygate::ephemeris::EphemerisDataManifestAsset;
-using skygate::ephemeris::EphemerisDataManifestAssetKind;
-using skygate::ephemeris::EphemerisDataManifestProfile;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationRequest;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationResult;
 using skygate::ephemeris::EphemerisStagedUpdateVerificationStatus;
@@ -162,7 +159,7 @@ QString safePathSegment(QString value)
     return result;
 }
 
-QString defaultRevisionToken(const EphemerisDataManifest& manifest, const EphemerisDataManifestProfile& profile)
+QString defaultRevisionToken(const EphemerisDataManifest& manifest, const EphemerisDataManifest::Profile& profile)
 {
     QStringList parts;
     if (!manifest.dataSetInfo.id.empty()) {
@@ -540,7 +537,7 @@ bool installedKernelLooksLongRange(const EphemerisDataCacheSnapshot& snapshot)
     return haystack.contains(QStringLiteral("de441")) || haystack.contains(QStringLiteral("long"));
 }
 
-const EphemerisDataManifestProfile*
+const EphemerisDataManifest::Profile*
 bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& profileId)
 {
     if (manifest == nullptr) {
@@ -549,12 +546,12 @@ bundledFallbackProfile(const EphemerisDataManifest* manifest, const QString& pro
 
     const std::string normalizedProfileId = profileId.trimmed().toStdString();
     if (!normalizedProfileId.empty()) {
-        const EphemerisDataManifestProfile* profile = manifest->profile(normalizedProfileId);
+        const EphemerisDataManifest::Profile* profile = manifest->profile(normalizedProfileId);
         return profile != nullptr && profile->bundled ? profile : nullptr;
     }
 
     const auto bundledShortRange =
-        std::ranges::find_if(manifest->profiles, [](const EphemerisDataManifestProfile& profile) {
+        std::ranges::find_if(manifest->profiles, [](const EphemerisDataManifest::Profile& profile) {
             return profile.bundled && !profile.longRange;
         });
     if (bundledShortRange != manifest->profiles.end()) {
@@ -653,7 +650,7 @@ std::filesystem::path activationCacheRoot(
 
 EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
     const EphemerisDataManifest& manifest,
-    const EphemerisDataManifestProfile& profile,
+    const EphemerisDataManifest::Profile& profile,
     const std::vector<std::pair<std::string, std::filesystem::path>>& activePaths,
     const EphemerisDataCacheSnapshot& baseSnapshot,
     const QString& revisionToken
@@ -666,7 +663,7 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
             .arg(profile.displayName.empty() ? stringToQString(profile.id) : stringToQString(profile.displayName));
 
     for (const std::string& assetId : profile.assetIds) {
-        const EphemerisDataManifestAsset* asset = manifest.asset(assetId);
+        const EphemerisDataManifest::Asset* asset = manifest.asset(assetId);
         if (asset == nullptr) {
             continue;
         }
@@ -675,7 +672,7 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
         });
 
         switch (asset->kind) {
-        case EphemerisDataManifestAssetKind::SolarSystemKernel:
+        case EphemerisDataManifest::AssetKind::SolarSystemKernel:
             snapshot.installedKernelAssetId = stringToQString(asset->id);
             snapshot.installedKernelProfileId = stringToQString(asset->profileId);
             snapshot.installedKernelVersion = stringToQString(asset->version);
@@ -683,19 +680,19 @@ EphemerisDataCacheSnapshot cacheSnapshotForActivatedProfile(
                 snapshot.installedKernelPath = pathToQString(activePath->second);
             }
             break;
-        case EphemerisDataManifestAssetKind::EarthOrientationData:
+        case EphemerisDataManifest::AssetKind::EarthOrientationData:
             snapshot.installedEarthOrientationVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
                 snapshot.installedEarthOrientationPath = pathToQString(activePath->second);
             }
             break;
-        case EphemerisDataManifestAssetKind::LeapSecondTable:
+        case EphemerisDataManifest::AssetKind::LeapSecondTable:
             snapshot.installedLeapSecondTableVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
                 snapshot.installedLeapSecondTablePath = pathToQString(activePath->second);
             }
             break;
-        case EphemerisDataManifestAssetKind::DeltaTData:
+        case EphemerisDataManifest::AssetKind::DeltaTData:
             snapshot.installedDeltaTDataVersion = stringToQString(asset->version);
             if (activePath != activePaths.end()) {
                 snapshot.installedDeltaTDataPath = pathToQString(activePath->second);
@@ -782,7 +779,7 @@ public:
             return asset;
         }
 
-        const EphemerisDataManifestProfile* profile =
+        const EphemerisDataManifest::Profile* profile =
             bundledFallbackProfile(m_bundledFallbackManifest, m_bundledFallbackProfileId);
         if (profile == nullptr || m_bundledFallbackResourceRoot.trimmed().isEmpty()) {
             return std::nullopt;
@@ -792,8 +789,8 @@ public:
             if (profileAssetId != assetId) {
                 continue;
             }
-            const EphemerisDataManifestAsset* manifestAsset = m_bundledFallbackManifest->asset(profileAssetId);
-            if (manifestAsset == nullptr || manifestAsset->kind != EphemerisDataManifestAssetKind::SolarSystemKernel
+            const EphemerisDataManifest::Asset* manifestAsset = m_bundledFallbackManifest->asset(profileAssetId);
+            if (manifestAsset == nullptr || manifestAsset->kind != EphemerisDataManifest::AssetKind::SolarSystemKernel
                 || manifestAsset->relativePath.empty()) {
                 return std::nullopt;
             }
@@ -1234,7 +1231,7 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
         return result;
     }
 
-    const EphemerisDataManifestProfile* profile = request.manifest->profile(profileId);
+    const EphemerisDataManifest::Profile* profile = request.manifest->profile(profileId);
     if (profile == nullptr) {
         result.status = StagedUpdateActivationStatus::VerificationFailed;
         result.verificationStatus = EphemerisStagedUpdateVerificationStatus::UnsupportedProfile;
@@ -1252,7 +1249,7 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
     std::vector<std::pair<std::string, std::filesystem::path>> activePaths;
     activePaths.reserve(profile->assetIds.size());
     for (const std::string& assetId : profile->assetIds) {
-        const EphemerisDataManifestAsset* asset = request.manifest->asset(assetId);
+        const EphemerisDataManifest::Asset* asset = request.manifest->asset(assetId);
         if (asset == nullptr) {
             result.status = StagedUpdateActivationStatus::ActivationFailed;
             addDiagnostic(result, QStringLiteral("Verified ephemeris staged update references a missing asset."));
