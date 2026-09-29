@@ -11,7 +11,7 @@
 #include "UtcTimeCodec.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/DeltaTDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
@@ -336,8 +336,8 @@ ephemerisProvidersFromSnapshot(const std::shared_ptr<const skygate::ephemeris::I
 
     const skygate::ephemeris::LeapSecondTableLoadResult leapSecondTable =
         skygate::ephemeris::loadLeapSecondTableFromSnapshot(*snapshot);
-    const skygate::ephemeris::DeltaTDataLoadResult deltaTData =
-        skygate::ephemeris::loadDeltaTDataFromSnapshot(*snapshot);
+    const skygate::ephemeris::DeltaTDataLoader::Result deltaTData =
+        skygate::ephemeris::DeltaTDataLoader::loadFromSnapshot(*snapshot);
     if (leapSecondTable.isSuccess()) {
         skygate::ephemeris::TimeScaleServiceOptions timeScaleOptions;
         timeScaleOptions.allowDegradedLeapSecondFallback = true;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DeltaTProvider.hpp"
+#include "ideltatprovider.hpp"
 #include "EarthOrientationProvider.hpp"
 #include "LeapSecondProvider.hpp"
 #include "time/AstronomicalEpoch.hpp"

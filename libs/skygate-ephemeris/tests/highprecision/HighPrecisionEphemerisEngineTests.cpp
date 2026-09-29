@@ -1,7 +1,7 @@
 #include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
-#include "engine/highprecision/DeltaTProvider.hpp"
+#include "engine/highprecision/DeltaTDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
@@ -247,7 +247,7 @@ makeEarthOrientationProvider(const std::optional<AstronomicalEpoch>& referenceEp
 
 [[nodiscard]] std::shared_ptr<const IDeltaTProvider> makeDeltaTProvider()
 {
-    const DeltaTDataLoadResult result = loadDeltaTDataFromTextAsset(makeDeltaTAsset());
+    const DeltaTDataLoader::Result result = DeltaTDataLoader::loadFromTextAsset(makeDeltaTAsset());
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }
