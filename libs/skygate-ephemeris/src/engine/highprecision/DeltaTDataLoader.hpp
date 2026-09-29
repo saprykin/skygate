@@ -1,7 +1,7 @@
 #pragma once
 
 #include "EphemerisDataSnapshot.hpp"
-#include "ideltatprovider.hpp"
+#include "IDeltaTProvider.hpp"
 
 #include <memory>
 #include <optional>
