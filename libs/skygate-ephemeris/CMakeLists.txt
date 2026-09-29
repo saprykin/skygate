@@ -73,6 +73,14 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/EarthOrientationSampler.hpp
     src/engine/highprecision/EarthOrientationSampler.cpp
     src/engine/highprecision/EphemerisDataActivation.cpp
+    src/engine/highprecision/EphemerisDataActivationRequest.cpp
+    src/engine/highprecision/EphemerisDataActivationResult.cpp
+    src/engine/highprecision/EphemerisDataActivationStatus.cpp
+    src/engine/highprecision/EphemerisDataPayloadReader.cpp
+    src/engine/highprecision/EphemerisStagedUpdateVerification.cpp
+    src/engine/highprecision/EphemerisStagedUpdateVerificationRequest.cpp
+    src/engine/highprecision/EphemerisStagedUpdateVerificationResult.cpp
+    src/engine/highprecision/EphemerisStagedUpdateVerificationStatus.cpp
     src/engine/highprecision/EphemerisDataManifest.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
     src/engine/highprecision/EphemerisComputationCache.cpp
@@ -144,6 +152,14 @@ add_library(skygate-ephemeris STATIC
     src/engine/highprecision/EarthOrientationSampler.hpp
     src/engine/highprecision/TableBackedEarthOrientationProvider.hpp
     src/engine/highprecision/EphemerisDataActivation.hpp
+    src/engine/highprecision/EphemerisDataActivationRequest.hpp
+    src/engine/highprecision/EphemerisDataActivationResult.hpp
+    src/engine/highprecision/EphemerisDataActivationStatus.hpp
+    src/engine/highprecision/EphemerisDataPayloadReader.hpp
+    src/engine/highprecision/EphemerisStagedUpdateVerification.hpp
+    src/engine/highprecision/EphemerisStagedUpdateVerificationRequest.hpp
+    src/engine/highprecision/EphemerisStagedUpdateVerificationResult.hpp
+    src/engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp
     src/engine/highprecision/EphemerisDataManifest.hpp
     src/engine/highprecision/EphemerisDataSnapshot.hpp
     src/engine/highprecision/ideltatprovider.hpp

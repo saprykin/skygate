@@ -308,6 +308,14 @@ fallback options and reports sample warnings. Provider contract types are
 nested in the interface; parsing, loading, and sampling types are nested
 in their respective classes.
 
+Ephemeris data updates use two independent library operations:
+`EphemerisStagedUpdateVerification::verify()` checks the staged profile,
+component metadata, and payloads without activating files.
+`EphemerisDataActivation::activate()` writes a validated asset into the cache
+and promotes it atomically. Each class has separate request, result, and status
+types. Both use `EphemerisDataPayloadReader` for streaming decompression and
+checksums; their operation-specific helpers remain in their source files.
+
 The factory supports strict high-precision creation or simple-engine fallback
 through `EphemerisFactoryFallbackPolicy`. `SkyContextController` owns the
 selected engine kind, correction options, refraction settings, data manager,

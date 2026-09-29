@@ -1,5 +1,6 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/EphemerisDataActivation.hpp"
+#include "engine/highprecision/EphemerisStagedUpdateVerification.hpp"
 
 #include <QDir>
 #include <QDirIterator>
@@ -251,6 +252,7 @@ private slots:
     void cancelsActivationAfterPayloadCopyBeforeCommit();
     void rejectsLargeKernelQtResourcePaths();
     void verifiesCompleteStagedUpdateSet();
+    void verifiesCompressedStagedAssetWithoutChangingSource();
     void cancelsStagedUpdateVerification();
     void rejectsStagedUpdateChecksumFailure();
     void rejectsStagedUpdateWrongComponentKind();
@@ -274,7 +276,7 @@ void EphemerisDataActivationTests::activatesValidZstdArchive()
     writeFile(sourcePath(bundledRoot), compressedPayload());
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+        skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
 
     if (result.status == skygate::ephemeris::EphemerisDataActivationStatus::UnsupportedCompression) {
         QSKIP("zstd runtime library is unavailable in this test environment.");
@@ -303,7 +305,7 @@ void EphemerisDataActivationTests::rejectsCorruptZstdArchive()
     writeFile(sourcePath(bundledRoot), corruptPayload);
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+        skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
 
     if (result.status == skygate::ephemeris::EphemerisDataActivationStatus::UnsupportedCompression) {
         QSKIP("zstd runtime library is unavailable in this test environment.");
@@ -329,7 +331,7 @@ void EphemerisDataActivationTests::rejectsChecksumMismatch()
     writeFile(sourcePath(bundledRoot), compressedPayload());
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+        skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
 
     if (result.status == skygate::ephemeris::EphemerisDataActivationStatus::UnsupportedCompression) {
         QSKIP("zstd runtime library is unavailable in this test environment.");
@@ -357,7 +359,7 @@ void EphemerisDataActivationTests::rejectsExpectedSizeMismatch()
     );
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+        skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
@@ -393,7 +395,7 @@ void EphemerisDataActivationTests::preservesExistingCacheFileWhenReplacementCann
     QVERIFY(QFile::setPermissions(activeDirectoryPath, readOnlyPermissions));
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(makeRequest(asset, bundledRoot, cacheRoot));
+        skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
 
     QVERIFY(QFile::setPermissions(activeDirectoryPath, originalPermissions));
     QCOMPARE(
@@ -416,7 +418,7 @@ void EphemerisDataActivationTests::treatsExistingValidCacheFileAsAlreadyActive()
 
     const skygate::ephemeris::EphemerisDataActivationRequest request = makeRequest(asset, bundledRoot, cacheRoot);
     const skygate::ephemeris::EphemerisDataActivationResult firstResult =
-        skygate::ephemeris::activateEphemerisDataAsset(request);
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
     if (firstResult.status == skygate::ephemeris::EphemerisDataActivationStatus::UnsupportedCompression) {
         QSKIP("zstd runtime library is unavailable in this test environment.");
     }
@@ -426,7 +428,7 @@ void EphemerisDataActivationTests::treatsExistingValidCacheFileAsAlreadyActive()
     );
 
     const skygate::ephemeris::EphemerisDataActivationResult secondResult =
-        skygate::ephemeris::activateEphemerisDataAsset(request);
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
 
     QCOMPARE(
         static_cast<std::uint8_t>(secondResult.status),
@@ -451,7 +453,7 @@ void EphemerisDataActivationTests::cancelsActivationBeforeWritingCacheFile()
     request.cancellationRequested = [] { return true; };
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(request);
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
@@ -481,7 +483,7 @@ void EphemerisDataActivationTests::cancelsActivationAfterPayloadCopyBeforeCommit
     };
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(request);
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
@@ -505,7 +507,7 @@ void EphemerisDataActivationTests::rejectsLargeKernelQtResourcePaths()
     };
 
     const skygate::ephemeris::EphemerisDataActivationResult result =
-        skygate::ephemeris::activateEphemerisDataAsset(request);
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.status),
@@ -522,7 +524,7 @@ void EphemerisDataActivationTests::verifiesCompleteStagedUpdateSet()
     writeAllStagedAssets(stagedRoot, manifest);
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(result.isSuccess());
     QCOMPARE(
@@ -530,6 +532,28 @@ void EphemerisDataActivationTests::verifiesCompleteStagedUpdateSet()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
     );
     QCOMPARE(result.verifiedAssetIds.size(), std::size_t{4});
+}
+
+void EphemerisDataActivationTests::verifiesCompressedStagedAssetWithoutChangingSource()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    manifest.assets[0] = makeZstdAsset();
+    manifest.assets[0].validityRange = testValidityRange();
+    writeAllStagedAssets(stagedRoot, manifest);
+    writeFile(sourcePath(stagedRoot), compressedPayload());
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
+
+    if (result.status == skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::UnsupportedCompression) {
+        QSKIP("zstd runtime is not available in this test environment.");
+    }
+    QVERIFY2(result.isSuccess(), result.diagnostics.empty() ? "" : result.diagnostics.front().c_str());
+    QCOMPARE(result.verifiedAssetIds.size(), std::size_t{4});
+    QCOMPARE(readFile(sourcePath(stagedRoot)), compressedPayload());
+    QVERIFY(!QFileInfo::exists(uncompressedSourcePath(stagedRoot)));
 }
 
 void EphemerisDataActivationTests::cancelsStagedUpdateVerification()
@@ -542,7 +566,7 @@ void EphemerisDataActivationTests::cancelsStagedUpdateVerification()
     request.cancellationRequested = [] { return true; };
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(request);
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(request);
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -562,7 +586,7 @@ void EphemerisDataActivationTests::rejectsStagedUpdateChecksumFailure()
     writeAllStagedAssets(stagedRoot, manifest);
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -581,7 +605,7 @@ void EphemerisDataActivationTests::rejectsStagedUpdateWrongComponentKind()
     writeAllStagedAssets(stagedRoot, manifest);
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -600,7 +624,7 @@ void EphemerisDataActivationTests::rejectsStagedUpdateVersionMismatch()
     writeAllStagedAssets(stagedRoot, manifest);
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -620,7 +644,7 @@ void EphemerisDataActivationTests::rejectsStagedUpdateValidityRangeMismatch()
     request.expectedComponents[0].requiredValidityRange = makeValidityRange(1990, 2100);
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(request);
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(request);
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -639,7 +663,7 @@ void EphemerisDataActivationTests::rejectsIncompleteStagedUpdateSet()
     QVERIFY(QFile::remove(stagedRoot.path() + QStringLiteral("/time/eop.csv")));
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -657,7 +681,7 @@ void EphemerisDataActivationTests::rejectsMalformedStagedMetadata()
     manifest.assets[0].relativePath = "../kernel.bsp";
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -675,7 +699,7 @@ void EphemerisDataActivationTests::rejectsMalformedStagedValidityRangeLabels()
     manifest.assets[0].validityRange.displayName.clear();
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -697,7 +721,7 @@ void EphemerisDataActivationTests::rejectsCorruptCompressedStagedAsset()
     writeFile(stagedRoot.path() + QStringLiteral("/kernels/de440s.bsp.zst"), QByteArrayLiteral("not-zstd"));
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest(manifest, stagedRoot));
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
 
     if (result.status == skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::UnsupportedCompression) {
         QSKIP("zstd runtime is not available in this test environment.");
@@ -719,7 +743,7 @@ void EphemerisDataActivationTests::rejectsUnsupportedStagedProfile()
     request.profileId = "missing-profile";
 
     const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(request);
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(request);
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
