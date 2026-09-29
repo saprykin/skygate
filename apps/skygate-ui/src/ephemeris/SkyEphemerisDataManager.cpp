@@ -1,9 +1,11 @@
 #include "SkyEphemerisDataManager.hpp"
+#include "engine/highprecision/EphemerisDataActivation.hpp"
+#include "engine/highprecision/EphemerisStagedUpdateVerification.hpp"
 
-#include <QFile>
-#include <QFileInfo>
 #include <QDir>
 #include <QEventLoop>
+#include <QFile>
+#include <QFileInfo>
 #include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -1209,7 +1211,7 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
     };
 
     const EphemerisStagedUpdateVerificationResult verificationResult =
-        skygate::ephemeris::verifyEphemerisStagedUpdateSet(verificationRequest);
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest);
     result.verificationStatus = verificationResult.status;
     if (verificationResult.status == EphemerisStagedUpdateVerificationStatus::Canceled) {
         result.status = StagedUpdateActivationStatus::Canceled;
@@ -1266,7 +1268,7 @@ SkyEphemerisDataManager::activateVerifiedStagedUpdateSet(const StagedUpdateActiv
             .cancellationRequested = isCanceled,
         };
         const skygate::ephemeris::EphemerisDataActivationResult activationResult =
-            skygate::ephemeris::activateEphemerisDataAsset(activationRequest);
+            skygate::ephemeris::EphemerisDataActivation::activate(activationRequest);
         result.activationStatus = activationResult.status;
         if (activationResult.status == skygate::ephemeris::EphemerisDataActivationStatus::Canceled) {
             result.status = StagedUpdateActivationStatus::Canceled;
