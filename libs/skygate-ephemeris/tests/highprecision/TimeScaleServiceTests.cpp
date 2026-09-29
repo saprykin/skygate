@@ -1,8 +1,9 @@
+#include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/EarthOrientationDataLoader.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
-#include "math/TimeConstants.hpp"
 
 #include <QtTest/QtTest>
 
@@ -60,10 +61,10 @@ namespace {
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider>
 makeEarthOrientationProvider(const std::optional<skygate::ephemeris::AstronomicalEpoch>& referenceEpoch = std::nullopt)
 {
-    skygate::ephemeris::EarthOrientationDataLoadOptions options;
+    skygate::ephemeris::EarthOrientationDataLoader::Options options;
     options.referenceEpoch = referenceEpoch;
-    const skygate::ephemeris::EarthOrientationDataLoadResult result =
-        skygate::ephemeris::loadEarthOrientationDataFromTextAsset(makeEarthOrientationAsset(), options);
+    const skygate::ephemeris::EarthOrientationDataLoader::Result result =
+        skygate::ephemeris::EarthOrientationDataLoader::loadFromTextAsset(makeEarthOrientationAsset(), options);
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }

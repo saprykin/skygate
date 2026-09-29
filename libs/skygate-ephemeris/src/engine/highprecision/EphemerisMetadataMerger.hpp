@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EarthOrientationProvider.hpp"
+#include "EarthOrientationSampler.hpp"
 #include "TimeScaleService.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 
@@ -51,7 +51,7 @@ public:
     ) noexcept;
 
     static void
-    mergeEarthOrientation(EphemerisEngineQueryResult& metadata, const EarthOrientationSample& sample) noexcept;
+    mergeEarthOrientation(EphemerisEngineQueryResult& metadata, const EarthOrientationSampler::Sample& sample) noexcept;
 };
 
 }  // namespace skygate::ephemeris::highprecision

@@ -387,11 +387,11 @@ class AcceptanceEarthOrientationProvider final : public IEarthOrientationProvide
 public:
     AcceptanceEarthOrientationProvider()
     {
-        m_dataInfo.status = EarthOrientationDataStatus::Available;
+        m_dataInfo.status = IEarthOrientationProvider::DataStatus::Available;
         m_dataInfo.version = "acceptance-eop";
         m_dataInfo.provenance = "acceptance test";
         m_entries.push_back(
-            EarthOrientationTableEntry{
+            IEarthOrientationProvider::TableEntry{
                 .effectiveUtcDate = {.astronomicalYear = 2024, .month = 1, .day = 1, .timeScale = TimeScale::Utc},
                 .effectiveUtcEpoch = makeEpoch(),
                 .ut1MinusUtcSeconds = 0.05,
@@ -401,19 +401,19 @@ public:
         );
     }
 
-    [[nodiscard]] const EarthOrientationDataInfo& dataInfo() const noexcept override
+    [[nodiscard]] const IEarthOrientationProvider::DataInfo& dataInfo() const noexcept override
     {
         return m_dataInfo;
     }
 
-    [[nodiscard]] std::span<const EarthOrientationTableEntry> entries() const noexcept override
+    [[nodiscard]] std::span<const IEarthOrientationProvider::TableEntry> entries() const noexcept override
     {
         return m_entries;
     }
 
 private:
-    EarthOrientationDataInfo m_dataInfo;
-    std::vector<EarthOrientationTableEntry> m_entries;
+    IEarthOrientationProvider::DataInfo m_dataInfo;
+    std::vector<IEarthOrientationProvider::TableEntry> m_entries;
 };
 
 class RecordingApparentPlaceCalculator final : public IApparentPlaceCalculator {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BaseCelestialBody.hpp"
-#include "EarthOrientationProvider.hpp"
+#include "EarthOrientationSampler.hpp"
 #include "EphemerisRequest.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "HorizontalCoordinate.hpp"
@@ -45,7 +45,7 @@ struct PreparedEphemerisRequestState {
     bool topocentricStatePrepared = false;
     bool topocentricStateAvailable = true;
     EphemerisEngineQueryResult topocentricMetadata;
-    std::optional<EarthOrientationSample> earthOrientationSample;
+    std::optional<EarthOrientationSampler::Sample> earthOrientationSample;
     std::optional<skygate::core::Vector3d> observerItrsPositionAu;
 };
 

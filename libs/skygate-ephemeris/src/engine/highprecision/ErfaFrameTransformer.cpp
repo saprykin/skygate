@@ -210,7 +210,7 @@ private:
         return conversion.epoch;
     }
 
-    [[nodiscard]] std::optional<EarthOrientationSample> earthOrientation(EphemerisEngineQueryResult& metadata)
+    [[nodiscard]] std::optional<EarthOrientationSampler::Sample> earthOrientation(EphemerisEngineQueryResult& metadata)
     {
         const std::optional<AstronomicalEpoch> utcEpoch = epochInScale(TimeScale::Utc, metadata);
         if (!utcEpoch.has_value()) {
@@ -218,10 +218,10 @@ private:
         }
 
         if (!m_earthOrientationSample.has_value()) {
-            m_earthOrientationSample = sampleEarthOrientation(
+            m_earthOrientationSample = EarthOrientationSampler::sample(
                 m_earthOrientationProvider,
                 *utcEpoch,
-                EarthOrientationSampleOptions{
+                EarthOrientationSampler::Options{
                     .allowOutOfRangeNearestSampleFallback = true,
                     .allowMissingDataZeroFallback = true,
                     .degradePredictedData = false,
@@ -249,7 +249,7 @@ private:
             return epochInScale(TimeScale::Ut1, metadata);
         }
 
-        const std::optional<EarthOrientationSample> sample = earthOrientation(metadata);
+        const std::optional<EarthOrientationSampler::Sample> sample = earthOrientation(metadata);
         if (!sample.has_value()) {
             return std::nullopt;
         }
@@ -303,7 +303,8 @@ private:
         if (!m_polarMotionMatrix.has_value()) {
             MatrixCacheEntry cacheEntry;
             const std::optional<AstronomicalEpoch> ttEpoch = epochInScale(TimeScale::Tt, cacheEntry.metadata);
-            const std::optional<EarthOrientationSample> earthOrientationSample = earthOrientation(cacheEntry.metadata);
+            const std::optional<EarthOrientationSampler::Sample> earthOrientationSample =
+                earthOrientation(cacheEntry.metadata);
             if (ttEpoch.has_value() && earthOrientationSample.has_value()) {
                 const std::optional<double> tioLocator = ErfaAstrometry::tioLocatorS00(*ttEpoch);
                 if (tioLocator.has_value()) {
@@ -462,7 +463,7 @@ private:
     std::optional<TimeScaleConversionResult> m_ttConversion;
     std::optional<TimeScaleConversionResult> m_utcConversion;
     std::optional<TimeScaleConversionResult> m_ut1Conversion;
-    std::optional<EarthOrientationSample> m_earthOrientationSample;
+    std::optional<EarthOrientationSampler::Sample> m_earthOrientationSample;
     std::optional<MatrixCacheEntry> m_celestialIntermediateMatrix;
     std::optional<MatrixCacheEntry> m_earthRotationMatrix;
     std::optional<MatrixCacheEntry> m_polarMotionMatrix;

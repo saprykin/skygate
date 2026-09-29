@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ideltatprovider.hpp"
-#include "EarthOrientationProvider.hpp"
+#include "EarthOrientationSampler.hpp"
 #include "LeapSecondProvider.hpp"
+#include "ideltatprovider.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CivilDateTime.hpp"
 #include "time/TimeScale.hpp"
@@ -118,7 +118,7 @@ struct TimeScaleConversionResult {
 struct TimeScaleServiceOptions {
     bool allowDegradedLeapSecondFallback = false;
     int fallbackTaiMinusUtcSeconds = 0;
-    EarthOrientationSampleOptions earthOrientationSampleOptions{false, false};
+    EarthOrientationSampler::Options earthOrientationSampleOptions{false, false};
     bool allowUt1DeltaTFallback = false;
 };
 

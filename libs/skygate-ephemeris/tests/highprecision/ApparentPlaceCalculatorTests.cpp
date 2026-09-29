@@ -5,6 +5,7 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/EphemerisMetadataMerger.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
+#include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QFile>
@@ -671,20 +672,20 @@ private:
     const double polarMotionYArcseconds
 )
 {
-    EarthOrientationDataInfo info;
+    IEarthOrientationProvider::DataInfo info;
     info.version = "unit-test-topocentric-eop";
     info.provenance = "JPL Horizons topocentric validation fixture";
-    info.status = EarthOrientationDataStatus::Available;
+    info.status = IEarthOrientationProvider::DataStatus::Available;
     info.diagnosticText = "Earth-orientation data loaded.";
 
-    EarthOrientationTableEntry entry;
+    IEarthOrientationProvider::TableEntry entry;
     entry.effectiveUtcEpoch = utcEpoch;
     entry.ut1MinusUtcSeconds = ut1MinusUtcSeconds;
     entry.polarMotionXArcseconds = polarMotionXArcseconds;
     entry.polarMotionYArcseconds = polarMotionYArcseconds;
 
     return std::make_shared<TableBackedEarthOrientationProvider>(
-        std::move(info), std::vector<EarthOrientationTableEntry>{entry}
+        std::move(info), std::vector<IEarthOrientationProvider::TableEntry>{entry}
     );
 }
 

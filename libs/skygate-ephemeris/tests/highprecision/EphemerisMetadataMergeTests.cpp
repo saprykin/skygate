@@ -69,10 +69,10 @@ void EphemerisMetadataMergeTests::failedTimeScaleConversionHonorsFailurePolicy()
 
 void EphemerisMetadataMergeTests::degradedEarthOrientationSampleMapsWarningCodes()
 {
-    EarthOrientationSample sample;
-    sample.status = EarthOrientationSampleStatus::Degraded;
-    sample.addWarning(EarthOrientationSampleWarningCode::MissingData);
-    sample.addWarning(EarthOrientationSampleWarningCode::EpochOutsideRange);
+    EarthOrientationSampler::Sample sample;
+    sample.status = EarthOrientationSampler::Sample::Status::Degraded;
+    sample.addWarning(EarthOrientationSampler::Sample::WarningCode::MissingData);
+    sample.addWarning(EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
 
     EphemerisEngineQueryResult metadata;
     EphemerisMetadataMerger::mergeEarthOrientation(metadata, sample);
@@ -88,9 +88,9 @@ void EphemerisMetadataMergeTests::degradedEarthOrientationSampleMapsWarningCodes
 
 void EphemerisMetadataMergeTests::failedEarthOrientationSampleMapsWarningCodes()
 {
-    EarthOrientationSample sample;
-    sample.status = EarthOrientationSampleStatus::Failed;
-    sample.addWarning(EarthOrientationSampleWarningCode::EpochOutsideRange);
+    EarthOrientationSampler::Sample sample;
+    sample.status = EarthOrientationSampler::Sample::Status::Failed;
+    sample.addWarning(EarthOrientationSampler::Sample::WarningCode::EpochOutsideRange);
 
     EphemerisEngineQueryResult metadata;
     EphemerisMetadataMerger::mergeEarthOrientation(metadata, sample);

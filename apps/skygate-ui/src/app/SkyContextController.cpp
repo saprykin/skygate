@@ -12,8 +12,9 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
+#include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/LeapSecondProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -328,8 +329,8 @@ ephemerisProvidersFromSnapshot(const std::shared_ptr<const skygate::ephemeris::I
         return bundle;
     }
 
-    const skygate::ephemeris::EarthOrientationDataLoadResult earthOrientationData =
-        skygate::ephemeris::loadEarthOrientationDataFromSnapshot(*snapshot);
+    const skygate::ephemeris::EarthOrientationDataLoader::Result earthOrientationData =
+        skygate::ephemeris::EarthOrientationDataLoader::loadFromSnapshot(*snapshot);
     if (earthOrientationData.isSuccess()) {
         bundle.earthOrientationProvider = earthOrientationData.provider;
     }

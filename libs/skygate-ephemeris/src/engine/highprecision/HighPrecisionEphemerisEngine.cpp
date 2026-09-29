@@ -585,10 +585,10 @@ private:
                     preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
                 );
             } else {
-                preparedState->earthOrientationSample = sampleEarthOrientation(
+                preparedState->earthOrientationSample = EarthOrientationSampler::sample(
                     m_dependencies.earthOrientationProvider,
                     utcConversion.epoch,
-                    EarthOrientationSampleOptions{
+                    EarthOrientationSampler::Options{
                         .allowOutOfRangeNearestSampleFallback = true,
                         .allowMissingDataZeroFallback = true,
                         .degradePredictedData = false,

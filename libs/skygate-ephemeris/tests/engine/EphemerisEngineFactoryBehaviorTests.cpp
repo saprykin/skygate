@@ -4,9 +4,9 @@
 #include "factory/IEphemerisDiagnosticsSink.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-#include "engine/highprecision/EarthOrientationProvider.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/IEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QCryptographicHash>
@@ -184,10 +184,10 @@ public:
         }
     )
     {
-        m_dataInfo.status = skygate::ephemeris::EarthOrientationDataStatus::Available;
+        m_dataInfo.status = skygate::ephemeris::IEarthOrientationProvider::DataStatus::Available;
         m_dataInfo.provenance = "factory behavior EOP";
         m_entries.push_back(
-            skygate::ephemeris::EarthOrientationTableEntry{
+            skygate::ephemeris::IEarthOrientationProvider::TableEntry{
                 .effectiveUtcDate =
                     skygate::ephemeris::CivilDateTime{
                         .astronomicalYear = 2023,
@@ -203,13 +203,14 @@ public:
         );
     }
 
-    [[nodiscard]] const skygate::ephemeris::EarthOrientationDataInfo& dataInfo() const noexcept override
+    [[nodiscard]] const skygate::ephemeris::IEarthOrientationProvider::DataInfo& dataInfo() const noexcept override
     {
         ++m_dataInfoCallCount;
         return m_dataInfo;
     }
 
-    [[nodiscard]] std::span<const skygate::ephemeris::EarthOrientationTableEntry> entries() const noexcept override
+    [[nodiscard]] std::span<const skygate::ephemeris::IEarthOrientationProvider::TableEntry>
+    entries() const noexcept override
     {
         ++m_entriesCallCount;
         return m_entries;
@@ -226,8 +227,8 @@ public:
     }
 
 private:
-    skygate::ephemeris::EarthOrientationDataInfo m_dataInfo;
-    std::vector<skygate::ephemeris::EarthOrientationTableEntry> m_entries;
+    skygate::ephemeris::IEarthOrientationProvider::DataInfo m_dataInfo;
+    std::vector<skygate::ephemeris::IEarthOrientationProvider::TableEntry> m_entries;
     mutable std::size_t m_dataInfoCallCount = 0U;
     mutable std::size_t m_entriesCallCount = 0U;
 };
