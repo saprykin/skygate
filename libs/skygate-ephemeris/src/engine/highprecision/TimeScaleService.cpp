@@ -184,8 +184,8 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
     }
 
     OffsetLookupResult result;
-    const LeapSecondTableInfo& tableInfo = provider->tableInfo();
-    if (tableInfo.status == LeapSecondTableStatus::Stale) {
+    const ILeapSecondProvider::TableInfo& tableInfo = provider->tableInfo();
+    if (tableInfo.status == ILeapSecondProvider::TableStatus::Stale) {
         result.status = TimeScaleConversionStatus::Degraded;
         result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
         result.diagnosticText = "Leap-second table is stale for UTC conversion.";
@@ -235,8 +235,8 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
     }
 
     OffsetLookupResult result;
-    const LeapSecondTableInfo& tableInfo = provider->tableInfo();
-    if (tableInfo.status == LeapSecondTableStatus::Stale) {
+    const ILeapSecondProvider::TableInfo& tableInfo = provider->tableInfo();
+    if (tableInfo.status == ILeapSecondProvider::TableStatus::Stale) {
         result.status = TimeScaleConversionStatus::Degraded;
         result.addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
         result.diagnosticText = "Leap-second table is stale for TAI conversion.";
@@ -244,7 +244,7 @@ failureResult(const AstronomicalEpoch& epoch, const TimeScale targetScale, std::
 
     const double requestedKey = taiEpoch.sortKey();
     std::optional<int> offset;
-    for (const LeapSecondTableEntry& entry : provider->entries()) {
+    for (const ILeapSecondProvider::TableEntry& entry : provider->entries()) {
         const AstronomicalEpoch entryTaiEpoch =
             entry.effectiveUtcEpoch.addSeconds(static_cast<double>(entry.taiMinusUtcSeconds), TimeScale::Tai);
         if (entryTaiEpoch.sortKey() > requestedKey) {

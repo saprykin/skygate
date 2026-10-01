@@ -2,7 +2,7 @@
 
 #include "EarthOrientationSampler.hpp"
 #include "IDeltaTProvider.hpp"
-#include "LeapSecondProvider.hpp"
+#include "ILeapSecondProvider.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CivilDateTime.hpp"
 #include "time/TimeScale.hpp"

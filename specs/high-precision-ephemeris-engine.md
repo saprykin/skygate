@@ -305,7 +305,9 @@ Add ephemeris-specific time types and services:
 - `AstronomicalEpoch`: two-part Julian date plus time scale
 - `CivilDateTime`: signed astronomical year, month, day, time, subsecond
 - `TimeScaleService`: UTC, TAI, TT, TDB, UT1 conversion
-- `LeapSecondProvider`: table-backed UTC/TAI data
+- `ILeapSecondProvider`: UTC/TAI data interface with nested table types
+- `TableBackedLeapSecondProvider`: table-backed UTC/TAI lookup
+- `LeapSecondTableLoader`: leap-second table parsing and validation
 - `DeltaTProvider`: historical and future Delta T estimates
 - `IEarthOrientationProvider`: immutable Earth-orientation data contract
 - `TableBackedEarthOrientationProvider`: metadata and table storage

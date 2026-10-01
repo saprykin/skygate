@@ -1,5 +1,5 @@
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
-#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/LeapSecondTableLoader.hpp"
 #include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -203,7 +203,7 @@ private:
 
 [[nodiscard]] std::shared_ptr<const ILeapSecondProvider> leapSecondProvider()
 {
-    const LeapSecondTableLoadResult result = loadLeapSecondTableFromTextAsset(
+    const LeapSecondTableLoader::Result result = LeapSecondTableLoader::loadFromTextAsset(
         EphemerisTextDataAsset{
             .id = "leap-seconds",
             .version = "unit-test-leap-seconds",

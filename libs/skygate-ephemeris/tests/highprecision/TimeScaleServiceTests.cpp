@@ -3,6 +3,7 @@
 #include "engine/highprecision/DeltaTDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/LeapSecondTableLoader.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -33,8 +34,8 @@ namespace {
 
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::ILeapSecondProvider> makeLeapSecondProvider()
 {
-    const skygate::ephemeris::LeapSecondTableLoadResult result =
-        skygate::ephemeris::loadLeapSecondTableFromTextAsset(makeLeapSecondAsset());
+    const skygate::ephemeris::LeapSecondTableLoader::Result result =
+        skygate::ephemeris::LeapSecondTableLoader::loadFromTextAsset(makeLeapSecondAsset());
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }

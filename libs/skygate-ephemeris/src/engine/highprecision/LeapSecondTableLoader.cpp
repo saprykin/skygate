@@ -1,5 +1,6 @@
-#include "LeapSecondProvider.hpp"
+#include "LeapSecondTableLoader.hpp"
 #include "HighPrecisionTextParser.hpp"
+#include "TableBackedLeapSecondProvider.hpp"
 #include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
 
@@ -105,7 +106,7 @@ constexpr std::string_view kValidityRangeDisplayName = "Leap-second table";
 }
 
 [[nodiscard]] std::optional<std::string>
-applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const std::size_t lineNumber)
+applyMetadataLine(ILeapSecondProvider::TableInfo& info, const std::string_view line, const std::size_t lineNumber)
 {
     if (std::optional<std::string> value = textParser().metadataValue(line, "version"); value.has_value()) {
         if (!value->empty()) {
@@ -149,7 +150,7 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
     return std::nullopt;
 }
 
-[[nodiscard]] bool parseCsvEntryLine(std::string_view line, LeapSecondTableEntry& entry) noexcept
+[[nodiscard]] bool parseCsvEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
     const std::size_t comma = line.find(',');
     if (comma == std::string_view::npos) {
@@ -174,7 +175,7 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
     return true;
 }
 
-[[nodiscard]] bool parseIanaEntryLine(std::string_view line, LeapSecondTableEntry& entry) noexcept
+[[nodiscard]] bool parseIanaEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
     const std::size_t commentOffset = line.find('#');
     const std::string_view payload = textParser().trimAsciiWhitespace(
@@ -209,7 +210,7 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
     return true;
 }
 
-[[nodiscard]] bool parseEntryLine(std::string_view line, LeapSecondTableEntry& entry) noexcept
+[[nodiscard]] bool parseEntryLine(std::string_view line, ILeapSecondProvider::TableEntry& entry) noexcept
 {
     return parseCsvEntryLine(line, entry) || parseIanaEntryLine(line, entry);
 }
@@ -220,8 +221,8 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
 }
 
 [[nodiscard]] EphemerisDateRange makeValidityRange(
-    const LeapSecondTableEntry& firstEntry,
-    const LeapSecondTableEntry& lastEntry,
+    const ILeapSecondProvider::TableEntry& firstEntry,
+    const ILeapSecondProvider::TableEntry& lastEntry,
     const std::optional<AstronomicalEpoch>& expiresAt
 )
 {
@@ -233,78 +234,46 @@ applyMetadataLine(LeapSecondTableInfo& info, const std::string_view line, const 
     return range;
 }
 
-[[nodiscard]] LeapSecondTableLoadResult
-failureResult(LeapSecondTableInfo info, const LeapSecondTableStatus status, std::string diagnosticText)
+[[nodiscard]] LeapSecondTableLoader::Result failureResult(
+    ILeapSecondProvider::TableInfo info, const ILeapSecondProvider::TableStatus status, std::string diagnosticText
+)
 {
     info.status = status;
     info.diagnosticText = std::move(diagnosticText);
 
-    LeapSecondTableLoadResult result;
+    LeapSecondTableLoader::Result result;
     result.tableInfo = std::move(info);
     return result;
 }
 
 }  // namespace
 
-TableBackedLeapSecondProvider::TableBackedLeapSecondProvider(
-    LeapSecondTableInfo tableInfo, std::vector<LeapSecondTableEntry> entries
+LeapSecondTableLoader::Result LeapSecondTableLoader::loadFromSnapshot(
+    const IEphemerisDataSnapshot& snapshot, const LeapSecondTableLoader::Options& options
 )
-    : m_tableInfo(std::move(tableInfo)), m_entries(std::move(entries))
-{
-}
-
-const LeapSecondTableInfo& TableBackedLeapSecondProvider::tableInfo() const noexcept
-{
-    return m_tableInfo;
-}
-
-std::span<const LeapSecondTableEntry> TableBackedLeapSecondProvider::entries() const noexcept
-{
-    return m_entries;
-}
-
-std::optional<int> TableBackedLeapSecondProvider::taiMinusUtcSeconds(const AstronomicalEpoch& utcEpoch) const noexcept
-{
-    if (!utcEpoch.isFiniteUtc()) {
-        return std::nullopt;
-    }
-
-    const double requestedEpochKey = utcEpoch.sortKey();
-    std::optional<int> offset;
-    for (const LeapSecondTableEntry& entry : m_entries) {
-        if (entry.effectiveUtcEpoch.sortKey() > requestedEpochKey) {
-            break;
-        }
-        offset = entry.taiMinusUtcSeconds;
-    }
-
-    return offset;
-}
-
-LeapSecondTableLoadResult
-loadLeapSecondTableFromSnapshot(const IEphemerisDataSnapshot& snapshot, const LeapSecondTableLoadOptions& options)
 {
     const std::optional<EphemerisTextDataAsset> asset = snapshot.leapSecondTableAsset();
     if (!asset.has_value()) {
-        LeapSecondTableInfo info;
+        ILeapSecondProvider::TableInfo info;
         return failureResult(
             std::move(info),
-            LeapSecondTableStatus::Missing,
+            ILeapSecondProvider::TableStatus::Missing,
             "Leap-second table asset is missing from the data snapshot."
         );
     }
 
-    return loadLeapSecondTableFromTextAsset(*asset, options);
+    return LeapSecondTableLoader::loadFromTextAsset(*asset, options);
 }
 
-LeapSecondTableLoadResult
-loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const LeapSecondTableLoadOptions& options)
+LeapSecondTableLoader::Result LeapSecondTableLoader::loadFromTextAsset(
+    const EphemerisTextDataAsset& asset, const LeapSecondTableLoader::Options& options
+)
 {
-    LeapSecondTableInfo info;
+    ILeapSecondProvider::TableInfo info;
     info.version = asset.version;
     info.provenance = asset.provenance;
 
-    std::vector<LeapSecondTableEntry> entries;
+    std::vector<ILeapSecondProvider::TableEntry> entries;
     std::string_view remaining = asset.content;
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
@@ -318,7 +287,9 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
         if (textParser().startsWith(line, "#@")) {
             if (std::optional<std::string> diagnosticText = applyMetadataLine(info, line, lineNumber);
                 diagnosticText.has_value()) {
-                return failureResult(std::move(info), LeapSecondTableStatus::Malformed, std::move(*diagnosticText));
+                return failureResult(
+                    std::move(info), ILeapSecondProvider::TableStatus::Malformed, std::move(*diagnosticText)
+                );
             }
             continue;
         }
@@ -329,11 +300,11 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
             continue;
         }
 
-        LeapSecondTableEntry entry;
+        ILeapSecondProvider::TableEntry entry;
         if (!parseEntryLine(line, entry)) {
             return failureResult(
                 std::move(info),
-                LeapSecondTableStatus::Malformed,
+                ILeapSecondProvider::TableStatus::Malformed,
                 "Leap-second table contains a malformed row at line " + std::to_string(lineNumber) + "."
             );
         }
@@ -341,28 +312,32 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
     }
 
     if (entries.empty()) {
-        return failureResult(std::move(info), LeapSecondTableStatus::Malformed, "Leap-second table contains no rows.");
+        return failureResult(
+            std::move(info), ILeapSecondProvider::TableStatus::Malformed, "Leap-second table contains no rows."
+        );
     }
 
-    const bool sorted = std::ranges::is_sorted(entries, {}, [](const LeapSecondTableEntry& entry) {
+    const bool sorted = std::ranges::is_sorted(entries, {}, [](const ILeapSecondProvider::TableEntry& entry) {
         return entry.effectiveUtcEpoch.sortKey();
     });
     if (!sorted) {
         return failureResult(
-            std::move(info), LeapSecondTableStatus::Malformed, "Leap-second table rows are not sorted by UTC date."
+            std::move(info),
+            ILeapSecondProvider::TableStatus::Malformed,
+            "Leap-second table rows are not sorted by UTC date."
         );
     }
 
     info.validityRange = makeValidityRange(entries.front(), entries.back(), info.expiresAt);
-    info.status = LeapSecondTableStatus::Available;
+    info.status = ILeapSecondProvider::TableStatus::Available;
     info.diagnosticText = "Leap-second table loaded.";
     if (options.referenceEpoch.has_value() && info.expiresAt.has_value() && options.referenceEpoch->isFiniteUtc()
         && options.referenceEpoch->sortKey() > info.expiresAt->sortKey()) {
-        info.status = LeapSecondTableStatus::Stale;
+        info.status = ILeapSecondProvider::TableStatus::Stale;
         info.diagnosticText = "Leap-second table is stale for the reference epoch.";
     }
 
-    LeapSecondTableLoadResult result;
+    LeapSecondTableLoader::Result result;
     result.tableInfo = info;
     result.provider = std::make_shared<TableBackedLeapSecondProvider>(std::move(info), std::move(entries));
     return result;
