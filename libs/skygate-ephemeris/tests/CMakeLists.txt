@@ -186,6 +186,12 @@ add_skygate_ephemeris_qtest(
 
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_skygate_ephemeris_qtest(
+        skygate-ephemeris-celestial-frame-math-tests
+        highprecision/CelestialFrameMathTests.cpp
+        LABELS "unit;highprecision"
+    )
+
+    add_skygate_ephemeris_qtest(
         skygate-ephemeris-highprecision-engine-tests
         highprecision/HighPrecisionEphemerisEngineTests.cpp
         LABELS "unit;highprecision"

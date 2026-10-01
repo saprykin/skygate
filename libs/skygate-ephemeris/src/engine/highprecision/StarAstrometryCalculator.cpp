@@ -1,4 +1,5 @@
 #include "StarAstrometryCalculator.hpp"
+#include "CelestialFrameMath.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
@@ -12,7 +13,6 @@
 #include "math/Vector3d.hpp"
 
 #include <cmath>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -75,19 +75,6 @@ hasAnnualParallaxInput(const CatalogStarAstrometry& astrometry, const EphemerisC
 }
 
 [[nodiscard]] skygate::core::Vector3d
-unitVectorFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
-{
-    const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
-    const double declinationRad = skygate::core::AngleMath::toRadians(coordinate.declinationDeg);
-    const double cosDeclination = std::cos(declinationRad);
-    return {
-        .x = cosDeclination * std::cos(rightAscensionRad),
-        .y = cosDeclination * std::sin(rightAscensionRad),
-        .z = std::sin(declinationRad),
-    };
-}
-
-[[nodiscard]] skygate::core::Vector3d
 eastBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) noexcept
 {
     const double rightAscensionRad = coordinate.rightAscensionHours * MathConstants::kRadiansPerHour;
@@ -107,30 +94,6 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
         .x = -std::sin(declinationRad) * std::cos(rightAscensionRad),
         .y = -std::sin(declinationRad) * std::sin(rightAscensionRad),
         .z = std::cos(declinationRad),
-    };
-}
-
-[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
-equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
-{
-    if (!vector.isFinite()) {
-        return std::nullopt;
-    }
-
-    const double xyDistance = std::hypot(vector.x, vector.y);
-    const double distance = vector.length();
-    if (distance <= std::numeric_limits<double>::min()) {
-        return std::nullopt;
-    }
-
-    double rightAscensionHours = std::atan2(vector.y, vector.x) * MathConstants::kHoursPerRadian;
-    if (rightAscensionHours < 0.0) {
-        rightAscensionHours += 24.0;
-    }
-
-    return skygate::core::EquatorialCoordinate{
-        .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = skygate::core::AngleMath::toDegrees(std::atan2(vector.z, xyDistance)),
     };
 }
 
@@ -162,7 +125,7 @@ equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
             ? finiteValueOrZero(astrometry.radialVelocityKmPerSecond)
             : 0.0;
 
-    const skygate::core::Vector3d referenceUnit = unitVectorFromEquatorial(reference);
+    const skygate::core::Vector3d referenceUnit = CelestialFrameMath::fromEquatorial(reference);
     const skygate::core::Vector3d east = eastBasisFromEquatorial(reference);
     const skygate::core::Vector3d north = northBasisFromEquatorial(reference);
     const double tangentialRaRadiansPerYear = properMotionRaMasPerYear * MathConstants::kMilliarcsecondsToRadians;
@@ -346,7 +309,7 @@ void recordAppliedCorrections(
             EphemerisMetadataMerger::markCorrectionUnavailable(
                 result.metadata, EphemerisCorrectionFlags::annualParallax()
             );
-            result.equatorial = equatorialFromVector(*propagatedVector);
+            result.equatorial = CelestialFrameMath::toEquatorial(*propagatedVector);
         } else {
             const std::optional<AstronomicalEpoch> kernelEpoch =
                 tdbEpochForKernel(result.metadata, request.epoch, timeScaleService, preparedState);
@@ -354,7 +317,7 @@ void recordAppliedCorrections(
                 EphemerisMetadataMerger::markCorrectionUnavailable(
                     result.metadata, EphemerisCorrectionFlags::annualParallax()
                 );
-                result.equatorial = equatorialFromVector(*propagatedVector);
+                result.equatorial = CelestialFrameMath::toEquatorial(*propagatedVector);
             } else {
                 const ICalcephKernel::StateResult earthState =
                     earthStateForAnnualParallax(*kernelEpoch, kernel, preparedState);
@@ -364,19 +327,19 @@ void recordAppliedCorrections(
                 if (earthState.positionAu.has_value()) {
                     const skygate::core::Vector3d geocentricVector = *propagatedVector - *earthState.positionAu;
                     result.observerRelativePositionAu = geocentricVector;
-                    result.equatorial = equatorialFromVector(geocentricVector);
+                    result.equatorial = CelestialFrameMath::toEquatorial(geocentricVector);
                     result.metadata.appliedCorrections |= EphemerisCorrectionFlags::annualParallax();
                 } else {
                     result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
                     EphemerisMetadataMerger::markCorrectionUnavailable(
                         result.metadata, EphemerisCorrectionFlags::annualParallax()
                     );
-                    result.equatorial = equatorialFromVector(*propagatedVector);
+                    result.equatorial = CelestialFrameMath::toEquatorial(*propagatedVector);
                 }
             }
         }
     } else {
-        result.equatorial = equatorialFromVector(*propagatedVector);
+        result.equatorial = CelestialFrameMath::toEquatorial(*propagatedVector);
     }
     if (!result.equatorial.has_value()) {
         return makeFailedResult();
