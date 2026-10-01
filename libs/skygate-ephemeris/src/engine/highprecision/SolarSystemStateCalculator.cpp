@@ -1,10 +1,10 @@
 #include "SolarSystemStateCalculator.hpp"
+#include "CelestialFrameMath.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
 #include "StringUtilities.hpp"
-#include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/Vector3d.hpp"
 
@@ -23,7 +23,6 @@ constexpr int kNaifEarth = 399;
 constexpr int kNaifSolarSystemBarycenter = 0;
 constexpr int kNaifSun = 10;
 
-using skygate::core::MathConstants;
 using skygate::core::PhysicalConstants;
 constexpr int kLightTimeIterationCount = 3;
 
@@ -182,30 +181,6 @@ makeStatusResult(const EphemerisEngineQueryStatus::Type status, const EphemerisE
     result.metadata.addWarning(warningCode);
     result.metadata.dataSourceProvenance = "CALCEPH geometric solar-system state";
     return result;
-}
-
-[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
-equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
-{
-    if (!vector.isFinite()) {
-        return std::nullopt;
-    }
-
-    const double xyDistance = std::hypot(vector.x, vector.y);
-    const double distance = vector.length();
-    if (distance <= std::numeric_limits<double>::min()) {
-        return std::nullopt;
-    }
-
-    double rightAscensionHours = std::atan2(vector.y, vector.x) * MathConstants::kHoursPerRadian;
-    if (rightAscensionHours < 0.0) {
-        rightAscensionHours += 24.0;
-    }
-
-    return skygate::core::EquatorialCoordinate{
-        .rightAscensionHours = rightAscensionHours,
-        .declinationDeg = std::atan2(vector.z, xyDistance) * MathConstants::kRadiansToDegrees,
-    };
 }
 
 [[nodiscard]] std::optional<skygate::core::Vector3d> withDirectionPreservingDistance(
@@ -485,7 +460,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     }
 
     result.observerRelativePositionAu = outputVector;
-    result.equatorial = equatorialFromVector(outputVector);
+    result.equatorial = CelestialFrameMath::toEquatorial(outputVector);
     if (!result.equatorial.has_value()) {
         result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
