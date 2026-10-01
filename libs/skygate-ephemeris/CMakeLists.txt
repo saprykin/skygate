@@ -51,7 +51,14 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/CelestialFrameMath.cpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.hpp
     src/engine/highprecision/HighPrecisionEphemerisEngine.cpp
-    src/engine/highprecision/HighPrecisionTypes.hpp
+    src/engine/highprecision/HighPrecisionComputationInput.hpp
+    src/engine/highprecision/HighPrecisionComputationInput.cpp
+    src/engine/highprecision/HighPrecisionCalculatorResult.hpp
+    src/engine/highprecision/HighPrecisionCalculatorResult.cpp
+    src/engine/highprecision/PreparedEphemerisRequestState.hpp
+    src/engine/highprecision/PreparedEphemerisRequestState.cpp
+    src/engine/highprecision/StarAstrometryBatchResult.hpp
+    src/engine/highprecision/StarAstrometryBatchResult.cpp
     src/engine/highprecision/IApparentPlaceCalculator.hpp
     src/engine/highprecision/IAtmosphericRefractionCalculator.hpp
     src/engine/highprecision/ICalcephKernel.hpp

@@ -26,7 +26,7 @@ public:
     [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override;
     [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override;
     [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept override;
-    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult
+    [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult
     compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
 
     void setStatus(Status status) noexcept;
@@ -36,17 +36,17 @@ public:
     void setRequiredTimeScale(TimeScale timeScale);
     void clearRequiredTimeScale() noexcept;
     void setValidateEpochRange(bool validateEpochRange) noexcept;
-    void setDefaultResult(skygate::ephemeris::highprecision::SolarSystemKernelStateResult result);
-    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult& defaultResult() noexcept;
-    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult&
+    void setDefaultResult(skygate::ephemeris::highprecision::ICalcephKernel::StateResult result);
+    [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult& defaultResult() noexcept;
+    [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult&
     response(int targetNaifId, int centerNaifId);
-    [[nodiscard]] std::vector<skygate::ephemeris::highprecision::SolarSystemKernelStateResult>&
+    [[nodiscard]] std::vector<skygate::ephemeris::highprecision::ICalcephKernel::StateResult>&
     responseSequence(int targetNaifId, int centerNaifId);
     void setResponse(
-        int targetNaifId, int centerNaifId, skygate::ephemeris::highprecision::SolarSystemKernelStateResult result
+        int targetNaifId, int centerNaifId, skygate::ephemeris::highprecision::ICalcephKernel::StateResult result
     );
     void appendResponse(
-        int targetNaifId, int centerNaifId, skygate::ephemeris::highprecision::SolarSystemKernelStateResult result
+        int targetNaifId, int centerNaifId, skygate::ephemeris::highprecision::ICalcephKernel::StateResult result
     );
 
     [[nodiscard]] int callCount() const noexcept;
@@ -65,9 +65,9 @@ private:
     std::optional<Info> m_kernelInfo;
     std::optional<TimeScale> m_requiredTimeScale;
     bool m_validateEpochRange = true;
-    skygate::ephemeris::highprecision::SolarSystemKernelStateResult m_defaultResult;
-    std::map<ResponseKey, skygate::ephemeris::highprecision::SolarSystemKernelStateResult> m_responses;
-    std::map<ResponseKey, std::vector<skygate::ephemeris::highprecision::SolarSystemKernelStateResult>>
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult m_defaultResult;
+    std::map<ResponseKey, skygate::ephemeris::highprecision::ICalcephKernel::StateResult> m_responses;
+    std::map<ResponseKey, std::vector<skygate::ephemeris::highprecision::ICalcephKernel::StateResult>>
         m_responseSequences;
     mutable std::map<ResponseKey, std::size_t> m_responseSequenceIndexes;
     mutable int m_callCount = 0;

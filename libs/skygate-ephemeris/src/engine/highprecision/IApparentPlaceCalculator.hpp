@@ -1,12 +1,15 @@
 #pragma once
-
-#include "HighPrecisionTypes.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
+#include "StarAstrometryBatchResult.hpp"
 
 #include <memory>
 #include <span>
 #include <vector>
 
 namespace skygate::ephemeris::highprecision {
+
+struct PreparedEphemerisRequestState;
 
 class IApparentPlaceCalculator {
 public:

@@ -2,6 +2,7 @@
 #include "CalcephKernel.hpp"
 #include "EphemerisDataManifest.hpp"
 #include "EphemerisDataSnapshot.hpp"
+#include "ICalcephKernel.hpp"
 
 #include <QByteArrayView>
 #include <QCryptographicHash>
@@ -55,14 +56,14 @@ public:
             return m_status;
         }
 
-        [[nodiscard]] SolarSystemKernelStateResult
+        [[nodiscard]] ICalcephKernel::StateResult
         compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override
         {
             Q_UNUSED(epoch)
             Q_UNUSED(targetNaifId)
             Q_UNUSED(centerNaifId)
 
-            SolarSystemKernelStateResult result;
+            ICalcephKernel::StateResult result;
             result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
             return result;

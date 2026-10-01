@@ -2,6 +2,7 @@
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "math/PhysicalConstants.hpp"
+#include "ICalcephKernel.hpp"
 #include <calceph.h>
 #include <array>
 #endif
@@ -53,10 +54,10 @@ struct CalcephKernel::Impl final {
         return Status::Ready;
     }
 
-    [[nodiscard]] SolarSystemKernelStateResult
+    [[nodiscard]] ICalcephKernel::StateResult
     compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
     {
-        SolarSystemKernelStateResult result;
+        ICalcephKernel::StateResult result;
         result.metadata.dataSourceProvenance = "CALCEPH solar-system kernel";
 
         if (epoch.timeScale != TimeScale::Tdb) {
@@ -147,7 +148,7 @@ ICalcephKernel::Status CalcephKernel::statusForEpoch(const AstronomicalEpoch& ep
     return m_impl->statusForEpoch(epoch);
 }
 
-SolarSystemKernelStateResult
+ICalcephKernel::StateResult
 CalcephKernel::compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
 {
     return m_impl->compute(epoch, targetNaifId, centerNaifId);

@@ -1,6 +1,10 @@
 #include "StarAstrometryCalculator.hpp"
 #include "EphemerisMetadataMerger.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
+#include "PreparedEphemerisRequestState.hpp"
+#include "StarAstrometryBatchResult.hpp"
 #include "math/AngleMath.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
@@ -226,7 +230,7 @@ equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
     return preparedState->tdbKernelEpoch;
 }
 
-[[nodiscard]] SolarSystemKernelStateResult earthStateForAnnualParallax(
+[[nodiscard]] ICalcephKernel::StateResult earthStateForAnnualParallax(
     const AstronomicalEpoch& kernelEpoch,
     const std::shared_ptr<const ICalcephKernel>& kernel,
     const PreparedEphemerisRequestState* preparedState
@@ -352,7 +356,7 @@ void recordAppliedCorrections(
                 );
                 result.equatorial = equatorialFromVector(*propagatedVector);
             } else {
-                const SolarSystemKernelStateResult earthState =
+                const ICalcephKernel::StateResult earthState =
                     earthStateForAnnualParallax(*kernelEpoch, kernel, preparedState);
                 EphemerisMetadataMerger::merge(
                     result.metadata, earthState.metadata, EphemerisMetadataMergeOptions{.mergeCorrections = false}

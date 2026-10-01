@@ -3,6 +3,7 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -432,7 +433,7 @@ void CalcephKernelProviderTests::rejectsNonTdbEpochsBeforeCallingKernel()
         openProvidedKernel(provider);
 
     const skygate::ephemeris::AstronomicalEpoch utcEpoch = epochForDate(2000, 1, 1);
-    const skygate::ephemeris::highprecision::SolarSystemKernelStateResult result = kernel->compute(utcEpoch, 499, 399);
+    const skygate::ephemeris::highprecision::ICalcephKernel::StateResult result = kernel->compute(utcEpoch, 499, 399);
 
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),

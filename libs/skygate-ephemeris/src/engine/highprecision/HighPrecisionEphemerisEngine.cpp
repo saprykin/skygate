@@ -2,6 +2,8 @@
 #include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
 #include "ICalcephKernel.hpp"
 #include "IEphemerisComputationCache.hpp"
@@ -9,6 +11,8 @@
 #include "ISolarSystemStateCalculator.hpp"
 #include "IStarAstrometryCalculator.hpp"
 #include "ObserverGeodesy.hpp"
+#include "PreparedEphemerisRequestState.hpp"
+#include "StarAstrometryBatchResult.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/simple/EquatorialToHorizontalCalculator.hpp"
@@ -181,7 +185,8 @@ void mergeKernelEpochTimeScaleMetadata(
     return calculatorResult;
 }
 
-[[nodiscard]] const IEphemerisResultBuilder& resultBuilder(const HighPrecisionEphemerisEngineDependencies& dependencies)
+[[nodiscard]] const IEphemerisResultBuilder&
+resultBuilder(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
 {
     static const EphemerisResultBuilder kDefaultBuilder;
     if (dependencies.resultBuilder != nullptr) {
@@ -192,7 +197,7 @@ void mergeKernelEpochTimeScaleMetadata(
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult applyApparentPlaceIfRequested(
-    const HighPrecisionEphemerisEngineDependencies& dependencies,
+    const HighPrecisionEphemerisEngine::Dependencies& dependencies,
     const EphemerisRequest& request,
     const HighPrecisionComputationInput& input,
     const HighPrecisionCalculatorResult& calculatorResult
@@ -239,7 +244,7 @@ void mergeKernelEpochTimeScaleMetadata(
 }
 
 [[nodiscard]] std::vector<StarAstrometryBatchResult> applyApparentPlaceBatchIfRequested(
-    const HighPrecisionEphemerisEngineDependencies& dependencies,
+    const HighPrecisionEphemerisEngine::Dependencies& dependencies,
     const EphemerisRequest& request,
     const std::span<const BaseCelestialBody* const> bodies,
     const std::span<const StarAstrometryBatchResult> calculatorResults,
@@ -284,7 +289,7 @@ public:
     Impl(
         const CelestialBodyCatalog& catalog,
         EphemerisEngineOptions engineOptions,
-        HighPrecisionEphemerisEngineDependencies dependencies
+        HighPrecisionEphemerisEngine::Dependencies dependencies
     )
         : m_catalog(std::make_shared<CelestialBodyCatalog>(catalog)),
           m_catalogStarAstrometryArrays(m_catalog->bodies()), m_options(engineOptions),
@@ -705,7 +710,7 @@ private:
     std::shared_ptr<const CelestialBodyCatalog> m_catalog;
     CatalogStarAstrometryArrays m_catalogStarAstrometryArrays;
     EphemerisEngineOptions m_options;
-    HighPrecisionEphemerisEngineDependencies m_dependencies;
+    HighPrecisionEphemerisEngine::Dependencies m_dependencies;
     mutable std::mutex m_directBodyStateCacheMutex;
     mutable std::deque<DirectBodyStateCacheEntry> m_directBodyStateCache;
 };
@@ -714,7 +719,7 @@ private:
 HighPrecisionEphemerisEngine::HighPrecisionEphemerisEngine(
     const CelestialBodyCatalog& catalog,
     EphemerisEngineOptions engineOptions,
-    HighPrecisionEphemerisEngineDependencies dependencies
+    HighPrecisionEphemerisEngine::Dependencies dependencies
 )
     : m_impl(std::make_unique<Impl>(catalog, engineOptions, std::move(dependencies)))
 {

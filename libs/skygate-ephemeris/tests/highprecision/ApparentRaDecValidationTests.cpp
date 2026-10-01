@@ -1,9 +1,12 @@
-#include "OwnGalaxyCelestialBody.hpp"
 #include "EphemerisFixtureSupport.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -121,9 +124,9 @@ struct ApparentValidationFixture {
     };
 }
 
-[[nodiscard]] SolarSystemKernelStateResult makeKernelState(const QJsonObject& object)
+[[nodiscard]] ICalcephKernel::StateResult makeKernelState(const QJsonObject& object)
 {
-    SolarSystemKernelStateResult result;
+    ICalcephKernel::StateResult result;
     result.positionAu = parseVector(object.value(QStringLiteral("positionAu")).toArray());
     if (object.contains(QStringLiteral("velocityAuPerDay"))) {
         result.velocityAuPerDay = parseVector(object.value(QStringLiteral("velocityAuPerDay")).toArray());
@@ -158,7 +161,7 @@ struct ApparentValidationFixture {
     const QJsonObject root = document.object();
     const QJsonObject request = root.value(QStringLiteral("request")).toObject();
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
-    SolarSystemKernelStateResult defaultResult;
+    ICalcephKernel::StateResult defaultResult;
     defaultResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
     defaultResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     defaultResult.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";

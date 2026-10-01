@@ -1,4 +1,6 @@
 #include "EphemerisResultBuilder.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 
 #include <cstddef>
 #include <cstdint>

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "IEphemerisResultBuilder.hpp"
 
 namespace skygate::ephemeris::highprecision {

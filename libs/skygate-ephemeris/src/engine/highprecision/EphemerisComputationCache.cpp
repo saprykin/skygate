@@ -1,4 +1,5 @@
 #include "EphemerisComputationCache.hpp"
+#include "PreparedEphemerisRequestState.hpp"
 #include "UtcTimeCodec.hpp"
 
 #include <array>

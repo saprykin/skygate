@@ -246,7 +246,7 @@ prefersPlanetarySystemBarycenters(const skygate::ephemeris::highprecision::ICalc
         } else if (kernel->status() != skygate::ephemeris::highprecision::ICalcephKernel::Status::Ready) {
             appendCalcephDiagnostics(diagnostics, *kernel);
         } else {
-            skygate::ephemeris::highprecision::HighPrecisionEphemerisEngineDependencies dependencies;
+            skygate::ephemeris::highprecision::HighPrecisionEphemerisEngine::Dependencies dependencies;
             dependencies.calcephKernel = kernel;
             dependencies.solarSystemStateCalculator =
                 std::make_shared<skygate::ephemeris::highprecision::SolarSystemStateCalculator>(

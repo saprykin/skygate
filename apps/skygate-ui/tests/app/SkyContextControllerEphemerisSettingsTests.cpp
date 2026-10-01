@@ -3,6 +3,7 @@
 #include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -92,7 +93,7 @@ skygate::ephemeris::EphemerisDateRange testValidityRange();
             .validityRange = testValidityRange(),
         }
     );
-    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult result;
     result.positionAu = skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
     result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
     kernel->setDefaultResult(std::move(result));

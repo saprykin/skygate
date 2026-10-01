@@ -1,6 +1,9 @@
 #pragma once
 
-#include "HighPrecisionTypes.hpp"
+#include "engine/EphemerisDateRange.hpp"
+#include "engine/EphemerisEngineQueryResult.hpp"
+#include "math/Vector3d.hpp"
+#include "time/AstronomicalEpoch.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -12,6 +15,12 @@ namespace skygate::ephemeris::highprecision {
 
 class ICalcephKernel {
 public:
+    struct StateResult {
+        std::optional<skygate::core::Vector3d> positionAu;
+        std::optional<skygate::core::Vector3d> velocityAuPerDay;
+        EphemerisEngineQueryResult metadata;
+    };
+
     enum class Status : std::uint8_t {
         Ready,
         CalcephUnavailable,
@@ -42,7 +51,7 @@ public:
     [[nodiscard]] virtual const std::vector<std::string>& diagnostics() const noexcept = 0;
     [[nodiscard]] virtual const std::optional<Info>& kernelInfo() const noexcept = 0;
     [[nodiscard]] virtual Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept = 0;
-    [[nodiscard]] virtual SolarSystemKernelStateResult
+    [[nodiscard]] virtual StateResult
     compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const = 0;
 };
 

@@ -300,6 +300,13 @@ high-precision providers and calculators:
 - `AtmosphericRefractionCalculator`
 - `EphemerisComputationCache`
 
+High-precision pipeline contracts have individual headers and companion sources:
+`HighPrecisionComputationInput`, `HighPrecisionCalculatorResult`,
+`PreparedEphemerisRequestState`, and `StarAstrometryBatchResult`. Kernel state
+results belong to `ICalcephKernel::StateResult`; engine construction uses
+`HighPrecisionEphemerisEngine::Dependencies`. Consumers include the specific
+contracts they use.
+
 Earth-orientation parsing returns validated rows and metadata without
 constructing a provider. The loader obtains snapshot assets, applies
 reference-epoch staleness, and creates an immutable table-backed provider.

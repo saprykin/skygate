@@ -1,7 +1,8 @@
 #pragma once
 
 #include "CelestialBodyState.hpp"
-#include "HighPrecisionTypes.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 
 namespace skygate::ephemeris::highprecision {
 

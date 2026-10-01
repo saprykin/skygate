@@ -1,4 +1,5 @@
 #include "TestCalcephKernel.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 
 #include <cstddef>
 #include <utility>
@@ -35,7 +36,7 @@ TestCalcephKernel::Status TestCalcephKernel::statusForEpoch(const AstronomicalEp
     return Status::Ready;
 }
 
-skygate::ephemeris::highprecision::SolarSystemKernelStateResult
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult
 TestCalcephKernel::compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
 {
     ++m_callCount;
@@ -48,7 +49,7 @@ TestCalcephKernel::compute(const AstronomicalEpoch& epoch, const int targetNaifI
         .centerNaifId = centerNaifId,
     });
     if (m_requiredTimeScale.has_value() && epoch.timeScale != *m_requiredTimeScale) {
-        skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+        skygate::ephemeris::highprecision::ICalcephKernel::StateResult result;
         result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
         result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         return result;
@@ -103,23 +104,23 @@ void TestCalcephKernel::setValidateEpochRange(const bool validateEpochRange) noe
     m_validateEpochRange = validateEpochRange;
 }
 
-void TestCalcephKernel::setDefaultResult(skygate::ephemeris::highprecision::SolarSystemKernelStateResult result)
+void TestCalcephKernel::setDefaultResult(skygate::ephemeris::highprecision::ICalcephKernel::StateResult result)
 {
     m_defaultResult = std::move(result);
 }
 
-skygate::ephemeris::highprecision::SolarSystemKernelStateResult& TestCalcephKernel::defaultResult() noexcept
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult& TestCalcephKernel::defaultResult() noexcept
 {
     return m_defaultResult;
 }
 
-skygate::ephemeris::highprecision::SolarSystemKernelStateResult&
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult&
 TestCalcephKernel::response(const int targetNaifId, const int centerNaifId)
 {
     return m_responses[responseKey(targetNaifId, centerNaifId)];
 }
 
-std::vector<skygate::ephemeris::highprecision::SolarSystemKernelStateResult>&
+std::vector<skygate::ephemeris::highprecision::ICalcephKernel::StateResult>&
 TestCalcephKernel::responseSequence(const int targetNaifId, const int centerNaifId)
 {
     return m_responseSequences[responseKey(targetNaifId, centerNaifId)];
@@ -128,7 +129,7 @@ TestCalcephKernel::responseSequence(const int targetNaifId, const int centerNaif
 void TestCalcephKernel::setResponse(
     const int targetNaifId,
     const int centerNaifId,
-    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult result
 )
 {
     m_responses[responseKey(targetNaifId, centerNaifId)] = std::move(result);
@@ -137,7 +138,7 @@ void TestCalcephKernel::setResponse(
 void TestCalcephKernel::appendResponse(
     const int targetNaifId,
     const int centerNaifId,
-    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult result
 )
 {
     m_responseSequences[responseKey(targetNaifId, centerNaifId)].push_back(std::move(result));

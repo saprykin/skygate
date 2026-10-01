@@ -1,13 +1,17 @@
 #pragma once
 
+#include "EphemerisRequest.hpp"
 #include "EphemerisSnapshot.hpp"
-#include "HighPrecisionTypes.hpp"
+#include "engine/EphemerisDatasetInfo.hpp"
 
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <span>
 
 namespace skygate::ephemeris::highprecision {
+
+struct PreparedEphemerisRequestState;
 
 class IEphemerisComputationCache {
 public:
