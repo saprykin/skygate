@@ -381,39 +381,7 @@ public:
         for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
             const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
             if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
-                if (isSolarSystemBody(body)) {
-                    if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
-                        cachedState.has_value()) {
-                        return cachedState;
-                    }
-                    CelestialBodyState state =
-                        computeStateForBody(request, bodyIndex, buildPreparedRequestState(request));
-                    storeDirectBodyState(request, bodyIndex, state);
-                    return state;
-                }
-
-                if (m_dependencies.computationCache != nullptr) {
-                    if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
-                            request, m_catalog->bodies(), m_dependencies.dataSetInfo
-                        );
-                        cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
-                        return cachedSnapshot->states[bodyIndex];
-                    }
-                    if (std::optional<CelestialBodyState> cachedBodyState =
-                            m_dependencies.computationCache->findBodyState(
-                                request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex
-                            );
-                        cachedBodyState.has_value()) {
-                        return cachedBodyState;
-                    }
-                }
-                CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
-                if (m_dependencies.computationCache != nullptr) {
-                    m_dependencies.computationCache->storeBodyState(
-                        request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex, state
-                    );
-                }
-                return state;
+                return computeResolvedBodyState(request, bodyIndex);
             }
         }
 
@@ -427,11 +395,18 @@ public:
             return std::nullopt;
         }
 
+        return computeResolvedBodyState(request, bodyIndex);
+    }
+
+private:
+    [[nodiscard]] CelestialBodyState
+    computeResolvedBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
+    {
         const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
         if (isSolarSystemBody(body)) {
             if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
                 cachedState.has_value()) {
-                return cachedState;
+                return *cachedState;
             }
             CelestialBodyState state = computeStateForBody(request, bodyIndex, buildPreparedRequestState(request));
             storeDirectBodyState(request, bodyIndex, state);
@@ -449,7 +424,7 @@ public:
                     request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex
                 );
                 cachedBodyState.has_value()) {
-                return cachedBodyState;
+                return *cachedBodyState;
             }
         }
 
@@ -462,7 +437,6 @@ public:
         return state;
     }
 
-private:
     [[nodiscard]] EphemerisSnapshot computeUncached(
         const EphemerisRequest& request, std::shared_ptr<const PreparedEphemerisRequestState> preparedState
     ) const

@@ -906,6 +906,8 @@ class HighPrecisionEphemerisEngineTests final : public QObject {
 private slots:
     void exposesMetadataAndCapabilities();
     void dispatchesSolarSystemAndStarBodies();
+    void singleBodyOverloadsShareResultsAndCaches_data();
+    void singleBodyOverloadsShareResultsAndCaches();
     void failsRequestedCorrectionsWhenApparentPlaceCalculatorIsMissing();
     void usesBatchStarPathForFullFrameSnapshot();
     void batchesRepresentativeLargeCatalogWithoutSingleStarDispatch();
@@ -1020,6 +1022,66 @@ void HighPrecisionEphemerisEngineTests::dispatchesSolarSystemAndStarBodies()
     QCOMPARE(snapshot.states[0].equatorial.declinationDeg, -2.5);
     QCOMPARE(snapshot.states[1].equatorial.rightAscensionHours, 13.5);
     QCOMPARE(snapshot.states[1].equatorial.declinationDeg, 42.0);
+}
+
+void HighPrecisionEphemerisEngineTests::singleBodyOverloadsShareResultsAndCaches_data()
+{
+    QTest::addColumn<bool>("idFirst");
+    QTest::addColumn<bool>("warmSnapshot");
+    QTest::newRow("id-first") << true << false;
+    QTest::newRow("index-first") << false << false;
+    QTest::newRow("snapshot-id-first") << true << true;
+    QTest::newRow("snapshot-index-first") << false << true;
+}
+
+void HighPrecisionEphemerisEngineTests::singleBodyOverloadsShareResultsAndCaches()
+{
+    QFETCH(bool, idFirst);
+    QFETCH(bool, warmSnapshot);
+    const std::array bodies{makeSunBody(), makeStarBody()};
+    auto solar = std::make_shared<RecordingSolarSystemCalculator>();
+    auto stars = std::make_shared<RecordingStarAstrometryCalculator>();
+    const EphemerisRequest request = makeRequest();
+    const HighPrecisionEphemerisEngine engine(
+        makeCatalog(bodies),
+        request.options,
+        makeDependencies(
+            solar,
+            stars,
+            std::make_shared<RecordingApparentPlaceCalculator>(),
+            {},
+            std::make_shared<EphemerisComputationCache>()
+        )
+    );
+    if (warmSnapshot) {
+        static_cast<void>(engine.compute(request));
+    }
+    const std::array<std::string_view, 2> ids{"SuN", "VEGA"};
+    for (std::size_t index = 0; index < ids.size(); ++index) {
+        const auto first =
+            idFirst ? engine.computeBodyState(request, ids[index]) : engine.computeBodyState(request, index);
+        const auto second =
+            idFirst ? engine.computeBodyState(request, index) : engine.computeBodyState(request, ids[index]);
+        QVERIFY(first.has_value());
+        QVERIFY(second.has_value());
+        QCOMPARE(first->bodyIndex, index);
+        QCOMPARE(second->bodyIndex, first->bodyIndex);
+        QCOMPARE(second->equatorial.rightAscensionHours, first->equatorial.rightAscensionHours);
+        QCOMPARE(second->equatorial.declinationDeg, first->equatorial.declinationDeg);
+        QCOMPARE(second->metadata.status, first->metadata.status);
+        QCOMPARE(second->metadata.warningCodeMask, first->metadata.warningCodeMask);
+        QCOMPARE(second->metadata.dataSourceProvenance, first->metadata.dataSourceProvenance);
+        QCOMPARE(second->metadata.requestedCorrections, first->metadata.requestedCorrections);
+        QCOMPARE(second->metadata.appliedCorrections, first->metadata.appliedCorrections);
+        QCOMPARE(second->metadata.unavailableCorrections, first->metadata.unavailableCorrections);
+        QCOMPARE(second->metadata.skippedCorrections, first->metadata.skippedCorrections);
+    }
+    QVERIFY(!engine.computeBodyState(request, "").has_value());
+    QVERIFY(!engine.computeBodyState(request, "unknown").has_value());
+    QVERIFY(!engine.computeBodyState(request, bodies.size()).has_value());
+    QVERIFY(!engine.computeBodyState(request, std::numeric_limits<std::size_t>::max()).has_value());
+    QCOMPARE(solar->callCount(), 1);
+    QCOMPARE(stars->callCount(), 1);
 }
 
 void HighPrecisionEphemerisEngineTests::failsRequestedCorrectionsWhenApparentPlaceCalculatorIsMissing()
