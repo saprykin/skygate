@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GeoLocation.hpp"
-#include "HighPrecisionTypes.hpp"
+#include "math/Vector3d.hpp"
 
 #include <optional>
 

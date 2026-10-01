@@ -5,6 +5,9 @@
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/EphemerisMetadataMerger.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HighPrecisionTypes.hpp"
+#include "engine/EphemerisDatasetInfo.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
 #include <cstddef>
@@ -9,14 +9,41 @@
 #include <span>
 #include <string_view>
 
+namespace skygate::ephemeris {
+class ITimeScaleService;
+class IEarthOrientationProvider;
+}  // namespace skygate::ephemeris
+
 namespace skygate::ephemeris::highprecision {
+
+// Forward declarations for interface classes referenced in dependencies.
+class ICalcephKernel;
+class ISolarSystemStateCalculator;
+class IStarAstrometryCalculator;
+class IApparentPlaceCalculator;
+class IAtmosphericRefractionCalculator;
+class IFrameTransformer;
+class IEphemerisResultBuilder;
+class IEphemerisComputationCache;
 
 class HighPrecisionEphemerisEngine final : public IEphemerisEngine {
 public:
+    struct Dependencies {
+        std::shared_ptr<const ICalcephKernel> calcephKernel;
+        std::shared_ptr<const ISolarSystemStateCalculator> solarSystemStateCalculator;
+        std::shared_ptr<const IStarAstrometryCalculator> starAstrometryCalculator;
+        std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
+        std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
+        std::shared_ptr<const IFrameTransformer> frameTransformer;
+        std::shared_ptr<const IApparentPlaceCalculator> apparentPlaceCalculator;
+        std::shared_ptr<const IAtmosphericRefractionCalculator> atmosphericRefractionCalculator;
+        std::shared_ptr<const IEphemerisResultBuilder> resultBuilder;
+        std::shared_ptr<const IEphemerisComputationCache> computationCache;
+        EphemerisDatasetInfo dataSetInfo;
+    };
+
     HighPrecisionEphemerisEngine(
-        const CelestialBodyCatalog& catalog,
-        EphemerisEngineOptions engineOptions,
-        HighPrecisionEphemerisEngineDependencies dependencies
+        const CelestialBodyCatalog& catalog, EphemerisEngineOptions engineOptions, Dependencies dependencies
     );
 
     ~HighPrecisionEphemerisEngine() override;

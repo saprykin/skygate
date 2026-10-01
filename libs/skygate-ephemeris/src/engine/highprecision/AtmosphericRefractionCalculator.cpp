@@ -1,5 +1,7 @@
 #include "AtmosphericRefractionCalculator.hpp"
 #include "EphemerisMetadataMerger.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "math/AngleMath.hpp"
 
 #include <algorithm>

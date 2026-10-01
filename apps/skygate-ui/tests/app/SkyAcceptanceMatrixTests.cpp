@@ -290,11 +290,11 @@ public:
         return Status::Ready;
     }
 
-    [[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult compute(
+    [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult compute(
         const skygate::ephemeris::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
     ) const override
     {
-        skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+        skygate::ephemeris::highprecision::ICalcephKernel::StateResult result;
         const Status epochStatus = statusForEpoch(epoch);
         if (epochStatus != Status::Ready) {
             result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;

@@ -1,11 +1,23 @@
 #pragma once
 
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
 #include "IAtmosphericRefractionCalculator.hpp"
+#include "StarAstrometryBatchResult.hpp"
 
 #include <memory>
 
+namespace skygate::ephemeris {
+class ITimeScaleService;
+class IEarthOrientationProvider;
+}  // namespace skygate::ephemeris
+
 namespace skygate::ephemeris::highprecision {
+
+struct PreparedEphemerisRequestState;
+
+class IFrameTransformer;
 
 class ApparentPlaceCalculator final : public IApparentPlaceCalculator {
 public:

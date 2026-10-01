@@ -5,13 +5,18 @@
 #include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
 #include "engine/highprecision/IFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondTableLoader.hpp"
+#include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -466,7 +471,7 @@ private:
 
 [[nodiscard]] std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel> makeLongRangeFallbackKernel()
 {
-    SolarSystemKernelStateResult result;
+    ICalcephKernel::StateResult result;
     result.positionAu = Vector3d{.x = 0.5, .y = 1.0, .z = 0.25};
     result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
     result.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
@@ -843,7 +848,7 @@ private:
     return result;
 }
 
-[[nodiscard]] HighPrecisionEphemerisEngineDependencies makeDependencies(
+[[nodiscard]] HighPrecisionEphemerisEngine::Dependencies makeDependencies(
     std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator = {},
     std::shared_ptr<IStarAstrometryCalculator> starAstrometryCalculator = {},
     std::shared_ptr<IApparentPlaceCalculator> apparentPlaceCalculator = {},
@@ -851,7 +856,7 @@ private:
     std::shared_ptr<IEphemerisComputationCache> computationCache = {}
 )
 {
-    HighPrecisionEphemerisEngineDependencies dependencies;
+    HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = std::move(solarSystemCalculator);
     dependencies.starAstrometryCalculator = std::move(starAstrometryCalculator);
     dependencies.apparentPlaceCalculator = std::move(apparentPlaceCalculator);
@@ -872,7 +877,7 @@ private:
     return dependencies;
 }
 
-[[nodiscard]] HighPrecisionEphemerisEngineDependencies makeApparentPipelineDependencies(
+[[nodiscard]] HighPrecisionEphemerisEngine::Dependencies makeApparentPipelineDependencies(
     std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator,
     std::shared_ptr<const ITimeScaleService> timeScaleService,
     std::shared_ptr<const IEarthOrientationProvider> earthOrientationProviderForFrame,
@@ -885,7 +890,7 @@ private:
         frameTransformer, timeScaleService, std::move(earthOrientationProviderForApparent)
     );
 
-    HighPrecisionEphemerisEngineDependencies dependencies =
+    HighPrecisionEphemerisEngine::Dependencies dependencies =
         makeDependencies(std::move(solarSystemCalculator), {}, apparentPlaceCalculator);
     dependencies.timeScaleService = std::move(timeScaleService);
     dependencies.earthOrientationProvider = std::move(earthOrientationProviderForFrame);
@@ -1237,7 +1242,7 @@ void HighPrecisionEphemerisEngineTests::reusesPreparedRequestStateAcrossSingleBo
     auto kernel = makeLongRangeFallbackKernel();
     auto starAstrometryCalculator = std::make_shared<StarAstrometryCalculator>(kernel);
     auto computationCache = std::make_shared<EphemerisComputationCache>();
-    HighPrecisionEphemerisEngineDependencies dependencies =
+    HighPrecisionEphemerisEngine::Dependencies dependencies =
         makeDependencies({}, starAstrometryCalculator, makePassThroughApparentPlaceCalculator(), {}, computationCache);
     dependencies.calcephKernel = kernel;
 

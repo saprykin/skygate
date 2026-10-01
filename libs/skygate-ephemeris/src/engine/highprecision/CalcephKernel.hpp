@@ -21,7 +21,7 @@ public:
     [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override;
     [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override;
     [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept override;
-    [[nodiscard]] SolarSystemKernelStateResult
+    [[nodiscard]] ICalcephKernel::StateResult
     compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
 
 private:

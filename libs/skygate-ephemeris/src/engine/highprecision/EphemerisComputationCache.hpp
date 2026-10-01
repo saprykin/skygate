@@ -11,6 +11,8 @@
 
 namespace skygate::ephemeris::highprecision {
 
+struct PreparedEphemerisRequestState;
+
 class EphemerisComputationCache final : public IEphemerisComputationCache {
 public:
     explicit EphemerisComputationCache(std::size_t maxEntries = 8U);

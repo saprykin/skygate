@@ -5,10 +5,14 @@
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
+#include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
@@ -245,12 +249,12 @@ public:
         return Status::Ready;
     }
 
-    [[nodiscard]] SolarSystemKernelStateResult
+    [[nodiscard]] ICalcephKernel::StateResult
     compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
     {
         ++m_callCount;
 
-        SolarSystemKernelStateResult result;
+        ICalcephKernel::StateResult result;
         result.metadata.dataSourceProvenance = "CALCEPH acceptance kernel";
         result.metadata.effectiveDataValidityRange =
             makeRange("de440-modern", "Bundled modern range", 2'300'000.5, 2'700'000.5);
@@ -507,7 +511,7 @@ public:
 [[nodiscard]] HighPrecisionEphemerisEngine makeHighPrecisionEngine(
     std::vector<OwnGalaxyCelestialBody> bodies,
     EphemerisEngineOptions options,
-    HighPrecisionEphemerisEngineDependencies dependencies
+    HighPrecisionEphemerisEngine::Dependencies dependencies
 )
 {
     if (dependencies.dataSetInfo.id.empty()) {
@@ -578,7 +582,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
 void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSupportsCorrectionOptions()
 {
     auto kernel = std::make_shared<AcceptanceKernel>();
-    HighPrecisionEphemerisEngineDependencies dependencies;
+    HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.calcephKernel = kernel;
     dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
     dependencies.apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
@@ -635,7 +639,7 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
     }
     QVERIFY2(kernel->status() == ICalcephKernel::Status::Ready, diagnostics.constData());
 
-    HighPrecisionEphemerisEngineDependencies dependencies;
+    HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.calcephKernel = kernel;
     dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
     dependencies.dataSetInfo = manifest.dataSetInfo;
@@ -673,7 +677,7 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
     for (const EphemerisCorrectionFlags correctionFlags : matrix) {
         auto kernel = std::make_shared<AcceptanceKernel>();
         auto apparentPlaceCalculator = std::make_shared<RecordingApparentPlaceCalculator>();
-        HighPrecisionEphemerisEngineDependencies dependencies;
+        HighPrecisionEphemerisEngine::Dependencies dependencies;
         dependencies.calcephKernel = kernel;
         dependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(kernel);
         dependencies.timeScaleService = std::make_shared<AcceptanceTimeScaleService>();
@@ -714,7 +718,7 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
 
 void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallbackMetadata()
 {
-    HighPrecisionEphemerisEngineDependencies dependencies;
+    HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = std::make_shared<DegradedSolarSystemCalculator>();
     dependencies.dataSetInfo = makeDataSetInfo(false);
 
@@ -756,7 +760,7 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
         QSKIP("Provider-selection acceptance row requires a kernel format supported by the linked CALCEPH.");
     }
 
-    HighPrecisionEphemerisEngineDependencies bundledDependencies;
+    HighPrecisionEphemerisEngine::Dependencies bundledDependencies;
     bundledDependencies.calcephKernel = bundledKernel;
     bundledDependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(bundledKernel);
     bundledDependencies.dataSetInfo = manifest.dataSetInfo;
@@ -776,7 +780,7 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
     auto longRangeKernelProvider =
         std::make_shared<CalcephKernelProvider>(longRangeSnapshot, manifest, selectionOptions);
     const std::shared_ptr<const ICalcephKernel> longRangeKernel = longRangeKernelProvider->openKernel();
-    HighPrecisionEphemerisEngineDependencies longRangeDependencies;
+    HighPrecisionEphemerisEngine::Dependencies longRangeDependencies;
     longRangeDependencies.calcephKernel = longRangeKernel;
     longRangeDependencies.solarSystemStateCalculator = std::make_shared<SolarSystemStateCalculator>(longRangeKernel);
     longRangeDependencies.dataSetInfo = manifest.dataSetInfo;
@@ -831,7 +835,7 @@ void EphemerisAcceptanceMatrixTests::deterministicHorizonsFixturesRemainReadable
 void EphemerisAcceptanceMatrixTests::fullFrameComputationCacheAvoidsPerObjectRecompute()
 {
     auto calculator = std::make_shared<CountingSolarSystemCalculator>();
-    HighPrecisionEphemerisEngineDependencies dependencies;
+    HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = calculator;
     dependencies.computationCache = std::make_shared<EphemerisComputationCache>();
     dependencies.dataSetInfo = makeDataSetInfo(false);

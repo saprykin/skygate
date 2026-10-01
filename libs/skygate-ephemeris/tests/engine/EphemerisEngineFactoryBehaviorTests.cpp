@@ -6,6 +6,7 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/IEarthOrientationProvider.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -265,10 +266,10 @@ makeKernelInfo(std::string id = "kernel", std::string profileId = "modern", std:
     };
 }
 
-[[nodiscard]] skygate::ephemeris::highprecision::SolarSystemKernelStateResult
+[[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult
 makeKernelResult(const skygate::ephemeris::highprecision::ICalcephKernel::Info& info)
 {
-    skygate::ephemeris::highprecision::SolarSystemKernelStateResult result;
+    skygate::ephemeris::highprecision::ICalcephKernel::StateResult result;
     result.positionAu = skygate::core::Vector3d{.x = 1.0, .y = 0.0, .z = 0.0};
     result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
     result.metadata.dataSourceProvenance = info.provenance;

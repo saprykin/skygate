@@ -2,6 +2,10 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "TestCalcephKernel.hpp"
 #include "math/MathConstants.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
@@ -189,7 +193,7 @@ void compareCalculatorResults(
 [[nodiscard]] std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel>
 makeFixedEarthKernel(std::optional<Vector3d> earthPositionAu, const bool requireTdbEpoch = false)
 {
-    SolarSystemKernelStateResult result;
+    ICalcephKernel::StateResult result;
     result.positionAu = earthPositionAu;
     result.metadata.status = earthPositionAu.has_value() ? skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid
                                                          : skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;

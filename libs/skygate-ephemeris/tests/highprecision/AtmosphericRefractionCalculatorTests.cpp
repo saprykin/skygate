@@ -1,5 +1,7 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
 
 #include <QtTest/QtTest>
 

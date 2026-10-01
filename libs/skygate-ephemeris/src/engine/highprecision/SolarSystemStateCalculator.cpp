@@ -1,5 +1,7 @@
 #include "SolarSystemStateCalculator.hpp"
 #include "EphemerisMetadataMerger.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
 #include "StringUtilities.hpp"
 #include "math/MathConstants.hpp"
@@ -26,7 +28,7 @@ using skygate::core::PhysicalConstants;
 constexpr int kLightTimeIterationCount = 3;
 
 struct TargetKernelState {
-    SolarSystemKernelStateResult state;
+    ICalcephKernel::StateResult state;
     int targetNaifId = 0;
     int requestedTargetNaifId = 0;
 };
@@ -240,7 +242,7 @@ equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
 )
 {
     if (preferFallbackTarget && fallbackTargetNaifId.has_value() && *fallbackTargetNaifId != targetNaifId) {
-        const SolarSystemKernelStateResult preferredState = kernel.compute(epoch, *fallbackTargetNaifId, centerNaifId);
+        const ICalcephKernel::StateResult preferredState = kernel.compute(epoch, *fallbackTargetNaifId, centerNaifId);
         if (preferredState.positionAu.has_value()
             || preferredState.metadata.status != EphemerisEngineQueryStatus::Type::Failed) {
             return TargetKernelState{
@@ -264,7 +266,7 @@ equatorialFromVector(const skygate::core::Vector3d& vector) noexcept
         return result;
     }
 
-    SolarSystemKernelStateResult fallbackState = kernel.compute(epoch, *fallbackTargetNaifId, centerNaifId);
+    ICalcephKernel::StateResult fallbackState = kernel.compute(epoch, *fallbackTargetNaifId, centerNaifId);
     if (!fallbackState.positionAu.has_value()) {
         return result;
     }
@@ -346,7 +348,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     const TargetKernelState targetKernelResult = computeTargetKernelState(
         *m_kernel, input.request.epoch, *targetNaifId, fallbackTargetNaifId, kNaifEarth, preferPlanetarySystemBarycenter
     );
-    const SolarSystemKernelStateResult& kernelResult = targetKernelResult.state;
+    const ICalcephKernel::StateResult& kernelResult = targetKernelResult.state;
     const int effectiveTargetNaifId = targetKernelResult.targetNaifId;
     HighPrecisionCalculatorResult result;
     result.metadata = kernelResult.metadata;
@@ -367,8 +369,8 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     }
 
     skygate::core::Vector3d outputVector = *kernelResult.positionAu;
-    std::optional<SolarSystemKernelStateResult> earthBarycentricState;
-    const auto observerState = [&]() -> const SolarSystemKernelStateResult& {
+    std::optional<ICalcephKernel::StateResult> earthBarycentricState;
+    const auto observerState = [&]() -> const ICalcephKernel::StateResult& {
         if (!earthBarycentricState.has_value()) {
             earthBarycentricState = m_kernel->compute(input.request.epoch, kNaifEarth, kNaifSolarSystemBarycenter);
         }
@@ -378,7 +380,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     if (skygate::ephemeris::EphemerisCorrectionFlags::has(
             input.request.options.correctionFlags(), EphemerisCorrectionFlags::lightTime()
         )) {
-        const SolarSystemKernelStateResult& earthState = observerState();
+        const ICalcephKernel::StateResult& earthState = observerState();
         if (!earthState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
             EphemerisMetadataMerger::markCorrectionUnavailable(result.metadata, EphemerisCorrectionFlags::lightTime());
@@ -398,7 +400,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
                     kNaifSolarSystemBarycenter,
                     preferPlanetarySystemBarycenter
                 );
-                const SolarSystemKernelStateResult& targetState = retardedTargetState.state;
+                const ICalcephKernel::StateResult& targetState = retardedTargetState.state;
                 if (!targetState.positionAu.has_value()) {
                     result.metadata.warningCodeMask |= targetState.metadata.warningCodeMask;
                     correctedVector = std::nullopt;
@@ -433,7 +435,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
             input.request.options.correctionFlags(), EphemerisCorrectionFlags::gravitationalLightDeflection()
         )
         && effectiveTargetNaifId != kNaifSun) {
-        const SolarSystemKernelStateResult sunState = m_kernel->compute(input.request.epoch, kNaifSun, kNaifEarth);
+        const ICalcephKernel::StateResult sunState = m_kernel->compute(input.request.epoch, kNaifSun, kNaifEarth);
         if (!sunState.positionAu.has_value()) {
             result.metadata.warningCodeMask |= sunState.metadata.warningCodeMask;
             EphemerisMetadataMerger::markCorrectionUnavailable(
@@ -459,7 +461,7 @@ HighPrecisionCalculatorResult SolarSystemStateCalculator::calculate(const HighPr
     if (skygate::ephemeris::EphemerisCorrectionFlags::has(
             input.request.options.correctionFlags(), EphemerisCorrectionFlags::stellarAberration()
         )) {
-        const SolarSystemKernelStateResult& earthState = observerState();
+        const ICalcephKernel::StateResult& earthState = observerState();
         if (!earthState.positionAu.has_value() || !earthState.velocityAuPerDay.has_value()) {
             result.metadata.warningCodeMask |= earthState.metadata.warningCodeMask;
             EphemerisMetadataMerger::markCorrectionUnavailable(

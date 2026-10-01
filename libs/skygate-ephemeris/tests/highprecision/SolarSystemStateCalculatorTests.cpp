@@ -3,6 +3,9 @@
 #include "TestCalcephKernel.hpp"
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 
 #include <QFile>
@@ -84,10 +87,10 @@ using namespace skygate::core;
     return calculator.calculate(makeInput(catalog.bodyAt(0U), request));
 }
 
-[[nodiscard]] SolarSystemKernelStateResult
+[[nodiscard]] ICalcephKernel::StateResult
 makeKernelVector(const Vector3d& vector, const std::optional<Vector3d>& velocity = std::nullopt)
 {
-    SolarSystemKernelStateResult result;
+    ICalcephKernel::StateResult result;
     result.positionAu = vector;
     result.velocityAuPerDay = velocity;
     result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
@@ -335,7 +338,7 @@ void SolarSystemStateCalculatorTests::mapsSupportedBodiesToNaifIds()
 void SolarSystemStateCalculatorTests::fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing()
 {
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
-    SolarSystemKernelStateResult missingBodyCenter;
+    ICalcephKernel::StateResult missingBodyCenter;
     missingBodyCenter.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
     missingBodyCenter.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
     provider->response(499, 399) = missingBodyCenter;

@@ -2,8 +2,12 @@
 #include "CelestialFrameMath.hpp"
 #include "EarthOrientationSampler.hpp"
 #include "EphemerisMetadataMerger.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "IFrameTransformer.hpp"
 #include "ObserverGeodesy.hpp"
+#include "PreparedEphemerisRequestState.hpp"
+#include "StarAstrometryBatchResult.hpp"
 
 #include <algorithm>
 #include <array>

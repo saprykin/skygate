@@ -1,10 +1,14 @@
 #pragma once
 
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
 #include "ISolarSystemStateCalculator.hpp"
 
 #include <memory>
 
 namespace skygate::ephemeris::highprecision {
+
+class ICalcephKernel;
 
 class SolarSystemStateCalculator final : public ISolarSystemStateCalculator {
 public:

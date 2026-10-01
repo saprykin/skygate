@@ -1,4 +1,6 @@
 #include "factory/EphemerisEngineFactory.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 
@@ -71,10 +73,10 @@ template <typename BodyRange>
     return request;
 }
 
-[[nodiscard]] HighPrecisionEphemerisEngineDependencies
+[[nodiscard]] HighPrecisionEphemerisEngine::Dependencies
 makeDependencies(std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalculator = {})
 {
-    HighPrecisionEphemerisEngineDependencies dependencies;
+    HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = std::move(solarSystemCalculator);
     dependencies.dataSetInfo.id = "fallback-validation";
     dependencies.dataSetInfo.displayName = "Fallback validation";

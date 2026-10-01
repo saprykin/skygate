@@ -1,13 +1,17 @@
 #pragma once
 
 #include "CatalogStarAstrometryArrays.hpp"
-#include "HighPrecisionTypes.hpp"
+#include "HighPrecisionCalculatorResult.hpp"
+#include "HighPrecisionComputationInput.hpp"
+#include "StarAstrometryBatchResult.hpp"
 
 #include <cstddef>
 #include <memory>
 #include <vector>
 
 namespace skygate::ephemeris::highprecision {
+
+struct PreparedEphemerisRequestState;
 
 class IStarAstrometryCalculator {
 public:
