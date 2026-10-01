@@ -1,9 +1,10 @@
 #include "HighPrecisionTextParser.hpp"
 #include "time/CalendarTime.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
-#include <cctype>
 #include <string>
 
 namespace skygate::ephemeris {
@@ -88,6 +89,57 @@ std::vector<std::string_view> HighPrecisionTextParser::splitAsciiWhitespace(std:
         text.remove_prefix(end);
     }
     return tokens;
+}
+
+bool HighPrecisionTextParser::parseBool(const std::string_view text, bool& value) const noexcept
+{
+    const std::string_view trimmed = trimAsciiWhitespace(text);
+    if (trimmed == "true" || trimmed == "1") {
+        value = true;
+        return true;
+    }
+    if (trimmed == "false" || trimmed == "0") {
+        value = false;
+        return true;
+    }
+
+    return false;
+}
+
+std::vector<std::string_view> HighPrecisionTextParser::splitCommaSeparated(std::string_view line) const
+{
+    std::vector<std::string_view> columns;
+    while (true) {
+        const std::size_t comma = line.find(',');
+        columns.push_back(trimAsciiWhitespace(comma == std::string_view::npos ? line : line.substr(0U, comma)));
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        line.remove_prefix(comma + 1U);
+    }
+    return columns;
+}
+
+std::string_view HighPrecisionTextParser::fixedColumn(
+    const std::string_view line, const std::size_t offset, const std::size_t length
+) const noexcept
+{
+    if (offset >= line.size()) {
+        return {};
+    }
+
+    return trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset)));
+}
+
+std::string_view HighPrecisionTextParser::takeLine(std::string_view& remaining) const noexcept
+{
+    const std::size_t newline = remaining.find('\n');
+    std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
+    remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
+    if (!line.empty() && line.back() == '\r') {
+        line.remove_suffix(1U);
+    }
+    return line;
 }
 
 std::optional<CivilDateTime> HighPrecisionTextParser::parseUtcDate(std::string_view text) const noexcept

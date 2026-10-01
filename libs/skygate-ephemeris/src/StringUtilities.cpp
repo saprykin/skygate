@@ -1,4 +1,5 @@
 #include "StringUtilities.hpp"
+#include "engine/highprecision/HighPrecisionTextParser.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -19,17 +20,9 @@ std::string StringUtilities::toLowerAscii(const std::string_view value)
     return lowered;
 }
 
-std::string_view StringUtilities::trimAsciiWhitespace(std::string_view value) noexcept
+std::string_view StringUtilities::trimAsciiWhitespace(const std::string_view value) noexcept
 {
-    while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())) != 0) {
-        value.remove_prefix(1);
-    }
-
-    while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back())) != 0) {
-        value.remove_suffix(1);
-    }
-
-    return value;
+    return HighPrecisionTextParser{}.trimAsciiWhitespace(value);
 }
 
 bool StringUtilities::equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept

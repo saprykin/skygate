@@ -309,12 +309,7 @@ loadLeapSecondTableFromTextAsset(const EphemerisTextDataAsset& asset, const Leap
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        const std::size_t newline = remaining.find('\n');
-        std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
-        remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
-        if (!line.empty() && line.back() == '\r') {
-            line.remove_suffix(1U);
-        }
+        std::string_view line = textParser().takeLine(remaining);
 
         line = textParser().trimAsciiWhitespace(line);
         if (line.empty()) {
