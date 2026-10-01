@@ -1,26 +1,18 @@
 #include "CatalogPayloadFormatDetector.hpp"
 #include "StringUtilities.hpp"
-
-#include <cstddef>
+#include "engine/highprecision/HighPrecisionTextParser.hpp"
 
 namespace skygate::ephemeris {
 namespace {
 
 std::string_view firstNonEmptyLine(std::string_view payload)
 {
-    std::size_t cursor = 0;
-    while (cursor < payload.size()) {
-        const std::size_t newline = payload.find('\n', cursor);
-        const std::size_t lineEnd = newline == std::string_view::npos ? payload.size() : newline;
-        const std::string_view line = StringUtilities::trimAsciiWhitespace(payload.substr(cursor, lineEnd - cursor));
+    const HighPrecisionTextParser parser;
+    while (!payload.empty()) {
+        const std::string_view line = parser.trimAsciiWhitespace(parser.takeLine(payload));
         if (!line.empty() && line.front() != '#') {
             return line;
         }
-
-        if (newline == std::string_view::npos) {
-            break;
-        }
-        cursor = newline + 1;
     }
 
     return {};

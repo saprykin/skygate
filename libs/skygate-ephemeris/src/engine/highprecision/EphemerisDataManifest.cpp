@@ -1,4 +1,5 @@
 #include "EphemerisDataManifest.hpp"
+#include "HighPrecisionTextParser.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QByteArray>
@@ -9,8 +10,6 @@
 #include <QJsonValue>
 
 #include <algorithm>
-#include <cctype>
-#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -26,66 +25,10 @@ private:
     static constexpr int kSupportedSchemaVersion = 1;
     static constexpr double kMaxExactJsonInteger = 9007199254740991.0;
 
-    [[nodiscard]] static std::string_view trimAsciiWhitespace(std::string_view text) noexcept
-    {
-        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
-            text.remove_prefix(1U);
-        }
-        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
-            text.remove_suffix(1U);
-        }
-        return text;
-    }
-
-    [[nodiscard]] static bool parseInt(const std::string_view text, int& value) noexcept
-    {
-        const std::string_view trimmed = trimAsciiWhitespace(text);
-        if (trimmed.empty()) {
-            return false;
-        }
-
-        const char* begin = trimmed.data();
-        const char* end = begin + trimmed.size();
-        const std::from_chars_result result = std::from_chars(begin, end, value);
-        return result.ec == std::errc{} && result.ptr == end;
-    }
-
-    [[nodiscard]] static std::optional<CivilDateTime> parseUtcDate(std::string_view text) noexcept
-    {
-        text = trimAsciiWhitespace(text);
-        const std::size_t yearSearchStart = text.starts_with("-") ? 1U : 0U;
-        const std::size_t firstDash = text.find('-', yearSearchStart);
-        const std::size_t secondDash =
-            firstDash == std::string_view::npos ? std::string_view::npos : text.find('-', firstDash + 1U);
-        if (firstDash == std::string_view::npos || secondDash == std::string_view::npos) {
-            return std::nullopt;
-        }
-
-        int year = 0;
-        int month = 0;
-        int day = 0;
-        if (!parseInt(text.substr(0U, firstDash), year)
-            || !parseInt(text.substr(firstDash + 1U, secondDash - firstDash - 1U), month)
-            || !parseInt(text.substr(secondDash + 1U), day)) {
-            return std::nullopt;
-        }
-
-        CivilDateTime dateTime;
-        dateTime.astronomicalYear = year;
-        dateTime.month = month;
-        dateTime.day = day;
-        dateTime.timeScale = TimeScale::Utc;
-        if (!CalendarTime::isValidCivilDateTime(dateTime)) {
-            return std::nullopt;
-        }
-
-        return dateTime;
-    }
-
     [[nodiscard]] static std::optional<AstronomicalEpoch> parseUtcDateEpoch(const QString& text) noexcept
     {
         const std::string value = text.toStdString();
-        const std::optional<CivilDateTime> dateTime = parseUtcDate(value);
+        const std::optional<CivilDateTime> dateTime = HighPrecisionTextParser{}.parseUtcDate(value);
         if (!dateTime.has_value()) {
             return std::nullopt;
         }
@@ -497,7 +440,7 @@ public:
     [[nodiscard]] static ParseResult parse(const std::string_view payload)
     {
         ParseResult result;
-        if (trimAsciiWhitespace(payload).empty()) {
+        if (HighPrecisionTextParser{}.trimAsciiWhitespace(payload).empty()) {
             result.diagnostics.push_back("Manifest payload is empty.");
             return result;
         }

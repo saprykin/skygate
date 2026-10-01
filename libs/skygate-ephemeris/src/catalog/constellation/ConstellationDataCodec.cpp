@@ -2,7 +2,6 @@
 #include "StringUtilities.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <utility>
 
 namespace skygate::ephemeris {
@@ -14,19 +13,7 @@ void sanitizeLabel(std::string& label)
     std::replace(label.begin(), label.end(), '\n', ' ');
     std::replace(label.begin(), label.end(), '\r', ' ');
 
-    const auto first = std::find_if(label.begin(), label.end(), [](const unsigned char character) {
-        return !std::isspace(character);
-    });
-    const auto last = std::find_if(label.rbegin(), label.rend(), [](const unsigned char character) {
-                          return !std::isspace(character);
-                      }).base();
-
-    if (first >= last) {
-        label.clear();
-        return;
-    }
-
-    label = std::string(first, last);
+    label = std::string(StringUtilities::trimAsciiWhitespace(label));
 }
 
 }  // namespace

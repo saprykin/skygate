@@ -3,7 +3,6 @@
 #include "HighPrecisionTextParser.hpp"
 #include "time/CalendarTime.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <optional>
@@ -32,21 +31,6 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     const std::vector<std::string_view> columns = textParser().splitAsciiWhitespace(line);
     int year = 0;
     return !columns.empty() && textParser().parseInt(columns.front(), year);
-}
-
-[[nodiscard]] bool parseBool(const std::string_view text, bool& value) noexcept
-{
-    const std::string_view trimmed = textParser().trimAsciiWhitespace(text);
-    if (trimmed == "true" || trimmed == "1") {
-        value = true;
-        return true;
-    }
-    if (trimmed == "false" || trimmed == "0") {
-        value = false;
-        return true;
-    }
-
-    return false;
 }
 
 [[nodiscard]] EphemerisDateRange makeRange(
@@ -152,42 +136,6 @@ constexpr std::string_view kPredictionRangeDisplayName = "Earth-orientation pred
     }
 
     return std::nullopt;
-}
-
-[[nodiscard]] std::vector<std::string_view> splitCsvLine(std::string_view line)
-{
-    std::vector<std::string_view> columns;
-    while (true) {
-        const std::size_t comma = line.find(',');
-        columns.push_back(
-            textParser().trimAsciiWhitespace(comma == std::string_view::npos ? line : line.substr(0U, comma))
-        );
-        if (comma == std::string_view::npos) {
-            break;
-        }
-        line.remove_prefix(comma + 1U);
-    }
-    return columns;
-}
-
-[[nodiscard]] std::string_view
-fixedColumn(const std::string_view line, const std::size_t offset, const std::size_t length) noexcept
-{
-    if (offset >= line.size()) {
-        return {};
-    }
-
-    return textParser().trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset)));
-}
-
-[[nodiscard]] bool
-isBlankFixedColumn(const std::string_view line, const std::size_t offset, const std::size_t length) noexcept
-{
-    if (offset >= line.size()) {
-        return true;
-    }
-
-    return textParser().trimAsciiWhitespace(line.substr(offset, std::min(length, line.size() - offset))).empty();
 }
 
 [[nodiscard]] std::optional<int> finalsYearFromMjd(const int twoDigitYear, const double mjd) noexcept
@@ -296,10 +244,10 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     int month = 0;
     int day = 0;
     double mjd = 0.0;
-    if (!textParser().parseInt(fixedColumn(line, 0U, 2U), twoDigitYear)
-        || !textParser().parseInt(fixedColumn(line, 2U, 2U), month)
-        || !textParser().parseInt(fixedColumn(line, 4U, 2U), day)
-        || !textParser().parseFiniteDouble(fixedColumn(line, 7U, 8U), mjd)) {
+    if (!textParser().parseInt(textParser().fixedColumn(line, 0U, 2U), twoDigitYear)
+        || !textParser().parseInt(textParser().fixedColumn(line, 2U, 2U), month)
+        || !textParser().parseInt(textParser().fixedColumn(line, 4U, 2U), day)
+        || !textParser().parseFiniteDouble(textParser().fixedColumn(line, 7U, 8U), mjd)) {
         return false;
     }
 
@@ -308,9 +256,9 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     double polarMotionXArcseconds = 0.0;
     double polarMotionYArcseconds = 0.0;
     double ut1MinusUtcSeconds = 0.0;
-    if (!textParser().parseFiniteDouble(fixedColumn(line, 18U, 9U), polarMotionXArcseconds)
-        || !textParser().parseFiniteDouble(fixedColumn(line, 37U, 9U), polarMotionYArcseconds)
-        || !textParser().parseFiniteDouble(fixedColumn(line, 58U, 10U), ut1MinusUtcSeconds)) {
+    if (!textParser().parseFiniteDouble(textParser().fixedColumn(line, 18U, 9U), polarMotionXArcseconds)
+        || !textParser().parseFiniteDouble(textParser().fixedColumn(line, 37U, 9U), polarMotionYArcseconds)
+        || !textParser().parseFiniteDouble(textParser().fixedColumn(line, 58U, 10U), ut1MinusUtcSeconds)) {
         return false;
     }
 
@@ -380,7 +328,7 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         return true;
     }
 
-    const std::vector<std::string_view> columns = splitCsvLine(line);
+    const std::vector<std::string_view> columns = textParser().splitCommaSeparated(line);
     if (columns.size() < 4U || columns.size() > 6U) {
         return parseIersC04EntryLine(line, entry);
     }
@@ -396,10 +344,11 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
         || !textParser().parseFiniteDouble(columns[3], polarMotionYArcseconds)) {
         return parseIersC04EntryLine(line, entry);
     }
-    if (columns.size() == 5U && !parseBool(columns[4], predicted)) {
+    if (columns.size() == 5U && !textParser().parseBool(columns[4], predicted)) {
         return false;
     }
-    if (columns.size() == 6U && (!parseBool(columns[4], predicted) || !parseBool(columns[5], estimated))) {
+    if (columns.size() == 6U
+        && (!textParser().parseBool(columns[4], predicted) || !textParser().parseBool(columns[5], estimated))) {
         return false;
     }
 
@@ -436,16 +385,17 @@ parseFinals2000AEntryLine(std::string_view line, IEarthOrientationProvider::Tabl
     int month = 0;
     int day = 0;
     double mjd = 0.0;
-    if (!textParser().parseInt(fixedColumn(line, 0U, 2U), twoDigitYear)
-        || !textParser().parseInt(fixedColumn(line, 2U, 2U), month)
-        || !textParser().parseInt(fixedColumn(line, 4U, 2U), day)
-        || !textParser().parseFiniteDouble(fixedColumn(line, 7U, 8U), mjd)
+    if (!textParser().parseInt(textParser().fixedColumn(line, 0U, 2U), twoDigitYear)
+        || !textParser().parseInt(textParser().fixedColumn(line, 2U, 2U), month)
+        || !textParser().parseInt(textParser().fixedColumn(line, 4U, 2U), day)
+        || !textParser().parseFiniteDouble(textParser().fixedColumn(line, 7U, 8U), mjd)
         || !finalsYearFromMjd(twoDigitYear, mjd).has_value()) {
         return false;
     }
 
-    return isBlankFixedColumn(line, 16U, 1U) && isBlankFixedColumn(line, 18U, 9U) && isBlankFixedColumn(line, 37U, 9U)
-           && isBlankFixedColumn(line, 57U, 1U) && isBlankFixedColumn(line, 58U, 10U);
+    return textParser().fixedColumn(line, 16U, 1U).empty() && textParser().fixedColumn(line, 18U, 9U).empty()
+           && textParser().fixedColumn(line, 37U, 9U).empty() && textParser().fixedColumn(line, 57U, 1U).empty()
+           && textParser().fixedColumn(line, 58U, 10U).empty();
 }
 
 [[nodiscard]] bool isHeaderLine(const std::string_view line) noexcept
@@ -492,12 +442,7 @@ EarthOrientationDataParser::Result EarthOrientationDataParser::parse(const Ephem
     std::size_t lineNumber = 0U;
     while (!remaining.empty()) {
         ++lineNumber;
-        const std::size_t newline = remaining.find('\n');
-        std::string_view line = newline == std::string_view::npos ? remaining : remaining.substr(0U, newline);
-        remaining = newline == std::string_view::npos ? std::string_view{} : remaining.substr(newline + 1U);
-        if (!line.empty() && line.back() == '\r') {
-            line.remove_suffix(1U);
-        }
+        std::string_view line = textParser().takeLine(remaining);
 
         const std::string_view trimmedLine = textParser().trimAsciiWhitespace(line);
         if (trimmedLine.empty()) {
