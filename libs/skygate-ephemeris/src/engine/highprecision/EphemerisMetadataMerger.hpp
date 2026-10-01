@@ -1,28 +1,12 @@
 #pragma once
 
 #include "EarthOrientationSampler.hpp"
-#include "TimeScaleService.hpp"
+#include "EphemerisMetadataFailurePolicy.hpp"
+#include "EphemerisMetadataMergeOptions.hpp"
+#include "TimeScaleConversionResult.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 
 namespace skygate::ephemeris::highprecision {
-
-enum class EphemerisMetadataStatusMergePolicy {
-    FullResultStatus,
-    DegradedAndFailedOnly
-};
-
-enum class EphemerisMetadataFailurePolicy {
-    MarkDegraded,
-    MarkFailed
-};
-
-struct EphemerisMetadataMergeOptions {
-    EphemerisMetadataStatusMergePolicy statusPolicy = EphemerisMetadataStatusMergePolicy::FullResultStatus;
-    bool mergeCorrections = true;
-    bool mergeProvenance = true;
-    bool mergeValidityRange = true;
-    bool mergeAngularUncertainty = true;
-};
 
 class EphemerisMetadataMerger final {
 public:

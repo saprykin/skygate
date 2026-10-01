@@ -116,7 +116,30 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/TableBackedDeltaTProvider.cpp
     src/engine/highprecision/TableBackedLeapSecondProvider.hpp
     src/engine/highprecision/TableBackedLeapSecondProvider.cpp
-    src/engine/highprecision/TimeScaleService.cpp
+    src/engine/highprecision/TimeScaleConversionStatus.hpp
+    src/engine/highprecision/TimeScaleConversionStatus.cpp
+    src/engine/highprecision/TimeScaleConversionWarningCode.hpp
+    src/engine/highprecision/TimeScaleConversionWarningCode.cpp
+    src/engine/highprecision/TimeScaleConversionDiagnostics.hpp
+    src/engine/highprecision/TimeScaleConversionDiagnostics.cpp
+    src/engine/highprecision/TimeScaleConversionResult.hpp
+    src/engine/highprecision/TimeScaleConversionResult.cpp
+    src/engine/highprecision/TimeScaleServiceOptions.hpp
+    src/engine/highprecision/TimeScaleServiceOptions.cpp
+    src/engine/highprecision/ITimeScaleService.hpp
+    src/engine/highprecision/LeapSecondTimeScaleService.hpp
+    src/engine/highprecision/LeapSecondTimeScaleService.cpp
+    src/engine/highprecision/EphemerisMetadataStatusMergePolicy.hpp
+    src/engine/highprecision/EphemerisMetadataStatusMergePolicy.cpp
+    src/engine/highprecision/EphemerisMetadataFailurePolicy.hpp
+    src/engine/highprecision/EphemerisMetadataFailurePolicy.cpp
+    src/engine/highprecision/EphemerisMetadataMergeOptions.hpp
+    src/engine/highprecision/EphemerisMetadataMergeOptions.cpp
+    src/engine/highprecision/EphemerisTextDataAsset.hpp
+    src/engine/highprecision/EphemerisTextDataAsset.cpp
+    src/engine/highprecision/EphemerisKernelDataAsset.hpp
+    src/engine/highprecision/EphemerisKernelDataAsset.cpp
+    src/engine/highprecision/IEphemerisDataSnapshot.hpp
 )
 
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)

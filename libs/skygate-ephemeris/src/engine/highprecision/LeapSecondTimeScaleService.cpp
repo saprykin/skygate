@@ -1,4 +1,4 @@
-#include "TimeScaleService.hpp"
+#include "LeapSecondTimeScaleService.hpp"
 #include "math/MathConstants.hpp"
 #include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
@@ -28,7 +28,7 @@ struct OffsetLookupResult {
 
     void addWarning(const TimeScaleConversionWarningCode code) noexcept
     {
-        warningCodeMask |= timeScaleConversionWarningMask(code);
+        warningCodeMask |= TimeScaleConversionDiagnostics::warningMask(code);
     }
 };
 
@@ -40,7 +40,7 @@ struct Ut1OffsetLookupResult {
 
     void addWarning(const TimeScaleConversionWarningCode code) noexcept
     {
-        warningCodeMask |= timeScaleConversionWarningMask(code);
+        warningCodeMask |= TimeScaleConversionDiagnostics::warningMask(code);
     }
 
     [[nodiscard]] bool isSuccess() const noexcept
@@ -677,7 +677,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
             TimeScaleConversionResult result = successResult(
                 epoch.addSeconds(*tdbMinusTt, TimeScale::Tdb),
                 TimeScaleConversionStatus::Degraded,
-                timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
+                TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
                 "TT to TDB conversion used the configured high-precision approximation."
             );
             addTdbApproximationWarning(result);
@@ -707,7 +707,7 @@ LeapSecondTimeScaleService::convert(const AstronomicalEpoch& epoch, const TimeSc
         TimeScaleConversionResult result = successResult(
             tt,
             TimeScaleConversionStatus::Degraded,
-            timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
+            TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied),
             "TDB to TT conversion used the configured high-precision approximation."
         );
         addTdbApproximationWarning(result);

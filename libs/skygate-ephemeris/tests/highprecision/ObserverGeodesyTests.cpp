@@ -25,7 +25,7 @@ private slots:
 
 void ObserverGeodesyTests::convertsEquatorPrimeMeridianToWgs84EquatorialRadius()
 {
-    const std::optional<Vector3d> position = observerItrsPositionAu(
+    const std::optional<Vector3d> position = ObserverGeodesy::observerItrsPositionAu(
         GeoLocation{
             .latitudeDeg = 0.0,
             .longitudeDeg = 0.0,
@@ -41,7 +41,7 @@ void ObserverGeodesyTests::convertsEquatorPrimeMeridianToWgs84EquatorialRadius()
 
 void ObserverGeodesyTests::convertsNorthPoleToWgs84PolarRadius()
 {
-    const std::optional<Vector3d> position = observerItrsPositionAu(
+    const std::optional<Vector3d> position = ObserverGeodesy::observerItrsPositionAu(
         GeoLocation{
             .latitudeDeg = 90.0,
             .longitudeDeg = 0.0,
@@ -57,14 +57,14 @@ void ObserverGeodesyTests::convertsNorthPoleToWgs84PolarRadius()
 
 void ObserverGeodesyTests::includesElevationAlongLocalUp()
 {
-    const std::optional<Vector3d> seaLevel = observerItrsPositionAu(
+    const std::optional<Vector3d> seaLevel = ObserverGeodesy::observerItrsPositionAu(
         GeoLocation{
             .latitudeDeg = 0.0,
             .longitudeDeg = 0.0,
             .elevationMeters = 0.0,
         }
     );
-    const std::optional<Vector3d> elevated = observerItrsPositionAu(
+    const std::optional<Vector3d> elevated = ObserverGeodesy::observerItrsPositionAu(
         GeoLocation{
             .latitudeDeg = 0.0,
             .longitudeDeg = 0.0,
@@ -81,7 +81,7 @@ void ObserverGeodesyTests::includesElevationAlongLocalUp()
 
 void ObserverGeodesyTests::rejectsInvalidObservers()
 {
-    const std::optional<Vector3d> position = observerItrsPositionAu(
+    const std::optional<Vector3d> position = ObserverGeodesy::observerItrsPositionAu(
         GeoLocation{
             .latitudeDeg = GeoLocation::kLatitudeMaxDeg + 1.0,
             .longitudeDeg = 0.0,

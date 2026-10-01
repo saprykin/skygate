@@ -403,7 +403,7 @@ void TimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()
         static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
     );
     QVERIFY(tdb.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
-    QVERIFY(!skygate::ephemeris::timeScaleConversionWarningText(
+    QVERIFY(!skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(
                  skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied
     )
                  .empty());
