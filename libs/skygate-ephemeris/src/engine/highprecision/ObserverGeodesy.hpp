@@ -7,7 +7,10 @@
 
 namespace skygate::ephemeris::highprecision {
 
-[[nodiscard]] std::optional<skygate::core::Vector3d>
-observerItrsPositionAu(const skygate::core::GeoLocation& observer) noexcept;
+class ObserverGeodesy final {
+public:
+    [[nodiscard]] static std::optional<skygate::core::Vector3d>
+    observerItrsPositionAu(const skygate::core::GeoLocation& observer) noexcept;
+};
 
 }  // namespace skygate::ephemeris::highprecision

@@ -1,6 +1,7 @@
 #include "ErfaFrameTransformer.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "ErfaAstrometry.hpp"
+#include "ITimeScaleService.hpp"
 #include "math/MathConstants.hpp"
 #include "math/Matrix3x3.hpp"
 

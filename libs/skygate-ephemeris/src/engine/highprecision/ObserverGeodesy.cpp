@@ -14,7 +14,8 @@ constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 
 }  // namespace
 
-std::optional<skygate::core::Vector3d> observerItrsPositionAu(const skygate::core::GeoLocation& observer) noexcept
+std::optional<skygate::core::Vector3d>
+ObserverGeodesy::observerItrsPositionAu(const skygate::core::GeoLocation& observer) noexcept
 {
     if (!observer.isValid()) {
         return std::nullopt;

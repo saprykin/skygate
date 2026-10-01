@@ -5,6 +5,7 @@
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IFrameTransformer.hpp"
+#include "ITimeScaleService.hpp"
 #include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
@@ -386,7 +387,7 @@ private:
         const std::optional<skygate::core::Vector3d> observerPosition =
             m_context.preparedRequestState != nullptr && m_context.preparedRequestState->topocentricStatePrepared
                 ? m_context.preparedRequestState->observerItrsPositionAu
-                : observerItrsPositionAu(m_context.request.context.observer);
+                : ObserverGeodesy::observerItrsPositionAu(m_context.request.context.observer);
         for (ApparentPlaceWorkItem& item : m_items) {
             if (!item.outputVector.has_value()) {
                 continue;

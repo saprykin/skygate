@@ -10,6 +10,7 @@
 #include "IEphemerisResultBuilder.hpp"
 #include "ISolarSystemStateCalculator.hpp"
 #include "IStarAstrometryCalculator.hpp"
+#include "ITimeScaleService.hpp"
 #include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
@@ -164,7 +165,7 @@ void mergeKernelEpochTimeScaleMetadata(
 ) noexcept
 {
     constexpr std::uint32_t kTdbApproximationWarning =
-        timeScaleConversionWarningMask(TimeScaleConversionWarningCode::TdbApproximationApplied);
+        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied);
     if (conversion.status == TimeScaleConversionStatus::Degraded
         && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
         return;
@@ -554,7 +555,7 @@ private:
 
         if (requestsTopocentricState(request) && m_dependencies.timeScaleService != nullptr) {
             preparedState->topocentricStatePrepared = true;
-            preparedState->observerItrsPositionAu = observerItrsPositionAu(request.context.observer);
+            preparedState->observerItrsPositionAu = ObserverGeodesy::observerItrsPositionAu(request.context.observer);
             const TimeScaleConversionResult utcConversion =
                 m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Utc);
             EphemerisMetadataMerger::mergeTimeScale(preparedState->topocentricMetadata, utcConversion);
