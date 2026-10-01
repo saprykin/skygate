@@ -278,7 +278,7 @@ focused calculator/provider classes:
 - `CalcephKernelProvider`
 - `SolarSystemStateCalculator`
 - `StarAstrometryCalculator`
-- `TimeScaleService`
+- `LeapSecondTimeScaleService`
 - `IEarthOrientationProvider`
 - `TableBackedEarthOrientationProvider`
 - `EarthOrientationDataParser`
@@ -304,7 +304,7 @@ Add ephemeris-specific time types and services:
 
 - `AstronomicalEpoch`: two-part Julian date plus time scale
 - `CivilDateTime`: signed astronomical year, month, day, time, subsecond
-- `TimeScaleService`: UTC, TAI, TT, TDB, UT1 conversion
+- `LeapSecondTimeScaleService`: UTC, TAI, TT, TDB, UT1 conversion
 - `ILeapSecondProvider`: UTC/TAI data interface with nested table types
 - `TableBackedLeapSecondProvider`: table-backed UTC/TAI lookup
 - `LeapSecondTableLoader`: leap-second table parsing and validation

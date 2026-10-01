@@ -289,7 +289,7 @@ high-precision providers and calculators:
 - `CalcephKernelProvider`
 - `SolarSystemStateCalculator`
 - `StarAstrometryCalculator`
-- `TimeScaleService`
+- `LeapSecondTimeScaleService`
 - `IEarthOrientationProvider`
 - `TableBackedEarthOrientationProvider`
 - `EarthOrientationDataParser`

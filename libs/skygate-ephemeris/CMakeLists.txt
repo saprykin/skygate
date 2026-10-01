@@ -196,7 +196,6 @@ add_library(skygate-ephemeris STATIC
     src/engine/highprecision/EphemerisStagedUpdateVerificationResult.hpp
     src/engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp
     src/engine/highprecision/EphemerisDataManifest.hpp
-    src/engine/highprecision/EphemerisDataSnapshot.hpp
     src/engine/highprecision/IDeltaTProvider.hpp
     src/factory/EphemerisEngineFactory.hpp
     src/factory/EphemerisFactoryCreationDiagnosticCode.hpp
@@ -233,7 +232,6 @@ add_library(skygate-ephemeris STATIC
     src/ObservationEventStatus.hpp
     src/ObservationEventSummary.hpp
     src/catalog/stellarium/StellariumConstellationParser.hpp
-    src/engine/highprecision/TimeScaleService.hpp
     src/time/TimeScale.hpp
     src/time/AstronomicalEpoch.hpp
     src/time/CivilDateTime.hpp

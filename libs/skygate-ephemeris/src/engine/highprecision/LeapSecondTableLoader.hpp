@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EphemerisDataSnapshot.hpp"
+#include "IEphemerisDataSnapshot.hpp"
 #include "ILeapSecondProvider.hpp"
 
 #include <memory>

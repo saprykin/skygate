@@ -7,9 +7,9 @@
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QFile>
 #include <QJsonArray>

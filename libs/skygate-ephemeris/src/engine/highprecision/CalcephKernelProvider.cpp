@@ -1,8 +1,8 @@
 #include "CalcephKernelProvider.hpp"
 #include "CalcephKernel.hpp"
 #include "EphemerisDataManifest.hpp"
-#include "EphemerisDataSnapshot.hpp"
 #include "ICalcephKernel.hpp"
+#include "IEphemerisDataSnapshot.hpp"
 
 #include <QByteArrayView>
 #include <QCryptographicHash>

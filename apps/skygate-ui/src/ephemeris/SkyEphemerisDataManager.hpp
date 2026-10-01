@@ -2,9 +2,9 @@
 
 #include "SkySettingsStore.hpp"
 #include "engine/highprecision/EphemerisDataActivationStatus.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/EphemerisStagedUpdateVerificationRequest.hpp"
 #include "engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 
 #include <QObject>
 #include <QString>

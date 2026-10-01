@@ -4,21 +4,21 @@
 #include "engine/highprecision/DeltaTDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
 #include "engine/highprecision/IFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondTableLoader.hpp"
+#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

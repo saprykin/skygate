@@ -1,7 +1,7 @@
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/LeapSecondTableLoader.hpp"
+#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 
