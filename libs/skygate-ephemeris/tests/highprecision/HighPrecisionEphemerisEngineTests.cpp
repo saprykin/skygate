@@ -10,7 +10,7 @@
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
 #include "engine/highprecision/IFrameTransformer.hpp"
-#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/LeapSecondTableLoader.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
@@ -188,9 +188,10 @@ template <typename BodyRange>
 [[nodiscard]] std::shared_ptr<const ILeapSecondProvider>
 makeLeapSecondProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = std::nullopt)
 {
-    LeapSecondTableLoadOptions options;
+    LeapSecondTableLoader::Options options;
     options.referenceEpoch = referenceEpoch;
-    const LeapSecondTableLoadResult result = loadLeapSecondTableFromTextAsset(makeLeapSecondAsset(), options);
+    const LeapSecondTableLoader::Result result =
+        LeapSecondTableLoader::loadFromTextAsset(makeLeapSecondAsset(), options);
     Q_ASSERT(result.isSuccess());
     return result.provider;
 }

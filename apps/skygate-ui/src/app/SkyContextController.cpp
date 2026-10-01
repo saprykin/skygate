@@ -15,7 +15,7 @@
 #include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/EphemerisDataSnapshot.hpp"
-#include "engine/highprecision/LeapSecondProvider.hpp"
+#include "engine/highprecision/LeapSecondTableLoader.hpp"
 #include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QDateTime>
@@ -336,8 +336,8 @@ ephemerisProvidersFromSnapshot(const std::shared_ptr<const skygate::ephemeris::I
         bundle.earthOrientationProvider = earthOrientationData.provider;
     }
 
-    const skygate::ephemeris::LeapSecondTableLoadResult leapSecondTable =
-        skygate::ephemeris::loadLeapSecondTableFromSnapshot(*snapshot);
+    const skygate::ephemeris::LeapSecondTableLoader::Result leapSecondTable =
+        skygate::ephemeris::LeapSecondTableLoader::loadFromSnapshot(*snapshot);
     const skygate::ephemeris::DeltaTDataLoader::Result deltaTData =
         skygate::ephemeris::DeltaTDataLoader::loadFromSnapshot(*snapshot);
     if (leapSecondTable.isSuccess()) {

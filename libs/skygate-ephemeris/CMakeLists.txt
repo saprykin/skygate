@@ -95,7 +95,10 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/HighPrecisionTextParser.hpp
     src/engine/highprecision/HighPrecisionTextParser.cpp
     src/engine/highprecision/IDeltaTProvider.hpp
-    src/engine/highprecision/LeapSecondProvider.cpp
+    src/engine/highprecision/ILeapSecondProvider.hpp
+    src/engine/highprecision/ILeapSecondProvider.cpp
+    src/engine/highprecision/LeapSecondTableLoader.hpp
+    src/engine/highprecision/LeapSecondTableLoader.cpp
     src/engine/highprecision/ObserverGeodesy.hpp
     src/engine/highprecision/ObserverGeodesy.cpp
     src/engine/highprecision/SolarSystemStateCalculator.hpp
@@ -104,6 +107,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/StarAstrometryCalculator.cpp
     src/engine/highprecision/TableBackedDeltaTProvider.hpp
     src/engine/highprecision/TableBackedDeltaTProvider.cpp
+    src/engine/highprecision/TableBackedLeapSecondProvider.hpp
+    src/engine/highprecision/TableBackedLeapSecondProvider.cpp
     src/engine/highprecision/TimeScaleService.cpp
 )
 
@@ -187,7 +192,6 @@ add_library(skygate-ephemeris STATIC
     src/EphemerisRequest.hpp
     src/EphemerisRequestFactory.hpp
     src/engine/IEphemerisEngine.hpp
-    src/engine/highprecision/LeapSecondProvider.hpp
     src/MoonPhase.hpp
     src/MoonPhaseCalculator.hpp
     src/NightConditions.hpp
