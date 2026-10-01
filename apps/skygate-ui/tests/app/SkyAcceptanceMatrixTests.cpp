@@ -8,7 +8,7 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
 #include "engine/highprecision/IEarthOrientationProvider.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
 
 #include <QDir>
 #include <QFile>

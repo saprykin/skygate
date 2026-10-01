@@ -5,9 +5,9 @@
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

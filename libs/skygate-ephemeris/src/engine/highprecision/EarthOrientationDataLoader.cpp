@@ -1,6 +1,6 @@
 #include "EarthOrientationDataLoader.hpp"
 #include "EarthOrientationDataParser.hpp"
-#include "EphemerisDataSnapshot.hpp"
+#include "IEphemerisDataSnapshot.hpp"
 #include "TableBackedEarthOrientationProvider.hpp"
 
 #include <utility>

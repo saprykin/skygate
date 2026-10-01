@@ -2,9 +2,9 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/DeltaTDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationDataLoader.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 #include "engine/highprecision/LeapSecondTableLoader.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
+#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

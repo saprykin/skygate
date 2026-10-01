@@ -4,16 +4,16 @@
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 

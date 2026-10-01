@@ -5,10 +5,10 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 #include "engine/highprecision/IEarthOrientationProvider.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
 
 #include <QCryptographicHash>
 #include <QFile>

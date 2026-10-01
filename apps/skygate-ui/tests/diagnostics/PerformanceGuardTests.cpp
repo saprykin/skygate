@@ -19,9 +19,9 @@
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/highprecision/IStarAstrometryCalculator.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
-#include "engine/highprecision/TimeScaleService.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
 
 #include <QElapsedTimer>

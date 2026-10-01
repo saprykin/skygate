@@ -2,8 +2,8 @@
 #include "engine/highprecision/CalcephKernel.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 
 #include <QDir>
 #include <QFile>

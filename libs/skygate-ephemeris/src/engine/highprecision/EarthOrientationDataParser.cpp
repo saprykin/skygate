@@ -1,6 +1,6 @@
 #include "EarthOrientationDataParser.hpp"
-#include "EphemerisDataSnapshot.hpp"
 #include "HighPrecisionTextParser.hpp"
+#include "IEphemerisDataSnapshot.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <cmath>

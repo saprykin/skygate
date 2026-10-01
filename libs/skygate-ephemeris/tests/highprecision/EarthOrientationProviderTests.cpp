@@ -2,7 +2,7 @@
 #include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EarthOrientationDataParser.hpp"
 #include "engine/highprecision/EarthOrientationSampler.hpp"
-#include "engine/highprecision/EphemerisDataSnapshot.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 #include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
 
 #include <QtTest/QtTest>
