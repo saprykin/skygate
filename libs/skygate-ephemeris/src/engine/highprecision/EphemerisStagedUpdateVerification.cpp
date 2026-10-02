@@ -159,6 +159,8 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         return EphemerisStagedUpdateVerificationStatus::Canceled;
     case EphemerisDataPayloadReader::Status::IoError:
         return EphemerisStagedUpdateVerificationStatus::IoError;
+    case EphemerisDataPayloadReader::Status::OutputLimitExceeded:
+        return EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
     case EphemerisDataPayloadReader::Status::Read:
         break;
     }
@@ -204,8 +206,9 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         return false;
     }
 
-    const EphemerisDataPayloadReader::Result payload =
-        EphemerisDataPayloadReader::read(asset.compression.kind, sourceFile, sink, cancellationCallback);
+    const EphemerisDataPayloadReader::Result payload = EphemerisDataPayloadReader::read(
+        asset.compression.kind, sourceFile, sink, cancellationCallback, asset.compression.uncompressedSizeBytes
+    );
     if (payload.status != EphemerisDataPayloadReader::Status::Read) {
         result.status = mappedVerificationStatus(payload.status);
         result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());

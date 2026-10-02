@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/EphemerisDateRange.hpp"
+#include "time/EphemerisDateRange.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CivilDateTime.hpp"
 

@@ -211,7 +211,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/BitFlagSetOperations.hpp
     src/engine/EphemerisCapabilities.hpp
     src/engine/EphemerisCorrectionFlags.hpp
-    src/engine/EphemerisDateRange.hpp
+    src/time/EphemerisDateRange.hpp
     src/engine/EphemerisDatasetInfo.hpp
     src/engine/EphemerisEngineKind.hpp
     src/engine/EphemerisEngineOptions.hpp
@@ -355,7 +355,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/BitFlagSetOperations.cpp
     src/engine/EphemerisCapabilities.cpp
     src/engine/EphemerisCorrectionFlags.cpp
-    src/engine/EphemerisDateRange.cpp
+    src/time/EphemerisDateRange.cpp
     src/engine/EphemerisDatasetInfo.cpp
     src/engine/EphemerisEngineKind.cpp
     src/engine/EphemerisEngineOptions.cpp

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ public:
         UnsupportedCompression,
         CorruptArchive,
         IoError,
+        OutputLimitExceeded,
         Canceled
     };
 
@@ -33,7 +35,8 @@ public:
         EphemerisDataManifest::CompressionKind compression,
         QFile& sourceFile,
         QIODevice& targetFile,
-        const std::function<bool()>& cancellationCallback
+        const std::function<bool()>& cancellationCallback,
+        std::optional<std::uint64_t> maximumOutputBytes = std::nullopt
     );
 };
 

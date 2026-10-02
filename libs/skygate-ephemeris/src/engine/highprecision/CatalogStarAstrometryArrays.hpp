@@ -1,7 +1,7 @@
 #pragma once
 
 #include "EquatorialCoordinate.hpp"
-#include "engine/EphemerisDateRange.hpp"
+#include "time/EphemerisDateRange.hpp"
 #include "time/AstronomicalEpoch.hpp"
 
 #include <cstddef>

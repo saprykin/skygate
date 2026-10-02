@@ -1,11 +1,19 @@
 #include "EarthOrientationSampler.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace skygate::ephemeris {
 
 namespace {
+
+constexpr double kEpochKeyEqualityToleranceDays = 1.0e-9;
+
+[[nodiscard]] bool sameEpochKey(const double lhs, const double rhs) noexcept
+{
+    return std::abs(lhs - rhs) <= kEpochKeyEqualityToleranceDays;
+}
 
 [[nodiscard]] bool epochInRange(const AstronomicalEpoch& epoch, const EphemerisDateRange& range) noexcept
 {
@@ -163,7 +171,7 @@ EarthOrientationSampler::Sample EarthOrientationSampler::sample(
     });
 
     EarthOrientationSampler::Sample sample;
-    if (lowerBound != entries.end() && lowerBound->effectiveUtcEpoch.sortKey() == requestedKey) {
+    if (lowerBound != entries.end() && sameEpochKey(lowerBound->effectiveUtcEpoch.sortKey(), requestedKey)) {
         sample = sampleFromEntry(utcEpoch, *lowerBound);
     } else if (lowerBound == entries.begin()) {
         if (!options.allowOutOfRangeNearestSampleFallback) {

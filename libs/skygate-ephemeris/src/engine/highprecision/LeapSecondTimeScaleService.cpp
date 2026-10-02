@@ -54,12 +54,6 @@ struct Ut1OffsetLookupResult {
     return epoch.julianDatePart1 + epoch.julianDatePart2;
 }
 
-[[nodiscard]] double fractionalDay(const AstronomicalEpoch& epoch) noexcept
-{
-    const double fraction = epochJulianDate(epoch) - std::floor(epochJulianDate(epoch));
-    return fraction < 0.0 ? fraction + 1.0 : fraction;
-}
-
 [[nodiscard]] double approximateTdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
 {
     const double daysSinceJ2000 = epochJulianDate(terrestrialTime) - TimeConstants::kJulianDateJ2000;
@@ -71,9 +65,12 @@ struct Ut1OffsetLookupResult {
 [[nodiscard]] std::optional<double> tdbMinusTtSeconds(const AstronomicalEpoch& terrestrialTime) noexcept
 {
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
-    const std::optional<double> erfaResult = skygate::ephemeris::highprecision::ErfaAstrometry::tdbMinusTtSeconds(
-        terrestrialTime, fractionalDay(terrestrialTime)
-    );
+    // The observer is geocentric (elongation, spin-axis distance, and
+    // equatorial-plane distance are all zero), so eraDtdb ignores the UT1
+    // fraction of day. Pass a neutral zero instead of a TT day fraction that is
+    // not valid UT1.
+    const std::optional<double> erfaResult =
+        skygate::ephemeris::highprecision::ErfaAstrometry::tdbMinusTtSeconds(terrestrialTime, 0.0);
     if (erfaResult.has_value()) {
         return erfaResult;
     }

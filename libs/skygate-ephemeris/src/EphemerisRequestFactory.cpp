@@ -1,14 +1,7 @@
 #include "EphemerisRequestFactory.hpp"
-#include "math/TimeConstants.hpp"
-#include "time/AstronomicalEpoch.hpp"
 #include "time/EpochCodec.hpp"
 
-#include <chrono>
-
 namespace skygate::ephemeris {
-
-using skygate::core::TimeConstants;
-
 skygate::core::ObservationContext EphemerisRequestFactory::contextFromRequest(const EphemerisRequest& request) noexcept
 {
     skygate::core::ObservationContext context = request.context;
@@ -35,15 +28,12 @@ EphemerisRequest EphemerisRequestFactory::atUtcTime(
 ) noexcept
 {
     EphemerisRequest request = baseRequest;
-    const double offsetSeconds = std::chrono::duration<double>(utcTime - baseRequest.context.utcTime).count();
     request.context.utcTime = utcTime;
-    request.epoch =
-        AstronomicalEpoch{
-            .julianDatePart1 = baseRequest.epoch.julianDatePart1,
-            .julianDatePart2 = baseRequest.epoch.julianDatePart2 + offsetSeconds / TimeConstants::kSecondsPerDay,
-            .timeScale = baseRequest.epoch.timeScale,
-        }
-            .normalized();
+
+    // The requested instant is always a UTC instant. Derive the request epoch
+    // from the UTC time point instead of adding a UTC interval to a base epoch
+    // that may be expressed in a non-UTC scale (TT/TDB/UT1).
+    request.epoch = EpochCodec::epochFromUtcTime(utcTime);
     return request;
 }
 

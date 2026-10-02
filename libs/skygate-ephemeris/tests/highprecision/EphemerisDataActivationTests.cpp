@@ -246,6 +246,7 @@ private slots:
     void rejectsCorruptZstdArchive();
     void rejectsChecksumMismatch();
     void rejectsExpectedSizeMismatch();
+    void rejectsCompressedAssetLargerThanDeclaredSize();
     void preservesExistingCacheFileWhenReplacementCannotBeWritten();
     void treatsExistingValidCacheFileAsAlreadyActive();
     void cancelsActivationBeforeWritingCacheFile();
@@ -328,6 +329,32 @@ void EphemerisDataActivationTests::rejectsChecksumMismatch()
     QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
     skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
     asset.checksum.value = std::string(64U, '0');
+    writeFile(sourcePath(bundledRoot), compressedPayload());
+
+    const skygate::ephemeris::EphemerisDataActivationResult result =
+        skygate::ephemeris::EphemerisDataActivation::activate(makeRequest(asset, bundledRoot, cacheRoot));
+
+    if (result.status == skygate::ephemeris::EphemerisDataActivationStatus::UnsupportedCompression) {
+        QSKIP("zstd runtime library is unavailable in this test environment.");
+    }
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::ChecksumMismatch)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(!QFileInfo::exists(pathToQString(result.activePath)));
+    QVERIFY(!containsFiles(cacheRoot.path()));
+}
+
+void EphemerisDataActivationTests::rejectsCompressedAssetLargerThanDeclaredSize()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeZstdAsset();
+    asset.compression.uncompressedSizeBytes = kPayload.size() - 1U;
     writeFile(sourcePath(bundledRoot), compressedPayload());
 
     const skygate::ephemeris::EphemerisDataActivationResult result =

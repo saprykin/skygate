@@ -335,6 +335,15 @@ DeltaTDataLoader::loadFromTextAsset(const EphemerisTextDataAsset& asset, const O
         );
     }
 
+    const auto duplicate = std::ranges::adjacent_find(entries, {}, [](const IDeltaTProvider::TableEntry& entry) {
+        return entry.effectiveUtcEpoch.sortKey();
+    });
+    if (duplicate != entries.end()) {
+        return failureResult(
+            std::move(info), IDeltaTProvider::DataStatus::Malformed, "Delta T rows contain duplicate UTC dates."
+        );
+    }
+
     if (info.ancientFallbackModel.has_value()) {
         IDeltaTProvider::DataInfo::FallbackModelInfo fallback = std::move(*info.ancientFallbackModel);
         if (!hasFallbackStart || !hasFallbackEnd || !fallback.validityRange.start.isFinite()

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/EphemerisDateRange.hpp"
+#include "time/EphemerisDateRange.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 #include "math/Vector3d.hpp"
 #include "time/AstronomicalEpoch.hpp"
