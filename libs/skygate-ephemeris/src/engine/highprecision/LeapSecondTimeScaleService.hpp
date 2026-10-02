@@ -1,9 +1,12 @@
 #pragma once
 
 #include "IDeltaTProvider.hpp"
+#include "IEarthOrientationProvider.hpp"
 #include "ILeapSecondProvider.hpp"
 #include "ITimeScaleService.hpp"
+#include "LeapSecondOffsetResolver.hpp"
 #include "TimeScaleServiceOptions.hpp"
+#include "Ut1OffsetResolver.hpp"
 
 #include <memory>
 
@@ -25,10 +28,8 @@ public:
     convertCivilDateTime(const CivilDateTime& dateTime, TimeScale targetScale) const override;
 
 private:
-    std::shared_ptr<const ILeapSecondProvider> m_leapSecondProvider;
-    std::shared_ptr<const IEarthOrientationProvider> m_earthOrientationProvider;
-    std::shared_ptr<const IDeltaTProvider> m_deltaTProvider;
-    TimeScaleServiceOptions m_options;
+    LeapSecondOffsetResolver m_leapSecondOffsetResolver;
+    Ut1OffsetResolver m_ut1OffsetResolver;
 };
 
 }  // namespace skygate::ephemeris

@@ -74,6 +74,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
     src/engine/highprecision/DeltaTDataLoader.hpp
     src/engine/highprecision/DeltaTDataLoader.cpp
+    src/engine/highprecision/DeltaTDataParser.hpp
+    src/engine/highprecision/DeltaTDataParser.cpp
     src/engine/highprecision/IEarthOrientationProvider.hpp
     src/engine/highprecision/TableBackedEarthOrientationProvider.hpp
     src/engine/highprecision/TableBackedEarthOrientationProvider.cpp
@@ -110,6 +112,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ILeapSecondProvider.cpp
     src/engine/highprecision/LeapSecondTableLoader.hpp
     src/engine/highprecision/LeapSecondTableLoader.cpp
+    src/engine/highprecision/LeapSecondTableParser.hpp
+    src/engine/highprecision/LeapSecondTableParser.cpp
     src/engine/highprecision/ObserverGeodesy.hpp
     src/engine/highprecision/ObserverGeodesy.cpp
     src/engine/highprecision/SolarSystemStateCalculator.hpp
@@ -133,6 +137,12 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ITimeScaleService.hpp
     src/engine/highprecision/LeapSecondTimeScaleService.hpp
     src/engine/highprecision/LeapSecondTimeScaleService.cpp
+    src/engine/highprecision/LeapSecondOffsetResolver.hpp
+    src/engine/highprecision/LeapSecondOffsetResolver.cpp
+    src/engine/highprecision/TdbTtConverter.hpp
+    src/engine/highprecision/TdbTtConverter.cpp
+    src/engine/highprecision/Ut1OffsetResolver.hpp
+    src/engine/highprecision/Ut1OffsetResolver.cpp
     src/engine/highprecision/EphemerisMetadataStatusMergePolicy.hpp
     src/engine/highprecision/EphemerisMetadataStatusMergePolicy.cpp
     src/engine/highprecision/EphemerisMetadataFailurePolicy.hpp
