@@ -11,7 +11,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -54,26 +53,13 @@ public:
         return engineOptions;
     }
 
-    [[nodiscard]] virtual EphemerisSnapshot compute(const EphemerisRequest& request) const
-    {
-        return compute(request.context);
-    }
+    [[nodiscard]] virtual EphemerisSnapshot compute(const EphemerisRequest& request) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState>
-    computeBodyState(const EphemerisRequest& request, std::string_view bodyId) const
-    {
-        return computeBodyState(request.context, bodyId);
-    }
+    computeBodyState(const EphemerisRequest& request, std::string_view bodyId) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState>
-    computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const
-    {
-        if (bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
-            return std::nullopt;
-        }
-
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
-    }
+    computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const = 0;
 
     [[nodiscard]] virtual EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const = 0;
     [[nodiscard]] virtual std::optional<CelestialBodyState>

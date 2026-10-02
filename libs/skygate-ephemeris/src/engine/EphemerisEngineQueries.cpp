@@ -29,6 +29,20 @@ EphemerisEngineQueries::findBodyStateByIndex(const EphemerisSnapshot& snapshot, 
 }
 
 std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateById(
+    const IEphemerisEngine& engine, const EphemerisRequest& request, const std::string_view bodyId
+)
+{
+    return engine.computeBodyState(request, bodyId);
+}
+
+std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateByIndex(
+    const IEphemerisEngine& engine, const EphemerisRequest& request, const std::size_t bodyIndex
+)
+{
+    return engine.computeBodyState(request, bodyIndex);
+}
+
+std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateById(
     const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, const std::string_view bodyId
 )
 {

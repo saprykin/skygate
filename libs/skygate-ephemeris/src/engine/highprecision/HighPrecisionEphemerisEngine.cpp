@@ -50,7 +50,7 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
 
 [[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
 {
-    return request.options.correctionFlags() != EphemerisCorrectionFlags::noCorrections();
+    return request.options.correctionFlags().hasCorrections();
 }
 
 [[nodiscard]] std::optional<CelestialBodyState> computeSimpleFallbackState(

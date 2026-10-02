@@ -696,9 +696,12 @@ void EphemerisAcceptanceMatrixTests::correctionMatrixRoutesAstrometricApparentAn
             static_cast<std::uint32_t>(state->metadata.requestedCorrections),
             static_cast<std::uint32_t>(correctionFlags)
         );
-        QVERIFY(
-            static_cast<std::uint32_t>(state->metadata.appliedCorrections)
-            == static_cast<std::uint32_t>(correctionFlags)
+        const EphemerisCorrectionFlags expectedApplied =
+            correctionFlags == EphemerisCorrectionFlags::geometric()
+                ? EphemerisCorrectionFlags::geometric()
+                : (correctionFlags | EphemerisCorrectionFlags::geometric());
+        QCOMPARE(
+            static_cast<std::uint32_t>(state->metadata.appliedCorrections), static_cast<std::uint32_t>(expectedApplied)
         );
 
         if (correctionFlags == EphemerisCorrectionFlags::geometric()) {

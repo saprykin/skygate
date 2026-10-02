@@ -39,8 +39,14 @@ struct EphemerisEngineQueryResult {
 
     void addUnavailableCorrection(const EphemerisCorrectionFlags correction) noexcept
     {
+        if (correction == EphemerisCorrectionFlags::noCorrections()) {
+            return;
+        }
         unavailableCorrections |= correction;
         addWarning(EphemerisEngineWarning::Code::CorrectionUnavailable);
+        if (status == EphemerisEngineQueryStatus::Type::Valid) {
+            status = EphemerisEngineQueryStatus::Type::Degraded;
+        }
     }
 
     void finalizeCorrectionTracking(const EphemerisCorrectionFlags requested) noexcept

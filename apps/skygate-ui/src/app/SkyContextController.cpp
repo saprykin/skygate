@@ -11,12 +11,8 @@
 #include "UtcTimeCodec.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/IEphemerisDataSnapshot.hpp"
-#include "engine/highprecision/LeapSecondTableLoader.hpp"
-#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
 
 #include <QDateTime>
 #include <QDir>
@@ -203,7 +199,7 @@ supportDataStatusText(const QString& rawStatusText, const QString& availableVers
 {
     const EphemerisCorrectionFlags baseFlags =
         skygate::ephemeris::EphemerisCorrectionFlags::without(flags, EphemerisCorrectionFlags::atmosphericRefraction());
-    if (baseFlags == EphemerisCorrectionFlags::geometric()) {
+    if (baseFlags == EphemerisCorrectionFlags::geometric() || baseFlags == EphemerisCorrectionFlags::noCorrections()) {
         return 0;
     }
     if (baseFlags == EphemerisCorrectionFlags::astrometric()) {
@@ -315,47 +311,6 @@ void appendRevisionComponent(std::uint64_t& revision, const std::string_view val
     }
 
     return std::nullopt;
-}
-
-struct EphemerisProviderBundle final {
-    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> timeScaleService;
-    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> earthOrientationProvider;
-};
-
-[[nodiscard]] EphemerisProviderBundle
-ephemerisProvidersFromSnapshot(const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& snapshot)
-{
-    EphemerisProviderBundle bundle;
-    if (snapshot == nullptr) {
-        return bundle;
-    }
-
-    const skygate::ephemeris::EarthOrientationDataLoader::Result earthOrientationData =
-        skygate::ephemeris::EarthOrientationDataLoader::loadFromSnapshot(*snapshot);
-    if (earthOrientationData.isSuccess()) {
-        bundle.earthOrientationProvider = earthOrientationData.provider;
-    }
-
-    const skygate::ephemeris::LeapSecondTableLoader::Result leapSecondTable =
-        skygate::ephemeris::LeapSecondTableLoader::loadFromSnapshot(*snapshot);
-    const skygate::ephemeris::DeltaTDataLoader::Result deltaTData =
-        skygate::ephemeris::DeltaTDataLoader::loadFromSnapshot(*snapshot);
-    if (leapSecondTable.isSuccess()) {
-        skygate::ephemeris::TimeScaleServiceOptions timeScaleOptions;
-        timeScaleOptions.allowDegradedLeapSecondFallback = true;
-        timeScaleOptions.allowUt1DeltaTFallback = true;
-        timeScaleOptions.earthOrientationSampleOptions.allowOutOfRangeNearestSampleFallback = true;
-        timeScaleOptions.earthOrientationSampleOptions.allowMissingDataZeroFallback = true;
-        timeScaleOptions.earthOrientationSampleOptions.degradePredictedData = false;
-        bundle.timeScaleService = std::make_shared<skygate::ephemeris::LeapSecondTimeScaleService>(
-            leapSecondTable.provider,
-            timeScaleOptions,
-            bundle.earthOrientationProvider,
-            deltaTData.isSuccess() ? deltaTData.provider : nullptr
-        );
-    }
-
-    return bundle;
 }
 
 }  // namespace
@@ -998,11 +953,6 @@ void SkyContextController::rebuildEphemerisEngine()
 {
     const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot =
         activeEphemerisDataSnapshot();
-    const EphemerisProviderBundle snapshotProviders =
-        m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-                && (m_ephemerisTimeScaleService == nullptr || m_ephemerisEarthOrientationProvider == nullptr)
-            ? ephemerisProvidersFromSnapshot(activeDataSnapshot)
-            : EphemerisProviderBundle{};
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = m_ephemerisEngineKind;
     const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
@@ -1015,11 +965,8 @@ void SkyContextController::rebuildEphemerisEngine()
     request.datasetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDatasetManifest;
     request.dataManifest = dataManifest;
     request.activeDataSnapshot = activeDataSnapshot;
-    request.timeScaleService =
-        m_ephemerisTimeScaleService != nullptr ? m_ephemerisTimeScaleService : snapshotProviders.timeScaleService;
-    request.earthOrientationProvider = m_ephemerisEarthOrientationProvider != nullptr
-                                           ? m_ephemerisEarthOrientationProvider
-                                           : snapshotProviders.earthOrientationProvider;
+    request.timeScaleService = m_ephemerisTimeScaleService;
+    request.earthOrientationProvider = m_ephemerisEarthOrientationProvider;
     request.calcephKernelProvider = m_ephemerisCalcephKernelProvider;
     request.diagnosticsSink = m_ephemerisDiagnosticsSink;
 

@@ -384,7 +384,7 @@ isTrustingGuidanceModel(const BaseCelestialBody* body, const EphemerisRequest& r
 {
     return searchMode == SearchMode::GuidedApproximate
            || (body != nullptr && body->fixedEquatorialValue().has_value()
-               && request.options.correctionFlags() != EphemerisCorrectionFlags::noCorrections());
+               && request.options.correctionFlags().hasCorrections());
 }
 
 [[nodiscard]] bool shouldFallBackToDirect(

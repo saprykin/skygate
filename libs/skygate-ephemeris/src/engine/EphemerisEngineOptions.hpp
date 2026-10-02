@@ -3,6 +3,7 @@
 #include "EphemerisCorrectionFlags.hpp"
 #include "EphemerisEngineKind.hpp"
 
+#include <cmath>
 #include <cstdint>
 
 namespace skygate::ephemeris {
@@ -68,6 +69,9 @@ public:
 
     void setAtmosphericPressureHpa(double atmosphericPressureHpa)
     {
+        if (!std::isfinite(atmosphericPressureHpa)) {
+            return;
+        }
         m_atmosphericPressureHpa = atmosphericPressureHpa;
         m_specifiedMask |= maskBit(Key::AtmosphericPressureHpa);
     }
@@ -90,6 +94,9 @@ public:
 
     void setRelativeHumidity(double relativeHumidity)
     {
+        if (!std::isfinite(relativeHumidity)) {
+            return;
+        }
         m_relativeHumidity = relativeHumidity;
         m_specifiedMask |= maskBit(Key::RelativeHumidity);
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CelestialBodyState.hpp"
+#include "EphemerisRequest.hpp"
 #include "EphemerisSnapshot.hpp"
 #include "IEphemerisEngine.hpp"
 #include "ObservationContext.hpp"
@@ -18,6 +19,12 @@ public:
 
     [[nodiscard]] static std::optional<CelestialBodyState>
     findBodyStateByIndex(const EphemerisSnapshot& snapshot, std::uint32_t bodyIndex);
+
+    [[nodiscard]] static std::optional<CelestialBodyState>
+    computeBodyStateById(const IEphemerisEngine& engine, const EphemerisRequest& request, std::string_view bodyId);
+
+    [[nodiscard]] static std::optional<CelestialBodyState>
+    computeBodyStateByIndex(const IEphemerisEngine& engine, const EphemerisRequest& request, std::size_t bodyIndex);
 
     [[nodiscard]] static std::optional<CelestialBodyState> computeBodyStateById(
         const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, std::string_view bodyId

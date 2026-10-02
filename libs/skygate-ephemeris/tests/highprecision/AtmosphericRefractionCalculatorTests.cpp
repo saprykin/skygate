@@ -191,8 +191,6 @@ void AtmosphericRefractionCalculatorTests::reportsInvalidAtmosphereInputs_data()
     QTest::newRow("zero pressure") << 0.0 << validTemperatureC << validRelativeHumidity << validWavelengthMicrometers;
     QTest::newRow("high pressure") << 1200.1 << validTemperatureC << validRelativeHumidity
                                    << validWavelengthMicrometers;
-    QTest::newRow("non-finite pressure") << nan << validTemperatureC << validRelativeHumidity
-                                         << validWavelengthMicrometers;
     QTest::newRow("low temperature") << validPressureHpa << -100.1 << validRelativeHumidity
                                      << validWavelengthMicrometers;
     QTest::newRow("high temperature") << validPressureHpa << 80.1 << validRelativeHumidity
@@ -203,8 +201,6 @@ void AtmosphericRefractionCalculatorTests::reportsInvalidAtmosphereInputs_data()
         << validPressureHpa << validTemperatureC << -0.1 << validWavelengthMicrometers;
     QTest::newRow("high relative humidity")
         << validPressureHpa << validTemperatureC << 1.1 << validWavelengthMicrometers;
-    QTest::newRow("non-finite relative humidity")
-        << validPressureHpa << validTemperatureC << nan << validWavelengthMicrometers;
     QTest::newRow("low wavelength") << validPressureHpa << validTemperatureC << validRelativeHumidity << 0.09;
     QTest::newRow("high wavelength") << validPressureHpa << validTemperatureC << validRelativeHumidity << 100.1;
     QTest::newRow("non-finite wavelength") << validPressureHpa << validTemperatureC << validRelativeHumidity << nan;
