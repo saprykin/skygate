@@ -59,7 +59,7 @@ void EphemerisFixtureSupportTests::loadsMetadataCompleteRaDecFixture()
     const std::optional<EphemerisRaDecFixture> fixture = loadRaDecFixture(smokeFixturePath(), &errorText);
 
     QVERIFY2(fixture.has_value(), qPrintable(errorText));
-    QCOMPARE(fixture->metadata.source, QStringLiteral("JPL Horizons"));
+    QCOMPARE(fixture->metadata.source, QStringLiteral("Self-derived geometric smoke fixture"));
     QCOMPARE(fixture->metadata.sourceFrame, QStringLiteral("ICRF"));
     QCOMPARE(fixture->metadata.timeScale, QStringLiteral("TDB"));
     QCOMPARE(fixture->metadata.target, QStringLiteral("Mars barycenter/body center (499)"));
@@ -68,7 +68,7 @@ void EphemerisFixtureSupportTests::loadsMetadataCompleteRaDecFixture()
     QVERIFY(fixture->metadata.apiParameters.contains(QStringLiteral("COMMAND=\"499\"")));
     QCOMPARE(fixture->expected.rightAscensionHours, 17.780024903465446);
     QCOMPARE(fixture->expected.declinationDegrees, -23.953152259288466);
-    QCOMPARE(fixture->toleranceDegrees, 1.0e-12);
+    QCOMPARE(fixture->toleranceDegrees, 1.0e-9);
 }
 
 void EphemerisFixtureSupportTests::rejectsMalformedFixture()
@@ -151,7 +151,7 @@ void EphemerisFixtureSupportTests::keepsCsvSmokeFixtureAvailableWithoutLfs()
 
     QVERIFY(!payload.isEmpty());
     QVERIFY(!isGitLfsPointerPayload(payload));
-    QVERIFY(payload.contains("JPL Horizons"));
+    QVERIFY(payload.contains("Self-derived geometric smoke fixture"));
 }
 
 void EphemerisFixtureSupportTests::computesAngularToleranceAcrossRaDec()
