@@ -15,6 +15,7 @@
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 
+#include <QFile>
 #include <QtTest/QtTest>
 
 #include <array>
@@ -41,7 +42,7 @@ constexpr int kNaifMars = 499;
 constexpr int kNaifSun = 10;
 constexpr int kNaifSolarSystemBarycenter = 0;
 constexpr double kCoordinateTolerance = 1.0e-9;
-constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d1114de63b7cf39eded66afc08e8f98";
+constexpr std::string_view kDe432sSha256 = "363f32e14f5255359ac32c4d38080cf28ab55564a5e16696a75f63394b666e9b";
 
 [[nodiscard]] OwnGalaxyCelestialBody makeMarsBody()
 {
@@ -163,11 +164,11 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     manifest.dataSetInfo = makeDataSetInfo(true);
     manifest.profiles.push_back(
         EphemerisDataManifest::Profile{
-            .id = "de405s-modern",
-            .displayName = "DE405s acceptance fixture",
+            .id = "de432s-modern",
+            .displayName = "DE432s acceptance fixture",
             .bundled = true,
             .longRange = false,
-            .assetIds = {"de405s-kernel"},
+            .assetIds = {"de432s-kernel"},
         }
     );
     manifest.profiles.push_back(
@@ -181,15 +182,15 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     );
     manifest.assets.push_back(
         EphemerisDataManifest::Asset{
-            .id = "de405s-kernel",
+            .id = "de432s-kernel",
             .kind = EphemerisDataManifest::AssetKind::SolarSystemKernel,
-            .profileId = "de405s-modern",
-            .version = "DE405s",
-            .sourceUrl = "https://naif.jpl.nasa.gov/pub/naif/M01/kernels/spk/de405s.bsp",
-            .relativePath = "ephemeris/kernels/de405s.bsp",
-            .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
-            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
-            .validityRange = makeRange("de405s-modern-range", "DE405s fixture range", 2'451'544.5, 2'455'197.5),
+            .profileId = "de432s-modern",
+            .version = "DE432s",
+            .sourceUrl = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de432s.bsp",
+            .relativePath = "ephemeris/kernels/de432s.bsp",
+            .checksum = {.algorithm = "sha256", .value = std::string{kDe432sSha256}},
+            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 10'895'360U},
+            .validityRange = makeRange("de432s-modern-range", "DE432s fixture range", 2'433'264.5, 2'469'808.5),
             .optional = false,
         }
     );
@@ -200,9 +201,9 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
             .profileId = "de441-long-range",
             .version = "DE441 fixture substitute",
             .sourceUrl = "https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de441.bsp",
-            .relativePath = "ephemeris/kernels/de405s.bsp",
-            .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
-            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
+            .relativePath = "ephemeris/kernels/de432s.bsp",
+            .checksum = {.algorithm = "sha256", .value = std::string{kDe432sSha256}},
+            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 10'895'360U},
             .validityRange = makeRange("de441-long-range", "Optional DE441 long range", -3'100'000.5, 8'000'000.5),
             .optional = true,
         }
@@ -329,7 +330,7 @@ public:
             .id = m_assetId,
             .profileId = m_profileId,
             .version = "acceptance-fixture",
-            .provenance = "NAIF DE405s acceptance fixture",
+            .provenance = "NAIF DE432s acceptance fixture",
             .activePath = m_activePath,
         };
     }
@@ -523,6 +524,15 @@ public:
     return HighPrecisionEphemerisEngine(CelestialBodyCatalog(std::move(bodies)), options, std::move(dependencies));
 }
 
+[[nodiscard]] bool isLfsPointerKernel(const std::string& path)
+{
+    QFile file(QString::fromStdString(path));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    return skygate::ephemeris::tests::isGitLfsPointerPayload(file.read(256));
+}
+
 }  // namespace
 
 class EphemerisAcceptanceMatrixTests final : public QObject {
@@ -626,9 +636,14 @@ void EphemerisAcceptanceMatrixTests::calcephProviderBackedSolarSystemRaDecSuppor
 
 void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSystemRaDecWhenAvailable()
 {
-    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de405s.bsp";
+    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de432s.bsp";
+    if (isLfsPointerKernel(kernelPath)) {
+        QSKIP(
+            "Real CALCEPH provider acceptance row requires the de432s.bsp kernel fixture (Git LFS content not pulled)."
+        );
+    }
     const EphemerisDataManifest manifest = makeFixtureDataManifest();
-    AcceptanceDataSnapshot snapshot("de405s-kernel", "de405s-modern", kernelPath);
+    AcceptanceDataSnapshot snapshot("de432s-kernel", "de432s-modern", kernelPath);
 
     auto provider = std::make_shared<CalcephKernelProvider>(snapshot, manifest);
     const std::shared_ptr<const ICalcephKernel> kernel = provider->openKernel();
@@ -641,7 +656,7 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
         QSKIP("Real CALCEPH provider acceptance row requires a kernel format supported by the linked CALCEPH.");
     }
     if (kernel->status() == ICalcephKernel::Status::MissingKernelFile) {
-        QSKIP("Real CALCEPH provider acceptance row requires the de405s.bsp kernel fixture.");
+        QSKIP("Real CALCEPH provider acceptance row requires the de432s.bsp kernel fixture.");
     }
     QVERIFY2(kernel->status() == ICalcephKernel::Status::Ready, diagnostics.constData());
 
@@ -660,9 +675,10 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
     QVERIFY(state.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
-    QCOMPARE(state->metadata.dataSourceProvenance, std::string{"NAIF DE405s acceptance fixture"});
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
+    QVERIFY(state->metadata.dataSourceProvenance.starts_with("NAIF DE432s acceptance fixture"));
     QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
     QCOMPARE(
@@ -754,9 +770,12 @@ void EphemerisAcceptanceMatrixTests::absentLongRangeKernelProducesDegradedFallba
 
 void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesDriveProviderSelection()
 {
-    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de405s.bsp";
+    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de432s.bsp";
+    if (isLfsPointerKernel(kernelPath)) {
+        QSKIP("Provider-selection acceptance row requires the de432s.bsp kernel fixture (Git LFS content not pulled).");
+    }
     const EphemerisDataManifest manifest = makeFixtureDataManifest();
-    AcceptanceDataSnapshot bundledSnapshot("de405s-kernel", "de405s-modern", kernelPath);
+    AcceptanceDataSnapshot bundledSnapshot("de432s-kernel", "de432s-modern", kernelPath);
     auto bundledKernelProvider = std::make_shared<CalcephKernelProvider>(bundledSnapshot, manifest);
     const std::shared_ptr<const ICalcephKernel> bundledKernel = bundledKernelProvider->openKernel();
     if (bundledKernel->status() == ICalcephKernel::Status::CalcephUnavailable) {
@@ -769,7 +788,7 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
         QSKIP("Provider-selection acceptance row requires a kernel format supported by the linked CALCEPH.");
     }
     if (bundledKernel->status() == ICalcephKernel::Status::MissingKernelFile) {
-        QSKIP("Provider-selection acceptance row requires the de405s.bsp kernel fixture.");
+        QSKIP("Provider-selection acceptance row requires the de432s.bsp kernel fixture.");
     }
 
     HighPrecisionEphemerisEngine::Dependencies bundledDependencies;
@@ -782,8 +801,8 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
 
     QVERIFY(bundledKernel->status() == ICalcephKernel::Status::Ready);
     QVERIFY(bundledKernel->kernelInfo().has_value());
-    QCOMPARE(bundledKernel->kernelInfo()->id, std::string{"de405s-kernel"});
-    QCOMPARE(bundledKernel->kernelInfo()->profileId, std::string{"de405s-modern"});
+    QCOMPARE(bundledKernel->kernelInfo()->id, std::string{"de432s-kernel"});
+    QCOMPARE(bundledKernel->kernelInfo()->profileId, std::string{"de432s-modern"});
     QVERIFY(!bundledKernel->kernelInfo()->longRange);
 
     AcceptanceDataSnapshot longRangeSnapshot("de441-kernel", "de441-long-range", kernelPath);
@@ -823,8 +842,9 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
     QVERIFY(state.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
-        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid)
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
     );
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::BarycenterFallback));
 }
 
 void EphemerisAcceptanceMatrixTests::deterministicSelfDerivedFixturesRemainReadable()

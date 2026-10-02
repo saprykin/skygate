@@ -14,6 +14,8 @@
 #include "engine/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 
+#include <QDebug>
+#include <QFile>
 #include <QtTest/QtTest>
 
 #include <array>
@@ -31,7 +33,7 @@ using namespace skygate::ephemeris::highprecision;
 using skygate::ephemeris::tests::angularSeparationDegrees;
 using skygate::ephemeris::tests::EphemerisRaDecExpectation;
 
-constexpr std::string_view kDe405sSha256 = "0e3793cca287b75ce33bf6155a8fef912d1114de63b7cf39eded66afc08e8f98";
+constexpr std::string_view kDe432sSha256 = "363f32e14f5255359ac32c4d38080cf28ab55564a5e16696a75f63394b666e9b";
 constexpr double kHoursToDegrees = 15.0;
 constexpr double kArcsecondsToDegrees = 1.0 / 3600.0;
 
@@ -117,31 +119,31 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     EphemerisDataManifest manifest;
     manifest.dataSetInfo.id = "real-kernel-horizons";
     manifest.dataSetInfo.displayName = "Real kernel Horizons acceptance";
-    manifest.dataSetInfo.version = "DE405s";
-    manifest.dataSetInfo.provenance = "NAIF DE405s kernel";
+    manifest.dataSetInfo.version = "DE432s";
+    manifest.dataSetInfo.provenance = "NAIF DE432s kernel";
     manifest.dataSetInfo.dateRanges.push_back(
-        makeRange("de405s-modern-range", "DE405s modern range", 2'451'544.5, 2'455'197.5)
+        makeRange("de432s-modern-range", "DE432s modern range", 2'433'264.5, 2'469'808.5)
     );
     manifest.profiles.push_back(
         EphemerisDataManifest::Profile{
-            .id = "de405s-modern",
-            .displayName = "DE405s modern",
+            .id = "de432s-modern",
+            .displayName = "DE432s modern",
             .bundled = true,
             .longRange = false,
-            .assetIds = {"de405s-kernel"},
+            .assetIds = {"de432s-kernel"},
         }
     );
     manifest.assets.push_back(
         EphemerisDataManifest::Asset{
-            .id = "de405s-kernel",
+            .id = "de432s-kernel",
             .kind = EphemerisDataManifest::AssetKind::SolarSystemKernel,
-            .profileId = "de405s-modern",
-            .version = "DE405s",
-            .sourceUrl = "https://naif.jpl.nasa.gov/pub/naif/M01/kernels/spk/de405s.bsp",
-            .relativePath = "ephemeris/kernels/de405s.bsp",
-            .checksum = {.algorithm = "sha256", .value = std::string{kDe405sSha256}},
-            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 1'426'432U},
-            .validityRange = makeRange("de405s-modern-range", "DE405s modern range", 2'451'544.5, 2'455'197.5),
+            .profileId = "de432s-modern",
+            .version = "DE432s",
+            .sourceUrl = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de432s.bsp",
+            .relativePath = "ephemeris/kernels/de432s.bsp",
+            .checksum = {.algorithm = "sha256", .value = std::string{kDe432sSha256}},
+            .compression = {.kind = EphemerisDataManifest::CompressionKind::None, .uncompressedSizeBytes = 10'895'360U},
+            .validityRange = makeRange("de432s-modern-range", "DE432s modern range", 2'433'264.5, 2'469'808.5),
             .optional = false,
         }
     );
@@ -160,15 +162,15 @@ public:
     [[nodiscard]] std::optional<EphemerisKernelDataAsset>
     solarSystemKernelAsset(const std::string_view assetId) const override
     {
-        if (assetId != "de405s-kernel") {
+        if (assetId != "de432s-kernel") {
             return std::nullopt;
         }
 
         return EphemerisKernelDataAsset{
-            .id = "de405s-kernel",
-            .profileId = "de405s-modern",
-            .version = "DE405s",
-            .provenance = "NAIF DE405s acceptance fixture",
+            .id = "de432s-kernel",
+            .profileId = "de432s-modern",
+            .version = "DE432s",
+            .provenance = "NAIF DE432s acceptance fixture",
             .activePath = m_activePath,
         };
     }
@@ -206,6 +208,15 @@ private:
     };
 }
 
+[[nodiscard]] bool isLfsPointerKernel(const std::string& path)
+{
+    QFile file(QString::fromStdString(path));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    return skygate::ephemeris::tests::isGitLfsPointerPayload(file.read(256));
+}
+
 }  // namespace
 
 class RealKernelHorizonsAcceptanceTests final : public QObject {
@@ -217,7 +228,10 @@ private slots:
 
 void RealKernelHorizonsAcceptanceTests::matchesIndependentJplHorizonsReferenceRows()
 {
-    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de405s.bsp";
+    const std::string kernelPath = std::string{SKYGATE_EPHEMERIS_TESTDATA_DIR} + "/ephemeris/kernels/de432s.bsp";
+    if (isLfsPointerKernel(kernelPath)) {
+        QSKIP("Real-kernel Horizons acceptance requires the de432s.bsp kernel fixture (Git LFS content not pulled).");
+    }
     const EphemerisDataManifest manifest = makeManifest();
     KernelSnapshot snapshot(kernelPath);
     auto provider = std::make_shared<CalcephKernelProvider>(snapshot, manifest);
@@ -227,7 +241,7 @@ void RealKernelHorizonsAcceptanceTests::matchesIndependentJplHorizonsReferenceRo
         QSKIP("Real-kernel Horizons acceptance requires SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=ON.");
     }
     if (kernel->status() == ICalcephKernel::Status::MissingKernelFile) {
-        QSKIP("Real-kernel Horizons acceptance requires the de405s.bsp kernel fixture.");
+        QSKIP("Real-kernel Horizons acceptance requires the de432s.bsp kernel fixture.");
     }
     if (kernel->status() == ICalcephKernel::Status::OpenFailed) {
         QSKIP("Real-kernel Horizons acceptance requires a kernel format supported by the linked CALCEPH.");
@@ -315,6 +329,12 @@ void RealKernelHorizonsAcceptanceTests::matchesIndependentJplHorizonsReferenceRo
                            .arg(apparentErrorDeg, 0, 'g', 12)
                            .arg(kApparentToleranceDeg, 0, 'g', 12))
         );
+
+        qInfo().noquote() << QStringLiteral("Horizons %1 JD %2: astrometric %3 arcsec, apparent %4 arcsec")
+                                 .arg(QString::fromStdString(std::string{row.bodyId}))
+                                 .arg(row.julianDateUtc, 0, 'f', 6)
+                                 .arg(astrometricErrorDeg * 3600.0, 0, 'f', 6)
+                                 .arg(apparentErrorDeg * 3600.0, 0, 'f', 6);
     }
 }
 
