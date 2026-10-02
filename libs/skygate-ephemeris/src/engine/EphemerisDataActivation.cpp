@@ -2,6 +2,7 @@
 #include "EphemerisDataManifest.hpp"
 #include "EphemerisDataPayloadReader.hpp"
 
+#include <QByteArray>
 #include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QDir>
@@ -131,7 +132,9 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
         hash.addData(QByteArrayView(buffer.data(), bytesRead));
     }
 
-    return hash.result().toHex().toStdString() == expectedHexDigest;
+    const QByteArray actualHexDigest = hash.result().toHex().toLower();
+    const QByteArray expectedHexDigestLower = QByteArray::fromStdString(expectedHexDigest).toLower();
+    return actualHexDigest == expectedHexDigestLower;
 }
 
 [[nodiscard]] bool existingTargetIsCurrent(
@@ -350,7 +353,8 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         targetFile.cancelWriting();
         return result;
     }
-    if (payload.checksum != request.asset->checksum.value) {
+    if (QByteArray::fromStdString(payload.checksum).toLower()
+        != QByteArray::fromStdString(request.asset->checksum.value).toLower()) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Activated ephemeris data asset checksum does not match manifest metadata.");
         targetFile.cancelWriting();

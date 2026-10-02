@@ -590,6 +590,8 @@ private slots:
     void initTestCase();
     void init();
     void asyncNetworkDownloadStagesWithoutBlocking();
+    void rejectsPlainHttpSourceUrls();
+    void rejectsOversizedNetworkStaging();
     void initialBundledStatus();
     void productionManifestMetadataIsVerifiable();
     void installedDataStatusAndSnapshot();
@@ -1213,6 +1215,90 @@ void SkyEphemerisDataManagerTests::asyncNetworkDownloadStagesWithoutBlocking()
     QFile stagedFile(result.stagedPath);
     QVERIFY(stagedFile.open(QIODevice::ReadOnly));
     QCOMPARE(stagedFile.readAll(), payload);
+}
+
+void SkyEphemerisDataManagerTests::rejectsPlainHttpSourceUrls()
+{
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    SkyEphemerisDownloadService service(&networkAccessManager);
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    const QString sourceUrl = QStringLiteral("http://example.test/kernels/de440s.bsp");
+    asset.sourceUrl = sourceUrl.toStdString();
+
+    SkyEphemerisDownloadService::StagedUpdateDownloadRequest request;
+    request.asset = &asset;
+    request.sourceUrl = sourceUrl;
+    request.stagedResourceRoot = stagedRoot.path();
+
+    bool completed = false;
+    SkyEphemerisDownloadService::StagedUpdateDownloadResult result;
+    service.stageAsync(
+        request, [&completed, &result](SkyEphemerisDownloadService::StagedUpdateDownloadResult stagedResult) {
+            completed = true;
+            result = std::move(stagedResult);
+        }
+    );
+
+    QTRY_VERIFY_WITH_TIMEOUT(completed, 5000);
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(SkyEphemerisDownloadService::StagedUpdateDownloadStatus::MissingSource)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(result.diagnostics.front().contains(QStringLiteral("HTTPS")));
+    QVERIFY(networkAccessManager.requestedUrls().isEmpty());
+}
+
+void SkyEphemerisDataManagerTests::rejectsOversizedNetworkStaging()
+{
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    SkyEphemerisDownloadService service(&networkAccessManager);
+
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = stagedAsset(
+        "download-kernel", skygate::ephemeris::EphemerisDataManifest::AssetKind::SolarSystemKernel, "kernels/de440s.bsp"
+    );
+    const QString sourceUrl = QStringLiteral("https://example.test/kernels/de440s.bsp");
+    asset.sourceUrl = sourceUrl.toStdString();
+
+    const std::uint64_t declaredBytes = static_cast<std::uint64_t>(kPayload.size());
+    const QByteArray oversizedPayload(static_cast<qsizetype>(declaredBytes + (2ULL << 20U)), 'x');
+    networkAccessManager.enqueueResponse(sourceUrl, {.payload = oversizedPayload});
+
+    SkyEphemerisDownloadService::StagedUpdateDownloadRequest request;
+    request.asset = &asset;
+    request.sourceUrl = sourceUrl;
+    request.stagedResourceRoot = stagedRoot.path();
+
+    bool completed = false;
+    SkyEphemerisDownloadService::StagedUpdateDownloadResult result;
+    service.stageAsync(
+        request, [&completed, &result](SkyEphemerisDownloadService::StagedUpdateDownloadResult stagedResult) {
+            completed = true;
+            result = std::move(stagedResult);
+        }
+    );
+
+    QTRY_VERIFY_WITH_TIMEOUT(completed, 5000);
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(SkyEphemerisDownloadService::StagedUpdateDownloadStatus::IoError)
+    );
+    QVERIFY(!result.diagnostics.empty());
+    QVERIFY(result.diagnostics.front().contains(QStringLiteral("declared staging size")));
+    QCOMPARE(result.stagedBytes, std::uint64_t{0});
+    QVERIFY(QFileInfo::exists(result.stagedPath));
+    QCOMPARE(QFileInfo(result.stagedPath).size(), qint64{0});
 }
 
 void SkyEphemerisDataManagerTests::cancellationDuringDownloadRetainsPartialStagingAndPreservesActiveData()

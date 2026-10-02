@@ -1,6 +1,6 @@
 #include "CatalogPayloadFormatDetector.hpp"
 #include "StringUtilities.hpp"
-#include "engine/HighPrecisionTextParser.hpp"
+#include "text/HighPrecisionTextParser.hpp"
 
 namespace skygate::ephemeris {
 namespace {

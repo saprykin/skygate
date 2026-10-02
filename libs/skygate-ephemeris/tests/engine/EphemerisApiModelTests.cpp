@@ -1062,6 +1062,8 @@ void EphemerisApiModelTests::unavailableCorrectionDegradesValidResult()
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineQueryStatus::Type>);
+// Guards the ABI/stack-usage ceiling for the QML-facing result type so it stays
+// cheap to pass by value across the UI boundary.
 static_assert(sizeof(skygate::ephemeris::EphemerisEngineQueryResult) <= 224);
 
 QTEST_MAIN(EphemerisApiModelTests)

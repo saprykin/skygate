@@ -1,5 +1,5 @@
 #include "EphemerisDataManifest.hpp"
-#include "HighPrecisionTextParser.hpp"
+#include "text/HighPrecisionTextParser.hpp"
 #include "time/CalendarTime.hpp"
 
 #include <QByteArray>

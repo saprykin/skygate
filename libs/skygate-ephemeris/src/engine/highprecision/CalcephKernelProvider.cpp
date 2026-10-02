@@ -4,6 +4,7 @@
 #include "ICalcephKernel.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 
+#include <QByteArray>
 #include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QFile>
@@ -238,7 +239,9 @@ public:
             hash.addData(QByteArrayView(buffer.data(), bytesRead));
         }
 
-        return hash.result().toHex().toStdString() == expectedHexDigest;
+        const QByteArray actualHexDigest = hash.result().toHex().toLower();
+        const QByteArray expectedHexDigestLower = QByteArray::fromStdString(expectedHexDigest).toLower();
+        return actualHexDigest == expectedHexDigestLower;
     }
 
     [[nodiscard]] const EphemerisDataManifest::Profile* selectProfile() const noexcept
