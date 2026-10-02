@@ -152,7 +152,7 @@ void compareSecondsBetween(
 
 }  // namespace
 
-class TimeScaleServiceTests final : public QObject {
+class LeapSecondTimeScaleServiceTests final : public QObject {
     Q_OBJECT
 
 private slots:
@@ -176,7 +176,7 @@ private slots:
     void reportsMissingEopWhenUt1FallbackIsDisallowed();
 };
 
-void TimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
+void LeapSecondTimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
 {
     const std::optional<int> oneBceAstronomicalYear =
         skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
@@ -209,7 +209,7 @@ void TimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
     compareSecondsBetween(firstCeDay, oneBce, 86'400.0);
 }
 
-void TimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
+void LeapSecondTimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
@@ -233,7 +233,7 @@ void TimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
     compareSecondsBetween(tt.epoch, utc, 69.184);
 }
 
-void TimeScaleServiceTests::roundTripsTaiAndTtHelpers()
+void LeapSecondTimeScaleServiceTests::roundTripsTaiAndTtHelpers()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::TimeScaleConversionResult tai =
@@ -256,7 +256,7 @@ void TimeScaleServiceTests::roundTripsTaiAndTtHelpers()
     compareSecondsBetween(utcAgain.epoch, makeUtcEpoch(2018, 1, 1), 0.0);
 }
 
-void TimeScaleServiceTests::handlesLeapSecondBoundaryOffsets()
+void LeapSecondTimeScaleServiceTests::handlesLeapSecondBoundaryOffsets()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::AstronomicalEpoch beforeLeap = makeUtcEpoch(2016, 12, 31, 23, 59, 59);
@@ -274,7 +274,7 @@ void TimeScaleServiceTests::handlesLeapSecondBoundaryOffsets()
     compareSecondsBetween(afterTai.epoch, beforeTai.epoch, 2.0);
 }
 
-void TimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
+void LeapSecondTimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
@@ -299,7 +299,7 @@ void TimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
     compareSecondsBetween(afterTai.epoch, tai.epoch, 1.0);
 }
 
-void TimeScaleServiceTests::convertsAtTableRangeBoundaries()
+void LeapSecondTimeScaleServiceTests::convertsAtTableRangeBoundaries()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
@@ -320,7 +320,7 @@ void TimeScaleServiceTests::convertsAtTableRangeBoundaries()
     );
 }
 
-void TimeScaleServiceTests::reportsOutOfRangeWithoutFallback()
+void LeapSecondTimeScaleServiceTests::reportsOutOfRangeWithoutFallback()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::TimeScaleConversionResult result =
@@ -335,7 +335,7 @@ void TimeScaleServiceTests::reportsOutOfRangeWithoutFallback()
     QVERIFY(!result.diagnosticText.empty());
 }
 
-void TimeScaleServiceTests::reportsReverseOutOfRangeWithoutFallback()
+void LeapSecondTimeScaleServiceTests::reportsReverseOutOfRangeWithoutFallback()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
@@ -366,7 +366,7 @@ void TimeScaleServiceTests::reportsReverseOutOfRangeWithoutFallback()
     QVERIFY(!utcFromTt.diagnosticText.empty());
 }
 
-void TimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAllowed()
+void LeapSecondTimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAllowed()
 {
     skygate::ephemeris::TimeScaleServiceOptions options;
     options.allowDegradedLeapSecondFallback = true;
@@ -387,7 +387,7 @@ void TimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAllowed()
     compareSecondsBetween(result.epoch, utc, 42.0);
 }
 
-void TimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()
+void LeapSecondTimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::AstronomicalEpoch tt = makeEpoch(skygate::ephemeris::TimeScale::Tt, 2000, 1, 1, 12, 0, 0);
@@ -410,7 +410,7 @@ void TimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()
     QVERIFY(std::abs(secondsBetween(tdb.epoch, tt) - -0.00007260319547380129) < 2.0e-3);
 }
 
-void TimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()
+void LeapSecondTimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::AstronomicalEpoch tt =
@@ -426,7 +426,7 @@ void TimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()
     compareSecondsBetween(ttAgain.epoch, tt, 0.0);
 }
 
-void TimeScaleServiceTests::convertsUtcToTdbThroughTt()
+void LeapSecondTimeScaleServiceTests::convertsUtcToTdbThroughTt()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
@@ -451,7 +451,7 @@ void TimeScaleServiceTests::convertsUtcToTdbThroughTt()
     compareSecondsBetween(utcAgain.epoch, utc, 0.0);
 }
 
-void TimeScaleServiceTests::convertsUtcToUt1FromExactEopSample()
+void LeapSecondTimeScaleServiceTests::convertsUtcToUt1FromExactEopSample()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
@@ -471,7 +471,7 @@ void TimeScaleServiceTests::convertsUtcToUt1FromExactEopSample()
     compareSecondsBetween(ut1.epoch, utc, 0.10);
 }
 
-void TimeScaleServiceTests::interpolatesUtcToUt1FromEopSamples()
+void LeapSecondTimeScaleServiceTests::interpolatesUtcToUt1FromEopSamples()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
@@ -484,7 +484,7 @@ void TimeScaleServiceTests::interpolatesUtcToUt1FromEopSamples()
     compareSecondsBetween(ut1.epoch, utc, 0.20);
 }
 
-void TimeScaleServiceTests::convertsUt1ToUtcFromEopSamples()
+void LeapSecondTimeScaleServiceTests::convertsUt1ToUtcFromEopSamples()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
@@ -500,7 +500,7 @@ void TimeScaleServiceTests::convertsUt1ToUtcFromEopSamples()
     compareSecondsBetween(utcAgain.epoch, utc, 0.0);
 }
 
-void TimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
+void LeapSecondTimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService predictedService(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
@@ -529,7 +529,7 @@ void TimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
     QVERIFY(stale.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EarthOrientationDataStale));
 }
 
-void TimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange()
+void LeapSecondTimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange()
 {
     skygate::ephemeris::TimeScaleServiceOptions options;
     options.allowDegradedLeapSecondFallback = true;
@@ -552,7 +552,7 @@ void TimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenEopIsOutOfRange()
     compareSecondsBetween(ut1.epoch, utc, -11968.316);
 }
 
-void TimeScaleServiceTests::reportsMissingEopWhenUt1FallbackIsDisallowed()
+void LeapSecondTimeScaleServiceTests::reportsMissingEopWhenUt1FallbackIsDisallowed()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
@@ -568,6 +568,6 @@ void TimeScaleServiceTests::reportsMissingEopWhenUt1FallbackIsDisallowed()
     QVERIFY(!result.diagnosticText.empty());
 }
 
-QTEST_MAIN(TimeScaleServiceTests)
+QTEST_MAIN(LeapSecondTimeScaleServiceTests)
 
-#include "TimeScaleServiceTests.moc"
+#include "LeapSecondTimeScaleServiceTests.moc"

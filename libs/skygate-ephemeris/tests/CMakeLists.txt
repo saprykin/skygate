@@ -288,8 +288,8 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         LABELS "unit;highprecision;validation;time-eop"
     )
     add_skygate_ephemeris_qtest(
-        skygate-ephemeris-time-scale-service-tests
-        highprecision/TimeScaleServiceTests.cpp
+        skygate-ephemeris-leap-second-time-scale-service-tests
+        highprecision/LeapSecondTimeScaleServiceTests.cpp
         LABELS "unit;highprecision;validation;time-eop"
     )
 endif()
