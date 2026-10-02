@@ -5,13 +5,21 @@
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
+#include "engine/highprecision/DeltaTDataLoader.hpp"
+#include "engine/highprecision/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
+#include "engine/highprecision/IEarthOrientationProvider.hpp"
+#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
+#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/highprecision/LeapSecondTableLoader.hpp"
+#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
+#include "engine/highprecision/TimeScaleServiceOptions.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
 #include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
 
@@ -184,6 +192,74 @@ prefersPlanetarySystemBarycenters(const skygate::ephemeris::highprecision::ICalc
            || StringUtilities::containsIgnoreAsciiCase(kernelInfo->version, "de441");
 }
 
+[[nodiscard]] EphemerisEngineFactoryRequest normalizeRequestOptions(EphemerisEngineFactoryRequest request)
+{
+    request.options.setEngineKind(request.engineKind);
+    if (request.engineKind == EphemerisEngineKind::Type::Simple) {
+        if (!request.options.isOptionSet(EphemerisEngineOptions::Key::CorrectionFlags)) {
+            request.options.setCorrectionFlags(EphemerisCorrectionFlags::noCorrections());
+        }
+        if (!request.options.isOptionSet(EphemerisEngineOptions::Key::EnableAtmosphericRefraction)) {
+            request.options.setEnableAtmosphericRefraction(false);
+        }
+    }
+
+    return request;
+}
+
+[[nodiscard]] std::shared_ptr<const IEarthOrientationProvider>
+loadEarthOrientationProviderFromSnapshot(const IEphemerisDataSnapshot& snapshot)
+{
+    const EarthOrientationDataLoader::Result result = EarthOrientationDataLoader::loadFromSnapshot(snapshot);
+    return result.isSuccess() ? result.provider : nullptr;
+}
+
+[[nodiscard]] std::shared_ptr<const ITimeScaleService> loadTimeScaleServiceFromSnapshot(
+    const IEphemerisDataSnapshot& snapshot,
+    const std::shared_ptr<const IEarthOrientationProvider>& earthOrientationProvider
+)
+{
+    const LeapSecondTableLoader::Result leapSecondTable = LeapSecondTableLoader::loadFromSnapshot(snapshot);
+    if (!leapSecondTable.isSuccess()) {
+        return nullptr;
+    }
+
+    const DeltaTDataLoader::Result deltaTData = DeltaTDataLoader::loadFromSnapshot(snapshot);
+    TimeScaleServiceOptions timeScaleOptions;
+    timeScaleOptions.allowDegradedLeapSecondFallback = true;
+    timeScaleOptions.allowUt1DeltaTFallback = true;
+    timeScaleOptions.earthOrientationSampleOptions.allowOutOfRangeNearestSampleFallback = true;
+    timeScaleOptions.earthOrientationSampleOptions.allowMissingDataZeroFallback = true;
+    timeScaleOptions.earthOrientationSampleOptions.degradePredictedData = false;
+
+    return std::make_shared<LeapSecondTimeScaleService>(
+        leapSecondTable.provider,
+        timeScaleOptions,
+        earthOrientationProvider,
+        deltaTData.isSuccess() ? deltaTData.provider : nullptr
+    );
+}
+
+void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
+{
+    if (request.activeDataSnapshot == nullptr) {
+        return;
+    }
+    if (request.timeScaleService != nullptr && request.earthOrientationProvider != nullptr) {
+        return;
+    }
+
+    std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider = request.earthOrientationProvider;
+    if (earthOrientationProvider == nullptr) {
+        earthOrientationProvider = loadEarthOrientationProviderFromSnapshot(*request.activeDataSnapshot);
+    }
+    if (request.timeScaleService == nullptr) {
+        request.timeScaleService =
+            loadTimeScaleServiceFromSnapshot(*request.activeDataSnapshot, earthOrientationProvider);
+    }
+    request.earthOrientationProvider = earthOrientationProvider;
+}
+
 [[nodiscard]] EphemerisEngineFactoryResult createHighPrecisionEngine(const EphemerisEngineFactoryRequest& request)
 {
     std::vector<EphemerisFactoryCreationDiagnostic> diagnostics;
@@ -323,18 +399,22 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
 {
     EphemerisEngineFactoryResult result;
     switch (request.engineKind) {
-    case EphemerisEngineKind::Type::Simple:
+    case EphemerisEngineKind::Type::Simple: {
+        const EphemerisEngineFactoryRequest normalizedRequest = normalizeRequestOptions(request);
         result = EphemerisEngineFactoryResult::success(
             std::make_unique<SimpleEphemerisEngine>(
-                request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{}, request.options
+                normalizedRequest.catalog != nullptr ? *normalizedRequest.catalog : CelestialBodyCatalog{},
+                normalizedRequest.options
             )
         );
         break;
+    }
     case EphemerisEngineKind::Type::HighPrecision: {
-        EphemerisEngineFactoryRequest alignedRequest = request;
+        EphemerisEngineFactoryRequest alignedRequest = normalizeRequestOptions(request);
         alignedRequest.fallbackPolicy = request.options.fallbackToSimpleEngine()
                                             ? EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback
                                             : EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+        populateProvidersFromSnapshot(alignedRequest);
         result = createHighPrecisionEngine(alignedRequest);
         break;
     }

@@ -16,7 +16,9 @@
 #include <QUrl>
 #include <QtTest/QtTest>
 
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -445,6 +447,27 @@ public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         return m_options;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::string_view bodyId) const override
+    {
+        return computeBodyState(request.context, bodyId);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::size_t bodyIndex) const override
+    {
+        if (bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
+            return std::nullopt;
+        }
+        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot

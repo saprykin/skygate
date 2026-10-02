@@ -85,6 +85,11 @@ public:
         return Type::NoCapabilities;
     }
 
+    [[nodiscard]] static constexpr EphemerisCapabilities simpleEngine() noexcept
+    {
+        return solarSystemBodies() | catalogStars() | topocentricPositions();
+    }
+
     [[nodiscard]] static constexpr EphemerisCapabilities solarSystemBodies() noexcept
     {
         return Type::SolarSystemBodies;

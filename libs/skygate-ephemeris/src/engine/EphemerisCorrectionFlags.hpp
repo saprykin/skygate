@@ -10,7 +10,7 @@ class EphemerisCorrectionFlags {
 public:
     enum class Type : std::uint32_t {
         NoCorrections = 0U,
-        Geometric = 0U,
+        Geometric = 1U << 11U,
         LightTime = 1U << 0U,
         StellarAberration = 1U << 1U,
         GravitationalLightDeflection = 1U << 2U,
@@ -22,8 +22,8 @@ public:
         ProperMotion = 1U << 8U,
         RadialVelocity = 1U << 9U,
         StellarParallax = 1U << 10U,
-        Astrometric =
-            (1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U),
+        Astrometric = (1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U)
+            | (1U << 10U),
         Apparent =
             ((1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U) | (1U << 5U) | (1U << 8U) | (1U << 9U) | (1U << 10U)
              | (1U << 6U)),
@@ -107,6 +107,11 @@ public:
     without(const EphemerisCorrectionFlags flags, const EphemerisCorrectionFlags removedFlags) noexcept
     {
         return BitFlagSetOperations<EphemerisCorrectionFlags>::withoutFlags(flags, removedFlags);
+    }
+
+    [[nodiscard]] constexpr bool hasCorrections() const noexcept
+    {
+        return without(geometric()) != noCorrections();
     }
 
     [[nodiscard]] static constexpr EphemerisCorrectionFlags noCorrections() noexcept

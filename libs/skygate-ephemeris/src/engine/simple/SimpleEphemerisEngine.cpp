@@ -19,32 +19,35 @@ constexpr std::string_view kSimpleEngineName = "Simple ephemeris engine";
 constexpr std::string_view kSimpleDataSetId = "simple";
 constexpr std::string_view kSimpleDataSetVersion = "built-in";
 
-[[nodiscard]] bool requestsUnsupportedSimpleOptions(const EphemerisEngineOptions& options) noexcept
+[[nodiscard]] EphemerisCorrectionFlags requestedCorrectionTerms(const EphemerisEngineOptions& options) noexcept
 {
-    return options.correctionFlags() != EphemerisCorrectionFlags::noCorrections();
+    return options.correctionFlags().without(EphemerisCorrectionFlags::geometric());
 }
 
 void markUnsupportedSimpleOptions(CelestialBodyState& state, const EphemerisEngineOptions& options) noexcept
 {
-    state.metadata.finalizeCorrectionTracking(options.correctionFlags());
-    if (!requestsUnsupportedSimpleOptions(options)) {
+    const EphemerisCorrectionFlags requested = options.correctionFlags();
+    const EphemerisCorrectionFlags correctionTerms = requestedCorrectionTerms(options);
+    if (!correctionTerms.hasCorrections()) {
+        state.metadata.appliedCorrections = requested == EphemerisCorrectionFlags::geometric()
+                                                ? EphemerisCorrectionFlags::geometric()
+                                                : EphemerisCorrectionFlags::noCorrections();
+        state.metadata.finalizeCorrectionTracking(requested);
         return;
     }
 
     if (state.metadata.status == EphemerisEngineQueryStatus::Type::Valid) {
         state.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
     }
-    state.metadata.appliedCorrections = EphemerisCorrectionFlags::noCorrections();
-    state.metadata.addUnavailableCorrection(options.correctionFlags());
-    state.metadata.finalizeCorrectionTracking(options.correctionFlags());
+    state.metadata.appliedCorrections = requested.has(EphemerisCorrectionFlags::geometric())
+                                            ? EphemerisCorrectionFlags::geometric()
+                                            : EphemerisCorrectionFlags::noCorrections();
+    state.metadata.addUnavailableCorrection(correctionTerms);
+    state.metadata.finalizeCorrectionTracking(requested);
 }
 
 void markUnsupportedSimpleOptions(EphemerisSnapshot& snapshot, const EphemerisEngineOptions& options) noexcept
 {
-    if (!requestsUnsupportedSimpleOptions(options)) {
-        return;
-    }
-
     for (CelestialBodyState& state : snapshot.states) {
         markUnsupportedSimpleOptions(state, options);
     }
@@ -78,8 +81,7 @@ std::string_view SimpleEphemerisEngine::name() const noexcept
 
 EphemerisCapabilities SimpleEphemerisEngine::capabilities() const noexcept
 {
-    return EphemerisCapabilities::solarSystemBodies() | EphemerisCapabilities::catalogStars()
-           | EphemerisCapabilities::topocentricPositions();
+    return EphemerisCapabilities::simpleEngine();
 }
 
 std::span<const EphemerisDateRange> SimpleEphemerisEngine::supportedDateRanges() const noexcept

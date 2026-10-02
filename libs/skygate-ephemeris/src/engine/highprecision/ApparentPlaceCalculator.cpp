@@ -81,7 +81,7 @@ struct TransformWorkItemRequest {
 
 [[nodiscard]] ApparentPlaceRequestMode requestModeForCorrections(const EphemerisCorrectionFlags flags) noexcept
 {
-    if (flags == EphemerisCorrectionFlags::noCorrections()) {
+    if (!flags.hasCorrections()) {
         return ApparentPlaceRequestMode::Geometric;
     }
     if (skygate::ephemeris::EphemerisCorrectionFlags::has(flags, EphemerisCorrectionFlags::diurnalParallax())) {

@@ -1,4 +1,5 @@
 #include "UtcTimeCodec.hpp"
+#include "engine/EphemerisEngineQueries.hpp"
 #include "engine/IEphemerisEngine.hpp"
 
 #include <QtTest/QtTest>
@@ -234,6 +235,7 @@ private slots:
     void requestComputeReceivesFullRequest();
     void requestBodyLookupSupportsIdAndIndex();
     void skyContextCompatibilityUsesEngineDefaultOptions();
+    void queriesDelegateToRequestAwareSingleBodyOverloads();
 };
 
 void EphemerisEngineInterfaceMigrationTests::metadataDefaultsRemainAvailableForTestEngines()
@@ -335,6 +337,29 @@ void EphemerisEngineInterfaceMigrationTests::skyContextCompatibilityUsesEngineDe
         static_cast<std::uint32_t>(bodyState->metadata.appliedCorrections),
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::noCorrections())
     );
+}
+
+void EphemerisEngineInterfaceMigrationTests::queriesDelegateToRequestAwareSingleBodyOverloads()
+{
+    RequestAwareTestEngine engine;
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeContext();
+    request.epoch = {.julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.5};
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::lightTime());
+
+    const auto byId = skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(engine, request, "target");
+    QVERIFY(byId.has_value());
+    QCOMPARE(engine.requestBodyLookupCount(), 1);
+    QCOMPARE(
+        static_cast<std::uint32_t>(engine.lastRequestOptions().correctionFlags()),
+        static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::lightTime())
+    );
+
+    const auto byIndex = skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(engine, request, 0U);
+    QVERIFY(byIndex.has_value());
+    QCOMPARE(engine.requestBodyLookupCount(), 2);
+    QCOMPARE(engine.lastRequestEpoch().julianDatePart1, 2'460'000.0);
+    QCOMPARE(engine.lastRequestEpoch().julianDatePart2, 0.5);
 }
 
 QTEST_APPLESS_MAIN(EphemerisEngineInterfaceMigrationTests)
