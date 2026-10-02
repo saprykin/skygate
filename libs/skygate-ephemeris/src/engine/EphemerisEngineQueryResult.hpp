@@ -1,9 +1,10 @@
 #pragma once
 
 #include "EphemerisCorrectionFlags.hpp"
-#include "time/EphemerisDateRange.hpp"
+#include "EphemerisDataSourceProvenance.hpp"
 #include "EphemerisEngineQueryStatus.hpp"
 #include "EphemerisEngineWarning.hpp"
+#include "time/EphemerisDateRange.hpp"
 
 #include <bit>
 #include <cstddef>
@@ -17,6 +18,7 @@ struct EphemerisEngineQueryResult {
     EphemerisEngineQueryStatus::Type status = EphemerisEngineQueryStatus::Type::Valid;
     std::uint32_t warningCodeMask = 0U;
     std::string dataSourceProvenance;
+    EphemerisDataSourceProvenance::Type dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::Unknown;
     std::optional<EphemerisDateRange> effectiveDataValidityRange;
     std::optional<double> estimatedAngularUncertaintyArcsec;
     EphemerisCorrectionFlags requestedCorrections = EphemerisCorrectionFlags::noCorrections();

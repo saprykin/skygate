@@ -556,7 +556,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     strictRequest.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     strictRequest.catalog = makeCatalogHandle(bodies);
     strictRequest.options = makeOptions(EphemerisCorrectionFlags::apparentTopocentric());
-    strictRequest.fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    strictRequest.options.setFallbackToSimpleEngine(false);
     const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
     QVERIFY(strictResult.isFailure());
     QVERIFY(strictResult.engine == nullptr);
@@ -565,7 +565,7 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     QVERIFY(!strictResult.diagnostics.front().displayText().empty());
 
     EphemerisEngineFactoryRequest fallbackRequest = strictRequest;
-    fallbackRequest.fallbackPolicy = EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    fallbackRequest.options.setFallbackToSimpleEngine(true);
     const EphemerisEngineFactoryResult fallbackResult =
         skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
     QVERIFY(fallbackResult.isSuccess());

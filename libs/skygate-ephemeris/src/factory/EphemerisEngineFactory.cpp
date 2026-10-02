@@ -13,6 +13,7 @@
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
+#include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
 
 #include <memory>
 #include <optional>
@@ -272,6 +273,7 @@ prefersPlanetarySystemBarycenters(const skygate::ephemeris::highprecision::ICalc
                 );
             dependencies.computationCache =
                 std::make_shared<skygate::ephemeris::highprecision::EphemerisComputationCache>();
+            dependencies.fallbackStrategy = std::make_shared<SimpleEphemerisFallbackStrategy>();
             if (request.datasetManifest != nullptr) {
                 dependencies.dataSetInfo = *request.datasetManifest;
             } else {
@@ -328,9 +330,14 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
             )
         );
         break;
-    case EphemerisEngineKind::Type::HighPrecision:
-        result = createHighPrecisionEngine(request);
+    case EphemerisEngineKind::Type::HighPrecision: {
+        EphemerisEngineFactoryRequest alignedRequest = request;
+        alignedRequest.fallbackPolicy = request.options.fallbackToSimpleEngine()
+                                            ? EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback
+                                            : EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+        result = createHighPrecisionEngine(alignedRequest);
         break;
+    }
     default:
         result = makeInvalidFactoryRequestResult();
         break;

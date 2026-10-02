@@ -646,6 +646,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestRequiresDatasetInf
     request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.options.setFallbackToSimpleEngine(false);
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
     request.calcephKernelProvider =
@@ -675,6 +676,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelP
     request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.options.setFallbackToSimpleEngine(false);
     request.datasetManifest = &datasetManifest;
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
@@ -869,6 +871,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDefaultProviderReportsUna
     request.catalog = makeCatalogHandle(bodies);
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
+    request.options.setFallbackToSimpleEngine(false);
     const skygate::ephemeris::EphemerisDataManifest manifest =
         makeFactoryManifest(kernelPayload, static_cast<std::uint64_t>(kernelPayload.size()));
     request.dataManifest = &manifest;
@@ -912,7 +915,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     fallbackRequest.catalog = makeCatalogHandle(bodies);
     fallbackRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     fallbackRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
-    fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    fallbackRequest.options.setFallbackToSimpleEngine(true);
     fallbackRequest.diagnosticsSink = &fallbackDiagnosticsSink;
 
     auto fallback = skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
@@ -934,7 +937,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
 
     RecordingEphemerisDiagnosticsSink strictDiagnosticsSink;
     skygate::ephemeris::EphemerisEngineFactoryRequest strictRequest = fallbackRequest;
-    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    strictRequest.options.setFallbackToSimpleEngine(false);
     strictRequest.diagnosticsSink = &strictDiagnosticsSink;
 
     const auto strict = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);

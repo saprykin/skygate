@@ -1,8 +1,10 @@
-#include "factory/EphemerisEngineFactory.hpp"
+#include "engine/EphemerisDataSourceProvenance.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
+#include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
+#include "factory/EphemerisEngineFactory.hpp"
 
 #include <QtTest/QtTest>
 
@@ -78,6 +80,7 @@ makeDependencies(std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalcula
 {
     HighPrecisionEphemerisEngine::Dependencies dependencies;
     dependencies.solarSystemStateCalculator = std::move(solarSystemCalculator);
+    dependencies.fallbackStrategy = std::make_shared<SimpleEphemerisFallbackStrategy>();
     dependencies.dataSetInfo.id = "fallback-validation";
     dependencies.dataSetInfo.displayName = "Fallback validation";
     dependencies.dataSetInfo.version = "test";
@@ -135,6 +138,7 @@ private slots:
     void staleDataWarningsRemainVisible();
     void unsupportedBodyReturnsStructuredWarning();
     void outOfRangeSolarSystemRequestUsesSimpleFallbackWhenEnabled();
+    void fallbackMarksDroppedCorrectionsUnavailableAndResetsValidity();
     void outOfRangeRequestWithoutFallbackStaysOutOfRange();
     void failedRequestReturnsFailedStatus();
 };
@@ -162,7 +166,7 @@ void EphemerisFallbackValidationTests::highPrecisionUnavailableFallbackProducesW
     EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.fallbackPolicy = EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
+    request.options.setFallbackToSimpleEngine(true);
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -189,7 +193,7 @@ void EphemerisFallbackValidationTests::strictHighPrecisionUnavailableProducesErr
     EphemerisEngineFactoryRequest request;
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
-    request.fallbackPolicy = EphemerisFactoryFallbackPolicy::StrictHighPrecision;
+    request.options.setFallbackToSimpleEngine(false);
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
@@ -331,11 +335,58 @@ void EphemerisFallbackValidationTests::outOfRangeSolarSystemRequestUsesSimpleFal
     );
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
     QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::MissingEphemerisData));
-    QVERIFY(state->metadata.dataSourceProvenance.find("simple solar-system fallback") != std::string::npos);
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.dataSourceProvenanceKind),
+        static_cast<std::uint8_t>(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
+    );
+    QCOMPARE(state->metadata.dataSourceProvenance, std::string{"simple solar-system fallback"});
+    QCOMPARE(static_cast<std::uint32_t>(state->metadata.skippedCorrections), std::uint32_t{0U});
+    QVERIFY(
+        EphemerisCorrectionFlags::has(state->metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax())
+    );
     QVERIFY(std::isfinite(state->equatorial.rightAscensionHours));
     QVERIFY(std::isfinite(state->equatorial.declinationDeg));
     QVERIFY(std::isfinite(state->horizontal.altitudeDeg));
     QVERIFY(std::isfinite(state->horizontal.azimuthDeg));
+}
+
+void EphemerisFallbackValidationTests::fallbackMarksDroppedCorrectionsUnavailableAndResetsValidity()
+{
+    HighPrecisionCalculatorResult calculatorResult;
+    calculatorResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange;
+    calculatorResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    calculatorResult.metadata.dataSourceProvenance = "kernel out of range";
+    calculatorResult.metadata.effectiveDataValidityRange = EphemerisDateRange{
+        .id = "de440-modern",
+        .displayName = "DE440 modern range",
+        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+    };
+    calculatorResult.metadata.estimatedAngularUncertaintyArcsec = 0.05;
+
+    const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
+    EphemerisRequest request = makeRequest();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::apparentTopocentric());
+
+    const auto state = engine.computeBodyState(request, std::size_t{0});
+
+    QVERIFY(state.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)
+    );
+    QVERIFY(state->metadata.hasWarning(EphemerisEngineWarning::Code::CorrectionUnavailable));
+    QVERIFY(!state->metadata.effectiveDataValidityRange.has_value());
+    QVERIFY(!state->metadata.estimatedAngularUncertaintyArcsec.has_value());
+    QCOMPARE(static_cast<std::uint32_t>(state->metadata.skippedCorrections), std::uint32_t{0U});
+    QVERIFY(
+        EphemerisCorrectionFlags::has(state->metadata.appliedCorrections, EphemerisCorrectionFlags::diurnalParallax())
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(state->metadata.dataSourceProvenanceKind),
+        static_cast<std::uint8_t>(EphemerisDataSourceProvenance::Type::SimpleSolarSystemFallback)
+    );
 }
 
 void EphemerisFallbackValidationTests::failedRequestReturnsFailedStatus()

@@ -22,6 +22,8 @@ set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
     src/engine/simple/SunEquatorialCalculator.hpp
     src/engine/simple/SimpleEphemerisEngine.hpp
     src/engine/simple/SimpleEphemerisEngine.cpp
+    src/engine/simple/SimpleEphemerisFallbackStrategy.hpp
+    src/engine/simple/SimpleEphemerisFallbackStrategy.cpp
     src/engine/simple/EclipticToEquatorialCalculator.cpp
     src/engine/simple/EquatorialToHorizontalCalculator.cpp
     src/engine/simple/MoonEquatorialCalculator.cpp
@@ -211,6 +213,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/BitFlagSetOperations.hpp
     src/engine/EphemerisCapabilities.hpp
     src/engine/EphemerisCorrectionFlags.hpp
+    src/engine/EphemerisDataSourceProvenance.hpp
     src/time/EphemerisDateRange.hpp
     src/engine/EphemerisDatasetInfo.hpp
     src/engine/EphemerisEngineKind.hpp
@@ -221,6 +224,7 @@ add_library(skygate-ephemeris STATIC
     src/EphemerisRequest.hpp
     src/EphemerisRequestFactory.hpp
     src/engine/IEphemerisEngine.hpp
+    src/engine/IEphemerisFallbackStrategy.hpp
     src/MoonPhase.hpp
     src/MoonPhaseCalculator.hpp
     src/NightConditions.hpp
@@ -355,6 +359,7 @@ add_library(skygate-ephemeris STATIC
     src/engine/BitFlagSetOperations.cpp
     src/engine/EphemerisCapabilities.cpp
     src/engine/EphemerisCorrectionFlags.cpp
+    src/engine/EphemerisDataSourceProvenance.cpp
     src/time/EphemerisDateRange.cpp
     src/engine/EphemerisDatasetInfo.cpp
     src/engine/EphemerisEngineKind.cpp
