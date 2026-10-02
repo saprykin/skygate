@@ -695,10 +695,10 @@ void PerformanceGuardTests::buildsHighPrecisionLargeFixedCatalogWithinGuardrail(
     cacheSnapshot.states.push_back(skygate::ephemeris::CelestialBodyState{.bodyIndex = 0U});
     timer.restart();
     computationCache->storeSnapshot(
-        controller.ephemerisRequestContext().request, bodyCatalog.bodies(), dependencies.dataSetInfo, cacheSnapshot
+        controller.ephemerisRequestContext().request, &bodyCatalog, dependencies.dataSetInfo, cacheSnapshot
     );
     const std::optional<skygate::ephemeris::EphemerisSnapshot> cachedSnapshot = computationCache->findSnapshot(
-        controller.ephemerisRequestContext().request, bodyCatalog.bodies(), dependencies.dataSetInfo
+        controller.ephemerisRequestContext().request, &bodyCatalog, dependencies.dataSetInfo
     );
     const qint64 cacheElapsedMs = timer.elapsed();
 

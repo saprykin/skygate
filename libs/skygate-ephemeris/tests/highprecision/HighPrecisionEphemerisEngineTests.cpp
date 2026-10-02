@@ -922,6 +922,7 @@ private slots:
     void isolatesCachedSnapshotsByMicrosecondUtc();
     void isolatesCachedSnapshotsByDataSetDateRangeContents();
     void isolatesCachedSnapshotsByCatalogContents();
+    void findSnapshotBodyStateReturnsSingleBodyWithoutFullSnapshotCopy();
     void fallsBackToSingleStarPathWhenBatchReturnsNoResults();
     void forwardsOptionsThroughCollaboratorsAndResultBuilder();
     void bypassesApparentPlaceForGeometricSolarSystemRequests();
@@ -1459,13 +1460,13 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetRevision
         }
     );
 
-    computationCache.storeSnapshot(request, catalog.bodies(), oldDataSet, oldSnapshot);
-    computationCache.storeSnapshot(request, catalog.bodies(), newDataSet, newSnapshot);
+    computationCache.storeSnapshot(request, &catalog, oldDataSet, oldSnapshot);
+    computationCache.storeSnapshot(request, &catalog, newDataSet, newSnapshot);
 
     const std::optional<EphemerisSnapshot> cachedOldSnapshot =
-        computationCache.findSnapshot(request, catalog.bodies(), oldDataSet);
+        computationCache.findSnapshot(request, &catalog, oldDataSet);
     const std::optional<EphemerisSnapshot> cachedNewSnapshot =
-        computationCache.findSnapshot(request, catalog.bodies(), newDataSet);
+        computationCache.findSnapshot(request, &catalog, newDataSet);
 
     QVERIFY(cachedOldSnapshot.has_value());
     QVERIFY(cachedNewSnapshot.has_value());
@@ -1474,7 +1475,7 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetRevision
 
     newSnapshot.states[0].equatorial.rightAscensionHours = 99.0;
     const std::optional<EphemerisSnapshot> cachedOldSnapshotAfterMutation =
-        computationCache.findSnapshot(request, catalog.bodies(), oldDataSet);
+        computationCache.findSnapshot(request, &catalog, oldDataSet);
 
     QVERIFY(cachedOldSnapshotAfterMutation.has_value());
     QCOMPARE(cachedOldSnapshotAfterMutation->states[0].equatorial.rightAscensionHours, 1.0);
@@ -1505,13 +1506,13 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByMicrosecondUtc(
         }
     );
 
-    computationCache.storeSnapshot(baseRequest, catalog.bodies(), dataSet, baseSnapshot);
-    computationCache.storeSnapshot(shiftedRequest, catalog.bodies(), dataSet, shiftedSnapshot);
+    computationCache.storeSnapshot(baseRequest, &catalog, dataSet, baseSnapshot);
+    computationCache.storeSnapshot(shiftedRequest, &catalog, dataSet, shiftedSnapshot);
 
     const std::optional<EphemerisSnapshot> cachedBaseSnapshot =
-        computationCache.findSnapshot(baseRequest, catalog.bodies(), dataSet);
+        computationCache.findSnapshot(baseRequest, &catalog, dataSet);
     const std::optional<EphemerisSnapshot> cachedShiftedSnapshot =
-        computationCache.findSnapshot(shiftedRequest, catalog.bodies(), dataSet);
+        computationCache.findSnapshot(shiftedRequest, &catalog, dataSet);
 
     QVERIFY(cachedBaseSnapshot.has_value());
     QVERIFY(cachedShiftedSnapshot.has_value());
@@ -1557,13 +1558,13 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetDateRang
         }
     );
 
-    computationCache.storeSnapshot(request, catalog.bodies(), oldDataSet, oldSnapshot);
-    computationCache.storeSnapshot(request, catalog.bodies(), newDataSet, newSnapshot);
+    computationCache.storeSnapshot(request, &catalog, oldDataSet, oldSnapshot);
+    computationCache.storeSnapshot(request, &catalog, newDataSet, newSnapshot);
 
     const std::optional<EphemerisSnapshot> cachedOldSnapshot =
-        computationCache.findSnapshot(request, catalog.bodies(), oldDataSet);
+        computationCache.findSnapshot(request, &catalog, oldDataSet);
     const std::optional<EphemerisSnapshot> cachedNewSnapshot =
-        computationCache.findSnapshot(request, catalog.bodies(), newDataSet);
+        computationCache.findSnapshot(request, &catalog, newDataSet);
 
     QVERIFY(cachedOldSnapshot.has_value());
     QVERIFY(cachedNewSnapshot.has_value());
@@ -1586,14 +1587,47 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByCatalogContents
             .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
         }
     );
-    computationCache.storeSnapshot(request, oldCatalog.bodies(), dataSet, oldSnapshot);
+    computationCache.storeSnapshot(request, &oldCatalog, dataSet, oldSnapshot);
 
     bodies[0] = makeFixedStarBody("star-b", 5.0, 6.0);
     const CelestialBodyCatalog newCatalog(bodies);
     const std::optional<EphemerisSnapshot> cachedSnapshot =
-        computationCache.findSnapshot(request, newCatalog.bodies(), dataSet);
+        computationCache.findSnapshot(request, &newCatalog, dataSet);
 
     QVERIFY(!cachedSnapshot.has_value());
+}
+
+void HighPrecisionEphemerisEngineTests::findSnapshotBodyStateReturnsSingleBodyWithoutFullSnapshotCopy()
+{
+    EphemerisComputationCache computationCache;
+    const std::vector<OwnGalaxyCelestialBody> bodies{makeSunBody(), makeStarBody()};
+    const CelestialBodyCatalog catalog(bodies);
+    const EphemerisRequest request = makeRequest();
+    const EphemerisDatasetInfo dataSet = makeDependencies().dataSetInfo;
+
+    EphemerisSnapshot snapshot;
+    snapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        }
+    );
+    snapshot.states.push_back(
+        CelestialBodyState{
+            .bodyIndex = 1U,
+            .equatorial = {.rightAscensionHours = 3.0, .declinationDeg = 4.0},
+        }
+    );
+    computationCache.storeSnapshot(request, &catalog, dataSet, snapshot);
+
+    const std::optional<CelestialBodyState> secondBody =
+        computationCache.findSnapshotBodyState(request, &catalog, dataSet, 1U);
+
+    QVERIFY(secondBody.has_value());
+    QCOMPARE(secondBody->bodyIndex, std::uint32_t{1});
+    QCOMPARE(secondBody->equatorial.rightAscensionHours, 3.0);
+    QCOMPARE(secondBody->equatorial.declinationDeg, 4.0);
+    QVERIFY(!computationCache.findSnapshotBodyState(request, &catalog, dataSet, 2U).has_value());
 }
 
 void HighPrecisionEphemerisEngineTests::fallsBackToSingleStarPathWhenBatchReturnsNoResults()
