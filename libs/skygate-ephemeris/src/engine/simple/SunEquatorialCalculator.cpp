@@ -1,6 +1,7 @@
 #include "SunEquatorialCalculator.hpp"
 #include "EclipticToEquatorialCalculator.hpp"
 #include "math/AngleMath.hpp"
+#include "math/PhysicalConstants.hpp"
 #include "time/AstronomicalTime.hpp"
 #include "time/EpochCodec.hpp"
 
@@ -11,9 +12,12 @@ namespace skygate::ephemeris {
 skygate::core::EquatorialCoordinate
 SunEquatorialCalculator::compute(const skygate::core::UtcTimePoint& utcTime) const noexcept
 {
-    const double daysSinceJ2000 = EpochCodec::daysSinceJ2000(utcTime);
+    const double daysSinceJ2000 = skygate::core::EpochCodec::daysSinceJ2000(utcTime);
     const double meanLongitudeDeg = skygate::core::AngleMath::normalizeDegrees(280.460 + 0.9856474 * daysSinceJ2000);
-    const double meanAnomalyDeg = skygate::core::AngleMath::normalizeDegrees(357.528 + 0.9856003 * daysSinceJ2000);
+    const double meanAnomalyDeg = skygate::core::AngleMath::normalizeDegrees(
+        skygate::core::PhysicalConstants::kSolarMeanAnomalyDegAtJ2000
+        + skygate::core::PhysicalConstants::kSolarMeanAnomalyDegPerDay * daysSinceJ2000
+    );
     const double meanAnomalyRad = skygate::core::AngleMath::toRadians(meanAnomalyDeg);
 
     const double eclipticLongitudeDeg = skygate::core::AngleMath::normalizeDegrees(
@@ -21,7 +25,7 @@ SunEquatorialCalculator::compute(const skygate::core::UtcTimePoint& utcTime) con
     );
 
     return EclipticToEquatorialCalculator::compute(
-        eclipticLongitudeDeg, 0.0, AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
+        eclipticLongitudeDeg, 0.0, skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
     );
 }
 

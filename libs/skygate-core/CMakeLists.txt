@@ -14,6 +14,13 @@ add_library(skygate-core STATIC
     src/SystemTimeSource.hpp
     src/UtcTimeCodec.hpp
     src/UtcTimePoint.hpp
+    src/NaifBodyIds.hpp
+    src/time/AstronomicalEpoch.hpp
+    src/time/AstronomicalTime.hpp
+    src/time/CalendarTime.hpp
+    src/time/CivilDateTime.hpp
+    src/time/EpochCodec.hpp
+    src/time/TimeScale.hpp
     src/math/AngleMath.hpp
     src/math/CircleHitIndex.hpp
     src/math/CircleHitTarget.hpp
@@ -43,6 +50,13 @@ add_library(skygate-core STATIC
     src/ObservationContext.cpp
     src/SystemTimeSource.cpp
     src/UtcTimeCodec.cpp
+    src/NaifBodyIds.cpp
+    src/time/AstronomicalEpoch.cpp
+    src/time/AstronomicalTime.cpp
+    src/time/CalendarTime.cpp
+    src/time/CivilDateTime.cpp
+    src/time/EpochCodec.cpp
+    src/time/TimeScale.cpp
     src/math/AngleMath.cpp
     src/math/CircleHitIndex.cpp
     src/math/CircleHitTarget.cpp

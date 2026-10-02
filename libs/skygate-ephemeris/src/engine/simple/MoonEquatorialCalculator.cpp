@@ -11,7 +11,7 @@ namespace skygate::ephemeris {
 skygate::core::EquatorialCoordinate
 MoonEquatorialCalculator::compute(const skygate::core::UtcTimePoint& utcTime) const noexcept
 {
-    const double daysSinceJ2000 = EpochCodec::daysSinceJ2000(utcTime);
+    const double daysSinceJ2000 = skygate::core::EpochCodec::daysSinceJ2000(utcTime);
     const double ascendingNodeDeg =
         skygate::core::AngleMath::normalizeDegrees(125.1228 - 0.0529538083 * daysSinceJ2000);
     const double inclinationDeg = 5.1454;
@@ -54,7 +54,7 @@ MoonEquatorialCalculator::compute(const skygate::core::UtcTimePoint& utcTime) co
         skygate::core::AngleMath::toDegrees(std::atan2(zH, std::sqrt(xH * xH + yH * yH)));
 
     return EclipticToEquatorialCalculator::compute(
-        eclipticLongitudeDeg, eclipticLatitudeDeg, AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
+        eclipticLongitudeDeg, eclipticLatitudeDeg, skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000)
     );
 }
 

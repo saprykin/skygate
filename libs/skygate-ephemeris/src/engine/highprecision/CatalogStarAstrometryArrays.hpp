@@ -33,7 +33,7 @@ public:
     [[nodiscard]] bool hasFixedEquatorialFallback(std::size_t arrayIndex) const noexcept;
 
     [[nodiscard]] skygate::core::EquatorialCoordinate referenceEquatorial(std::size_t arrayIndex) const noexcept;
-    [[nodiscard]] AstronomicalEpoch referenceEpoch(std::size_t arrayIndex) const noexcept;
+    [[nodiscard]] skygate::core::AstronomicalEpoch referenceEpoch(std::size_t arrayIndex) const noexcept;
     [[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
     fixedEquatorialFallback(std::size_t arrayIndex) const noexcept;
     [[nodiscard]] std::optional<EphemerisDateRange> validityRange(std::size_t arrayIndex) const;
@@ -47,7 +47,7 @@ public:
     [[nodiscard]] std::span<const double> referenceDeclinationDegrees() const noexcept;
     [[nodiscard]] std::span<const double> referenceEpochJulianDatePart1() const noexcept;
     [[nodiscard]] std::span<const double> referenceEpochJulianDatePart2() const noexcept;
-    [[nodiscard]] std::span<const TimeScale> referenceEpochTimeScales() const noexcept;
+    [[nodiscard]] std::span<const skygate::core::TimeScale> referenceEpochTimeScales() const noexcept;
     [[nodiscard]] std::span<const std::uint8_t> hasCatalogAstrometryMask() const noexcept;
     [[nodiscard]] std::span<const std::uint8_t> hasFixedEquatorialFallbackMask() const noexcept;
     [[nodiscard]] std::span<const double> fixedRightAscensionHours() const noexcept;
@@ -79,7 +79,7 @@ private:
     std::vector<double> m_referenceDeclinationDegrees;
     std::vector<double> m_referenceEpochJulianDatePart1;
     std::vector<double> m_referenceEpochJulianDatePart2;
-    std::vector<TimeScale> m_referenceEpochTimeScales;
+    std::vector<skygate::core::TimeScale> m_referenceEpochTimeScales;
 
     std::vector<std::uint8_t> m_hasFixedEquatorialFallback;
     std::vector<double> m_fixedRightAscensionHours;

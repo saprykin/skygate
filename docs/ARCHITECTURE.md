@@ -224,6 +224,21 @@ used by the controller for projection selection and sample output.
   - Small interface used to make time acquisition replaceable and testable.
 - `SystemTimeSource`
   - Default production implementation.
+- `UtcTimePoint` / `UtcTimeCodec`
+  - Microsecond UTC timestamp storage and epoch-scalar conversion.
+- `TimeScale`
+  - UTC/TAI/TT/TDB/UT1 enum used across time-scale conversion boundaries.
+- `CivilDateTime` / `CalendarTime`
+  - Proleptic Gregorian civil-date validation and civil-date/epoch mapping.
+- `AstronomicalEpoch`
+  - Two-part Julian-date value with normalization, arithmetic, and ordering.
+- `EpochCodec`
+  - UTC time to Julian-date/J2000 epoch conversion.
+- `AstronomicalTime`
+  - Mean obliquity and Greenwich mean sidereal time helpers.
+
+Calendar and Julian-date arithmetic intentionally lives in `skygate-core` so
+both the simple and high-precision engines share one time implementation.
 
 ### `skygate-ephemeris`
 This module owns celestial body metadata, catalog parsing, and runtime sky
@@ -328,6 +343,41 @@ through `EphemerisFactoryFallbackPolicy`. `SkyContextController` owns the
 selected engine kind, correction options, refraction settings, data manager,
 and diagnostics surfaced to the UI.
 
+#### High-precision interface layer
+Replaceable high-precision subsystems are exposed as narrow `I*` contracts so
+the engine and factory depend on behavior rather than concrete providers:
+
+- `ICalcephKernel` / `ICalcephKernelProvider` for kernel state and kernel
+  acquisition
+- `IDeltaTProvider`, `ILeapSecondProvider`, and `IEarthOrientationProvider`
+  for time-scale support tables
+- `ITimeScaleService` for UTC/TAI/TT/TDB/UT1 conversion
+- `ISolarSystemStateCalculator` and `IStarAstrometryCalculator` for body
+  state and catalog-star astrometry
+- `IApparentPlaceCalculator` and `IAtmosphericRefractionCalculator` for
+  apparent/topocentric corrections
+- `IEphemerisComputationCache`, `IEphemerisResultBuilder`, and
+  `IFrameTransformer` for caching, result assembly, and frame transforms
+- `IEphemerisFallbackStrategy` for simple-engine degradation
+- `IEphemerisDataSnapshot` for staged high-precision data assets
+
+Concrete implementations (`CalcephKernel`, `TableBacked*Provider`,
+`LeapSecondTimeScaleService`, the calculators, `EphemerisComputationCache`,
+`ErfaFrameTransformer`, and `SimpleEphemerisFallbackStrategy`) are wired
+through `EphemerisEngineFactory` and injected as `shared_ptr<const ...>`
+dependencies.
+
+#### Fallback strategy
+Fallback is implemented once in the simple-engine module as
+`SimpleEphemerisFallbackStrategy`, which is injected into the high-precision
+engine through `IEphemerisFallbackStrategy`. When a high-precision request is
+out of range and the request explicitly allows fallback, the strategy produces
+a simple-engine body state, marks the high-precision result as degraded, and
+records the corrections that could not be applied as unavailable. Fallback
+control is single-sourced: the factory policy determines whether a fallback
+engine is created, while `EphemerisEngineOptions::fallbackToSimpleEngine()`
+determines whether a runtime request may degrade.
+
 #### Catalog ingestion pipeline
 Catalog import supports multiple payload shapes:
 
@@ -358,11 +408,11 @@ unresolved instead of falling back to engine-owned representative coordinates.
 The public catalog API intentionally has only narrow front doors:
 
 - `CatalogPayloadParser` for unknown downloaded/imported payloads
-- `loadStarCatalog(...)` for known catalog source types with diagnostics
-- `createStarCatalogFromBodies(...)` for test/UI fixtures and already parsed
-  bodies
-- `createBundledStarCatalog()` for the bundled starter dataset
-- `composeActiveCatalog(...)` for active application catalog composition
+- `CatalogLoader::load(...)` for known catalog source types with diagnostics
+- `CatalogFactory::createStarCatalogFromBodies(...)` for test/UI fixtures and
+  already parsed bodies
+- `CatalogFactory::createBundledStarCatalog()` for the bundled starter dataset
+- `CatalogComposer::compose(...)` for active application catalog composition
 
 Deep-sky objects are a fixed-equatorial catalog layer. The UI can use bundled
 Messier data or download/update the OpenNGC preset. Bundled Messier data is

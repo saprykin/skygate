@@ -1,4 +1,4 @@
-#include "engine/highprecision/HighPrecisionTextParser.hpp"
+#include "engine/HighPrecisionTextParser.hpp"
 
 #include <QtTest/QtTest>
 
@@ -94,7 +94,7 @@ void HighPrecisionTextParserTests::parsesAstronomicalUtcDates()
     QCOMPARE(negativeYear->astronomicalYear, -44);
     QCOMPARE(negativeYear->month, 3);
     QCOMPARE(negativeYear->day, 15);
-    QCOMPARE(negativeYear->timeScale, TimeScale::Utc);
+    QCOMPARE(negativeYear->timeScale, skygate::core::TimeScale::Utc);
     const auto yearZero = parser.parseUtcDate("0-02-29");
     QVERIFY(yearZero.has_value());
     QCOMPARE(yearZero->astronomicalYear, 0);

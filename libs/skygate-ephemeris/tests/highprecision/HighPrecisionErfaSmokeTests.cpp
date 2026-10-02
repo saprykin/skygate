@@ -12,10 +12,10 @@ private slots:
 
 void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForTerrestrialTime()
 {
-    const skygate::ephemeris::AstronomicalEpoch utcEpoch{
+    const skygate::core::AstronomicalEpoch utcEpoch{
         .julianDatePart1 = 2400000.5,
         .julianDatePart2 = 51544.0,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 
     QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::celestialToIntermediateMatrix06A(utcEpoch).has_value());
@@ -26,10 +26,10 @@ void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForTerrestrialTime()
 
 void HighPrecisionErfaSmokeTests::rejectsWrongTimeScaleForUniversalTime1()
 {
-    const skygate::ephemeris::AstronomicalEpoch ttEpoch{
+    const skygate::core::AstronomicalEpoch ttEpoch{
         .julianDatePart1 = 2400000.5,
         .julianDatePart2 = 51544.0,
-        .timeScale = skygate::ephemeris::TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
 
     QVERIFY(!skygate::ephemeris::highprecision::ErfaAstrometry::earthRotationMatrix00(ttEpoch).has_value());

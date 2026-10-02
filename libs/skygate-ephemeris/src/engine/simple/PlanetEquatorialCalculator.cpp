@@ -62,8 +62,8 @@ std::optional<skygate::core::EquatorialCoordinate> PlanetEquatorialCalculator::c
     const std::string_view bodyId, const skygate::core::UtcTimePoint& utcTime
 ) const noexcept
 {
-    const double daysSinceJ2000 = EpochCodec::daysSinceJ2000(utcTime);
-    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
+    const double daysSinceJ2000 = skygate::core::EpochCodec::daysSinceJ2000(utcTime);
+    const double obliquityDeg = skygate::core::AstronomicalTime::meanObliquityDeg(daysSinceJ2000);
 
     for (const PlanetApproximateOrbit& planet : kPlanetApproximateOrbits) {
         if (bodyId != planet.id) {

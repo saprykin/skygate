@@ -9,8 +9,6 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 using skygate::core::PhysicalConstants;
-constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
-constexpr double kWgs84Flattening = 1.0 / 298.257223563;
 
 }  // namespace
 
@@ -27,9 +25,10 @@ ObserverGeodesy::observerItrsPositionAu(const skygate::core::GeoLocation& observ
     const double cosLatitude = std::cos(latitudeRad);
     const double sinLongitude = std::sin(longitudeRad);
     const double cosLongitude = std::cos(longitudeRad);
-    const double firstEccentricitySquared = kWgs84Flattening * (2.0 - kWgs84Flattening);
-    const double primeVerticalRadius =
-        kWgs84EquatorialRadiusMeters / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
+    const double firstEccentricitySquared =
+        PhysicalConstants::kWgs84Flattening * (2.0 - PhysicalConstants::kWgs84Flattening);
+    const double primeVerticalRadius = PhysicalConstants::kWgs84EquatorialRadiusMeters
+                                       / std::sqrt(1.0 - firstEccentricitySquared * sinLatitude * sinLatitude);
 
     const double xMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * cosLongitude;
     const double yMeters = (primeVerticalRadius + observer.elevationMeters) * cosLatitude * sinLongitude;

@@ -7,7 +7,7 @@ namespace skygate::ephemeris {
 
 class MoonPhaseCalculator final {
 public:
-    [[nodiscard]] MoonPhase compute(const AstronomicalEpoch& epoch) const noexcept;
+    [[nodiscard]] MoonPhase compute(const skygate::core::AstronomicalEpoch& epoch) const noexcept;
 };
 
 }  // namespace skygate::ephemeris

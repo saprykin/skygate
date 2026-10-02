@@ -9,7 +9,7 @@
 #include "IEphemerisResultBuilder.hpp"
 #include "ISolarSystemStateCalculator.hpp"
 #include "IStarAstrometryCalculator.hpp"
-#include "ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "PreparedRequestStateBuilder.hpp"
 #include "StarAstrometryBatchResult.hpp"
@@ -32,7 +32,7 @@ namespace {
 
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
 
-[[nodiscard]] bool hasValidEpoch(const AstronomicalEpoch& epoch) noexcept
+[[nodiscard]] bool hasValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
     return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
 }
@@ -133,14 +133,14 @@ resultBuilder(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
     return dependencies.apparentPlaceCalculator->apply(input, calculatorResult);
 }
 
-[[nodiscard]] std::optional<AstronomicalEpoch> kernelEpochForSolarSystemState(
+[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> kernelEpochForSolarSystemState(
     EphemerisEngineQueryResult& metadata,
     const EphemerisRequest& request,
     const PreparedEphemerisRequestState* preparedState,
     const std::shared_ptr<const ITimeScaleService>& timeScaleService
 )
 {
-    if (request.epoch.timeScale == TimeScale::Tdb) {
+    if (request.epoch.timeScale == skygate::core::TimeScale::Tdb) {
         return request.epoch.normalized();
     }
     if (preparedState != nullptr && preparedState->tdbKernelEpoch.has_value()) {
@@ -153,7 +153,8 @@ resultBuilder(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
         return std::nullopt;
     }
 
-    const TimeScaleConversionResult conversion = timeScaleService->convert(request.epoch, TimeScale::Tdb);
+    const TimeScaleConversionResult conversion =
+        timeScaleService->convert(request.epoch, skygate::core::TimeScale::Tdb);
     mergeKernelEpochTimeScaleMetadata(metadata, conversion);
     if (!conversion.isSuccess()) {
         return std::nullopt;
@@ -459,7 +460,7 @@ private:
         const ISolarSystemStateCalculator* solarSystemCalculator = m_dependencies.solarSystemStateCalculator.get();
         if (isSolarSystemBody(body) && solarSystemCalculator != nullptr) {
             HighPrecisionCalculatorResult kernelEpochMetadata;
-            const std::optional<AstronomicalEpoch> kernelEpoch = kernelEpochForSolarSystemState(
+            const std::optional<skygate::core::AstronomicalEpoch> kernelEpoch = kernelEpochForSolarSystemState(
                 kernelEpochMetadata.metadata, request, input.preparedRequestState.get(), m_dependencies.timeScaleService
             );
             if (!kernelEpoch.has_value()) {

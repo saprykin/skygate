@@ -80,7 +80,8 @@ void CatalogStarAstrometryArrays::appendBody(const std::size_t bodyIndex, const 
         body.starAstrometryValue().has_value() ? &*body.starAstrometryValue() : nullptr;
     const skygate::core::EquatorialCoordinate referenceEquatorial =
         astrometry != nullptr ? astrometry->referenceEquatorial : *body.fixedEquatorialValue();
-    const AstronomicalEpoch referenceEpoch = astrometry != nullptr ? astrometry->referenceEpoch : AstronomicalEpoch{};
+    const skygate::core::AstronomicalEpoch referenceEpoch =
+        astrometry != nullptr ? astrometry->referenceEpoch : skygate::core::AstronomicalEpoch{};
 
     m_bodyIndices.push_back(bodyIndex);
     m_hasCatalogAstrometry.push_back(astrometry != nullptr ? 1U : 0U);
@@ -168,7 +169,8 @@ CatalogStarAstrometryArrays::referenceEquatorial(const std::size_t arrayIndex) c
     };
 }
 
-AstronomicalEpoch CatalogStarAstrometryArrays::referenceEpoch(const std::size_t arrayIndex) const noexcept
+skygate::core::AstronomicalEpoch
+CatalogStarAstrometryArrays::referenceEpoch(const std::size_t arrayIndex) const noexcept
 {
     return {
         .julianDatePart1 = m_referenceEpochJulianDatePart1[arrayIndex],
@@ -242,7 +244,7 @@ std::span<const double> CatalogStarAstrometryArrays::referenceEpochJulianDatePar
     return m_referenceEpochJulianDatePart2;
 }
 
-std::span<const TimeScale> CatalogStarAstrometryArrays::referenceEpochTimeScales() const noexcept
+std::span<const skygate::core::TimeScale> CatalogStarAstrometryArrays::referenceEpochTimeScales() const noexcept
 {
     return m_referenceEpochTimeScales;
 }

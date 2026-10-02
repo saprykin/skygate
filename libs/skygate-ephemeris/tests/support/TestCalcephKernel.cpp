@@ -23,7 +23,8 @@ const std::optional<TestCalcephKernel::Info>& TestCalcephKernel::kernelInfo() co
     return m_kernelInfo;
 }
 
-TestCalcephKernel::Status TestCalcephKernel::statusForEpoch(const AstronomicalEpoch& epoch) const noexcept
+TestCalcephKernel::Status
+TestCalcephKernel::statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept
 {
     if (m_status != Status::Ready || !m_validateEpochRange || !m_kernelInfo.has_value()) {
         return m_status;
@@ -36,8 +37,9 @@ TestCalcephKernel::Status TestCalcephKernel::statusForEpoch(const AstronomicalEp
     return Status::Ready;
 }
 
-skygate::ephemeris::highprecision::ICalcephKernel::StateResult
-TestCalcephKernel::compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
+skygate::ephemeris::highprecision::ICalcephKernel::StateResult TestCalcephKernel::compute(
+    const skygate::core::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+) const
 {
     ++m_callCount;
     m_lastEpoch = epoch;
@@ -89,7 +91,7 @@ void TestCalcephKernel::clearKernelInfo() noexcept
     m_kernelInfo = std::nullopt;
 }
 
-void TestCalcephKernel::setRequiredTimeScale(const TimeScale timeScale)
+void TestCalcephKernel::setRequiredTimeScale(const skygate::core::TimeScale timeScale)
 {
     m_requiredTimeScale = timeScale;
 }
@@ -149,7 +151,7 @@ int TestCalcephKernel::callCount() const noexcept
     return m_callCount;
 }
 
-const AstronomicalEpoch& TestCalcephKernel::lastEpoch() const noexcept
+const skygate::core::AstronomicalEpoch& TestCalcephKernel::lastEpoch() const noexcept
 {
     return m_lastEpoch;
 }

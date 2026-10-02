@@ -1,10 +1,10 @@
 #pragma once
 
 #include "SkySettingsStore.hpp"
-#include "engine/highprecision/EphemerisDataActivationStatus.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisStagedUpdateVerificationRequest.hpp"
-#include "engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp"
+#include "engine/EphemerisDataActivationStatus.hpp"
+#include "engine/EphemerisDataManifest.hpp"
+#include "engine/EphemerisStagedUpdateVerificationRequest.hpp"
+#include "engine/EphemerisStagedUpdateVerificationStatus.hpp"
 
 #include <QString>
 

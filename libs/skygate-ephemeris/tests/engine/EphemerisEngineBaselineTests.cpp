@@ -33,7 +33,7 @@ skygate::ephemeris::OwnGalaxyCelestialBody makeBody(
     return body;
 }
 
-skygate::ephemeris::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimePoint& utcTime)
+skygate::core::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimePoint& utcTime)
 {
     const double julianDay =
         skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / kSecondsPerDay + kUnixEpochJulianDay;
@@ -41,7 +41,7 @@ skygate::ephemeris::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimeP
     return {
         .julianDatePart1 = julianDatePart1,
         .julianDatePart2 = julianDay - julianDatePart1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 }
 

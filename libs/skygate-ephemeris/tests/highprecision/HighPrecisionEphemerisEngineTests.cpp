@@ -1,8 +1,8 @@
 #include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
-#include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationDataLoader.hpp"
+#include "engine/DeltaTDataLoader.hpp"
+#include "engine/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
@@ -10,11 +10,11 @@
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/IAtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
 #include "engine/highprecision/IEphemerisResultBuilder.hpp"
 #include "engine/highprecision/IFrameTransformer.hpp"
-#include "engine/highprecision/LeapSecondTableLoader.hpp"
-#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
+#include "engine/LeapSecondTableLoader.hpp"
+#include "engine/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
@@ -87,10 +87,10 @@ makeFixedStarBody(std::string id, const double rightAscensionHours, const double
                 .declinationDeg = 10.0,
             },
         .referenceEpoch =
-            AstronomicalEpoch{
+            skygate::core::AstronomicalEpoch{
                 .julianDatePart1 = 2'451'545.0,
                 .julianDatePart2 = 0.0,
-                .timeScale = TimeScale::Tdb,
+                .timeScale = skygate::core::TimeScale::Tdb,
             },
         .properMotionRightAscensionMasPerYear = 0.0,
         .properMotionDeclinationMasPerYear = 0.0,
@@ -134,15 +134,15 @@ template <typename BodyRange>
     request.epoch = {
         .julianDatePart1 = 2'460'310.0,
         .julianDatePart2 = 0.5,
-        .timeScale = TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::apparent());
     return request;
 }
 
-[[nodiscard]] AstronomicalEpoch makeEpoch(
-    const TimeScale timeScale,
+[[nodiscard]] skygate::core::AstronomicalEpoch makeEpoch(
+    const skygate::core::TimeScale timeScale,
     const int year,
     const int month,
     const int day,
@@ -151,26 +151,27 @@ template <typename BodyRange>
     const int second = 0
 )
 {
-    const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(
-        CivilDateTime{
-            .astronomicalYear = year,
-            .month = month,
-            .day = day,
-            .hour = hour,
-            .minute = minute,
-            .second = second,
-            .timeScale = timeScale,
-        }
-    );
+    const std::optional<skygate::core::AstronomicalEpoch> epoch =
+        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{
+                .astronomicalYear = year,
+                .month = month,
+                .day = day,
+                .hour = hour,
+                .minute = minute,
+                .second = second,
+                .timeScale = timeScale,
+            }
+        );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
 
-[[nodiscard]] AstronomicalEpoch makeUtcEpoch(
+[[nodiscard]] skygate::core::AstronomicalEpoch makeUtcEpoch(
     const int year, const int month, const int day, const int hour = 0, const int minute = 0, const int second = 0
 )
 {
-    return makeEpoch(TimeScale::Utc, year, month, day, hour, minute, second);
+    return makeEpoch(skygate::core::TimeScale::Utc, year, month, day, hour, minute, second);
 }
 
 [[nodiscard]] EphemerisTextDataAsset makeLeapSecondAsset()
@@ -191,7 +192,7 @@ template <typename BodyRange>
 }
 
 [[nodiscard]] std::shared_ptr<const ILeapSecondProvider>
-makeLeapSecondProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = std::nullopt)
+makeLeapSecondProvider(const std::optional<skygate::core::AstronomicalEpoch>& referenceEpoch = std::nullopt)
 {
     LeapSecondTableLoader::Options options;
     options.referenceEpoch = referenceEpoch;
@@ -221,7 +222,7 @@ makeLeapSecondProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = 
 }
 
 [[nodiscard]] std::shared_ptr<const IEarthOrientationProvider>
-makeEarthOrientationProvider(const std::optional<AstronomicalEpoch>& referenceEpoch = std::nullopt)
+makeEarthOrientationProvider(const std::optional<skygate::core::AstronomicalEpoch>& referenceEpoch = std::nullopt)
 {
     EarthOrientationDataLoader::Options options;
     options.referenceEpoch = referenceEpoch;
@@ -480,8 +481,8 @@ private:
     result.metadata.effectiveDataValidityRange = EphemerisDateRange{
         .id = "de440-modern",
         .displayName = "DE440 modern range",
-        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
     result.metadata.estimatedAngularUncertaintyArcsec = 3600.0;
 
@@ -625,7 +626,7 @@ private:
 class BatchValidTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         ++m_callCount;
         TimeScaleConversionResult result;
@@ -635,8 +636,9 @@ public:
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
 
@@ -820,8 +822,9 @@ public:
                 continue;
             }
 
-            const TimeScaleConversionResult conversion =
-                m_timeScaleService->convert(request.epoch, usesTerrestrialFrame ? TimeScale::Ut1 : TimeScale::Tt);
+            const TimeScaleConversionResult conversion = m_timeScaleService->convert(
+                request.epoch, usesTerrestrialFrame ? skygate::core::TimeScale::Ut1 : skygate::core::TimeScale::Tt
+            );
             mergeConversionMetadata(result.metadata, conversion);
             if (!conversion.isSuccess()) {
                 result.vector.reset();
@@ -870,8 +873,9 @@ private:
         EphemerisDateRange{
             .id = "modern",
             .displayName = "Modern",
-            .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .start =
+                {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
         }
     );
     return dependencies;
@@ -1535,8 +1539,9 @@ void HighPrecisionEphemerisEngineTests::isolatesCachedSnapshotsByDataSetDateRang
         EphemerisDateRange{
             .id = "modern",
             .displayName = "Modern",
-            .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .start =
+                {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
         }
     );
 
@@ -1824,8 +1829,8 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesValidMetada
     calculatorResult.metadata.effectiveDataValidityRange = EphemerisDateRange{
         .id = "modern",
         .displayName = "Modern range",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
     calculatorResult.metadata.estimatedAngularUncertaintyArcsec = 0.12;
     calculatorResult.metadata.appliedCorrections = EphemerisCorrectionFlags::lightTime();
@@ -2056,7 +2061,7 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesMissingLong
     );
 
     EphemerisRequest request = makeRequest();
-    request.epoch = makeEpoch(TimeScale::Tdb, -5000, 1, 1);
+    request.epoch = makeEpoch(skygate::core::TimeScale::Tdb, -5000, 1, 1);
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::geometric());
 
     const auto state = engine.computeBodyState(request, std::size_t{0});
@@ -2065,7 +2070,10 @@ void HighPrecisionEphemerisEngineTests::defaultResultBuilderAssemblesMissingLong
     QCOMPARE(kernel->callCount(), 1);
     QCOMPARE(kernel->lastTargetNaifId(), 10);
     QCOMPARE(kernel->lastCenterNaifId(), 399);
-    QCOMPARE(static_cast<std::uint8_t>(kernel->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb));
+    QCOMPARE(
+        static_cast<std::uint8_t>(kernel->lastEpoch().timeScale),
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
+    );
     QCOMPARE(
         static_cast<std::uint8_t>(state->metadata.status),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineQueryStatus::Type::Degraded)

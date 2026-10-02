@@ -1,5 +1,5 @@
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/LeapSecondTableLoader.hpp"
+#include "engine/LeapSecondTableLoader.hpp"
 
 #include <QtTest/QtTest>
 
@@ -41,18 +41,25 @@ private:
     };
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
+[[nodiscard]] skygate::core::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = year,
             .month = month,
             .day = day,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(epoch.has_value());
     return *epoch;
+}
+
+[[nodiscard]] skygate::core::CivilDateTime dateFromEpoch(const skygate::core::AstronomicalEpoch& epoch)
+{
+    const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    Q_ASSERT(date.has_value());
+    return *date;
 }
 
 }  // namespace
@@ -109,9 +116,10 @@ void LeapSecondProviderTests::loadsIanaLeapSecondList()
     QVERIFY(result.isSuccess());
     QVERIFY(result.provider != nullptr);
     QCOMPARE(result.provider->entries().size(), std::size_t{3});
-    QCOMPARE(result.provider->entries().front().effectiveUtcDate.astronomicalYear, 1972);
-    QCOMPARE(result.provider->entries().front().effectiveUtcDate.month, 1);
-    QCOMPARE(result.provider->entries().front().effectiveUtcDate.day, 1);
+    const skygate::core::CivilDateTime firstDate = dateFromEpoch(result.provider->entries().front().effectiveUtcEpoch);
+    QCOMPARE(firstDate.astronomicalYear, 1972);
+    QCOMPARE(firstDate.month, 1);
+    QCOMPARE(firstDate.day, 1);
     QCOMPARE(result.provider->taiMinusUtcSeconds(epochForDate(2018, 1, 1)).value_or(-1), 37);
     QVERIFY(result.tableInfo.expiresAt.has_value());
     QCOMPARE(result.tableInfo.expiresAt->julianDatePart1, epochForDate(2026, 12, 28).julianDatePart1);

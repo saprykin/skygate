@@ -40,7 +40,7 @@ private:
     struct TrailSampleCacheKey final {
         const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
         skygate::core::ObservationContext context;
-        std::optional<skygate::ephemeris::AstronomicalEpoch> requestEpoch;
+        std::optional<skygate::core::AstronomicalEpoch> requestEpoch;
         std::optional<skygate::ephemeris::EphemerisEngineOptions> requestOptions;
         std::optional<skygate::core::EquatorialCoordinate> targetEquatorial;
         std::uint32_t targetBodyIndex = 0;

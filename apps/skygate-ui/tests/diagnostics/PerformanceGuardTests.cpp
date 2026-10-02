@@ -19,7 +19,7 @@
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ISolarSystemStateCalculator.hpp"
 #include "engine/highprecision/IStarAstrometryCalculator.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "skygate/testsupport/PerformanceBudget.hpp"
@@ -282,9 +282,8 @@ private:
 
 class GuardTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
 public:
-    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convert(
-        const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::TimeScale targetScale
-    ) const override
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         skygate::ephemeris::TimeScaleConversionResult result;
         result.epoch = epoch;
@@ -294,11 +293,11 @@ public:
     }
 
     [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convertCivilDateTime(
-        const skygate::ephemeris::CivilDateTime& dateTime, const skygate::ephemeris::TimeScale targetScale
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
     ) const override
     {
-        const std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
-            skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        const std::optional<skygate::core::AstronomicalEpoch> epoch =
+            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (epoch.has_value()) {
             return convert(*epoch, targetScale);
         }
@@ -563,12 +562,8 @@ skygate::ephemeris::EphemerisDatasetInfo makeHighPrecisionGuardDataSetInfo()
             .id = "guard-range",
             .displayName = "Guard range",
             .start =
-                {.julianDatePart1 = 2'400'000.5,
-                 .julianDatePart2 = 0.0,
-                 .timeScale = skygate::ephemeris::TimeScale::Tdb},
-            .end = {
-                .julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
-            },
+                {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
         }
     );
     return dataSetInfo;

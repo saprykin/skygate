@@ -265,7 +265,7 @@ void EphemerisRegressionTests::equatorialToHorizontalPlacesTransitAtZenith()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
     const double transitRightAscensionHours =
-        skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+        skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
     const auto horizontal = skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = transitRightAscensionHours, .declinationDeg = 0.0},
@@ -282,7 +282,7 @@ void EphemerisRegressionTests::observerLongitudeChangesLocalSiderealHourAngle()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
     const double greenwichRightAscensionHours =
-        skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+        skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
     const auto greenwichHorizontal = skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},
@@ -323,7 +323,7 @@ void EphemerisRegressionTests::negativeLongitudeMirrorsPositiveLongitude()
 {
     const skygate::core::UtcTimePoint j2000NoonUtc(std::chrono::seconds(946'728'000));
     const double greenwichRightAscensionHours =
-        skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
+        skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(j2000NoonUtc) / 15.0;
 
     const auto eastLongitudeHorizontal = skygate::ephemeris::EquatorialToHorizontalCalculator::compute(
         {.rightAscensionHours = greenwichRightAscensionHours, .declinationDeg = 0.0},

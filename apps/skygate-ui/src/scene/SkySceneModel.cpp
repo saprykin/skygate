@@ -18,22 +18,22 @@
 namespace {
 
 [[nodiscard]] bool epochInRange(
-    const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::EphemerisDateRange& range
+    const skygate::core::AstronomicalEpoch& epoch, const skygate::ephemeris::EphemerisDateRange& range
 ) noexcept
 {
     const double key = epoch.sortKey();
     return key >= range.start.sortKey() && key <= range.end.sortKey();
 }
 
-[[nodiscard]] QString formatEpochDate(const skygate::ephemeris::AstronomicalEpoch& epoch)
+[[nodiscard]] QString formatEpochDate(const skygate::core::AstronomicalEpoch& epoch)
 {
-    const auto dateTime = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    const auto dateTime = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
     if (!dateTime.has_value()) {
         return QStringLiteral("--");
     }
 
     const int historicalYear =
-        skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+        skygate::core::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
     return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 
@@ -60,7 +60,7 @@ void appendUniqueReason(QStringList& reasons, const QString& reason)
 
 void appendRangeWarning(
     QStringList& reasons,
-    const skygate::ephemeris::AstronomicalEpoch& epoch,
+    const skygate::core::AstronomicalEpoch& epoch,
     const std::optional<skygate::ephemeris::EphemerisDateRange>& range,
     const QString& label
 )

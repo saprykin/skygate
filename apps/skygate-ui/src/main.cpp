@@ -6,7 +6,7 @@
 #include "SkyViewportItem.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 
 #include <QDir>
 #include <QFile>

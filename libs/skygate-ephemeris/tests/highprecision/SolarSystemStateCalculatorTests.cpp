@@ -35,7 +35,7 @@ using namespace skygate::core;
     request.epoch = {
         .julianDatePart1 = 2'460'310.0,
         .julianDatePart2 = 0.5,
-        .timeScale = TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::geometric());
@@ -102,7 +102,7 @@ makeKernelVector(const Vector3d& vector, const std::optional<Vector3d>& velocity
 struct GeometricFixture {
     int targetNaifId = 0;
     int centerNaifId = 0;
-    AstronomicalEpoch epoch;
+    skygate::core::AstronomicalEpoch epoch;
     Vector3d vector;
     double expectedRightAscensionHours = 0.0;
     double expectedDeclinationDeg = 0.0;
@@ -110,7 +110,7 @@ struct GeometricFixture {
 };
 
 struct LightTimeTargetState {
-    AstronomicalEpoch epoch;
+    skygate::core::AstronomicalEpoch epoch;
     Vector3d vector;
 };
 
@@ -118,7 +118,7 @@ struct LightTimeFixture {
     int targetNaifId = 0;
     int earthNaifId = 0;
     int barycenterNaifId = 0;
-    AstronomicalEpoch receiveEpoch;
+    skygate::core::AstronomicalEpoch receiveEpoch;
     Vector3d geometricVector;
     Vector3d earthReceiveVector;
     std::vector<LightTimeTargetState> retardedTargetStates;
@@ -145,7 +145,10 @@ struct LightTimeFixture {
         return GeometricFixture{
             .targetNaifId = fields[1].toInt(),
             .centerNaifId = fields[2].toInt(),
-            .epoch = {.julianDatePart1 = fields[3].toDouble(), .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .epoch =
+                {.julianDatePart1 = fields[3].toDouble(),
+                 .julianDatePart2 = 0.0,
+                 .timeScale = skygate::core::TimeScale::Tdb},
             .vector =
                 {
                     .x = fields[4].toDouble(),
@@ -180,10 +183,10 @@ struct LightTimeFixture {
         const QString role = fields[1];
         const int targetNaifId = fields[2].toInt();
         const int centerNaifId = fields[3].toInt();
-        const AstronomicalEpoch epoch{
+        const skygate::core::AstronomicalEpoch epoch{
             .julianDatePart1 = fields[4].toDouble(),
             .julianDatePart2 = 0.0,
-            .timeScale = TimeScale::Tdb,
+            .timeScale = skygate::core::TimeScale::Tdb,
         };
         const Vector3d vector{
             .x = fields[5].toDouble(),
@@ -222,7 +225,7 @@ struct LightTimeFixture {
     return fixture;
 }
 
-[[nodiscard]] double epochTotal(const AstronomicalEpoch& epoch) noexcept
+[[nodiscard]] double epochTotal(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
     return epoch.julianDatePart1 + epoch.julianDatePart2;
 }
@@ -753,7 +756,7 @@ void SolarSystemStateCalculatorTests::rejectsNonTdbEpochs()
     provider->defaultResult() = makeKernelVector({.x = 1.0, .y = 0.0, .z = 0.0});
     const SolarSystemStateCalculator calculator(provider);
     EphemerisRequest request = makeRequest();
-    request.epoch.timeScale = TimeScale::Utc;
+    request.epoch.timeScale = skygate::core::TimeScale::Utc;
 
     const HighPrecisionCalculatorResult result = calculateBody(calculator, makePlanetBody("mars"), request);
 

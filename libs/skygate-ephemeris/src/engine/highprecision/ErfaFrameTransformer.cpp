@@ -1,7 +1,7 @@
 #include "ErfaFrameTransformer.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "ErfaAstrometry.hpp"
-#include "ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "math/MathConstants.hpp"
 #include "math/Matrix3x3.hpp"
 
@@ -22,7 +22,7 @@ public:
     FrameTransformSession(
         const CelestialReferenceFrame::Type sourceFrame,
         const CelestialReferenceFrame::Type targetFrame,
-        AstronomicalEpoch epoch,
+        skygate::core::AstronomicalEpoch epoch,
         const skygate::ephemeris::ITimeScaleService* timeScaleService,
         const skygate::ephemeris::IEarthOrientationProvider* earthOrientationProvider
     )
@@ -173,8 +173,8 @@ private:
         EphemerisMetadataMerger::markCorrectionUnavailable(stage.metadata, unavailableCorrection);
     }
 
-    [[nodiscard]] std::optional<AstronomicalEpoch>
-    epochInScale(TimeScale targetScale, EphemerisEngineQueryResult& metadata)
+    [[nodiscard]] std::optional<skygate::core::AstronomicalEpoch>
+    epochInScale(skygate::core::TimeScale targetScale, EphemerisEngineQueryResult& metadata)
     {
         if (!m_epoch.isFinite()) {
             metadata.status = EphemerisEngineQueryStatus::Type::Failed;
@@ -213,7 +213,8 @@ private:
 
     [[nodiscard]] std::optional<EarthOrientationSampler::Sample> earthOrientation(EphemerisEngineQueryResult& metadata)
     {
-        const std::optional<AstronomicalEpoch> utcEpoch = epochInScale(TimeScale::Utc, metadata);
+        const std::optional<skygate::core::AstronomicalEpoch> utcEpoch =
+            epochInScale(skygate::core::TimeScale::Utc, metadata);
         if (!utcEpoch.has_value()) {
             return std::nullopt;
         }
@@ -238,7 +239,7 @@ private:
         return m_earthOrientationSample;
     }
 
-    [[nodiscard]] std::optional<AstronomicalEpoch> ut1Epoch(EphemerisEngineQueryResult& metadata)
+    [[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> ut1Epoch(EphemerisEngineQueryResult& metadata)
     {
         if (!m_epoch.isFinite()) {
             metadata.status = EphemerisEngineQueryStatus::Type::Failed;
@@ -246,8 +247,8 @@ private:
             return std::nullopt;
         }
 
-        if (m_epoch.timeScale == TimeScale::Ut1 || m_earthOrientationProvider == nullptr) {
-            return epochInScale(TimeScale::Ut1, metadata);
+        if (m_epoch.timeScale == skygate::core::TimeScale::Ut1 || m_earthOrientationProvider == nullptr) {
+            return epochInScale(skygate::core::TimeScale::Ut1, metadata);
         }
 
         const std::optional<EarthOrientationSampler::Sample> sample = earthOrientation(metadata);
@@ -255,7 +256,7 @@ private:
             return std::nullopt;
         }
 
-        return sample->requestedUtcEpoch.addSeconds(sample->ut1MinusUtcSeconds, TimeScale::Ut1);
+        return sample->requestedUtcEpoch.addSeconds(sample->ut1MinusUtcSeconds, skygate::core::TimeScale::Ut1);
     }
 
     [[nodiscard]] std::optional<skygate::core::Matrix3x3>
@@ -263,7 +264,8 @@ private:
     {
         if (!m_celestialIntermediateMatrix.has_value()) {
             MatrixCacheEntry cacheEntry;
-            const std::optional<AstronomicalEpoch> ttEpoch = epochInScale(TimeScale::Tt, cacheEntry.metadata);
+            const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
+                epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
             if (ttEpoch.has_value()) {
                 cacheEntry.matrix = ErfaAstrometry::celestialToIntermediateMatrix06A(*ttEpoch);
                 if (!cacheEntry.matrix.has_value()) {
@@ -283,7 +285,7 @@ private:
     {
         if (!m_earthRotationMatrix.has_value()) {
             MatrixCacheEntry cacheEntry;
-            const std::optional<AstronomicalEpoch> universalTime1 = ut1Epoch(cacheEntry.metadata);
+            const std::optional<skygate::core::AstronomicalEpoch> universalTime1 = ut1Epoch(cacheEntry.metadata);
             if (universalTime1.has_value()) {
                 cacheEntry.matrix = ErfaAstrometry::earthRotationMatrix00(*universalTime1);
                 if (!cacheEntry.matrix.has_value()) {
@@ -303,7 +305,8 @@ private:
     {
         if (!m_polarMotionMatrix.has_value()) {
             MatrixCacheEntry cacheEntry;
-            const std::optional<AstronomicalEpoch> ttEpoch = epochInScale(TimeScale::Tt, cacheEntry.metadata);
+            const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
+                epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
             const std::optional<EarthOrientationSampler::Sample> earthOrientationSample =
                 earthOrientation(cacheEntry.metadata);
             if (ttEpoch.has_value() && earthOrientationSample.has_value()) {
@@ -335,7 +338,8 @@ private:
     {
         if (!m_apparentEquatorAndEquinoxMatrix.has_value()) {
             MatrixCacheEntry cacheEntry;
-            const std::optional<AstronomicalEpoch> ttEpoch = epochInScale(TimeScale::Tt, cacheEntry.metadata);
+            const std::optional<skygate::core::AstronomicalEpoch> ttEpoch =
+                epochInScale(skygate::core::TimeScale::Tt, cacheEntry.metadata);
             if (ttEpoch.has_value()) {
                 cacheEntry.matrix = ErfaAstrometry::precessionNutationMatrix06A(*ttEpoch);
                 if (!cacheEntry.matrix.has_value()) {
@@ -439,17 +443,18 @@ private:
         return result;
     }
 
-    [[nodiscard]] std::optional<TimeScaleConversionResult>* conversionCacheFor(const TimeScale targetScale)
+    [[nodiscard]] std::optional<TimeScaleConversionResult>*
+    conversionCacheFor(const skygate::core::TimeScale targetScale)
     {
         switch (targetScale) {
-        case TimeScale::Tt:
+        case skygate::core::TimeScale::Tt:
             return &m_ttConversion;
-        case TimeScale::Utc:
+        case skygate::core::TimeScale::Utc:
             return &m_utcConversion;
-        case TimeScale::Ut1:
+        case skygate::core::TimeScale::Ut1:
             return &m_ut1Conversion;
-        case TimeScale::Tai:
-        case TimeScale::Tdb:
+        case skygate::core::TimeScale::Tai:
+        case skygate::core::TimeScale::Tdb:
             return nullptr;
         }
 
@@ -458,7 +463,7 @@ private:
 
     const CelestialReferenceFrame::Type m_sourceFrame = CelestialReferenceFrame::Type::Gcrs;
     const CelestialReferenceFrame::Type m_targetFrame = CelestialReferenceFrame::Type::Cirs;
-    const AstronomicalEpoch m_epoch;
+    const skygate::core::AstronomicalEpoch m_epoch;
     const skygate::ephemeris::ITimeScaleService* const m_timeScaleService = nullptr;
     const skygate::ephemeris::IEarthOrientationProvider* const m_earthOrientationProvider = nullptr;
     std::optional<TimeScaleConversionResult> m_ttConversion;

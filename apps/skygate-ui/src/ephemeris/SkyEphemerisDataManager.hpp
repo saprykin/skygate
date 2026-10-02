@@ -3,8 +3,8 @@
 #include "SkyEphemerisCacheController.hpp"
 #include "SkyEphemerisDownloadService.hpp"
 #include "SkySettingsStore.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
+#include "engine/EphemerisDataManifest.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
 
 #include <QObject>
 #include <QString>

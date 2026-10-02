@@ -7,7 +7,7 @@
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 
 #include <QFile>
@@ -38,7 +38,7 @@ using skygate::ephemeris::tests::loadRaDecFixture;
     const IFrameTransformer& transformer,
     const CelestialReferenceFrame::Type sourceFrame,
     const CelestialReferenceFrame::Type targetFrame,
-    const AstronomicalEpoch& epoch,
+    const skygate::core::AstronomicalEpoch& epoch,
     const Vector3d& vector
 )
 {
@@ -80,11 +80,11 @@ using skygate::ephemeris::tests::loadRaDecFixture;
 class SameInstantTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
         result.epoch =
-            AstronomicalEpoch{
+            skygate::core::AstronomicalEpoch{
                 .julianDatePart1 = epoch.julianDatePart1,
                 .julianDatePart2 = epoch.julianDatePart2,
                 .timeScale = targetScale,
@@ -94,10 +94,12 @@ public:
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
-        const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        const std::optional<skygate::core::AstronomicalEpoch> epoch =
+            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (!epoch.has_value()) {
             TimeScaleConversionResult result;
             result.status = TimeScaleConversionStatus::Failed;
@@ -110,7 +112,7 @@ public:
 
 struct ApparentValidationFixture {
     EphemerisRaDecFixture raDec;
-    AstronomicalEpoch requestEpoch;
+    skygate::core::AstronomicalEpoch requestEpoch;
     std::shared_ptr<skygate::ephemeris::tests::TestCalcephKernel> provider;
 };
 
@@ -191,7 +193,7 @@ struct ApparentValidationFixture {
             {
                 .julianDatePart1 = request.value(QStringLiteral("julianDateTdb")).toDouble(),
                 .julianDatePart2 = 0.0,
-                .timeScale = TimeScale::Tdb,
+                .timeScale = skygate::core::TimeScale::Tdb,
             },
         .provider = provider,
     };

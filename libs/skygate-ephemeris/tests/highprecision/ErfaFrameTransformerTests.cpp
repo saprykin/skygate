@@ -1,7 +1,7 @@
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
-#include "engine/highprecision/LeapSecondTableLoader.hpp"
-#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
-#include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
+#include "engine/LeapSecondTableLoader.hpp"
+#include "engine/LeapSecondTimeScaleService.hpp"
+#include "engine/TableBackedEarthOrientationProvider.hpp"
 
 #include <QtTest/QtTest>
 
@@ -23,39 +23,39 @@ using namespace skygate::core;
 
 constexpr double kTolerance = 1.0e-14;
 
-[[nodiscard]] AstronomicalEpoch sofaReferenceTtEpoch() noexcept
+[[nodiscard]] skygate::core::AstronomicalEpoch sofaReferenceTtEpoch() noexcept
 {
     return {
         .julianDatePart1 = 2'400'000.5,
         .julianDatePart2 = 53'736.0,
-        .timeScale = TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
 }
 
-[[nodiscard]] AstronomicalEpoch utcEpoch() noexcept
+[[nodiscard]] skygate::core::AstronomicalEpoch utcEpoch() noexcept
 {
     return {
         .julianDatePart1 = 2'400'000.5,
         .julianDatePart2 = 53'735.9992,
-        .timeScale = TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 }
 
-[[nodiscard]] AstronomicalEpoch sofaReferenceUtcEpoch() noexcept
+[[nodiscard]] skygate::core::AstronomicalEpoch sofaReferenceUtcEpoch() noexcept
 {
     return {
         .julianDatePart1 = 2'400'000.5,
         .julianDatePart2 = 53'736.0,
-        .timeScale = TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 }
 
-[[nodiscard]] AstronomicalEpoch sofaReferenceUt1Epoch() noexcept
+[[nodiscard]] skygate::core::AstronomicalEpoch sofaReferenceUt1Epoch() noexcept
 {
     return {
         .julianDatePart1 = 2'400'000.5,
         .julianDatePart2 = 53'736.0,
-        .timeScale = TimeScale::Ut1,
+        .timeScale = skygate::core::TimeScale::Ut1,
     };
 }
 
@@ -70,7 +70,7 @@ void compareVector(const Vector3d& actual, const Vector3d& expected, const doubl
     const IFrameTransformer& transformer,
     const CelestialReferenceFrame::Type sourceFrame,
     const CelestialReferenceFrame::Type targetFrame,
-    const AstronomicalEpoch& epoch,
+    const skygate::core::AstronomicalEpoch& epoch,
     const Vector3d& vector
 )
 {
@@ -89,25 +89,26 @@ void compareVector(const Vector3d& actual, const Vector3d& expected, const doubl
 class RecordingTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         ++convertCallCount;
         lastEpoch = epoch;
         lastTargetScale = targetScale;
-        if (targetScale == TimeScale::Tt && ttResult.has_value()) {
+        if (targetScale == skygate::core::TimeScale::Tt && ttResult.has_value()) {
             return *ttResult;
         }
-        if (targetScale == TimeScale::Utc && utcResult.has_value()) {
+        if (targetScale == skygate::core::TimeScale::Utc && utcResult.has_value()) {
             return *utcResult;
         }
-        if (targetScale == TimeScale::Ut1 && ut1Result.has_value()) {
+        if (targetScale == skygate::core::TimeScale::Ut1 && ut1Result.has_value()) {
             return *ut1Result;
         }
         return nextResult;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
         static_cast<void>(targetScale);
@@ -115,8 +116,8 @@ public:
     }
 
     mutable int convertCallCount = 0;
-    mutable AstronomicalEpoch lastEpoch;
-    mutable TimeScale lastTargetScale = TimeScale::Utc;
+    mutable skygate::core::AstronomicalEpoch lastEpoch;
+    mutable skygate::core::TimeScale lastTargetScale = skygate::core::TimeScale::Utc;
     TimeScaleConversionResult nextResult;
     std::optional<TimeScaleConversionResult> ttResult;
     std::optional<TimeScaleConversionResult> utcResult;
@@ -327,7 +328,7 @@ void ErfaFrameTransformerTests::treatsIcrsAndGcrsAsIdentityCelestialAxes()
         {
             .julianDatePart1 = std::numeric_limits<double>::quiet_NaN(),
             .julianDatePart2 = std::numeric_limits<double>::quiet_NaN(),
-            .timeScale = TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         },
         {.x = 0.25, .y = 0.5, .z = -0.75}
     );
@@ -392,7 +393,7 @@ void ErfaFrameTransformerTests::preservesBatchResultOrder()
                 {
                     .julianDatePart1 = std::numeric_limits<double>::quiet_NaN(),
                     .julianDatePart2 = std::numeric_limits<double>::quiet_NaN(),
-                    .timeScale = TimeScale::Utc,
+                    .timeScale = skygate::core::TimeScale::Utc,
                 },
             .vectors = vectors,
         }
@@ -410,7 +411,7 @@ void ErfaFrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
     auto service = std::make_shared<RecordingTimeScaleService>();
     service->nextResult = validTtConversionResult();
     const ErfaFrameTransformer transformer(service);
-    const AstronomicalEpoch epoch = utcEpoch();
+    const skygate::core::AstronomicalEpoch epoch = utcEpoch();
 
     const CelestialFrameTransformResult result = transformSingleVector(
         transformer,
@@ -422,7 +423,9 @@ void ErfaFrameTransformerTests::usesTimeScaleServiceForNonTtEpochs()
 
     QVERIFY(result.vector.has_value());
     QCOMPARE(service->convertCallCount, 1);
-    QCOMPARE(static_cast<std::uint8_t>(service->lastTargetScale), static_cast<std::uint8_t>(TimeScale::Tt));
+    QCOMPARE(
+        static_cast<std::uint8_t>(service->lastTargetScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt)
+    );
     QCOMPARE(service->lastEpoch.julianDatePart1, epoch.julianDatePart1);
     QCOMPARE(service->lastEpoch.julianDatePart2, epoch.julianDatePart2);
 }
@@ -637,7 +640,7 @@ void ErfaFrameTransformerTests::reusesTimeScaleConversionsAcrossComposedStages()
                 {
                     .julianDatePart1 = 2'400'000.5,
                     .julianDatePart2 = 53'736.0,
-                    .timeScale = TimeScale::Tai,
+                    .timeScale = skygate::core::TimeScale::Tai,
                 },
             .vectors = vectors,
         }

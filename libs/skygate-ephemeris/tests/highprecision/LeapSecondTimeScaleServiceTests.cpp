@@ -1,10 +1,10 @@
 #include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationDataLoader.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
-#include "engine/highprecision/LeapSecondTableLoader.hpp"
-#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
+#include "engine/DeltaTDataLoader.hpp"
+#include "engine/EarthOrientationDataLoader.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
+#include "engine/LeapSecondTableLoader.hpp"
+#include "engine/LeapSecondTimeScaleService.hpp"
 
 #include <QtTest/QtTest>
 
@@ -60,7 +60,7 @@ namespace {
 }
 
 [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider>
-makeEarthOrientationProvider(const std::optional<skygate::ephemeris::AstronomicalEpoch>& referenceEpoch = std::nullopt)
+makeEarthOrientationProvider(const std::optional<skygate::core::AstronomicalEpoch>& referenceEpoch = std::nullopt)
 {
     skygate::ephemeris::EarthOrientationDataLoader::Options options;
     options.referenceEpoch = referenceEpoch;
@@ -99,8 +99,8 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
     return result.provider;
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch makeEpoch(
-    const skygate::ephemeris::TimeScale timeScale,
+[[nodiscard]] skygate::core::AstronomicalEpoch makeEpoch(
+    const skygate::core::TimeScale timeScale,
     const int year,
     const int month,
     const int day,
@@ -110,8 +110,8 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
     const std::uint32_t nanosecond = 0U
 )
 {
-    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = year,
             .month = month,
             .day = day,
@@ -126,24 +126,23 @@ makeEarthOrientationProvider(const std::optional<skygate::ephemeris::Astronomica
     return *epoch;
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch makeUtcEpoch(
+[[nodiscard]] skygate::core::AstronomicalEpoch makeUtcEpoch(
     const int year, const int month, const int day, const int hour = 0, const int minute = 0, const int second = 0
 )
 {
-    return makeEpoch(skygate::ephemeris::TimeScale::Utc, year, month, day, hour, minute, second);
+    return makeEpoch(skygate::core::TimeScale::Utc, year, month, day, hour, minute, second);
 }
 
-[[nodiscard]] double secondsBetween(
-    const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::ephemeris::AstronomicalEpoch& rhs
-) noexcept
+[[nodiscard]] double
+secondsBetween(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::AstronomicalEpoch& rhs) noexcept
 {
     return ((lhs.julianDatePart1 - rhs.julianDatePart1) + (lhs.julianDatePart2 - rhs.julianDatePart2))
            * skygate::core::TimeConstants::kSecondsPerDay;
 }
 
 void compareSecondsBetween(
-    const skygate::ephemeris::AstronomicalEpoch& lhs,
-    const skygate::ephemeris::AstronomicalEpoch& rhs,
+    const skygate::core::AstronomicalEpoch& lhs,
+    const skygate::core::AstronomicalEpoch& rhs,
     const double expectedSeconds
 )
 {
@@ -179,57 +178,50 @@ private slots:
 void LeapSecondTimeScaleServiceTests::roundTripsBceCivilDatesWithHistoricalYearHelpers()
 {
     const std::optional<int> oneBceAstronomicalYear =
-        skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
+        skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(oneBceAstronomicalYear.has_value());
     QCOMPARE(*oneBceAstronomicalYear, 0);
-    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
-    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(-1), -2);
-    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
+    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(*oneBceAstronomicalYear), -1);
+    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(-1), -2);
+    QVERIFY(!skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
 
-    const skygate::ephemeris::AstronomicalEpoch oneBce =
-        makeEpoch(skygate::ephemeris::TimeScale::Tt, *oneBceAstronomicalYear, 12, 31, 12, 0, 0);
-    const std::optional<skygate::ephemeris::CivilDateTime> roundTrip =
-        skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(oneBce);
+    const skygate::core::AstronomicalEpoch oneBce =
+        makeEpoch(skygate::core::TimeScale::Tt, *oneBceAstronomicalYear, 12, 31, 12, 0, 0);
+    const std::optional<skygate::core::CivilDateTime> roundTrip =
+        skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(oneBce);
 
     QVERIFY(roundTrip.has_value());
     QCOMPARE(roundTrip->astronomicalYear, 0);
-    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
+    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(roundTrip->astronomicalYear), -1);
     QCOMPARE(roundTrip->month, 12);
     QCOMPARE(roundTrip->day, 31);
     QCOMPARE(roundTrip->hour, 12);
     QCOMPARE(roundTrip->minute, 0);
     QCOMPARE(roundTrip->second, 0);
     QCOMPARE(roundTrip->nanosecond, 0U);
-    QCOMPARE(
-        static_cast<std::uint8_t>(roundTrip->timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(roundTrip->timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt));
 
-    const skygate::ephemeris::AstronomicalEpoch firstCeDay =
-        makeEpoch(skygate::ephemeris::TimeScale::Tt, 1, 1, 1, 12, 0, 0);
+    const skygate::core::AstronomicalEpoch firstCeDay = makeEpoch(skygate::core::TimeScale::Tt, 1, 1, 1, 12, 0, 0);
     compareSecondsBetween(firstCeDay, oneBce, 86'400.0);
 }
 
 void LeapSecondTimeScaleServiceTests::convertsNormalUtcToTaiAndTt()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
 
-    const skygate::ephemeris::TimeScaleConversionResult tai = service.convert(utc, skygate::ephemeris::TimeScale::Tai);
+    const skygate::ephemeris::TimeScaleConversionResult tai = service.convert(utc, skygate::core::TimeScale::Tai);
     QVERIFY(tai.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(tai.status),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Valid)
     );
-    QCOMPARE(
-        static_cast<std::uint8_t>(tai.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tai)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(tai.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tai));
     compareSecondsBetween(tai.epoch, utc, 37.0);
 
-    const skygate::ephemeris::TimeScaleConversionResult tt = service.convert(utc, skygate::ephemeris::TimeScale::Tt);
+    const skygate::ephemeris::TimeScaleConversionResult tt = service.convert(utc, skygate::core::TimeScale::Tt);
     QVERIFY(tt.isSuccess());
-    QCOMPARE(
-        static_cast<std::uint8_t>(tt.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(tt.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt));
     compareSecondsBetween(tt.epoch, utc, 69.184);
 }
 
@@ -237,21 +229,20 @@ void LeapSecondTimeScaleServiceTests::roundTripsTaiAndTtHelpers()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::TimeScaleConversionResult tai =
-        service.convert(makeUtcEpoch(2018, 1, 1), skygate::ephemeris::TimeScale::Tai);
+        service.convert(makeUtcEpoch(2018, 1, 1), skygate::core::TimeScale::Tai);
     QVERIFY(tai.isSuccess());
 
-    const skygate::ephemeris::TimeScaleConversionResult tt =
-        service.convert(tai.epoch, skygate::ephemeris::TimeScale::Tt);
+    const skygate::ephemeris::TimeScaleConversionResult tt = service.convert(tai.epoch, skygate::core::TimeScale::Tt);
     QVERIFY(tt.isSuccess());
     compareSecondsBetween(tt.epoch, tai.epoch, 32.184);
 
     const skygate::ephemeris::TimeScaleConversionResult taiAgain =
-        service.convert(tt.epoch, skygate::ephemeris::TimeScale::Tai);
+        service.convert(tt.epoch, skygate::core::TimeScale::Tai);
     QVERIFY(taiAgain.isSuccess());
     compareSecondsBetween(taiAgain.epoch, tai.epoch, 0.0);
 
     const skygate::ephemeris::TimeScaleConversionResult utcAgain =
-        service.convert(tai.epoch, skygate::ephemeris::TimeScale::Utc);
+        service.convert(tai.epoch, skygate::core::TimeScale::Utc);
     QVERIFY(utcAgain.isSuccess());
     compareSecondsBetween(utcAgain.epoch, makeUtcEpoch(2018, 1, 1), 0.0);
 }
@@ -259,13 +250,13 @@ void LeapSecondTimeScaleServiceTests::roundTripsTaiAndTtHelpers()
 void LeapSecondTimeScaleServiceTests::handlesLeapSecondBoundaryOffsets()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
-    const skygate::ephemeris::AstronomicalEpoch beforeLeap = makeUtcEpoch(2016, 12, 31, 23, 59, 59);
-    const skygate::ephemeris::AstronomicalEpoch afterLeap = makeUtcEpoch(2017, 1, 1, 0, 0, 0);
+    const skygate::core::AstronomicalEpoch beforeLeap = makeUtcEpoch(2016, 12, 31, 23, 59, 59);
+    const skygate::core::AstronomicalEpoch afterLeap = makeUtcEpoch(2017, 1, 1, 0, 0, 0);
 
     const skygate::ephemeris::TimeScaleConversionResult beforeTai =
-        service.convert(beforeLeap, skygate::ephemeris::TimeScale::Tai);
+        service.convert(beforeLeap, skygate::core::TimeScale::Tai);
     const skygate::ephemeris::TimeScaleConversionResult afterTai =
-        service.convert(afterLeap, skygate::ephemeris::TimeScale::Tai);
+        service.convert(afterLeap, skygate::core::TimeScale::Tai);
 
     QVERIFY(beforeTai.isSuccess());
     QVERIFY(afterTai.isSuccess());
@@ -278,24 +269,24 @@ void LeapSecondTimeScaleServiceTests::convertsPositiveLeapSecondCivilLabel()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
-    const skygate::ephemeris::CivilDateTime leapSecond{
+    const skygate::core::CivilDateTime leapSecond{
         .astronomicalYear = 2016,
         .month = 12,
         .day = 31,
         .hour = 23,
         .minute = 59,
         .second = 60,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
-    QVERIFY(skygate::ephemeris::CalendarTime::isValidCivilDateTime(leapSecond));
-    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(leapSecond).has_value());
+    QVERIFY(skygate::core::CalendarTime::isValidCivilDateTime(leapSecond));
+    QVERIFY(!skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(leapSecond).has_value());
 
     const skygate::ephemeris::TimeScaleConversionResult tai =
-        service.convertCivilDateTime(leapSecond, skygate::ephemeris::TimeScale::Tai);
+        service.convertCivilDateTime(leapSecond, skygate::core::TimeScale::Tai);
     QVERIFY(tai.isSuccess());
 
     const skygate::ephemeris::TimeScaleConversionResult afterTai =
-        service.convert(makeUtcEpoch(2017, 1, 1, 0, 0, 0), skygate::ephemeris::TimeScale::Tai);
+        service.convert(makeUtcEpoch(2017, 1, 1, 0, 0, 0), skygate::core::TimeScale::Tai);
     compareSecondsBetween(afterTai.epoch, tai.epoch, 1.0);
 }
 
@@ -304,7 +295,7 @@ void LeapSecondTimeScaleServiceTests::convertsAtTableRangeBoundaries()
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
     const skygate::ephemeris::TimeScaleConversionResult firstEntry =
-        service.convert(makeUtcEpoch(1972, 1, 1), skygate::ephemeris::TimeScale::Tai);
+        service.convert(makeUtcEpoch(1972, 1, 1), skygate::core::TimeScale::Tai);
     QVERIFY(firstEntry.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(firstEntry.status),
@@ -312,7 +303,7 @@ void LeapSecondTimeScaleServiceTests::convertsAtTableRangeBoundaries()
     );
 
     const skygate::ephemeris::TimeScaleConversionResult expiresAt =
-        service.convert(makeUtcEpoch(2027, 1, 1), skygate::ephemeris::TimeScale::Tai);
+        service.convert(makeUtcEpoch(2027, 1, 1), skygate::core::TimeScale::Tai);
     QVERIFY(expiresAt.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(expiresAt.status),
@@ -324,7 +315,7 @@ void LeapSecondTimeScaleServiceTests::reportsOutOfRangeWithoutFallback()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
     const skygate::ephemeris::TimeScaleConversionResult result =
-        service.convert(makeUtcEpoch(2030, 1, 1), skygate::ephemeris::TimeScale::Tai);
+        service.convert(makeUtcEpoch(2030, 1, 1), skygate::core::TimeScale::Tai);
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(
@@ -339,10 +330,10 @@ void LeapSecondTimeScaleServiceTests::reportsReverseOutOfRangeWithoutFallback()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
-    skygate::ephemeris::AstronomicalEpoch tai = makeUtcEpoch(2030, 1, 1);
-    tai.timeScale = skygate::ephemeris::TimeScale::Tai;
+    skygate::core::AstronomicalEpoch tai = makeUtcEpoch(2030, 1, 1);
+    tai.timeScale = skygate::core::TimeScale::Tai;
     const skygate::ephemeris::TimeScaleConversionResult utcFromTai =
-        service.convert(tai, skygate::ephemeris::TimeScale::Utc);
+        service.convert(tai, skygate::core::TimeScale::Utc);
 
     QVERIFY(!utcFromTai.isSuccess());
     QCOMPARE(
@@ -352,10 +343,9 @@ void LeapSecondTimeScaleServiceTests::reportsReverseOutOfRangeWithoutFallback()
     QVERIFY(utcFromTai.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::EpochOutsideLeapSecondTable));
     QVERIFY(!utcFromTai.diagnosticText.empty());
 
-    skygate::ephemeris::AstronomicalEpoch tt = makeUtcEpoch(2030, 1, 1);
-    tt.timeScale = skygate::ephemeris::TimeScale::Tt;
-    const skygate::ephemeris::TimeScaleConversionResult utcFromTt =
-        service.convert(tt, skygate::ephemeris::TimeScale::Utc);
+    skygate::core::AstronomicalEpoch tt = makeUtcEpoch(2030, 1, 1);
+    tt.timeScale = skygate::core::TimeScale::Tt;
+    const skygate::ephemeris::TimeScaleConversionResult utcFromTt = service.convert(tt, skygate::core::TimeScale::Utc);
 
     QVERIFY(!utcFromTt.isSuccess());
     QCOMPARE(
@@ -373,9 +363,8 @@ void LeapSecondTimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAll
     options.fallbackTaiMinusUtcSeconds = 42;
     const skygate::ephemeris::LeapSecondTimeScaleService service(nullptr, options);
 
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 1, 1);
-    const skygate::ephemeris::TimeScaleConversionResult result =
-        service.convert(utc, skygate::ephemeris::TimeScale::Tai);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2026, 1, 1);
+    const skygate::ephemeris::TimeScaleConversionResult result = service.convert(utc, skygate::core::TimeScale::Tai);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(
@@ -390,18 +379,16 @@ void LeapSecondTimeScaleServiceTests::usesDegradedFallbackForMissingTableWhenAll
 void LeapSecondTimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
-    const skygate::ephemeris::AstronomicalEpoch tt = makeEpoch(skygate::ephemeris::TimeScale::Tt, 2000, 1, 1, 12, 0, 0);
+    const skygate::core::AstronomicalEpoch tt = makeEpoch(skygate::core::TimeScale::Tt, 2000, 1, 1, 12, 0, 0);
 
-    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::ephemeris::TimeScale::Tdb);
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::core::TimeScale::Tdb);
 
     QVERIFY(tdb.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(tdb.status),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
     );
-    QCOMPARE(
-        static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb));
     QVERIFY(tdb.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
     QVERIFY(!skygate::ephemeris::TimeScaleConversionDiagnostics::warningText(
                  skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied
@@ -413,14 +400,14 @@ void LeapSecondTimeScaleServiceTests::convertsTtToTdbWithDocumentedApproximation
 void LeapSecondTimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
-    const skygate::ephemeris::AstronomicalEpoch tt =
-        makeEpoch(skygate::ephemeris::TimeScale::Tt, 2024, 2, 1, 6, 7, 8, 123'456'789U);
+    const skygate::core::AstronomicalEpoch tt =
+        makeEpoch(skygate::core::TimeScale::Tt, 2024, 2, 1, 6, 7, 8, 123'456'789U);
 
-    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::ephemeris::TimeScale::Tdb);
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(tt, skygate::core::TimeScale::Tdb);
     QVERIFY(tdb.isSuccess());
 
     const skygate::ephemeris::TimeScaleConversionResult ttAgain =
-        service.convert(tdb.epoch, skygate::ephemeris::TimeScale::Tt);
+        service.convert(tdb.epoch, skygate::core::TimeScale::Tt);
     QVERIFY(ttAgain.isSuccess());
     QVERIFY(ttAgain.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
     compareSecondsBetween(ttAgain.epoch, tt, 0.0);
@@ -429,23 +416,21 @@ void LeapSecondTimeScaleServiceTests::roundTripsTtAndTdbPreservingPrecision()
 void LeapSecondTimeScaleServiceTests::convertsUtcToTdbThroughTt()
 {
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2018, 1, 1);
 
-    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(utc, skygate::ephemeris::TimeScale::Tdb);
+    const skygate::ephemeris::TimeScaleConversionResult tdb = service.convert(utc, skygate::core::TimeScale::Tdb);
 
     QVERIFY(tdb.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(tdb.status),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Degraded)
     );
-    QCOMPARE(
-        static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(tdb.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb));
     QVERIFY(tdb.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
     QVERIFY(std::abs(secondsBetween(tdb.epoch, utc) - 69.1839224023) < 2.0e-3);
 
     const skygate::ephemeris::TimeScaleConversionResult utcAgain =
-        service.convert(tdb.epoch, skygate::ephemeris::TimeScale::Utc);
+        service.convert(tdb.epoch, skygate::core::TimeScale::Utc);
     QVERIFY(utcAgain.isSuccess());
     QVERIFY(utcAgain.hasWarning(skygate::ephemeris::TimeScaleConversionWarningCode::TdbApproximationApplied));
     compareSecondsBetween(utcAgain.epoch, utc, 0.0);
@@ -456,18 +441,16 @@ void LeapSecondTimeScaleServiceTests::convertsUtcToUt1FromExactEopSample()
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
     );
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 1);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 1);
 
-    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::core::TimeScale::Ut1);
 
     QVERIFY(ut1.isSuccess());
     QCOMPARE(
         static_cast<std::uint8_t>(ut1.status),
         static_cast<std::uint8_t>(skygate::ephemeris::TimeScaleConversionStatus::Valid)
     );
-    QCOMPARE(
-        static_cast<std::uint8_t>(ut1.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Ut1)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(ut1.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Ut1));
     compareSecondsBetween(ut1.epoch, utc, 0.10);
 }
 
@@ -476,9 +459,9 @@ void LeapSecondTimeScaleServiceTests::interpolatesUtcToUt1FromEopSamples()
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
     );
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 6);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 6);
 
-    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::core::TimeScale::Ut1);
 
     QVERIFY(ut1.isSuccess());
     compareSecondsBetween(ut1.epoch, utc, 0.20);
@@ -489,12 +472,12 @@ void LeapSecondTimeScaleServiceTests::convertsUt1ToUtcFromEopSamples()
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
     );
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 6);
-    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(2026, 4, 6);
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::core::TimeScale::Ut1);
     QVERIFY(ut1.isSuccess());
 
     const skygate::ephemeris::TimeScaleConversionResult utcAgain =
-        service.convert(ut1.epoch, skygate::ephemeris::TimeScale::Utc);
+        service.convert(ut1.epoch, skygate::core::TimeScale::Utc);
 
     QVERIFY(utcAgain.isSuccess());
     compareSecondsBetween(utcAgain.epoch, utc, 0.0);
@@ -506,7 +489,7 @@ void LeapSecondTimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider()
     );
     const skygate::ephemeris::TimeScaleConversionResult predicted =
-        predictedService.convert(makeUtcEpoch(2026, 5, 1), skygate::ephemeris::TimeScale::Ut1);
+        predictedService.convert(makeUtcEpoch(2026, 5, 1), skygate::core::TimeScale::Ut1);
 
     QVERIFY(predicted.isSuccess());
     QCOMPARE(
@@ -519,7 +502,7 @@ void LeapSecondTimeScaleServiceTests::reportsPredictedAndStaleEopWarnings()
         makeLeapSecondProvider(), {}, makeEarthOrientationProvider(makeUtcEpoch(2026, 8, 1))
     );
     const skygate::ephemeris::TimeScaleConversionResult stale =
-        staleService.convert(makeUtcEpoch(2026, 4, 1), skygate::ephemeris::TimeScale::Ut1);
+        staleService.convert(makeUtcEpoch(2026, 4, 1), skygate::core::TimeScale::Ut1);
 
     QVERIFY(stale.isSuccess());
     QCOMPARE(
@@ -538,9 +521,9 @@ void LeapSecondTimeScaleServiceTests::usesDeltaTFallbackForAncientUt1WhenEopIsOu
     const skygate::ephemeris::LeapSecondTimeScaleService service(
         makeLeapSecondProvider(), options, makeEarthOrientationProvider(), makeDeltaTProvider()
     );
-    const skygate::ephemeris::AstronomicalEpoch utc = makeUtcEpoch(-5000, 1, 1);
+    const skygate::core::AstronomicalEpoch utc = makeUtcEpoch(-5000, 1, 1);
 
-    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::ephemeris::TimeScale::Ut1);
+    const skygate::ephemeris::TimeScaleConversionResult ut1 = service.convert(utc, skygate::core::TimeScale::Ut1);
 
     QVERIFY(ut1.isSuccess());
     QCOMPARE(
@@ -557,7 +540,7 @@ void LeapSecondTimeScaleServiceTests::reportsMissingEopWhenUt1FallbackIsDisallow
     const skygate::ephemeris::LeapSecondTimeScaleService service(makeLeapSecondProvider());
 
     const skygate::ephemeris::TimeScaleConversionResult result =
-        service.convert(makeUtcEpoch(2026, 4, 1), skygate::ephemeris::TimeScale::Ut1);
+        service.convert(makeUtcEpoch(2026, 4, 1), skygate::core::TimeScale::Ut1);
 
     QVERIFY(!result.isSuccess());
     QCOMPARE(

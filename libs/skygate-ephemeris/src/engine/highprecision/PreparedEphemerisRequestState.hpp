@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EarthOrientationSampler.hpp"
+#include "engine/EarthOrientationSampler.hpp"
 #include "ICalcephKernel.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 #include "math/Vector3d.hpp"
@@ -12,7 +12,7 @@ namespace skygate::ephemeris::highprecision {
 
 struct PreparedEphemerisRequestState {
     EphemerisEngineQueryResult tdbKernelEpochMetadata;
-    std::optional<AstronomicalEpoch> tdbKernelEpoch;
+    std::optional<skygate::core::AstronomicalEpoch> tdbKernelEpoch;
     std::optional<ICalcephKernel::StateResult> annualParallaxEarthState;
 
     bool topocentricStatePrepared = false;

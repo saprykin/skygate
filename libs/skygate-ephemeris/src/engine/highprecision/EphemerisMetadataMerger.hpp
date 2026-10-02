@@ -1,9 +1,9 @@
 #pragma once
 
-#include "EarthOrientationSampler.hpp"
+#include "engine/EarthOrientationSampler.hpp"
 #include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMergeOptions.hpp"
-#include "TimeScaleConversionResult.hpp"
+#include "engine/TimeScaleConversionResult.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 
 namespace skygate::ephemeris::highprecision {

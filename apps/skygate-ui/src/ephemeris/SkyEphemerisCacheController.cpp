@@ -1,7 +1,7 @@
 #include "SkyEphemerisCacheController.hpp"
 
-#include "engine/highprecision/EphemerisDataActivation.hpp"
-#include "engine/highprecision/EphemerisStagedUpdateVerification.hpp"
+#include "engine/EphemerisDataActivation.hpp"
+#include "engine/EphemerisStagedUpdateVerification.hpp"
 
 #include <QLoggingCategory>
 #include <QStringList>

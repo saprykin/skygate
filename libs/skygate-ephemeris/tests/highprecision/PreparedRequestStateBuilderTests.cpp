@@ -5,10 +5,10 @@
 #include "time/AstronomicalEpoch.hpp"
 #include "time/CivilDateTime.hpp"
 #include "time/TimeScale.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/PreparedRequestStateBuilder.hpp"
-#include "engine/highprecision/TimeScaleConversionWarningCode.hpp"
+#include "engine/TimeScaleConversionWarningCode.hpp"
 
 #include <QtTest/QtTest>
 
@@ -23,10 +23,10 @@ using namespace skygate::ephemeris::highprecision;
 [[nodiscard]] EphemerisRequest makeTopocentricRequest()
 {
     EphemerisRequest request;
-    request.epoch = AstronomicalEpoch{
+    request.epoch = skygate::core::AstronomicalEpoch{
         .julianDatePart1 = 2'460'310.0,
         .julianDatePart2 = 0.5,
-        .timeScale = TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
     request.options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::topocentric());
@@ -36,7 +36,7 @@ using namespace skygate::ephemeris::highprecision;
 class FailingTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         ++m_convertCallCount;
         TimeScaleConversionResult result;
@@ -47,8 +47,9 @@ public:
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
         TimeScaleConversionResult result;

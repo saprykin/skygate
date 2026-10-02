@@ -1,10 +1,10 @@
 #include "PreparedRequestStateBuilder.hpp"
-#include "EarthOrientationSampler.hpp"
+#include "engine/EarthOrientationSampler.hpp"
 #include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "ICalcephKernel.hpp"
-#include "IEarthOrientationProvider.hpp"
-#include "ITimeScaleService.hpp"
+#include "engine/IEarthOrientationProvider.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
@@ -59,14 +59,14 @@ PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
 {
     auto preparedState = std::make_shared<PreparedEphemerisRequestState>();
     {
-        if (request.epoch.timeScale == TimeScale::Tdb) {
+        if (request.epoch.timeScale == skygate::core::TimeScale::Tdb) {
             preparedState->tdbKernelEpoch = request.epoch.normalized();
         } else if (m_dependencies.timeScaleService == nullptr) {
             preparedState->tdbKernelEpochMetadata.status = EphemerisEngineQueryStatus::Type::Degraded;
             preparedState->tdbKernelEpochMetadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
         } else {
             const TimeScaleConversionResult conversion =
-                m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Tdb);
+                m_dependencies.timeScaleService->convert(request.epoch, skygate::core::TimeScale::Tdb);
             mergeKernelEpochTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
             if (conversion.isSuccess()) {
                 preparedState->tdbKernelEpoch = conversion.epoch.normalized();
@@ -85,7 +85,7 @@ PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
         preparedState->topocentricStatePrepared = true;
         preparedState->observerItrsPositionAu = ObserverGeodesy::observerItrsPositionAu(request.context.observer);
         const TimeScaleConversionResult utcConversion =
-            m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Utc);
+            m_dependencies.timeScaleService->convert(request.epoch, skygate::core::TimeScale::Utc);
         EphemerisMetadataMerger::mergeTimeScale(
             preparedState->topocentricMetadata, utcConversion, EphemerisMetadataFailurePolicy::MarkFailed
         );

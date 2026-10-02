@@ -11,8 +11,8 @@
 #include "UtcTimeCodec.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
+#include "engine/EphemerisDataManifest.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
 
 #include <QDateTime>
 #include <QDir>
@@ -51,19 +51,19 @@ using skygate::ephemeris::EphemerisEngineKind;
     return remainder;
 }
 
-[[nodiscard]] std::optional<skygate::ephemeris::AstronomicalEpoch>
+[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch>
 astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcept
 {
     const QDateTime normalizedUtcDateTime = SkyQtTimeCodec::toQDateTimeUtc(utcTime);
     const QDate date = normalizedUtcDateTime.date();
     const QTime time = normalizedUtcDateTime.time();
-    const auto astronomicalYear = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(date.year());
+    const auto astronomicalYear = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(date.year());
     if (!astronomicalYear.has_value()) {
         return std::nullopt;
     }
 
-    return skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    return skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = *astronomicalYear,
             .month = date.month(),
             .day = date.day(),
@@ -74,7 +74,7 @@ astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcep
                               static_cast<qint64>(skygate::core::UtcTimeCodec::toEpochMicros(utcTime)), 1'000'000
                           ))
                           * 1000U,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
 }

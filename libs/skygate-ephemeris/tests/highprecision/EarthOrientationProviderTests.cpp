@@ -1,9 +1,9 @@
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/EarthOrientationDataLoader.hpp"
-#include "engine/highprecision/EarthOrientationDataParser.hpp"
-#include "engine/highprecision/EarthOrientationSampler.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
-#include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
+#include "engine/EarthOrientationDataLoader.hpp"
+#include "engine/EarthOrientationDataParser.hpp"
+#include "engine/EarthOrientationSampler.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
+#include "engine/TableBackedEarthOrientationProvider.hpp"
 
 #include <QtTest/QtTest>
 
@@ -57,18 +57,25 @@ private:
     };
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
+[[nodiscard]] skygate::core::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = year,
             .month = month,
             .day = day,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(epoch.has_value());
     return *epoch;
+}
+
+[[nodiscard]] skygate::core::CivilDateTime dateFromEpoch(const skygate::core::AstronomicalEpoch& epoch)
+{
+    const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    Q_ASSERT(date.has_value());
+    return *date;
 }
 
 }  // namespace
@@ -156,9 +163,10 @@ void EarthOrientationProviderTests::loadsIersC04Data()
     QVERIFY(result.provider != nullptr);
     QCOMPARE(result.provider->entries().size(), std::size_t{2});
     const skygate::ephemeris::IEarthOrientationProvider::TableEntry& firstEntry = result.provider->entries().front();
-    QCOMPARE(firstEntry.effectiveUtcDate.astronomicalYear, 1962);
-    QCOMPARE(firstEntry.effectiveUtcDate.month, 1);
-    QCOMPARE(firstEntry.effectiveUtcDate.day, 1);
+    const skygate::core::CivilDateTime firstDate = dateFromEpoch(firstEntry.effectiveUtcEpoch);
+    QCOMPARE(firstDate.astronomicalYear, 1962);
+    QCOMPARE(firstDate.month, 1);
+    QCOMPARE(firstDate.day, 1);
     QCOMPARE(firstEntry.ut1MinusUtcSeconds, 0.0326330);
     QCOMPARE(firstEntry.polarMotionXArcseconds, 0.003212);
     QCOMPARE(firstEntry.polarMotionYArcseconds, 0.195335);
@@ -184,18 +192,20 @@ void EarthOrientationProviderTests::loadsIersFinals2000AData()
     QVERIFY(result.provider != nullptr);
     QCOMPARE(result.provider->entries().size(), std::size_t{2});
     const skygate::ephemeris::IEarthOrientationProvider::TableEntry& firstEntry = result.provider->entries().front();
-    QCOMPARE(firstEntry.effectiveUtcDate.astronomicalYear, 1973);
-    QCOMPARE(firstEntry.effectiveUtcDate.month, 1);
-    QCOMPARE(firstEntry.effectiveUtcDate.day, 2);
+    const skygate::core::CivilDateTime firstDate = dateFromEpoch(firstEntry.effectiveUtcEpoch);
+    QCOMPARE(firstDate.astronomicalYear, 1973);
+    QCOMPARE(firstDate.month, 1);
+    QCOMPARE(firstDate.day, 2);
     QCOMPARE(firstEntry.ut1MinusUtcSeconds, 0.8084178);
     QCOMPARE(firstEntry.polarMotionXArcseconds, 0.120733);
     QCOMPARE(firstEntry.polarMotionYArcseconds, 0.136966);
     QVERIFY(!firstEntry.predicted);
 
     const skygate::ephemeris::IEarthOrientationProvider::TableEntry& lastEntry = result.provider->entries().back();
-    QCOMPARE(lastEntry.effectiveUtcDate.astronomicalYear, 2026);
-    QCOMPARE(lastEntry.effectiveUtcDate.month, 5);
-    QCOMPARE(lastEntry.effectiveUtcDate.day, 15);
+    const skygate::core::CivilDateTime lastDate = dateFromEpoch(lastEntry.effectiveUtcEpoch);
+    QCOMPARE(lastDate.astronomicalYear, 2026);
+    QCOMPARE(lastDate.month, 5);
+    QCOMPARE(lastDate.day, 15);
     QCOMPARE(lastEntry.ut1MinusUtcSeconds, 0.0271380);
     QCOMPARE(lastEntry.polarMotionXArcseconds, 0.170615);
     QCOMPARE(lastEntry.polarMotionYArcseconds, 0.411608);
@@ -635,9 +645,10 @@ void EarthOrientationProviderTests::loadsFixedColumnFinalsAndDateOnlyTail()
     QVERIFY(result.isSuccess());
     QCOMPARE(result.provider->entries().size(), std::size_t{1});
     const auto& entry = result.provider->entries().front();
-    QCOMPARE(entry.effectiveUtcDate.astronomicalYear, 2026);
-    QCOMPARE(entry.effectiveUtcDate.month, 4);
-    QCOMPARE(entry.effectiveUtcDate.day, 15);
+    const skygate::core::CivilDateTime entryDate = dateFromEpoch(entry.effectiveUtcEpoch);
+    QCOMPARE(entryDate.astronomicalYear, 2026);
+    QCOMPARE(entryDate.month, 4);
+    QCOMPARE(entryDate.day, 15);
     QCOMPARE(entry.ut1MinusUtcSeconds, 0.8084178);
     QCOMPARE(entry.polarMotionXArcseconds, 0.120733);
     QCOMPARE(entry.polarMotionYArcseconds, 0.136966);
@@ -675,7 +686,7 @@ void EarthOrientationProviderTests::preservesExpirationBoundaries()
     QCOMPARE(stale.dataInfo.status, skygate::ephemeris::IEarthOrientationProvider::DataStatus::Stale);
     QCOMPARE(stale.dataInfo.diagnosticText, std::string{"Earth-orientation data is stale for the reference epoch."});
     QCOMPARE(stale.provider->dataInfo().status, stale.dataInfo.status);
-    options.referenceEpoch->timeScale = skygate::ephemeris::TimeScale::Tt;
+    options.referenceEpoch->timeScale = skygate::core::TimeScale::Tt;
     QCOMPARE(
         skygate::ephemeris::EarthOrientationDataLoader::loadFromTextAsset(asset, options).dataInfo.status,
         skygate::ephemeris::IEarthOrientationProvider::DataStatus::Available
@@ -717,12 +728,12 @@ void EarthOrientationProviderTests::rejectsInvalidEpochsBeforeFallback()
     skygate::ephemeris::EarthOrientationSampler::Options options;
     options.allowMissingDataZeroFallback = true;
     auto epoch = epochForDate(2026, 4, 1);
-    epoch.timeScale = skygate::ephemeris::TimeScale::Tt;
+    epoch.timeScale = skygate::core::TimeScale::Tt;
     const auto nonUtc = skygate::ephemeris::EarthOrientationSampler::sample(nullptr, epoch, options);
     QCOMPARE(nonUtc.status, skygate::ephemeris::EarthOrientationSampler::Sample::Status::Failed);
     QCOMPARE(nonUtc.warningCodeMask, std::uint32_t{16});
     QCOMPARE(nonUtc.diagnosticText, std::string{"Earth-orientation sampling requires a finite UTC epoch."});
-    epoch.timeScale = skygate::ephemeris::TimeScale::Utc;
+    epoch.timeScale = skygate::core::TimeScale::Utc;
     epoch.julianDatePart2 = std::numeric_limits<double>::quiet_NaN();
     const auto nonFinite = skygate::ephemeris::EarthOrientationSampler::sample(nullptr, epoch, options);
     QCOMPARE(nonFinite.warningCodeMask, nonUtc.warningCodeMask);

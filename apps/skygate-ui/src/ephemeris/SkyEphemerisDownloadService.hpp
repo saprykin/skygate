@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 
 #include <QObject>
 #include <QString>
