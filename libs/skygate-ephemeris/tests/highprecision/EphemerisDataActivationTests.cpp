@@ -257,6 +257,7 @@ private slots:
     void verifiesCompressedStagedAssetWithoutChangingSource();
     void cancelsStagedUpdateVerification();
     void rejectsStagedUpdateChecksumFailure();
+    void acceptsUppercaseStagedUpdateChecksum();
     void rejectsStagedUpdateWrongComponentKind();
     void rejectsStagedUpdateVersionMismatch();
     void rejectsStagedUpdateValidityRangeMismatch();
@@ -653,6 +654,27 @@ void EphemerisDataActivationTests::rejectsStagedUpdateChecksumFailure()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::ChecksumMismatch)
     );
     QVERIFY(!result.diagnostics.empty());
+}
+
+void EphemerisDataActivationTests::acceptsUppercaseStagedUpdateChecksum()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    for (skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
+        asset.checksum.value = QString::fromStdString(asset.checksum.value).toUpper().toStdString();
+    }
+    writeAllStagedAssets(stagedRoot, manifest);
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
+
+    QVERIFY2(result.isSuccess(), result.diagnostics.empty() ? "" : result.diagnostics.front().c_str());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
+    );
+    QCOMPARE(result.verifiedAssetIds.size(), std::size_t{4});
 }
 
 void EphemerisDataActivationTests::rejectsStagedUpdateWrongComponentKind()
