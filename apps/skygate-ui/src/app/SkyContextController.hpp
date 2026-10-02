@@ -28,7 +28,9 @@
 #include <QVariantMap>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <utility>
@@ -341,6 +343,7 @@ public:
     [[nodiscard]] const skygate::ui::internal::SkyThemeRenderPalette& renderTheme() const noexcept;
     [[nodiscard]] const SkyOverlayLayerVisibility& overlayLayerVisibility() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
+    [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> ephemerisEngineHandle() const;
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
     activeEphemerisDataSnapshot() const noexcept;
     [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
@@ -483,7 +486,9 @@ private:
     void setEphemerisDataOperationStatusText(QString statusText);
     void setEphemerisDataUpdateProgress(double progress) noexcept;
     [[nodiscard]] const skygate::ephemeris::EphemerisDataManifest* activeEphemerisDataManifest() const noexcept;
-    [[nodiscard]] bool refreshEphemerisDataManifest(const QString& stagedRoot);
+    void refreshEphemerisDataManifestAsync(const QString& stagedRoot, std::function<void(bool)> completionHandler);
+    void finishEphemerisDataUpdate(bool success, QString statusText);
+    void continueEphemerisDataUpdate(const QString& profileId, const QString& stagedRoot);
     void rebuildEphemerisEngine();
 
 private:
@@ -503,7 +508,8 @@ private:
     std::unique_ptr<SkyOverlayLayerSettings> m_overlayLayerSettings;
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
-    std::unique_ptr<skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    mutable std::mutex m_ephemerisEngineMutex;
     skygate::ephemeris::EphemerisEngineKind::Type m_ephemerisEngineKind =
         skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     skygate::ephemeris::EphemerisEngineOptions m_ephemerisEngineOptions;

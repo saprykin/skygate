@@ -1,9 +1,9 @@
 #pragma once
 
+#include "SkyEphemerisCacheController.hpp"
+#include "SkyEphemerisDownloadService.hpp"
 #include "SkySettingsStore.hpp"
-#include "engine/highprecision/EphemerisDataActivationStatus.hpp"
-#include "engine/highprecision/EphemerisStagedUpdateVerificationRequest.hpp"
-#include "engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp"
+#include "engine/highprecision/EphemerisDataManifest.hpp"
 #include "engine/highprecision/IEphemerisDataSnapshot.hpp"
 
 #include <QObject>
@@ -13,8 +13,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <optional>
-#include <vector>
 
 class SkySettingsStore;
 
@@ -22,75 +20,12 @@ class SkyEphemerisDataManager final : public QObject {
     Q_OBJECT
 
 public:
-    enum class StagedUpdateActivationStatus : std::uint8_t {
-        Activated,
-        InvalidRequest,
-        VerificationFailed,
-        ActivationFailed,
-        PersistenceFailed,
-        Canceled
-    };
-
-    enum class StagedUpdateDownloadStatus : std::uint8_t {
-        Downloaded,
-        InvalidRequest,
-        MissingSource,
-        IoError,
-        Canceled
-    };
-
-    struct StagedUpdateDownloadRequest final {
-        const skygate::ephemeris::EphemerisDataManifest::Asset* asset = nullptr;
-        QString sourceUrl;
-        QString sourceResourceRoot;
-        QString stagedResourceRoot;
-        std::function<bool()> cancellationRequested;
-        std::function<void(std::uint64_t stagedBytes, std::optional<std::uint64_t> totalBytes)> progressHandler;
-        bool retainPartialStagingOnCancellation = true;
-    };
-
-    struct StagedUpdateDownloadResult final {
-        StagedUpdateDownloadStatus status = StagedUpdateDownloadStatus::InvalidRequest;
-        QString stagedPath;
-        std::uint64_t stagedBytes = 0U;
-        std::vector<QString> diagnostics;
-
-        [[nodiscard]] bool isSuccess() const noexcept
-        {
-            return status == StagedUpdateDownloadStatus::Downloaded;
-        }
-    };
-
-    struct StagedUpdateActivationRequest final {
-        const skygate::ephemeris::EphemerisDataManifest* manifest = nullptr;
-        QString profileId;
-        QString stagedResourceRoot;
-        QString writableCacheRoot;
-        QString revisionToken;
-        std::vector<skygate::ephemeris::EphemerisDataManifest::AssetKind> requiredKinds;
-        std::vector<skygate::ephemeris::EphemerisStagedUpdateVerificationRequest::ExpectedComponent> expectedComponents;
-        std::function<bool()> cancellationRequested;
-        bool allowQtResourceKernelAssets = false;
-        std::uint64_t largeKernelResourceThresholdBytes = 128ULL * 1024ULL * 1024ULL;
-        bool retainStagedResourcesOnCancellation = true;
-        bool cleanupFailedActivationCache = true;
-    };
-
-    struct StagedUpdateActivationResult final {
-        StagedUpdateActivationStatus status = StagedUpdateActivationStatus::InvalidRequest;
-        skygate::ephemeris::EphemerisStagedUpdateVerificationStatus verificationStatus =
-            skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::InvalidRequest;
-        skygate::ephemeris::EphemerisDataActivationStatus activationStatus =
-            skygate::ephemeris::EphemerisDataActivationStatus::InvalidRequest;
-        SkySettingsStore::EphemerisDataCacheSnapshot cacheSnapshot;
-        std::vector<QString> diagnostics;
-        std::vector<QString> activatedAssetIds;
-
-        [[nodiscard]] bool isSuccess() const noexcept
-        {
-            return status == StagedUpdateActivationStatus::Activated;
-        }
-    };
+    using StagedUpdateActivationStatus = SkyEphemerisCacheController::StagedUpdateActivationStatus;
+    using StagedUpdateDownloadStatus = SkyEphemerisDownloadService::StagedUpdateDownloadStatus;
+    using StagedUpdateDownloadRequest = SkyEphemerisDownloadService::StagedUpdateDownloadRequest;
+    using StagedUpdateDownloadResult = SkyEphemerisDownloadService::StagedUpdateDownloadResult;
+    using StagedUpdateActivationRequest = SkyEphemerisCacheController::StagedUpdateActivationRequest;
+    using StagedUpdateActivationResult = SkyEphemerisCacheController::StagedUpdateActivationResult;
 
     explicit SkyEphemerisDataManager(SkySettingsStore* settingsStore, QObject* parent = nullptr);
     ~SkyEphemerisDataManager() override;
@@ -121,7 +56,11 @@ public:
     void requestUpdateCancellation() noexcept;
     void clearUpdateCancellation() noexcept;
     [[nodiscard]] bool updateCancellationRequested() const noexcept;
+
     [[nodiscard]] StagedUpdateDownloadResult stageEphemerisUpdateAsset(const StagedUpdateDownloadRequest& request);
+    void stageEphemerisUpdateAssetAsync(
+        const StagedUpdateDownloadRequest& request, std::function<void(StagedUpdateDownloadResult)> completionHandler
+    );
     [[nodiscard]] StagedUpdateActivationResult
     activateVerifiedStagedUpdateSet(const StagedUpdateActivationRequest& request);
 
@@ -146,6 +85,8 @@ private:
 
 private:
     SkySettingsStore* m_settingsStore = nullptr;
+    std::unique_ptr<SkyEphemerisDownloadService> m_downloadService;
+    SkyEphemerisCacheController m_cacheController;
     SkySettingsStore::EphemerisDataCacheSnapshot m_activeCacheSnapshot;
     std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> m_activeDataSnapshot;
     const skygate::ephemeris::EphemerisDataManifest* m_bundledFallbackManifest = nullptr;
