@@ -343,7 +343,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
 EphemerisEngineFactoryResult EphemerisEngineFactory::create()
 {
     EphemerisEngineFactoryRequest request;
-    request.options = simpleEphemerisEngineDefaultOptions();
+    request.options = SimpleEphemerisEngine::defaultOptions();
     return create(request);
 }
 
@@ -366,7 +366,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const CelestialBodyC
 {
     EphemerisEngineFactoryRequest request;
     request.catalog = std::make_shared<CelestialBodyCatalog>(catalog);
-    request.options = simpleEphemerisEngineDefaultOptions();
+    request.options = SimpleEphemerisEngine::defaultOptions();
     return create(request);
 }
 

@@ -1,5 +1,6 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/DeltaTDataLoader.hpp"
+#include "engine/highprecision/TableBackedDeltaTProvider.hpp"
 
 #include <QtTest/QtTest>
 
@@ -76,6 +77,8 @@ private slots:
     void loadsUsnoDeltaTData();
     void reportsMissingData();
     void rejectsMalformedRows();
+    void rejectsDuplicateEffectiveEpochs();
+    void doesNotReturnNanForDuplicateProviderTable();
     void exposesAncientFallbackMetadata();
     void exposesValidityRangeMetadata();
     void returnsUnavailableBetweenLastTableRowAndExpiration();
@@ -134,6 +137,48 @@ void DeltaTProviderTests::loadsUsnoDeltaTData()
     QVERIFY(estimate.isUsable());
     QVERIFY(estimate.deltaTSeconds.has_value());
     QVERIFY(std::abs(*estimate.deltaTSeconds - 69.2) < 0.001);
+}
+
+void DeltaTProviderTests::rejectsDuplicateEffectiveEpochs()
+{
+    skygate::ephemeris::EphemerisTextDataAsset asset = makeValidAsset();
+    asset.content = "effective_utc_date,delta_t_seconds\n"
+                    "1900-01-01,-2.72\n"
+                    "2000-01-01,63.83\n"
+                    "2000-01-01,64.00\n";
+
+    const skygate::ephemeris::DeltaTDataLoader::Result result =
+        skygate::ephemeris::DeltaTDataLoader::loadFromTextAsset(asset);
+
+    QVERIFY(!result.isSuccess());
+    QVERIFY(result.provider == nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.dataInfo.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::IDeltaTProvider::DataStatus::Malformed)
+    );
+    QVERIFY(!result.dataInfo.diagnosticText.empty());
+}
+
+void DeltaTProviderTests::doesNotReturnNanForDuplicateProviderTable()
+{
+    skygate::ephemeris::IDeltaTProvider::DataInfo info;
+    info.status = skygate::ephemeris::IDeltaTProvider::DataStatus::Available;
+
+    std::vector<skygate::ephemeris::IDeltaTProvider::TableEntry> entries;
+    auto makeEntry = [](const int year, const double deltaTSeconds) {
+        skygate::ephemeris::IDeltaTProvider::TableEntry entry;
+        entry.effectiveUtcEpoch = epochForDate(year, 1, 1);
+        entry.deltaTSeconds = deltaTSeconds;
+        return entry;
+    };
+    entries.push_back(makeEntry(1900, -2.72));
+    entries.push_back(makeEntry(2000, 63.83));
+    entries.push_back(makeEntry(2000, 64.00));
+
+    const skygate::ephemeris::TableBackedDeltaTProvider provider(info, std::move(entries));
+    const skygate::ephemeris::IDeltaTProvider::Estimate estimate = provider.deltaTSeconds(epochForDate(2000, 1, 1));
+
+    QVERIFY(!estimate.deltaTSeconds.has_value() || std::isfinite(*estimate.deltaTSeconds));
 }
 
 void DeltaTProviderTests::reportsMissingData()

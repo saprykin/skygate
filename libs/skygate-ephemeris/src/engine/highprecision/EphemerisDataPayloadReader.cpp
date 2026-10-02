@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstddef>
+#include <optional>
 #include <string_view>
 
 namespace skygate::ephemeris {
@@ -153,6 +154,7 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
     QIODevice& targetFile,
     QCryptographicHash& hash,
     std::uint64_t& outputBytes,
+    const std::optional<std::uint64_t>& maximumOutputBytes,
     EphemerisDataPayloadReader::Result& result,
     const std::function<bool()>& cancellationCallback
 )
@@ -171,12 +173,18 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
         if (bytesRead == 0) {
             continue;
         }
+        const std::uint64_t chunkBytes = static_cast<std::uint64_t>(bytesRead);
+        if (maximumOutputBytes.has_value() && chunkBytes > *maximumOutputBytes - outputBytes) {
+            result.status = EphemerisDataPayloadReader::Status::OutputLimitExceeded;
+            addDiagnostic(result, "Ephemeris data asset exceeds the configured maximum output size.");
+            return false;
+        }
         if (targetFile.write(buffer.data(), bytesRead) != bytesRead) {
             addDiagnostic(result, "Unable to write ephemeris data asset into the writable cache.");
             return false;
         }
         hash.addData(QByteArrayView(buffer.data(), bytesRead));
-        outputBytes += static_cast<std::uint64_t>(bytesRead);
+        outputBytes += chunkBytes;
     }
 
     return true;
@@ -187,6 +195,7 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
     QIODevice& targetFile,
     QCryptographicHash& hash,
     std::uint64_t& outputBytes,
+    const std::optional<std::uint64_t>& maximumOutputBytes,
     EphemerisDataPayloadReader::Result& result,
     const std::function<bool()>& cancellationCallback
 )
@@ -234,13 +243,19 @@ void markCanceled(EphemerisDataPayloadReader::Result& result)
                 return false;
             }
             if (output.pos > 0U) {
+                const std::uint64_t chunkBytes = static_cast<std::uint64_t>(output.pos);
+                if (maximumOutputBytes.has_value() && chunkBytes > *maximumOutputBytes - outputBytes) {
+                    result.status = EphemerisDataPayloadReader::Status::OutputLimitExceeded;
+                    addDiagnostic(result, "Ephemeris data asset exceeds the configured maximum output size.");
+                    return false;
+                }
                 if (targetFile.write(outputBuffer.data(), static_cast<qint64>(output.pos))
                     != static_cast<qint64>(output.pos)) {
                     addDiagnostic(result, "Unable to write decompressed ephemeris data into the writable cache.");
                     return false;
                 }
                 hash.addData(QByteArrayView(outputBuffer.data(), static_cast<qsizetype>(output.pos)));
-                outputBytes += static_cast<std::uint64_t>(output.pos);
+                outputBytes += chunkBytes;
             }
             sawFrameEnd = remainingHint == 0U;
         }
@@ -261,7 +276,8 @@ EphemerisDataPayloadReader::Result EphemerisDataPayloadReader::read(
     const EphemerisDataManifest::CompressionKind compression,
     QFile& sourceFile,
     QIODevice& targetFile,
-    const std::function<bool()>& cancellationCallback
+    const std::function<bool()>& cancellationCallback,
+    const std::optional<std::uint64_t> maximumOutputBytes
 )
 {
     Result result;
@@ -269,10 +285,14 @@ EphemerisDataPayloadReader::Result EphemerisDataPayloadReader::read(
     bool read = false;
     switch (compression) {
     case EphemerisDataManifest::CompressionKind::None:
-        read = copyUncompressedAsset(sourceFile, targetFile, hash, result.outputBytes, result, cancellationCallback);
+        read = copyUncompressedAsset(
+            sourceFile, targetFile, hash, result.outputBytes, maximumOutputBytes, result, cancellationCallback
+        );
         break;
     case EphemerisDataManifest::CompressionKind::Zstd:
-        read = decompressZstdAsset(sourceFile, targetFile, hash, result.outputBytes, result, cancellationCallback);
+        read = decompressZstdAsset(
+            sourceFile, targetFile, hash, result.outputBytes, maximumOutputBytes, result, cancellationCallback
+        );
         break;
     }
     if (read) {

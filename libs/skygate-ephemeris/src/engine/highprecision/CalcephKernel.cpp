@@ -1,15 +1,53 @@
 #include "CalcephKernel.hpp"
 
-#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "math/PhysicalConstants.hpp"
-#include "ICalcephKernel.hpp"
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include <calceph.h>
-#include <array>
+#include <erfa.h>
 #endif
 
+#include <array>
+#include <cmath>
+#include <optional>
 #include <utility>
 
 namespace skygate::ephemeris::highprecision {
+namespace {
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+[[nodiscard]] std::optional<double> utcSortKeyForTdbEpoch(const AstronomicalEpoch& epoch) noexcept
+{
+    if (epoch.timeScale != TimeScale::Tdb || !epoch.isFinite()) {
+        return std::nullopt;
+    }
+
+    // eraDtdb returns TDB-TT; the geocentric observer (u == v == 0) nullifies
+    // the topocentric term, so the UT1 fraction argument is irrelevant here.
+    const double tdbMinusTtSeconds = eraDtdb(epoch.julianDatePart1, epoch.julianDatePart2, 0.0, 0.0, 0.0, 0.0);
+    if (!std::isfinite(tdbMinusTtSeconds)) {
+        return std::nullopt;
+    }
+
+    const AstronomicalEpoch tt = epoch.addSeconds(-tdbMinusTtSeconds, TimeScale::Tt);
+    double tai1 = 0.0;
+    double tai2 = 0.0;
+    if (eraTttai(tt.julianDatePart1, tt.julianDatePart2, &tai1, &tai2) != 0) {
+        return std::nullopt;
+    }
+
+    double utc1 = 0.0;
+    double utc2 = 0.0;
+    if (eraTaiutc(tai1, tai2, &utc1, &utc2) < 0) {
+        return std::nullopt;
+    }
+
+    const AstronomicalEpoch utcEpoch{.julianDatePart1 = utc1, .julianDatePart2 = utc2, .timeScale = TimeScale::Utc};
+    return utcEpoch.sortKey();
+}
+#endif
+
+}  // namespace
 
 struct CalcephKernel::Impl final {
     explicit Impl(Info info) : m_kernelInfo(std::move(info))
@@ -46,7 +84,26 @@ struct CalcephKernel::Impl final {
         if (m_status != Status::Ready || !m_kernelInfo.has_value()) {
             return m_status;
         }
-        if (!epoch.isFinite() || epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
+        if (!epoch.isFinite()) {
+            return Status::OutOfRange;
+        }
+
+#if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+        // Kernel epochs are expressed in TDB while the manifest validity range
+        // is expressed in UTC. Convert the epoch to UTC before comparing so a
+        // ~69 second boundary offset cannot misclassify the requested instant.
+        if (epoch.timeScale == TimeScale::Tdb) {
+            const std::optional<double> utcKey = utcSortKeyForTdbEpoch(epoch);
+            if (utcKey.has_value()) {
+                return *utcKey < m_kernelInfo->validityRange.start.sortKey()
+                               || *utcKey > m_kernelInfo->validityRange.end.sortKey()
+                           ? Status::OutOfRange
+                           : Status::Ready;
+            }
+        }
+#endif
+
+        if (epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
             || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
             return Status::OutOfRange;
         }

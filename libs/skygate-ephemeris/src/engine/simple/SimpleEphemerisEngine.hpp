@@ -12,13 +12,12 @@
 
 namespace skygate::ephemeris {
 
-[[nodiscard]] EphemerisEngineOptions simpleEphemerisEngineDefaultOptions() noexcept;
-
 class SimpleEphemerisEngine final : public IEphemerisEngine {
 public:
+    [[nodiscard]] static EphemerisEngineOptions defaultOptions() noexcept;
+
     explicit SimpleEphemerisEngine(
-        const CelestialBodyCatalog& catalog,
-        EphemerisEngineOptions engineOptions = simpleEphemerisEngineDefaultOptions()
+        const CelestialBodyCatalog& catalog, EphemerisEngineOptions engineOptions = defaultOptions()
     );
 
     [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;

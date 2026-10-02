@@ -251,7 +251,7 @@ std::optional<skygate::core::EquatorialCoordinate> SimpleEphemerisEngine::comput
     return std::nullopt;
 }
 
-EphemerisEngineOptions simpleEphemerisEngineDefaultOptions() noexcept
+EphemerisEngineOptions SimpleEphemerisEngine::defaultOptions() noexcept
 {
     EphemerisEngineOptions engineOptions;
     engineOptions.setEngineKind(EphemerisEngineKind::Type::Simple);

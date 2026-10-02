@@ -72,6 +72,7 @@ private slots:
     void combinesCorrectionFlags();
     void constructsRequestAndDataSetModels();
     void constructsRequestsWithFactory();
+    void shiftsNonUtcBaseRequestsAtUtcTime();
     void constructsCatalogStarAstrometryModel();
     void constructsAndNormalizesAstronomicalTimePrimitives();
     void exposesCelestialReferenceFrameHelpers();
@@ -95,7 +96,7 @@ void EphemerisApiModelTests::exposesExactlyTwoEngineKinds()
         engineKinds{
             skygate::ephemeris::EphemerisEngineKind::Type::Simple,
             skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision,
-        };
+    };
 
     QCOMPARE(engineKinds.size(), 2U);
     QVERIFY(skygate::ephemeris::EphemerisEngineKind::displayName(engineKinds[0]) == "Simple");
@@ -264,6 +265,40 @@ void EphemerisApiModelTests::constructsRequestsWithFactory()
         static_cast<std::uint32_t>(shiftedRequest.options.correctionFlags()),
         static_cast<std::uint32_t>(skygate::ephemeris::EphemerisCorrectionFlags::apparent())
     );
+}
+
+void EphemerisApiModelTests::shiftsNonUtcBaseRequestsAtUtcTime()
+{
+    skygate::core::ObservationContext context;
+    context.observer = {.latitudeDeg = 47.3769, .longitudeDeg = 8.5417, .elevationMeters = 408.0};
+    context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'704'067'200));
+
+    skygate::ephemeris::EphemerisEngineOptions options;
+    options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+
+    for (const skygate::ephemeris::TimeScale timeScale :
+         {skygate::ephemeris::TimeScale::Tt, skygate::ephemeris::TimeScale::Tdb, skygate::ephemeris::TimeScale::Ut1}) {
+        skygate::ephemeris::EphemerisRequest baseRequest;
+        baseRequest.context = context;
+        baseRequest.options = options;
+        baseRequest.epoch = skygate::ephemeris::AstronomicalEpoch{
+            .julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.25, .timeScale = timeScale
+        };
+
+        const skygate::core::UtcTimePoint shiftedUtc = context.utcTime + std::chrono::seconds(90);
+        const skygate::ephemeris::EphemerisRequest shiftedRequest =
+            skygate::ephemeris::EphemerisRequestFactory::atUtcTime(baseRequest, shiftedUtc);
+
+        QCOMPARE(
+            static_cast<std::uint8_t>(shiftedRequest.epoch.timeScale),
+            static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+        );
+        QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(shiftedRequest.context.utcTime), 1'704'067'290'000'000LL);
+        const qint64 shiftedRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
+            skygate::ephemeris::EphemerisRequestFactory::contextFromRequest(shiftedRequest).utcTime
+        );
+        QVERIFY(std::llabs(shiftedRoundTrip - 1'704'067'290'000'000LL) <= 100);
+    }
 }
 
 void EphemerisApiModelTests::constructsCatalogStarAstrometryModel()
@@ -787,7 +822,7 @@ void EphemerisApiModelTests::constructsResultStatusAndWarningModels()
             skygate::ephemeris::EphemerisEngineQueryStatus::Type::Unsupported,
             skygate::ephemeris::EphemerisEngineQueryStatus::Type::OutOfRange,
             skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed,
-        };
+    };
 
     QCOMPARE(statuses.size(), 5U);
     QVERIFY(skygate::ephemeris::EphemerisEngineQueryStatus::displayName(statuses[0]) == "valid");

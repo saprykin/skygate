@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <optional>
 #include <string_view>
+#include <system_error>
 
 namespace skygate::ephemeris {
 
@@ -152,6 +153,29 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     return verifySha256File(targetPath, asset.checksum.value, result);
 }
 
+[[nodiscard]] bool pathIsWithinCanonicalRoot(const std::filesystem::path& root, const std::filesystem::path& candidate)
+{
+    std::error_code error;
+    const std::filesystem::path canonicalRoot = std::filesystem::canonical(root, error);
+    if (error) {
+        return false;
+    }
+    const std::filesystem::path canonicalCandidate = std::filesystem::canonical(candidate, error);
+    if (error) {
+        return false;
+    }
+
+    auto rootIt = canonicalRoot.begin();
+    auto candidateIt = canonicalCandidate.begin();
+    for (; rootIt != canonicalRoot.end() && candidateIt != canonicalCandidate.end(); ++rootIt, ++candidateIt) {
+        if (*rootIt != *candidateIt) {
+            return false;
+        }
+    }
+
+    return rootIt == canonicalRoot.end();
+}
+
 [[nodiscard]] bool prepareTargetDirectory(const QString& targetPath, EphemerisDataActivationResult& result)
 {
     const QFileInfo targetInfo(targetPath);
@@ -199,6 +223,8 @@ mappedActivationStatus(const EphemerisDataPayloadReader::Status status) noexcept
         return EphemerisDataActivationStatus::Canceled;
     case EphemerisDataPayloadReader::Status::IoError:
         return EphemerisDataActivationStatus::IoError;
+    case EphemerisDataPayloadReader::Status::OutputLimitExceeded:
+        return EphemerisDataActivationStatus::ChecksumMismatch;
     case EphemerisDataPayloadReader::Status::Read:
         break;
     }
@@ -268,6 +294,11 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         result.status = EphemerisDataActivationStatus::IoError;
         return result;
     }
+    if (!pathIsWithinCanonicalRoot(request.writableCacheRoot, targetPath.parent_path())) {
+        result.status = EphemerisDataActivationStatus::IoError;
+        addDiagnostic(result, "Ephemeris data activation target path escapes the writable cache root.");
+        return result;
+    }
 
     QFile sourceFile(sourcePath);
     QSaveFile targetFile(targetPathString);
@@ -283,7 +314,11 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
     }
 
     const EphemerisDataPayloadReader::Result payload = EphemerisDataPayloadReader::read(
-        request.asset->compression.kind, sourceFile, targetFile, request.cancellationRequested
+        request.asset->compression.kind,
+        sourceFile,
+        targetFile,
+        request.cancellationRequested,
+        request.asset->compression.uncompressedSizeBytes
     );
     result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());
     if (payload.status != EphemerisDataPayloadReader::Status::Read) {

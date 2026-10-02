@@ -1,10 +1,17 @@
 #include "StringUtilities.hpp"
-#include "engine/highprecision/HighPrecisionTextParser.hpp"
 
 #include <algorithm>
 #include <cctype>
 
 namespace skygate::ephemeris {
+namespace {
+
+[[nodiscard]] bool isAsciiWhitespace(const char character) noexcept
+{
+    return std::isspace(static_cast<unsigned char>(character)) != 0;
+}
+
+}  // namespace
 
 char StringUtilities::toLowerAscii(const char character) noexcept
 {
@@ -22,7 +29,14 @@ std::string StringUtilities::toLowerAscii(const std::string_view value)
 
 std::string_view StringUtilities::trimAsciiWhitespace(const std::string_view value) noexcept
 {
-    return HighPrecisionTextParser{}.trimAsciiWhitespace(value);
+    std::string_view trimmed = value;
+    while (!trimmed.empty() && isAsciiWhitespace(trimmed.front())) {
+        trimmed.remove_prefix(1U);
+    }
+    while (!trimmed.empty() && isAsciiWhitespace(trimmed.back())) {
+        trimmed.remove_suffix(1U);
+    }
+    return trimmed;
 }
 
 bool StringUtilities::equalsIgnoreAsciiCase(const std::string_view lhs, const std::string_view rhs) noexcept

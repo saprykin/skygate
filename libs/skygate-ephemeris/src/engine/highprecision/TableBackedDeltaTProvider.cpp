@@ -80,6 +80,10 @@ IDeltaTProvider::Estimate TableBackedDeltaTProvider::deltaTSeconds(const Astrono
         const TableEntry& after = *upper;
         const double beforeKey = before.effectiveUtcEpoch.sortKey();
         const double afterKey = after.effectiveUtcEpoch.sortKey();
+        if (!(afterKey > beforeKey)) {
+            return unavailableEstimate("Delta T data contains duplicate or non-monotonic effective UTC epochs.");
+        }
+
         const double ratio = (requestedEpochKey - beforeKey) / (afterKey - beforeKey);
         return Estimate{
             .status = EstimateStatus::Available,

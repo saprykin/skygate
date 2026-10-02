@@ -1,7 +1,7 @@
 #pragma once
 
 #include "EphemerisCorrectionFlags.hpp"
-#include "EphemerisDateRange.hpp"
+#include "time/EphemerisDateRange.hpp"
 #include "EphemerisEngineQueryStatus.hpp"
 #include "EphemerisEngineWarning.hpp"
 
