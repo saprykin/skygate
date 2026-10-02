@@ -7,6 +7,39 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 
 ## [Unreleased]
 
+### High-precision ephemeris engine
+
+This release hardens the high-precision ephemeris engine, tightens its
+architecture boundaries, and improves diagnostics and test provenance.
+
+- Guarded Delta-T interpolation denominators and rejected duplicate
+  effective epochs in table data.
+- Fixed UTC interval arithmetic so request epochs are no longer corrupted
+  across time scales.
+- Removed the simple-only link dependency on high-precision text parsing and
+  broke the catalog/engine date-range coupling.
+- Fixed the TDB-TT UT1-fraction argument and capped decompressed output and
+  network staging to prevent decompression bombs.
+- Added real-kernel Horizons acceptance rows at arcsecond/milliarcsecond
+  tolerances and relabeled self-derived fixtures.
+- Extracted an injected fallback strategy, unified the computation cache, and
+  made the factory a complete composition root with lossless request
+  overloads.
+- Split the time-scale service into focused offset resolvers and the data
+  manager into download, cache, and snapshot responsibilities.
+- Propagated calceph diagnostics end-to-end and added ephemeris logging.
+- Gave geometric corrections a distinct flag and added structured fallback
+  provenance.
+- Moved core-worthy calendar and Julian-date arithmetic (`CalendarTime`,
+  `EpochCodec`, `AstronomicalEpoch`, and related time types) into
+  `skygate-core` with dedicated core tests.
+- Deduplicated NAIF body IDs, WGS84 geodesy constants, and solar
+  mean-anomaly constants into `skygate-core`.
+- Removed the dual civil-date/epoch table-entry representation and added
+  `AstronomicalEpoch` equality.
+- Documented the high-precision interface layer and fallback strategy in the
+  architecture notes.
+
 ## [1.1.0] - 2026-05-08
 
 ### Added

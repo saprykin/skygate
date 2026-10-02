@@ -12,7 +12,7 @@ skygate::core::HorizontalCoordinate EquatorialToHorizontalCalculator::compute(
     const skygate::core::UtcTimePoint& utcTime
 ) noexcept
 {
-    const double gmstDeg = AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
+    const double gmstDeg = skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(utcTime);
     const double localSiderealDeg = skygate::core::AngleMath::normalizeDegrees(gmstDeg + observer.longitudeDeg);
     const double hourAngleDeg =
         skygate::core::AngleMath::normalizeDegreesSigned(localSiderealDeg - equatorial.rightAscensionHours * 15.0);

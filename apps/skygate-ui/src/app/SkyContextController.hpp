@@ -19,7 +19,7 @@
 #include "catalog/IStarCatalog.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 
 #include <QAbstractItemModel>
 #include <QObject>

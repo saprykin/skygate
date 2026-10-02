@@ -1,6 +1,6 @@
 #include "QmlPreferencesTestSupport.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 
 #include <QFileInfo>
 #include <QSettings>
@@ -15,20 +15,20 @@ constexpr std::string_view kEmptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae4
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto start = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 1900,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto end = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2100,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(start.has_value());

@@ -1,6 +1,6 @@
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/DeltaTDataLoader.hpp"
-#include "engine/highprecision/TableBackedDeltaTProvider.hpp"
+#include "engine/DeltaTDataLoader.hpp"
+#include "engine/TableBackedDeltaTProvider.hpp"
 
 #include <QtTest/QtTest>
 
@@ -53,18 +53,25 @@ private:
     };
 }
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
+[[nodiscard]] skygate::core::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = year,
             .month = month,
             .day = day,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(epoch.has_value());
     return *epoch;
+}
+
+[[nodiscard]] skygate::core::CivilDateTime dateFromEpoch(const skygate::core::AstronomicalEpoch& epoch)
+{
+    const auto date = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    Q_ASSERT(date.has_value());
+    return *date;
 }
 
 }  // namespace
@@ -129,9 +136,10 @@ void DeltaTProviderTests::loadsUsnoDeltaTData()
     QVERIFY(result.isSuccess());
     QVERIFY(result.provider != nullptr);
     QCOMPARE(result.provider->entries().size(), std::size_t{3});
-    QCOMPARE(result.provider->entries().front().effectiveUtcDate.astronomicalYear, 1973);
-    QCOMPARE(result.provider->entries().front().effectiveUtcDate.month, 2);
-    QCOMPARE(result.provider->entries().front().effectiveUtcDate.day, 1);
+    const skygate::core::CivilDateTime firstDate = dateFromEpoch(result.provider->entries().front().effectiveUtcEpoch);
+    QCOMPARE(firstDate.astronomicalYear, 1973);
+    QCOMPARE(firstDate.month, 2);
+    QCOMPARE(firstDate.day, 1);
     const skygate::ephemeris::IDeltaTProvider::Estimate estimate =
         result.provider->deltaTSeconds(epochForDate(2026, 1, 1));
     QVERIFY(estimate.isUsable());
@@ -235,13 +243,13 @@ void DeltaTProviderTests::exposesAncientFallbackMetadata()
     QCOMPARE(fallback.validityRange.start.julianDatePart2, epochForDate(-13200, 1, 1).julianDatePart2);
     QCOMPARE(
         static_cast<std::uint8_t>(fallback.validityRange.start.timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
     );
     QCOMPARE(fallback.validityRange.end.julianDatePart1, epochForDate(1600, 1, 1).julianDatePart1);
     QCOMPARE(fallback.validityRange.end.julianDatePart2, epochForDate(1600, 1, 1).julianDatePart2);
     QCOMPARE(
         static_cast<std::uint8_t>(fallback.validityRange.end.timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
     );
 
     const skygate::ephemeris::IDeltaTProvider::Estimate estimate =

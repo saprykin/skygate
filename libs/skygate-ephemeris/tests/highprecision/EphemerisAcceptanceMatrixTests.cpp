@@ -3,14 +3,14 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/IApparentPlaceCalculator.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "engine/highprecision/PreparedEphemerisRequestState.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
@@ -88,20 +88,21 @@ template <typename BodyRange>
     return context;
 }
 
-[[nodiscard]] AstronomicalEpoch makeEpoch(const double julianDatePart1 = 2'460'310.0)
+[[nodiscard]] skygate::core::AstronomicalEpoch makeEpoch(const double julianDatePart1 = 2'460'310.0)
 {
     return {
         .julianDatePart1 = julianDatePart1,
         .julianDatePart2 = 0.5,
-        .timeScale = TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
 }
 
-[[nodiscard]] AstronomicalEpoch makeCivilEpoch(const int year, const int month, const int day)
+[[nodiscard]] skygate::core::AstronomicalEpoch makeCivilEpoch(const int year, const int month, const int day)
 {
-    const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(
-        CivilDateTime{.astronomicalYear = year, .month = month, .day = day}
-    );
+    const std::optional<skygate::core::AstronomicalEpoch> epoch =
+        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{.astronomicalYear = year, .month = month, .day = day}
+        );
     Q_ASSERT(epoch.has_value());
     return *epoch;
 }
@@ -122,7 +123,7 @@ template <typename BodyRange>
 }
 
 [[nodiscard]] EphemerisRequest
-makeRequestForEpoch(const EphemerisCorrectionFlags correctionFlags, const AstronomicalEpoch epoch)
+makeRequestForEpoch(const EphemerisCorrectionFlags correctionFlags, const skygate::core::AstronomicalEpoch epoch)
 {
     EphemerisRequest request = makeRequest(correctionFlags);
     request.epoch = epoch;
@@ -135,8 +136,8 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     return {
         .id = std::move(id),
         .displayName = std::move(displayName),
-        .start = {.julianDatePart1 = startJd, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = endJd, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = startJd, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = endJd, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
 }
 
@@ -244,13 +245,14 @@ public:
         return m_info;
     }
 
-    [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch&) const noexcept override
+    [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch&) const noexcept override
     {
         return Status::Ready;
     }
 
-    [[nodiscard]] ICalcephKernel::StateResult
-    compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const override
+    [[nodiscard]] ICalcephKernel::StateResult compute(
+        const skygate::core::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+    ) const override
     {
         ++m_callCount;
 
@@ -366,7 +368,7 @@ private:
 class AcceptanceTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
         result.epoch = epoch;
@@ -375,12 +377,14 @@ public:
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         TimeScaleConversionResult result;
-        const std::optional<AstronomicalEpoch> epoch = CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
-        result.epoch = epoch.value_or(AstronomicalEpoch{});
+        const std::optional<skygate::core::AstronomicalEpoch> epoch =
+            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        result.epoch = epoch.value_or(skygate::core::AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
         result.status = epoch.has_value() ? TimeScaleConversionStatus::Valid : TimeScaleConversionStatus::Failed;
         return result;
@@ -396,7 +400,6 @@ public:
         m_dataInfo.provenance = "acceptance test";
         m_entries.push_back(
             IEarthOrientationProvider::TableEntry{
-                .effectiveUtcDate = {.astronomicalYear = 2024, .month = 1, .day = 1, .timeScale = TimeScale::Utc},
                 .effectiveUtcEpoch = makeEpoch(),
                 .ut1MinusUtcSeconds = 0.05,
                 .polarMotionXArcseconds = 0.01,
@@ -649,8 +652,8 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
     const HighPrecisionEphemerisEngine engine =
         makeHighPrecisionEngine({makeMarsBody()}, makeOptions(EphemerisCorrectionFlags::geometric()), dependencies);
 
-    AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
-    epoch.timeScale = TimeScale::Tdb;
+    skygate::core::AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
+    epoch.timeScale = skygate::core::TimeScale::Tdb;
     const auto state =
         engine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::geometric(), epoch), "mars");
 
@@ -813,8 +816,8 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
         )
     );
 
-    AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
-    epoch.timeScale = TimeScale::Tdb;
+    skygate::core::AstronomicalEpoch epoch = makeCivilEpoch(2004, 1, 1);
+    epoch.timeScale = skygate::core::TimeScale::Tdb;
     const auto state =
         longRangeEngine.computeBodyState(makeRequestForEpoch(EphemerisCorrectionFlags::geometric(), epoch), "mars");
     QVERIFY(state.has_value());

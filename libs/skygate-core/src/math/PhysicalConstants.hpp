@@ -11,6 +11,12 @@ public:
     static constexpr double kAuPerParsec = 206'264.80624709636;
     static constexpr double kSolarSchwarzschildRadiusAu = 1.97412574336e-8;
     static constexpr double kSynodicMonthDays = 29.530588853;
+
+    static constexpr double kWgs84EquatorialRadiusMeters = 6'378'137.0;
+    static constexpr double kWgs84Flattening = 1.0 / 298.257223563;
+
+    static constexpr double kSolarMeanAnomalyDegAtJ2000 = 357.528;
+    static constexpr double kSolarMeanAnomalyDegPerDay = 0.9856003;
 };
 
 }  // namespace skygate::core

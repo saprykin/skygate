@@ -178,10 +178,10 @@ void EphemerisApiModelTests::combinesCorrectionFlags()
 
 void EphemerisApiModelTests::constructsRequestAndDataSetModels()
 {
-    skygate::ephemeris::AstronomicalEpoch epoch;
+    skygate::core::AstronomicalEpoch epoch;
     epoch.julianDatePart1 = 2'460'310.0;
     epoch.julianDatePart2 = 0.5;
-    epoch.timeScale = skygate::ephemeris::TimeScale::Tt;
+    epoch.timeScale = skygate::core::TimeScale::Tt;
 
     skygate::ephemeris::EphemerisRequest request;
     request.epoch = epoch;
@@ -191,7 +191,7 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
 
     QCOMPARE(
-        static_cast<std::uint8_t>(request.epoch.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
+        static_cast<std::uint8_t>(request.epoch.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt)
     );
     QCOMPARE(
         static_cast<std::uint8_t>(request.options.engineKind()),
@@ -202,11 +202,11 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
     skygate::ephemeris::EphemerisDateRange modernRange;
     modernRange.id = "modern";
     modernRange.displayName = "Modern kernel";
-    modernRange.start = skygate::ephemeris::AstronomicalEpoch{
-        .julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
+    modernRange.start = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb
     };
-    modernRange.end = skygate::ephemeris::AstronomicalEpoch{
-        .julianDatePart1 = 2'600'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
+    modernRange.end = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'600'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb
     };
 
     skygate::ephemeris::EphemerisDatasetInfo dataSet;
@@ -220,7 +220,7 @@ void EphemerisApiModelTests::constructsRequestAndDataSetModels()
     QVERIFY(dataSet.dateRanges.front().id == std::string("modern"));
     QCOMPARE(
         static_cast<std::uint8_t>(dataSet.dateRanges.front().start.timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
     );
 }
 
@@ -281,12 +281,12 @@ void EphemerisApiModelTests::shiftsNonUtcBaseRequestsAtUtcTime()
     skygate::ephemeris::EphemerisEngineOptions options;
     options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
 
-    for (const skygate::ephemeris::TimeScale timeScale :
-         {skygate::ephemeris::TimeScale::Tt, skygate::ephemeris::TimeScale::Tdb, skygate::ephemeris::TimeScale::Ut1}) {
+    for (const skygate::core::TimeScale timeScale :
+         {skygate::core::TimeScale::Tt, skygate::core::TimeScale::Tdb, skygate::core::TimeScale::Ut1}) {
         skygate::ephemeris::EphemerisRequest baseRequest;
         baseRequest.context = context;
         baseRequest.options = options;
-        baseRequest.epoch = skygate::ephemeris::AstronomicalEpoch{
+        baseRequest.epoch = skygate::core::AstronomicalEpoch{
             .julianDatePart1 = 2'460'000.0, .julianDatePart2 = 0.25, .timeScale = timeScale
         };
 
@@ -296,7 +296,7 @@ void EphemerisApiModelTests::shiftsNonUtcBaseRequestsAtUtcTime()
 
         QCOMPARE(
             static_cast<std::uint8_t>(shiftedRequest.epoch.timeScale),
-            static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+            static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
         );
         QCOMPARE(skygate::core::UtcTimeCodec::toEpochMicros(shiftedRequest.context.utcTime), 1'704'067'290'000'000LL);
         const qint64 shiftedRoundTrip = skygate::core::UtcTimeCodec::toEpochMicros(
@@ -315,7 +315,7 @@ void EphemerisApiModelTests::constructsCatalogStarAstrometryModel()
             {
                 .julianDatePart1 = 2'451'545.0,
                 .julianDatePart2 = 0.0,
-                .timeScale = skygate::ephemeris::TimeScale::Tt,
+                .timeScale = skygate::core::TimeScale::Tt,
             },
         .properMotionRightAscensionMasPerYear = 200.0,
         .properMotionDeclinationMasPerYear = -300.0,
@@ -333,68 +333,64 @@ void EphemerisApiModelTests::constructsCatalogStarAstrometryModel()
 
 void EphemerisApiModelTests::constructsAndNormalizesAstronomicalTimePrimitives()
 {
-    const skygate::ephemeris::AstronomicalEpoch overflowEpoch{
+    const skygate::core::AstronomicalEpoch overflowEpoch{
         .julianDatePart1 = 2'451'545.0,
         .julianDatePart2 = 1.75,
-        .timeScale = skygate::ephemeris::TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
     const auto normalizedOverflow = overflowEpoch.normalized();
     QCOMPARE(normalizedOverflow.julianDatePart1, 2'451'546.0);
     QCOMPARE(normalizedOverflow.julianDatePart2, 0.75);
     QCOMPARE(
-        static_cast<std::uint8_t>(normalizedOverflow.timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
+        static_cast<std::uint8_t>(normalizedOverflow.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt)
     );
 
-    const skygate::ephemeris::AstronomicalEpoch negativeFractionEpoch{
+    const skygate::core::AstronomicalEpoch negativeFractionEpoch{
         .julianDatePart1 = 2'451'545.0,
         .julianDatePart2 = -0.25,
-        .timeScale = skygate::ephemeris::TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     const auto normalizedNegativeFraction = negativeFractionEpoch.normalized();
     QCOMPARE(normalizedNegativeFraction.julianDatePart1, 2'451'544.0);
     QCOMPARE(normalizedNegativeFraction.julianDatePart2, 0.75);
     QCOMPARE(
         static_cast<std::uint8_t>(normalizedNegativeFraction.timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tdb)
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
     );
 
-    const skygate::ephemeris::AstronomicalEpoch utcEpoch{
+    const skygate::core::AstronomicalEpoch utcEpoch{
         .julianDatePart1 = 2'451'545.0,
         .julianDatePart2 = 0.25,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
     const auto plusSeconds = utcEpoch.addSeconds(43'200.0);
     QCOMPARE(plusSeconds.julianDatePart1, 2'451'545.0);
     QCOMPARE(plusSeconds.julianDatePart2, 0.75);
     QCOMPARE(
-        static_cast<std::uint8_t>(plusSeconds.timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+        static_cast<std::uint8_t>(plusSeconds.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
     );
 
-    const auto plusMinutesInTai = utcEpoch.addMinutes(720.0, skygate::ephemeris::TimeScale::Tai);
+    const auto plusMinutesInTai = utcEpoch.addMinutes(720.0, skygate::core::TimeScale::Tai);
     QCOMPARE(plusMinutesInTai.julianDatePart1, 2'451'545.0);
     QCOMPARE(plusMinutesInTai.julianDatePart2, 0.75);
     QCOMPARE(
-        static_cast<std::uint8_t>(plusMinutesInTai.timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tai)
+        static_cast<std::uint8_t>(plusMinutesInTai.timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tai)
     );
 
-    const skygate::ephemeris::CivilDateTime j2000Noon{
+    const skygate::core::CivilDateTime j2000Noon{
         .astronomicalYear = 2000,
         .month = 1,
         .day = 1,
         .hour = 12,
         .minute = 0,
         .second = 0,
-        .timeScale = skygate::ephemeris::TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
-    const auto j2000Epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(j2000Noon);
+    const auto j2000Epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(j2000Noon);
     QVERIFY(j2000Epoch.has_value());
     QCOMPARE(j2000Epoch->julianDatePart1, 2'451'545.0);
     QCOMPARE(j2000Epoch->julianDatePart2, 0.0);
-    QCOMPARE(
-        static_cast<std::uint8_t>(j2000Epoch->timeScale), static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Tt)
-    );
+    QCOMPARE(static_cast<std::uint8_t>(j2000Epoch->timeScale), static_cast<std::uint8_t>(skygate::core::TimeScale::Tt));
 }
 
 void EphemerisApiModelTests::exposesCelestialReferenceFrameHelpers()
@@ -490,7 +486,7 @@ void EphemerisApiModelTests::constructsCelestialFrameTransformResults()
 
 void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
 {
-    const skygate::ephemeris::CivilDateTime preciseDateTime{
+    const skygate::core::CivilDateTime preciseDateTime{
         .astronomicalYear = 2026,
         .month = 5,
         .day = 13,
@@ -498,12 +494,12 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
         .minute = 34,
         .second = 56,
         .nanosecond = 123'456'789U,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 
-    const auto preciseEpoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(preciseDateTime);
+    const auto preciseEpoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(preciseDateTime);
     QVERIFY(preciseEpoch.has_value());
-    const auto preciseRoundTrip = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(*preciseEpoch);
+    const auto preciseRoundTrip = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(*preciseEpoch);
     QVERIFY(preciseRoundTrip.has_value());
     QCOMPARE(preciseRoundTrip->astronomicalYear, preciseDateTime.astronomicalYear);
     QCOMPARE(preciseRoundTrip->month, preciseDateTime.month);
@@ -516,50 +512,49 @@ void EphemerisApiModelTests::convertsCivilDatesAndDefinesNoYearZeroPolicy()
                                               : preciseDateTime.nanosecond - preciseRoundTrip->nanosecond;
     QVERIFY(nanosecondDelta <= 1'000U);
 
-    const skygate::ephemeris::CivilDateTime astronomicalYearZero{
+    const skygate::core::CivilDateTime astronomicalYearZero{
         .astronomicalYear = 0,
         .month = 1,
         .day = 1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
-    const auto yearZeroEpoch =
-        skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(astronomicalYearZero);
+    const auto yearZeroEpoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(astronomicalYearZero);
     QVERIFY(yearZeroEpoch.has_value());
-    const auto yearZeroRoundTrip = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(*yearZeroEpoch);
+    const auto yearZeroRoundTrip = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(*yearZeroEpoch);
     QVERIFY(yearZeroRoundTrip.has_value());
     QCOMPARE(yearZeroRoundTrip->astronomicalYear, 0);
     QCOMPARE(yearZeroRoundTrip->month, 1);
     QCOMPARE(yearZeroRoundTrip->day, 1);
 
-    const auto astronomicalFromOneBce = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-1);
+    const auto astronomicalFromOneBce = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(-1);
     QVERIFY(astronomicalFromOneBce.has_value());
     QCOMPARE(*astronomicalFromOneBce, 0);
-    const auto astronomicalFromFortyFourBce = skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(-44);
+    const auto astronomicalFromFortyFourBce = skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(-44);
     QVERIFY(astronomicalFromFortyFourBce.has_value());
     QCOMPARE(*astronomicalFromFortyFourBce, -43);
-    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
-    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(0), -1);
-    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(-43), -44);
-    QCOMPARE(skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(2026), 2026);
+    QVERIFY(!skygate::core::CalendarTime::astronomicalYearFromHistoricalYear(0).has_value());
+    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(0), -1);
+    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(-43), -44);
+    QCOMPARE(skygate::core::CalendarTime::historicalYearFromAstronomicalYear(2026), 2026);
 
-    const skygate::ephemeris::CivilDateTime invalidLeapDay{
+    const skygate::core::CivilDateTime invalidLeapDay{
         .astronomicalYear = 2023,
         .month = 2,
         .day = 29,
     };
-    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(invalidLeapDay).has_value());
+    QVERIFY(!skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(invalidLeapDay).has_value());
 
-    const skygate::ephemeris::CivilDateTime leapSecondLabel{
+    const skygate::core::CivilDateTime leapSecondLabel{
         .astronomicalYear = 2016,
         .month = 12,
         .day = 31,
         .hour = 23,
         .minute = 59,
         .second = 60,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
-    QVERIFY(skygate::ephemeris::CalendarTime::isValidCivilDateTime(leapSecondLabel));
-    QVERIFY(!skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(leapSecondLabel).has_value());
+    QVERIFY(skygate::core::CalendarTime::isValidCivilDateTime(leapSecondLabel));
+    QVERIFY(!skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(leapSecondLabel).has_value());
 }
 
 void EphemerisApiModelTests::constructsFactoryRequestDefaults()

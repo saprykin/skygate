@@ -102,15 +102,15 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
 }
 
 [[nodiscard]] bool
-epochsEqual(const skygate::ephemeris::AstronomicalEpoch& lhs, const skygate::ephemeris::AstronomicalEpoch& rhs) noexcept
+epochsEqual(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::AstronomicalEpoch& rhs) noexcept
 {
     return lhs.julianDatePart1 == rhs.julianDatePart1 && lhs.julianDatePart2 == rhs.julianDatePart2
            && lhs.timeScale == rhs.timeScale;
 }
 
 [[nodiscard]] bool optionalEpochsEqual(
-    const std::optional<skygate::ephemeris::AstronomicalEpoch>& lhs,
-    const std::optional<skygate::ephemeris::AstronomicalEpoch>& rhs
+    const std::optional<skygate::core::AstronomicalEpoch>& lhs,
+    const std::optional<skygate::core::AstronomicalEpoch>& rhs
 ) noexcept
 {
     if (lhs.has_value() != rhs.has_value()) {
@@ -577,7 +577,7 @@ SkyObjectTrailBuilder::TrailSampleCacheKey SkyObjectTrailBuilder::sampleCacheKey
         .ephemerisEngine = input.ephemerisEngine,
         .context = context,
         .requestEpoch = input.ephemerisRequest.has_value() ? std::make_optional(input.ephemerisRequest->epoch)
-                                                           : std::optional<skygate::ephemeris::AstronomicalEpoch>{},
+                                                           : std::optional<skygate::core::AstronomicalEpoch>{},
         .requestOptions = input.ephemerisRequest.has_value()
                               ? std::make_optional(input.ephemerisRequest->options)
                               : std::optional<skygate::ephemeris::EphemerisEngineOptions>{},

@@ -8,17 +8,17 @@
 
 namespace {
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch
+[[nodiscard]] skygate::core::AstronomicalEpoch
 epochFromCivil(const int year, const int month, const int day, const int hour, const int minute)
 {
-    return *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    return *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = year,
             .month = month,
             .day = day,
             .hour = hour,
             .minute = minute,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
 }

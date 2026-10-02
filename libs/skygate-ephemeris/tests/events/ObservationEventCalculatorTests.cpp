@@ -60,7 +60,7 @@ double currentLocalSiderealHours(const skygate::core::ObservationContext& contex
 {
     return skygate::core::AngleMath::normalizeHours(
         skygate::core::AngleMath::normalizeDegrees(
-            skygate::ephemeris::AstronomicalTime::greenwichMeanSiderealTimeDeg(context.utcTime)
+            skygate::core::AstronomicalTime::greenwichMeanSiderealTimeDeg(context.utcTime)
             + context.observer.longitudeDeg
         )
         / 15.0
@@ -229,7 +229,7 @@ public:
 
     skygate::ephemeris::EphemerisEngineOptions engineOptions;
     skygate::core::UtcTimePoint baseUtcTime{};
-    skygate::ephemeris::AstronomicalEpoch baseEpoch;
+    skygate::core::AstronomicalEpoch baseEpoch;
     mutable int requestSampleCount = 0;
     mutable int contextSampleCount = 0;
     mutable bool sawLightTimeRequest = false;
@@ -454,12 +454,12 @@ void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSear
     );
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext();
-    request.epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    request.epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2024,
             .month = 6,
             .day = 2,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     request.options = engine.options();
@@ -480,12 +480,12 @@ void ObservationEventCalculatorTests::requestOverloadPropagatesOptionsAndSampleE
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeContext(0.0, 0.0);
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(0));
-    request.epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    request.epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 1970,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);

@@ -70,7 +70,7 @@ class RequestAwareTrailEngine final : public skygate::ephemeris::IEphemerisEngin
 public:
     struct RequestSample final {
         std::int64_t utcSeconds = 0;
-        skygate::ephemeris::AstronomicalEpoch epoch;
+        skygate::core::AstronomicalEpoch epoch;
         skygate::ephemeris::EphemerisEngineOptions options;
         std::size_t bodyIndex = 0U;
     };
@@ -275,8 +275,8 @@ void BodyTrailCalculatorTests::requestSamplingPreservesOptionsAndUpdatesEpochs()
 
     skygate::ephemeris::EphemerisRequest request;
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
-    request.epoch = skygate::ephemeris::AstronomicalEpoch{
-        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());

@@ -19,12 +19,12 @@ constexpr std::size_t kHygMinExpectedBytesPerDataRow = 6;
 constexpr double kMasPerArcsecond = 1'000.0;
 constexpr double kHygMissingDistanceParsecs = 100'000.0;
 
-[[nodiscard]] AstronomicalEpoch j2000CatalogEpoch() noexcept
+[[nodiscard]] skygate::core::AstronomicalEpoch j2000CatalogEpoch() noexcept
 {
     return {
         .julianDatePart1 = 2'451'545.0,
         .julianDatePart2 = 0.0,
-        .timeScale = TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
 }
 

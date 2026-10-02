@@ -1,9 +1,9 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernel.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -61,10 +61,10 @@ private:
     bool m_requireRequestedAssetId = true;
 };
 
-[[nodiscard]] skygate::ephemeris::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
+[[nodiscard]] skygate::core::AstronomicalEpoch epochForDate(const int year, const int month, const int day)
 {
-    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{.astronomicalYear = year, .month = month, .day = day}
+    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{.astronomicalYear = year, .month = month, .day = day}
     );
     Q_ASSERT(epoch.has_value());
     return *epoch;
@@ -432,7 +432,7 @@ void CalcephKernelProviderTests::rejectsNonTdbEpochsBeforeCallingKernel()
     const std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernel> kernel =
         openProvidedKernel(provider);
 
-    const skygate::ephemeris::AstronomicalEpoch utcEpoch = epochForDate(2000, 1, 1);
+    const skygate::core::AstronomicalEpoch utcEpoch = epochForDate(2000, 1, 1);
     const skygate::ephemeris::highprecision::ICalcephKernel::StateResult result = kernel->compute(utcEpoch, 499, 399);
 
     QCOMPARE(

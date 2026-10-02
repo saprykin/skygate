@@ -5,7 +5,7 @@
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
 
@@ -24,12 +24,12 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
 
-[[nodiscard]] AstronomicalEpoch epochForYearOffset(const double years) noexcept
+[[nodiscard]] skygate::core::AstronomicalEpoch epochForYearOffset(const double years) noexcept
 {
     return {
         .julianDatePart1 = 2'451'545.0,
         .julianDatePart2 = years * 365.25,
-        .timeScale = TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
 }
 
@@ -205,7 +205,7 @@ makeFixedEarthKernel(std::optional<Vector3d> earthPositionAu, const bool require
     auto kernel = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
     kernel->setDefaultResult(std::move(result));
     if (requireTdbEpoch) {
-        kernel->setRequiredTimeScale(TimeScale::Tdb);
+        kernel->setRequiredTimeScale(skygate::core::TimeScale::Tdb);
     }
     return kernel;
 }
@@ -213,7 +213,7 @@ makeFixedEarthKernel(std::optional<Vector3d> earthPositionAu, const bool require
 class FixedTdbTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         ++m_callCount;
         m_lastTargetScale = targetScale;
@@ -225,8 +225,9 @@ public:
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
 
@@ -242,14 +243,14 @@ public:
         return m_callCount;
     }
 
-    [[nodiscard]] TimeScale lastTargetScale() const noexcept
+    [[nodiscard]] skygate::core::TimeScale lastTargetScale() const noexcept
     {
         return m_lastTargetScale;
     }
 
 private:
     mutable int m_callCount = 0;
-    mutable TimeScale m_lastTargetScale = TimeScale::Utc;
+    mutable skygate::core::TimeScale m_lastTargetScale = skygate::core::TimeScale::Utc;
 };
 
 }  // namespace
@@ -386,9 +387,15 @@ void StarAstrometryCalculatorTests::appliesAnnualParallaxWithEarthBarycentricSta
     QCOMPARE(kernel->callCount(), 1);
     QCOMPARE(kernel->lastTargetNaifId(), 399);
     QCOMPARE(kernel->lastCenterNaifId(), 0);
-    QCOMPARE(static_cast<std::uint8_t>(kernel->lastEpoch().timeScale), static_cast<std::uint8_t>(TimeScale::Tdb));
+    QCOMPARE(
+        static_cast<std::uint8_t>(kernel->lastEpoch().timeScale),
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
+    );
     QCOMPARE(timeScaleService->callCount(), 1);
-    QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Tdb));
+    QCOMPARE(
+        static_cast<std::uint8_t>(timeScaleService->lastTargetScale()),
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Tdb)
+    );
 }
 
 void StarAstrometryCalculatorTests::batchMatchesSingleStarPropagationForFullPartialAndFixedStars()

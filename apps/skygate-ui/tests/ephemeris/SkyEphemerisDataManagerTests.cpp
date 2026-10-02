@@ -8,7 +8,7 @@
 #include "SkySettingsStore.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -76,20 +76,20 @@ SkySettingsStore::EphemerisDataCacheSnapshot installedSnapshot(
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto start = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2000,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto end = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2100,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(start.has_value());

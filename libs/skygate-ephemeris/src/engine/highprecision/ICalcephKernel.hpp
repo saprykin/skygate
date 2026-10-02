@@ -50,9 +50,9 @@ public:
     [[nodiscard]] virtual Status status() const noexcept = 0;
     [[nodiscard]] virtual const std::vector<std::string>& diagnostics() const noexcept = 0;
     [[nodiscard]] virtual const std::optional<Info>& kernelInfo() const noexcept = 0;
-    [[nodiscard]] virtual Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept = 0;
+    [[nodiscard]] virtual Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept = 0;
     [[nodiscard]] virtual StateResult
-    compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const = 0;
+    compute(const skygate::core::AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const = 0;
 };
 
 }  // namespace skygate::ephemeris::highprecision

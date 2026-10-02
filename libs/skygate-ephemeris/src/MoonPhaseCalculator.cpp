@@ -10,9 +10,9 @@
 namespace skygate::ephemeris {
 namespace {
 
-[[nodiscard]] double normalizedLunarCycleFraction(const AstronomicalEpoch& epoch) noexcept
+[[nodiscard]] double normalizedLunarCycleFraction(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
-    const AstronomicalEpoch normalizedEpoch = epoch.normalized();
+    const skygate::core::AstronomicalEpoch normalizedEpoch = epoch.normalized();
     const double julianDay = normalizedEpoch.julianDatePart1 + normalizedEpoch.julianDatePart2;
     const double daysSinceKnownNewMoon = julianDay - skygate::core::TimeConstants::kJulianDateKnownNewMoon;
     double fraction = std::fmod(daysSinceKnownNewMoon / skygate::core::PhysicalConstants::kSynodicMonthDays, 1.0);
@@ -55,7 +55,7 @@ namespace {
 
 }  // namespace
 
-MoonPhase MoonPhaseCalculator::compute(const AstronomicalEpoch& epoch) const noexcept
+MoonPhase MoonPhaseCalculator::compute(const skygate::core::AstronomicalEpoch& epoch) const noexcept
 {
     const double fraction = normalizedLunarCycleFraction(epoch);
     return MoonPhase{

@@ -17,7 +17,8 @@ skygate::core::HorizontalCoordinate CelestialReferenceCalculator::eclipticPoint(
     const skygate::core::UtcTimePoint& utcTime
 ) noexcept
 {
-    const double obliquityDeg = AstronomicalTime::meanObliquityDeg(EpochCodec::daysSinceJ2000(utcTime));
+    const double obliquityDeg =
+        skygate::core::AstronomicalTime::meanObliquityDeg(skygate::core::EpochCodec::daysSinceJ2000(utcTime));
     return EquatorialToHorizontalCalculator::compute(
         EclipticToEquatorialCalculator::compute(eclipticLongitudeDeg, 0.0, obliquityDeg), observer, utcTime
     );

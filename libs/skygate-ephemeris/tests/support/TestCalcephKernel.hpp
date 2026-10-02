@@ -14,7 +14,7 @@ namespace skygate::ephemeris::tests {
 class TestCalcephKernel final : public skygate::ephemeris::highprecision::ICalcephKernel {
 public:
     struct Call {
-        AstronomicalEpoch epoch;
+        skygate::core::AstronomicalEpoch epoch;
         int targetNaifId = 0;
         int centerNaifId = 0;
     };
@@ -25,15 +25,15 @@ public:
     [[nodiscard]] Status status() const noexcept override;
     [[nodiscard]] const std::vector<std::string>& diagnostics() const noexcept override;
     [[nodiscard]] const std::optional<Info>& kernelInfo() const noexcept override;
-    [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept override;
+    [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept override;
     [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult
-    compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
+    compute(const skygate::core::AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override;
 
     void setStatus(Status status) noexcept;
     void setDiagnostics(std::vector<std::string> diagnostics);
     void setKernelInfo(Info info);
     void clearKernelInfo() noexcept;
-    void setRequiredTimeScale(TimeScale timeScale);
+    void setRequiredTimeScale(skygate::core::TimeScale timeScale);
     void clearRequiredTimeScale() noexcept;
     void setValidateEpochRange(bool validateEpochRange) noexcept;
     void setDefaultResult(skygate::ephemeris::highprecision::ICalcephKernel::StateResult result);
@@ -50,7 +50,7 @@ public:
     );
 
     [[nodiscard]] int callCount() const noexcept;
-    [[nodiscard]] const AstronomicalEpoch& lastEpoch() const noexcept;
+    [[nodiscard]] const skygate::core::AstronomicalEpoch& lastEpoch() const noexcept;
     [[nodiscard]] int lastTargetNaifId() const noexcept;
     [[nodiscard]] int lastCenterNaifId() const noexcept;
     [[nodiscard]] const std::vector<Call>& calls() const noexcept;
@@ -63,7 +63,7 @@ private:
     Status m_status = Status::Ready;
     std::vector<std::string> m_diagnostics;
     std::optional<Info> m_kernelInfo;
-    std::optional<TimeScale> m_requiredTimeScale;
+    std::optional<skygate::core::TimeScale> m_requiredTimeScale;
     bool m_validateEpochRange = true;
     skygate::ephemeris::highprecision::ICalcephKernel::StateResult m_defaultResult;
     std::map<ResponseKey, skygate::ephemeris::highprecision::ICalcephKernel::StateResult> m_responses;
@@ -71,7 +71,7 @@ private:
         m_responseSequences;
     mutable std::map<ResponseKey, std::size_t> m_responseSequenceIndexes;
     mutable int m_callCount = 0;
-    mutable AstronomicalEpoch m_lastEpoch;
+    mutable skygate::core::AstronomicalEpoch m_lastEpoch;
     mutable int m_lastTargetNaifId = 0;
     mutable int m_lastCenterNaifId = 0;
     mutable std::vector<Call> m_calls;

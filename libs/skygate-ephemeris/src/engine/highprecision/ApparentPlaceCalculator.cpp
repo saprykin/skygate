@@ -1,11 +1,11 @@
 #include "ApparentPlaceCalculator.hpp"
 #include "CelestialFrameMath.hpp"
-#include "EarthOrientationSampler.hpp"
+#include "engine/EarthOrientationSampler.hpp"
 #include "EphemerisMetadataMerger.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IFrameTransformer.hpp"
-#include "ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
@@ -254,7 +254,7 @@ private:
         }
 
         const TimeScaleConversionResult utcConversion =
-            m_context.timeScaleService->convert(m_context.request.epoch, TimeScale::Utc);
+            m_context.timeScaleService->convert(m_context.request.epoch, skygate::core::TimeScale::Utc);
         EphemerisMetadataMerger::mergeTimeScale(
             state.metadata, utcConversion, EphemerisMetadataFailurePolicy::MarkFailed
         );

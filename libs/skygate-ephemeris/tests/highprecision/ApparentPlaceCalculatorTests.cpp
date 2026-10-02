@@ -7,9 +7,9 @@
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
 #include "engine/highprecision/HighPrecisionComputationInput.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "engine/highprecision/StarAstrometryBatchResult.hpp"
-#include "engine/highprecision/TableBackedEarthOrientationProvider.hpp"
+#include "engine/TableBackedEarthOrientationProvider.hpp"
 
 #include <QFile>
 #include <QJsonArray>
@@ -87,7 +87,7 @@ struct TopocentricFixture {
     request.epoch = {
         .julianDatePart1 = 2'460'310.0,
         .julianDatePart2 = 0.5,
-        .timeScale = TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(correctionFlags);
@@ -227,7 +227,7 @@ struct TopocentricFixture {
     fixture.request.epoch = {
         .julianDatePart1 = requestObject.value(QStringLiteral("utcJulianDate")).toDouble(),
         .julianDatePart2 = 0.0,
-        .timeScale = TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
     fixture.request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     fixture.request.options.setCorrectionFlags(EphemerisCorrectionFlags::topocentric());
@@ -269,7 +269,7 @@ struct TopocentricFixture {
     const IFrameTransformer& transformer,
     const CelestialReferenceFrame::Type sourceFrame,
     const CelestialReferenceFrame::Type targetFrame,
-    const AstronomicalEpoch& epoch,
+    const skygate::core::AstronomicalEpoch& epoch,
     const Vector3d& vector
 )
 {
@@ -539,13 +539,13 @@ private:
 class ValidUtcTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         ++m_convertCallCount;
         m_lastTargetScale = targetScale;
         return {
             .epoch =
-                AstronomicalEpoch{
+                skygate::core::AstronomicalEpoch{
                     .julianDatePart1 = epoch.julianDatePart1,
                     .julianDatePart2 = epoch.julianDatePart2,
                     .timeScale = targetScale,
@@ -556,8 +556,9 @@ public:
         };
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
         static_cast<void>(targetScale);
@@ -569,14 +570,14 @@ public:
         return m_convertCallCount;
     }
 
-    [[nodiscard]] TimeScale lastTargetScale() const noexcept
+    [[nodiscard]] skygate::core::TimeScale lastTargetScale() const noexcept
     {
         return m_lastTargetScale;
     }
 
 private:
     mutable int m_convertCallCount = 0;
-    mutable TimeScale m_lastTargetScale = TimeScale::Utc;
+    mutable skygate::core::TimeScale m_lastTargetScale = skygate::core::TimeScale::Utc;
 };
 
 class FixedTopocentricTimeScaleService final : public ITimeScaleService {
@@ -587,24 +588,25 @@ public:
     }
 
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         TimeScaleConversionResult result;
         result.status = TimeScaleConversionStatus::Valid;
         result.diagnosticText = "unit test fixed UTC conversion";
         result.epoch = epoch;
         result.epoch.timeScale = targetScale;
-        if (epoch.timeScale == TimeScale::Utc && targetScale == TimeScale::Tt) {
+        if (epoch.timeScale == skygate::core::TimeScale::Utc && targetScale == skygate::core::TimeScale::Tt) {
             result.epoch.julianDatePart2 = addSecondsToJulianDatePart2(epoch.julianDatePart2, m_ttMinusUtcSeconds);
-        } else if (epoch.timeScale == TimeScale::Utc && targetScale == TimeScale::Ut1) {
+        } else if (epoch.timeScale == skygate::core::TimeScale::Utc && targetScale == skygate::core::TimeScale::Ut1) {
             result.epoch.julianDatePart2 = addSecondsToJulianDatePart2(epoch.julianDatePart2, m_ut1MinusUtcSeconds);
         }
         result.epoch = result.epoch.normalized();
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
         static_cast<void>(targetScale);
@@ -619,11 +621,11 @@ private:
 class DegradedTtTimeScaleService final : public ITimeScaleService {
 public:
     [[nodiscard]] TimeScaleConversionResult
-    convert(const AstronomicalEpoch& epoch, const TimeScale targetScale) const override
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         ++m_convertCallCount;
         m_lastTargetScale = targetScale;
-        if (targetScale != TimeScale::Tt) {
+        if (targetScale != skygate::core::TimeScale::Tt) {
             TimeScaleConversionResult result;
             result.epoch = epoch;
             result.status = TimeScaleConversionStatus::Failed;
@@ -633,10 +635,10 @@ public:
 
         TimeScaleConversionResult result;
         result.epoch =
-            AstronomicalEpoch{
+            skygate::core::AstronomicalEpoch{
                 .julianDatePart1 = epoch.julianDatePart1,
                 .julianDatePart2 = epoch.julianDatePart2,
-                .timeScale = TimeScale::Tt,
+                .timeScale = skygate::core::TimeScale::Tt,
             }
                 .normalized();
         result.status = TimeScaleConversionStatus::Degraded;
@@ -645,8 +647,9 @@ public:
         return result;
     }
 
-    [[nodiscard]] TimeScaleConversionResult
-    convertCivilDateTime(const CivilDateTime& dateTime, const TimeScale targetScale) const override
+    [[nodiscard]] TimeScaleConversionResult convertCivilDateTime(
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
+    ) const override
     {
         static_cast<void>(dateTime);
         static_cast<void>(targetScale);
@@ -658,18 +661,18 @@ public:
         return m_convertCallCount;
     }
 
-    [[nodiscard]] TimeScale lastTargetScale() const noexcept
+    [[nodiscard]] skygate::core::TimeScale lastTargetScale() const noexcept
     {
         return m_lastTargetScale;
     }
 
 private:
     mutable int m_convertCallCount = 0;
-    mutable TimeScale m_lastTargetScale = TimeScale::Utc;
+    mutable skygate::core::TimeScale m_lastTargetScale = skygate::core::TimeScale::Utc;
 };
 
 [[nodiscard]] std::shared_ptr<const IEarthOrientationProvider> makeEarthOrientationProvider(
-    const AstronomicalEpoch& utcEpoch,
+    const skygate::core::AstronomicalEpoch& utcEpoch,
     const double ut1MinusUtcSeconds,
     const double polarMotionXArcseconds,
     const double polarMotionYArcseconds
@@ -692,7 +695,7 @@ private:
     );
 }
 
-void compareEpochs(const AstronomicalEpoch& actual, const AstronomicalEpoch& expected)
+void compareEpochs(const skygate::core::AstronomicalEpoch& actual, const skygate::core::AstronomicalEpoch& expected)
 {
     QCOMPARE(actual.julianDatePart1, expected.julianDatePart1);
     QCOMPARE(actual.julianDatePart2, expected.julianDatePart2);
@@ -1085,7 +1088,7 @@ void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataF
         {
             .julianDatePart1 = 2'400'000.5,
             .julianDatePart2 = 53'736.0,
-            .timeScale = TimeScale::Tt,
+            .timeScale = skygate::core::TimeScale::Tt,
         },
         {.x = 1.0, .y = 0.0, .z = 0.0}
     );
@@ -1100,13 +1103,16 @@ void ApparentPlaceCalculatorTests::propagatesDegradedRealFrameTransformMetadataF
     request.epoch = {
         .julianDatePart1 = 2'400'000.5,
         .julianDatePart2 = 53'736.0,
-        .timeScale = TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 
     const HighPrecisionCalculatorResult result = calculator.apply(makeInput(request), makeCalculatorResult());
 
     QCOMPARE(timeScaleService->convertCallCount(), 1);
-    QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Tt));
+    QCOMPARE(
+        static_cast<std::uint8_t>(timeScaleService->lastTargetScale()),
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Tt)
+    );
     QVERIFY(result.equatorial.has_value());
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),
@@ -1145,7 +1151,10 @@ void ApparentPlaceCalculatorTests::appliesTopocentricParallaxAndHorizontalCoordi
     );
 
     QCOMPARE(timeScaleService->convertCallCount(), 1);
-    QCOMPARE(static_cast<std::uint8_t>(timeScaleService->lastTargetScale()), static_cast<std::uint8_t>(TimeScale::Utc));
+    QCOMPARE(
+        static_cast<std::uint8_t>(timeScaleService->lastTargetScale()),
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
+    );
     QCOMPARE(frameTransformer->callCount(), 3);
     QCOMPARE(
         static_cast<std::uint8_t>(frameTransformer->lastTargetFrame()),

@@ -17,12 +17,12 @@ using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
 using namespace skygate::core;
 
-[[nodiscard]] AstronomicalEpoch referenceEpoch()
+[[nodiscard]] skygate::core::AstronomicalEpoch referenceEpoch()
 {
     return {
         .julianDatePart1 = 2'451'545.0,
         .julianDatePart2 = 0.25,
-        .timeScale = TimeScale::Tt,
+        .timeScale = skygate::core::TimeScale::Tt,
     };
 }
 
@@ -54,7 +54,7 @@ using namespace skygate::core;
             .end = {
                 .julianDatePart1 = 2'452'545.0,
                 .julianDatePart2 = 0.25,
-                .timeScale = TimeScale::Tt,
+                .timeScale = skygate::core::TimeScale::Tt,
             },
         },
     };
@@ -174,7 +174,7 @@ void CatalogStarAstrometryArraysTests::buildsCacheFriendlyArraysFromFullPartialA
     QCOMPARE(arrays.referenceEquatorial(0).rightAscensionHours, 10.25);
     QCOMPARE(arrays.referenceEquatorial(0).declinationDeg, 20.5);
     QCOMPARE(arrays.referenceEpoch(0).julianDatePart1, referenceEpoch().julianDatePart1);
-    QCOMPARE(static_cast<int>(arrays.referenceEpoch(0).timeScale), static_cast<int>(TimeScale::Tt));
+    QCOMPARE(static_cast<int>(arrays.referenceEpoch(0).timeScale), static_cast<int>(skygate::core::TimeScale::Tt));
     QCOMPARE(*arrays.properMotionRightAscensionMasPerYear(0), 125.0);
     QCOMPARE(*arrays.properMotionDeclinationMasPerYear(0), -55.0);
     QCOMPARE(*arrays.stellarParallaxMas(0), 7.5);

@@ -211,15 +211,15 @@ QStringList correctionNames(const skygate::ephemeris::EphemerisCorrectionFlags f
     return names;
 }
 
-QString formatDate(const skygate::ephemeris::AstronomicalEpoch& epoch)
+QString formatDate(const skygate::core::AstronomicalEpoch& epoch)
 {
-    const auto dateTime = skygate::ephemeris::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
+    const auto dateTime = skygate::core::CalendarTime::civilDateTimeFromAstronomicalEpoch(epoch);
     if (!dateTime.has_value()) {
         return "--";
     }
 
     const int historicalYear =
-        skygate::ephemeris::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
+        skygate::core::CalendarTime::historicalYearFromAstronomicalYear(dateTime->astronomicalYear);
     return SkyQtTimeCodec::formatDateText(QDate(historicalYear, dateTime->month, dateTime->day));
 }
 

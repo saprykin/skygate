@@ -61,6 +61,12 @@ public:
     [[nodiscard]] virtual std::optional<CelestialBodyState>
     computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const = 0;
 
+    // Observation-context overloads are a convenience API for callers that
+    // only have an observer and a UTC instant. They construct an
+    // EphemerisRequest from the engine's current options and a UTC epoch
+    // derived from context.utcTime, so they intentionally use defaults for
+    // corrections, precision, and fallback. Callers that need explicit epoch
+    // or correction control should build an EphemerisRequest instead.
     [[nodiscard]] virtual EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const = 0;
     [[nodiscard]] virtual std::optional<CelestialBodyState>
     computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const = 0;

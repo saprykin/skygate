@@ -47,7 +47,7 @@ void mixString(std::uint64_t& hash, const std::string_view value) noexcept
     }
 }
 
-void mixEpoch(std::uint64_t& hash, const AstronomicalEpoch& epoch) noexcept
+void mixEpoch(std::uint64_t& hash, const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
     mixDouble(hash, epoch.julianDatePart1);
     mixDouble(hash, epoch.julianDatePart2);
@@ -119,7 +119,8 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
     return std::bit_cast<std::uint64_t>(lhs) == std::bit_cast<std::uint64_t>(rhs);
 }
 
-[[nodiscard]] bool sameEpoch(const AstronomicalEpoch& lhs, const AstronomicalEpoch& rhs) noexcept
+[[nodiscard]] bool
+sameEpoch(const skygate::core::AstronomicalEpoch& lhs, const skygate::core::AstronomicalEpoch& rhs) noexcept
 {
     return sameDoubleIdentity(lhs.julianDatePart1, rhs.julianDatePart1)
            && sameDoubleIdentity(lhs.julianDatePart2, rhs.julianDatePart2) && lhs.timeScale == rhs.timeScale;

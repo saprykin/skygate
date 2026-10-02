@@ -26,9 +26,9 @@ void captureCalcephError(const char* message)
 {
     g_lastCalcephError = message != nullptr ? std::string{message} : std::string{};
 }
-[[nodiscard]] std::optional<double> utcSortKeyForTdbEpoch(const AstronomicalEpoch& epoch) noexcept
+[[nodiscard]] std::optional<double> utcSortKeyForTdbEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
-    if (epoch.timeScale != TimeScale::Tdb || !epoch.isFinite()) {
+    if (epoch.timeScale != skygate::core::TimeScale::Tdb || !epoch.isFinite()) {
         return std::nullopt;
     }
 
@@ -39,7 +39,7 @@ void captureCalcephError(const char* message)
         return std::nullopt;
     }
 
-    const AstronomicalEpoch tt = epoch.addSeconds(-tdbMinusTtSeconds, TimeScale::Tt);
+    const skygate::core::AstronomicalEpoch tt = epoch.addSeconds(-tdbMinusTtSeconds, skygate::core::TimeScale::Tt);
     double tai1 = 0.0;
     double tai2 = 0.0;
     if (eraTttai(tt.julianDatePart1, tt.julianDatePart2, &tai1, &tai2) != 0) {
@@ -52,7 +52,9 @@ void captureCalcephError(const char* message)
         return std::nullopt;
     }
 
-    const AstronomicalEpoch utcEpoch{.julianDatePart1 = utc1, .julianDatePart2 = utc2, .timeScale = TimeScale::Utc};
+    const skygate::core::AstronomicalEpoch utcEpoch{
+        .julianDatePart1 = utc1, .julianDatePart2 = utc2, .timeScale = skygate::core::TimeScale::Utc
+    };
     return utcEpoch.sortKey();
 }
 #endif
@@ -96,7 +98,7 @@ struct CalcephKernel::Impl final {
     Impl(const Impl&) = delete;
     Impl& operator=(const Impl&) = delete;
 
-    [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept
+    [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept
     {
         if (m_status != Status::Ready || !m_kernelInfo.has_value()) {
             return m_status;
@@ -109,7 +111,7 @@ struct CalcephKernel::Impl final {
         // Kernel epochs are expressed in TDB while the manifest validity range
         // is expressed in UTC. Convert the epoch to UTC before comparing so a
         // ~69 second boundary offset cannot misclassify the requested instant.
-        if (epoch.timeScale == TimeScale::Tdb) {
+        if (epoch.timeScale == skygate::core::TimeScale::Tdb) {
             const std::optional<double> utcKey = utcSortKeyForTdbEpoch(epoch);
             if (utcKey.has_value()) {
                 return *utcKey < m_kernelInfo->validityRange.start.sortKey()
@@ -129,12 +131,12 @@ struct CalcephKernel::Impl final {
     }
 
     [[nodiscard]] ICalcephKernel::StateResult
-    compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
+    compute(const skygate::core::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
     {
         ICalcephKernel::StateResult result;
         result.metadata.dataSourceProvenance = "CALCEPH solar-system kernel";
 
-        if (epoch.timeScale != TimeScale::Tdb) {
+        if (epoch.timeScale != skygate::core::TimeScale::Tdb) {
             result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
             return result;
@@ -227,13 +229,14 @@ const std::optional<ICalcephKernel::Info>& CalcephKernel::kernelInfo() const noe
     return m_impl->m_kernelInfo;
 }
 
-ICalcephKernel::Status CalcephKernel::statusForEpoch(const AstronomicalEpoch& epoch) const noexcept
+ICalcephKernel::Status CalcephKernel::statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept
 {
     return m_impl->statusForEpoch(epoch);
 }
 
-ICalcephKernel::StateResult
-CalcephKernel::compute(const AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId) const
+ICalcephKernel::StateResult CalcephKernel::compute(
+    const skygate::core::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+) const
 {
     return m_impl->compute(epoch, targetNaifId, centerNaifId);
 }

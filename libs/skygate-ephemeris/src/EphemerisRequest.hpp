@@ -8,7 +8,7 @@
 namespace skygate::ephemeris {
 
 struct EphemerisRequest {
-    AstronomicalEpoch epoch;
+    skygate::core::AstronomicalEpoch epoch;
     skygate::core::ObservationContext context;
     EphemerisEngineOptions options;
 

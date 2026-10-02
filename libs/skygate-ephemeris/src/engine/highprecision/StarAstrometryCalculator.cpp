@@ -4,7 +4,7 @@
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "ICalcephKernel.hpp"
-#include "ITimeScaleService.hpp"
+#include "engine/ITimeScaleService.hpp"
 #include "PreparedEphemerisRequestState.hpp"
 #include "StarAstrometryBatchResult.hpp"
 #include "math/AngleMath.hpp"
@@ -33,7 +33,8 @@ constexpr int kNaifSolarSystemBarycenter = 0;
            && coordinate.declinationDeg >= -90.0 && coordinate.declinationDeg <= 90.0;
 }
 
-[[nodiscard]] double yearsBetween(const AstronomicalEpoch& start, const AstronomicalEpoch& end) noexcept
+[[nodiscard]] double
+yearsBetween(const skygate::core::AstronomicalEpoch& start, const skygate::core::AstronomicalEpoch& end) noexcept
 {
     return (end.sortKey() - start.sortKey()) / TimeConstants::kJulianDaysPerYear;
 }
@@ -151,13 +152,13 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
     return referencePosition + (velocity * years);
 }
 
-[[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
+[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> tdbEpochForKernel(
     EphemerisEngineQueryResult& metadata,
-    const AstronomicalEpoch& epoch,
+    const skygate::core::AstronomicalEpoch& epoch,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService
 ) noexcept
 {
-    if (epoch.timeScale == TimeScale::Tdb) {
+    if (epoch.timeScale == skygate::core::TimeScale::Tdb) {
         return epoch;
     }
     if (timeScaleService == nullptr) {
@@ -168,7 +169,7 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
         return std::nullopt;
     }
 
-    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, TimeScale::Tdb);
+    const TimeScaleConversionResult conversion = timeScaleService->convert(epoch, skygate::core::TimeScale::Tdb);
     EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
     if (!conversion.isSuccess()) {
         return std::nullopt;
@@ -177,9 +178,9 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
     return conversion.epoch;
 }
 
-[[nodiscard]] std::optional<AstronomicalEpoch> tdbEpochForKernel(
+[[nodiscard]] std::optional<skygate::core::AstronomicalEpoch> tdbEpochForKernel(
     EphemerisEngineQueryResult& metadata,
-    const AstronomicalEpoch& epoch,
+    const skygate::core::AstronomicalEpoch& epoch,
     const std::shared_ptr<const skygate::ephemeris::ITimeScaleService>& timeScaleService,
     const PreparedEphemerisRequestState* preparedState
 ) noexcept
@@ -195,7 +196,7 @@ northBasisFromEquatorial(const skygate::core::EquatorialCoordinate& coordinate) 
 }
 
 [[nodiscard]] ICalcephKernel::StateResult earthStateForAnnualParallax(
-    const AstronomicalEpoch& kernelEpoch,
+    const skygate::core::AstronomicalEpoch& kernelEpoch,
     const std::shared_ptr<const ICalcephKernel>& kernel,
     const PreparedEphemerisRequestState* preparedState
 )
@@ -312,7 +313,7 @@ void recordAppliedCorrections(
             );
             result.equatorial = CelestialFrameMath::toEquatorial(*propagatedVector);
         } else {
-            const std::optional<AstronomicalEpoch> kernelEpoch =
+            const std::optional<skygate::core::AstronomicalEpoch> kernelEpoch =
                 tdbEpochForKernel(result.metadata, request.epoch, timeScaleService, preparedState);
             if (!kernelEpoch.has_value()) {
                 EphemerisMetadataMerger::markCorrectionUnavailable(

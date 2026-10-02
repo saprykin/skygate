@@ -1,8 +1,8 @@
 #include "CalcephKernelProvider.hpp"
 #include "CalcephKernel.hpp"
-#include "EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 #include "ICalcephKernel.hpp"
-#include "IEphemerisDataSnapshot.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
 
 #include <QByteArrayView>
 #include <QCryptographicHash>
@@ -50,14 +50,14 @@ public:
             return m_kernelInfo;
         }
 
-        [[nodiscard]] Status statusForEpoch(const AstronomicalEpoch& epoch) const noexcept override
+        [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept override
         {
             Q_UNUSED(epoch)
             return m_status;
         }
 
         [[nodiscard]] ICalcephKernel::StateResult
-        compute(const AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override
+        compute(const skygate::core::AstronomicalEpoch& epoch, int targetNaifId, int centerNaifId) const override
         {
             Q_UNUSED(epoch)
             Q_UNUSED(targetNaifId)

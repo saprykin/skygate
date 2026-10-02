@@ -11,7 +11,8 @@ extern "C" {
 namespace skygate::ephemeris::highprecision {
 namespace {
 
-[[nodiscard]] bool epochInScaleIsFinite(const AstronomicalEpoch& epoch, const TimeScale timeScale) noexcept
+[[nodiscard]] bool
+epochInScaleIsFinite(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale timeScale) noexcept
 {
     return epoch.timeScale == timeScale && epoch.isFinite();
 }
@@ -41,9 +42,9 @@ namespace {
 }  // namespace
 
 std::optional<skygate::core::Matrix3x3>
-ErfaAstrometry::celestialToIntermediateMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
+ErfaAstrometry::celestialToIntermediateMatrix06A(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
 {
-    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt)) {
         return std::nullopt;
     }
 
@@ -58,9 +59,9 @@ ErfaAstrometry::celestialToIntermediateMatrix06A(const AstronomicalEpoch& terres
 }
 
 std::optional<skygate::core::Matrix3x3>
-ErfaAstrometry::precessionNutationMatrix06A(const AstronomicalEpoch& terrestrialTime) noexcept
+ErfaAstrometry::precessionNutationMatrix06A(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
 {
-    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt)) {
         return std::nullopt;
     }
 
@@ -75,9 +76,9 @@ ErfaAstrometry::precessionNutationMatrix06A(const AstronomicalEpoch& terrestrial
 }
 
 std::optional<skygate::core::Matrix3x3>
-ErfaAstrometry::earthRotationMatrix00(const AstronomicalEpoch& universalTime1) noexcept
+ErfaAstrometry::earthRotationMatrix00(const skygate::core::AstronomicalEpoch& universalTime1) noexcept
 {
-    if (!epochInScaleIsFinite(universalTime1, TimeScale::Ut1)) {
+    if (!epochInScaleIsFinite(universalTime1, skygate::core::TimeScale::Ut1)) {
         return std::nullopt;
     }
 
@@ -88,9 +89,9 @@ ErfaAstrometry::earthRotationMatrix00(const AstronomicalEpoch& universalTime1) n
 #endif
 }
 
-std::optional<double> ErfaAstrometry::tioLocatorS00(const AstronomicalEpoch& terrestrialTime) noexcept
+std::optional<double> ErfaAstrometry::tioLocatorS00(const skygate::core::AstronomicalEpoch& terrestrialTime) noexcept
 {
-    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt)) {
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt)) {
         return std::nullopt;
     }
 
@@ -123,14 +124,14 @@ std::optional<skygate::core::Matrix3x3> ErfaAstrometry::polarMotionMatrix00(
 }
 
 std::optional<double> ErfaAstrometry::tdbMinusTtSeconds(
-    const AstronomicalEpoch& terrestrialTime,
+    const skygate::core::AstronomicalEpoch& terrestrialTime,
     const double ut1FractionOfDay,
     const double eastLongitudeRadians,
     const double distanceFromSpinAxisKm,
     const double distanceNorthOfEquatorialPlaneKm
 ) noexcept
 {
-    if (!epochInScaleIsFinite(terrestrialTime, TimeScale::Tt) || !std::isfinite(ut1FractionOfDay)
+    if (!epochInScaleIsFinite(terrestrialTime, skygate::core::TimeScale::Tt) || !std::isfinite(ut1FractionOfDay)
         || !std::isfinite(eastLongitudeRadians) || !std::isfinite(distanceFromSpinAxisKm)
         || !std::isfinite(distanceNorthOfEquatorialPlaneKm)) {
         return std::nullopt;

@@ -20,7 +20,7 @@ namespace {
 constexpr double kSecondsPerDay = 86'400.0;
 constexpr double kUnixEpochJulianDay = 2'440'587.5;
 
-skygate::ephemeris::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimePoint& utcTime)
+skygate::core::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimePoint& utcTime)
 {
     const double julianDay =
         skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime) / kSecondsPerDay + kUnixEpochJulianDay;
@@ -28,7 +28,7 @@ skygate::ephemeris::AstronomicalEpoch epochFromUtc(const skygate::core::UtcTimeP
     return {
         .julianDatePart1 = julianDatePart1,
         .julianDatePart2 = julianDay - julianDatePart1,
-        .timeScale = skygate::ephemeris::TimeScale::Utc,
+        .timeScale = skygate::core::TimeScale::Utc,
     };
 }
 
@@ -191,7 +191,7 @@ public:
         return m_lastRequestOptions;
     }
 
-    [[nodiscard]] skygate::ephemeris::AstronomicalEpoch lastRequestEpoch() const noexcept
+    [[nodiscard]] skygate::core::AstronomicalEpoch lastRequestEpoch() const noexcept
     {
         return m_lastRequestEpoch;
     }
@@ -210,7 +210,7 @@ private:
     mutable int m_requestComputeCount = 0;
     mutable int m_requestBodyLookupCount = 0;
     mutable skygate::ephemeris::EphemerisEngineOptions m_lastRequestOptions;
-    mutable skygate::ephemeris::AstronomicalEpoch m_lastRequestEpoch;
+    mutable skygate::core::AstronomicalEpoch m_lastRequestEpoch;
 };
 
 skygate::core::ObservationContext makeContext()
@@ -328,7 +328,7 @@ void EphemerisEngineInterfaceMigrationTests::skyContextCompatibilityUsesEngineDe
     );
     QCOMPARE(
         static_cast<std::uint8_t>(engine.lastRequestEpoch().timeScale),
-        static_cast<std::uint8_t>(skygate::ephemeris::TimeScale::Utc)
+        static_cast<std::uint8_t>(skygate::core::TimeScale::Utc)
     );
 
     const auto bodyState = engine.computeBodyState(context, "target");

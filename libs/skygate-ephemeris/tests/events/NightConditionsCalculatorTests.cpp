@@ -263,14 +263,14 @@ void NightConditionsCalculatorTests::requestEpochControlsLunarPhaseWhenContextTi
     skygate::ephemeris::EphemerisRequest request;
     request.context = makeZurichContext();
     request.context.utcTime = utcFromUnixSeconds(1'711'024'800);  // 2024-03-21 12:00:00 UTC
-    request.epoch = *skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    request.epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2000,
             .month = 1,
             .day = 6,
             .hour = 18,
             .minute = 14,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
 

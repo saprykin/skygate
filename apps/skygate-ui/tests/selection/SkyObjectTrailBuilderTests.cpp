@@ -428,8 +428,8 @@ void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolated
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
-    request.epoch = skygate::ephemeris::AstronomicalEpoch{
-        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
@@ -478,8 +478,8 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
     request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
-    request.epoch = skygate::ephemeris::AstronomicalEpoch{
-        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::ephemeris::TimeScale::Utc
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
@@ -551,8 +551,8 @@ void SkyObjectTrailBuilderTests::highPrecisionTrailRefinesCurvedInterpolation()
     auto input = makeInput(engine, *projection);
     skygate::ephemeris::EphemerisRequest request;
     request.context = input.skyContext;
-    request.epoch = skygate::ephemeris::AstronomicalEpoch{
-        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Utc
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Utc
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(

@@ -72,29 +72,29 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/IFrameTransformer.hpp
     src/engine/highprecision/IStarAstrometryCalculator.hpp
     src/engine/highprecision/ISolarSystemStateCalculator.hpp
-    src/engine/highprecision/DeltaTDataLoader.hpp
-    src/engine/highprecision/DeltaTDataLoader.cpp
-    src/engine/highprecision/DeltaTDataParser.hpp
-    src/engine/highprecision/DeltaTDataParser.cpp
-    src/engine/highprecision/IEarthOrientationProvider.hpp
-    src/engine/highprecision/TableBackedEarthOrientationProvider.hpp
-    src/engine/highprecision/TableBackedEarthOrientationProvider.cpp
-    src/engine/highprecision/EarthOrientationDataParser.hpp
-    src/engine/highprecision/EarthOrientationDataParser.cpp
-    src/engine/highprecision/EarthOrientationDataLoader.hpp
-    src/engine/highprecision/EarthOrientationDataLoader.cpp
-    src/engine/highprecision/EarthOrientationSampler.hpp
-    src/engine/highprecision/EarthOrientationSampler.cpp
-    src/engine/highprecision/EphemerisDataActivation.cpp
-    src/engine/highprecision/EphemerisDataActivationRequest.cpp
-    src/engine/highprecision/EphemerisDataActivationResult.cpp
-    src/engine/highprecision/EphemerisDataActivationStatus.cpp
-    src/engine/highprecision/EphemerisDataPayloadReader.cpp
-    src/engine/highprecision/EphemerisStagedUpdateVerification.cpp
-    src/engine/highprecision/EphemerisStagedUpdateVerificationRequest.cpp
-    src/engine/highprecision/EphemerisStagedUpdateVerificationResult.cpp
-    src/engine/highprecision/EphemerisStagedUpdateVerificationStatus.cpp
-    src/engine/highprecision/EphemerisDataManifest.cpp
+    src/engine/DeltaTDataLoader.hpp
+    src/engine/DeltaTDataLoader.cpp
+    src/engine/DeltaTDataParser.hpp
+    src/engine/DeltaTDataParser.cpp
+    src/engine/IEarthOrientationProvider.hpp
+    src/engine/TableBackedEarthOrientationProvider.hpp
+    src/engine/TableBackedEarthOrientationProvider.cpp
+    src/engine/EarthOrientationDataParser.hpp
+    src/engine/EarthOrientationDataParser.cpp
+    src/engine/EarthOrientationDataLoader.hpp
+    src/engine/EarthOrientationDataLoader.cpp
+    src/engine/EarthOrientationSampler.hpp
+    src/engine/EarthOrientationSampler.cpp
+    src/engine/EphemerisDataActivation.cpp
+    src/engine/EphemerisDataActivationRequest.cpp
+    src/engine/EphemerisDataActivationResult.cpp
+    src/engine/EphemerisDataActivationStatus.cpp
+    src/engine/EphemerisDataPayloadReader.cpp
+    src/engine/EphemerisStagedUpdateVerification.cpp
+    src/engine/EphemerisStagedUpdateVerificationRequest.cpp
+    src/engine/EphemerisStagedUpdateVerificationResult.cpp
+    src/engine/EphemerisStagedUpdateVerificationStatus.cpp
+    src/engine/EphemerisDataManifest.cpp
     src/engine/highprecision/EphemerisComputationCache.hpp
     src/engine/highprecision/EphemerisComputationCache.cpp
     src/engine/highprecision/EphemerisMetadataMerger.hpp
@@ -105,55 +105,54 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaFrameTransformer.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
-    src/engine/highprecision/HighPrecisionTextParser.hpp
-    src/engine/highprecision/HighPrecisionTextParser.cpp
-    src/engine/highprecision/IDeltaTProvider.hpp
-    src/engine/highprecision/ILeapSecondProvider.hpp
-    src/engine/highprecision/ILeapSecondProvider.cpp
-    src/engine/highprecision/LeapSecondTableLoader.hpp
-    src/engine/highprecision/LeapSecondTableLoader.cpp
-    src/engine/highprecision/LeapSecondTableParser.hpp
-    src/engine/highprecision/LeapSecondTableParser.cpp
+    src/engine/HighPrecisionTextParser.hpp
+    src/engine/HighPrecisionTextParser.cpp
+    src/engine/IDeltaTProvider.hpp
+    src/engine/ILeapSecondProvider.hpp
+    src/engine/LeapSecondTableLoader.hpp
+    src/engine/LeapSecondTableLoader.cpp
+    src/engine/LeapSecondTableParser.hpp
+    src/engine/LeapSecondTableParser.cpp
     src/engine/highprecision/ObserverGeodesy.hpp
     src/engine/highprecision/ObserverGeodesy.cpp
     src/engine/highprecision/SolarSystemStateCalculator.hpp
     src/engine/highprecision/SolarSystemStateCalculator.cpp
     src/engine/highprecision/StarAstrometryCalculator.hpp
     src/engine/highprecision/StarAstrometryCalculator.cpp
-    src/engine/highprecision/TableBackedDeltaTProvider.hpp
-    src/engine/highprecision/TableBackedDeltaTProvider.cpp
-    src/engine/highprecision/TableBackedLeapSecondProvider.hpp
-    src/engine/highprecision/TableBackedLeapSecondProvider.cpp
-    src/engine/highprecision/TimeScaleConversionStatus.hpp
-    src/engine/highprecision/TimeScaleConversionStatus.cpp
-    src/engine/highprecision/TimeScaleConversionWarningCode.hpp
-    src/engine/highprecision/TimeScaleConversionWarningCode.cpp
-    src/engine/highprecision/TimeScaleConversionDiagnostics.hpp
-    src/engine/highprecision/TimeScaleConversionDiagnostics.cpp
-    src/engine/highprecision/TimeScaleConversionResult.hpp
-    src/engine/highprecision/TimeScaleConversionResult.cpp
-    src/engine/highprecision/TimeScaleServiceOptions.hpp
-    src/engine/highprecision/TimeScaleServiceOptions.cpp
-    src/engine/highprecision/ITimeScaleService.hpp
-    src/engine/highprecision/LeapSecondTimeScaleService.hpp
-    src/engine/highprecision/LeapSecondTimeScaleService.cpp
-    src/engine/highprecision/LeapSecondOffsetResolver.hpp
-    src/engine/highprecision/LeapSecondOffsetResolver.cpp
-    src/engine/highprecision/TdbTtConverter.hpp
-    src/engine/highprecision/TdbTtConverter.cpp
-    src/engine/highprecision/Ut1OffsetResolver.hpp
-    src/engine/highprecision/Ut1OffsetResolver.cpp
+    src/engine/TableBackedDeltaTProvider.hpp
+    src/engine/TableBackedDeltaTProvider.cpp
+    src/engine/TableBackedLeapSecondProvider.hpp
+    src/engine/TableBackedLeapSecondProvider.cpp
+    src/engine/TimeScaleConversionStatus.hpp
+    src/engine/TimeScaleConversionStatus.cpp
+    src/engine/TimeScaleConversionWarningCode.hpp
+    src/engine/TimeScaleConversionWarningCode.cpp
+    src/engine/TimeScaleConversionDiagnostics.hpp
+    src/engine/TimeScaleConversionDiagnostics.cpp
+    src/engine/TimeScaleConversionResult.hpp
+    src/engine/TimeScaleConversionResult.cpp
+    src/engine/TimeScaleServiceOptions.hpp
+    src/engine/TimeScaleServiceOptions.cpp
+    src/engine/ITimeScaleService.hpp
+    src/engine/LeapSecondTimeScaleService.hpp
+    src/engine/LeapSecondTimeScaleService.cpp
+    src/engine/LeapSecondOffsetResolver.hpp
+    src/engine/LeapSecondOffsetResolver.cpp
+    src/engine/TdbTtConverter.hpp
+    src/engine/TdbTtConverter.cpp
+    src/engine/Ut1OffsetResolver.hpp
+    src/engine/Ut1OffsetResolver.cpp
     src/engine/highprecision/EphemerisMetadataStatusMergePolicy.hpp
     src/engine/highprecision/EphemerisMetadataStatusMergePolicy.cpp
     src/engine/highprecision/EphemerisMetadataFailurePolicy.hpp
     src/engine/highprecision/EphemerisMetadataFailurePolicy.cpp
     src/engine/highprecision/EphemerisMetadataMergeOptions.hpp
     src/engine/highprecision/EphemerisMetadataMergeOptions.cpp
-    src/engine/highprecision/EphemerisTextDataAsset.hpp
-    src/engine/highprecision/EphemerisTextDataAsset.cpp
-    src/engine/highprecision/EphemerisKernelDataAsset.hpp
-    src/engine/highprecision/EphemerisKernelDataAsset.cpp
-    src/engine/highprecision/IEphemerisDataSnapshot.hpp
+    src/engine/EphemerisTextDataAsset.hpp
+    src/engine/EphemerisTextDataAsset.cpp
+    src/engine/EphemerisKernelDataAsset.hpp
+    src/engine/EphemerisKernelDataAsset.cpp
+    src/engine/IEphemerisDataSnapshot.hpp
 )
 
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
@@ -194,23 +193,23 @@ add_library(skygate-ephemeris STATIC
     src/catalog/constellation/ConstellationData.hpp
     src/catalog/constellation/ConstellationDataCodec.hpp
     src/ConstellationReferenceCalculator.hpp
-    src/engine/highprecision/DeltaTDataLoader.hpp
-    src/engine/highprecision/IEarthOrientationProvider.hpp
-    src/engine/highprecision/EarthOrientationDataParser.hpp
-    src/engine/highprecision/EarthOrientationDataLoader.hpp
-    src/engine/highprecision/EarthOrientationSampler.hpp
-    src/engine/highprecision/TableBackedEarthOrientationProvider.hpp
-    src/engine/highprecision/EphemerisDataActivation.hpp
-    src/engine/highprecision/EphemerisDataActivationRequest.hpp
-    src/engine/highprecision/EphemerisDataActivationResult.hpp
-    src/engine/highprecision/EphemerisDataActivationStatus.hpp
-    src/engine/highprecision/EphemerisDataPayloadReader.hpp
-    src/engine/highprecision/EphemerisStagedUpdateVerification.hpp
-    src/engine/highprecision/EphemerisStagedUpdateVerificationRequest.hpp
-    src/engine/highprecision/EphemerisStagedUpdateVerificationResult.hpp
-    src/engine/highprecision/EphemerisStagedUpdateVerificationStatus.hpp
-    src/engine/highprecision/EphemerisDataManifest.hpp
-    src/engine/highprecision/IDeltaTProvider.hpp
+    src/engine/DeltaTDataLoader.hpp
+    src/engine/IEarthOrientationProvider.hpp
+    src/engine/EarthOrientationDataParser.hpp
+    src/engine/EarthOrientationDataLoader.hpp
+    src/engine/EarthOrientationSampler.hpp
+    src/engine/TableBackedEarthOrientationProvider.hpp
+    src/engine/EphemerisDataActivation.hpp
+    src/engine/EphemerisDataActivationRequest.hpp
+    src/engine/EphemerisDataActivationResult.hpp
+    src/engine/EphemerisDataActivationStatus.hpp
+    src/engine/EphemerisDataPayloadReader.hpp
+    src/engine/EphemerisStagedUpdateVerification.hpp
+    src/engine/EphemerisStagedUpdateVerificationRequest.hpp
+    src/engine/EphemerisStagedUpdateVerificationResult.hpp
+    src/engine/EphemerisStagedUpdateVerificationStatus.hpp
+    src/engine/EphemerisDataManifest.hpp
+    src/engine/IDeltaTProvider.hpp
     src/factory/EphemerisEngineFactory.hpp
     src/factory/EphemerisFactoryCreationDiagnosticCode.hpp
     src/factory/EphemerisFactoryCreationDiagnosticSeverity.hpp
@@ -248,12 +247,6 @@ add_library(skygate-ephemeris STATIC
     src/ObservationEventStatus.hpp
     src/ObservationEventSummary.hpp
     src/catalog/stellarium/StellariumConstellationParser.hpp
-    src/time/TimeScale.hpp
-    src/time/AstronomicalEpoch.hpp
-    src/time/CivilDateTime.hpp
-    src/time/CalendarTime.hpp
-    src/time/EpochCodec.hpp
-    src/time/AstronomicalTime.hpp
     src/BaseCelestialBody.hpp
     src/CelestialBodyCatalog.hpp
     src/CelestialBodyState.hpp
@@ -350,12 +343,6 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumHipParser.cpp
     src/catalog/stellarium/StellariumAnchorGroupExtractor.cpp
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
-    src/time/TimeScale.cpp
-    src/time/AstronomicalEpoch.cpp
-    src/time/CivilDateTime.cpp
-    src/time/CalendarTime.cpp
-    src/time/EpochCodec.cpp
-    src/time/AstronomicalTime.cpp
     src/CelestialReferenceCalculator.cpp
     src/ConstellationReferenceCalculator.cpp
     src/factory/EphemerisEngineFactory.cpp

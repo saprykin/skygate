@@ -18,28 +18,26 @@
 
 namespace {
 
-void compareEpoch(
-    const skygate::ephemeris::AstronomicalEpoch& actual, const skygate::ephemeris::AstronomicalEpoch& expected
-)
+void compareEpoch(const skygate::core::AstronomicalEpoch& actual, const skygate::core::AstronomicalEpoch& expected)
 {
     QCOMPARE(actual.timeScale, expected.timeScale);
     QVERIFY(std::abs(actual.julianDatePart1 - expected.julianDatePart1) < 1.0e-12);
     QVERIFY(std::abs(actual.julianDatePart2 - expected.julianDatePart2) < 1.0e-12);
 }
 
-skygate::ephemeris::AstronomicalEpoch expectedUtcEpoch(
+skygate::core::AstronomicalEpoch expectedUtcEpoch(
     const int astronomicalYear, const int month, const int day, const int hour, const int minute, const int second
 )
 {
-    const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = astronomicalYear,
             .month = month,
             .day = day,
             .hour = hour,
             .minute = minute,
             .second = second,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(epoch.has_value());
@@ -102,20 +100,20 @@ skygate::ephemeris::EphemerisDateRange testValidityRange();
 
 skygate::ephemeris::EphemerisDateRange testValidityRange()
 {
-    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto start = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2000,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto end = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = 2100,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(start.has_value());

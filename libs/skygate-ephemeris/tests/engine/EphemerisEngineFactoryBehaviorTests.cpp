@@ -4,11 +4,11 @@
 #include "factory/IEphemerisDiagnosticsSink.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
+#include "engine/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
-#include "engine/highprecision/IEarthOrientationProvider.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
+#include "engine/IEarthOrientationProvider.hpp"
+#include "engine/ITimeScaleService.hpp"
 
 #include <QCryptographicHash>
 #include <QFile>
@@ -135,9 +135,8 @@ private:
 
 class TestTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
 public:
-    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convert(
-        const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::TimeScale targetScale
-    ) const override
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         static_cast<void>(epoch);
         ++m_convertCallCount;
@@ -152,10 +151,10 @@ public:
     }
 
     [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convertCivilDateTime(
-        const skygate::ephemeris::CivilDateTime& dateTime, const skygate::ephemeris::TimeScale targetScale
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
     ) const override
     {
-        const auto epoch = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        const auto epoch = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
         if (epoch.has_value()) {
             return convert(*epoch, targetScale);
         }
@@ -178,10 +177,10 @@ private:
 class TestEarthOrientationProvider final : public skygate::ephemeris::IEarthOrientationProvider {
 public:
     explicit TestEarthOrientationProvider(
-        const skygate::ephemeris::AstronomicalEpoch& effectiveUtcEpoch = skygate::ephemeris::AstronomicalEpoch{
+        const skygate::core::AstronomicalEpoch& effectiveUtcEpoch = skygate::core::AstronomicalEpoch{
             .julianDatePart1 = 2'400'000.5,
             .julianDatePart2 = 53'736.0,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     )
     {
@@ -189,13 +188,6 @@ public:
         m_dataInfo.provenance = "factory behavior EOP";
         m_entries.push_back(
             skygate::ephemeris::IEarthOrientationProvider::TableEntry{
-                .effectiveUtcDate =
-                    skygate::ephemeris::CivilDateTime{
-                        .astronomicalYear = 2023,
-                        .month = 2,
-                        .day = 25,
-                        .timeScale = skygate::ephemeris::TimeScale::Utc,
-                    },
                 .effectiveUtcEpoch = effectiveUtcEpoch,
                 .ut1MinusUtcSeconds = 0.0,
                 .polarMotionXArcseconds = 0.0,
@@ -304,11 +296,8 @@ makeReadyKernel(skygate::ephemeris::highprecision::ICalcephKernel::Info info = m
     return {
         .id = "modern",
         .displayName = "Modern",
-        .start =
-            {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb},
-        .end = {
-            .julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb
-        },
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
 }
 
@@ -595,7 +584,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     computeRequest.epoch = {
         .julianDatePart1 = 2'460'000.5,
         .julianDatePart2 = 0.0,
-        .timeScale = skygate::ephemeris::TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     computeRequest.options = request.options;
 
@@ -783,8 +772,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDE441RequestUsesPlanetary
     QVERIFY(result.isSuccess());
     QVERIFY(result.engine != nullptr);
     const skygate::ephemeris::EphemerisRequest computeRequest{
-        .epoch =
-            {.julianDatePart1 = 2'460'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::ephemeris::TimeScale::Tdb},
+        .epoch = {.julianDatePart1 = 2'460'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
         .context = makeContext(),
         .options = request.options,
     };
@@ -845,7 +833,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestWiresApparentTopoc
     computeRequest.epoch = {
         .julianDatePart1 = 2'460'000.5,
         .julianDatePart2 = 0.0,
-        .timeScale = skygate::ephemeris::TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     computeRequest.options = request.options;
 

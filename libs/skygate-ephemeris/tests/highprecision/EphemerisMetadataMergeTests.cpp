@@ -373,8 +373,8 @@ void EphemerisMetadataMergeTests::mergeCombinesCorrectionsWarningsAndOptionalMet
     source.effectiveDataValidityRange = EphemerisDateRange{
         .id = "source-range",
         .displayName = "Source range",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
     source.estimatedAngularUncertaintyArcsec = 0.5;
 
@@ -408,8 +408,8 @@ void EphemerisMetadataMergeTests::mergeHonorsMetadataOptionToggles()
     source.effectiveDataValidityRange = EphemerisDateRange{
         .id = "source-range",
         .displayName = "Source range",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
     source.estimatedAngularUncertaintyArcsec = 0.5;
 
@@ -418,8 +418,8 @@ void EphemerisMetadataMergeTests::mergeHonorsMetadataOptionToggles()
     target.effectiveDataValidityRange = EphemerisDateRange{
         .id = "target-range",
         .displayName = "Target range",
-        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
     target.estimatedAngularUncertaintyArcsec = 1.0;
 

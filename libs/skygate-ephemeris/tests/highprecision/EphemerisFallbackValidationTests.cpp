@@ -68,7 +68,7 @@ template <typename BodyRange>
     request.epoch = {
         .julianDatePart1 = 2'460'310.0,
         .julianDatePart2 = 0.5,
-        .timeScale = TimeScale::Tdb,
+        .timeScale = skygate::core::TimeScale::Tdb,
     };
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(EphemerisCorrectionFlags::geometric());
@@ -89,8 +89,9 @@ makeDependencies(std::shared_ptr<ISolarSystemStateCalculator> solarSystemCalcula
         EphemerisDateRange{
             .id = "modern",
             .displayName = "Modern",
-            .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+            .start =
+                {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+            .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
         }
     );
     return dependencies;
@@ -226,8 +227,8 @@ void EphemerisFallbackValidationTests::missingLongRangeKernelFallbackIsDegraded(
     calculatorResult.metadata.effectiveDataValidityRange = EphemerisDateRange{
         .id = "de440-modern",
         .displayName = "DE440 modern range",
-        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
 
     const HighPrecisionEphemerisEngine engine = makeHighPrecisionEngine(std::move(calculatorResult));
@@ -360,8 +361,8 @@ void EphemerisFallbackValidationTests::fallbackMarksDroppedCorrectionsUnavailabl
     calculatorResult.metadata.effectiveDataValidityRange = EphemerisDateRange{
         .id = "de440-modern",
         .displayName = "DE440 modern range",
-        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = 2'300'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'700'000.5, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
     calculatorResult.metadata.estimatedAngularUncertaintyArcsec = 0.05;
 

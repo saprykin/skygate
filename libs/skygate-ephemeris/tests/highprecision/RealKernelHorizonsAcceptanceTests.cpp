@@ -4,14 +4,14 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-#include "engine/highprecision/EphemerisDataManifest.hpp"
-#include "engine/highprecision/EphemerisTextDataAsset.hpp"
+#include "engine/EphemerisDataManifest.hpp"
+#include "engine/EphemerisTextDataAsset.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
 #include "engine/highprecision/HighPrecisionEphemerisEngine.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/IEphemerisDataSnapshot.hpp"
-#include "engine/highprecision/LeapSecondTableLoader.hpp"
-#include "engine/highprecision/LeapSecondTimeScaleService.hpp"
+#include "engine/IEphemerisDataSnapshot.hpp"
+#include "engine/LeapSecondTableLoader.hpp"
+#include "engine/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 
 #include <QtTest/QtTest>
@@ -91,7 +91,7 @@ constexpr std::array kReferenceRows{
 }
 
 [[nodiscard]] EphemerisRequest
-makeRequest(const EphemerisCorrectionFlags correctionFlags, const AstronomicalEpoch& epoch)
+makeRequest(const EphemerisCorrectionFlags correctionFlags, const skygate::core::AstronomicalEpoch& epoch)
 {
     EphemerisRequest request;
     request.epoch = epoch;
@@ -107,8 +107,8 @@ makeRange(std::string id, std::string displayName, const double startJd, const d
     return {
         .id = std::move(id),
         .displayName = std::move(displayName),
-        .start = {.julianDatePart1 = startJd, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
-        .end = {.julianDatePart1 = endJd, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .start = {.julianDatePart1 = startJd, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
+        .end = {.julianDatePart1 = endJd, .julianDatePart2 = 0.0, .timeScale = skygate::core::TimeScale::Tdb},
     };
 }
 
@@ -264,10 +264,10 @@ void RealKernelHorizonsAcceptanceTests::matchesIndependentJplHorizonsReferenceRo
     constexpr double kApparentToleranceDeg = 2.0 * kArcsecondsToDegrees;
 
     for (const HorizonsReferenceRow& row : kReferenceRows) {
-        const AstronomicalEpoch epoch{
+        const skygate::core::AstronomicalEpoch epoch{
             .julianDatePart1 = row.julianDateUtc,
             .julianDatePart2 = 0.0,
-            .timeScale = TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         };
 
         const auto astrometricState =

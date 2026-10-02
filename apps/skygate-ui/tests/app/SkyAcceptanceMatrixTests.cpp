@@ -7,8 +7,8 @@
 #include "time/CalendarTime.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
-#include "engine/highprecision/IEarthOrientationProvider.hpp"
-#include "engine/highprecision/ITimeScaleService.hpp"
+#include "engine/IEarthOrientationProvider.hpp"
+#include "engine/ITimeScaleService.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -52,20 +52,20 @@ bool writeFile(const QString& path, const QByteArray& contents)
 skygate::ephemeris::EphemerisDateRange
 acceptanceRange(std::string id, std::string displayName, const int startYear, const int endYear)
 {
-    const auto start = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto start = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = startYear,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
-    const auto end = skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-        skygate::ephemeris::CivilDateTime{
+    const auto end = skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
             .astronomicalYear = endYear,
             .month = 1,
             .day = 1,
-            .timeScale = skygate::ephemeris::TimeScale::Utc,
+            .timeScale = skygate::core::TimeScale::Utc,
         }
     );
     Q_ASSERT(start.has_value());
@@ -212,19 +212,19 @@ skygate::ephemeris::OwnGalaxyCelestialBody acceptanceMarsBody()
     return body;
 }
 
-skygate::ephemeris::AstronomicalEpoch acceptanceEpoch(const int year)
+skygate::core::AstronomicalEpoch acceptanceEpoch(const int year)
 {
-    std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
-        skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(
-            skygate::ephemeris::CivilDateTime{
+    std::optional<skygate::core::AstronomicalEpoch> epoch =
+        skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+            skygate::core::CivilDateTime{
                 .astronomicalYear = year,
                 .month = 1,
                 .day = 1,
-                .timeScale = skygate::ephemeris::TimeScale::Tdb,
+                .timeScale = skygate::core::TimeScale::Tdb,
             }
         );
     Q_ASSERT(epoch.has_value());
-    epoch->timeScale = skygate::ephemeris::TimeScale::Tdb;
+    epoch->timeScale = skygate::core::TimeScale::Tdb;
     return *epoch;
 }
 
@@ -280,7 +280,7 @@ public:
         return m_kernelInfo;
     }
 
-    [[nodiscard]] Status statusForEpoch(const skygate::ephemeris::AstronomicalEpoch& epoch) const noexcept override
+    [[nodiscard]] Status statusForEpoch(const skygate::core::AstronomicalEpoch& epoch) const noexcept override
     {
         if (!epoch.isFinite() || epoch.sortKey() < m_kernelInfo->validityRange.start.sortKey()
             || epoch.sortKey() > m_kernelInfo->validityRange.end.sortKey()) {
@@ -291,7 +291,7 @@ public:
     }
 
     [[nodiscard]] skygate::ephemeris::highprecision::ICalcephKernel::StateResult compute(
-        const skygate::ephemeris::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
+        const skygate::core::AstronomicalEpoch& epoch, const int targetNaifId, const int centerNaifId
     ) const override
     {
         skygate::ephemeris::highprecision::ICalcephKernel::StateResult result;
@@ -356,9 +356,8 @@ skygate::ephemeris::highprecision::ICalcephKernel::Info acceptanceKernelInfo(
 
 class AcceptanceTimeScaleService final : public skygate::ephemeris::ITimeScaleService {
 public:
-    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convert(
-        const skygate::ephemeris::AstronomicalEpoch& epoch, const skygate::ephemeris::TimeScale targetScale
-    ) const override
+    [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult
+    convert(const skygate::core::AstronomicalEpoch& epoch, const skygate::core::TimeScale targetScale) const override
     {
         skygate::ephemeris::TimeScaleConversionResult result;
         result.epoch = epoch;
@@ -368,13 +367,13 @@ public:
     }
 
     [[nodiscard]] skygate::ephemeris::TimeScaleConversionResult convertCivilDateTime(
-        const skygate::ephemeris::CivilDateTime& dateTime, const skygate::ephemeris::TimeScale targetScale
+        const skygate::core::CivilDateTime& dateTime, const skygate::core::TimeScale targetScale
     ) const override
     {
         skygate::ephemeris::TimeScaleConversionResult result;
-        const std::optional<skygate::ephemeris::AstronomicalEpoch> epoch =
-            skygate::ephemeris::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
-        result.epoch = epoch.value_or(skygate::ephemeris::AstronomicalEpoch{});
+        const std::optional<skygate::core::AstronomicalEpoch> epoch =
+            skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(dateTime);
+        result.epoch = epoch.value_or(skygate::core::AstronomicalEpoch{});
         result.epoch.timeScale = targetScale;
         result.status = epoch.has_value() ? skygate::ephemeris::TimeScaleConversionStatus::Valid
                                           : skygate::ephemeris::TimeScaleConversionStatus::Failed;
