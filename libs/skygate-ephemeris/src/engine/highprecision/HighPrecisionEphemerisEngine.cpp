@@ -16,10 +16,7 @@
 #include "StarAstrometryBatchResult.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
-#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
-#include "engine/simple/MoonEquatorialCalculator.hpp"
-#include "engine/simple/PlanetEquatorialCalculator.hpp"
-#include "engine/simple/SunEquatorialCalculator.hpp"
+#include "engine/IEphemerisFallbackStrategy.hpp"
 
 #include <bit>
 #include <cmath>
@@ -77,56 +74,29 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
     );
 }
 
-[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
-simpleSolarSystemEquatorial(const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime)
-{
-    if (body.kind == BaseCelestialBody::Kind::Sun || body.kind == BaseCelestialBody::Kind::Sun) {
-        return SunEquatorialCalculator{}.compute(utcTime);
-    }
-    if (body.kind == BaseCelestialBody::Kind::Moon || body.kind == BaseCelestialBody::Kind::Moon) {
-        return MoonEquatorialCalculator{}.compute(utcTime);
-    }
-    if (body.kind == BaseCelestialBody::Kind::Planet || body.kind == BaseCelestialBody::Kind::Planet) {
-        return PlanetEquatorialCalculator{}.compute(body.id, utcTime);
-    }
-
-    return std::nullopt;
-}
-
-[[nodiscard]] std::optional<HighPrecisionCalculatorResult> simpleSolarSystemFallbackResult(
-    const HighPrecisionComputationInput& input, const HighPrecisionCalculatorResult& originalResult
+[[nodiscard]] std::optional<CelestialBodyState> computeSimpleFallbackState(
+    const HighPrecisionEphemerisEngine::Dependencies& dependencies,
+    const HighPrecisionComputationInput& input,
+    const HighPrecisionCalculatorResult& originalResult
 )
 {
     if (!input.request.options.fallbackToSimpleEngine() || originalResult.equatorial.has_value()
-        || !originalResult.metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange)) {
+        || !originalResult.metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange)
+        || dependencies.fallbackStrategy == nullptr) {
         return std::nullopt;
     }
 
-    const std::optional<skygate::core::EquatorialCoordinate> equatorial =
-        simpleSolarSystemEquatorial(input.body, input.request.context.utcTime);
-    if (!equatorial.has_value()) {
+    std::optional<CelestialBodyState> fallbackState =
+        dependencies.fallbackStrategy->computeFallbackState(input.request, input.body, input.bodyIndex);
+    if (!fallbackState.has_value()) {
         return std::nullopt;
     }
 
-    HighPrecisionCalculatorResult fallbackResult = originalResult;
-    fallbackResult.equatorial = *equatorial;
-    fallbackResult.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-    fallbackResult.metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
-    fallbackResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-    fallbackResult.metadata.dataSourceProvenance =
-        fallbackResult.metadata.dataSourceProvenance.empty()
-            ? "simple solar-system fallback for out-of-range high-precision kernel"
-            : fallbackResult.metadata.dataSourceProvenance
-                  + "; simple solar-system fallback for out-of-range high-precision kernel";
-    fallbackResult.metadata.appliedCorrections = EphemerisCorrectionFlags::geometric();
-    if (requestsTopocentricState(input.request) && input.request.context.observer.isValid()) {
-        fallbackResult.horizontal = EquatorialToHorizontalCalculator::compute(
-            *equatorial, input.request.context.observer, input.request.context.utcTime
-        );
-        fallbackResult.metadata.appliedCorrections |= EphemerisCorrectionFlags::diurnalParallax();
-    }
-
-    return fallbackResult;
+    fallbackState->metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
+    fallbackState->metadata.warningCodeMask |= originalResult.metadata.warningCodeMask;
+    fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    return fallbackState;
 }
 
 [[nodiscard]] bool sameDoubleIdentity(const double lhs, const double rhs) noexcept
@@ -661,10 +631,10 @@ private:
             };
             HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(kernelInput);
             EphemerisMetadataMerger::merge(calculatorResult.metadata, kernelEpochMetadata.metadata);
-            if (std::optional<HighPrecisionCalculatorResult> fallbackResult =
-                    simpleSolarSystemFallbackResult(input, calculatorResult);
-                fallbackResult.has_value()) {
-                return builder.buildState(input, *fallbackResult);
+            if (std::optional<CelestialBodyState> fallbackState =
+                    computeSimpleFallbackState(m_dependencies, input, calculatorResult);
+                fallbackState.has_value()) {
+                return *fallbackState;
             }
             HighPrecisionCalculatorResult apparentResult =
                 applyApparentPlaceIfRequested(m_dependencies, request, input, calculatorResult);

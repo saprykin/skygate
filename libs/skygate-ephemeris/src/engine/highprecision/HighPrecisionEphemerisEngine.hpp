@@ -12,6 +12,7 @@
 namespace skygate::ephemeris {
 class ITimeScaleService;
 class IEarthOrientationProvider;
+class IEphemerisFallbackStrategy;
 }  // namespace skygate::ephemeris
 
 namespace skygate::ephemeris::highprecision {
@@ -39,6 +40,7 @@ public:
         std::shared_ptr<const IAtmosphericRefractionCalculator> atmosphericRefractionCalculator;
         std::shared_ptr<const IEphemerisResultBuilder> resultBuilder;
         std::shared_ptr<const IEphemerisComputationCache> computationCache;
+        std::shared_ptr<const skygate::ephemeris::IEphemerisFallbackStrategy> fallbackStrategy;
         EphemerisDatasetInfo dataSetInfo;
     };
 

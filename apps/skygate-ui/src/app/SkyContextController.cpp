@@ -1022,10 +1022,6 @@ void SkyContextController::rebuildEphemerisEngine()
                                            : snapshotProviders.earthOrientationProvider;
     request.calcephKernelProvider = m_ephemerisCalcephKernelProvider;
     request.diagnosticsSink = m_ephemerisDiagnosticsSink;
-    request.fallbackPolicy = m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-                                     && !m_ephemerisEngineOptions.fallbackToSimpleEngine()
-                                 ? skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision
-                                 : skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
     if (result.usedSimpleEngineFallback()
