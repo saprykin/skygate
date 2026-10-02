@@ -11,12 +11,15 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace skygate::ephemeris {
 
 struct EphemerisEngineQueryResult {
     EphemerisEngineQueryStatus::Type status = EphemerisEngineQueryStatus::Type::Valid;
     std::uint32_t warningCodeMask = 0U;
+    std::vector<EphemerisEngineWarning::Detail> warningDetails;
     std::string dataSourceProvenance;
     EphemerisDataSourceProvenance::Type dataSourceProvenanceKind = EphemerisDataSourceProvenance::Type::Unknown;
     std::optional<EphemerisDateRange> effectiveDataValidityRange;
@@ -35,6 +38,12 @@ struct EphemerisEngineQueryResult {
     void addWarning(const EphemerisEngineWarning::Code code) noexcept
     {
         warningCodeMask |= EphemerisEngineWarning::mask(code);
+    }
+
+    void addWarning(const EphemerisEngineWarning::Code code, std::string text)
+    {
+        addWarning(code);
+        warningDetails.push_back(EphemerisEngineWarning::Detail{code, std::move(text)});
     }
 
     void addUnavailableCorrection(const EphemerisCorrectionFlags correction) noexcept

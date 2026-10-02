@@ -331,6 +331,7 @@ void recordAppliedCorrections(
                     result.equatorial = CelestialFrameMath::toEquatorial(geocentricVector);
                     result.metadata.appliedCorrections |= EphemerisCorrectionFlags::annualParallax();
                 } else {
+                    EphemerisMetadataMerger::mergeKernelDiagnostics(result.metadata, *kernel);
                     result.metadata.status = EphemerisEngineQueryStatus::Type::Degraded;
                     EphemerisMetadataMerger::markCorrectionUnavailable(
                         result.metadata, EphemerisCorrectionFlags::annualParallax()

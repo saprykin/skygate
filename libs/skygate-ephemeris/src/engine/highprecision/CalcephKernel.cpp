@@ -1,5 +1,5 @@
 #include "CalcephKernel.hpp"
-
+#include "engine/EphemerisLogging.hpp"
 #include "math/PhysicalConstants.hpp"
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
@@ -7,15 +7,25 @@
 #include <erfa.h>
 #endif
 
+#include <QDebug>
+#include <QString>
+
 #include <array>
 #include <cmath>
 #include <optional>
+#include <string>
 #include <utility>
 
 namespace skygate::ephemeris::highprecision {
 namespace {
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+thread_local std::string g_lastCalcephError;
+
+void captureCalcephError(const char* message)
+{
+    g_lastCalcephError = message != nullptr ? std::string{message} : std::string{};
+}
 [[nodiscard]] std::optional<double> utcSortKeyForTdbEpoch(const AstronomicalEpoch& epoch) noexcept
 {
     if (epoch.timeScale != TimeScale::Tdb || !epoch.isFinite()) {
@@ -53,10 +63,17 @@ struct CalcephKernel::Impl final {
     explicit Impl(Info info) : m_kernelInfo(std::move(info))
     {
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+        calceph_seterrorhandler(3, captureCalcephError);
         m_handle = calceph_open(m_kernelInfo->activePath.generic_string().c_str());
         if (m_handle == nullptr) {
             m_status = Status::OpenFailed;
-            m_diagnostics.push_back("CALCEPH failed to open the selected solar-system kernel.");
+            const std::string openError = g_lastCalcephError;
+            g_lastCalcephError.clear();
+            m_diagnostics.push_back(
+                openError.empty() ? "CALCEPH failed to open the selected solar-system kernel."
+                                  : "CALCEPH failed to open the selected solar-system kernel: " + openError
+            );
+            qCWarning(skygateEphemerisEngineLog).noquote() << QString::fromStdString(m_diagnostics.back());
             return;
         }
 
@@ -139,6 +156,7 @@ struct CalcephKernel::Impl final {
 
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         std::array<double, 6> positionVelocity{};
+        g_lastCalcephError.clear();
         const int calcephResult = calceph_compute_unit(
             m_handle,
             epoch.julianDatePart1,
@@ -149,8 +167,17 @@ struct CalcephKernel::Impl final {
             positionVelocity.data()
         );
         if (calcephResult == 0) {
+            const std::string computeError = g_lastCalcephError;
             result.metadata.status = EphemerisEngineQueryStatus::Type::Failed;
             result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed);
+            if (!computeError.empty()) {
+                result.metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed, computeError);
+                m_diagnostics.push_back(computeError);
+            }
+            qCWarning(skygateEphemerisEngineLog).noquote()
+                << "CALCEPH compute failed for target" << targetNaifId << "center" << centerNaifId
+                << (computeError.empty() ? QStringLiteral("unknown CALCEPH error")
+                                         : QString::fromStdString(computeError));
             return result;
         }
 
@@ -174,7 +201,7 @@ struct CalcephKernel::Impl final {
     }
 
     Status m_status = Status::OpenFailed;
-    std::vector<std::string> m_diagnostics;
+    mutable std::vector<std::string> m_diagnostics;
     std::optional<Info> m_kernelInfo;
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     t_calcephbin* m_handle = nullptr;

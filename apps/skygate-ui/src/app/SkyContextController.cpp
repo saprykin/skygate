@@ -26,8 +26,10 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 using namespace skygate::ui::internal;
 
@@ -117,6 +119,32 @@ astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcep
         return QStringLiteral("Bundled");
     }
     return statusText;
+}
+
+[[nodiscard]] QString joinedDiagnostics(const std::vector<QString>& diagnostics, const QString& fallback)
+{
+    QStringList parts;
+    for (const QString& diagnostic : diagnostics) {
+        const QString trimmed = diagnostic.trimmed();
+        if (!trimmed.isEmpty()) {
+            parts.append(trimmed);
+        }
+    }
+
+    return parts.isEmpty() ? fallback : parts.join(QStringLiteral("; "));
+}
+
+[[nodiscard]] QString joinedDiagnostics(const std::vector<std::string>& diagnostics, const QString& fallback)
+{
+    QStringList parts;
+    for (const std::string& diagnostic : diagnostics) {
+        const QString trimmed = QString::fromStdString(diagnostic).trimmed();
+        if (!trimmed.isEmpty()) {
+            parts.append(trimmed);
+        }
+    }
+
+    return parts.isEmpty() ? fallback : parts.join(QStringLiteral("; "));
 }
 
 [[nodiscard]] QString
@@ -768,6 +796,11 @@ QString SkyContextController::ephemerisDataStatusText() const
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->statusText() : QString();
 }
 
+QString SkyContextController::ephemerisEngineStatusText() const
+{
+    return m_ephemerisEngineStatusText;
+}
+
 QString SkyContextController::ephemerisShortRangeKernelStatusText() const
 {
     return m_ephemerisDataManager != nullptr ? m_ephemerisDataManager->shortRangeKernelStatusText() : QString();
@@ -981,6 +1014,16 @@ void SkyContextController::rebuildEphemerisEngine()
     request.diagnosticsSink = m_ephemerisDiagnosticsSink;
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
+    if (result.hasDiagnostics()) {
+        QStringList diagnostics;
+        for (const skygate::ephemeris::EphemerisFactoryCreationDiagnostic& diagnostic : result.diagnostics) {
+            diagnostics.append(QString::fromStdString(std::string{diagnostic.displayText()}));
+        }
+        setEphemerisEngineStatusText(diagnostics.join(QStringLiteral("; ")));
+    } else {
+        setEphemerisEngineStatusText({});
+    }
+
     const std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> currentEngine = ephemerisEngineHandle();
     if (result.usedSimpleEngineFallback()
         && m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
@@ -1265,6 +1308,17 @@ void SkyContextController::setEphemerisDataOperationStatusText(QString statusTex
     emit ephemerisDataStatusTextChanged();
 }
 
+void SkyContextController::setEphemerisEngineStatusText(QString statusText)
+{
+    statusText = statusText.trimmed();
+    if (m_ephemerisEngineStatusText == statusText) {
+        return;
+    }
+
+    m_ephemerisEngineStatusText = std::move(statusText);
+    emit ephemerisEngineStatusTextChanged();
+}
+
 void SkyContextController::setEphemerisDataUpdateProgress(const double progress) noexcept
 {
     const double boundedProgress = std::clamp(progress, 0.0, 1.0);
@@ -1315,9 +1369,8 @@ void SkyContextController::refreshEphemerisDataManifestAsync(
         request,
         [this, manifestAsset, completionHandler](SkyEphemerisDataManager::StagedUpdateDownloadResult downloadResult) {
             if (!downloadResult.isSuccess()) {
-                const QString diagnostic = downloadResult.diagnostics.empty()
-                                               ? QStringLiteral("manifest download failed")
-                                               : downloadResult.diagnostics.front();
+                const QString diagnostic =
+                    joinedDiagnostics(downloadResult.diagnostics, QStringLiteral("manifest download failed"));
                 setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: %1").arg(diagnostic));
                 completionHandler(false);
                 return;
@@ -1347,9 +1400,8 @@ void SkyContextController::refreshEphemerisDataManifestAsync(
                     std::string_view(payload.constData(), static_cast<std::size_t>(payload.size()))
                 );
             if (!parseResult.isSuccess()) {
-                const QString diagnostic = parseResult.diagnostics.empty()
-                                               ? QStringLiteral("manifest parse failed")
-                                               : QString::fromStdString(parseResult.diagnostics.front());
+                const QString diagnostic =
+                    joinedDiagnostics(parseResult.diagnostics, QStringLiteral("manifest parse failed"));
                 qCWarning(skygateEphemerisUpdateLog).noquote()
                     << "Unable to parse ephemeris update manifest:" << diagnostic;
                 setEphemerisDataOperationStatusText(QStringLiteral("Ephemeris data: %1").arg(diagnostic));
@@ -1612,8 +1664,8 @@ void SkyContextController::continueEphemerisDataUpdate(const QString& profileId,
                 }
                 finishEphemerisDataUpdate(true, {});
             } else {
-                const QString diagnostic = activationResult.diagnostics.empty() ? QStringLiteral("activation failed")
-                                                                                : activationResult.diagnostics.front();
+                const QString diagnostic =
+                    joinedDiagnostics(activationResult.diagnostics, QStringLiteral("activation failed"));
                 finishEphemerisDataUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
             }
             return;
@@ -1655,9 +1707,8 @@ void SkyContextController::continueEphemerisDataUpdate(const QString& profileId,
         m_ephemerisDataManager->stageEphemerisUpdateAssetAsync(
             downloadRequest, [=, this](const SkyEphemerisDataManager::StagedUpdateDownloadResult downloadResult) {
                 if (!downloadResult.isSuccess()) {
-                    const QString diagnostic = downloadResult.diagnostics.empty()
-                                                   ? QStringLiteral("asset download failed")
-                                                   : downloadResult.diagnostics.front();
+                    const QString diagnostic =
+                        joinedDiagnostics(downloadResult.diagnostics, QStringLiteral("asset download failed"));
                     finishEphemerisDataUpdate(false, QStringLiteral("Ephemeris data: %1").arg(diagnostic));
                     return;
                 }
