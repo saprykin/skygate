@@ -376,6 +376,8 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisDatasetInfo.cpp
     src/engine/EphemerisEngineKind.cpp
     src/engine/EphemerisEngineOptions.cpp
+    src/engine/EphemerisLogging.hpp
+    src/engine/EphemerisLogging.cpp
     src/engine/EphemerisEngineQueryResult.cpp
     src/engine/EphemerisEngineWarning.cpp
     src/engine/EphemerisEngineQueryStatus.cpp

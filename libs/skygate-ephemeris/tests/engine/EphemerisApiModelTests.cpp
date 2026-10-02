@@ -1067,7 +1067,7 @@ void EphemerisApiModelTests::unavailableCorrectionDegradesValidResult()
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineKind::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisCorrectionFlags::Type>);
 static_assert(std::is_enum_v<skygate::ephemeris::EphemerisEngineQueryStatus::Type>);
-static_assert(sizeof(skygate::ephemeris::EphemerisEngineQueryResult) <= 192);
+static_assert(sizeof(skygate::ephemeris::EphemerisEngineQueryResult) <= 224);
 
 QTEST_MAIN(EphemerisApiModelTests)
 

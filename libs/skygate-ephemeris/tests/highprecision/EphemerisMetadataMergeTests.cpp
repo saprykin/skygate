@@ -1,8 +1,11 @@
 #include "engine/highprecision/EphemerisMetadataMerger.hpp"
+#include "TestCalcephKernel.hpp"
 
 #include <QtTest/QtTest>
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 using namespace skygate::ephemeris;
 using namespace skygate::ephemeris::highprecision;
@@ -12,9 +15,12 @@ class EphemerisMetadataMergeTests final : public QObject {
 
 private slots:
     void degradedTimeScaleConversionMapsWarningCodes();
+    void degradedTimeScaleConversionPreservesSpecificCodesAndText();
     void failedTimeScaleConversionHonorsFailurePolicy();
     void degradedEarthOrientationSampleMapsWarningCodes();
+    void degradedEarthOrientationSamplePreservesSpecificCodesAndText();
     void failedEarthOrientationSampleMapsWarningCodes();
+    void mergeKernelDiagnosticsAppendsUnreportedDiagnostics();
     void markCorrectionUnavailableDegradesAndAddsWarning();
     void markCorrectionFailedFailsRecoverableStatusesAndAddsWarnings();
     void markCorrectionFailedPreservesTerminalStatusesAndAddsWarnings();
@@ -42,6 +48,32 @@ void EphemerisMetadataMergeTests::degradedTimeScaleConversionMapsWarningCodes()
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+}
+
+void EphemerisMetadataMergeTests::degradedTimeScaleConversionPreservesSpecificCodesAndText()
+{
+    TimeScaleConversionResult conversion;
+    conversion.status = TimeScaleConversionStatus::Degraded;
+    conversion.diagnosticText = "degraded leap-second lookup";
+    conversion.addWarning(TimeScaleConversionWarningCode::LeapSecondTableStale);
+    conversion.addWarning(TimeScaleConversionWarningCode::DeltaTFallbackApplied);
+
+    EphemerisEngineQueryResult metadata;
+    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
+
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::LeapSecondTableStale));
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::DeltaTFallbackApplied));
+    QVERIFY(!metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
+    QVERIFY(!metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+
+    bool foundLeapSecondText = false;
+    for (const EphemerisEngineWarning::Detail& detail : metadata.warningDetails) {
+        if (detail.code == EphemerisEngineWarning::Code::LeapSecondTableStale
+            && detail.text == conversion.diagnosticText) {
+            foundLeapSecondText = true;
+        }
+    }
+    QVERIFY(foundLeapSecondText);
 }
 
 void EphemerisMetadataMergeTests::failedTimeScaleConversionHonorsFailurePolicy()
@@ -88,6 +120,32 @@ void EphemerisMetadataMergeTests::degradedEarthOrientationSampleMapsWarningCodes
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
     QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+}
+
+void EphemerisMetadataMergeTests::degradedEarthOrientationSamplePreservesSpecificCodesAndText()
+{
+    EarthOrientationSampler::Sample sample;
+    sample.status = EarthOrientationSampler::Sample::Status::Degraded;
+    sample.diagnosticText = "Earth-orientation data is stale.";
+    sample.addWarning(EarthOrientationSampler::Sample::WarningCode::StaleData);
+    sample.addWarning(EarthOrientationSampler::Sample::WarningCode::PredictedData);
+
+    EphemerisEngineQueryResult metadata;
+    EphemerisMetadataMerger::mergeEarthOrientation(metadata, sample);
+
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::EarthOrientationStaleData));
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::EarthOrientationPredictedData));
+    QVERIFY(!metadata.hasWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable));
+    QVERIFY(!metadata.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+
+    bool foundStaleText = false;
+    for (const EphemerisEngineWarning::Detail& detail : metadata.warningDetails) {
+        if (detail.code == EphemerisEngineWarning::Code::EarthOrientationStaleData
+            && detail.text == sample.diagnosticText) {
+            foundStaleText = true;
+        }
+    }
+    QVERIFY(foundStaleText);
 }
 
 void EphemerisMetadataMergeTests::failedEarthOrientationSampleMapsWarningCodes()
@@ -375,6 +433,28 @@ void EphemerisMetadataMergeTests::mergeHonorsMetadataOptionToggles()
     QCOMPARE(target.dataSourceProvenance, std::string{"target-provenance"});
     QCOMPARE(target.effectiveDataValidityRange->id, std::string{"target-range"});
     QCOMPARE(*target.estimatedAngularUncertaintyArcsec, 1.0);
+}
+
+void EphemerisMetadataMergeTests::mergeKernelDiagnosticsAppendsUnreportedDiagnostics()
+{
+    skygate::ephemeris::tests::TestCalcephKernel kernel;
+    kernel.setDiagnostics({"calceph compute failed", "already reported"});
+
+    EphemerisEngineQueryResult metadata;
+    metadata.addWarning(EphemerisEngineWarning::Code::ComputationFailed, "already reported");
+
+    EphemerisMetadataMerger::mergeKernelDiagnostics(metadata, kernel);
+
+    QVERIFY(metadata.hasWarning(EphemerisEngineWarning::Code::ComputationFailed));
+    QVERIFY(metadata.warningDetails.size() == 2U);
+
+    bool foundCalcephFailure = false;
+    for (const EphemerisEngineWarning::Detail& detail : metadata.warningDetails) {
+        if (detail.text == "calceph compute failed") {
+            foundCalcephFailure = true;
+        }
+    }
+    QVERIFY(foundCalcephFailure);
 }
 
 QTEST_APPLESS_MAIN(EphemerisMetadataMergeTests)

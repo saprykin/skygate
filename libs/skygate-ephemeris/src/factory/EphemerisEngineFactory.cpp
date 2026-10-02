@@ -2,6 +2,7 @@
 #include "EphemerisFactoryCreationDiagnostic.hpp"
 #include "IEphemerisDiagnosticsSink.hpp"
 #include "StringUtilities.hpp"
+#include "engine/EphemerisLogging.hpp"
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
@@ -22,6 +23,8 @@
 #include "engine/highprecision/TimeScaleServiceOptions.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
 #include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
+
+#include <QDebug>
 
 #include <memory>
 #include <optional>
@@ -306,7 +309,6 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
             request.calcephKernelProvider;
         if (kernelProvider == nullptr) {
             skygate::ephemeris::highprecision::CalcephKernelProvider::Options kernelSelectionOptions;
-            kernelSelectionOptions.verifyChecksum = false;
             kernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
                 *request.activeDataSnapshot, *request.dataManifest, std::move(kernelSelectionOptions)
             );
@@ -393,6 +395,18 @@ void publishDiagnostics(
     }
 }
 
+void logDiagnostics(const std::vector<EphemerisFactoryCreationDiagnostic>& diagnostics)
+{
+    for (const EphemerisFactoryCreationDiagnostic& diagnostic : diagnostics) {
+        const QString text = QString::fromStdString(std::string{diagnostic.displayText()});
+        if (diagnostic.isError()) {
+            qCWarning(skygateEphemerisEngineLog).noquote() << text;
+        } else {
+            qCInfo(skygateEphemerisEngineLog).noquote() << text;
+        }
+    }
+}
+
 }  // namespace
 
 EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngineFactoryRequest& request)
@@ -424,6 +438,7 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
     }
 
     publishDiagnostics(request.diagnosticsSink, result.diagnostics);
+    logDiagnostics(result.diagnostics);
     return result;
 }
 

@@ -70,6 +70,29 @@ Item {
                 }
 
                 Label {
+                    visible: engineSection.controllerText("ephemerisEngineStatusText", "") !== ""
+                    Layout.preferredHeight: visible ? implicitHeight : 0
+                    text: "Status"
+                    color: skyContext.theme.formLabelText
+                    font.family: "Avenir Next"
+                    font.pixelSize: 10
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Label {
+                    objectName: "ephemerisEngineStatusLabel"
+                    visible: engineSection.controllerText("ephemerisEngineStatusText", "") !== ""
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: visible ? implicitHeight : 0
+                    text: engineSection.controllerText("ephemerisEngineStatusText", "")
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
                     visible: preferencesDraft.ephemerisEngineKindIndex === 1
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Corrections"

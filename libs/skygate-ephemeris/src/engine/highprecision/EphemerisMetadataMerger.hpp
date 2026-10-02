@@ -8,6 +8,8 @@
 
 namespace skygate::ephemeris::highprecision {
 
+class ICalcephKernel;
+
 class EphemerisMetadataMerger final {
 public:
     EphemerisMetadataMerger() = delete;
@@ -36,6 +38,10 @@ public:
 
     static void
     mergeEarthOrientation(EphemerisEngineQueryResult& metadata, const EarthOrientationSampler::Sample& sample) noexcept;
+
+    static void mergeWarnings(EphemerisEngineQueryResult& target, const EphemerisEngineQueryResult& source) noexcept;
+
+    static void mergeKernelDiagnostics(EphemerisEngineQueryResult& metadata, const ICalcephKernel& kernel) noexcept;
 };
 
 }  // namespace skygate::ephemeris::highprecision

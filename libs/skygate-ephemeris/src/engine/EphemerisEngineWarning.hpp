@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace skygate::ephemeris {
@@ -16,7 +17,32 @@ public:
         TimeScaleDataUnavailable,
         CorrectionUnavailable,
         ComputationFailed,
-        BarycenterFallback
+        BarycenterFallback,
+        LeapSecondTableMissing,
+        LeapSecondTableStale,
+        EpochOutsideLeapSecondTable,
+        LeapSecondFallbackApplied,
+        UnsupportedTimeScaleConversion,
+        InvalidTimeScaleInput,
+        TdbApproximationApplied,
+        EarthOrientationDataMissing,
+        EarthOrientationDataStale,
+        EarthOrientationDataPredicted,
+        EpochOutsideEarthOrientationData,
+        DeltaTFallbackApplied,
+        DeltaTUnavailable,
+        EarthOrientationDataEstimated,
+        EarthOrientationStaleData,
+        EarthOrientationPredictedData,
+        EarthOrientationMissingData,
+        EarthOrientationEpochOutsideRange,
+        EarthOrientationInvalidInput,
+        EarthOrientationEstimatedData
+    };
+
+    struct Detail {
+        Code code = Code::AccuracyDegraded;
+        std::string text;
     };
 
     constexpr EphemerisEngineWarning() noexcept = default;
@@ -54,6 +80,46 @@ public:
             return "The ephemeris computation failed.";
         case Code::BarycenterFallback:
             return "A planetary-system barycenter was used because the requested body center is unavailable.";
+        case Code::LeapSecondTableMissing:
+            return "Leap-second table data is unavailable.";
+        case Code::LeapSecondTableStale:
+            return "Leap-second table data is stale for this conversion.";
+        case Code::EpochOutsideLeapSecondTable:
+            return "The requested epoch is outside the leap-second table validity range.";
+        case Code::LeapSecondFallbackApplied:
+            return "A degraded leap-second fallback offset was applied.";
+        case Code::UnsupportedTimeScaleConversion:
+            return "The requested time-scale conversion is not supported.";
+        case Code::InvalidTimeScaleInput:
+            return "The requested time-scale conversion input is invalid.";
+        case Code::TdbApproximationApplied:
+            return "The TT/TDB conversion used a documented approximation.";
+        case Code::EarthOrientationDataMissing:
+            return "Earth-orientation data is unavailable.";
+        case Code::EarthOrientationDataStale:
+            return "Earth-orientation data is stale for this conversion.";
+        case Code::EarthOrientationDataPredicted:
+            return "Earth-orientation data uses a prediction for this conversion.";
+        case Code::EpochOutsideEarthOrientationData:
+            return "The requested epoch is outside the Earth-orientation data range.";
+        case Code::DeltaTFallbackApplied:
+            return "A degraded Delta T fallback was applied.";
+        case Code::DeltaTUnavailable:
+            return "Delta T data is unavailable for this conversion.";
+        case Code::EarthOrientationDataEstimated:
+            return "Earth-orientation data uses an estimate for this conversion.";
+        case Code::EarthOrientationStaleData:
+            return "Earth-orientation data is stale for this conversion.";
+        case Code::EarthOrientationPredictedData:
+            return "Earth-orientation data uses a prediction for this conversion.";
+        case Code::EarthOrientationMissingData:
+            return "Earth-orientation data is unavailable.";
+        case Code::EarthOrientationEpochOutsideRange:
+            return "The requested epoch is outside the Earth-orientation data range.";
+        case Code::EarthOrientationInvalidInput:
+            return "Earth-orientation data input is invalid.";
+        case Code::EarthOrientationEstimatedData:
+            return "Earth-orientation data uses an estimate for this conversion.";
         }
 
         return "Ephemeris warning.";

@@ -116,6 +116,11 @@ class SkyContextController final : public QObject {
         NOTIFY ephemerisDataStatusTextChanged
     )
     Q_PROPERTY(
+        QString ephemerisEngineStatusText
+        READ ephemerisEngineStatusText
+        NOTIFY ephemerisEngineStatusTextChanged
+    )
+    Q_PROPERTY(
         QString ephemerisShortRangeKernelStatusText
         READ ephemerisShortRangeKernelStatusText
         NOTIFY ephemerisDataStatusTextChanged
@@ -311,6 +316,7 @@ public:
     [[nodiscard]] QString locationStatusText() const;
     [[nodiscard]] QString catalogStatusText() const;
     [[nodiscard]] QString ephemerisDataStatusText() const;
+    [[nodiscard]] QString ephemerisEngineStatusText() const;
     [[nodiscard]] QString ephemerisShortRangeKernelStatusText() const;
     [[nodiscard]] QString ephemerisLongRangeKernelStatusText() const;
     [[nodiscard]] QString ephemerisEarthOrientationStatusText() const;
@@ -443,6 +449,7 @@ signals:
     void locationStatusTextChanged();
     void catalogStatusTextChanged();
     void ephemerisDataStatusTextChanged();
+    void ephemerisEngineStatusTextChanged();
     void ephemerisDataChanged();
     void catalogDatasetInfoTextChanged();
     void deepSkyCatalogInfoTextChanged();
@@ -484,6 +491,7 @@ private:
     ephemerisRequestContextFor(const skygate::core::ObservationContext& skyContext) const;
     void applyEphemerisUserSettings(const SkySettingsStore::EphemerisUserSettingsSnapshot& settings);
     void setEphemerisDataOperationStatusText(QString statusText);
+    void setEphemerisEngineStatusText(QString statusText);
     void setEphemerisDataUpdateProgress(double progress) noexcept;
     [[nodiscard]] const skygate::ephemeris::EphemerisDataManifest* activeEphemerisDataManifest() const noexcept;
     void refreshEphemerisDataManifestAsync(const QString& stagedRoot, std::function<void(bool)> completionHandler);
@@ -521,6 +529,7 @@ private:
     QString m_ephemerisUpdateResourceRoot;
     QString m_ephemerisWritableCacheRoot;
     QString m_ephemerisDataOperationStatusText;
+    QString m_ephemerisEngineStatusText;
     QString m_availableEarthOrientationVersion;
     QString m_availableLeapSecondVersion;
     QString m_availableDeltaTVersion;
