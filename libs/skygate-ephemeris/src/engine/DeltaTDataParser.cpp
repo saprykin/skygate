@@ -1,5 +1,5 @@
 #include "DeltaTDataParser.hpp"
-#include "HighPrecisionTextParser.hpp"
+#include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "time/CalendarTime.hpp"
 

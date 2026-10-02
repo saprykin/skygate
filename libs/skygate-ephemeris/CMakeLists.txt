@@ -105,8 +105,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/highprecision/ErfaFrameTransformer.cpp
     src/engine/highprecision/ErfaAstrometry.hpp
     src/engine/highprecision/ErfaAstrometry.cpp
-    src/engine/HighPrecisionTextParser.hpp
-    src/engine/HighPrecisionTextParser.cpp
+    src/text/HighPrecisionTextParser.hpp
+    src/text/HighPrecisionTextParser.cpp
     src/engine/IDeltaTProvider.hpp
     src/engine/ILeapSecondProvider.hpp
     src/engine/LeapSecondTableLoader.hpp

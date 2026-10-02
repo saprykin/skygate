@@ -1,4 +1,4 @@
-#include "engine/HighPrecisionTextParser.hpp"
+#include "text/HighPrecisionTextParser.hpp"
 
 #include <QtTest/QtTest>
 

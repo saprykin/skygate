@@ -185,6 +185,7 @@ private slots:
     void usesActiveSnapshotKernelWhenDefaultProfileAssetIsAbsent();
     void reportsMissingKernelWhenExplicitProfileSnapshotMismatches();
     void rejectsChecksumMismatchBeforeOpening();
+    void acceptsUppercaseManifestChecksum();
     void reportsSelectedKernelOpenFailure();
     void rejectsNonTdbEpochsBeforeCallingKernel();
     void keepsSelectedMetadataWhenOpenFails();
@@ -405,6 +406,27 @@ void CalcephKernelProviderTests::rejectsChecksumMismatchBeforeOpening()
         static_cast<std::uint8_t>(skygate::ephemeris::highprecision::ICalcephKernel::Status::ChecksumMismatch)
     );
     QVERIFY(!kernel->diagnostics().empty());
+}
+
+void CalcephKernelProviderTests::acceptsUppercaseManifestChecksum()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    const QString kernelPath = writeKernel(root);
+    skygate::ephemeris::EphemerisDataManifest manifest = makeManifest();
+    manifest.assets.front().checksum.value =
+        QString::fromLatin1(kPayloadSha256.data(), static_cast<qsizetype>(kPayloadSha256.size()))
+            .toUpper()
+            .toStdString();
+
+    const skygate::ephemeris::highprecision::CalcephKernelProvider provider(makeSnapshot(kernelPath), manifest);
+    const std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernel> kernel =
+        openProvidedKernel(provider);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(kernel->status()), static_cast<std::uint8_t>(expectedSelectedKernelOpenStatus())
+    );
+    QVERIFY(kernel->kernelInfo().has_value());
 }
 
 void CalcephKernelProviderTests::reportsSelectedKernelOpenFailure()

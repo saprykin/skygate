@@ -1,5 +1,5 @@
 #include "LeapSecondTableParser.hpp"
-#include "HighPrecisionTextParser.hpp"
+#include "text/HighPrecisionTextParser.hpp"
 #include "IEphemerisDataSnapshot.hpp"
 #include "math/TimeConstants.hpp"
 #include "time/CalendarTime.hpp"

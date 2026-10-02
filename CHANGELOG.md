@@ -35,6 +35,10 @@ architecture boundaries, and improves diagnostics and test provenance.
   `skygate-core` with dedicated core tests.
 - Deduplicated NAIF body IDs, WGS84 geodesy constants, and solar
   mean-anomaly constants into `skygate-core`.
+- Consolidated the solar mean-anomaly constant so the shared value feeds
+  both the TDB-TT term and the simple Sun position; the simple-only
+  approximation changed from 357.53 to 357.528 (a sub-microsecond TDB-TT
+  effect; the HP path uses ERFA).
 - Removed the dual civil-date/epoch table-entry representation and added
   `AstronomicalEpoch` equality.
 - Documented the high-precision interface layer and fallback strategy in the

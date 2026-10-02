@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -29,6 +30,8 @@ using StagedUpdateDownloadResult = SkyEphemerisDownloadService::StagedUpdateDown
 using StagedUpdateDownloadStatus = SkyEphemerisDownloadService::StagedUpdateDownloadStatus;
 
 constexpr std::size_t kDownloadBufferBytes = 64U * 1024U;
+constexpr std::uint64_t kNetworkStagingSlackBytes = 1U << 20U;
+constexpr std::uint64_t kNetworkStagingFallbackByteCap = 4ULL << 30U;
 
 std::filesystem::path pathFromQString(const QString& path)
 {
@@ -165,6 +168,23 @@ void cleanupCanceledDownload(const StagedUpdateDownloadRequest& request, const S
     return false;
 }
 
+[[nodiscard]] std::uint64_t networkStagingByteCap(const StagedUpdateDownloadRequest& request)
+{
+    std::optional<std::uint64_t> declaredBytes;
+    if (request.asset != nullptr) {
+        declaredBytes = request.asset->compression.compressedSizeBytes.has_value()
+                            ? request.asset->compression.compressedSizeBytes
+                            : request.asset->compression.uncompressedSizeBytes;
+    }
+
+    const std::uint64_t baseBytes = declaredBytes.value_or(kNetworkStagingFallbackByteCap);
+    constexpr std::uint64_t kMaxUint64 = std::numeric_limits<std::uint64_t>::max();
+    if (baseBytes > kMaxUint64 - kNetworkStagingSlackBytes) {
+        return kMaxUint64;
+    }
+    return baseBytes + kNetworkStagingSlackBytes;
+}
+
 struct NetworkDownloadState final {
     StagedUpdateDownloadRequest request;
     std::function<void(StagedUpdateDownloadResult)> completionHandler;
@@ -172,6 +192,7 @@ struct NetworkDownloadState final {
     std::shared_ptr<QFile> stagedFile;
     QNetworkReply* reply = nullptr;
     QTimer* cancellationTimer = nullptr;
+    std::uint64_t stagingByteCap = 0U;
     bool completed = false;
 };
 
@@ -263,10 +284,15 @@ void SkyEphemerisDownloadService::stageInternal(
         completionHandler(stageLocalFile(request, sourceUrlText));
         return;
     }
-    if (sourceUrl.scheme() != QStringLiteral("http") && sourceUrl.scheme() != QStringLiteral("https")) {
+    if (sourceUrl.scheme() != QStringLiteral("https")) {
         StagedUpdateDownloadResult result;
         result.status = StagedUpdateDownloadStatus::MissingSource;
-        addDiagnostic(result, QStringLiteral("Ephemeris update download source URL scheme is unsupported."));
+        addDiagnostic(
+            result,
+            sourceUrl.scheme() == QStringLiteral("http")
+                ? QStringLiteral("Ephemeris update download URLs must use HTTPS.")
+                : QStringLiteral("Ephemeris update download source URL scheme is unsupported.")
+        );
         completionHandler(std::move(result));
         return;
     }
@@ -350,6 +376,8 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
         return;
     }
 
+    state->stagingByteCap = networkStagingByteCap(request);
+
     const QString sourceUrlText = sourceUrlForRequest(request);
     QNetworkRequest networkRequest{QUrl(sourceUrlText)};
     networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -368,13 +396,23 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
         if (payload.isEmpty()) {
             return;
         }
+        const std::uint64_t incomingBytes = static_cast<std::uint64_t>(payload.size());
+        if (incomingBytes > state->stagingByteCap
+            || state->result.stagedBytes > state->stagingByteCap - incomingBytes) {
+            state->result.status = StagedUpdateDownloadStatus::IoError;
+            addDiagnostic(
+                state->result, QStringLiteral("Ephemeris update download exceeded the declared staging size.")
+            );
+            state->reply->abort();
+            return;
+        }
         if (state->stagedFile->write(payload) != payload.size()) {
             state->result.status = StagedUpdateDownloadStatus::IoError;
             addDiagnostic(state->result, QStringLiteral("Unable to write ephemeris update staging file."));
             state->reply->abort();
             return;
         }
-        state->result.stagedBytes += static_cast<std::uint64_t>(payload.size());
+        state->result.stagedBytes += incomingBytes;
         reportDownloadProgress(state->request, state->result.stagedBytes, std::nullopt);
     });
 
@@ -414,11 +452,18 @@ void SkyEphemerisDownloadService::stageNetworkUrl(
 
         const QByteArray remainingPayload = state->reply->readAll();
         if (!remainingPayload.isEmpty() && state->result.status != StagedUpdateDownloadStatus::IoError) {
-            if (state->stagedFile->write(remainingPayload) != remainingPayload.size()) {
+            const std::uint64_t incomingBytes = static_cast<std::uint64_t>(remainingPayload.size());
+            if (incomingBytes > state->stagingByteCap
+                || state->result.stagedBytes > state->stagingByteCap - incomingBytes) {
+                state->result.status = StagedUpdateDownloadStatus::IoError;
+                addDiagnostic(
+                    state->result, QStringLiteral("Ephemeris update download exceeded the declared staging size.")
+                );
+            } else if (state->stagedFile->write(remainingPayload) != remainingPayload.size()) {
                 state->result.status = StagedUpdateDownloadStatus::IoError;
                 addDiagnostic(state->result, QStringLiteral("Unable to write ephemeris update staging file."));
             } else {
-                state->result.stagedBytes += static_cast<std::uint64_t>(remainingPayload.size());
+                state->result.stagedBytes += incomingBytes;
                 reportDownloadProgress(state->request, state->result.stagedBytes, state->result.stagedBytes);
             }
         }

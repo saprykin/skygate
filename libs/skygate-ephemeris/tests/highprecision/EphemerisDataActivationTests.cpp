@@ -245,6 +245,7 @@ private slots:
     void activatesValidZstdArchive();
     void rejectsCorruptZstdArchive();
     void rejectsChecksumMismatch();
+    void acceptsUppercaseManifestChecksum();
     void rejectsExpectedSizeMismatch();
     void rejectsCompressedAssetLargerThanDeclaredSize();
     void preservesExistingCacheFileWhenReplacementCannotBeWritten();
@@ -344,6 +345,37 @@ void EphemerisDataActivationTests::rejectsChecksumMismatch()
     QVERIFY(!result.diagnostics.empty());
     QVERIFY(!QFileInfo::exists(pathToQString(result.activePath)));
     QVERIFY(!containsFiles(cacheRoot.path()));
+}
+
+void EphemerisDataActivationTests::acceptsUppercaseManifestChecksum()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
+    asset.checksum.value = QString::fromLatin1(kPayloadSha256.data(), static_cast<qsizetype>(kPayloadSha256.size()))
+                               .toUpper()
+                               .toStdString();
+    writeFile(
+        uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+
+    const skygate::ephemeris::EphemerisDataActivationRequest request = makeRequest(asset, bundledRoot, cacheRoot);
+    const skygate::ephemeris::EphemerisDataActivationResult firstResult =
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
+    QCOMPARE(
+        static_cast<std::uint8_t>(firstResult.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Activated)
+    );
+
+    const skygate::ephemeris::EphemerisDataActivationResult secondResult =
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
+    QCOMPARE(
+        static_cast<std::uint8_t>(secondResult.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::AlreadyActive)
+    );
 }
 
 void EphemerisDataActivationTests::rejectsCompressedAssetLargerThanDeclaredSize()
