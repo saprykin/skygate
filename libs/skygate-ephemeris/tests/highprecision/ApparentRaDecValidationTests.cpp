@@ -132,7 +132,7 @@ struct ApparentValidationFixture {
         result.velocityAuPerDay = parseVector(object.value(QStringLiteral("velocityAuPerDay")).toArray());
     }
     result.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Valid;
-    result.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
+    result.metadata.dataSourceProvenance = "Self-derived apparent smoke fixture";
     return result;
 }
 
@@ -164,7 +164,7 @@ struct ApparentValidationFixture {
     ICalcephKernel::StateResult defaultResult;
     defaultResult.metadata.status = skygate::ephemeris::EphemerisEngineQueryStatus::Type::Failed;
     defaultResult.metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-    defaultResult.metadata.dataSourceProvenance = "JPL Horizons apparent fixture";
+    defaultResult.metadata.dataSourceProvenance = "Self-derived apparent smoke fixture";
     provider->setDefaultResult(std::move(defaultResult));
 
     const QJsonArray kernelStates = root.value(QStringLiteral("kernelStates")).toArray();

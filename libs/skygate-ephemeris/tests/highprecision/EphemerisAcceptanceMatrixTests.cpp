@@ -532,7 +532,7 @@ private slots:
     void correctionMatrixRoutesAstrometricApparentAndTopocentricRequests();
     void absentLongRangeKernelProducesDegradedFallbackMetadata();
     void bundledAndOptionalLongRangeDataSetProfilesDriveProviderSelection();
-    void deterministicHorizonsFixturesRemainReadable();
+    void deterministicSelfDerivedFixturesRemainReadable();
     void fullFrameComputationCacheAvoidsPerObjectRecompute();
 };
 
@@ -636,6 +636,9 @@ void EphemerisAcceptanceMatrixTests::realCalcephRuntimeComputesFixtureSolarSyste
         kernel->diagnostics().empty() ? QByteArray{} : QByteArray(kernel->diagnostics().front().c_str());
     if (kernel->status() == ICalcephKernel::Status::OpenFailed && diagnostics.contains("CALCEPH failed to open")) {
         QSKIP("Real CALCEPH provider acceptance row requires a kernel format supported by the linked CALCEPH.");
+    }
+    if (kernel->status() == ICalcephKernel::Status::MissingKernelFile) {
+        QSKIP("Real CALCEPH provider acceptance row requires the de405s.bsp kernel fixture.");
     }
     QVERIFY2(kernel->status() == ICalcephKernel::Status::Ready, diagnostics.constData());
 
@@ -759,6 +762,9 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
         && bundledDiagnostics.contains("CALCEPH failed to open")) {
         QSKIP("Provider-selection acceptance row requires a kernel format supported by the linked CALCEPH.");
     }
+    if (bundledKernel->status() == ICalcephKernel::Status::MissingKernelFile) {
+        QSKIP("Provider-selection acceptance row requires the de405s.bsp kernel fixture.");
+    }
 
     HighPrecisionEphemerisEngine::Dependencies bundledDependencies;
     bundledDependencies.calcephKernel = bundledKernel;
@@ -815,7 +821,7 @@ void EphemerisAcceptanceMatrixTests::bundledAndOptionalLongRangeDataSetProfilesD
     );
 }
 
-void EphemerisAcceptanceMatrixTests::deterministicHorizonsFixturesRemainReadable()
+void EphemerisAcceptanceMatrixTests::deterministicSelfDerivedFixturesRemainReadable()
 {
     QString errorText;
     const auto fixture = skygate::ephemeris::tests::loadRaDecFixture(
@@ -825,11 +831,12 @@ void EphemerisAcceptanceMatrixTests::deterministicHorizonsFixturesRemainReadable
     );
 
     QVERIFY2(fixture.has_value(), qPrintable(errorText));
-    QCOMPARE(fixture->metadata.source, QStringLiteral("JPL Horizons"));
+    QCOMPARE(fixture->metadata.source, QStringLiteral("Self-derived apparent smoke fixture"));
     QVERIFY(fixture->metadata.apiParameters.contains(QStringLiteral("COMMAND='499'")));
     QVERIFY(fixture->metadata.target.contains(QStringLiteral("Mars")));
     QVERIFY(skygate::ephemeris::tests::hasFiniteCoordinates(fixture->expected));
     QVERIFY(fixture->toleranceDegrees > 0.0);
+    QVERIFY(fixture->toleranceDegrees < (1.0 / 3600.0));
 }
 
 void EphemerisAcceptanceMatrixTests::fullFrameComputationCacheAvoidsPerObjectRecompute()

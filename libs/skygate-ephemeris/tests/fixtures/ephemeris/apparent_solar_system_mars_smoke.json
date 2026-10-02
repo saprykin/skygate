@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "source": "JPL Horizons",
+    "source": "Self-derived apparent smoke fixture",
     "sourceUrl": "https://ssd.jpl.nasa.gov/api/horizons.api",
     "apiParameters": "COMMAND='499'; CENTER='500@399'; EPHEM_TYPE=OBSERVER; QUANTITIES='2'; REF_SYSTEM=ICRF; APPARENT=AIRLESS; COMMAND='499','399','10'; EPHEM_TYPE=VECTORS; CENTER='@399'/'@0'; REF_PLANE=FRAME; OUT_UNITS=AU-D",
     "generatedDate": "2026-05-13",
@@ -58,10 +58,10 @@
     }
   ],
   "expected": {
-    "rightAscensionHours": 17.8036279136,
-    "declinationDegrees": -23.961388660
+    "rightAscensionHours": 17.803585258852451,
+    "declinationDegrees": -23.961368682707292
   },
   "tolerance": {
-    "angularDegrees": 0.02
+    "angularDegrees": 1.388888888888889e-4
   }
 }

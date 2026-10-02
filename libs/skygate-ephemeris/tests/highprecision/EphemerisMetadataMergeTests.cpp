@@ -19,6 +19,10 @@ private slots:
     void markCorrectionFailedFailsRecoverableStatusesAndAddsWarnings();
     void markCorrectionFailedPreservesTerminalStatusesAndAddsWarnings();
     void markCorrectionAppliedRecordsCorrection();
+    void mergePropagatesFullResultStatuses();
+    void mergeRespectsDegradedAndFailedOnlyStatusPolicy();
+    void mergeCombinesCorrectionsWarningsAndOptionalMetadata();
+    void mergeHonorsMetadataOptionToggles();
 };
 
 void EphemerisMetadataMergeTests::degradedTimeScaleConversionMapsWarningCodes()
@@ -215,6 +219,162 @@ void EphemerisMetadataMergeTests::markCorrectionAppliedRecordsCorrection()
     QCOMPARE(
         static_cast<std::uint8_t>(metadata.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Valid)
     );
+}
+
+void EphemerisMetadataMergeTests::mergePropagatesFullResultStatuses()
+{
+    EphemerisEngineQueryResult target;
+    EphemerisEngineQueryResult failed;
+    failed.status = EphemerisEngineQueryStatus::Type::Failed;
+    EphemerisMetadataMerger::merge(target, failed);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Failed)
+    );
+
+    target = {};
+    EphemerisEngineQueryResult outOfRange;
+    outOfRange.status = EphemerisEngineQueryStatus::Type::OutOfRange;
+    EphemerisMetadataMerger::merge(target, outOfRange);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::OutOfRange)
+    );
+
+    target = {};
+    EphemerisEngineQueryResult unsupported;
+    unsupported.status = EphemerisEngineQueryStatus::Type::Unsupported;
+    EphemerisMetadataMerger::merge(target, unsupported);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status),
+        static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Unsupported)
+    );
+
+    target = {};
+    EphemerisEngineQueryResult degraded;
+    degraded.status = EphemerisEngineQueryStatus::Type::Degraded;
+    EphemerisMetadataMerger::merge(target, degraded);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+
+    target = {};
+    target.status = EphemerisEngineQueryStatus::Type::Degraded;
+    EphemerisEngineQueryResult valid;
+    EphemerisMetadataMerger::merge(target, valid);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+}
+
+void EphemerisMetadataMergeTests::mergeRespectsDegradedAndFailedOnlyStatusPolicy()
+{
+    EphemerisMetadataMergeOptions options;
+    options.statusPolicy = EphemerisMetadataStatusMergePolicy::DegradedAndFailedOnly;
+
+    EphemerisEngineQueryResult target;
+    EphemerisEngineQueryResult outOfRange;
+    outOfRange.status = EphemerisEngineQueryStatus::Type::OutOfRange;
+    EphemerisMetadataMerger::merge(target, outOfRange, options);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Valid)
+    );
+
+    target = {};
+    EphemerisEngineQueryResult unsupported;
+    unsupported.status = EphemerisEngineQueryStatus::Type::Unsupported;
+    EphemerisMetadataMerger::merge(target, unsupported, options);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Valid)
+    );
+
+    target = {};
+    EphemerisEngineQueryResult failed;
+    failed.status = EphemerisEngineQueryStatus::Type::Failed;
+    EphemerisMetadataMerger::merge(target, failed, options);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Failed)
+    );
+
+    target = {};
+    EphemerisEngineQueryResult degraded;
+    degraded.status = EphemerisEngineQueryStatus::Type::Degraded;
+    EphemerisMetadataMerger::merge(target, degraded, options);
+    QCOMPARE(
+        static_cast<std::uint8_t>(target.status), static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Degraded)
+    );
+}
+
+void EphemerisMetadataMergeTests::mergeCombinesCorrectionsWarningsAndOptionalMetadata()
+{
+    EphemerisEngineQueryResult source;
+    source.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    source.addWarning(EphemerisEngineWarning::Code::AccuracyDegraded);
+    source.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
+    source.unavailableCorrections = EphemerisCorrectionFlags::earthOrientation();
+    source.dataSourceProvenance = "source-provenance";
+    source.effectiveDataValidityRange = EphemerisDateRange{
+        .id = "source-range",
+        .displayName = "Source range",
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+    };
+    source.estimatedAngularUncertaintyArcsec = 0.5;
+
+    EphemerisEngineQueryResult target;
+    EphemerisMetadataMerger::merge(target, source);
+
+    QVERIFY(target.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(target.hasWarning(EphemerisEngineWarning::Code::AccuracyDegraded));
+    QVERIFY(EphemerisCorrectionFlags::has(target.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()));
+    QVERIFY(EphemerisCorrectionFlags::has(target.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation()));
+    QCOMPARE(target.dataSourceProvenance, std::string{"source-provenance"});
+    QVERIFY(target.effectiveDataValidityRange.has_value());
+    QCOMPARE(target.effectiveDataValidityRange->id, std::string{"source-range"});
+    QVERIFY(target.estimatedAngularUncertaintyArcsec.has_value());
+    QCOMPARE(*target.estimatedAngularUncertaintyArcsec, 0.5);
+}
+
+void EphemerisMetadataMergeTests::mergeHonorsMetadataOptionToggles()
+{
+    EphemerisMetadataMergeOptions options;
+    options.mergeCorrections = false;
+    options.mergeProvenance = false;
+    options.mergeValidityRange = false;
+    options.mergeAngularUncertainty = false;
+
+    EphemerisEngineQueryResult source;
+    source.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
+    source.appliedCorrections = EphemerisCorrectionFlags::precessionNutation();
+    source.unavailableCorrections = EphemerisCorrectionFlags::earthOrientation();
+    source.dataSourceProvenance = "source-provenance";
+    source.effectiveDataValidityRange = EphemerisDateRange{
+        .id = "source-range",
+        .displayName = "Source range",
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+    };
+    source.estimatedAngularUncertaintyArcsec = 0.5;
+
+    EphemerisEngineQueryResult target;
+    target.dataSourceProvenance = "target-provenance";
+    target.effectiveDataValidityRange = EphemerisDateRange{
+        .id = "target-range",
+        .displayName = "Target range",
+        .start = {.julianDatePart1 = 2'400'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+        .end = {.julianDatePart1 = 2'500'000.5, .julianDatePart2 = 0.0, .timeScale = TimeScale::Tdb},
+    };
+    target.estimatedAngularUncertaintyArcsec = 1.0;
+
+    EphemerisMetadataMerger::merge(target, source, options);
+
+    QVERIFY(target.hasWarning(EphemerisEngineWarning::Code::DataOutOfRange));
+    QVERIFY(!EphemerisCorrectionFlags::has(target.appliedCorrections, EphemerisCorrectionFlags::precessionNutation()));
+    QVERIFY(
+        !EphemerisCorrectionFlags::has(target.unavailableCorrections, EphemerisCorrectionFlags::earthOrientation())
+    );
+    QCOMPARE(target.dataSourceProvenance, std::string{"target-provenance"});
+    QCOMPARE(target.effectiveDataValidityRange->id, std::string{"target-range"});
+    QCOMPARE(*target.estimatedAngularUncertaintyArcsec, 1.0);
 }
 
 QTEST_APPLESS_MAIN(EphemerisMetadataMergeTests)

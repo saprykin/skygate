@@ -1,4 +1,5 @@
 #include "CelestialBodyCatalog.hpp"
+#include "EphemerisFixtureSupport.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "TestCalcephKernel.hpp"
 #include "math/MathConstants.hpp"
@@ -233,7 +234,7 @@ class SolarSystemStateCalculatorTests final : public QObject {
 
 private slots:
     void computesGeometricRaDecFromKernelVector();
-    void computesGeometricRaDecAgainstHorizonsSmokeFixture();
+    void computesGeometricRaDecAgainstSelfDerivedSmokeFixture();
     void mapsSupportedBodiesToNaifIds();
     void fallsBackToPlanetarySystemBarycenterWhenBodyCenterIsMissing();
     void prefersPlanetarySystemBarycenterWhenConfigured();
@@ -284,7 +285,7 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecFromKernelVector()
     QVERIFY(result.metadata.dataSourceProvenance == std::string{"Horizons ICRF geometric fixture"});
 }
 
-void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstHorizonsSmokeFixture()
+void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstSelfDerivedSmokeFixture()
 {
     const GeometricFixture fixture = loadSmokeFixture();
     const auto provider = std::make_shared<skygate::ephemeris::tests::TestCalcephKernel>();
@@ -299,7 +300,11 @@ void SolarSystemStateCalculatorTests::computesGeometricRaDecAgainstHorizonsSmoke
     QCOMPARE(provider->lastCenterNaifId(), fixture.centerNaifId);
     QVERIFY(result.equatorial.has_value());
     QVERIFY(
-        std::abs(result.equatorial->rightAscensionHours - fixture.expectedRightAscensionHours) < fixture.toleranceDeg
+        std::abs(
+            skygate::ephemeris::tests::rightAscensionHoursToDegrees(result.equatorial->rightAscensionHours)
+            - skygate::ephemeris::tests::rightAscensionHoursToDegrees(fixture.expectedRightAscensionHours)
+        )
+        < fixture.toleranceDeg
     );
     QVERIFY(std::abs(result.equatorial->declinationDeg - fixture.expectedDeclinationDeg) < fixture.toleranceDeg);
 }
@@ -487,7 +492,13 @@ void SolarSystemStateCalculatorTests::computesLightTimeRaDecAgainstHorizonsFixtu
         QVERIFY(std::abs(epochTotal(call.epoch) - epochTotal(fixture.retardedTargetStates[index].epoch)) < 1.0e-9);
     }
     QVERIFY(result.equatorial.has_value());
-    QVERIFY(std::abs(result.equatorial->rightAscensionHours - fixture.expectedRightAscensionHours) < fixture.tolerance);
+    QVERIFY(
+        std::abs(
+            skygate::ephemeris::tests::rightAscensionHoursToDegrees(result.equatorial->rightAscensionHours)
+            - skygate::ephemeris::tests::rightAscensionHoursToDegrees(fixture.expectedRightAscensionHours)
+        )
+        < fixture.tolerance
+    );
     QVERIFY(std::abs(result.equatorial->declinationDeg - fixture.expectedDeclinationDeg) < fixture.tolerance);
     QCOMPARE(
         static_cast<std::uint8_t>(result.metadata.status),

@@ -222,6 +222,12 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         LABELS "unit;highprecision;validation;acceptance"
     )
     add_skygate_ephemeris_qtest(
+        skygate-ephemeris-real-kernel-horizons-acceptance-tests
+        highprecision/RealKernelHorizonsAcceptanceTests.cpp
+        LABELS "unit;highprecision;validation;acceptance;kernel"
+        TIMEOUT 60
+    )
+    add_skygate_ephemeris_qtest(
         skygate-ephemeris-star-astrometry-calculator-tests
         highprecision/StarAstrometryCalculatorTests.cpp
         LABELS "unit;highprecision;validation;stellar-astrometry"

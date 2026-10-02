@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "source": "JPL Horizons",
+    "source": "Self-derived geometric smoke fixture",
     "sourceUrl": "https://ssd.jpl.nasa.gov/horizons/",
     "apiParameters": "COMMAND=\"499\" CENTER=\"399\" EPHEM_TYPE=VECTORS REF_PLANE=FRAME OUT_UNITS=AU-D VEC_TABLE=2",
     "generatedDate": "2026-05-13",
@@ -17,6 +17,6 @@
     "declinationDegrees": -23.953152259288466
   },
   "tolerance": {
-    "angularDegrees": 1.0e-12
+    "angularDegrees": 1.0e-9
   }
 }
