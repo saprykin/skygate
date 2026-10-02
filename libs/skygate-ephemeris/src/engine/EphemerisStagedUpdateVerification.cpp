@@ -220,7 +220,8 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         addDiagnostic(result, "Staged ephemeris asset uncompressed size does not match manifest metadata.");
         return false;
     }
-    if (payload.checksum != asset.checksum.value) {
+    if (QByteArray::fromStdString(payload.checksum).toLower()
+        != QByteArray::fromStdString(asset.checksum.value).toLower()) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
         addDiagnostic(result, "Staged ephemeris asset checksum does not match manifest metadata.");
         return false;
