@@ -197,6 +197,11 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         LABELS "unit;highprecision"
     )
     add_skygate_ephemeris_qtest(
+        skygate-ephemeris-prepared-request-state-builder-tests
+        highprecision/PreparedRequestStateBuilderTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
         skygate-ephemeris-apparent-place-calculator-tests
         highprecision/ApparentPlaceCalculatorTests.cpp
         LABELS "unit;highprecision;validation;apparent;topocentric;corrections"

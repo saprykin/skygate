@@ -5,26 +5,22 @@
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
-#include "ICalcephKernel.hpp"
 #include "IEphemerisComputationCache.hpp"
 #include "IEphemerisResultBuilder.hpp"
 #include "ISolarSystemStateCalculator.hpp"
 #include "IStarAstrometryCalculator.hpp"
 #include "ITimeScaleService.hpp"
-#include "ObserverGeodesy.hpp"
 #include "PreparedEphemerisRequestState.hpp"
+#include "PreparedRequestStateBuilder.hpp"
 #include "StarAstrometryBatchResult.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisFallbackStrategy.hpp"
 
-#include <bit>
 #include <cmath>
 #include <cstdint>
-#include <deque>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -35,9 +31,6 @@ namespace skygate::ephemeris::highprecision {
 namespace {
 
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
-constexpr int kNaifEarth = 399;
-constexpr int kNaifSolarSystemBarycenter = 0;
-constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
 
 [[nodiscard]] bool hasValidEpoch(const AstronomicalEpoch& epoch) noexcept
 {
@@ -58,20 +51,6 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
 [[nodiscard]] bool requestsApparentPlaceProcessing(const EphemerisRequest& request) noexcept
 {
     return request.options.correctionFlags() != EphemerisCorrectionFlags::noCorrections();
-}
-
-[[nodiscard]] bool requestsAnnualParallaxState(const EphemerisRequest& request) noexcept
-{
-    return skygate::ephemeris::EphemerisCorrectionFlags::has(
-        request.options.correctionFlags(), EphemerisCorrectionFlags::annualParallax()
-    );
-}
-
-[[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
-{
-    return skygate::ephemeris::EphemerisCorrectionFlags::has(
-        request.options.correctionFlags(), EphemerisCorrectionFlags::diurnalParallax()
-    );
 }
 
 [[nodiscard]] std::optional<CelestialBodyState> computeSimpleFallbackState(
@@ -97,37 +76,6 @@ constexpr std::size_t kDirectBodyStateCacheMaxEntries = 8U;
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
     return fallbackState;
-}
-
-[[nodiscard]] bool sameDoubleIdentity(const double lhs, const double rhs) noexcept
-{
-    return std::bit_cast<std::uint64_t>(lhs) == std::bit_cast<std::uint64_t>(rhs);
-}
-
-[[nodiscard]] bool sameEpoch(const AstronomicalEpoch& lhs, const AstronomicalEpoch& rhs) noexcept
-{
-    return sameDoubleIdentity(lhs.julianDatePart1, rhs.julianDatePart1)
-           && sameDoubleIdentity(lhs.julianDatePart2, rhs.julianDatePart2) && lhs.timeScale == rhs.timeScale;
-}
-
-[[nodiscard]] bool sameObserver(const skygate::core::GeoLocation& lhs, const skygate::core::GeoLocation& rhs) noexcept
-{
-    return sameDoubleIdentity(lhs.latitudeDeg, rhs.latitudeDeg)
-           && sameDoubleIdentity(lhs.longitudeDeg, rhs.longitudeDeg)
-           && sameDoubleIdentity(lhs.elevationMeters, rhs.elevationMeters);
-}
-
-[[nodiscard]] bool sameOptions(const EphemerisEngineOptions& lhs, const EphemerisEngineOptions& rhs) noexcept
-{
-    return lhs == rhs;
-}
-
-[[nodiscard]] bool sameRequest(const EphemerisRequest& lhs, const EphemerisRequest& rhs) noexcept
-{
-    return sameEpoch(lhs.epoch, rhs.epoch)
-           && skygate::core::UtcTimeCodec::toEpochMicros(lhs.context.utcTime)
-                  == skygate::core::UtcTimeCodec::toEpochMicros(rhs.context.utcTime)
-           && sameObserver(lhs.context.observer, rhs.context.observer) && sameOptions(lhs.options, rhs.options);
 }
 
 void mergeKernelEpochTimeScaleMetadata(
@@ -247,16 +195,20 @@ resultBuilder(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
     );
 }
 
+[[nodiscard]] PreparedRequestStateBuilder::Dependencies
+makePreparedRequestStateBuilderDependencies(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
+{
+    return PreparedRequestStateBuilder::Dependencies{
+        .calcephKernel = dependencies.calcephKernel,
+        .timeScaleService = dependencies.timeScaleService,
+        .earthOrientationProvider = dependencies.earthOrientationProvider,
+    };
+}
+
 }  // namespace
 
 class HighPrecisionEphemerisEngine::Impl {
 public:
-    struct DirectBodyStateCacheEntry {
-        EphemerisRequest request;
-        std::size_t bodyIndex = 0U;
-        CelestialBodyState state;
-    };
-
     Impl(
         const CelestialBodyCatalog& catalog,
         EphemerisEngineOptions engineOptions,
@@ -264,7 +216,8 @@ public:
     )
         : m_catalog(std::make_shared<CelestialBodyCatalog>(catalog)),
           m_catalogStarAstrometryArrays(m_catalog->bodies()), m_options(engineOptions),
-          m_dependencies(std::move(dependencies))
+          m_dependencies(std::move(dependencies)),
+          m_preparedRequestStateBuilder(makePreparedRequestStateBuilderDependencies(m_dependencies))
     {
         m_options.setEngineKind(EphemerisEngineKind::Type::HighPrecision);
     }
@@ -325,7 +278,7 @@ public:
     {
         if (m_dependencies.computationCache != nullptr) {
             if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
-                    request, m_catalog->bodies(), m_dependencies.dataSetInfo
+                    request, catalogIdentity(), m_dependencies.dataSetInfo
                 );
                 cachedSnapshot.has_value()) {
                 return *cachedSnapshot;
@@ -336,7 +289,7 @@ public:
         EphemerisSnapshot snapshot = computeUncached(request, preparedState);
         if (m_dependencies.computationCache != nullptr) {
             m_dependencies.computationCache->storeSnapshot(
-                request, m_catalog->bodies(), m_dependencies.dataSetInfo, snapshot
+                request, catalogIdentity(), m_dependencies.dataSetInfo, snapshot
             );
         }
         return snapshot;
@@ -370,29 +323,24 @@ public:
     }
 
 private:
+    [[nodiscard]] const CelestialBodyCatalog* catalogIdentity() const noexcept
+    {
+        return m_catalog.get();
+    }
+
     [[nodiscard]] CelestialBodyState
     computeResolvedBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
     {
-        const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
-        if (isSolarSystemBody(body)) {
-            if (std::optional<CelestialBodyState> cachedState = findDirectBodyState(request, bodyIndex);
-                cachedState.has_value()) {
-                return *cachedState;
-            }
-            CelestialBodyState state = computeStateForBody(request, bodyIndex, buildPreparedRequestState(request));
-            storeDirectBodyState(request, bodyIndex, state);
-            return state;
-        }
-
         if (m_dependencies.computationCache != nullptr) {
-            if (std::optional<EphemerisSnapshot> cachedSnapshot = m_dependencies.computationCache->findSnapshot(
-                    request, m_catalog->bodies(), m_dependencies.dataSetInfo
-                );
-                cachedSnapshot.has_value() && bodyIndex < cachedSnapshot->states.size()) {
-                return cachedSnapshot->states[bodyIndex];
+            if (std::optional<CelestialBodyState> cachedSnapshotState =
+                    m_dependencies.computationCache->findSnapshotBodyState(
+                        request, catalogIdentity(), m_dependencies.dataSetInfo, bodyIndex
+                    );
+                cachedSnapshotState.has_value()) {
+                return *cachedSnapshotState;
             }
             if (std::optional<CelestialBodyState> cachedBodyState = m_dependencies.computationCache->findBodyState(
-                    request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex
+                    request, catalogIdentity(), m_dependencies.dataSetInfo, bodyIndex
                 );
                 cachedBodyState.has_value()) {
                 return *cachedBodyState;
@@ -402,7 +350,7 @@ private:
         CelestialBodyState state = computeStateForBody(request, bodyIndex, preparedRequestState(request));
         if (m_dependencies.computationCache != nullptr) {
             m_dependencies.computationCache->storeBodyState(
-                request, m_catalog->bodies(), m_dependencies.dataSetInfo, bodyIndex, state
+                request, catalogIdentity(), m_dependencies.dataSetInfo, bodyIndex, state
             );
         }
         return state;
@@ -427,9 +375,6 @@ private:
                     .bodyIndex = bodyIndex,
                 };
                 snapshot.states[bodyIndex] = builder.buildFailedState(input);
-                if (isSolarSystemBody(m_catalog->bodyAt(bodyIndex))) {
-                    storeDirectBodyState(request, bodyIndex, snapshot.states[bodyIndex]);
-                }
             }
             return snapshot;
         }
@@ -464,9 +409,6 @@ private:
                 continue;
             }
             snapshot.states[bodyIndex] = computeStateForBody(request, bodyIndex, preparedState);
-            if (isSolarSystemBody(m_catalog->bodyAt(bodyIndex))) {
-                storeDirectBodyState(request, bodyIndex, snapshot.states[bodyIndex]);
-            }
         }
 
         return snapshot;
@@ -478,119 +420,21 @@ private:
         if (m_dependencies.computationCache != nullptr) {
             if (std::shared_ptr<const PreparedEphemerisRequestState> cachedState =
                     m_dependencies.computationCache->findPreparedRequestState(
-                        request, m_catalog->bodies(), m_dependencies.dataSetInfo
+                        request, catalogIdentity(), m_dependencies.dataSetInfo
                     );
                 cachedState != nullptr) {
                 return cachedState;
             }
         }
 
-        std::shared_ptr<const PreparedEphemerisRequestState> preparedState = buildPreparedRequestState(request);
+        std::shared_ptr<const PreparedEphemerisRequestState> preparedState =
+            m_preparedRequestStateBuilder.build(request);
         if (m_dependencies.computationCache != nullptr) {
             m_dependencies.computationCache->storePreparedRequestState(
-                request, m_catalog->bodies(), m_dependencies.dataSetInfo, preparedState
+                request, catalogIdentity(), m_dependencies.dataSetInfo, preparedState
             );
         }
         return preparedState;
-    }
-
-    [[nodiscard]] std::shared_ptr<const PreparedEphemerisRequestState>
-    buildPreparedRequestState(const EphemerisRequest& request) const
-    {
-        auto preparedState = std::make_shared<PreparedEphemerisRequestState>();
-        {
-            if (request.epoch.timeScale == TimeScale::Tdb) {
-                preparedState->tdbKernelEpoch = request.epoch.normalized();
-            } else if (m_dependencies.timeScaleService == nullptr) {
-                preparedState->tdbKernelEpochMetadata.status = EphemerisEngineQueryStatus::Type::Degraded;
-                preparedState->tdbKernelEpochMetadata.addWarning(
-                    EphemerisEngineWarning::Code::TimeScaleDataUnavailable
-                );
-            } else {
-                const TimeScaleConversionResult conversion =
-                    m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Tdb);
-                mergeKernelEpochTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
-                if (conversion.isSuccess()) {
-                    preparedState->tdbKernelEpoch = conversion.epoch.normalized();
-                }
-            }
-
-            if (requestsAnnualParallaxState(request) && preparedState->tdbKernelEpoch.has_value()
-                && m_dependencies.calcephKernel != nullptr) {
-                preparedState->annualParallaxEarthState = m_dependencies.calcephKernel->compute(
-                    *preparedState->tdbKernelEpoch, kNaifEarth, kNaifSolarSystemBarycenter
-                );
-            }
-        }
-
-        if (requestsTopocentricState(request) && m_dependencies.timeScaleService != nullptr) {
-            preparedState->topocentricStatePrepared = true;
-            preparedState->observerItrsPositionAu = ObserverGeodesy::observerItrsPositionAu(request.context.observer);
-            const TimeScaleConversionResult utcConversion =
-                m_dependencies.timeScaleService->convert(request.epoch, TimeScale::Utc);
-            EphemerisMetadataMerger::mergeTimeScale(preparedState->topocentricMetadata, utcConversion);
-            if (!utcConversion.isSuccess()) {
-                preparedState->topocentricStateAvailable = false;
-                EphemerisMetadataMerger::markCorrectionUnavailable(
-                    preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
-                );
-            } else {
-                preparedState->earthOrientationSample = EarthOrientationSampler::sample(
-                    m_dependencies.earthOrientationProvider,
-                    utcConversion.epoch,
-                    EarthOrientationSampler::Options{
-                        .allowOutOfRangeNearestSampleFallback = true,
-                        .allowMissingDataZeroFallback = true,
-                        .degradePredictedData = false,
-                    }
-                );
-                EphemerisMetadataMerger::mergeEarthOrientation(
-                    preparedState->topocentricMetadata, *preparedState->earthOrientationSample
-                );
-                if (!preparedState->earthOrientationSample->isSuccess()) {
-                    preparedState->topocentricStateAvailable = false;
-                    EphemerisMetadataMerger::markCorrectionUnavailable(
-                        preparedState->topocentricMetadata, EphemerisCorrectionFlags::earthOrientation()
-                    );
-                }
-            }
-        }
-
-        return preparedState;
-    }
-
-    [[nodiscard]] std::optional<CelestialBodyState>
-    findDirectBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
-    {
-        const std::scoped_lock lock(m_directBodyStateCacheMutex);
-        for (auto cacheEntry = m_directBodyStateCache.rbegin(); cacheEntry != m_directBodyStateCache.rend();
-             ++cacheEntry) {
-            if (cacheEntry->bodyIndex == bodyIndex && sameRequest(cacheEntry->request, request)) {
-                return cacheEntry->state;
-            }
-        }
-
-        return std::nullopt;
-    }
-
-    void storeDirectBodyState(
-        const EphemerisRequest& request, const std::size_t bodyIndex, const CelestialBodyState& state
-    ) const
-    {
-        const std::scoped_lock lock(m_directBodyStateCacheMutex);
-        for (DirectBodyStateCacheEntry& cacheEntry : m_directBodyStateCache) {
-            if (cacheEntry.bodyIndex == bodyIndex && sameRequest(cacheEntry.request, request)) {
-                cacheEntry.state = state;
-                return;
-            }
-        }
-
-        m_directBodyStateCache.push_back(
-            DirectBodyStateCacheEntry{.request = request, .bodyIndex = bodyIndex, .state = state}
-        );
-        while (m_directBodyStateCache.size() > kDirectBodyStateCacheMaxEntries) {
-            m_directBodyStateCache.pop_front();
-        }
     }
 
     [[nodiscard]] CelestialBodyState computeStateForBody(
@@ -656,8 +500,7 @@ private:
     CatalogStarAstrometryArrays m_catalogStarAstrometryArrays;
     EphemerisEngineOptions m_options;
     HighPrecisionEphemerisEngine::Dependencies m_dependencies;
-    mutable std::mutex m_directBodyStateCacheMutex;
-    mutable std::deque<DirectBodyStateCacheEntry> m_directBodyStateCache;
+    PreparedRequestStateBuilder m_preparedRequestStateBuilder;
 };
 
 // Public interface delegates

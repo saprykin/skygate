@@ -81,81 +81,6 @@ void mixDateRange(std::uint64_t& hash, const EphemerisDateRange& range) noexcept
     mixEpoch(hash, range.end);
 }
 
-void mixOptionalDateRange(std::uint64_t& hash, const std::optional<EphemerisDateRange>& range) noexcept
-{
-    mixBool(hash, range.has_value());
-    if (range.has_value()) {
-        mixDateRange(hash, *range);
-    }
-}
-
-void mixOptionalDouble(std::uint64_t& hash, const std::optional<double>& value) noexcept
-{
-    mixBool(hash, value.has_value());
-    if (value.has_value()) {
-        mixDouble(hash, *value);
-    }
-}
-
-void mixOptionalEquatorial(
-    std::uint64_t& hash, const std::optional<skygate::core::EquatorialCoordinate>& coordinate
-) noexcept
-{
-    mixBool(hash, coordinate.has_value());
-    if (!coordinate.has_value()) {
-        return;
-    }
-
-    mixDouble(hash, coordinate->rightAscensionHours);
-    mixDouble(hash, coordinate->declinationDeg);
-}
-
-void mixOptionalAstrometry(std::uint64_t& hash, const std::optional<CatalogStarAstrometry>& astrometry) noexcept
-{
-    mixBool(hash, astrometry.has_value());
-    if (!astrometry.has_value()) {
-        return;
-    }
-
-    mixDouble(hash, astrometry->referenceEquatorial.rightAscensionHours);
-    mixDouble(hash, astrometry->referenceEquatorial.declinationDeg);
-    mixEpoch(hash, astrometry->referenceEpoch);
-    mixOptionalDouble(hash, astrometry->properMotionRightAscensionMasPerYear);
-    mixOptionalDouble(hash, astrometry->properMotionDeclinationMasPerYear);
-    mixOptionalDouble(hash, astrometry->stellarParallaxMas);
-    mixOptionalDouble(hash, astrometry->radialVelocityKmPerSecond);
-    mixOptionalDateRange(hash, astrometry->validityRange);
-}
-
-void mixDeepSkyObject(std::uint64_t& hash, const std::optional<DeepSkyObjectInfo>& deepSkyObject) noexcept
-{
-    mixBool(hash, deepSkyObject.has_value());
-    if (!deepSkyObject.has_value()) {
-        return;
-    }
-
-    mixUint64(hash, static_cast<std::uint64_t>(deepSkyObject->kind));
-    mixOptionalDouble(hash, deepSkyObject->majorAxisArcmin);
-    mixOptionalDouble(hash, deepSkyObject->minorAxisArcmin);
-    mixOptionalDouble(hash, deepSkyObject->positionAngleDeg);
-    mixUint64(hash, deepSkyObject->aliases.size());
-    for (const std::string& alias : deepSkyObject->aliases) {
-        mixString(hash, alias);
-    }
-}
-
-void mixCatalogBody(std::uint64_t& hash, const BaseCelestialBody& body) noexcept
-{
-    mixString(hash, body.id);
-    mixString(hash, body.displayName);
-    mixUint64(hash, static_cast<std::uint64_t>(body.kind));
-    mixUint64(hash, static_cast<std::uint64_t>(body.kind));
-    mixDouble(hash, body.visualMagnitude);
-    mixOptionalEquatorial(hash, body.fixedEquatorialValue());
-    mixOptionalAstrometry(hash, body.starAstrometryValue());
-    mixDeepSkyObject(hash, body.deepSkyObjectValue());
-}
-
 [[nodiscard]] std::uint64_t hashRequest(const EphemerisRequest& request) noexcept
 {
     std::uint64_t hash = kFnvOffsetBasis;
@@ -163,18 +88,6 @@ void mixCatalogBody(std::uint64_t& hash, const BaseCelestialBody& body) noexcept
     mixUint64(hash, static_cast<std::uint64_t>(skygate::core::UtcTimeCodec::toEpochMicros(request.context.utcTime)));
     mixObserver(hash, request.context.observer);
     mixOptions(hash, request.options);
-    return hash;
-}
-
-[[nodiscard]] std::uint64_t hashCatalogBodies(std::span<const BaseCelestialBody* const> catalogBodies) noexcept
-{
-    std::uint64_t hash = kFnvOffsetBasis;
-    mixUint64(hash, catalogBodies.size());
-    for (const BaseCelestialBody* body : catalogBodies) {
-        if (body != nullptr) {
-            mixCatalogBody(hash, *body);
-        }
-    }
     return hash;
 }
 
@@ -244,107 +157,6 @@ void appendKeyPart(std::string& key, const std::string_view label, const std::ui
            && sameEpoch(lhs.end, rhs.end);
 }
 
-[[nodiscard]] bool sameOptionalDateRange(
-    const std::optional<EphemerisDateRange>& lhs, const std::optional<EphemerisDateRange>& rhs
-) noexcept
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-    return !lhs.has_value() || sameDateRange(*lhs, *rhs);
-}
-
-[[nodiscard]] bool sameOptionalDouble(const std::optional<double>& lhs, const std::optional<double>& rhs) noexcept
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-    return !lhs.has_value() || sameDoubleIdentity(*lhs, *rhs);
-}
-
-[[nodiscard]] bool sameOptionalEquatorial(
-    const std::optional<skygate::core::EquatorialCoordinate>& lhs,
-    const std::optional<skygate::core::EquatorialCoordinate>& rhs
-) noexcept
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-    return !lhs.has_value()
-           || (sameDoubleIdentity(lhs->rightAscensionHours, rhs->rightAscensionHours)
-               && sameDoubleIdentity(lhs->declinationDeg, rhs->declinationDeg));
-}
-
-[[nodiscard]] bool sameAstrometry(const CatalogStarAstrometry& lhs, const CatalogStarAstrometry& rhs) noexcept
-{
-    return sameDoubleIdentity(lhs.referenceEquatorial.rightAscensionHours, rhs.referenceEquatorial.rightAscensionHours)
-           && sameDoubleIdentity(lhs.referenceEquatorial.declinationDeg, rhs.referenceEquatorial.declinationDeg)
-           && sameEpoch(lhs.referenceEpoch, rhs.referenceEpoch)
-           && sameOptionalDouble(lhs.properMotionRightAscensionMasPerYear, rhs.properMotionRightAscensionMasPerYear)
-           && sameOptionalDouble(lhs.properMotionDeclinationMasPerYear, rhs.properMotionDeclinationMasPerYear)
-           && sameOptionalDouble(lhs.stellarParallaxMas, rhs.stellarParallaxMas)
-           && sameOptionalDouble(lhs.radialVelocityKmPerSecond, rhs.radialVelocityKmPerSecond)
-           && sameOptionalDateRange(lhs.validityRange, rhs.validityRange);
-}
-
-[[nodiscard]] bool sameOptionalAstrometry(
-    const std::optional<CatalogStarAstrometry>& lhs, const std::optional<CatalogStarAstrometry>& rhs
-) noexcept
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-    return !lhs.has_value() || sameAstrometry(*lhs, *rhs);
-}
-
-[[nodiscard]] bool sameDeepSkyObject(const DeepSkyObjectInfo& lhs, const DeepSkyObjectInfo& rhs)
-{
-    return lhs.kind == rhs.kind && lhs.aliases == rhs.aliases
-           && sameOptionalDouble(lhs.majorAxisArcmin, rhs.majorAxisArcmin)
-           && sameOptionalDouble(lhs.minorAxisArcmin, rhs.minorAxisArcmin)
-           && sameOptionalDouble(lhs.positionAngleDeg, rhs.positionAngleDeg);
-}
-
-[[nodiscard]] bool
-sameOptionalDeepSkyObject(const std::optional<DeepSkyObjectInfo>& lhs, const std::optional<DeepSkyObjectInfo>& rhs)
-{
-    if (lhs.has_value() != rhs.has_value()) {
-        return false;
-    }
-    return !lhs.has_value() || sameDeepSkyObject(*lhs, *rhs);
-}
-
-[[nodiscard]] bool sameCatalogBody(const BaseCelestialBody& lhs, const BaseCelestialBody& rhs)
-{
-    return lhs.id == rhs.id && lhs.displayName == rhs.displayName && lhs.kind == rhs.kind && lhs.kind == rhs.kind
-           && sameDoubleIdentity(lhs.visualMagnitude, rhs.visualMagnitude)
-           && sameOptionalEquatorial(lhs.fixedEquatorialValue(), rhs.fixedEquatorialValue())
-           && sameOptionalAstrometry(lhs.starAstrometryValue(), rhs.starAstrometryValue())
-           && sameOptionalDeepSkyObject(lhs.deepSkyObjectValue(), rhs.deepSkyObjectValue());
-}
-
-[[nodiscard]] bool sameCatalogBodies(
-    const std::span<const BaseCelestialBody* const> lhs, const std::span<const BaseCelestialBody* const> rhs
-)
-{
-    if (lhs.size() != rhs.size()) {
-        return false;
-    }
-    for (std::size_t bodyIndex = 0U; bodyIndex < lhs.size(); ++bodyIndex) {
-        if (lhs[bodyIndex] == nullptr || rhs[bodyIndex] == nullptr) {
-            if (lhs[bodyIndex] != rhs[bodyIndex]) {
-                return false;
-            }
-            continue;
-        }
-
-        if (!sameCatalogBody(*lhs[bodyIndex], *rhs[bodyIndex])) {
-            return false;
-        }
-    }
-    return true;
-}
-
 [[nodiscard]] bool sameDataSetInfo(const EphemerisDatasetInfo& lhs, const EphemerisDatasetInfo& rhs)
 {
     if (lhs.id != rhs.id || lhs.displayName != rhs.displayName || lhs.version != rhs.version
@@ -368,13 +180,13 @@ EphemerisComputationCache::EphemerisComputationCache(const std::size_t maxEntrie
 
 EphemerisComputationCache::RequestIdentity EphemerisComputationCache::makeIdentity(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 )
 {
     return RequestIdentity{
         .request = request,
-        .catalog = CelestialBodyCatalog(catalogBodies),
+        .catalogIdentity = catalogIdentity,
         .dataSetInfo = dataSetInfo,
     };
 }
@@ -382,49 +194,73 @@ EphemerisComputationCache::RequestIdentity EphemerisComputationCache::makeIdenti
 bool EphemerisComputationCache::matchesIdentity(
     const EphemerisComputationCache::RequestIdentity& identity,
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 )
 {
-    return sameRequest(identity.request, request) && sameCatalogBodies(identity.catalog.bodies(), catalogBodies)
+    return sameRequest(identity.request, request) && identity.catalogIdentity == catalogIdentity
            && sameDataSetInfo(identity.dataSetInfo, dataSetInfo);
 }
 
 std::optional<EphemerisSnapshot> EphemerisComputationCache::findSnapshot(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 ) const
 {
-    const std::string key = makeSnapshotKey(request, catalogBodies, dataSetInfo);
+    const std::string key = makeSnapshotKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
     const auto snapshot = m_snapshots.find(key);
     if (snapshot == m_snapshots.end()) {
         return std::nullopt;
     }
-    if (!matchesIdentity(snapshot->second.identity, request, catalogBodies, dataSetInfo)) {
+    if (!matchesIdentity(snapshot->second.identity, request, catalogIdentity, dataSetInfo)) {
         return std::nullopt;
     }
 
     return snapshot->second.snapshot;
 }
 
+std::optional<CelestialBodyState> EphemerisComputationCache::findSnapshotBodyState(
+    const EphemerisRequest& request,
+    const CelestialBodyCatalog* catalogIdentity,
+    const EphemerisDatasetInfo& dataSetInfo,
+    const std::size_t bodyIndex
+) const
+{
+    const std::string key = makeSnapshotKey(request, catalogIdentity, dataSetInfo);
+
+    const std::scoped_lock lock(m_mutex);
+    const auto snapshot = m_snapshots.find(key);
+    if (snapshot == m_snapshots.end()) {
+        return std::nullopt;
+    }
+    if (!matchesIdentity(snapshot->second.identity, request, catalogIdentity, dataSetInfo)) {
+        return std::nullopt;
+    }
+    if (bodyIndex >= snapshot->second.snapshot.states.size()) {
+        return std::nullopt;
+    }
+
+    return snapshot->second.snapshot.states[bodyIndex];
+}
+
 void EphemerisComputationCache::storeSnapshot(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo,
     const EphemerisSnapshot& snapshot
 ) const
 {
-    const std::string key = makeSnapshotKey(request, catalogBodies, dataSetInfo);
+    const std::string key = makeSnapshotKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
     if (!m_snapshots.contains(key)) {
         m_snapshotOrder.push_back(key);
     }
     m_snapshots[key] = SnapshotEntry{
-        .identity = makeIdentity(request, catalogBodies, dataSetInfo),
+        .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
         .snapshot = snapshot,
     };
 
@@ -436,18 +272,18 @@ void EphemerisComputationCache::storeSnapshot(
 
 std::shared_ptr<const PreparedEphemerisRequestState> EphemerisComputationCache::findPreparedRequestState(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 ) const
 {
-    const std::string key = makePreparedStateKey(request, catalogBodies, dataSetInfo);
+    const std::string key = makePreparedStateKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
     const auto preparedState = m_preparedStates.find(key);
     if (preparedState == m_preparedStates.end()) {
         return nullptr;
     }
-    if (!matchesIdentity(preparedState->second.identity, request, catalogBodies, dataSetInfo)) {
+    if (!matchesIdentity(preparedState->second.identity, request, catalogIdentity, dataSetInfo)) {
         return nullptr;
     }
 
@@ -456,7 +292,7 @@ std::shared_ptr<const PreparedEphemerisRequestState> EphemerisComputationCache::
 
 void EphemerisComputationCache::storePreparedRequestState(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo,
     std::shared_ptr<const PreparedEphemerisRequestState> preparedState
 ) const
@@ -465,14 +301,14 @@ void EphemerisComputationCache::storePreparedRequestState(
         return;
     }
 
-    const std::string key = makePreparedStateKey(request, catalogBodies, dataSetInfo);
+    const std::string key = makePreparedStateKey(request, catalogIdentity, dataSetInfo);
 
     const std::scoped_lock lock(m_mutex);
     if (!m_preparedStates.contains(key)) {
         m_preparedStateOrder.push_back(key);
     }
     m_preparedStates[key] = PreparedStateEntry{
-        .identity = makeIdentity(request, catalogBodies, dataSetInfo),
+        .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
         .preparedState = std::move(preparedState),
     };
 
@@ -484,12 +320,12 @@ void EphemerisComputationCache::storePreparedRequestState(
 
 std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo,
     const std::size_t bodyIndex
 ) const
 {
-    const std::string key = makeBodyStateKey(request, catalogBodies, dataSetInfo, bodyIndex);
+    const std::string key = makeBodyStateKey(request, catalogIdentity, dataSetInfo, bodyIndex);
 
     const std::scoped_lock lock(m_mutex);
     const auto bodyState = m_bodyStates.find(key);
@@ -497,7 +333,7 @@ std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
         return std::nullopt;
     }
     if (bodyState->second.bodyIndex != bodyIndex
-        || !matchesIdentity(bodyState->second.identity, request, catalogBodies, dataSetInfo)) {
+        || !matchesIdentity(bodyState->second.identity, request, catalogIdentity, dataSetInfo)) {
         return std::nullopt;
     }
 
@@ -506,20 +342,20 @@ std::optional<CelestialBodyState> EphemerisComputationCache::findBodyState(
 
 void EphemerisComputationCache::storeBodyState(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo,
     const std::size_t bodyIndex,
     const CelestialBodyState& state
 ) const
 {
-    const std::string key = makeBodyStateKey(request, catalogBodies, dataSetInfo, bodyIndex);
+    const std::string key = makeBodyStateKey(request, catalogIdentity, dataSetInfo, bodyIndex);
 
     const std::scoped_lock lock(m_mutex);
     if (!m_bodyStates.contains(key)) {
         m_bodyStateOrder.push_back(key);
     }
     m_bodyStates[key] = BodyStateEntry{
-        .identity = makeIdentity(request, catalogBodies, dataSetInfo),
+        .identity = makeIdentity(request, catalogIdentity, dataSetInfo),
         .bodyIndex = bodyIndex,
         .state = state,
     };
@@ -543,7 +379,7 @@ void EphemerisComputationCache::clear() const
 
 std::string EphemerisComputationCache::makeRequestKey(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 )
 {
@@ -551,7 +387,7 @@ std::string EphemerisComputationCache::makeRequestKey(
     key.reserve(96);
     appendKeyPart(key, "request", hashRequest(request));
     key.push_back('|');
-    appendKeyPart(key, "catalog", hashCatalogBodies(catalogBodies));
+    appendKeyPart(key, "catalog", reinterpret_cast<std::uintptr_t>(catalogIdentity));
     key.push_back('|');
     appendKeyPart(key, "dataset", hashDataSetInfo(dataSetInfo));
     return key;
@@ -559,31 +395,31 @@ std::string EphemerisComputationCache::makeRequestKey(
 
 std::string EphemerisComputationCache::makeSnapshotKey(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 )
 {
-    return "snapshot|" + makeRequestKey(request, catalogBodies, dataSetInfo);
+    return "snapshot|" + makeRequestKey(request, catalogIdentity, dataSetInfo);
 }
 
 std::string EphemerisComputationCache::makePreparedStateKey(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo
 )
 {
-    return "prepared|" + makeRequestKey(request, catalogBodies, dataSetInfo);
+    return "prepared|" + makeRequestKey(request, catalogIdentity, dataSetInfo);
 }
 
 std::string EphemerisComputationCache::makeBodyStateKey(
     const EphemerisRequest& request,
-    std::span<const BaseCelestialBody* const> catalogBodies,
+    const CelestialBodyCatalog* catalogIdentity,
     const EphemerisDatasetInfo& dataSetInfo,
     const std::size_t bodyIndex
 )
 {
     std::string key = "body|";
-    key += makeRequestKey(request, catalogBodies, dataSetInfo);
+    key += makeRequestKey(request, catalogIdentity, dataSetInfo);
     key.push_back('|');
     appendKeyPart(key, "index", bodyIndex);
     return key;
