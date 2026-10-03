@@ -66,7 +66,23 @@ simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions) noe
     return request.epoch.hasExplicit() && request.epoch.timeScale != skygate::core::TimeScale::Utc;
 }
 
-[[nodiscard]] CelestialBodyState makeUnsupportedEpochState(const std::size_t bodyIndex) noexcept
+// A zero/default epoch means "no explicit epoch" and must remain a context-only
+// request. A non-finite Julian date part is an invalid explicit epoch rather
+// than an absent one, so it is rejected instead of falling back to context time.
+[[nodiscard]] std::optional<EphemerisEngineWarning::Code>
+unsupportedEpochWarningCode(const EphemerisRequest& request) noexcept
+{
+    if (!request.epoch.isFinite()) {
+        return EphemerisEngineWarning::Code::InvalidExplicitEpoch;
+    }
+    if (hasUnsupportedExplicitEpoch(request)) {
+        return EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion;
+    }
+    return std::nullopt;
+}
+
+[[nodiscard]] CelestialBodyState
+makeUnsupportedEpochState(const std::size_t bodyIndex, const EphemerisEngineWarning::Code warningCode) noexcept
 {
     CelestialBodyState state;
     state.bodyIndex = static_cast<std::uint32_t>(bodyIndex);
@@ -75,9 +91,25 @@ simpleEngineOptionsFromRequest(const EphemerisEngineOptions& requestOptions) noe
     state.horizontal.altitudeDeg = std::numeric_limits<double>::quiet_NaN();
     state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
     state.metadata.status = EphemerisEngineQueryStatus::Type::Unsupported;
-    state.metadata.addWarning(EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion);
+    state.metadata.addWarning(warningCode);
     state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
     return state;
+}
+
+[[nodiscard]] EphemerisSnapshot makeUnsupportedEpochSnapshot(
+    const EphemerisRequest& request,
+    const std::shared_ptr<const CelestialBodyCatalog>& catalog,
+    const EphemerisEngineWarning::Code warningCode
+) noexcept
+{
+    EphemerisSnapshot snapshot;
+    snapshot.context = request.context;
+    snapshot.catalogBodies = catalog;
+    snapshot.states.reserve(catalog->size());
+    for (std::size_t bodyIndex = 0; bodyIndex < catalog->size(); ++bodyIndex) {
+        snapshot.states.push_back(makeUnsupportedEpochState(bodyIndex, warningCode));
+    }
+    return snapshot;
 }
 
 }  // namespace
@@ -130,15 +162,8 @@ EphemerisEngineOptions SimpleEphemerisEngine::options() const noexcept
 
 EphemerisSnapshot SimpleEphemerisEngine::compute(const EphemerisRequest& request) const
 {
-    if (hasUnsupportedExplicitEpoch(request)) {
-        EphemerisSnapshot snapshot;
-        snapshot.context = request.context;
-        snapshot.catalogBodies = m_catalog;
-        snapshot.states.reserve(m_catalog->size());
-        for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
-            snapshot.states.push_back(makeUnsupportedEpochState(bodyIndex));
-        }
-        return snapshot;
+    if (const auto warningCode = unsupportedEpochWarningCode(request)) {
+        return makeUnsupportedEpochSnapshot(request, m_catalog, *warningCode);
     }
 
     EphemerisSnapshot snapshot = computeSnapshot(EphemerisRequestFactory::contextFromRequest(request));
@@ -149,11 +174,11 @@ EphemerisSnapshot SimpleEphemerisEngine::compute(const EphemerisRequest& request
 std::optional<CelestialBodyState>
 SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const std::string_view bodyId) const
 {
-    if (hasUnsupportedExplicitEpoch(request)) {
+    if (const auto warningCode = unsupportedEpochWarningCode(request)) {
         for (std::size_t bodyIndex = 0; bodyIndex < m_catalog->size(); ++bodyIndex) {
             const BaseCelestialBody& body = m_catalog->bodyAt(bodyIndex);
             if (StringUtilities::equalsIgnoreAsciiCase(body.id, bodyId)) {
-                return makeUnsupportedEpochState(bodyIndex);
+                return makeUnsupportedEpochState(bodyIndex, *warningCode);
             }
         }
         return std::nullopt;
@@ -174,8 +199,8 @@ SimpleEphemerisEngine::computeBodyState(const EphemerisRequest& request, const s
         return std::nullopt;
     }
 
-    if (hasUnsupportedExplicitEpoch(request)) {
-        return makeUnsupportedEpochState(bodyIndex);
+    if (const auto warningCode = unsupportedEpochWarningCode(request)) {
+        return makeUnsupportedEpochState(bodyIndex, *warningCode);
     }
 
     CelestialBodyState state = computeStateForBody(

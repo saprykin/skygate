@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <span>
 #include <utility>
@@ -143,8 +144,10 @@ class EphemerisRequestTimeContractTests final : public QObject {
 
 private slots:
     void simpleEngineRejectsExplicitNonUtcEpoch();
+    void simpleEngineRejectsNonFiniteExplicitEpoch();
     void simpleEngineUsesExplicitUtcEpochOverStaleContext();
     void simpleEngineConvenienceOverloadMatchesExplicitUtcRequest();
+    void simpleEngineZeroEpochRemainsContextOnly();
 #ifdef SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS
     void highPrecisionEngineUsesExplicitUtcEpoch();
     void highPrecisionEngineUsesExplicitTdbEpoch();
@@ -202,6 +205,67 @@ void EphemerisRequestTimeContractTests::simpleEngineRejectsExplicitNonUtcEpoch()
             static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Unsupported)
         );
         QVERIFY(std::isnan(byIndex->equatorial.rightAscensionHours));
+    }
+}
+
+void EphemerisRequestTimeContractTests::simpleEngineRejectsNonFiniteExplicitEpoch()
+{
+    const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
+    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
+
+    const UtcTimePoint staleUtcTime = utcTime(0);
+    const std::array<double, 3> nonFiniteValues{
+        std::numeric_limits<double>::quiet_NaN(),
+        std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity(),
+    };
+
+    for (const double nonFinite : nonFiniteValues) {
+        for (const bool nonFiniteInPart1 : {false, true}) {
+            EphemerisRequest request;
+            request.context = makeContext(staleUtcTime);
+            request.epoch = AstronomicalEpoch{
+                .julianDatePart1 = nonFiniteInPart1 ? nonFinite : 0.0,
+                .julianDatePart2 = nonFiniteInPart1 ? 0.0 : nonFinite,
+                .timeScale = TimeScale::Utc,
+            };
+            request.options = engine.options();
+
+            const EphemerisSnapshot snapshot = engine.compute(request);
+            QCOMPARE(snapshot.states.size(), std::size_t{1});
+            const CelestialBodyState& state = snapshot.states.front();
+            QCOMPARE(
+                static_cast<std::uint8_t>(state.metadata.status),
+                static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Unsupported)
+            );
+            QVERIFY(state.metadata.hasWarning(EphemerisEngineWarning::Code::InvalidExplicitEpoch));
+            QVERIFY(!state.metadata.hasWarning(EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion));
+            QVERIFY(!state.metadata.isSuccessful());
+            QVERIFY(std::isnan(state.equatorial.rightAscensionHours));
+
+            const std::optional<CelestialBodyState> byId = engine.computeBodyState(request, "sun");
+            QVERIFY(byId.has_value());
+            QCOMPARE(
+                static_cast<std::uint8_t>(byId->metadata.status),
+                static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Unsupported)
+            );
+            QVERIFY(byId->metadata.hasWarning(EphemerisEngineWarning::Code::InvalidExplicitEpoch));
+            QVERIFY(!byId->metadata.hasWarning(EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion));
+            QVERIFY(!byId->metadata.isSuccessful());
+            QVERIFY(std::isnan(byId->equatorial.rightAscensionHours));
+
+            const std::optional<CelestialBodyState> byIndex = engine.computeBodyState(request, std::size_t{0});
+            QVERIFY(byIndex.has_value());
+            QCOMPARE(
+                static_cast<std::uint8_t>(byIndex->metadata.status),
+                static_cast<std::uint8_t>(EphemerisEngineQueryStatus::Type::Unsupported)
+            );
+            QVERIFY(byIndex->metadata.hasWarning(EphemerisEngineWarning::Code::InvalidExplicitEpoch));
+            QVERIFY(!byIndex->metadata.hasWarning(EphemerisEngineWarning::Code::UnsupportedTimeScaleConversion));
+            QVERIFY(!byIndex->metadata.isSuccessful());
+            QVERIFY(std::isnan(byIndex->equatorial.rightAscensionHours));
+        }
     }
 }
 
@@ -268,6 +332,52 @@ void EphemerisRequestTimeContractTests::simpleEngineConvenienceOverloadMatchesEx
     const CelestialBodyState& contextState = contextSnapshot.states.front();
     const CelestialBodyState& requestState = requestSnapshot.states.front();
     QCOMPARE(contextState.metadata.status, requestState.metadata.status);
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            requestState.equatorial.rightAscensionHours, contextState.equatorial.rightAscensionHours, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            requestState.equatorial.declinationDeg, contextState.equatorial.declinationDeg, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(
+            requestState.horizontal.altitudeDeg, contextState.horizontal.altitudeDeg, 1e-12
+        )
+    );
+    QVERIFY(
+        skygate::ephemeris::tests::isNear(requestState.horizontal.azimuthDeg, contextState.horizontal.azimuthDeg, 1e-12)
+    );
+}
+
+void EphemerisRequestTimeContractTests::simpleEngineZeroEpochRemainsContextOnly()
+{
+    const std::array<OwnGalaxyCelestialBody, 1> bodies{makeSunBody()};
+    const CelestialBodyCatalog catalog(std::span<const OwnGalaxyCelestialBody>{bodies});
+    const SimpleEphemerisEngine engine(catalog, SimpleEphemerisEngine::defaultOptions());
+
+    const ObservationContext context = makeContext(utcTime(1'704'067'200));
+
+    EphemerisRequest request;
+    request.context = context;
+    request.options = engine.options();
+    // request.epoch stays at its default/zero value, which means "no explicit
+    // epoch" and must be treated as a context-only request.
+
+    const EphemerisSnapshot requestSnapshot = engine.compute(request);
+    const EphemerisSnapshot contextSnapshot = engine.compute(context);
+
+    QCOMPARE(requestSnapshot.states.size(), std::size_t{1});
+    QCOMPARE(contextSnapshot.states.size(), std::size_t{1});
+
+    const CelestialBodyState& requestState = requestSnapshot.states.front();
+    const CelestialBodyState& contextState = contextSnapshot.states.front();
+
+    QVERIFY(requestState.metadata.isSuccessful());
+    QVERIFY(!requestState.metadata.hasWarning(EphemerisEngineWarning::Code::InvalidExplicitEpoch));
+    QCOMPARE(requestState.metadata.status, contextState.metadata.status);
     QVERIFY(
         skygate::ephemeris::tests::isNear(
             requestState.equatorial.rightAscensionHours, contextState.equatorial.rightAscensionHours, 1e-12
