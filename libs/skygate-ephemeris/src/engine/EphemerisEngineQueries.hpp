@@ -31,7 +31,7 @@ public:
     );
 
     [[nodiscard]] static std::optional<CelestialBodyState> computeBodyStateByIndex(
-        const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, std::uint32_t bodyIndex
+        const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, std::size_t bodyIndex
     );
 };
 

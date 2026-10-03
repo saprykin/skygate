@@ -32,6 +32,11 @@ public:
                                    : skygate::ephemeris::EphemerisEngineKind::Type::Simple;
     }
 
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Trail test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
     {
         return m_highPrecisionTraits ? skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine()
@@ -88,10 +93,10 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         ++m_contextBodyStateCalls;
-        return stateForContext(context, bodyIndex);
+        return stateForContext(context, static_cast<std::uint32_t>(bodyIndex));
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
@@ -159,6 +164,16 @@ private:
 
 class CurvedHighPrecisionTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Curved high-precision trail test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
     {
         return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
@@ -207,7 +222,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         return std::nullopt;
     }
@@ -223,6 +238,16 @@ private:
 
 class CrossingTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Crossing trail test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -238,7 +263,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -255,19 +280,21 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         const auto offsetMinutes = static_cast<int>(
             std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
         );
         if (offsetMinutes == -30) {
             return skygate::ephemeris::CelestialBodyState{
-                .bodyIndex = bodyIndex, .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0}
+                .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 179.0}
             };
         }
         if (offsetMinutes == 0) {
             return skygate::ephemeris::CelestialBodyState{
-                .bodyIndex = bodyIndex, .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0}
+                .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+                .horizontal = {.altitudeDeg = 45.0, .azimuthDeg = 181.0}
             };
         }
 
@@ -278,6 +305,16 @@ public:
 class MarkerTrailGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit MarkerTrailGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Marker trail guidance test engine";
+    }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
@@ -319,7 +356,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         return std::nullopt;
     }

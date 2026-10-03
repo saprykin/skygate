@@ -446,6 +446,11 @@ public:
         return m_options.engineKind();
     }
 
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Configured ephemeris test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
     {
         return m_options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
@@ -473,10 +478,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, std::size_t bodyIndex) const override
     {
-        if (bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
-            return std::nullopt;
-        }
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -495,7 +497,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         return std::nullopt;
     }

@@ -25,6 +25,9 @@ public:
     explicit FixedAltitudeEngine(double altitudeDeg);
     explicit FixedAltitudeEngine(std::vector<FixedAltitudeBody> bodies);
 
+    [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;
+    [[nodiscard]] std::string_view name() const noexcept override;
+
     [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const override;
 
     [[nodiscard]] std::optional<CelestialBodyState>
@@ -39,7 +42,7 @@ public:
     computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
 
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override;
+    computeBodyState(const skygate::core::ObservationContext& context, std::size_t bodyIndex) const override;
 
 private:
     [[nodiscard]] CelestialBodyState stateFor(std::uint32_t bodyIndex) const;
@@ -57,6 +60,7 @@ public:
     );
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override;
+    [[nodiscard]] std::string_view name() const noexcept override;
     [[nodiscard]] EphemerisEngineTraits traits() const noexcept override;
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
     [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const override;
@@ -73,7 +77,7 @@ public:
     computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
 
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override;
+    computeBodyState(const skygate::core::ObservationContext& context, std::size_t bodyIndex) const override;
 
     [[nodiscard]] int requestSampleCount() const noexcept;
     [[nodiscard]] int contextSampleCount() const noexcept;
@@ -109,7 +113,7 @@ public:
     computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
 
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override;
+    computeBodyState(const skygate::core::ObservationContext& context, std::size_t bodyIndex) const override;
 };
 
 [[nodiscard]] EphemerisEngineOptions highPrecisionLightTimeOptions() noexcept;

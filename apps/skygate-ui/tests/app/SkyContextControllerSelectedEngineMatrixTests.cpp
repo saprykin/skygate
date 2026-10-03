@@ -281,13 +281,13 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         ++m_contextBodyStateCount;
         skygate::ephemeris::EphemerisRequest request;
         request.context = context;
         request.options = m_options;
-        return computeBodyState(request, static_cast<std::size_t>(bodyIndex));
+        return computeBodyState(request, bodyIndex);
     }
 
     [[nodiscard]] skygate::core::HorizontalCoordinate

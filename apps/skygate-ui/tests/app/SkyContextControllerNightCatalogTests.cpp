@@ -90,7 +90,7 @@ public:
         snapshot.context = context;
         snapshot.catalogBodies = m_bodies;
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
-            snapshot.states.push_back(*computeBodyState(context, static_cast<std::uint32_t>(bodyIndex)));
+            snapshot.states.push_back(*computeBodyState(context, bodyIndex));
         }
         return snapshot;
     }
@@ -100,14 +100,14 @@ public:
     {
         for (std::size_t bodyIndex = 0; bodyIndex < m_bodies->size(); ++bodyIndex) {
             if (m_bodies->bodyAt(bodyIndex).id == bodyId) {
-                return computeBodyState(context, static_cast<std::uint32_t>(bodyIndex));
+                return computeBodyState(context, bodyIndex);
             }
         }
         return std::nullopt;
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext&, const std::size_t bodyIndex) const override
     {
         ++m_contextBodyStateCount;
         if (bodyIndex >= m_bodies->size()) {
