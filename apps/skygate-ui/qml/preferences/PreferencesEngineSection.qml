@@ -18,6 +18,14 @@ Item {
         return value === undefined || value === null ? fallback : value;
     }
 
+    function supportsCorrections() {
+        return skyContextController.ephemerisEngineSupportsCorrections(preferencesDraft.ephemerisEngineKindIndex);
+    }
+
+    function supportsAtmosphereSettings() {
+        return skyContextController.ephemerisEngineSupportsAtmosphereSettings(preferencesDraft.ephemerisEngineKindIndex);
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -51,7 +59,7 @@ Item {
                     id: ephemerisEngineCombo
                     objectName: "ephemerisEngineSelectorCombo"
                     Layout.fillWidth: true
-                    model: ["Simple", "High precision"]
+                    model: skyContextController.ephemerisEngineLabels
 
                     Binding on currentIndex {
                         value: Math.max(0, Math.min(ephemerisEngineCombo.count - 1, preferencesDraft.ephemerisEngineKindIndex))
@@ -93,7 +101,7 @@ Item {
                 }
 
                 Label {
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1
+                    visible: engineSection.supportsCorrections()
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Corrections"
                     color: skyContext.theme.formLabelText
@@ -105,7 +113,7 @@ Item {
                 PreferencesComboBox {
                     id: ephemerisCorrectionCombo
                     objectName: "ephemerisCorrectionPresetCombo"
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1
+                    visible: engineSection.supportsCorrections()
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     model: ["Geometric", "Astrometric", "Apparent", "Topocentric apparent"]
@@ -118,7 +126,7 @@ Item {
                 }
 
                 Label {
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1
+                    visible: engineSection.supportsAtmosphereSettings()
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Refraction"
                     color: skyContext.theme.formLabelText
@@ -129,7 +137,7 @@ Item {
 
                 RowLayout {
                     id: ephemerisRefractionRow
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1
+                    visible: engineSection.supportsAtmosphereSettings()
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     spacing: 7
@@ -151,7 +159,7 @@ Item {
                 }
 
                 Label {
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Pressure"
                     color: skyContext.theme.formLabelText
@@ -162,7 +170,7 @@ Item {
 
                 PreferencesTextField {
                     objectName: "ephemerisPressureInput"
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisAtmosphericPressureText
@@ -172,7 +180,7 @@ Item {
                 }
 
                 Label {
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Temperature"
                     color: skyContext.theme.formLabelText
@@ -183,7 +191,7 @@ Item {
 
                 PreferencesTextField {
                     objectName: "ephemerisTemperatureInput"
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisAtmosphericTemperatureText
@@ -193,7 +201,7 @@ Item {
                 }
 
                 Label {
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Humidity"
                     color: skyContext.theme.formLabelText
@@ -204,7 +212,7 @@ Item {
 
                 PreferencesTextField {
                     objectName: "ephemerisHumidityInput"
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisRelativeHumidityText
@@ -214,7 +222,7 @@ Item {
                 }
 
                 Label {
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: "Wavelength"
                     color: skyContext.theme.formLabelText
@@ -225,7 +233,7 @@ Item {
 
                 PreferencesTextField {
                     objectName: "ephemerisWavelengthInput"
-                    visible: preferencesDraft.ephemerisEngineKindIndex === 1 && preferencesDraft.ephemerisRefractionEnabled
+                    visible: engineSection.supportsAtmosphereSettings() && preferencesDraft.ephemerisRefractionEnabled
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? implicitHeight : 0
                     text: preferencesDraft.ephemerisWavelengthText
