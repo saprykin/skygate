@@ -13,6 +13,8 @@
 #include "time/CalendarTime.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
+#include "engine/TimeScaleProviderLoader.hpp"
+#include "engine/highprecision/CalcephKernelProvider.hpp"
 
 #include <QDateTime>
 #include <QDir>
@@ -992,10 +994,60 @@ std::span<const skygate::ephemeris::BaseCelestialBody* const> SkyContextControll
                                   : std::span<const skygate::ephemeris::BaseCelestialBody* const>{};
 }
 
+void SkyContextController::refreshCachedEphemerisProviders(
+    const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& activeDataSnapshot,
+    const skygate::ephemeris::EphemerisDataManifest* dataManifest
+)
+{
+    const std::uint64_t dataRevision = ephemerisDataRevision();
+    if (m_ephemerisProviderCacheManaged
+        && (m_ephemerisProviderCacheRevision != dataRevision || m_ephemerisProviderCacheManifest != dataManifest)) {
+        m_ephemerisTimeScaleService.reset();
+        m_ephemerisEarthOrientationProvider.reset();
+        m_ephemerisCalcephKernelProvider.reset();
+        m_ephemerisProviderCacheManaged = false;
+    }
+    m_ephemerisProviderCacheRevision = dataRevision;
+    m_ephemerisProviderCacheManifest = dataManifest;
+
+    if (activeDataSnapshot == nullptr) {
+        return;
+    }
+
+    if (m_ephemerisEarthOrientationProvider == nullptr) {
+        m_ephemerisEarthOrientationProvider =
+            skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(*activeDataSnapshot);
+        m_ephemerisProviderCacheManaged = true;
+    }
+    if (m_ephemerisTimeScaleService == nullptr) {
+        m_ephemerisTimeScaleService = skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(
+            *activeDataSnapshot, m_ephemerisEarthOrientationProvider
+        );
+        m_ephemerisProviderCacheManaged = true;
+    }
+    if (m_ephemerisCalcephKernelProvider == nullptr && dataManifest != nullptr) {
+        // Installed ephemeris data is checksum-verified when it is activated.
+        // Re-hashing the (potentially multi-gigabyte) kernel on every engine
+        // rebuild would dominate startup time, so the cached kernel provider
+        // skips per-open checksum verification.
+        skygate::ephemeris::highprecision::CalcephKernelProvider::Options kernelOptions;
+        kernelOptions.verifyChecksum = false;
+        m_ephemerisCalcephKernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
+            *activeDataSnapshot, *dataManifest, std::move(kernelOptions)
+        );
+        m_ephemerisProviderCacheManaged = true;
+    }
+}
+
 void SkyContextController::rebuildEphemerisEngine()
 {
     const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot =
         activeEphemerisDataSnapshot();
+    const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
+    if (m_ephemerisEngineKind == EphemerisEngineKind::Type::HighPrecision) {
+        refreshCachedEphemerisProviders(activeDataSnapshot, dataManifest);
+    }
+
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
     request.engineKind = m_ephemerisEngineKind;
     const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
@@ -1004,7 +1056,6 @@ void SkyContextController::rebuildEphemerisEngine()
     }
     request.options = m_ephemerisEngineOptions;
     request.options.setEngineKind(m_ephemerisEngineKind);
-    const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
     request.datasetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDatasetManifest;
     request.dataManifest = dataManifest;
     request.activeDataSnapshot = activeDataSnapshot;

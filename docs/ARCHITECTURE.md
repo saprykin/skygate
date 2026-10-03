@@ -39,6 +39,11 @@ the UI object graph:
    from the current catalog, engine settings, and active ephemeris data. If a
    data refresh would only produce a simple fallback while a high-precision
    engine is already active, it keeps the active high-precision engine.
+   Time-scale, Earth-orientation, and kernel providers derived from the active
+   data set are cached across engine rebuilds and invalidated when the data
+   set changes. The cached kernel provider skips per-open checksum
+   verification because installed data is checksum-verified when it is
+   activated.
 4. `SkySceneModel` listens to the controller and derives renderable scene data.
 5. `SkyViewportItem` consumes the scene model and renders the sky with Qt Quick
    scene graph nodes.
@@ -163,7 +168,10 @@ scene graph code, while transient UI and chrome stay in QML.
   - Persists the selected display timezone as an IANA timezone id; UTC remains
     the internal calculation and storage time basis.
   - Persists downloaded/imported catalog rows in an app-data cache file and
-    stores related metadata in `QSettings`.
+    stores related metadata in `QSettings`. The cache keeps a binary
+    serialization of the parsed catalogs alongside the raw payloads, so
+    restores skip the CSV re-parse; legacy caches are upgraded on first
+    restore and unreadable binary payloads fall back to payload parsing.
 - `LocationCatalogModel`
   - Loads a bundled CSV of major cities from Qt resources.
   - Exposes a flat, filterable `QAbstractListModel` with country headers and

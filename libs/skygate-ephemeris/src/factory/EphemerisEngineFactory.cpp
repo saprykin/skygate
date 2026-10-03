@@ -6,8 +6,6 @@
 #include "engine/highprecision/ApparentPlaceCalculator.hpp"
 #include "engine/highprecision/AtmosphericRefractionCalculator.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
-#include "engine/DeltaTDataLoader.hpp"
-#include "engine/EarthOrientationDataLoader.hpp"
 #include "engine/highprecision/EphemerisComputationCache.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/highprecision/ErfaFrameTransformer.hpp"
@@ -16,11 +14,9 @@
 #include "engine/IEarthOrientationProvider.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 #include "engine/ITimeScaleService.hpp"
-#include "engine/LeapSecondTableLoader.hpp"
-#include "engine/LeapSecondTimeScaleService.hpp"
 #include "engine/highprecision/SolarSystemStateCalculator.hpp"
 #include "engine/highprecision/StarAstrometryCalculator.hpp"
-#include "engine/TimeScaleServiceOptions.hpp"
+#include "engine/TimeScaleProviderLoader.hpp"
 #include "engine/simple/SimpleEphemerisEngine.hpp"
 #include "engine/simple/SimpleEphemerisFallbackStrategy.hpp"
 
@@ -210,39 +206,6 @@ prefersPlanetarySystemBarycenters(const skygate::ephemeris::highprecision::ICalc
     return request;
 }
 
-[[nodiscard]] std::shared_ptr<const IEarthOrientationProvider>
-loadEarthOrientationProviderFromSnapshot(const IEphemerisDataSnapshot& snapshot)
-{
-    const EarthOrientationDataLoader::Result result = EarthOrientationDataLoader::loadFromSnapshot(snapshot);
-    return result.isSuccess() ? result.provider : nullptr;
-}
-
-[[nodiscard]] std::shared_ptr<const ITimeScaleService> loadTimeScaleServiceFromSnapshot(
-    const IEphemerisDataSnapshot& snapshot,
-    const std::shared_ptr<const IEarthOrientationProvider>& earthOrientationProvider
-)
-{
-    const LeapSecondTableLoader::Result leapSecondTable = LeapSecondTableLoader::loadFromSnapshot(snapshot);
-    if (!leapSecondTable.isSuccess()) {
-        return nullptr;
-    }
-
-    const DeltaTDataLoader::Result deltaTData = DeltaTDataLoader::loadFromSnapshot(snapshot);
-    TimeScaleServiceOptions timeScaleOptions;
-    timeScaleOptions.allowDegradedLeapSecondFallback = true;
-    timeScaleOptions.allowUt1DeltaTFallback = true;
-    timeScaleOptions.earthOrientationSampleOptions.allowOutOfRangeNearestSampleFallback = true;
-    timeScaleOptions.earthOrientationSampleOptions.allowMissingDataZeroFallback = true;
-    timeScaleOptions.earthOrientationSampleOptions.degradePredictedData = false;
-
-    return std::make_shared<LeapSecondTimeScaleService>(
-        leapSecondTable.provider,
-        timeScaleOptions,
-        earthOrientationProvider,
-        deltaTData.isSuccess() ? deltaTData.provider : nullptr
-    );
-}
-
 void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
 {
     if (request.activeDataSnapshot == nullptr) {
@@ -254,11 +217,11 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
 
     std::shared_ptr<const IEarthOrientationProvider> earthOrientationProvider = request.earthOrientationProvider;
     if (earthOrientationProvider == nullptr) {
-        earthOrientationProvider = loadEarthOrientationProviderFromSnapshot(*request.activeDataSnapshot);
+        earthOrientationProvider = TimeScaleProviderLoader::loadEarthOrientationProvider(*request.activeDataSnapshot);
     }
     if (request.timeScaleService == nullptr) {
         request.timeScaleService =
-            loadTimeScaleServiceFromSnapshot(*request.activeDataSnapshot, earthOrientationProvider);
+            TimeScaleProviderLoader::loadTimeScaleService(*request.activeDataSnapshot, earthOrientationProvider);
     }
     request.earthOrientationProvider = earthOrientationProvider;
 }

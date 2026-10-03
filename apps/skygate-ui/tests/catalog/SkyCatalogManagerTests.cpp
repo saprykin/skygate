@@ -153,7 +153,7 @@ void SkyCatalogManagerTests::restoreCachePathThroughManager()
     QCOMPARE(manager.constellationCount(), 1U);
     QCOMPARE(manager.constellationLineRefs().size(), 1U);
     QVERIFY(manager.bodyCount() > 0U);
-    QVERIFY(catalogSpy.count() >= 1);
+    QCOMPARE(catalogSpy.count(), 1);
 }
 
 void SkyCatalogManagerTests::localCatalogDownloadTogglesBusyProcessingAndAppliesCatalog()

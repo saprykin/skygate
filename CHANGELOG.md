@@ -21,6 +21,17 @@ architecture boundaries, and improves diagnostics and test provenance.
 
 - Guarded Delta-T interpolation denominators and rejected duplicate
   effective epochs in table data.
+- Cached time-scale, Earth-orientation, and CALCEPH kernel providers across
+  ephemeris engine rebuilds and skipped per-open kernel checksum
+  verification for installed data, which removes a multi-gigabyte kernel
+  re-hash from every startup.
+- Added a binary catalog cache payload next to the raw downloaded catalog
+  payloads so startup restores skip the gzip CSV re-parse; legacy caches are
+  upgraded on first restore and corrupt binary payloads fall back to payload
+  parsing.
+- Coalesced catalog-cache restores into a single catalog change emission so
+  startup no longer rebuilds the ephemeris engine and search model once per
+  restored catalog component.
 - Fixed UTC interval arithmetic so request epochs are no longer corrupted
   across time scales.
 - Removed the simple-only link dependency on high-precision text parsing and

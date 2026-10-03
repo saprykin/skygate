@@ -131,6 +131,8 @@ list(APPEND SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES
     src/engine/TimeScaleConversionDiagnostics.cpp
     src/engine/TimeScaleConversionResult.hpp
     src/engine/TimeScaleConversionResult.cpp
+    src/engine/TimeScaleProviderLoader.hpp
+    src/engine/TimeScaleProviderLoader.cpp
     src/engine/TimeScaleServiceOptions.hpp
     src/engine/TimeScaleServiceOptions.cpp
     src/engine/ITimeScaleService.hpp

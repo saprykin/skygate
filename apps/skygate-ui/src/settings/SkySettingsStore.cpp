@@ -131,12 +131,13 @@ bool SkySettingsStore::clearCatalogCache() const
     QStringList cachePaths;
     appendCachePath(cachePaths, configuredPath);
     appendCachePath(cachePaths, defaultPath);
+    appendCachePath(cachePaths, SkyContextSettings::defaultCatalogBinaryCachePath());
 
     if (!defaultPath.isEmpty()) {
         const QFileInfo defaultInfo(defaultPath);
         const QDir defaultDir(defaultInfo.absolutePath());
         const QStringList matchingEntries =
-            defaultDir.entryList(QStringList{"catalog-cache*.txt"}, QDir::Files | QDir::Readable);
+            defaultDir.entryList(QStringList{"catalog-cache*"}, QDir::Files | QDir::Readable);
         for (const QString& entryName : matchingEntries) {
             appendCachePath(cachePaths, defaultDir.filePath(entryName));
         }
@@ -145,6 +146,8 @@ bool SkySettingsStore::clearCatalogCache() const
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
 
     settings.remove(SkyContextSettings::key("catalogCachePath"));
+    settings.remove(SkyContextSettings::key("catalogBinaryCachePath"));
+    settings.remove(SkyContextSettings::key("catalogBinarySchemaVersion"));
     settings.remove(SkyContextSettings::key("catalogSourceLabel"));
     settings.remove(SkyContextSettings::key("catalogConstellationLineRefs"));
     settings.remove(SkyContextSettings::key("catalogConstellationAnchorGroups"));
@@ -174,9 +177,11 @@ bool SkySettingsStore::clearDeepSkyCatalogCache() const
             .toString()
     );
     appendCachePath(cachePaths, SkyContextSettings::defaultDeepSkyCatalogCachePath());
+    appendCachePath(cachePaths, SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath());
 
     const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
     settings.remove(SkyContextSettings::key("deepSkyCatalogCachePath"));
+    settings.remove(SkyContextSettings::key("deepSkyBinaryCatalogCachePath"));
     settings.remove(SkyContextSettings::key("deepSkyCatalogSourceLabel"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
@@ -247,12 +252,27 @@ bool SkySettingsStore::saveCatalogCache(const CatalogCacheSnapshot& snapshot) co
     if (!writePayload(configuredDeepSkyPath, snapshot.deepSkyCatalogPayload)) {
         return false;
     }
+    const QString configuredBinaryPath = SkyContextSettings::defaultCatalogBinaryCachePath();
+    const QString configuredDeepSkyBinaryPath = SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath();
+    if (!writePayload(configuredBinaryPath, snapshot.catalogBinaryPayload)) {
+        return false;
+    }
+    if (!writePayload(configuredDeepSkyBinaryPath, snapshot.deepSkyBinaryPayload)) {
+        return false;
+    }
     settings.setValue(SkyContextSettings::key("version"), SkyContextControllerConstants::kSettingsVersion);
     if (!snapshot.catalogPayload.isEmpty()) {
         settings.setValue(SkyContextSettings::key("catalogCachePath"), configuredPath);
     }
     if (!snapshot.deepSkyCatalogPayload.isEmpty()) {
         settings.setValue(SkyContextSettings::key("deepSkyCatalogCachePath"), configuredDeepSkyPath);
+    }
+    if (!snapshot.catalogBinaryPayload.isEmpty()) {
+        settings.setValue(SkyContextSettings::key("catalogBinaryCachePath"), configuredBinaryPath);
+        settings.setValue(SkyContextSettings::key("catalogBinarySchemaVersion"), snapshot.catalogBinarySchemaVersion);
+    }
+    if (!snapshot.deepSkyBinaryPayload.isEmpty()) {
+        settings.setValue(SkyContextSettings::key("deepSkyBinaryCatalogCachePath"), configuredDeepSkyBinaryPath);
     }
     if (!snapshot.catalogPayload.isEmpty()) {
         settings.setValue(SkyContextSettings::key("catalogSourceLabel"), snapshot.sourceLabel);
@@ -311,7 +331,28 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
             << "Failed to open deep-sky catalog cache" << configuredDeepSkyPath << deepSkyCacheFile.errorString();
     }
 
-    if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()) {
+    const QString configuredBinaryPath = SkyContextSettings::defaultCatalogBinaryCachePath();
+    QFile binaryCacheFile(configuredBinaryPath);
+    if (!configuredBinaryPath.isEmpty() && binaryCacheFile.exists() && binaryCacheFile.open(QIODevice::ReadOnly)) {
+        snapshot.catalogBinaryPayload = binaryCacheFile.readAll();
+    } else if (!configuredBinaryPath.isEmpty() && binaryCacheFile.exists()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open binary star catalog cache" << configuredBinaryPath << binaryCacheFile.errorString();
+    }
+
+    const QString configuredDeepSkyBinaryPath = SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath();
+    QFile deepSkyBinaryCacheFile(configuredDeepSkyBinaryPath);
+    if (!configuredDeepSkyBinaryPath.isEmpty() && deepSkyBinaryCacheFile.exists()
+        && deepSkyBinaryCacheFile.open(QIODevice::ReadOnly)) {
+        snapshot.deepSkyBinaryPayload = deepSkyBinaryCacheFile.readAll();
+    } else if (!configuredDeepSkyBinaryPath.isEmpty() && deepSkyBinaryCacheFile.exists()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open binary deep-sky catalog cache" << configuredDeepSkyBinaryPath
+            << deepSkyBinaryCacheFile.errorString();
+    }
+
+    if (snapshot.catalogPayload.isEmpty() && snapshot.deepSkyCatalogPayload.isEmpty()
+        && snapshot.catalogBinaryPayload.isEmpty() && snapshot.deepSkyBinaryPayload.isEmpty()) {
         return std::nullopt;
     }
 
@@ -332,8 +373,12 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
     snapshot.constellationCount = static_cast<std::size_t>(
         readULongLongSetting(settings, SkyContextSettings::key("catalogConstellationCount"), static_cast<qulonglong>(0))
     );
-    qCInfo(skygateCatalogCacheLog).noquote() << "Catalog cache loaded: starBytes" << snapshot.catalogPayload.size()
-                                             << "deepSkyBytes" << snapshot.deepSkyCatalogPayload.size();
+    snapshot.catalogBinarySchemaVersion =
+        readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+    qCInfo(skygateCatalogCacheLog).noquote()
+        << "Catalog cache loaded: starBytes" << snapshot.catalogPayload.size() << "deepSkyBytes"
+        << snapshot.deepSkyCatalogPayload.size() << "starBinaryBytes" << snapshot.catalogBinaryPayload.size()
+        << "deepSkyBinaryBytes" << snapshot.deepSkyBinaryPayload.size();
     return snapshot;
 }
 

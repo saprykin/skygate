@@ -1,5 +1,6 @@
 #include "SkyCatalogCacheController.hpp"
 
+#include "SkyCatalogBinaryCodec.hpp"
 #include "SkyContextControllerSupport.hpp"
 
 #include "catalog/CatalogPayloadParser.hpp"
@@ -78,41 +79,71 @@ SkyCatalogCacheController::restore(const int catalogPresetIndex, const int deepS
     }
 
     const skygate::ephemeris::CatalogPayloadParser parser;
-    if (catalogPresetIndex != 0 && !cacheSnapshot->catalogPayload.isEmpty()) {
-        auto restoredCatalogResult = parser.parseResult(payloadView(cacheSnapshot->catalogPayload));
-        if (!restoredCatalogResult.isSuccess() || restoredCatalogResult.catalog == nullptr) {
-            result.savedCatalogUnreadable = true;
-            result.statusText = "Catalog: Saved cache unreadable, using bundled";
-            qCWarning(skygateCatalogCacheLog).noquote() << "Saved star catalog cache unreadable; using bundled catalog:"
-                                                        << QString::fromStdString(restoredCatalogResult.errorDetail);
-            return result;
+    if (catalogPresetIndex != 0) {
+        if (!cacheSnapshot->catalogBinaryPayload.isEmpty()
+            && cacheSnapshot->catalogBinarySchemaVersion == SkyCatalogBinaryCodec::kSchemaVersion) {
+            result.catalog = SkyCatalogBinaryCodec::deserialize(cacheSnapshot->catalogBinaryPayload);
+            if (result.catalog == nullptr) {
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Saved binary star catalog cache unreadable; falling back to payload parsing";
+            }
         }
+        if (result.catalog == nullptr && !cacheSnapshot->catalogPayload.isEmpty()) {
+            auto restoredCatalogResult = parser.parseResult(payloadView(cacheSnapshot->catalogPayload));
+            if (!restoredCatalogResult.isSuccess() || restoredCatalogResult.catalog == nullptr) {
+                result.savedCatalogUnreadable = true;
+                result.statusText = "Catalog: Saved cache unreadable, using bundled";
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Saved star catalog cache unreadable; using bundled catalog:"
+                    << QString::fromStdString(restoredCatalogResult.errorDetail);
+                return result;
+            }
 
-        result.catalogPayload = cacheSnapshot->catalogPayload;
-        result.sourceLabel = savedLabel(cacheSnapshot->sourceLabel, "Saved");
-        result.catalog = std::move(restoredCatalogResult.catalog);
-        result.restored = true;
-        qCInfo(skygateCatalogCacheLog).noquote()
-            << "Saved star catalog cache restored:" << result.sourceLabel << "objects"
-            << static_cast<qulonglong>(restoredCatalogResult.diagnostics.selectedBodyCount) << "bytes"
-            << cacheSnapshot->catalogPayload.size();
+            result.catalog = std::move(restoredCatalogResult.catalog);
+            result.requiresBinaryUpgrade = true;
+        }
+        if (result.catalog != nullptr) {
+            result.catalogPayload = cacheSnapshot->catalogPayload;
+            result.sourceLabel = savedLabel(cacheSnapshot->sourceLabel, "Saved");
+            result.restored = true;
+            qCInfo(skygateCatalogCacheLog).noquote()
+                << "Saved star catalog cache restored:" << result.sourceLabel << "objects"
+                << static_cast<qulonglong>(result.catalog->bodies().size()) << "starBytes"
+                << cacheSnapshot->catalogPayload.size() << "binaryBytes" << cacheSnapshot->catalogBinaryPayload.size();
+        }
     }
 
-    if (deepSkyCatalogPresetIndex != 0 && !cacheSnapshot->deepSkyCatalogPayload.isEmpty()) {
-        auto restoredDeepSkyResult = parser.parseResult(payloadView(cacheSnapshot->deepSkyCatalogPayload));
-        if (restoredDeepSkyResult.isSuccess() && restoredDeepSkyResult.catalog != nullptr) {
+    if (deepSkyCatalogPresetIndex != 0) {
+        if (!cacheSnapshot->deepSkyBinaryPayload.isEmpty()
+            && cacheSnapshot->catalogBinarySchemaVersion == SkyCatalogBinaryCodec::kSchemaVersion) {
+            result.deepSkyCatalog = SkyCatalogBinaryCodec::deserialize(cacheSnapshot->deepSkyBinaryPayload);
+            if (result.deepSkyCatalog == nullptr) {
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Saved binary deep-sky catalog cache unreadable; falling back to payload parsing";
+            }
+        }
+        if (result.deepSkyCatalog == nullptr && !cacheSnapshot->deepSkyCatalogPayload.isEmpty()) {
+            auto restoredDeepSkyResult = parser.parseResult(payloadView(cacheSnapshot->deepSkyCatalogPayload));
+            if (restoredDeepSkyResult.isSuccess() && restoredDeepSkyResult.catalog != nullptr) {
+                result.deepSkyCatalog = std::move(restoredDeepSkyResult.catalog);
+                result.deepSkyObjectCount = restoredDeepSkyResult.diagnostics.parsedBodyCount;
+                result.requiresBinaryUpgrade = true;
+            } else {
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Saved deep-sky catalog cache unreadable; ignoring cache:"
+                    << QString::fromStdString(restoredDeepSkyResult.errorDetail);
+            }
+        }
+        if (result.deepSkyCatalog != nullptr) {
             result.deepSkyCatalogPayload = cacheSnapshot->deepSkyCatalogPayload;
-            result.deepSkyObjectCount = restoredDeepSkyResult.diagnostics.parsedBodyCount;
+            result.deepSkyObjectCount = result.deepSkyCatalog->bodies().size();
             result.deepSkySourceLabel = savedLabel(cacheSnapshot->deepSkySourceLabel, "Saved deep sky");
-            result.deepSkyCatalog = std::move(restoredDeepSkyResult.catalog);
             result.restored = true;
             qCInfo(skygateCatalogCacheLog).noquote()
                 << "Saved deep-sky catalog cache restored:" << result.deepSkySourceLabel << "objects"
-                << static_cast<qulonglong>(result.deepSkyObjectCount) << "bytes"
-                << cacheSnapshot->deepSkyCatalogPayload.size();
-        } else {
-            qCWarning(skygateCatalogCacheLog).noquote() << "Saved deep-sky catalog cache unreadable; ignoring cache:"
-                                                        << QString::fromStdString(restoredDeepSkyResult.errorDetail);
+                << static_cast<qulonglong>(result.deepSkyCatalog->bodies().size()) << "deepSkyBytes"
+                << cacheSnapshot->deepSkyCatalogPayload.size() << "binaryBytes"
+                << cacheSnapshot->deepSkyBinaryPayload.size();
         }
     }
 
@@ -157,6 +188,9 @@ void SkyCatalogCacheController::persist(const SkyCatalogCachePersistRequest& req
     snapshot.deepSkySourceLabel = request.deepSkySourceLabel;
     snapshot.catalogPayload = request.catalogPayload;
     snapshot.deepSkyCatalogPayload = request.deepSkyCatalogPayload;
+    snapshot.catalogBinaryPayload = request.catalogBinaryPayload;
+    snapshot.deepSkyBinaryPayload = request.deepSkyBinaryPayload;
+    snapshot.catalogBinarySchemaVersion = static_cast<int>(SkyCatalogBinaryCodec::kSchemaVersion);
     snapshot.constellationLineRows =
         SkyContextCatalogCodec::serializeConstellationLineRows(request.constellationLineRefs);
     snapshot.constellationAnchorGroupRows =
