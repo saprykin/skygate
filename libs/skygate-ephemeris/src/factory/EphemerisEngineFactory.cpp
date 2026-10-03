@@ -102,7 +102,8 @@ namespace {
     return {code, severity, std::move(text)};
 }
 
-[[nodiscard]] EphemerisEngineFactoryResult makeInvalidFactoryRequestResult()
+[[nodiscard]] EphemerisEngineFactoryResult
+makeInvalidFactoryRequestResult(const EphemerisEngineKind::Type requestedKind)
 {
     return EphemerisEngineFactoryResult::failure(
         EphemerisFactoryCreationStatus::FailedInvalidRequest,
@@ -110,7 +111,8 @@ namespace {
             EphemerisFactoryCreationDiagnosticCode::InvalidRequest,
             EphemerisFactoryCreationDiagnosticSeverity::Error,
             "The requested ephemeris engine kind is not supported.",
-        }}
+        }},
+        requestedKind
     );
 }
 
@@ -327,7 +329,10 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
                     request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{},
                     request.options,
                     std::move(dependencies)
-                )
+                ),
+                EphemerisFactoryCreationStatus::CreatedRequestedEngine,
+                {},
+                request.engineKind
             );
         }
     }
@@ -338,11 +343,14 @@ void populateProvidersFromSnapshot(EphemerisEngineFactoryRequest& request)
                 request.catalog != nullptr ? *request.catalog : CelestialBodyCatalog{}, request.options
             ),
             EphemerisFactoryCreationStatus::CreatedSimpleFallback,
-            withSeverity(std::move(diagnostics), EphemerisFactoryCreationDiagnosticSeverity::Warning)
+            withSeverity(std::move(diagnostics), EphemerisFactoryCreationDiagnosticSeverity::Warning),
+            request.engineKind
         );
     }
 
-    return EphemerisEngineFactoryResult::failure(highPrecisionFailureStatus(diagnostics), std::move(diagnostics));
+    return EphemerisEngineFactoryResult::failure(
+        highPrecisionFailureStatus(diagnostics), std::move(diagnostics), request.engineKind
+    );
 }
 
 void publishDiagnostics(
@@ -382,21 +390,21 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create(const EphemerisEngin
             std::make_unique<SimpleEphemerisEngine>(
                 normalizedRequest.catalog != nullptr ? *normalizedRequest.catalog : CelestialBodyCatalog{},
                 normalizedRequest.options
-            )
+            ),
+            EphemerisFactoryCreationStatus::CreatedRequestedEngine,
+            {},
+            normalizedRequest.engineKind
         );
         break;
     }
     case EphemerisEngineKind::Type::HighPrecision: {
         EphemerisEngineFactoryRequest alignedRequest = normalizeRequestOptions(request);
-        alignedRequest.fallbackPolicy = request.options.fallbackToSimpleEngine()
-                                            ? EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback
-                                            : EphemerisFactoryFallbackPolicy::StrictHighPrecision;
         populateProvidersFromSnapshot(alignedRequest);
         result = createHighPrecisionEngine(alignedRequest);
         break;
     }
     default:
-        result = makeInvalidFactoryRequestResult();
+        result = makeInvalidFactoryRequestResult(request.engineKind);
         break;
     }
 
