@@ -3,6 +3,13 @@
 #include "math/MathConstants.hpp"
 #include "math/PhysicalConstants.hpp"
 #include "math/TimeConstants.hpp"
+// TdbTtConverter is a shared time-scale service used by both the simple-only
+// and high-precision configurations. When the high-precision engine is
+// enabled it prefers the ERFA TDB-TT adapter and otherwise falls back to the
+// analytic approximation below. This is a deliberate, build-gated crossing of
+// the engine boundary; it is tracked by the engine header isolation check and
+// is the only non-engine ephemeris source allowed to reach a concrete
+// high-precision implementation header.
 #if defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 #include "engine/highprecision/ErfaAstrometry.hpp"
 #endif

@@ -1,8 +1,8 @@
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "reference/EclipticToEquatorialCalculator.hpp"
+#include "reference/EquatorialToHorizontalCalculator.hpp"
 #include "time/AstronomicalTime.hpp"
-#include "engine/simple/EclipticToEquatorialCalculator.hpp"
-#include "engine/simple/EquatorialToHorizontalCalculator.hpp"
 
 #include <QtTest/QtTest>
 

@@ -1,7 +1,7 @@
 #include "SimpleEphemerisEngine.hpp"
 #include "EphemerisRequestFactory.hpp"
-#include "EquatorialToHorizontalCalculator.hpp"
 #include "StringUtilities.hpp"
+#include "reference/EquatorialToHorizontalCalculator.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -261,7 +261,8 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
     state.horizontal.azimuthDeg = std::numeric_limits<double>::quiet_NaN();
     state.metadata.dataSourceProvenance = kSimpleDataSourceProvenance;
 
-    if (const auto equatorial = computeEquatorial(body, context.utcTime); equatorial.has_value()) {
+    if (const auto equatorial = m_bodyStateCalculator.computeEquatorial(body, context.utcTime);
+        equatorial.has_value()) {
         state.equatorial = *equatorial;
         if (context.observer.isValid()) {
             state.horizontal =
@@ -276,30 +277,6 @@ CelestialBodyState SimpleEphemerisEngine::computeStateForBody(
     }
 
     return state;
-}
-
-std::optional<skygate::core::EquatorialCoordinate> SimpleEphemerisEngine::computeEquatorial(
-    const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime
-) const
-{
-    if (body.fixedEquatorialValue().has_value()) {
-        return body.fixedEquatorialValue();
-    }
-
-    switch (body.kind) {
-    case BaseCelestialBody::Kind::Sun:
-        return m_sunCalculator.compute(utcTime);
-    case BaseCelestialBody::Kind::Moon:
-        return m_moonCalculator.compute(utcTime);
-    case BaseCelestialBody::Kind::Planet:
-        return m_planetCalculator.compute(body.id, utcTime);
-    case BaseCelestialBody::Kind::Star:
-    case BaseCelestialBody::Kind::Constellation:
-    case BaseCelestialBody::Kind::DeepSkyObject:
-        break;
-    }
-
-    return std::nullopt;
 }
 
 EphemerisEngineOptions SimpleEphemerisEngine::defaultOptions() noexcept
