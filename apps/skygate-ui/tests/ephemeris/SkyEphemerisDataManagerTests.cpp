@@ -602,6 +602,7 @@ private slots:
     void activatesVerifiedStagedUpdateSetAtomically();
     void activatesFullLongRangeProfileUpdateSet();
     void supportDataActivationPreservesInstalledKernelSelection();
+    void activatesLiveSupportDataUpdateWithDriftedPayload();
     void clearPlanetaryKernelCachePreservesSupportData();
     void clearSupportDataCachePreservesInstalledKernel();
     void activationFailurePreservesActiveDataAndSettings();
@@ -659,11 +660,16 @@ void SkyEphemerisDataManagerTests::productionManifestMetadataIsVerifiable()
     QVERIFY(!manifest.assets.empty());
 
     for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
-        QCOMPARE(QString::fromStdString(asset.checksum.algorithm), QString("sha256"));
-        QVERIFY2(isSha256Hex(asset.checksum.value), asset.id.c_str());
-        QVERIFY2(asset.compression.uncompressedSizeBytes.has_value(), asset.id.c_str());
-        QVERIFY2(*asset.compression.uncompressedSizeBytes > 0U, asset.id.c_str());
         QVERIFY2(!asset.sourceUrl.empty(), asset.id.c_str());
+        if (asset.live) {
+            QVERIFY2(asset.checksum.algorithm.empty() && asset.checksum.value.empty(), asset.id.c_str());
+            QVERIFY2(!asset.compression.uncompressedSizeBytes.has_value(), asset.id.c_str());
+        } else {
+            QCOMPARE(QString::fromStdString(asset.checksum.algorithm), QString("sha256"));
+            QVERIFY2(isSha256Hex(asset.checksum.value), asset.id.c_str());
+            QVERIFY2(asset.compression.uncompressedSizeBytes.has_value(), asset.id.c_str());
+            QVERIFY2(*asset.compression.uncompressedSizeBytes > 0U, asset.id.c_str());
+        }
     }
 
     for (const skygate::ephemeris::EphemerisDataManifest::Profile& profile : manifest.profiles) {
@@ -953,6 +959,58 @@ void SkyEphemerisDataManagerTests::supportDataActivationPreservesInstalledKernel
     QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
     QCOMPARE(manager.shortRangeKernelStatusText(), QString("Installed: DE-test"));
     QCOMPARE(manager.earthOrientationStatusText(), QString("Installed: test"));
+}
+
+void SkyEphemerisDataManagerTests::activatesLiveSupportDataUpdateWithDriftedPayload()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = supportDataStagedManifest();
+    for (skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
+        asset.live = true;
+        asset.checksum.algorithm.clear();
+        asset.checksum.value = std::string(64U, '0');
+        asset.compression.uncompressedSizeBytes = 999U;
+    }
+
+    const QByteArray driftedPayload("Drifted live support data payload that does not match pinned metadata.\n");
+    for (const skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
+        QVERIFY(writeFile(
+            stagedRoot.path() + QStringLiteral("/") + QString::fromStdString(asset.relativePath), driftedPayload
+        ));
+    }
+
+    SkySettingsStore store;
+    SkyEphemerisDataManager manager(&store);
+    const SkyEphemerisDataManager::StagedUpdateActivationResult result = manager.activateVerifiedStagedUpdateSet(
+        stagedActivationRequest(manifest, stagedRoot, m_settings.path(), QStringLiteral("support-data"))
+    );
+
+    const QByteArray failureMessage = result.diagnostics.empty() ? QByteArray{} : result.diagnostics.front().toUtf8();
+    QVERIFY2(result.isSuccess(), failureMessage.constData());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.verificationStatus),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
+    );
+    QCOMPARE(result.activatedAssetIds.size(), std::size_t{3});
+    QVERIFY(manager.usingInstalledData());
+
+    const SkySettingsStore::EphemerisDataCacheSnapshot savedSnapshot = store.loadEphemerisDataCache();
+    QCOMPARE(savedSnapshot.installedEarthOrientationVersion, QString("test"));
+    QCOMPARE(savedSnapshot.installedLeapSecondTableVersion, QString("test"));
+    QCOMPARE(savedSnapshot.installedDeltaTDataVersion, QString("test"));
+
+    const auto snapshot = manager.activeDataSnapshot();
+    QVERIFY(snapshot != nullptr);
+    const auto leapSeconds = snapshot->leapSecondTableAsset();
+    QVERIFY(leapSeconds.has_value());
+    QCOMPARE(QString::fromStdString(leapSeconds->content), QString::fromUtf8(driftedPayload));
+    const auto eop = snapshot->earthOrientationDataAsset();
+    QVERIFY(eop.has_value());
+    QCOMPARE(QString::fromStdString(eop->content), QString::fromUtf8(driftedPayload));
+    const auto deltaT = snapshot->deltaTDataAsset();
+    QVERIFY(deltaT.has_value());
+    QCOMPARE(QString::fromStdString(deltaT->content), QString::fromUtf8(driftedPayload));
 }
 
 void SkyEphemerisDataManagerTests::clearPlanetaryKernelCachePreservesSupportData()

@@ -141,6 +141,9 @@ verifySha256File(const QString& path, const std::string& expectedHexDigest, Ephe
     const EphemerisDataManifest::Asset& asset, const QString& targetPath, EphemerisDataActivationResult& result
 )
 {
+    if (asset.live) {
+        return false;
+    }
     const QFileInfo targetInfo(targetPath);
     if (!targetInfo.exists() || !targetInfo.isFile()) {
         return false;
@@ -252,7 +255,8 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         addDiagnostic(result, "Ephemeris data activation requires a writable cache root.");
         return result;
     }
-    if (request.asset->checksum.algorithm != "sha256" || request.asset->checksum.value.empty()) {
+    if (!request.asset->live
+        && (request.asset->checksum.algorithm != "sha256" || request.asset->checksum.value.empty())) {
         addDiagnostic(result, "Ephemeris data activation requires a sha256 checksum for the active asset bytes.");
         return result;
     }
@@ -288,7 +292,7 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         addDiagnostic(result, "Bundled ephemeris data asset source file is missing.");
         return result;
     }
-    if (!sourceSizeMatchesMetadata(sourceInfo, *request.asset)) {
+    if (!request.asset->live && !sourceSizeMatchesMetadata(sourceInfo, *request.asset)) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Bundled ephemeris data asset compressed size does not match manifest metadata.");
         return result;
@@ -321,7 +325,7 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         sourceFile,
         targetFile,
         request.cancellationRequested,
-        request.asset->compression.uncompressedSizeBytes
+        request.asset->live ? std::nullopt : request.asset->compression.uncompressedSizeBytes
     );
     result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());
     if (payload.status != EphemerisDataPayloadReader::Status::Read) {
@@ -346,15 +350,22 @@ EphemerisDataActivationResult EphemerisDataActivation::activate(const EphemerisD
         return result;
     }
 
-    if (request.asset->compression.uncompressedSizeBytes.has_value()
+    if (request.asset->live && payload.outputBytes == 0U) {
+        result.status = EphemerisDataActivationStatus::ChecksumMismatch;
+        addDiagnostic(result, "Activated live ephemeris data asset payload is empty.");
+        targetFile.cancelWriting();
+        return result;
+    }
+    if (!request.asset->live && request.asset->compression.uncompressedSizeBytes.has_value()
         && payload.outputBytes != *request.asset->compression.uncompressedSizeBytes) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Activated ephemeris data asset size does not match manifest metadata.");
         targetFile.cancelWriting();
         return result;
     }
-    if (QByteArray::fromStdString(payload.checksum).toLower()
-        != QByteArray::fromStdString(request.asset->checksum.value).toLower()) {
+    if (!request.asset->live
+        && QByteArray::fromStdString(payload.checksum).toLower()
+               != QByteArray::fromStdString(request.asset->checksum.value).toLower()) {
         result.status = EphemerisDataActivationStatus::ChecksumMismatch;
         addDiagnostic(result, "Activated ephemeris data asset checksum does not match manifest metadata.");
         targetFile.cancelWriting();

@@ -352,8 +352,14 @@ private:
         valid &= readRequiredString(object, "sourceUrl", context, diagnostics, asset.sourceUrl);
         (void)readOptionalString(object, "relativePath", asset.relativePath);
         valid &= readOptionalBool(object, "optional", context, diagnostics, asset.optional);
+        valid &= readOptionalBool(object, "live", context, diagnostics, asset.live);
 
-        valid &= parseChecksum(object.value("checksum"), context, diagnostics, asset.checksum);
+        if (object.contains("checksum")) {
+            valid &= parseChecksum(object.value("checksum"), context, diagnostics, asset.checksum);
+        } else if (!asset.live) {
+            diagnostics.push_back("Asset requires checksum metadata.");
+            valid = false;
+        }
         valid &= parseCompression(object.value("compression"), context, diagnostics, asset.compression);
         if (!object.value("validityRange").isObject()) {
             diagnostics.push_back("Asset requires validityRange metadata.");
