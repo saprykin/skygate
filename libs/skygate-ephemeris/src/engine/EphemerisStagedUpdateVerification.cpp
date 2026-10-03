@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <string_view>
 #include <unordered_set>
 
@@ -120,7 +121,7 @@ validateAssetMetadata(const EphemerisDataManifest::Asset& asset, EphemerisStaged
         addDiagnostic(result, "Staged ephemeris asset metadata requires id, profile, version, and relative path.");
         valid = false;
     }
-    if (asset.checksum.algorithm != "sha256" || asset.checksum.value.empty()) {
+    if (!asset.live && (asset.checksum.algorithm != "sha256" || asset.checksum.value.empty())) {
         addDiagnostic(result, "Staged ephemeris asset metadata requires a sha256 checksum.");
         valid = false;
     }
@@ -186,7 +187,7 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
         addDiagnostic(result, "Staged ephemeris asset file is missing.");
         return false;
     }
-    if (!sourceSizeMatchesMetadata(sourceInfo, asset)) {
+    if (!asset.live && !sourceSizeMatchesMetadata(sourceInfo, asset)) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
         addDiagnostic(result, "Staged ephemeris asset size does not match manifest metadata.");
         return false;
@@ -207,21 +208,31 @@ mappedVerificationStatus(const EphemerisDataPayloadReader::Status status) noexce
     }
 
     const EphemerisDataPayloadReader::Result payload = EphemerisDataPayloadReader::read(
-        asset.compression.kind, sourceFile, sink, cancellationCallback, asset.compression.uncompressedSizeBytes
+        asset.compression.kind,
+        sourceFile,
+        sink,
+        cancellationCallback,
+        asset.live ? std::nullopt : asset.compression.uncompressedSizeBytes
     );
     if (payload.status != EphemerisDataPayloadReader::Status::Read) {
         result.status = mappedVerificationStatus(payload.status);
         result.diagnostics.insert(result.diagnostics.end(), payload.diagnostics.begin(), payload.diagnostics.end());
         return false;
     }
-    if (asset.compression.uncompressedSizeBytes.has_value()
+    if (asset.live && payload.outputBytes == 0U) {
+        result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
+        addDiagnostic(result, "Staged live ephemeris asset payload is empty.");
+        return false;
+    }
+    if (!asset.live && asset.compression.uncompressedSizeBytes.has_value()
         && payload.outputBytes != *asset.compression.uncompressedSizeBytes) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
         addDiagnostic(result, "Staged ephemeris asset uncompressed size does not match manifest metadata.");
         return false;
     }
-    if (QByteArray::fromStdString(payload.checksum).toLower()
-        != QByteArray::fromStdString(asset.checksum.value).toLower()) {
+    if (!asset.live
+        && QByteArray::fromStdString(payload.checksum).toLower()
+               != QByteArray::fromStdString(asset.checksum.value).toLower()) {
         result.status = EphemerisStagedUpdateVerificationStatus::ChecksumMismatch;
         addDiagnostic(result, "Staged ephemeris asset checksum does not match manifest metadata.");
         return false;

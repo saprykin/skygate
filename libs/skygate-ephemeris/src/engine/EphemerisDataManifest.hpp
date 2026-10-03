@@ -52,6 +52,7 @@ public:
         Compression compression;
         EphemerisDateRange validityRange;
         bool optional = false;
+        bool live = false;
     };
 
     struct Profile {

@@ -338,6 +338,14 @@ and promotes it atomically. Each class has separate request, result, and status
 types. Both use `EphemerisDataPayloadReader` for streaming decompression and
 checksums; their operation-specific helpers remain in their source files.
 
+Manifest assets with `live: true` describe upstream files that may change
+without a manifest update (for example the IERS Earth-orientation series).
+Live assets may omit checksum and size metadata; verification and activation
+still require a readable non-empty payload and a valid manifest validity
+range, but they do not enforce exact size or checksum equality. Pinned
+(non-live) assets, including all solar-system kernels, keep the strict
+size and sha256 checks.
+
 The factory supports strict high-precision creation or simple-engine fallback
 through `EphemerisFactoryFallbackPolicy`. `SkyContextController` owns the
 selected engine kind, correction options, refraction settings, data manager,

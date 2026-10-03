@@ -16,6 +16,7 @@ private slots:
     void rejectsMalformedManifest();
     void rejectsMissingRequiredFields();
     void parsesChecksumAndCompressionMetadata();
+    void parsesLiveAssetsWithoutChecksums();
     void parsesValidityRanges();
     void distinguishesModernAndOptionalDe441Profiles();
     void rejectsUnknownProfileAssetReferences();
@@ -289,6 +290,39 @@ void EphemerisDataManifestTests::parsesChecksumAndCompressionMetadata()
     QVERIFY(!leapSeconds->compression.compressedSizeBytes.has_value());
 }
 
+void EphemerisDataManifestTests::parsesLiveAssetsWithoutChecksums()
+{
+    const std::string livePayload = manifestWithReplacement(
+        "                \"checksum\": {\n"
+        "                    \"algorithm\": \"sha256\",\n"
+        "                    \"value\": \"abcdef0123456789\"\n"
+        "                },",
+        "                \"live\": true,"
+    );
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult liveResult =
+        skygate::ephemeris::EphemerisDataManifest::parse(livePayload);
+
+    QVERIFY2(liveResult.isSuccess(), "live asset without checksum must parse");
+    const skygate::ephemeris::EphemerisDataManifest::Asset* leapSeconds = liveResult.manifest.asset("leap-seconds");
+    QVERIFY(leapSeconds != nullptr);
+    QVERIFY(leapSeconds->live);
+    QVERIFY(leapSeconds->checksum.algorithm.empty());
+    QVERIFY(leapSeconds->checksum.value.empty());
+
+    const std::string pinnedPayload = manifestWithReplacement(
+        "                \"checksum\": {\n"
+        "                    \"algorithm\": \"sha256\",\n"
+        "                    \"value\": \"abcdef0123456789\"\n"
+        "                },",
+        "                \"live\": false,"
+    );
+    const skygate::ephemeris::EphemerisDataManifest::ParseResult pinnedResult =
+        skygate::ephemeris::EphemerisDataManifest::parse(pinnedPayload);
+
+    QVERIFY(!pinnedResult.isSuccess());
+    QVERIFY(hasDiagnosticContaining(pinnedResult, "checksum"));
+}
+
 void EphemerisDataManifestTests::parsesValidityRanges()
 {
     const skygate::ephemeris::EphemerisDataManifest::ParseResult result =
@@ -412,6 +446,7 @@ void EphemerisDataManifestTests::rejectsInvalidBooleanFields()
         manifestWithReplacement("\"bundled\": true", "\"bundled\": \"true\""),
         manifestWithReplacement("\"longRange\": false", "\"longRange\": 0"),
         manifestWithReplacement("\"optional\": true", "\"optional\": null"),
+        manifestWithReplacement("\"optional\": true", "\"optional\": true,\n                \"live\": \"yes\""),
     };
 
     for (const std::string& payload : payloads) {

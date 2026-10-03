@@ -171,7 +171,7 @@ void cleanupCanceledDownload(const StagedUpdateDownloadRequest& request, const S
 [[nodiscard]] std::uint64_t networkStagingByteCap(const StagedUpdateDownloadRequest& request)
 {
     std::optional<std::uint64_t> declaredBytes;
-    if (request.asset != nullptr) {
+    if (request.asset != nullptr && !request.asset->live) {
         declaredBytes = request.asset->compression.compressedSizeBytes.has_value()
                             ? request.asset->compression.compressedSizeBytes
                             : request.asset->compression.uncompressedSizeBytes;

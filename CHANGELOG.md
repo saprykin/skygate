@@ -12,6 +12,13 @@ to `v*` Git tags and the version declared in `CMakeLists.txt`.
 This release hardens the high-precision ephemeris engine, tightens its
 architecture boundaries, and improves diagnostics and test provenance.
 
+- Added live manifest assets for upstream data that changes without a
+  manifest update. Time and Earth data (leap-second table, Earth-orientation
+  series, and Delta T data) is now marked `live` and no longer requires exact
+  size or sha256 pins, so downloading and applying updated time and Earth
+  data from the upstream providers works again while kernels keep strict
+  integrity verification.
+
 - Guarded Delta-T interpolation denominators and rejected duplicate
   effective epochs in table data.
 - Fixed UTC interval arithmetic so request epochs are no longer corrupted

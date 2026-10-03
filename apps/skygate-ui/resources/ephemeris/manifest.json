@@ -93,44 +93,36 @@
       "id": "support-leap-seconds",
       "kind": "leap-second-table",
       "profileId": "support-data",
-      "version": "2026a",
+      "version": "2026-07-06",
       "sourceUrl": "https://data.iana.org/time-zones/data/leap-seconds.list",
       "relativePath": "time/leap-seconds.list",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "506e737d1a950148f0daed3c75a55ad497a0f2fa1a82661a361882dd8f4b2093"
-      },
+      "live": true,
       "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 5069
+        "format": "none"
       },
       "validityRange": {
         "id": "leap-second-range",
         "displayName": "Leap-second table range",
         "start": "1972-01-01",
-        "end": "2027-01-01"
+        "end": "2027-06-28"
       }
     },
     {
       "id": "support-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "support-data",
-      "version": "2026-05-21",
+      "version": "2027-09-09",
       "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
       "relativePath": "time/eop.txt",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "14af3d1772a078c04c031fdd52597a8df1247ce05e3ee1cf9182eeb5116e4242"
-      },
+      "live": true,
       "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 3745148
+        "format": "none"
       },
       "validityRange": {
         "id": "eop-range",
         "displayName": "Earth orientation range",
         "start": "1973-01-02",
-        "end": "2027-07-18"
+        "end": "2027-09-09"
       }
     },
     {
@@ -140,13 +132,9 @@
       "version": "2026a",
       "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
       "relativePath": "time/delta-t.data",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "9f88e53593495a09219fe956eeadea0fa9f8e3e02c310b2aa2b70852383cdf6f"
-      },
+      "live": true,
       "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 13419
+        "format": "none"
       },
       "validityRange": {
         "id": "delta-t-range",
@@ -159,44 +147,36 @@
       "id": "de441-leap-seconds",
       "kind": "leap-second-table",
       "profileId": "de441-long-range",
-      "version": "2026a",
+      "version": "2026-07-06",
       "sourceUrl": "https://data.iana.org/time-zones/data/leap-seconds.list",
       "relativePath": "time/leap-seconds.list",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "506e737d1a950148f0daed3c75a55ad497a0f2fa1a82661a361882dd8f4b2093"
-      },
+      "live": true,
       "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 5069
+        "format": "none"
       },
       "validityRange": {
         "id": "leap-second-range",
         "displayName": "Leap-second table range",
         "start": "1972-01-01",
-        "end": "2027-01-01"
+        "end": "2027-06-28"
       }
     },
     {
       "id": "de441-earth-orientation",
       "kind": "earth-orientation-data",
       "profileId": "de441-long-range",
-      "version": "2026-05-21",
+      "version": "2027-09-09",
       "sourceUrl": "https://datacenter.iers.org/data/latestVersion/9_FINALS.ALL_IAU2000_V2013_019.txt",
       "relativePath": "time/eop.txt",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "14af3d1772a078c04c031fdd52597a8df1247ce05e3ee1cf9182eeb5116e4242"
-      },
+      "live": true,
       "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 3745148
+        "format": "none"
       },
       "validityRange": {
         "id": "eop-range",
         "displayName": "Earth orientation range",
         "start": "1973-01-02",
-        "end": "2027-07-18"
+        "end": "2027-09-09"
       }
     },
     {
@@ -206,13 +186,9 @@
       "version": "2026a",
       "sourceUrl": "https://maia.usno.navy.mil/ser7/deltat.data",
       "relativePath": "time/delta-t.data",
-      "checksum": {
-        "algorithm": "sha256",
-        "value": "9f88e53593495a09219fe956eeadea0fa9f8e3e02c310b2aa2b70852383cdf6f"
-      },
+      "live": true,
       "compression": {
-        "format": "none",
-        "uncompressedSizeBytes": 13419
+        "format": "none"
       },
       "validityRange": {
         "id": "delta-t-range",

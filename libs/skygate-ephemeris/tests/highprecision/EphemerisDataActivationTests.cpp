@@ -243,6 +243,7 @@ class EphemerisDataActivationTests final : public QObject {
 
 private slots:
     void activatesValidZstdArchive();
+    void activatesLiveAssetWithoutIntegrityPins();
     void rejectsCorruptZstdArchive();
     void rejectsChecksumMismatch();
     void acceptsUppercaseManifestChecksum();
@@ -254,6 +255,8 @@ private slots:
     void cancelsActivationAfterPayloadCopyBeforeCommit();
     void rejectsLargeKernelQtResourcePaths();
     void verifiesCompleteStagedUpdateSet();
+    void verifiesStagedLiveAssetsWithoutIntegrityPins();
+    void rejectsStagedLiveAssetWithEmptyPayload();
     void verifiesCompressedStagedAssetWithoutChangingSource();
     void cancelsStagedUpdateVerification();
     void rejectsStagedUpdateChecksumFailure();
@@ -293,6 +296,43 @@ void EphemerisDataActivationTests::activatesValidZstdArchive()
     QVERIFY(activeFile.open(QIODevice::ReadOnly));
     QCOMPARE(activeFile.readAll(), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size())));
     QVERIFY(result.activePath.generic_string().ends_with("modern/kernels/de440s.bsp"));
+}
+
+void EphemerisDataActivationTests::activatesLiveAssetWithoutIntegrityPins()
+{
+    QTemporaryDir bundledRoot;
+    QTemporaryDir cacheRoot;
+    QVERIFY(bundledRoot.isValid());
+    QVERIFY(cacheRoot.isValid());
+    QVERIFY(QDir(bundledRoot.path()).mkpath(QStringLiteral("kernels")));
+    skygate::ephemeris::EphemerisDataManifest::Asset asset = makeUncompressedAsset();
+    asset.live = true;
+    asset.checksum.algorithm.clear();
+    asset.checksum.value = std::string(64U, '0');
+    asset.compression.uncompressedSizeBytes = 999U;
+    writeFile(
+        uncompressedSourcePath(bundledRoot), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size()))
+    );
+
+    const skygate::ephemeris::EphemerisDataActivationRequest request = makeRequest(asset, bundledRoot, cacheRoot);
+    const skygate::ephemeris::EphemerisDataActivationResult firstResult =
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
+
+    QVERIFY2(firstResult.isSuccess(), firstResult.diagnostics.empty() ? "" : firstResult.diagnostics.front().c_str());
+    QCOMPARE(
+        static_cast<std::uint8_t>(firstResult.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Activated)
+    );
+    QFile activeFile(QString::fromStdString(firstResult.activePath.generic_string()));
+    QVERIFY(activeFile.open(QIODevice::ReadOnly));
+    QCOMPARE(activeFile.readAll(), QByteArray(kPayload.data(), static_cast<qsizetype>(kPayload.size())));
+
+    const skygate::ephemeris::EphemerisDataActivationResult secondResult =
+        skygate::ephemeris::EphemerisDataActivation::activate(request);
+    QCOMPARE(
+        static_cast<std::uint8_t>(secondResult.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisDataActivationStatus::Activated)
+    );
 }
 
 void EphemerisDataActivationTests::rejectsCorruptZstdArchive()
@@ -592,6 +632,50 @@ void EphemerisDataActivationTests::verifiesCompleteStagedUpdateSet()
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
     );
     QCOMPARE(result.verifiedAssetIds.size(), std::size_t{4});
+}
+
+void EphemerisDataActivationTests::verifiesStagedLiveAssetsWithoutIntegrityPins()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    for (skygate::ephemeris::EphemerisDataManifest::Asset& asset : manifest.assets) {
+        asset.live = true;
+        asset.checksum.algorithm.clear();
+        asset.checksum.value = std::string(64U, '0');
+        asset.compression.uncompressedSizeBytes = 999U;
+    }
+    writeAllStagedAssets(stagedRoot, manifest);
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
+
+    QVERIFY2(result.isSuccess(), result.diagnostics.empty() ? "" : result.diagnostics.front().c_str());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::Verified)
+    );
+    QCOMPARE(result.verifiedAssetIds.size(), std::size_t{4});
+}
+
+void EphemerisDataActivationTests::rejectsStagedLiveAssetWithEmptyPayload()
+{
+    QTemporaryDir stagedRoot;
+    QVERIFY(stagedRoot.isValid());
+    skygate::ephemeris::EphemerisDataManifest manifest = makeStagedManifest();
+    manifest.assets[1].live = true;
+    writeAllStagedAssets(stagedRoot, manifest);
+    writeFile(stagedRoot.path() + QStringLiteral("/time/leap-seconds.list"), QByteArray{});
+
+    const skygate::ephemeris::EphemerisStagedUpdateVerificationResult result =
+        skygate::ephemeris::EphemerisStagedUpdateVerification::verify(verificationRequest(manifest, stagedRoot));
+
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.status),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisStagedUpdateVerificationStatus::ChecksumMismatch)
+    );
+    QVERIFY(!result.diagnostics.empty());
 }
 
 void EphemerisDataActivationTests::verifiesCompressedStagedAssetWithoutChangingSource()
