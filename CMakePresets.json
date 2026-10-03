@@ -9,8 +9,8 @@
         {
             "name": "base",
             "hidden": true,
-            "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build-make/${presetName}",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-ninja/${presetName}",
             "cacheVariables": {
                 "CMAKE_CXX_STANDARD": "20",
                 "CMAKE_CXX_STANDARD_REQUIRED": "ON",

@@ -167,14 +167,14 @@ preferences, interaction, rendering, and smoke tests.
 With the included `ui-debug` preset build tree, the equivalent command is:
 
 ```bash
-ctest --test-dir build-make/ui-debug --output-on-failure
+ctest --test-dir build-ninja/ui-debug --output-on-failure
 ```
 
 Tests carry CTest labels such as `unit`, `integration`, `qml`,
 `highprecision`, `validation`, `acceptance`, `perf`, `platform`, `advisory`,
-and `slow`. Use `ctest --test-dir build-make/ui-debug -LE slow
+and `slow`. Use `ctest --test-dir build-ninja/ui-debug -LE slow
 --output-on-failure` for the default non-slow suite, or `ctest --test-dir
-build-make/ui-debug -L slow --output-on-failure` for slow guard/rendering
+build-ninja/ui-debug -L slow --output-on-failure` for slow guard/rendering
 coverage.
 
 ### Coverage
@@ -200,8 +200,8 @@ cmake --build --preset core-coverage-codecov
 ```
 
 The text report is written to
-`build-make/core-coverage/coverage/coverage.txt`, and the HTML report starts at
-`build-make/core-coverage/coverage/html/index.html`. The Codecov report target
+`build-ninja/core-coverage/coverage/coverage.txt`, and the HTML report starts at
+`build-ninja/core-coverage/coverage/html/index.html`. The Codecov report target
 writes `coverage.lcov` for LLVM builds or `coverage.xml` for GCC builds under
 the same coverage directory. Coverage reports focus on production sources under
 `libs` and `apps`, excluding tests, build-tree files, and generated Qt sources.
@@ -233,7 +233,7 @@ Codecov report on non-PR coverage runs with GitHub OIDC authentication.
 The repository includes `CMakePresets.json` with `core-debug`, `ui-debug`, and
 `ui-run` presets, plus `core-coverage` report presets for opt-in coverage
 builds. They keep a stable local workflow and use the existing
-`build-make/<preset>` layout.
+`build-ninja/<preset>` layout.
 
 Developer presets keep `SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=OFF` unless
 their name contains `highprecision`. Use the `core-debug-highprecision-*`

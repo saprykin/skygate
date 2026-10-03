@@ -145,7 +145,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
-          files: build-make/core-coverage/coverage/coverage.xml
+          files: build-ninja/core-coverage/coverage/coverage.xml
           flags: core
           name: linux-core
           fail_ci_if_error: true
