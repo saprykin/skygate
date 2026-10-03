@@ -272,8 +272,9 @@ computation.
   - Pure interface for computing an `EphemerisSnapshot` from a
     `core::ObservationContext` and resolving individual body states.
 - `EphemerisEngineQueries`
-  - Explicit fallback helper for implementations that resolve a body by
-    scanning a computed snapshot.
+  - Query helper routing lookups through the engine's direct single-body
+    virtual overloads, with snapshot-scan helpers for finding a body state
+    inside an already-computed snapshot.
 - `EphemerisSnapshot`
   - Current context
   - shared immutable catalog body vector
@@ -281,6 +282,27 @@ computation.
 
 This immutable/shared snapshot shape avoids copying full body metadata into each
 frame and keeps rendering decoupled from catalog ownership.
+
+#### Request time contract
+`EphemerisRequest` carries both an explicit astronomical epoch and a UTC time
+inside its observation context. For request-based engine calls the explicit
+`request.epoch` is the single authoritative computation instant; engines must
+not substitute `request.context.utcTime` for a valid explicit epoch. The
+observation-context convenience overloads carry no explicit epoch: they build
+an `EphemerisRequest` from the engine's current options and a UTC epoch derived
+from `context.utcTime` (`EphemerisRequestFactory::requestFromContext`), so that
+derived UTC epoch is the authoritative instant for those calls. Callers that
+need a non-UTC epoch or explicit correction control should build an
+`EphemerisRequest` directly.
+
+Engines enforce this contract according to their capabilities. The simple
+engine is UTC-only: when it receives an explicit non-UTC epoch it reports each
+body as unsupported (`EphemerisEngineQueryStatus::Unsupported` with the
+`UnsupportedTimeScaleConversion` warning) instead of silently using
+`context.utcTime`. The high-precision engine honors explicit epochs: it rejects
+a non-explicit (default/zero) epoch as a failed computation, uses TDB epochs
+directly for kernel queries, and converts other scales through its injected
+time-scale service, recording any conversion metadata.
 
 #### Engine implementation
 Engines are created through `EphemerisEngineFactory`.
@@ -389,10 +411,44 @@ Fallback is implemented once in the simple-engine module as
 engine through `IEphemerisFallbackStrategy`. When a high-precision request is
 out of range and the request explicitly allows fallback, the strategy produces
 a simple-engine body state, marks the high-precision result as degraded, and
-records the corrections that could not be applied as unavailable. Fallback
-control is single-sourced: the factory policy determines whether a fallback
-engine is created, while `EphemerisEngineOptions::fallbackToSimpleEngine()`
-determines whether a runtime request may degrade.
+records the corrections that could not be applied as unavailable.
+
+Creation and runtime degradation use separate policies.
+`EphemerisEngineFactoryRequest::fallbackPolicy` governs whether factory
+creation may substitute the simple engine for a requested high-precision
+engine. It defaults to `AllowSimpleEngineFallback`, so a default
+high-precision request keeps the existing fallback behavior. Setting it to
+`StrictHighPrecision` makes creation fail with
+`FailedStrictHighPrecisionUnavailable` when high-precision dependencies are
+unavailable, regardless of the runtime option.
+`EphemerisEngineOptions::fallbackToSimpleEngine()` only governs runtime
+degradation inside an already-created high-precision engine; its default
+remains `true`.
+
+#### Guidance versus runtime fallback
+Event and trail sampling use an explicit `IEphemerisGuidanceStrategy`.
+`SimpleEphemerisGuidanceStrategy` creates an inexpensive simple engine for
+guided event search and UI guidance trails. This is a separately selected
+sampling path, independent of factory creation fallback and runtime
+degradation: turning off fallback does not remove guidance, and guidance
+samples do not imply a degraded high-precision result.
+
+#### Requested vs effective engine identity
+`EphemerisEngineFactoryResult` distinguishes the engine the caller asked for
+from the engine actually produced. `requestedKind()` is the kind passed to the
+factory; `effectiveKind()` is the kind of the returned engine (or the requested
+kind when creation fails). A high-precision request whose dependencies are
+unavailable therefore succeeds with
+`requestedKind() == EphemerisEngineKind::Type::HighPrecision`, a `Simple`
+engine, and `EphemerisFactoryCreationStatus::CreatedSimpleFallback`, which
+`usedSimpleEngineFallback()` reports.
+
+`SkyContextController` uses that distinction when it rebuilds the active
+engine. If a rebuild would replace an active high-precision engine with a
+simple fallback, the controller keeps the active engine instead of applying
+the lower-fidelity result. The generic rule is that a degraded fallback never
+silently replaces a more capable active engine: the active engine remains in
+effect until a rebuild produces an engine at the requested capability.
 
 #### Catalog ingestion pipeline
 Catalog import supports multiple payload shapes:
@@ -471,6 +527,74 @@ than rendering hand-authored bundled outlines.
 `StellariumConstellationParser` is a small orchestration entrypoint over
 private helpers: `StellariumHipParser`, `StellariumLineRefExtractor`, and
 `StellariumAnchorGroupExtractor`.
+
+## Result semantics
+`CelestialBodyState` carries a body index, an `EquatorialCoordinate`
+(right ascension/declination), a `HorizontalCoordinate`
+(altitude/azimuth), and an `EphemerisEngineQueryResult` metadata block. The
+meaning of the coordinates depends on the engine and on the requested
+corrections.
+
+### Simple engine coordinates and corrections
+- Fixed catalog bodies (stars, constellations, and deep-sky objects) use their
+  catalog fixed-equatorial coordinates unchanged; no precession, nutation,
+  proper motion, or parallax is applied.
+- The Sun, Moon, and planets use approximate orbital elements of date
+  converted to equatorial coordinates through the mean obliquity of date.
+- Horizontal coordinates are derived from the equatorial position using
+  Greenwich mean sidereal time and the observer's geodetic position. No
+  atmospheric refraction or diurnal parallax is applied.
+- The simple engine applies at most the `geometric` correction; any other
+  requested correction terms are reported as unavailable and the result is
+  marked degraded. An invalid observer degrades the result and leaves
+  horizontal coordinates unset (`NaN`).
+
+### High-precision engine coordinates and corrections
+- Base solar-system and star positions are computed geocentrically in the GCRS
+  (geocentric celestial reference system) frame.
+- With no corrections requested, `equatorial` is the geometric GCRS position.
+  Astrometric terms (proper motion, parallax, radial velocity, annual
+  parallax) are folded into the GCRS direction when requested and available.
+- When precession/nutation is requested, `equatorial` is transformed to the
+  true equator and equinox of date (apparent place).
+- When diurnal parallax (topocentric) is requested, the position is
+  transformed to ITRS, the observer parallax is applied, and `horizontal` is
+  populated as the topocentric altitude/azimuth. Atmospheric refraction is
+  applied to `horizontal` when it is both requested and enabled.
+- `horizontal` is therefore unset (`NaN`) unless the topocentric path runs;
+  `equatorial` reflects geometric/astrometric GCRS, apparent of date, or a
+  topocentric direction, depending on the requested corrections.
+
+### Unknown bodies versus failed calculations
+- The single-body overloads return `std::nullopt` when the body cannot be
+  found (unknown id or out-of-range index). This is distinct from a failed or
+  unsupported calculation, which returns a state.
+- In a full snapshot every catalog body receives a state entry. A body the
+  engine cannot compute is reported as
+  `EphemerisEngineQueryStatus::Unsupported` (with the `UnsupportedBody`
+  warning) and `NaN` coordinates; a failed calculation is reported as
+  `EphemerisEngineQueryStatus::Failed` (with the `ComputationFailed`
+  warning).
+
+### Supported date ranges
+`supportedDateRanges()` declares the validity window of the engine's
+underlying data set. The simple engine has no time-bounded data and returns an
+empty range; the high-precision engine returns the ranges declared by its
+active data set. These ranges are advisory: requests outside them are not
+rejected at the interface but produce out-of-range or degraded metadata (for
+example the `DataOutOfRange` warning), and runtime fallback may substitute the
+simple engine when the caller allows it.
+
+### Thread safety of const methods
+Shared const ownership (`std::shared_ptr<const IEphemerisEngine>`) does not by
+itself make concurrent const calls safe; an implementation with mutable caches
+must synchronize them internally. The simple engine holds only immutable state
+(its catalog copy, options, and stateless calculators), so its const methods
+are reentrant. The high-precision engine documents that it is safe for
+concurrent read-only computations after construction: its only mutable state is
+the `EphemerisComputationCache`, whose accessors are mutex-guarded, and mutable
+data updates are expected to create a new engine instance (or a versioned
+immutable snapshot) rather than mutate active computation data in place.
 
 ## Caching and Performance Model
 The current application uses several lightweight caches instead of a global
@@ -602,10 +726,47 @@ Update:
 - parser tests
 
 ### Replacing or adding an ephemeris engine
-Provide another `IEphemerisEngine` implementation, add an
-`EphemerisEngineKind`, and wire construction through `EphemerisEngineFactory`.
-`SkyContextController` owns engine selection and recreation; UI consumers depend
-on the interface.
+Provide another `IEphemerisEngine` implementation and register it in the
+central descriptors instead of teaching every consumer its name.
+
+- `EphemerisEngineDescriptor` records a stable string id, an
+  `EphemerisEngineKind`, a display name, default `EphemerisEngineOptions`, and
+  whether the engine supports correction and atmosphere settings.
+  `EphemerisEngineDescriptorRegistry` is the static table that maps ids, kinds,
+  and UI indices to descriptors. Settings persist the stable id (for example
+  `"simple"` or `"highPrecision"`) rather than a UI position, so adding an
+  engine does not disturb existing stored selections.
+
+- `EphemerisEngineTraits` describes the behaviors previously inferred from the
+  engine name: scene-correction policy support, inspector detail recomputation,
+  guided approximate event search, adaptive trail sampling, and live-recompute
+  throttling. `EphemerisComputationPolicy` resolves those questions at one
+  boundary from the active engine's traits and the request, so consumers
+  branch on policy instead of identity.
+
+- Event and trail sampling obtain their inexpensive guidance engine from an
+  explicit `IEphemerisGuidanceStrategy` supplied during composition
+  (`SimpleEphemerisGuidanceStrategy` currently provides the simple engine).
+  Guidance is a separately selected sampling path, independent of factory
+  creation fallback and runtime degradation.
+
+- Backend resource construction and reuse moved out of `SkyContextController`
+  into `EphemerisBackendResourceCache`, which owns the time-scale,
+  Earth-orientation, and CALCEPH kernel providers, invalidates them on data
+  revision or manifest changes, and copies them into factory requests.
+  `EphemerisEngineReplacementPolicy` states when a degraded rebuild may not
+  replace the active engine.
+
+- `EphemerisEngineFactoryResult` keeps requested versus effective identity
+  separate, and `EphemerisRequest` makes the explicit epoch the authoritative
+  computation instant.
+
+New implementations add descriptor entries, define their traits and defaults,
+wire the factory switch, and pass the contract and architecture checks:
+`EphemerisEngineContractTests` runs the shared interface contract against every
+implementation, `EphemerisRequestTimeContractTests` checks epoch authority, and
+the engine header isolation test forbids concrete engine includes outside the
+factory, composition component, implementation directories, and test support.
 
 ### Evolving the rendering path
 The scene model already isolates render preparation from drawing. Alternate
