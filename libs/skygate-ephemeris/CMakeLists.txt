@@ -15,20 +15,25 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
 endif()
 
 set(SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES
-    src/engine/simple/EclipticToEquatorialCalculator.hpp
-    src/engine/simple/EquatorialToHorizontalCalculator.hpp
-    src/engine/simple/MoonEquatorialCalculator.hpp
-    src/engine/simple/PlanetEquatorialCalculator.hpp
-    src/engine/simple/SunEquatorialCalculator.hpp
     src/engine/simple/SimpleEphemerisEngine.hpp
     src/engine/simple/SimpleEphemerisEngine.cpp
     src/engine/simple/SimpleEphemerisFallbackStrategy.hpp
     src/engine/simple/SimpleEphemerisFallbackStrategy.cpp
-    src/engine/simple/EclipticToEquatorialCalculator.cpp
-    src/engine/simple/EquatorialToHorizontalCalculator.cpp
-    src/engine/simple/MoonEquatorialCalculator.cpp
-    src/engine/simple/PlanetEquatorialCalculator.cpp
-    src/engine/simple/SunEquatorialCalculator.cpp
+)
+
+set(SKYGATE_EPHEMERIS_REFERENCE_SOURCES
+    src/reference/EclipticToEquatorialCalculator.hpp
+    src/reference/EclipticToEquatorialCalculator.cpp
+    src/reference/EquatorialToHorizontalCalculator.hpp
+    src/reference/EquatorialToHorizontalCalculator.cpp
+    src/reference/MoonEquatorialCalculator.hpp
+    src/reference/MoonEquatorialCalculator.cpp
+    src/reference/PlanetEquatorialCalculator.hpp
+    src/reference/PlanetEquatorialCalculator.cpp
+    src/reference/SunEquatorialCalculator.hpp
+    src/reference/SunEquatorialCalculator.cpp
+    src/reference/SimpleBodyStateCalculator.hpp
+    src/reference/SimpleBodyStateCalculator.cpp
 )
 
 set(SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES)
@@ -173,6 +178,7 @@ endif()
 
 add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}
+    ${SKYGATE_EPHEMERIS_REFERENCE_SOURCES}
     ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
     src/catalog/ActiveCatalogCompositionRequest.hpp
     src/catalog/ActiveCatalogCompositionResult.hpp

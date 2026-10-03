@@ -1,8 +1,6 @@
 #include "SimpleEphemerisFallbackStrategy.hpp"
-#include "EquatorialToHorizontalCalculator.hpp"
-#include "MoonEquatorialCalculator.hpp"
-#include "PlanetEquatorialCalculator.hpp"
-#include "SunEquatorialCalculator.hpp"
+#include "reference/EquatorialToHorizontalCalculator.hpp"
+#include "reference/SimpleBodyStateCalculator.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -11,29 +9,6 @@
 
 namespace skygate::ephemeris {
 namespace {
-
-[[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
-computeEquatorial(const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime) noexcept
-{
-    if (body.fixedEquatorialValue().has_value()) {
-        return body.fixedEquatorialValue();
-    }
-
-    switch (body.kind) {
-    case BaseCelestialBody::Kind::Sun:
-        return SunEquatorialCalculator{}.compute(utcTime);
-    case BaseCelestialBody::Kind::Moon:
-        return MoonEquatorialCalculator{}.compute(utcTime);
-    case BaseCelestialBody::Kind::Planet:
-        return PlanetEquatorialCalculator{}.compute(body.id, utcTime);
-    case BaseCelestialBody::Kind::Star:
-    case BaseCelestialBody::Kind::Constellation:
-    case BaseCelestialBody::Kind::DeepSkyObject:
-        break;
-    }
-
-    return std::nullopt;
-}
 
 [[nodiscard]] bool requestsTopocentricState(const EphemerisRequest& request) noexcept
 {
@@ -49,7 +24,7 @@ std::optional<CelestialBodyState> SimpleEphemerisFallbackStrategy::computeFallba
 ) const
 {
     const std::optional<skygate::core::EquatorialCoordinate> equatorial =
-        computeEquatorial(body, request.context.utcTime);
+        SimpleBodyStateCalculator{}.computeEquatorial(body, request.context.utcTime);
     if (!equatorial.has_value()) {
         return std::nullopt;
     }

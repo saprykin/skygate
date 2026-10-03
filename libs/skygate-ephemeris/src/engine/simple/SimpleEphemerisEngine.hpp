@@ -1,9 +1,7 @@
 #pragma once
 
-#include "MoonEquatorialCalculator.hpp"
-#include "PlanetEquatorialCalculator.hpp"
-#include "SunEquatorialCalculator.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "reference/SimpleBodyStateCalculator.hpp"
 
 #include <memory>
 #include <optional>
@@ -45,14 +43,9 @@ private:
     [[nodiscard]] CelestialBodyState computeStateForBody(
         const BaseCelestialBody& body, std::size_t bodyIndex, const skygate::core::ObservationContext& context
     ) const;
-    [[nodiscard]] std::optional<skygate::core::EquatorialCoordinate>
-    computeEquatorial(const BaseCelestialBody& body, const skygate::core::UtcTimePoint& utcTime) const;
-
     std::shared_ptr<const CelestialBodyCatalog> m_catalog;
     EphemerisEngineOptions m_options;
-    SunEquatorialCalculator m_sunCalculator;
-    MoonEquatorialCalculator m_moonCalculator;
-    PlanetEquatorialCalculator m_planetCalculator;
+    SimpleBodyStateCalculator m_bodyStateCalculator;
 };
 
 }  // namespace skygate::ephemeris

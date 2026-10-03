@@ -95,6 +95,33 @@ set_tests_properties(skygate-ephemeris-simple-engine-isolation-test
         TIMEOUT 30
 )
 
+set(SKYGATE_ENGINE_HEADER_ISOLATION_SCAN_ROOTS
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src"
+    "${CMAKE_SOURCE_DIR}/apps/skygate-ui/src"
+)
+set(SKYGATE_ENGINE_HEADER_ISOLATION_ALLOWLIST
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/factory/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/composition/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/simple/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/highprecision/"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src/engine/TdbTtConverter.cpp"
+    "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/tests/support/"
+    "${CMAKE_SOURCE_DIR}/apps/skygate-ui/tests/support/"
+)
+add_test(
+    NAME skygate-ephemeris-engine-header-isolation-test
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DSCAN_ROOTS=${SKYGATE_ENGINE_HEADER_ISOLATION_SCAN_ROOTS}"
+        "-DALLOWLIST_PREFIXES=${SKYGATE_ENGINE_HEADER_ISOLATION_ALLOWLIST}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EngineHeaderIsolationTest.cmake"
+)
+set_tests_properties(skygate-ephemeris-engine-header-isolation-test
+    PROPERTIES
+        LABELS "unit;architecture"
+        TIMEOUT 30
+)
+
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_executable(skygate-ephemeris-highprecision-dependency-smoke-tests
         highprecision/HighPrecisionDependencySmokeTests.cpp
