@@ -12,6 +12,9 @@ EphemerisEngineFactoryResult EphemerisEngineFactoryResult::success(
 )
 {
     EphemerisEngineFactoryResult result;
+    if (createdEngine != nullptr) {
+        result.m_effectiveKind = createdEngine->kind();
+    }
     result.engine = std::move(createdEngine);
     result.status = creationStatus;
     result.diagnostics = std::move(creationDiagnostics);
@@ -56,18 +59,8 @@ EphemerisEngineKind::Type EphemerisEngineFactoryResult::requestedKind() const no
 
 EphemerisEngineKind::Type EphemerisEngineFactoryResult::effectiveKind() const noexcept
 {
-    if (engine != nullptr) {
-        return engine->kind();
-    }
-
-    switch (status) {
-    case EphemerisFactoryCreationStatus::FailedStrictHighPrecisionUnavailable:
-    case EphemerisFactoryCreationStatus::FailedCreationError:
-    case EphemerisFactoryCreationStatus::FailedInvalidRequest:
-        return m_requestedKind;
-    case EphemerisFactoryCreationStatus::CreatedRequestedEngine:
-    case EphemerisFactoryCreationStatus::CreatedSimpleFallback:
-        break;
+    if (m_effectiveKind.has_value()) {
+        return *m_effectiveKind;
     }
 
     return m_requestedKind;
