@@ -2,6 +2,7 @@
 #include "EphemerisRequestFactory.hpp"
 #include "NightConditionsCalculator.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
+#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
@@ -212,6 +213,7 @@ private slots:
     void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
     void highPrecisionNightConditionsUseGuidedEventSearch();
     void guidanceStrategyInjectionIsHonored();
+    void nullGuidanceStrategyFallsBackToDirectSampling();
     void approximateHighPrecisionSunMoonEventsUseSimpleEstimates();
     void verifiedHighPrecisionNightConditionsUseSelectedEngineSamples();
 };
@@ -368,7 +370,8 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
     });
     const auto approximateEngine = makeGuidedNightEngine(bodies);
     const auto verifiedEngine = makeGuidedNightEngine(bodies);
-    const skygate::ephemeris::NightConditionsCalculator calculator;
+    const auto strategy = std::make_shared<skygate::ephemeris::SimpleEphemerisGuidanceStrategy>();
+    const skygate::ephemeris::NightConditionsCalculator calculator(strategy);
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::requestFromContext(
             makeZurichContext(), approximateEngine.options()
@@ -415,12 +418,31 @@ void NightConditionsCalculatorTests::guidanceStrategyInjectionIsHonored()
     QCOMPARE(engine.contextSampleCount(), 0);
 }
 
+void NightConditionsCalculatorTests::nullGuidanceStrategyFallsBackToDirectSampling()
+{
+    const auto bodies = makeCatalog({
+        skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
+        skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
+    });
+    const auto engine = makeGuidedNightEngine(bodies);
+    const skygate::ephemeris::NightConditionsCalculator calculator(nullptr);
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), engine.options());
+
+    const auto conditions = calculator.compute(engine, request, 0U, &bodies->bodyAt(0), 1U, &bodies->bodyAt(1));
+
+    QVERIFY(conditions.valid);
+    QVERIFY(engine.requestSampleCount() > 2);
+    QCOMPARE(engine.contextSampleCount(), 0);
+}
+
 void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSimpleEstimates()
 {
     const auto bodies = makeSunMoonBodies();
     const auto approximateEngine = makeGuidedNightEngine(bodies);
     const auto verifiedEngine = makeGuidedNightEngine(bodies);
-    const skygate::ephemeris::NightConditionsCalculator calculator;
+    const auto strategy = std::make_shared<skygate::ephemeris::SimpleEphemerisGuidanceStrategy>();
+    const skygate::ephemeris::NightConditionsCalculator calculator(strategy);
     const skygate::ephemeris::EphemerisRequest request =
         skygate::ephemeris::EphemerisRequestFactory::requestFromContext(
             makeZurichContext(), approximateEngine.options()

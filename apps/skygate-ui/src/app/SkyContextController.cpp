@@ -10,6 +10,7 @@
 #include "SkyTimeController.hpp"
 #include "UtcTimeCodec.hpp"
 #include "composition/EphemerisBackendResourceCache.hpp"
+#include "composition/EphemerisGuidanceComposition.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "factory/EphemerisEngineReplacementPolicy.hpp"
 #include "time/CalendarTime.hpp"
@@ -393,7 +394,7 @@ SkyContextController::SkyContextController(
       m_settingsStore(std::make_unique<SkySettingsStore>()),
       m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
       m_ephemerisEngine(std::move(ephemerisEngine)),
-      m_ephemerisGuidanceStrategy(std::make_shared<skygate::ephemeris::SimpleEphemerisGuidanceStrategy>()),
+      m_ephemerisGuidanceStrategy(skygate::ephemeris::EphemerisGuidanceComposition::defaultGuidanceStrategy()),
       m_ephemerisDatasetManifest(initializationOptions.ephemerisFactoryInputs.datasetManifest),
       m_ephemerisDataManifest(initializationOptions.ephemerisFactoryInputs.dataManifest),
       m_ephemerisUpdateResourceRoot(initializationOptions.ephemerisFactoryInputs.updateResourceRoot),

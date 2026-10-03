@@ -2,6 +2,7 @@
 #include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
+#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "UtcTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -350,6 +351,7 @@ private slots:
     void movingBodySamplesThroughEphemerisEngine();
     void guidanceStrategyInjectionIsHonored();
     void highPrecisionFixedBodyUsesGuidedCoarseSearch();
+    void nullGuidanceStrategyFallsBackToDirectSampling();
     void requestOverloadPropagatesOptionsAndSampleEpochs();
     void contextOverloadSeedsRequestOptionsFromEngine();
 };
@@ -574,7 +576,8 @@ void ObservationEventCalculatorTests::guidanceStrategyInjectionIsHonored()
 
 void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSearch()
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const auto strategy = std::make_shared<skygate::ephemeris::SimpleEphemerisGuidanceStrategy>();
+    const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
     const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
     const skygate::ephemeris::tests::RequestCountingEphemerisEngine engine(
         makeEngineForBody(body), skygate::ephemeris::tests::highPrecisionLightTimeOptions()
@@ -595,6 +598,34 @@ void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSear
 
     QCOMPARE(engine.contextSampleCount(), 0);
     QCOMPARE(engine.requestSampleCount(), 0);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
+}
+
+void ObservationEventCalculatorTests::nullGuidanceStrategyFallsBackToDirectSampling()
+{
+    const skygate::ephemeris::ObservationEventCalculator calculator(nullptr);
+    const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
+    const skygate::ephemeris::tests::RequestCountingEphemerisEngine engine(
+        makeEngineForBody(body), skygate::ephemeris::tests::highPrecisionLightTimeOptions()
+    );
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeContext();
+    request.epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
+            .astronomicalYear = 2024,
+            .month = 6,
+            .day = 2,
+            .timeScale = skygate::core::TimeScale::Utc,
+        }
+    );
+    request.options = engine.options();
+
+    const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
+
+    QCOMPARE(engine.contextSampleCount(), 0);
+    QVERIFY(engine.requestSampleCount() > 0);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);

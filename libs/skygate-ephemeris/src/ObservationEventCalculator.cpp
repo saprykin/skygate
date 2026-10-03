@@ -5,7 +5,6 @@
 #include "EphemerisRequestFactory.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 
 #include <array>
 #include <chrono>
@@ -435,16 +434,10 @@ isTrustingGuidanceModel(const BaseCelestialBody* body, const EphemerisRequest& r
 
 }  // namespace
 
-ObservationEventCalculator::ObservationEventCalculator()
-    : m_guidanceStrategy(std::make_shared<SimpleEphemerisGuidanceStrategy>())
-{
-}
+ObservationEventCalculator::ObservationEventCalculator() = default;
 
 ObservationEventCalculator::ObservationEventCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
-    : m_guidanceStrategy(
-          guidanceStrategy != nullptr ? std::move(guidanceStrategy)
-                                      : std::make_shared<SimpleEphemerisGuidanceStrategy>()
-      )
+    : m_guidanceStrategy(std::move(guidanceStrategy))
 {
 }
 
@@ -467,7 +460,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     SampleRole sampleRole = SampleRole::Direct;
     std::vector<AltitudeSample> samples;
 
-    if (shouldUseGuidanceEngine(ephemerisEngine, body, searchMode)) {
+    if (m_guidanceStrategy != nullptr && shouldUseGuidanceEngine(ephemerisEngine, body, searchMode)) {
         if (auto guidanceSamples = sampleGuidanceAltitudes(search, *body, request, *m_guidanceStrategy);
             guidanceSamples.has_value()) {
             samples = std::move(*guidanceSamples);
