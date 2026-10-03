@@ -23,6 +23,9 @@ public:
     /// sampling.
     explicit NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy);
 
+    /// Event search mode. Approximate mode events may still be refined or
+    /// verified against the primary engine when the engine does not grant
+    /// `trustsGuidedSearchResult`.
     enum class EventSearchMode : std::uint8_t {
         Approximate,
         Verified

@@ -333,6 +333,91 @@ public:
     std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
 };
 
+class TrustOptOutEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    TrustOptOutEngine(std::shared_ptr<int> primaryCall, const bool trustGuidance)
+        : m_primaryCall(std::move(primaryCall)), m_trustGuidance(trustGuidance)
+    {
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Trust opt-out primary test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        skygate::ephemeris::EphemerisEngineTraits traits = skygate::ephemeris::EphemerisEngineTraits::noTraits();
+        traits.supportsGuidedEventSearch = true;
+        traits.trustsGuidedSearchResult = m_trustGuidance;
+        return traits;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        if (bodyIndex != 0U) {
+            return std::nullopt;
+        }
+
+        ++*m_primaryCall;
+        return altitudeState(static_cast<std::uint32_t>(bodyIndex), request.context.utcTime);
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::size_t) const override
+    {
+        return std::nullopt;
+    }
+
+private:
+    [[nodiscard]] static skygate::ephemeris::CelestialBodyState
+    altitudeState(const std::uint32_t bodyIndex, const skygate::core::UtcTimePoint& utcTime) noexcept
+    {
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(utcTime);
+        const double phase = std::fmod(seconds, 86400.0) / 86400.0;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = bodyIndex,
+            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+            .horizontal = {.altitudeDeg = 35.0 * std::sin(2.0 * kPi * (phase - 0.25)) + 5.0, .azimuthDeg = 180.0}
+        };
+    }
+
+    std::shared_ptr<int> m_primaryCall;
+    bool m_trustGuidance;
+};
+
 class LinearAltitudeGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     LinearAltitudeGuidanceEngine(const skygate::core::UtcTimePoint crossingTime, const double slopeDegPerSecond)
@@ -444,6 +529,9 @@ private slots:
     void nullGuidanceStrategyFallsBackToDirectSampling();
     void requestOverloadPropagatesOptionsAndSampleEpochs();
     void contextOverloadSeedsRequestOptionsFromEngine();
+    void untrustedFixedStarGuidedSearchVerifiesAgainstPrimaryEngine();
+    void untrustedGuidedApproximateVerifiesAgainstPrimaryEngine();
+    void trustedFixedStarGuidedSearchSkipsPrimaryVerification();
 };
 
 void ObservationEventCalculatorTests::normalObjectFindsOrderedEventsAndRefinedHorizonCrossings()
@@ -815,6 +903,73 @@ void ObservationEventCalculatorTests::contextOverloadSeedsRequestOptionsFromEngi
     QVERIFY(!engine.sawLightTimeRequest);
     QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
     QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::NoEventInSearchWindow);
+}
+
+void ObservationEventCalculatorTests::untrustedFixedStarGuidedSearchVerifiesAgainstPrimaryEngine()
+{
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
+    const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
+    const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
+    auto primaryCall = std::make_shared<int>(0);
+    const TrustOptOutEngine engine(primaryCall, false);
+
+    const auto request = makeRequest(makeContext(), engine);
+    const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
+
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QVERIFY(summary.nextRise.utcTime.has_value());
+    QVERIFY(*primaryCall > 0);
+
+    const auto verificationRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, *summary.nextRise.utcTime);
+    const auto state = engine.computeBodyState(verificationRequest, std::size_t{0U});
+    QVERIFY(state.has_value());
+    QVERIFY(std::abs(state->horizontal.altitudeDeg - 0.0) < 1.0);
+}
+
+void ObservationEventCalculatorTests::untrustedGuidedApproximateVerifiesAgainstPrimaryEngine()
+{
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
+    const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
+    const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
+    auto primaryCall = std::make_shared<int>(0);
+    const TrustOptOutEngine engine(primaryCall, false);
+
+    const auto request = makeRequest(makeContext(), engine);
+    const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::GuidedApproximate);
+
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QVERIFY(summary.nextRise.utcTime.has_value());
+    QVERIFY(*primaryCall > 0);
+
+    const auto verificationRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, *summary.nextRise.utcTime);
+    const auto state = engine.computeBodyState(verificationRequest, std::size_t{0U});
+    QVERIFY(state.has_value());
+    QVERIFY(std::abs(state->horizontal.altitudeDeg - 0.0) < 1.0);
+}
+
+void ObservationEventCalculatorTests::trustedFixedStarGuidedSearchSkipsPrimaryVerification()
+{
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
+    const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
+    const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
+    auto primaryCall = std::make_shared<int>(0);
+    const TrustOptOutEngine engine(primaryCall, true);
+
+    const auto request = makeRequest(makeContext(), engine);
+    const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
+
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QVERIFY(summary.nextRise.utcTime.has_value());
+    QCOMPARE(*primaryCall, 0);
+
+    const MarkerGuidanceEngine guidance(std::make_shared<int>(0));
+    const auto guidanceRequest =
+        skygate::ephemeris::EphemerisRequestFactory::atUtcTime(request, *summary.nextRise.utcTime);
+    const auto state = guidance.computeBodyState(guidanceRequest, std::size_t{0U});
+    QVERIFY(state.has_value());
+    QVERIFY(std::abs(state->horizontal.altitudeDeg - 0.0) < 0.5);
 }
 
 QTEST_APPLESS_MAIN(ObservationEventCalculatorTests)
