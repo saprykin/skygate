@@ -195,6 +195,13 @@ public:
         return m_options.engineKind();
     }
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return m_options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
+                   ? skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine()
+                   : skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    }
+
     [[nodiscard]] std::string_view name() const noexcept override
     {
         return "Selected-engine matrix test engine";

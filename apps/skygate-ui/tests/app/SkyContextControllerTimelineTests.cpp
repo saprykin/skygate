@@ -14,6 +14,11 @@ public:
         return m_options.engineKind();
     }
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
+    }
+
     [[nodiscard]] std::string_view name() const noexcept override
     {
         return "Throttled live test engine";

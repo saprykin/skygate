@@ -5,6 +5,7 @@
 #include "EphemerisDatasetInfo.hpp"
 #include "EphemerisEngineKind.hpp"
 #include "EphemerisEngineOptions.hpp"
+#include "EphemerisEngineTraits.hpp"
 #include "EphemerisRequest.hpp"
 #include "EphemerisSnapshot.hpp"
 #include "ObservationContext.hpp"
@@ -34,6 +35,11 @@ public:
     [[nodiscard]] virtual EphemerisCapabilities capabilities() const noexcept
     {
         return EphemerisCapabilities::noCapabilities();
+    }
+
+    [[nodiscard]] virtual EphemerisEngineTraits traits() const noexcept
+    {
+        return EphemerisEngineTraits::noTraits();
     }
 
     [[nodiscard]] virtual std::span<const EphemerisDateRange> supportedDateRanges() const noexcept

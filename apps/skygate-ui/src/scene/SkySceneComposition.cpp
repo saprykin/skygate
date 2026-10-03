@@ -126,13 +126,17 @@ std::vector<SkyOverlayItem> renderLabelsToOverlayItems(const std::span<const Sky
 namespace {
 
 std::optional<skygate::ephemeris::EphemerisRequest> trailEphemerisRequestFor(
+    const skygate::ephemeris::IEphemerisEngine* ephemerisEngine,
     const std::optional<skygate::ephemeris::EphemerisRequest>& selectionRequest,
     const std::optional<skygate::ephemeris::EphemerisRequest>& frameRequest
 ) noexcept
 {
     if (selectionRequest.has_value()) {
+        if (ephemerisEngine == nullptr) {
+            return selectionRequest;
+        }
         return skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
-            *selectionRequest, skygate::ephemeris::EphemerisPrecisionPolicy::Trail
+            *selectionRequest, skygate::ephemeris::EphemerisPrecisionPolicy::Trail, *ephemerisEngine
         );
     }
 
@@ -206,8 +210,11 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
                     .targetBody = trailTarget.body,
                     .targetState = trailTarget.state,
                     .skyContext = input.frameInput.skyContext,
-                    .ephemerisRequest =
-                        trailEphemerisRequestFor(input.selectionEphemerisRequest, input.frameInput.ephemerisRequest),
+                    .ephemerisRequest = trailEphemerisRequestFor(
+                        input.frameInput.ephemerisEngine,
+                        input.selectionEphemerisRequest,
+                        input.frameInput.ephemerisRequest
+                    ),
                     .renderTheme = input.frameInput.renderTheme,
                     .targetBodyIndex = *trailTargetBodyIndex,
                     .viewportWidth = input.viewportWidth,

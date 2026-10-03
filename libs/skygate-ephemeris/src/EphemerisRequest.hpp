@@ -7,6 +7,8 @@
 
 namespace skygate::ephemeris {
 
+class IEphemerisEngine;
+
 struct EphemerisRequest {
     // The explicit astronomical epoch is the authoritative computation
     // instant for request-based engine calls. Engines must use this epoch
@@ -18,8 +20,9 @@ struct EphemerisRequest {
     skygate::core::ObservationContext context;
     EphemerisEngineOptions options;
 
-    [[nodiscard]] static EphemerisRequest
-    fromPrecisionPolicy(EphemerisRequest request, EphemerisPrecisionPolicy policy) noexcept;
+    [[nodiscard]] static EphemerisRequest fromPrecisionPolicy(
+        EphemerisRequest request, EphemerisPrecisionPolicy policy, const IEphemerisEngine& engine
+    ) noexcept;
 };
 
 }  // namespace skygate::ephemeris

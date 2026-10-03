@@ -1,6 +1,7 @@
 #include "SkyObjectTrailBuilder.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "CelestialReferenceCalculator.hpp"
+#include "engine/EphemerisComputationPolicy.hpp"
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
 #include "engine/IEphemerisEngine.hpp"
@@ -46,11 +47,12 @@ QColor colorWithAlpha(const QColor& color, const int alpha)
     return adjusted;
 }
 
-[[nodiscard]] bool usesHighPrecisionRequest(const SkyObjectTrailInput& input) noexcept
+[[nodiscard]] bool usesAdaptiveTrailSampling(const SkyObjectTrailInput& input) noexcept
 {
-    return input.ephemerisRequest.has_value()
-           && input.ephemerisRequest->options.engineKind()
-                  == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    return input.ephemerisEngine != nullptr && input.ephemerisRequest.has_value()
+           && skygate::ephemeris::EphemerisComputationPolicy::trailSamplingIsAdaptive(
+               *input.ephemerisEngine, *input.ephemerisRequest
+           );
 }
 
 void copyCommonBodyFields(
@@ -87,7 +89,7 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
 
 [[nodiscard]] bool isFixedEquatorialTrailTarget(const SkyObjectTrailInput& input) noexcept
 {
-    if (!usesHighPrecisionRequest(input) || input.targetBody == nullptr || input.targetState == nullptr
+    if (!usesAdaptiveTrailSampling(input) || input.targetBody == nullptr || input.targetState == nullptr
         || !input.targetState->equatorial.isFinite()) {
         return false;
     }
@@ -98,7 +100,11 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
 
 [[nodiscard]] bool shouldUseGuidanceTrail(const SkyObjectTrailInput& input) noexcept
 {
-    return usesHighPrecisionRequest(input) && input.targetBody != nullptr && !isFixedEquatorialTrailTarget(input);
+    return input.ephemerisEngine != nullptr && input.ephemerisRequest.has_value()
+           && skygate::ephemeris::EphemerisComputationPolicy::trailUsesGuidance(
+               *input.ephemerisEngine, *input.ephemerisRequest, input.targetBody
+           )
+           && !isFixedEquatorialTrailTarget(input);
 }
 
 [[nodiscard]] bool
@@ -495,7 +501,7 @@ sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephe
         }
     }
 
-    if (usesHighPrecisionRequest(input)) {
+    if (usesAdaptiveTrailSampling(input)) {
         return sampleAdaptiveHighPrecisionTrail(input, trailCalculator, renderOptions);
     }
 
@@ -639,8 +645,8 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
     const skygate::ephemeris::BodyTrailOptions trailOptions{
         .pastHours = kObjectTrailPastHours,
         .futureHours = kObjectTrailFutureHours,
-        .sampleStepMinutes =
-            usesHighPrecisionRequest(input) ? kObjectTrailHighPrecisionRenderStepMinutes : kObjectTrailSampleStepMinutes
+        .sampleStepMinutes = usesAdaptiveTrailSampling(input) ? kObjectTrailHighPrecisionRenderStepMinutes
+                                                              : kObjectTrailSampleStepMinutes
     };
     const TrailSampleCacheKey cacheKey = sampleCacheKeyFor(input);
     const bool sampleCacheHit = m_sampleCacheKey.has_value() && sampleCacheKeysEqual(*m_sampleCacheKey, cacheKey);
@@ -696,7 +702,7 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
             << "sampleMs=" << skygate::ui::performanceMilliseconds(sampleNs)
             << "renderMs=" << skygate::ui::performanceMilliseconds(timer.nsecsElapsed() - sampleNs)
             << "samples=" << static_cast<qsizetype>(samples.size()) << "cacheHit=" << sampleCacheHit
-            << "highPrecision=" << usesHighPrecisionRequest(input) << "guidance=" << shouldUseGuidanceTrail(input)
+            << "highPrecision=" << usesAdaptiveTrailSampling(input) << "guidance=" << shouldUseGuidanceTrail(input)
             << "fixedEquatorial=" << isFixedEquatorialTrailTarget(input)
             << "bodyIndex=" << static_cast<qulonglong>(input.targetBodyIndex)
             << "linesAdded=" << static_cast<int>(frame.lines.size()) - lineCountBefore

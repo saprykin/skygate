@@ -373,10 +373,10 @@ ObservationEvent EventSearch::findCulmination(const std::vector<AltitudeSample>&
 }
 
 [[nodiscard]] bool
-shouldUseGuidanceEngine(const BaseCelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
+shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody* body, SearchMode searchMode) noexcept
 {
     return (searchMode == SearchMode::Guided || searchMode == SearchMode::GuidedApproximate) && body != nullptr
-           && request.options.engineKind() == EphemerisEngineKind::Type::HighPrecision;
+           && engine.traits().supportsGuidedApproximateEventSearch;
 }
 
 [[nodiscard]] bool
@@ -451,7 +451,7 @@ ObservationEventSummary ObservationEventCalculator::compute(
     SampleRole sampleRole = SampleRole::Direct;
     std::vector<AltitudeSample> samples;
 
-    if (shouldUseGuidanceEngine(body, request, searchMode)) {
+    if (shouldUseGuidanceEngine(ephemerisEngine, body, searchMode)) {
         if (auto guidanceSamples = sampleGuidanceAltitudes(search, *body, request); guidanceSamples.has_value()) {
             samples = std::move(*guidanceSamples);
             sampleRole = SampleRole::Guidance;

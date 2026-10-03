@@ -22,6 +22,11 @@ public:
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
+    }
+
     [[nodiscard]] std::string_view name() const noexcept override
     {
         return "Request-sensitive test engine";
@@ -161,6 +166,11 @@ public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override

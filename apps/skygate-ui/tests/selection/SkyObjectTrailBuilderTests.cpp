@@ -23,6 +23,28 @@ class TrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit TrailEngine(const std::uint32_t expectedBodyIndex = 7U) : m_expectedBodyIndex(expectedBodyIndex) {}
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return m_nonEnumeratedKind ? static_cast<skygate::ephemeris::EphemerisEngineKind::Type>(42)
+                                   : skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return m_highPrecisionTraits ? skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine()
+                                     : skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    }
+
+    void setHighPrecisionTraits(const bool highPrecisionTraits) noexcept
+    {
+        m_highPrecisionTraits = highPrecisionTraits;
+    }
+
+    void setNonEnumeratedKind(const bool nonEnumeratedKind) noexcept
+    {
+        m_nonEnumeratedKind = nonEnumeratedKind;
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -122,6 +144,8 @@ public:
 
 private:
     std::uint32_t m_expectedBodyIndex = 0;
+    bool m_highPrecisionTraits = false;
+    bool m_nonEnumeratedKind = false;
     bool m_gapAtPresent = false;
     mutable bool m_sawExpectedBodyIndex = false;
     mutable int m_requestBodyStateCalls = 0;
@@ -132,6 +156,11 @@ private:
 
 class CurvedHighPrecisionTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -312,6 +341,7 @@ private slots:
     void invalidSamplesBreakContinuity();
     void highPrecisionFixedTargetTrailUsesEquatorialModel();
     void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
+    void thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples();
     void highPrecisionNonFixedTargetTrailUsesGuidanceEngine();
     void highPrecisionTrailRefinesCurvedInterpolation();
     void longProjectedJumpsAreDropped();
@@ -386,6 +416,7 @@ void SkyObjectTrailBuilderTests::highPrecisionFixedTargetTrailUsesEquatorialMode
     const auto projection = makeProjection();
     QVERIFY(projection.has_value());
     TrailEngine engine;
+    engine.setHighPrecisionTraits(true);
     const SkyObjectTrailBuilder builder;
     SkyRenderFrame frame;
     auto input = makeInput(engine, *projection);
@@ -422,6 +453,7 @@ void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolated
     const auto projection = makeProjection();
     QVERIFY(projection.has_value());
     TrailEngine engine;
+    engine.setHighPrecisionTraits(true);
     const SkyObjectTrailBuilder builder;
     SkyRenderFrame frame;
     auto input = makeInput(engine, *projection);
@@ -467,11 +499,42 @@ void SkyObjectTrailBuilderTests::highPrecisionRequestTrailUsesSparseInterpolated
     QCOMPARE(engine.requestBodyStateCalls(), 25);
 }
 
+void SkyObjectTrailBuilderTests::thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    engine.setHighPrecisionTraits(true);
+    engine.setNonEnumeratedKind(true);
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    request.options.setEngineKind(engine.kind());
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    request.options.setEnableAtmosphericRefraction(false);
+    input.ephemerisRequest = request;
+
+    builder.appendTrail(frame, input);
+
+    QVERIFY(engine.sawExpectedBodyIndex());
+    QVERIFY(frame.lines.size() > 40U);
+    QCOMPARE(countLabelsOfKind(frame.labels, "trailTick"), 3);
+    QCOMPARE(engine.requestBodyStateCalls(), 25);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+}
+
 void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEngine()
 {
     const auto projection = makeProjection();
     QVERIFY(projection.has_value());
     TrailEngine engine;
+    engine.setHighPrecisionTraits(true);
     const SkyObjectTrailBuilder builder;
     SkyRenderFrame frame;
     auto input = makeInput(engine, *projection);

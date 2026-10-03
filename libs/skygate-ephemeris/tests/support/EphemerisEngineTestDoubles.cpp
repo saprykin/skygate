@@ -125,6 +125,13 @@ skygate::ephemeris::EphemerisEngineKind::Type RequestCountingEphemerisEngine::ki
     return m_options.engineKind();
 }
 
+EphemerisEngineTraits RequestCountingEphemerisEngine::traits() const noexcept
+{
+    return m_options.engineKind() == EphemerisEngineKind::Type::HighPrecision
+               ? EphemerisEngineTraits::highPrecisionEngine()
+               : EphemerisEngineTraits::noTraits();
+}
+
 EphemerisEngineOptions RequestCountingEphemerisEngine::options() const noexcept
 {
     return m_options;
@@ -197,6 +204,69 @@ EphemerisEngineOptions highPrecisionLightTimeOptions() noexcept
     options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     options.setCorrectionFlags(EphemerisCorrectionFlags::lightTime());
     return options;
+}
+
+EphemerisEngineKind::Type NonEnumeratedHighPrecisionTraitsEngine::kind() const noexcept
+{
+    return static_cast<EphemerisEngineKind::Type>(42);
+}
+
+std::string_view NonEnumeratedHighPrecisionTraitsEngine::name() const noexcept
+{
+    return "Non-enumerated high-precision traits test engine";
+}
+
+EphemerisEngineTraits NonEnumeratedHighPrecisionTraitsEngine::traits() const noexcept
+{
+    return EphemerisEngineTraits::highPrecisionEngine();
+}
+
+EphemerisEngineOptions NonEnumeratedHighPrecisionTraitsEngine::options() const noexcept
+{
+    EphemerisEngineOptions options;
+    options.setEngineKind(kind());
+    return options;
+}
+
+EphemerisSnapshot NonEnumeratedHighPrecisionTraitsEngine::compute(const EphemerisRequest& request) const
+{
+    EphemerisSnapshot snapshot;
+    snapshot.context = request.context;
+    return snapshot;
+}
+
+std::optional<CelestialBodyState>
+NonEnumeratedHighPrecisionTraitsEngine::computeBodyState(const EphemerisRequest&, const std::string_view) const
+{
+    return std::nullopt;
+}
+
+std::optional<CelestialBodyState>
+NonEnumeratedHighPrecisionTraitsEngine::computeBodyState(const EphemerisRequest&, const std::size_t) const
+{
+    return std::nullopt;
+}
+
+EphemerisSnapshot
+NonEnumeratedHighPrecisionTraitsEngine::compute(const skygate::core::ObservationContext& context) const
+{
+    EphemerisSnapshot snapshot;
+    snapshot.context = context;
+    return snapshot;
+}
+
+std::optional<CelestialBodyState> NonEnumeratedHighPrecisionTraitsEngine::computeBodyState(
+    const skygate::core::ObservationContext&, const std::string_view
+) const
+{
+    return std::nullopt;
+}
+
+std::optional<CelestialBodyState> NonEnumeratedHighPrecisionTraitsEngine::computeBodyState(
+    const skygate::core::ObservationContext&, const std::uint32_t
+) const
+{
+    return std::nullopt;
 }
 
 }  // namespace skygate::ephemeris::tests

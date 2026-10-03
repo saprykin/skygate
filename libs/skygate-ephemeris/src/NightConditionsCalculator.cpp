@@ -43,7 +43,8 @@ observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noe
         request,
         eventSearchMode == NightConditionsCalculator::EventSearchMode::Verified
             ? EphemerisPrecisionPolicy::NightConditionsVerified
-            : EphemerisPrecisionPolicy::NightConditionsApproximate
+            : EphemerisPrecisionPolicy::NightConditionsApproximate,
+        ephemerisEngine
     );
     return eventCalculator.compute(
         ephemerisEngine, eventRequest, bodyIndex, body, crossingAltitudeDeg, observationSearchMode(eventSearchMode)

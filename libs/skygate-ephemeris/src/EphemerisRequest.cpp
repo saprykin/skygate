@@ -1,39 +1,14 @@
 #include "EphemerisRequest.hpp"
-#include "engine/EphemerisCorrectionFlags.hpp"
-#include "engine/EphemerisEngineKind.hpp"
+#include "engine/EphemerisComputationPolicy.hpp"
+#include "engine/IEphemerisEngine.hpp"
 
 namespace skygate::ephemeris {
 
-EphemerisRequest
-EphemerisRequest::fromPrecisionPolicy(EphemerisRequest request, const EphemerisPrecisionPolicy policy) noexcept
+EphemerisRequest EphemerisRequest::fromPrecisionPolicy(
+    EphemerisRequest request, const EphemerisPrecisionPolicy policy, const IEphemerisEngine& engine
+) noexcept
 {
-    if (request.options.engineKind() != EphemerisEngineKind::Type::HighPrecision) {
-        return request;
-    }
-
-    switch (policy) {
-    case EphemerisPrecisionPolicy::SceneRender:
-    case EphemerisPrecisionPolicy::Trail: {
-        EphemerisCorrectionFlags corrections = EphemerisCorrectionFlags::precessionNutation()
-                                               | EphemerisCorrectionFlags::earthOrientation()
-                                               | EphemerisCorrectionFlags::diurnalParallax();
-        if (request.options.enableAtmosphericRefraction()
-            && EphemerisCorrectionFlags::has(
-                request.options.correctionFlags(), EphemerisCorrectionFlags::atmosphericRefraction()
-            )) {
-            corrections |= EphemerisCorrectionFlags::atmosphericRefraction();
-        }
-        request.options.setCorrectionFlags(corrections);
-        return request;
-    }
-    case EphemerisPrecisionPolicy::SelectionDetail:
-    case EphemerisPrecisionPolicy::EventSearch:
-    case EphemerisPrecisionPolicy::NightConditionsApproximate:
-    case EphemerisPrecisionPolicy::NightConditionsVerified:
-        return request;
-    }
-
-    return request;
+    return EphemerisComputationPolicy::correctionFlagsFor(engine, request, policy);
 }
 
 }  // namespace skygate::ephemeris

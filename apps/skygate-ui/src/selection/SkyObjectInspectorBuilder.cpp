@@ -1,4 +1,5 @@
 #include "SkyObjectInspectorBuilder.hpp"
+#include "engine/EphemerisComputationPolicy.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
@@ -66,15 +67,13 @@ skygate::ephemeris::ObservationEventCalculator::SearchMode observationEventSearc
     const SkySelectionOverlayInput& input, const skygate::ephemeris::BaseCelestialBody& body
 ) noexcept
 {
-    if (input.ephemerisEngine != nullptr
-        && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-        && input.ephemerisRequest.has_value()
-        && input.ephemerisRequest->options.engineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-        && !body.fixedEquatorialValue().has_value()) {
-        return skygate::ephemeris::ObservationEventCalculator::SearchMode::GuidedApproximate;
+    if (input.ephemerisEngine == nullptr || !input.ephemerisRequest.has_value()) {
+        return skygate::ephemeris::ObservationEventCalculator::SearchMode::Guided;
     }
 
-    return skygate::ephemeris::ObservationEventCalculator::SearchMode::Guided;
+    return skygate::ephemeris::EphemerisComputationPolicy::inspectorEventSearchMode(
+        *input.ephemerisEngine, *input.ephemerisRequest, &body
+    );
 }
 
 struct EphemerisInspectorMetadata final {
@@ -86,18 +85,12 @@ struct EphemerisInspectorMetadata final {
     QString corrections;
 };
 
-bool shouldShowHighPrecisionDetails(const SkySelectionOverlayInput& input) noexcept
+bool shouldComputeInspectorDetailState(const SkySelectionOverlayInput& input) noexcept
 {
-    return input.ephemerisRequest.has_value()
-           && input.ephemerisRequest->options.engineKind()
-                  == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
-}
-
-bool shouldComputeHighPrecisionInspectorState(const SkySelectionOverlayInput& input) noexcept
-{
-    return input.ephemerisEngine != nullptr
-           && input.ephemerisEngine->kind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-           && shouldShowHighPrecisionDetails(input);
+    return input.ephemerisEngine != nullptr && input.ephemerisRequest.has_value()
+           && skygate::ephemeris::EphemerisComputationPolicy::shouldRecomputeInspectorDetail(
+               *input.ephemerisEngine, *input.ephemerisRequest
+           );
 }
 
 skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
@@ -122,7 +115,7 @@ skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
 skygate::ephemeris::CelestialBodyState
 detailedInspectorState(const SkySelectionOverlayInput& input, const skygate::ephemeris::CelestialBodyState& sceneState)
 {
-    if (!shouldComputeHighPrecisionInspectorState(input)) {
+    if (!shouldComputeInspectorDetailState(input)) {
         return sceneState;
     }
 
@@ -132,26 +125,23 @@ detailedInspectorState(const SkySelectionOverlayInput& input, const skygate::eph
     return preciseState.value_or(sceneState);
 }
 
-EphemerisInspectorMetadata buildEphemerisInspectorMetadata(
-    const skygate::ephemeris::EphemerisEngineQueryResult& metadata, const bool includeHighPrecisionDetails
-)
+EphemerisInspectorMetadata
+buildEphemerisInspectorMetadata(const skygate::ephemeris::EphemerisEngineQueryResult& metadata)
 {
     EphemerisInspectorMetadata result;
     result.status = skygate::ui::internal::formatEphemerisStatus(metadata.status);
     result.warningText = skygate::ui::internal::formatEphemerisWarnings(metadata);
-    if (includeHighPrecisionDetails && !metadata.dataSourceProvenance.empty()) {
+    if (!metadata.dataSourceProvenance.empty()) {
         result.provenance = QString::fromStdString(metadata.dataSourceProvenance);
     }
-    if (includeHighPrecisionDetails && metadata.effectiveDataValidityRange.has_value()) {
+    if (metadata.effectiveDataValidityRange.has_value()) {
         result.dataRange = skygate::ui::internal::formatEphemerisDateRange(*metadata.effectiveDataValidityRange);
     }
-    if (includeHighPrecisionDetails && metadata.estimatedAngularUncertaintyArcsec.has_value()) {
+    if (metadata.estimatedAngularUncertaintyArcsec.has_value()) {
         result.uncertainty =
             skygate::ui::internal::formatAngularUncertaintyArcsec(*metadata.estimatedAngularUncertaintyArcsec);
     }
-    if (includeHighPrecisionDetails) {
-        result.corrections = skygate::ui::internal::formatCorrectionSummary(metadata);
-    }
+    result.corrections = skygate::ui::internal::formatCorrectionSummary(metadata);
     return result;
 }
 
@@ -234,8 +224,7 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     fields.push_back(inspectorField("Magnitude", skygate::ui::internal::formatMagnitude(body.visualMagnitude)));
     fields.push_back(inspectorField("Alt / Az", skygate::ui::internal::formatHorizontalCoordinate(state.horizontal)));
     fields.push_back(inspectorField("RA / Dec", skygate::ui::internal::formatEquatorialCoordinate(state.equatorial)));
-    const EphemerisInspectorMetadata ephemerisMetadata =
-        buildEphemerisInspectorMetadata(state.metadata, shouldShowHighPrecisionDetails(input));
+    const EphemerisInspectorMetadata ephemerisMetadata = buildEphemerisInspectorMetadata(state.metadata);
     appendEphemerisMetadataFields(fields, ephemerisMetadata, state.metadata.status);
     appendObservationEventFields(fields, input, body, sceneState.bodyIndex);
 

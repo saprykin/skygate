@@ -103,6 +103,11 @@ EphemerisCapabilities SimpleEphemerisEngine::capabilities() const noexcept
     return EphemerisCapabilities::simpleEngine();
 }
 
+EphemerisEngineTraits SimpleEphemerisEngine::traits() const noexcept
+{
+    return EphemerisEngineTraits::noTraits();
+}
+
 std::span<const EphemerisDateRange> SimpleEphemerisEngine::supportedDateRanges() const noexcept
 {
     return {};

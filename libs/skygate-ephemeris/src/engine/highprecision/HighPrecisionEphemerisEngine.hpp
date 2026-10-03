@@ -58,6 +58,7 @@ public:
     [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;
     [[nodiscard]] std::string_view name() const noexcept override;
     [[nodiscard]] EphemerisCapabilities capabilities() const noexcept override;
+    [[nodiscard]] EphemerisEngineTraits traits() const noexcept override;
     [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept override;
     [[nodiscard]] EphemerisDatasetInfo dataSetInfo() const override;
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
