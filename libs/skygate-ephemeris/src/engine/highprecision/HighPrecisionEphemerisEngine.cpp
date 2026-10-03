@@ -2,6 +2,7 @@
 #include "EphemerisMetadataMerger.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "EphemerisResultBuilder.hpp"
+#include "EphemerisTimeScaleMetadataMerger.hpp"
 #include "HighPrecisionCalculatorResult.hpp"
 #include "HighPrecisionComputationInput.hpp"
 #include "IApparentPlaceCalculator.hpp"
@@ -58,10 +59,6 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
     return request.options.correctionFlags().hasCorrections();
 }
 
-void mergeKernelEpochTimeScaleMetadata(
-    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
-) noexcept;
-
 [[nodiscard]] std::optional<CelestialBodyState> computeSimpleFallbackState(
     const HighPrecisionEphemerisEngine::Dependencies& dependencies,
     const HighPrecisionComputationInput& input,
@@ -104,22 +101,8 @@ void mergeKernelEpochTimeScaleMetadata(
     fallbackState->metadata.warningCodeMask |= originalResult.metadata.warningCodeMask;
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
-    mergeKernelEpochTimeScaleMetadata(fallbackState->metadata, conversion);
+    EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(fallbackState->metadata, conversion);
     return fallbackState;
-}
-
-void mergeKernelEpochTimeScaleMetadata(
-    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
-) noexcept
-{
-    constexpr std::uint32_t kTdbApproximationWarning =
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied);
-    if (conversion.status == TimeScaleConversionStatus::Degraded
-        && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
-        return;
-    }
-
-    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
 }
 
 [[nodiscard]] HighPrecisionCalculatorResult missingApparentPlaceCalculatorResult(
@@ -185,7 +168,7 @@ resultBuilder(const HighPrecisionEphemerisEngine::Dependencies& dependencies)
 
     const TimeScaleConversionResult conversion =
         timeScaleService->convert(request.epoch, skygate::core::TimeScale::Tdb);
-    mergeKernelEpochTimeScaleMetadata(metadata, conversion);
+    EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(metadata, conversion);
     if (!conversion.isSuccess()) {
         return std::nullopt;
     }
