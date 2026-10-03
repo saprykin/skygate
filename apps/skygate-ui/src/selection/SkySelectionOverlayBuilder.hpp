@@ -9,6 +9,7 @@
 #include "PreparedProjection.hpp"
 #include "SkySceneOverlayData.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QHash>
@@ -16,6 +17,7 @@
 #include <QStringList>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 
@@ -40,6 +42,7 @@ struct SkySelectionOverlayInput final {
     double inspectorPinnedX = 0.0;
     double inspectorPinnedY = 0.0;
     bool inspectorPinned = false;
+    std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> guidanceStrategy;
 };
 
 class SkySelectionOverlayBuilder final {

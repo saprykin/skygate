@@ -12,12 +12,14 @@
 #include "trail/BodyTrailCalculator.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
 
 namespace skygate::ephemeris {
 class IEphemerisEngine;
-}
+class IEphemerisGuidanceStrategy;
+}  // namespace skygate::ephemeris
 
 struct SkyObjectTrailInput final {
     const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
@@ -30,6 +32,7 @@ struct SkyObjectTrailInput final {
     std::uint32_t targetBodyIndex = 0;
     double viewportWidth = 0.0;
     double viewportHeight = 0.0;
+    std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> guidanceStrategy;
 };
 
 class SkyObjectTrailBuilder final {
@@ -39,6 +42,7 @@ public:
 private:
     struct TrailSampleCacheKey final {
         const skygate::ephemeris::IEphemerisEngine* ephemerisEngine = nullptr;
+        const skygate::ephemeris::IEphemerisGuidanceStrategy* guidanceStrategy = nullptr;
         skygate::core::ObservationContext context;
         std::optional<skygate::core::AstronomicalEpoch> requestEpoch;
         std::optional<skygate::ephemeris::EphemerisEngineOptions> requestOptions;

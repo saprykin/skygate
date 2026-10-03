@@ -150,7 +150,7 @@ void SkyContextController::refreshNightConditions()
 
     SkyNightConditionsData nextData = dataBuilder.placeholderData();
     if (engine != nullptr && sunIndex.has_value() && moonIndex.has_value()) {
-        const skygate::ephemeris::NightConditionsCalculator calculator;
+        const skygate::ephemeris::NightConditionsCalculator calculator(ephemerisGuidanceStrategy());
         const auto requestContext = ephemerisRequestContext();
         nextData = dataBuilder.conditionsData(calculator.compute(
             *engine, requestContext.request, *sunIndex, bodies[*sunIndex], *moonIndex, bodies[*moonIndex]

@@ -218,7 +218,8 @@ SkySceneCompositionResult SkySceneComposer::rebuild(
                     .renderTheme = input.frameInput.renderTheme,
                     .targetBodyIndex = *trailTargetBodyIndex,
                     .viewportWidth = input.viewportWidth,
-                    .viewportHeight = input.viewportHeight
+                    .viewportHeight = input.viewportHeight,
+                    .guidanceStrategy = input.guidanceStrategy
                 }
             );
         }
@@ -359,6 +360,7 @@ SkySelectionOverlayInput SkySceneComposer::buildSelectionInput(
         .trackedTargetId = input.trackedTargetId,
         .inspectorPinnedX = input.inspectorPinnedX,
         .inspectorPinnedY = input.inspectorPinnedY,
-        .inspectorPinned = input.inspectorPinned
+        .inspectorPinned = input.inspectorPinned,
+        .guidanceStrategy = input.guidanceStrategy
     };
 }

@@ -5,7 +5,7 @@
 #include "EphemerisRequestFactory.hpp"
 #include "UtcTimeCodec.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
+#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 
 #include <array>
 #include <chrono>
@@ -407,13 +407,16 @@ isTrustingGuidanceModel(const BaseCelestialBody* body, const EphemerisRequest& r
     return unresolved || nonFixedMiss;
 }
 
-[[nodiscard]] std::optional<std::vector<AltitudeSample>>
-sampleGuidanceAltitudes(EventSearch& search, const BaseCelestialBody& body, const EphemerisRequest& request)
+[[nodiscard]] std::optional<std::vector<AltitudeSample>> sampleGuidanceAltitudes(
+    EventSearch& search,
+    const BaseCelestialBody& body,
+    const EphemerisRequest& request,
+    const IEphemerisGuidanceStrategy& guidanceStrategy
+)
 {
     const std::array<const BaseCelestialBody*, 1> bodies{&body};
-    auto factoryResult =
-        EphemerisEngineFactory::create(CelestialBodyCatalog(std::span<const BaseCelestialBody* const>{bodies}));
-    std::unique_ptr<IEphemerisEngine> guidanceEngine = std::move(factoryResult.engine);
+    std::unique_ptr<IEphemerisEngine> guidanceEngine =
+        guidanceStrategy.createGuidanceEngine(CelestialBodyCatalog(std::span<const BaseCelestialBody* const>{bodies}));
     if (guidanceEngine == nullptr) {
         return std::nullopt;
     }
@@ -431,6 +434,19 @@ sampleGuidanceAltitudes(EventSearch& search, const BaseCelestialBody& body, cons
 }
 
 }  // namespace
+
+ObservationEventCalculator::ObservationEventCalculator()
+    : m_guidanceStrategy(std::make_shared<SimpleEphemerisGuidanceStrategy>())
+{
+}
+
+ObservationEventCalculator::ObservationEventCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
+    : m_guidanceStrategy(
+          guidanceStrategy != nullptr ? std::move(guidanceStrategy)
+                                      : std::make_shared<SimpleEphemerisGuidanceStrategy>()
+      )
+{
+}
 
 ObservationEventSummary ObservationEventCalculator::compute(
     const IEphemerisEngine& ephemerisEngine,
@@ -452,7 +468,8 @@ ObservationEventSummary ObservationEventCalculator::compute(
     std::vector<AltitudeSample> samples;
 
     if (shouldUseGuidanceEngine(ephemerisEngine, body, searchMode)) {
-        if (auto guidanceSamples = sampleGuidanceAltitudes(search, *body, request); guidanceSamples.has_value()) {
+        if (auto guidanceSamples = sampleGuidanceAltitudes(search, *body, request, *m_guidanceStrategy);
+            guidanceSamples.has_value()) {
             samples = std::move(*guidanceSamples);
             sampleRole = SampleRole::Guidance;
         }

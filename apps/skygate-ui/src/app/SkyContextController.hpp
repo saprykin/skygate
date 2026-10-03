@@ -18,6 +18,8 @@
 #include "UtcTimePoint.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
+#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 
@@ -350,6 +352,8 @@ public:
     [[nodiscard]] const SkyOverlayLayerVisibility& overlayLayerVisibility() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IEphemerisEngine* ephemerisEngine() const noexcept;
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> ephemerisEngineHandle() const;
+    [[nodiscard]] std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy>
+    ephemerisGuidanceStrategy() const noexcept;
     [[nodiscard]] std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>
     activeEphemerisDataSnapshot() const noexcept;
     [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
@@ -521,6 +525,7 @@ private:
     std::unique_ptr<SkySettingsStore> m_settingsStore;
     std::unique_ptr<SkyEphemerisDataManager> m_ephemerisDataManager;
     std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> m_ephemerisEngine;
+    std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> m_ephemerisGuidanceStrategy;
     mutable std::mutex m_ephemerisEngineMutex;
     skygate::ephemeris::EphemerisEngineKind::Type m_ephemerisEngineKind =
         skygate::ephemeris::EphemerisEngineKind::Type::Simple;

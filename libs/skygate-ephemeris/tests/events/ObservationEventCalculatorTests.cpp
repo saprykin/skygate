@@ -1,6 +1,7 @@
 #include "EphemerisEngineTestDoubles.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "ObservationEventCalculator.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "UtcTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
@@ -15,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -237,6 +239,69 @@ public:
     mutable bool sawSampleEpochUpdate = false;
 };
 
+class MarkerGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit MarkerGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        ++*m_sampleCount;
+        const double seconds = skygate::core::UtcTimeCodec::secondsSinceEpochDouble(request.context.utcTime);
+        const double phase = std::fmod(seconds, 86400.0) / 86400.0;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+            .horizontal = {.altitudeDeg = 35.0 * std::sin(2.0 * kPi * (phase - 0.25)), .azimuthDeg = 180.0}
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot compute(const skygate::core::ObservationContext&) const override
+    {
+        return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    {
+        return std::nullopt;
+    }
+
+private:
+    std::shared_ptr<int> m_sampleCount;
+};
+
+class MarkerGuidanceStrategy final : public skygate::ephemeris::IEphemerisGuidanceStrategy {
+public:
+    [[nodiscard]] std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+    createGuidanceEngine(const skygate::ephemeris::CelestialBodyCatalog&) const override
+    {
+        ++createCount;
+        return std::make_unique<MarkerGuidanceEngine>(m_sampleCount);
+    }
+
+    mutable int createCount = 0;
+    std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
+};
+
 using SearchMode = skygate::ephemeris::ObservationEventCalculator::SearchMode;
 
 }  // namespace
@@ -253,6 +318,7 @@ private slots:
     void invalidAndUnresolvedInputsReturnExplicitStatuses();
     void unprovenWindowMissDoesNotReportAlwaysAboveOrBelow();
     void movingBodySamplesThroughEphemerisEngine();
+    void guidanceStrategyInjectionIsHonored();
     void highPrecisionFixedBodyUsesGuidedCoarseSearch();
     void requestOverloadPropagatesOptionsAndSampleEpochs();
     void contextOverloadSeedsRequestOptionsFromEngine();
@@ -443,6 +509,37 @@ void ObservationEventCalculatorTests::movingBodySamplesThroughEphemerisEngine()
     QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
     QVERIFY(summary.culmination.altitudeDeg.has_value());
     QVERIFY(*summary.culmination.altitudeDeg > 34.9);
+}
+
+void ObservationEventCalculatorTests::guidanceStrategyInjectionIsHonored()
+{
+    const auto strategy = std::make_shared<MarkerGuidanceStrategy>();
+    const skygate::ephemeris::ObservationEventCalculator calculator(strategy);
+    const auto body = makeFixedBody({.rightAscensionHours = 8.0, .declinationDeg = 20.0});
+    const skygate::ephemeris::tests::RequestCountingEphemerisEngine engine(
+        makeEngineForBody(body), skygate::ephemeris::tests::highPrecisionLightTimeOptions()
+    );
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = makeContext();
+    request.epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
+        skygate::core::CivilDateTime{
+            .astronomicalYear = 2024,
+            .month = 6,
+            .day = 2,
+            .timeScale = skygate::core::TimeScale::Utc,
+        }
+    );
+    request.options = engine.options();
+
+    const auto summary = calculator.compute(engine, request, 0U, &body, 0.0, SearchMode::Guided);
+
+    QCOMPARE(strategy->createCount, 1);
+    QVERIFY(*strategy->m_sampleCount > 0);
+    QCOMPARE(engine.requestSampleCount(), 0);
+    QCOMPARE(engine.contextSampleCount(), 0);
+    QCOMPARE(summary.nextRise.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.nextSet.status, skygate::ephemeris::ObservationEventStatus::Available);
+    QCOMPARE(summary.culmination.status, skygate::ephemeris::ObservationEventStatus::Available);
 }
 
 void ObservationEventCalculatorTests::highPrecisionFixedBodyUsesGuidedCoarseSearch()

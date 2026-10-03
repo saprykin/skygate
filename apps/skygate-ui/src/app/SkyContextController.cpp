@@ -381,6 +381,7 @@ SkyContextController::SkyContextController(
       m_settingsStore(std::make_unique<SkySettingsStore>()),
       m_ephemerisDataManager(std::make_unique<SkyEphemerisDataManager>(m_settingsStore.get(), this)),
       m_ephemerisEngine(std::move(ephemerisEngine)),
+      m_ephemerisGuidanceStrategy(std::make_shared<skygate::ephemeris::SimpleEphemerisGuidanceStrategy>()),
       m_ephemerisDatasetManifest(initializationOptions.ephemerisFactoryInputs.datasetManifest),
       m_ephemerisDataManifest(initializationOptions.ephemerisFactoryInputs.dataManifest),
       m_ephemerisUpdateResourceRoot(initializationOptions.ephemerisFactoryInputs.updateResourceRoot),
@@ -922,6 +923,12 @@ std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> SkyContextController
 {
     const std::lock_guard<std::mutex> lock(m_ephemerisEngineMutex);
     return m_ephemerisEngine;
+}
+
+std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy>
+SkyContextController::ephemerisGuidanceStrategy() const noexcept
+{
+    return m_ephemerisGuidanceStrategy;
 }
 
 skygate::ephemeris::EphemerisEngineKind::Type SkyContextController::activeEphemerisEngineKind() const noexcept

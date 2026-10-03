@@ -240,6 +240,9 @@ add_library(skygate-ephemeris STATIC
     src/EphemerisRequestFactory.hpp
     src/engine/IEphemerisEngine.hpp
     src/engine/IEphemerisFallbackStrategy.hpp
+    src/engine/IEphemerisGuidanceStrategy.hpp
+    src/engine/SimpleEphemerisGuidanceStrategy.hpp
+    src/engine/SimpleEphemerisGuidanceStrategy.cpp
     src/MoonPhase.hpp
     src/MoonPhaseCalculator.hpp
     src/NightConditions.hpp
