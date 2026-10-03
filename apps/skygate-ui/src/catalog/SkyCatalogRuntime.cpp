@@ -1,6 +1,7 @@
 #include "SkyCatalogRuntime.hpp"
 
 #include "SkyActiveCatalogBuilder.hpp"
+#include "SkyCatalogBinaryCodec.hpp"
 
 #include "catalog/CatalogFactory.hpp"
 
@@ -223,6 +224,10 @@ SkyCatalogRuntime::cachePersistRequest(const QByteArray& catalogPayload, const Q
     request.deepSkySourceLabel = m_deepSkySourceLabel;
     request.catalogPayload = catalogPayload;
     request.deepSkyCatalogPayload = deepSkyCatalogPayload;
+    request.catalogBinaryPayload = SkyCatalogBinaryCodec::serialize(m_sourceCatalog->catalog());
+    if (m_deepSkyCatalog != nullptr) {
+        request.deepSkyBinaryPayload = SkyCatalogBinaryCodec::serialize(m_deepSkyCatalog->catalog());
+    }
     request.constellationLineRefs = m_constellationRefs.lineRefVector();
     request.constellationAnchorGroups = m_constellationRefs.anchorGroupVector();
     request.constellationCount = m_constellationRefs.count();

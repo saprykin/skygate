@@ -167,6 +167,11 @@ std::span<const DistantCelestialBody> CelestialBodyCatalog::distantBodies() cons
     return m_distantBodies;
 }
 
+std::span<const CelestialBodyCatalog::OrderEntry> CelestialBodyCatalog::orderedBodyIndexes() const noexcept
+{
+    return m_orderedBodyIndexes;
+}
+
 const BaseCelestialBody& CelestialBodyCatalog::bodyAt(const std::size_t bodyIndex) const noexcept
 {
     return *m_orderedBodies[bodyIndex];

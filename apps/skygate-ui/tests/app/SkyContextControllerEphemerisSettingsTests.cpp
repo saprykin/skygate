@@ -78,6 +78,41 @@ bool writeFile(const QString& path, const QByteArray& contents)
     return file.write(contents) == contents.size();
 }
 
+bool writeInstalledSupportFiles(
+    const QString& leapSecondPath, const QString& earthOrientationPath, const QString& deltaTPath
+)
+{
+    return writeFile(
+               leapSecondPath,
+               QByteArrayLiteral(
+                   "# IANA leap-second file sample\n"
+                   "# File expires on 28 December 2026\n"
+                   "#@ 4007404800\n"
+                   "#NTP Time      DTAI    Day Month Year\n"
+                   "2272060800     10      # 1 Jan 1972\n"
+                   "3692217600     37      # 1 Jan 2017\n"
+               )
+           )
+           && writeFile(
+               earthOrientationPath,
+               QByteArrayLiteral(
+                   "EARTH ORIENTATION PARAMETER (EOP) PRODUCT CENTER CENTER (PARIS OBSERVATORY)\n"
+                   "Date      MJD      x          y        UT1-UTC       LOD\n"
+                   "(0h UTC)\n"
+                   "2026  5  1  60431   0.112300   0.218700   0.0314200   0.001723\n"
+                   "2026  5  2  60432   0.118000   0.221000   0.0345000   0.001669\n"
+               )
+           )
+           && writeFile(
+               deltaTPath,
+               QByteArrayLiteral(
+                   "1900  1  1  -2.7200\n"
+                   "2000  1  1  63.8300\n"
+                   "2026  1  1  69.2000\n"
+               )
+           );
+}
+
 skygate::ephemeris::EphemerisDateRange testValidityRange();
 
 [[nodiscard]] std::shared_ptr<skygate::ephemeris::highprecision::ICalcephKernelProvider> makeTestCalcephKernelProvider()
@@ -219,6 +254,7 @@ private slots:
     void loadSavePreservesAllEphemerisUserSettings();
     void loadSettingsWithEphemerisSettingsNotifiesSceneConsumers();
     void loadSettingsBuildsHighPrecisionEngineFromInstalledEphemerisData();
+    void cachedProvidersRebuildAndInvalidateWithInstalledData();
     void requestContextUsesSimpleEngineDefaults();
     void requestContextCombinesRestoredSettingsObserverTimeAndDataRevision();
     void requestContextConvertsBceUtcToAstronomicalEpoch();
@@ -264,35 +300,7 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     const QString earthOrientationPath = m_settings.currentTestFilePath(QStringLiteral("eop.txt"));
     const QString deltaTPath = m_settings.currentTestFilePath(QStringLiteral("deltat.data"));
     QVERIFY(writeFile(kernelPath, kernelPayload));
-    QVERIFY(writeFile(
-        leapSecondPath,
-        QByteArrayLiteral(
-            "# IANA leap-second file sample\n"
-            "# File expires on 28 December 2026\n"
-            "#@ 4007404800\n"
-            "#NTP Time      DTAI    Day Month Year\n"
-            "2272060800     10      # 1 Jan 1972\n"
-            "3692217600     37      # 1 Jan 2017\n"
-        )
-    ));
-    QVERIFY(writeFile(
-        earthOrientationPath,
-        QByteArrayLiteral(
-            "EARTH ORIENTATION PARAMETER (EOP) PRODUCT CENTER CENTER (PARIS OBSERVATORY)\n"
-            "Date      MJD      x          y        UT1-UTC       LOD\n"
-            "(0h UTC)\n"
-            "2026  5  1  60431   0.112300   0.218700   0.0314200   0.001723\n"
-            "2026  5  2  60432   0.118000   0.221000   0.0345000   0.001669\n"
-        )
-    ));
-    QVERIFY(writeFile(
-        deltaTPath,
-        QByteArrayLiteral(
-            "1900  1  1  -2.7200\n"
-            "2000  1  1  63.8300\n"
-            "2026  1  1  69.2000\n"
-        )
-    ));
+    QVERIFY(writeInstalledSupportFiles(leapSecondPath, earthOrientationPath, deltaTPath));
 
     SkySettingsStore store;
     QVERIFY(store.saveEphemerisDataCache(
@@ -318,6 +326,63 @@ void SkyContextControllerEphemerisSettingsTests::loadSettingsBuildsHighPrecision
     );
     QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
     QCOMPARE(controller->ephemerisDataStatusText(), QString("Ephemeris data: Installed data active"));
+}
+
+void SkyContextControllerEphemerisSettingsTests::cachedProvidersRebuildAndInvalidateWithInstalledData()
+{
+    QFile fixtureKernel(QStringLiteral(SKYGATE_EPHEMERIS_TESTDATA_DIR "/ephemeris/kernels/de432s.bsp"));
+    QVERIFY(fixtureKernel.open(QIODevice::ReadOnly));
+    const QByteArray kernelPayload = fixtureKernel.readAll();
+
+    const QString kernelPath = m_settings.currentTestFilePath(QStringLiteral("de432s.bsp"));
+    const QString leapSecondPath = m_settings.currentTestFilePath(QStringLiteral("leap-seconds.list"));
+    const QString earthOrientationPath = m_settings.currentTestFilePath(QStringLiteral("eop.txt"));
+    const QString deltaTPath = m_settings.currentTestFilePath(QStringLiteral("deltat.data"));
+    QVERIFY(writeFile(kernelPath, kernelPayload));
+    QVERIFY(writeInstalledSupportFiles(leapSecondPath, earthOrientationPath, deltaTPath));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveEphemerisDataCache(
+        installedEphemerisDataSnapshot(kernelPath, leapSecondPath, earthOrientationPath, deltaTPath)
+    ));
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.ephemerisSettingsPresent = true;
+    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    snapshot.ephemeris.fallbackToSimpleEngine = true;
+    QVERIFY(store.saveState(snapshot));
+
+    const skygate::ephemeris::EphemerisDataManifest manifest = makeInstalledEphemerisManifest(kernelPayload);
+    SkyContextController::InitializationOptions options = controllerInitializationOptions(true);
+    options.ephemerisFactoryInputs.dataManifest = &manifest;
+    const auto controller = createControllerWithOptions(options);
+
+    QCOMPARE(
+        static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+
+    // A rebuild without a data change reuses the cached providers, so the
+    // high-precision engine is still created.
+    controller->setEphemerisRefractionEnabled(true);
+    QCOMPARE(
+        static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+
+    // A data change drops the cached providers. Without the invalidation the
+    // stale time-scale and kernel providers would keep the high-precision
+    // engine alive even though the support data is gone.
+    controller->setEphemerisEngineKindIndex(0);
+    QCOMPARE(
+        static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
+    QVERIFY(controller->clearSupportDataCache());
+    controller->setEphemerisEngineKindIndex(1);
+    QCOMPARE(
+        static_cast<std::uint8_t>(controller->ephemerisEngine()->kind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
 }
 
 void SkyContextControllerEphemerisSettingsTests::loadSettingsWithEphemerisSettingsNotifiesSceneConsumers()

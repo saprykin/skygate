@@ -46,6 +46,7 @@ public:
     [[nodiscard]] std::span<const BaseCelestialBody* const> bodies() const noexcept;
     [[nodiscard]] std::span<const OwnGalaxyCelestialBody> ownGalaxyBodies() const noexcept;
     [[nodiscard]] std::span<const DistantCelestialBody> distantBodies() const noexcept;
+    [[nodiscard]] std::span<const OrderEntry> orderedBodyIndexes() const noexcept;
     [[nodiscard]] const BaseCelestialBody& bodyAt(std::size_t bodyIndex) const noexcept;
 
 private:

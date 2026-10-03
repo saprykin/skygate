@@ -498,6 +498,10 @@ private:
     void finishEphemerisDataUpdate(bool success, QString statusText);
     void continueEphemerisDataUpdate(const QString& profileId, const QString& stagedRoot);
     void rebuildEphemerisEngine();
+    void refreshCachedEphemerisProviders(
+        const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& activeDataSnapshot,
+        const skygate::ephemeris::EphemerisDataManifest* dataManifest
+    );
 
 private:
     skygate::core::SystemTimeSource m_systemTimeSource;
@@ -537,6 +541,9 @@ private:
     std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;
     std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_ephemerisEarthOrientationProvider;
     std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> m_ephemerisCalcephKernelProvider;
+    bool m_ephemerisProviderCacheManaged = false;
+    std::uint64_t m_ephemerisProviderCacheRevision = 0U;
+    const skygate::ephemeris::EphemerisDataManifest* m_ephemerisProviderCacheManifest = nullptr;
     skygate::ephemeris::IEphemerisDiagnosticsSink* m_ephemerisDiagnosticsSink = nullptr;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;

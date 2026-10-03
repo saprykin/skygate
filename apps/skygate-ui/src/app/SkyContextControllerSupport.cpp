@@ -225,6 +225,27 @@ QString SkyContextSettings::defaultDeepSkyCatalogCachePath()
     return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kDeepSkyCatalogCacheFileName));
 }
 
+QString SkyContextSettings::defaultCatalogBinaryCachePath()
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        return {};
+    }
+
+    return QDir(appDataPath).filePath(QString::fromUtf8(SkyContextControllerConstants::kCatalogBinaryCacheFileName));
+}
+
+QString SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath()
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        return {};
+    }
+
+    return QDir(appDataPath)
+        .filePath(QString::fromUtf8(SkyContextControllerConstants::kDeepSkyBinaryCatalogCacheFileName));
+}
+
 QByteArray
 SkyContextCatalogCodec::serializeConstellationLineRows(const std::vector<std::pair<std::string, std::string>>& lineRefs)
 {

@@ -16,6 +16,22 @@
 
 using namespace skygate::ui::internal;
 
+namespace {
+
+SkyCatalogRuntimeResult& operator|=(SkyCatalogRuntimeResult& target, const SkyCatalogRuntimeResult& source)
+{
+    if (source.statusTextChanged) {
+        target.statusText = source.statusText;
+        target.statusTextChanged = true;
+    }
+    target.datasetInfoChanged = target.datasetInfoChanged || source.datasetInfoChanged;
+    target.deepSkyCatalogInfoChanged = target.deepSkyCatalogInfoChanged || source.deepSkyCatalogInfoChanged;
+    target.catalogChanged = target.catalogChanged || source.catalogChanged;
+    return target;
+}
+
+}  // namespace
+
 SkyCatalogManager::SkyCatalogManager(
     SkySettingsStore* settingsStore, std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog, QObject* parent
 )
@@ -284,38 +300,45 @@ bool SkyCatalogManager::restoreCatalogCache()
         return false;
     }
 
+    // Apply every restored piece into a merged runtime result and emit the
+    // change signals once, so the controller does not rebuild the ephemeris
+    // engine and search model for each restored catalog component.
+    SkyCatalogRuntimeResult mergedResult;
     if (restoreResult.catalog != nullptr) {
         m_cachedCatalogPayload = restoreResult.catalogPayload;
-        applyCatalog(std::move(restoreResult.catalog), restoreResult.sourceLabel, false);
+        mergedResult |=
+            m_runtime->applyCatalog(std::move(restoreResult.catalog), restoreResult.sourceLabel, runtimeBuildOptions());
     }
 
     if (restoreResult.deepSkyCatalog != nullptr) {
         m_cachedDeepSkyCatalogPayload = restoreResult.deepSkyCatalogPayload;
-        applyDeepSkyCatalog(
+        mergedResult |= m_runtime->applyDeepSkyCatalog(
             std::move(restoreResult.deepSkyCatalog),
             restoreResult.deepSkySourceLabel,
             restoreResult.deepSkyObjectCount,
-            false
+            runtimeBuildOptions()
         );
     }
 
     if (!restoreResult.constellationLineRefs.empty()) {
-        applyRuntimeResult(m_runtime->restoreConstellationRefs(
+        mergedResult |= m_runtime->restoreConstellationRefs(
             std::move(restoreResult.constellationLineRefs),
             std::move(restoreResult.constellationAnchorGroups),
             restoreResult.constellationCount
-        ));
-        return true;
+        );
     }
 
     if (restoreResult.resetConstellationLineRefs) {
-        const SkyCatalogRuntimeResult result = m_runtime->resetConstellationLineRefs();
-        if (result.catalogChanged) {
-            emit catalogChanged();
-        }
-        return true;
+        mergedResult |= m_runtime->resetConstellationLineRefs();
     }
 
+    applyRuntimeResult(mergedResult);
+
+    // First restore from a legacy (gzip-only) cache upgrades it with binary
+    // payloads so subsequent startups skip the CSV re-parse.
+    if (restoreResult.requiresBinaryUpgrade) {
+        persistCatalogCache();
+    }
     return true;
 }
 

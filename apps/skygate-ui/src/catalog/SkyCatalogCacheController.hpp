@@ -17,6 +17,7 @@ namespace skygate::ui::internal {
 struct SkyCatalogCacheRestoreResult final {
     bool restored = false;
     bool savedCatalogUnreadable = false;
+    bool requiresBinaryUpgrade = false;
     QString statusText;
     QByteArray catalogPayload;
     QByteArray deepSkyCatalogPayload;
@@ -36,6 +37,8 @@ struct SkyCatalogCachePersistRequest final {
     QString deepSkySourceLabel;
     QByteArray catalogPayload;
     QByteArray deepSkyCatalogPayload;
+    QByteArray catalogBinaryPayload;
+    QByteArray deepSkyBinaryPayload;
     std::vector<skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
     std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
     std::size_t constellationCount = 0;

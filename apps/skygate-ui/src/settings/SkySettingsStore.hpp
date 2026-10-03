@@ -71,11 +71,14 @@ public:
     struct CatalogCacheSnapshot final {
         QString sourceLabel;
         QByteArray catalogPayload;
+        QByteArray catalogBinaryPayload;
         QString deepSkySourceLabel;
         QByteArray deepSkyCatalogPayload;
+        QByteArray deepSkyBinaryPayload;
         QByteArray constellationLineRows;
         QByteArray constellationAnchorGroupRows;
         int constellationLineSchemaVersion = 0;
+        int catalogBinarySchemaVersion = 0;
         std::size_t constellationCount = 0;
     };
 

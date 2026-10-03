@@ -1,8 +1,11 @@
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
+#include "CelestialBodyCatalog.hpp"
 #include "LogCapture.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
 #include "SkySettingsStore.hpp"
 #include "SettingsTestFixture.hpp"
+#include "catalog/SkyCatalogBinaryCodec.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 
 #include <QtTest/QtTest>
@@ -17,6 +20,8 @@ private slots:
     void unreadableSavedStarCatalogFallsBack();
     void staleConstellationLineSchemaRequestsReset();
     void persistRoundTripsConstellationRows();
+    void restoresBinaryCatalogPayloads();
+    void corruptBinaryPayloadFallsBackToCsvParsing();
     void logsCacheLifecycleSummariesAtInfoLevel();
 
 private:
@@ -56,6 +61,7 @@ void SkyCatalogCacheControllerTests::restoresSavedCatalogsAndConstellationLabels
     QVERIFY(!result.savedCatalogUnreadable);
     QVERIFY(result.catalog != nullptr);
     QVERIFY(result.deepSkyCatalog != nullptr);
+    QVERIFY(result.requiresBinaryUpgrade);
     QCOMPARE(result.sourceLabel, QString("Downloaded (saved)"));
     QCOMPARE(result.deepSkySourceLabel, QString("OpenNGC (saved)"));
     QCOMPARE(result.constellationLineRefs.size(), 1U);
@@ -130,6 +136,57 @@ void SkyCatalogCacheControllerTests::persistRoundTripsConstellationRows()
     QCOMPARE(result.constellationAnchorGroups[0].second.size(), 3U);
     QVERIFY(result.constellationCount.has_value());
     QCOMPARE(*result.constellationCount, 12U);
+}
+
+void SkyCatalogCacheControllerTests::restoresBinaryCatalogPayloads()
+{
+    SkySettingsStore store;
+    const skygate::ui::internal::SkyCatalogCacheController controller(&store);
+
+    skygate::ephemeris::OwnGalaxyCelestialBody star;
+    star.id = "hip_11";
+    star.displayName = "Alpha";
+    star.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    star.visualMagnitude = 3.0;
+    skygate::ephemeris::CelestialBodyCatalog catalog(std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{star});
+
+    skygate::ui::internal::SkyCatalogCachePersistRequest request;
+    request.sourceLabel = "Binary";
+    request.catalogPayload = skygate::ui::tests::sampleHygCsvPayload();
+    request.catalogBinaryPayload = skygate::ui::internal::SkyCatalogBinaryCodec::serialize(catalog);
+    controller.persist(request);
+
+    const auto result = controller.restore(1, 0);
+    QVERIFY(result.restored);
+    QVERIFY(result.catalog != nullptr);
+    QCOMPARE(result.sourceLabel, QString("Binary (saved)"));
+    QCOMPARE(result.catalog->bodies().size(), 1U);
+    QCOMPARE(std::string{result.catalog->bodies()[0]->id}, std::string("hip_11"));
+    QVERIFY(!result.requiresBinaryUpgrade);
+}
+
+void SkyCatalogCacheControllerTests::corruptBinaryPayloadFallsBackToCsvParsing()
+{
+    auto snapshot = makeValidCacheSnapshot();
+    snapshot.catalogBinaryPayload = "corrupt binary payload";
+    snapshot.deepSkyBinaryPayload = "also corrupt";
+    snapshot.catalogBinarySchemaVersion =
+        static_cast<int>(skygate::ui::internal::SkyCatalogBinaryCodec::kSchemaVersion);
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCache(snapshot));
+
+    const skygate::ui::internal::SkyCatalogCacheController controller(&store);
+    QTest::ignoreMessage(QtWarningMsg, "Saved binary star catalog cache unreadable; falling back to payload parsing");
+    QTest::ignoreMessage(
+        QtWarningMsg, "Saved binary deep-sky catalog cache unreadable; falling back to payload parsing"
+    );
+    const auto result = controller.restore(1, 1);
+
+    QVERIFY(result.restored);
+    QVERIFY(result.catalog != nullptr);
+    QVERIFY(result.deepSkyCatalog != nullptr);
+    QVERIFY(result.requiresBinaryUpgrade);
 }
 
 void SkyCatalogCacheControllerTests::logsCacheLifecycleSummariesAtInfoLevel()

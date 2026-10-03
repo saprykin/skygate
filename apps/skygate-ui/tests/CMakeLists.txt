@@ -139,6 +139,10 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 60
 )
+target_compile_definitions(skygate-ui-context-controller-ephemeris-settings-tests
+    PRIVATE
+        SKYGATE_EPHEMERIS_TESTDATA_DIR="${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/tests/fixtures"
+)
 add_skygate_ui_qtest(
     skygate-ui-context-controller-timeline-tests
     app/SkyContextControllerTimelineTests.cpp
@@ -199,6 +203,10 @@ add_skygate_ui_qtest(
     catalog/SkyCatalogCacheControllerTests.cpp
     LABELS integration
     TIMEOUT 45
+)
+add_skygate_ui_qtest(
+    skygate-ui-catalog-binary-codec-tests
+    catalog/SkyCatalogBinaryCodecTests.cpp
 )
 add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests catalog/SkyActiveCatalogBuilderTests.cpp)
 add_skygate_ui_qtest(
