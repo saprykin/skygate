@@ -15,6 +15,7 @@
 #include "StarAstrometryBatchResult.hpp"
 #include "StringUtilities.hpp"
 #include "UtcTimeCodec.hpp"
+#include "time/EpochCodec.hpp"
 #include "engine/IEphemerisFallbackStrategy.hpp"
 
 #include <cmath>
@@ -57,10 +58,15 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
     return request.options.correctionFlags().hasCorrections();
 }
 
+void mergeKernelEpochTimeScaleMetadata(
+    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
+) noexcept;
+
 [[nodiscard]] std::optional<CelestialBodyState> computeSimpleFallbackState(
     const HighPrecisionEphemerisEngine::Dependencies& dependencies,
     const HighPrecisionComputationInput& input,
-    const HighPrecisionCalculatorResult& originalResult
+    const HighPrecisionCalculatorResult& originalResult,
+    const IEphemerisResultBuilder& builder
 )
 {
     if (!input.request.options.fallbackToSimpleEngine() || originalResult.equatorial.has_value()
@@ -69,8 +75,27 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
         return std::nullopt;
     }
 
+    if (dependencies.timeScaleService == nullptr) {
+        CelestialBodyState failedState = builder.buildFailedState(input);
+        failedState.metadata.addWarning(EphemerisEngineWarning::Code::TimeScaleDataUnavailable);
+        return failedState;
+    }
+
+    const TimeScaleConversionResult conversion =
+        dependencies.timeScaleService->convert(input.request.epoch, skygate::core::TimeScale::Utc);
+    if (!conversion.isSuccess()) {
+        CelestialBodyState failedState = builder.buildFailedState(input);
+        EphemerisMetadataMerger::mergeTimeScale(
+            failedState.metadata, conversion, EphemerisMetadataFailurePolicy::MarkFailed
+        );
+        return failedState;
+    }
+
+    EphemerisRequest normalizedRequest = input.request;
+    normalizedRequest.context.utcTime = skygate::core::EpochCodec::utcTimeFromEpoch(conversion.epoch);
+
     std::optional<CelestialBodyState> fallbackState =
-        dependencies.fallbackStrategy->computeFallbackState(input.request, input.body, input.bodyIndex);
+        dependencies.fallbackStrategy->computeFallbackState(normalizedRequest, input.body, input.bodyIndex);
     if (!fallbackState.has_value()) {
         return std::nullopt;
     }
@@ -79,6 +104,7 @@ constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris 
     fallbackState->metadata.warningCodeMask |= originalResult.metadata.warningCodeMask;
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::DataOutOfRange);
     fallbackState->metadata.addWarning(EphemerisEngineWarning::Code::MissingEphemerisData);
+    mergeKernelEpochTimeScaleMetadata(fallbackState->metadata, conversion);
     return fallbackState;
 }
 
@@ -486,7 +512,7 @@ private:
             HighPrecisionCalculatorResult calculatorResult = solarSystemCalculator->calculate(kernelInput);
             EphemerisMetadataMerger::merge(calculatorResult.metadata, kernelEpochMetadata.metadata);
             if (std::optional<CelestialBodyState> fallbackState =
-                    computeSimpleFallbackState(m_dependencies, input, calculatorResult);
+                    computeSimpleFallbackState(m_dependencies, input, calculatorResult, builder);
                 fallbackState.has_value()) {
                 return *fallbackState;
             }
