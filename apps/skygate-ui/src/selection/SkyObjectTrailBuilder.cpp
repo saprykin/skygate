@@ -30,9 +30,9 @@ namespace {
 constexpr int kObjectTrailPastHours = 6;
 constexpr int kObjectTrailFutureHours = 18;
 constexpr int kObjectTrailSampleStepMinutes = 30;
-constexpr int kObjectTrailHighPrecisionRenderStepMinutes = 10;
-constexpr int kObjectTrailHighPrecisionSampleStepMinutes = 120;
-constexpr double kObjectTrailHighPrecisionMaxInterpolationErrorDeg = 0.05;
+constexpr int kObjectTrailAdaptiveRenderStepMinutes = 10;
+constexpr int kObjectTrailAdaptiveSampleStepMinutes = 120;
+constexpr double kObjectTrailAdaptiveMaxInterpolationErrorDeg = 0.05;
 constexpr double kObjectTrailPastWidthPx = 1.4;
 constexpr double kObjectTrailFutureWidthPx = 2.0;
 constexpr double kObjectTrailPastDashLengthPx = 8.0;
@@ -337,7 +337,7 @@ void alignGuidanceTrailToSelectedState(
 }
 
 [[nodiscard]] skygate::ephemeris::BodyTrailSample
-sampleHighPrecisionTrailAtOffset(const SkyObjectTrailInput& input, const int offsetMinutes)
+sampleAdaptiveTrailAtOffset(const SkyObjectTrailInput& input, const int offsetMinutes)
 {
     skygate::ephemeris::EphemerisRequest sampleRequest = *input.ephemerisRequest;
     sampleRequest.context.utcTime += std::chrono::minutes(offsetMinutes);
@@ -371,11 +371,10 @@ sampleHighPrecisionTrailAtOffset(const SkyObjectTrailInput& input, const int off
         *next.horizontal,
         static_cast<double>(midpoint.offsetMinutes - previous.offsetMinutes) / static_cast<double>(spanMinutes)
     );
-    return angularSeparationDegrees(interpolated, *midpoint.horizontal)
-           <= kObjectTrailHighPrecisionMaxInterpolationErrorDeg;
+    return angularSeparationDegrees(interpolated, *midpoint.horizontal) <= kObjectTrailAdaptiveMaxInterpolationErrorDeg;
 }
 
-void appendAdaptiveHighPrecisionAnchors(
+void appendAdaptiveTrailAnchors(
     std::vector<skygate::ephemeris::BodyTrailSample>& anchors,
     const SkyObjectTrailInput& input,
     const skygate::ephemeris::BodyTrailSample& previous,
@@ -383,7 +382,7 @@ void appendAdaptiveHighPrecisionAnchors(
 )
 {
     const int spanMinutes = next.offsetMinutes - previous.offsetMinutes;
-    if (spanMinutes <= kObjectTrailHighPrecisionRenderStepMinutes) {
+    if (spanMinutes <= kObjectTrailAdaptiveRenderStepMinutes) {
         anchors.push_back(next);
         return;
     }
@@ -394,17 +393,17 @@ void appendAdaptiveHighPrecisionAnchors(
         return;
     }
 
-    const skygate::ephemeris::BodyTrailSample midpoint = sampleHighPrecisionTrailAtOffset(input, midpointOffsetMinutes);
+    const skygate::ephemeris::BodyTrailSample midpoint = sampleAdaptiveTrailAtOffset(input, midpointOffsetMinutes);
     if (interpolationErrorWithinBounds(previous, midpoint, next)) {
         anchors.push_back(next);
         return;
     }
 
-    appendAdaptiveHighPrecisionAnchors(anchors, input, previous, midpoint);
-    appendAdaptiveHighPrecisionAnchors(anchors, input, midpoint, next);
+    appendAdaptiveTrailAnchors(anchors, input, previous, midpoint);
+    appendAdaptiveTrailAnchors(anchors, input, midpoint, next);
 }
 
-[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> sampleAdaptiveHighPrecisionTrail(
+[[nodiscard]] std::vector<skygate::ephemeris::BodyTrailSample> sampleAdaptiveTrail(
     const SkyObjectTrailInput& input,
     const skygate::ephemeris::BodyTrailCalculator& trailCalculator,
     const skygate::ephemeris::BodyTrailOptions& renderOptions
@@ -413,7 +412,7 @@ void appendAdaptiveHighPrecisionAnchors(
     const skygate::ephemeris::BodyTrailOptions anchorOptions{
         .pastHours = renderOptions.pastHours,
         .futureHours = renderOptions.futureHours,
-        .sampleStepMinutes = kObjectTrailHighPrecisionSampleStepMinutes
+        .sampleStepMinutes = kObjectTrailAdaptiveSampleStepMinutes
     };
     const std::vector<skygate::ephemeris::BodyTrailSample> coarseAnchors =
         trailCalculator.sample(*input.ephemerisEngine, *input.ephemerisRequest, input.targetBodyIndex, anchorOptions);
@@ -425,7 +424,7 @@ void appendAdaptiveHighPrecisionAnchors(
     adaptiveAnchors.reserve(coarseAnchors.size());
     adaptiveAnchors.push_back(coarseAnchors.front());
     for (std::size_t index = 1U; index < coarseAnchors.size(); ++index) {
-        appendAdaptiveHighPrecisionAnchors(adaptiveAnchors, input, coarseAnchors[index - 1U], coarseAnchors[index]);
+        appendAdaptiveTrailAnchors(adaptiveAnchors, input, coarseAnchors[index - 1U], coarseAnchors[index]);
     }
 
     return interpolateTrailSamples(adaptiveAnchors, renderOptions);
@@ -506,7 +505,7 @@ sampleFixedEquatorialTrail(const SkyObjectTrailInput& input, const skygate::ephe
     }
 
     if (usesAdaptiveTrailSampling(input)) {
-        return sampleAdaptiveHighPrecisionTrail(input, trailCalculator, renderOptions);
+        return sampleAdaptiveTrail(input, trailCalculator, renderOptions);
     }
 
     return input.ephemerisRequest.has_value()
@@ -651,8 +650,8 @@ void SkyObjectTrailBuilder::appendTrail(SkyRenderFrame& frame, const SkyObjectTr
     const skygate::ephemeris::BodyTrailOptions trailOptions{
         .pastHours = kObjectTrailPastHours,
         .futureHours = kObjectTrailFutureHours,
-        .sampleStepMinutes = usesAdaptiveTrailSampling(input) ? kObjectTrailHighPrecisionRenderStepMinutes
-                                                              : kObjectTrailSampleStepMinutes
+        .sampleStepMinutes =
+            usesAdaptiveTrailSampling(input) ? kObjectTrailAdaptiveRenderStepMinutes : kObjectTrailSampleStepMinutes
     };
     const TrailSampleCacheKey cacheKey = sampleCacheKeyFor(input);
     const bool sampleCacheHit = m_sampleCacheKey.has_value() && sampleCacheKeysEqual(*m_sampleCacheKey, cacheKey);
