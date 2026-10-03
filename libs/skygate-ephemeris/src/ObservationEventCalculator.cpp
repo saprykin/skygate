@@ -399,7 +399,17 @@ shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody*
     const ObservationEvent& nextSet
 ) noexcept
 {
-    if (searchMode == SearchMode::GuidedApproximate && trustGuidance) {
+    // Direct sampling is the verification mechanism for every untrusted
+    // no-crossing conclusion. A missed crossing, an always-above/below
+    // classification, or a window miss must be rechecked against the primary
+    // engine before it is reported, including for fixed bodies whose catalog
+    // geometry may not match the engine's corrected positions.
+    if (!trustGuidance) {
+        return nextRise.status != ObservationEventStatus::Available
+               || nextSet.status != ObservationEventStatus::Available;
+    }
+
+    if (searchMode == SearchMode::GuidedApproximate) {
         return false;
     }
 
