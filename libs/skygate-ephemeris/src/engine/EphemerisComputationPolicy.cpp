@@ -51,7 +51,7 @@ ObservationEventCalculator::SearchMode EphemerisComputationPolicy::inspectorEven
 ) noexcept
 {
     (void)request;
-    if (engine.traits().supportsGuidedEventSearch && body != nullptr
+    if (engine.traits().supportsGuidedEventSearch && engine.traits().trustsGuidedSearchResult && body != nullptr
         && !body->fixedEquatorialValue().has_value()) {
         return ObservationEventCalculator::SearchMode::GuidedApproximate;
     }
@@ -71,7 +71,13 @@ bool EphemerisComputationPolicy::trailUsesGuidance(
     const IEphemerisEngine& engine, const EphemerisRequest& request, const BaseCelestialBody* body
 ) noexcept
 {
-    return trailSamplingIsAdaptive(engine, request) && body != nullptr;
+    return trailSamplingIsAdaptive(engine, request) && engine.traits().allowsTrailGuidanceApproximation
+           && body != nullptr;
+}
+
+bool EphemerisComputationPolicy::trailAllowsGuidanceApproximation(const IEphemerisEngine& engine) noexcept
+{
+    return engine.traits().allowsTrailGuidanceApproximation;
 }
 
 bool EphemerisComputationPolicy::liveRecomputeThrottleApplies(const IEphemerisEngine& engine) noexcept

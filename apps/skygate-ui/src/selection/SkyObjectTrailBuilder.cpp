@@ -89,8 +89,9 @@ makeSingleBodyCatalog(const skygate::ephemeris::BaseCelestialBody& body)
 
 [[nodiscard]] bool isFixedEquatorialTrailTarget(const SkyObjectTrailInput& input) noexcept
 {
-    if (!usesAdaptiveTrailSampling(input) || input.targetBody == nullptr || input.targetState == nullptr
-        || !input.targetState->equatorial.isFinite()) {
+    if (!usesAdaptiveTrailSampling(input) || input.ephemerisEngine == nullptr
+        || !skygate::ephemeris::EphemerisComputationPolicy::trailAllowsGuidanceApproximation(*input.ephemerisEngine)
+        || input.targetBody == nullptr || input.targetState == nullptr || !input.targetState->equatorial.isFinite()) {
         return false;
     }
 
