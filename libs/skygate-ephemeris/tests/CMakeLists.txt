@@ -95,6 +95,11 @@ set_tests_properties(skygate-ephemeris-simple-engine-isolation-test
         TIMEOUT 30
 )
 
+# Scan application and non-engine ephemeris sources for includes of concrete
+# engine implementation headers. Concrete headers are the engine/simple/ and
+# engine/highprecision/ implementation directories plus the concrete guidance
+# strategy engine/SimpleEphemerisGuidanceStrategy.hpp, which lives directly
+# under engine/.
 set(SKYGATE_ENGINE_HEADER_ISOLATION_SCAN_ROOTS
     "${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/src"
     "${CMAKE_SOURCE_DIR}/apps/skygate-ui/src"

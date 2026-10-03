@@ -1,8 +1,8 @@
 # EngineHeaderIsolationTest.cmake
 #
 # Scans application and non-engine ephemeris sources for includes of concrete
-# engine implementation headers (engine/simple/*.hpp and
-# engine/highprecision/*.hpp).
+# engine implementation headers (engine/simple/*.hpp,
+# engine/highprecision/*.hpp, and engine/SimpleEphemerisGuidanceStrategy.hpp).
 #
 # Concrete engine knowledge is reserved for:
 #   - the engine factory (src/factory)
@@ -20,6 +20,7 @@ set(_allowlistPrefixes ${ALLOWLIST_PREFIXES})
 set(_forbiddenTokens
     "engine/simple/"
     "engine/highprecision/"
+    "engine/SimpleEphemerisGuidanceStrategy.hpp"
 )
 
 set(_scannedFileCount 0)
