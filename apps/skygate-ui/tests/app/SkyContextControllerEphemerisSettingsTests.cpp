@@ -2,7 +2,6 @@
 #include "StaticCalcephKernelProvider.hpp"
 #include "TestCalcephKernel.hpp"
 #include "time/CalendarTime.hpp"
-#include "engine/highprecision/CalcephKernelProvider.hpp"
 #include "engine/highprecision/ICalcephKernel.hpp"
 
 #include <QCryptographicHash>

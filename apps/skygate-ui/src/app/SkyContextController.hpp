@@ -39,6 +39,7 @@
 #include <vector>
 
 namespace skygate::ephemeris {
+class EphemerisBackendResourceCache;
 class IEarthOrientationProvider;
 class IEphemerisDataSnapshot;
 class IEphemerisDiagnosticsSink;
@@ -506,10 +507,6 @@ private:
     void finishEphemerisDataUpdate(bool success, QString statusText);
     void continueEphemerisDataUpdate(const QString& profileId, const QString& stagedRoot);
     void rebuildEphemerisEngine();
-    void refreshCachedEphemerisProviders(
-        const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& activeDataSnapshot,
-        const skygate::ephemeris::EphemerisDataManifest* dataManifest
-    );
 
 private:
     skygate::core::SystemTimeSource m_systemTimeSource;
@@ -547,12 +544,7 @@ private:
     QString m_availableLeapSecondVersion;
     QString m_availableDeltaTVersion;
     bool m_ephemerisSupportDataUpdateChecked = false;
-    std::shared_ptr<const skygate::ephemeris::ITimeScaleService> m_ephemerisTimeScaleService;
-    std::shared_ptr<const skygate::ephemeris::IEarthOrientationProvider> m_ephemerisEarthOrientationProvider;
-    std::shared_ptr<const skygate::ephemeris::highprecision::ICalcephKernelProvider> m_ephemerisCalcephKernelProvider;
-    bool m_ephemerisProviderCacheManaged = false;
-    std::uint64_t m_ephemerisProviderCacheRevision = 0U;
-    const skygate::ephemeris::EphemerisDataManifest* m_ephemerisProviderCacheManifest = nullptr;
+    std::unique_ptr<skygate::ephemeris::EphemerisBackendResourceCache> m_ephemerisBackendResourceCache;
     skygate::ephemeris::IEphemerisDiagnosticsSink* m_ephemerisDiagnosticsSink = nullptr;
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;

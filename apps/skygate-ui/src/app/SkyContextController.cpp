@@ -9,13 +9,13 @@
 #include "SkySettingsStore.hpp"
 #include "SkyTimeController.hpp"
 #include "UtcTimeCodec.hpp"
+#include "composition/EphemerisBackendResourceCache.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
+#include "factory/EphemerisEngineReplacementPolicy.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "engine/EphemerisEngineDescriptorRegistry.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
-#include "engine/TimeScaleProviderLoader.hpp"
-#include "engine/highprecision/CalcephKernelProvider.hpp"
 
 #include <QDateTime>
 #include <QDir>
@@ -395,11 +395,17 @@ SkyContextController::SkyContextController(
               ? QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/ephemeris-data")
               : initializationOptions.ephemerisFactoryInputs.writableCacheRoot.trimmed()
       ),
-      m_ephemerisTimeScaleService(std::move(initializationOptions.ephemerisFactoryInputs.timeScaleService)),
-      m_ephemerisEarthOrientationProvider(
-          std::move(initializationOptions.ephemerisFactoryInputs.earthOrientationProvider)
+      m_ephemerisBackendResourceCache(
+          std::make_unique<skygate::ephemeris::EphemerisBackendResourceCache>(
+              skygate::ephemeris::EphemerisBackendResourceCache::InitialProviders{
+                  .timeScaleService = std::move(initializationOptions.ephemerisFactoryInputs.timeScaleService),
+                  .earthOrientationProvider =
+                      std::move(initializationOptions.ephemerisFactoryInputs.earthOrientationProvider),
+                  .calcephKernelProvider =
+                      std::move(initializationOptions.ephemerisFactoryInputs.calcephKernelProvider),
+              }
+          )
       ),
-      m_ephemerisCalcephKernelProvider(std::move(initializationOptions.ephemerisFactoryInputs.calcephKernelProvider)),
       m_ephemerisDiagnosticsSink(initializationOptions.ephemerisFactoryInputs.diagnosticsSink),
       m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
       m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
@@ -1034,58 +1040,13 @@ std::span<const skygate::ephemeris::BaseCelestialBody* const> SkyContextControll
                                   : std::span<const skygate::ephemeris::BaseCelestialBody* const>{};
 }
 
-void SkyContextController::refreshCachedEphemerisProviders(
-    const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot>& activeDataSnapshot,
-    const skygate::ephemeris::EphemerisDataManifest* dataManifest
-)
-{
-    const std::uint64_t dataRevision = ephemerisDataRevision();
-    if (m_ephemerisProviderCacheManaged
-        && (m_ephemerisProviderCacheRevision != dataRevision || m_ephemerisProviderCacheManifest != dataManifest)) {
-        m_ephemerisTimeScaleService.reset();
-        m_ephemerisEarthOrientationProvider.reset();
-        m_ephemerisCalcephKernelProvider.reset();
-        m_ephemerisProviderCacheManaged = false;
-    }
-    m_ephemerisProviderCacheRevision = dataRevision;
-    m_ephemerisProviderCacheManifest = dataManifest;
-
-    if (activeDataSnapshot == nullptr) {
-        return;
-    }
-
-    if (m_ephemerisEarthOrientationProvider == nullptr) {
-        m_ephemerisEarthOrientationProvider =
-            skygate::ephemeris::TimeScaleProviderLoader::loadEarthOrientationProvider(*activeDataSnapshot);
-        m_ephemerisProviderCacheManaged = true;
-    }
-    if (m_ephemerisTimeScaleService == nullptr) {
-        m_ephemerisTimeScaleService = skygate::ephemeris::TimeScaleProviderLoader::loadTimeScaleService(
-            *activeDataSnapshot, m_ephemerisEarthOrientationProvider
-        );
-        m_ephemerisProviderCacheManaged = true;
-    }
-    if (m_ephemerisCalcephKernelProvider == nullptr && dataManifest != nullptr) {
-        // Installed ephemeris data is checksum-verified when it is activated.
-        // Re-hashing the (potentially multi-gigabyte) kernel on every engine
-        // rebuild would dominate startup time, so the cached kernel provider
-        // skips per-open checksum verification.
-        skygate::ephemeris::highprecision::CalcephKernelProvider::Options kernelOptions;
-        kernelOptions.verifyChecksum = false;
-        m_ephemerisCalcephKernelProvider = std::make_shared<skygate::ephemeris::highprecision::CalcephKernelProvider>(
-            *activeDataSnapshot, *dataManifest, std::move(kernelOptions)
-        );
-        m_ephemerisProviderCacheManaged = true;
-    }
-}
-
 void SkyContextController::rebuildEphemerisEngine()
 {
     const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot =
         activeEphemerisDataSnapshot();
     const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
     if (m_ephemerisEngineKind == EphemerisEngineKind::Type::HighPrecision) {
-        refreshCachedEphemerisProviders(activeDataSnapshot, dataManifest);
+        m_ephemerisBackendResourceCache->refresh(activeDataSnapshot, dataManifest, ephemerisDataRevision());
     }
 
     skygate::ephemeris::EphemerisEngineFactoryRequest request;
@@ -1099,9 +1060,7 @@ void SkyContextController::rebuildEphemerisEngine()
     request.datasetManifest = dataManifest != nullptr ? &dataManifest->dataSetInfo : m_ephemerisDatasetManifest;
     request.dataManifest = dataManifest;
     request.activeDataSnapshot = activeDataSnapshot;
-    request.timeScaleService = m_ephemerisTimeScaleService;
-    request.earthOrientationProvider = m_ephemerisEarthOrientationProvider;
-    request.calcephKernelProvider = m_ephemerisCalcephKernelProvider;
+    m_ephemerisBackendResourceCache->applyProviderFields(request);
     request.diagnosticsSink = m_ephemerisDiagnosticsSink;
 
     auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
@@ -1116,10 +1075,10 @@ void SkyContextController::rebuildEphemerisEngine()
     }
 
     const std::shared_ptr<const skygate::ephemeris::IEphemerisEngine> currentEngine = ephemerisEngineHandle();
-    if (result.usedSimpleEngineFallback()
-        && m_ephemerisEngineKind == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
-        && currentEngine != nullptr
-        && currentEngine->kind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision) {
+    if (currentEngine != nullptr
+        && skygate::ephemeris::EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
+            m_ephemerisEngineKind, result, currentEngine->kind()
+        )) {
         return;
     }
     if (result.engine != nullptr) {
