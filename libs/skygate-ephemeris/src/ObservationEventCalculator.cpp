@@ -68,11 +68,8 @@ isSetBracket(const AltitudeSample& previous, const AltitudeSample& next, double 
     }
 
     const double fraction = std::clamp((crossingAltitudeDeg - previous.altitudeDeg) / altitudeSpanDeg, 0.0, 1.0);
-    const auto span = next.utcTime - previous.utcTime;
-    return previous.utcTime
-           + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(
-               std::chrono::duration<double>(static_cast<double>(span.count()) * fraction)
-           );
+    const std::chrono::duration<double> spanSeconds = next.utcTime - previous.utcTime;
+    return previous.utcTime + std::chrono::duration_cast<skygate::core::UtcTimePoint::duration>(spanSeconds * fraction);
 }
 
 [[nodiscard]] ObservationEventStatus unavailableCrossingStatus(
