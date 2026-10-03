@@ -376,7 +376,7 @@ ObservationEvent EventSearch::findCulmination(const std::vector<AltitudeSample>&
 shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody* body, SearchMode searchMode) noexcept
 {
     return (searchMode == SearchMode::Guided || searchMode == SearchMode::GuidedApproximate) && body != nullptr
-           && engine.traits().supportsGuidedApproximateEventSearch;
+           && engine.traits().supportsGuidedEventSearch;
 }
 
 [[nodiscard]] bool

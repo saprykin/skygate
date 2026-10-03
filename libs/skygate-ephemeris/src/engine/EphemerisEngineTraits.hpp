@@ -5,7 +5,7 @@ namespace skygate::ephemeris {
 struct EphemerisEngineTraits final {
     bool supportsSceneCorrectionsPolicy = false;
     bool supportsInspectorDetailRecompute = false;
-    bool supportsGuidedApproximateEventSearch = false;
+    bool supportsGuidedEventSearch = false;
     bool prefersAdaptiveTrailSampling = false;
     bool recommendsLiveRecomputeThrottling = false;
 
@@ -19,7 +19,7 @@ struct EphemerisEngineTraits final {
         EphemerisEngineTraits traits;
         traits.supportsSceneCorrectionsPolicy = true;
         traits.supportsInspectorDetailRecompute = true;
-        traits.supportsGuidedApproximateEventSearch = true;
+        traits.supportsGuidedEventSearch = true;
         traits.prefersAdaptiveTrailSampling = true;
         traits.recommendsLiveRecomputeThrottling = true;
         return traits;
