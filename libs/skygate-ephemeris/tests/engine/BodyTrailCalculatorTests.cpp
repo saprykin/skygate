@@ -15,6 +15,16 @@ namespace {
 
 class FakeTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Fake trail test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -30,7 +40,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -46,7 +56,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         const auto offset =
             std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count();
@@ -55,7 +65,7 @@ public:
         }
 
         skygate::ephemeris::CelestialBodyState state{
-            .bodyIndex = bodyIndex,
+            .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
             .equatorial = {.rightAscensionHours = 1.0, .declinationDeg = 2.0},
             .horizontal = {.altitudeDeg = static_cast<double>(offset / 30), .azimuthDeg = 120.0}
         };
@@ -74,6 +84,16 @@ public:
         skygate::ephemeris::EphemerisEngineOptions options;
         std::size_t bodyIndex = 0U;
     };
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Request-aware trail test engine";
+    }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
@@ -117,7 +137,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         m_usedContextPath = true;
         return std::nullopt;
@@ -196,6 +216,16 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
 {
     class MissingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
     public:
+        [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+        {
+            return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+        }
+
+        [[nodiscard]] std::string_view name() const noexcept override
+        {
+            return "Missing body test engine";
+        }
+
         [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
         compute(const skygate::ephemeris::EphemerisRequest& request) const override
         {
@@ -212,7 +242,7 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
             const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex
         ) const override
         {
-            return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+            return computeBodyState(request.context, bodyIndex);
         }
 
         [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -228,7 +258,7 @@ void BodyTrailCalculatorTests::preservesMissingBodySamplesAsGaps()
         }
 
         [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-        computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+        computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
         {
             return std::nullopt;
         }

@@ -41,6 +41,16 @@ FixedAltitudeEngine::FixedAltitudeEngine(std::vector<FixedAltitudeBody> bodies)
     m_catalogBodies = std::make_shared<const CelestialBodyCatalog>(std::move(catalogBodies));
 }
 
+EphemerisEngineKind::Type FixedAltitudeEngine::kind() const noexcept
+{
+    return EphemerisEngineKind::Type::Simple;
+}
+
+std::string_view FixedAltitudeEngine::name() const noexcept
+{
+    return "Fixed altitude test engine";
+}
+
 EphemerisSnapshot FixedAltitudeEngine::compute(const EphemerisRequest& request) const
 {
     return compute(request.context);
@@ -55,7 +65,7 @@ FixedAltitudeEngine::computeBodyState(const EphemerisRequest& request, const std
 std::optional<CelestialBodyState>
 FixedAltitudeEngine::computeBodyState(const EphemerisRequest& request, const std::size_t bodyIndex) const
 {
-    return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+    return computeBodyState(request.context, bodyIndex);
 }
 
 EphemerisSnapshot FixedAltitudeEngine::compute(const skygate::core::ObservationContext& context) const
@@ -82,12 +92,12 @@ FixedAltitudeEngine::computeBodyState(const skygate::core::ObservationContext&, 
 }
 
 std::optional<CelestialBodyState>
-FixedAltitudeEngine::computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t bodyIndex) const
+FixedAltitudeEngine::computeBodyState(const skygate::core::ObservationContext&, const std::size_t bodyIndex) const
 {
     if (bodyIndex >= m_bodies->size()) {
         return std::nullopt;
     }
-    return stateFor(bodyIndex);
+    return stateFor(static_cast<std::uint32_t>(bodyIndex));
 }
 
 CelestialBodyState FixedAltitudeEngine::stateFor(const std::uint32_t bodyIndex) const
@@ -123,6 +133,11 @@ RequestCountingEphemerisEngine::RequestCountingEphemerisEngine(
 skygate::ephemeris::EphemerisEngineKind::Type RequestCountingEphemerisEngine::kind() const noexcept
 {
     return m_options.engineKind();
+}
+
+std::string_view RequestCountingEphemerisEngine::name() const noexcept
+{
+    return "Request counting ephemeris engine";
 }
 
 EphemerisEngineTraits RequestCountingEphemerisEngine::traits() const noexcept
@@ -174,7 +189,7 @@ std::optional<CelestialBodyState> RequestCountingEphemerisEngine::computeBodySta
 }
 
 std::optional<CelestialBodyState> RequestCountingEphemerisEngine::computeBodyState(
-    const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
+    const skygate::core::ObservationContext& context, const std::size_t bodyIndex
 ) const
 {
     ++m_contextSampleCount;
@@ -263,7 +278,7 @@ std::optional<CelestialBodyState> NonEnumeratedHighPrecisionTraitsEngine::comput
 }
 
 std::optional<CelestialBodyState> NonEnumeratedHighPrecisionTraitsEngine::computeBodyState(
-    const skygate::core::ObservationContext&, const std::uint32_t
+    const skygate::core::ObservationContext&, const std::size_t
 ) const
 {
     return std::nullopt;

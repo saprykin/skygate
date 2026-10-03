@@ -36,7 +36,7 @@ public:
     [[nodiscard]] std::optional<CelestialBodyState>
     computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
     [[nodiscard]] std::optional<CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override;
+    computeBodyState(const skygate::core::ObservationContext& context, std::size_t bodyIndex) const override;
 
 private:
     [[nodiscard]] EphemerisSnapshot computeSnapshot(const skygate::core::ObservationContext& context) const;

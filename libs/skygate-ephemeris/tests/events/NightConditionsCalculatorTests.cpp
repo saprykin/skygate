@@ -126,6 +126,16 @@ class MarkerNightGuidanceEngine final : public skygate::ephemeris::IEphemerisEng
 public:
     explicit MarkerNightGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Marker night guidance test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest&) const override
     {
@@ -166,7 +176,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         return std::nullopt;
     }

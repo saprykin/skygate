@@ -204,7 +204,7 @@ std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyState(
 }
 
 std::optional<CelestialBodyState> SimpleEphemerisEngine::computeBodyState(
-    const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
+    const skygate::core::ObservationContext& context, const std::size_t bodyIndex
 ) const
 {
     if (bodyIndex >= m_catalog->size()) {

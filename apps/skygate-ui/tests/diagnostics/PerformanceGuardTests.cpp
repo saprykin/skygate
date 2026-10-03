@@ -62,6 +62,16 @@ constexpr qint64 kManyTrailsBudgetMs = 12000;
 
 class PerformanceTrailEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Performance trail test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -77,7 +87,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -94,14 +104,14 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         const double offsetMinutes = static_cast<double>(
             std::chrono::duration_cast<std::chrono::minutes>(context.utcTime.time_since_epoch()).count()
         );
         const double bodyOffset = static_cast<double>(bodyIndex % 40U) * 0.015;
         return skygate::ephemeris::CelestialBodyState{
-            .bodyIndex = bodyIndex,
+            .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
             .horizontal = {
                 .altitudeDeg = 45.0 + bodyOffset + (offsetMinutes / 8000.0),
                 .azimuthDeg = 180.0 + bodyOffset + (offsetMinutes / 8000.0)

@@ -594,10 +594,10 @@ std::optional<CelestialBodyState> HighPrecisionEphemerisEngine::computeBodyState
 }
 
 std::optional<CelestialBodyState> HighPrecisionEphemerisEngine::computeBodyState(
-    const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
+    const skygate::core::ObservationContext& context, const std::size_t bodyIndex
 ) const
 {
-    return m_impl->computeBodyState(m_impl->makeCompatibilityRequest(context), static_cast<std::size_t>(bodyIndex));
+    return m_impl->computeBodyState(m_impl->makeCompatibilityRequest(context), bodyIndex);
 }
 
 }  // namespace skygate::ephemeris::highprecision

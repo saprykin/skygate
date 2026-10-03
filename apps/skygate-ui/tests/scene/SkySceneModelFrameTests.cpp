@@ -23,6 +23,11 @@ public:
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Snapshot context test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
     {
         return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
@@ -84,9 +89,11 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
-        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateByIndex(compute(context), bodyIndex);
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateByIndex(
+            compute(context), static_cast<std::uint32_t>(bodyIndex)
+        );
     }
 
     [[nodiscard]] int requestComputeCount() const noexcept

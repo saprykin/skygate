@@ -176,6 +176,10 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisEngineInterfaceMigrationTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-contract-tests
+    engine/EphemerisEngineContractTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-factory-selection-tests
     engine/EphemerisEngineFactorySelectionTests.cpp
 )

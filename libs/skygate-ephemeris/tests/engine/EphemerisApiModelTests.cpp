@@ -836,7 +836,7 @@ void EphemerisApiModelTests::preservesSimpleFactoryCompatibilityOverloads()
     QVERIFY(catalogEngineResult.isSuccess());
     const auto& catalogEngine = catalogEngineResult.engine;
 
-    const auto catalogState = catalogEngine->computeBodyState(context, std::uint32_t{0});
+    const auto catalogState = catalogEngine->computeBodyState(context, std::size_t{0});
     QVERIFY(catalogState.has_value());
     QCOMPARE(catalogState->bodyIndex, 0U);
     QCOMPARE(catalogState->equatorial.rightAscensionHours, spanState->equatorial.rightAscensionHours);

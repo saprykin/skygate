@@ -84,6 +84,16 @@ void verifyCrossingAltitude(
 
 class MovingBodyEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Moving body test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -99,7 +109,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -121,7 +131,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         if (bodyIndex != 0U) {
             return std::nullopt;
@@ -142,6 +152,16 @@ public:
 
 class RequestSensitiveMovingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return engineOptions.engineKind();
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Request-sensitive moving test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -211,7 +231,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -242,6 +262,16 @@ public:
 class MarkerGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit MarkerGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Marker guidance test engine";
+    }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
@@ -280,7 +310,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         return std::nullopt;
     }

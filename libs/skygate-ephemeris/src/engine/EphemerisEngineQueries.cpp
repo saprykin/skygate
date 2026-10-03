@@ -46,14 +46,14 @@ std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateById(
     const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, const std::string_view bodyId
 )
 {
-    return findBodyStateById(engine.compute(context), bodyId);
+    return engine.computeBodyState(context, bodyId);
 }
 
 std::optional<CelestialBodyState> EphemerisEngineQueries::computeBodyStateByIndex(
-    const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex
+    const IEphemerisEngine& engine, const skygate::core::ObservationContext& context, const std::size_t bodyIndex
 )
 {
-    return findBodyStateByIndex(engine.compute(context), bodyIndex);
+    return engine.computeBodyState(context, bodyIndex);
 }
 
 }  // namespace skygate::ephemeris

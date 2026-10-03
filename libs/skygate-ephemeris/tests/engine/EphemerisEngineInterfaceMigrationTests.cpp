@@ -65,6 +65,16 @@ makeState(const skygate::ephemeris::EphemerisRequest& request, const std::uint32
 
 class MetadataDefaultEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Metadata default test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -80,10 +90,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        if (bodyIndex > std::numeric_limits<std::uint32_t>::max()) {
-            return std::nullopt;
-        }
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -99,7 +106,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         return std::nullopt;
     }
@@ -107,6 +114,16 @@ public:
 
 class RequestAwareTestEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Request-aware test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisEngineOptions options() const noexcept override
     {
         skygate::ephemeris::EphemerisEngineOptions engineOptions;
@@ -171,9 +188,9 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(makeCompatibilityRequest(context), static_cast<std::size_t>(bodyIndex));
+        return computeBodyState(makeCompatibilityRequest(context), bodyIndex);
     }
 
     [[nodiscard]] int requestComputeCount() const noexcept
@@ -246,7 +263,7 @@ void EphemerisEngineInterfaceMigrationTests::metadataDefaultsRemainAvailableForT
         static_cast<std::uint8_t>(engine.kind()),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
     );
-    QVERIFY(engine.name() == std::string_view{"Ephemeris engine"});
+    QVERIFY(engine.name() == std::string_view{"Metadata default test engine"});
 
     const auto capabilities = engine.capabilities();
     QVERIFY(!skygate::ephemeris::EphemerisCapabilities::has(

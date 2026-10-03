@@ -18,6 +18,16 @@ class CountingEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
     explicit CountingEngine(std::string bodyId = "target") : m_bodyId(std::move(bodyId)) {}
 
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Counting test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -44,7 +54,7 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(request.context, static_cast<std::uint32_t>(bodyIndex));
+        return computeBodyState(request.context, bodyIndex);
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
@@ -72,13 +82,15 @@ public:
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
     computeBodyState(const skygate::core::ObservationContext& context, const std::string_view bodyId) const override
     {
-        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateById(*this, context, bodyId);
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateById(compute(context), bodyId);
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
-        return skygate::ephemeris::EphemerisEngineQueries::computeBodyStateByIndex(*this, context, bodyIndex);
+        return skygate::ephemeris::EphemerisEngineQueries::findBodyStateByIndex(
+            compute(context), static_cast<std::uint32_t>(bodyIndex)
+        );
     }
 
 private:

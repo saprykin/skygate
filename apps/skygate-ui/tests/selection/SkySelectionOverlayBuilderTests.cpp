@@ -71,6 +71,16 @@ struct OverlayFixture final {
 
 class RequestOnlyObservationEngine final : public skygate::ephemeris::IEphemerisEngine {
 public:
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Request-only observation test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
     compute(const skygate::ephemeris::EphemerisRequest& request) const override
     {
@@ -125,7 +135,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -141,6 +151,11 @@ public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Non-fixed observation profile test engine";
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
@@ -201,7 +216,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;
@@ -216,6 +231,11 @@ public:
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
     {
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "High-precision inspector test engine";
     }
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
@@ -279,7 +299,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, std::uint32_t) const override
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
     {
         ++contextSampleCount;
         return std::nullopt;

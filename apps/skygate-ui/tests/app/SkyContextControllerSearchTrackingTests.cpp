@@ -101,7 +101,7 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext& context, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext& context, const std::size_t bodyIndex) const override
     {
         const auto snapshot = compute(context);
         if (bodyIndex >= snapshot.states.size()) {
@@ -168,6 +168,11 @@ public:
         return skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     }
 
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Body lookup counting test engine";
+    }
+
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
     {
         return skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine();
@@ -232,9 +237,9 @@ public:
     }
 
     [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
-    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t bodyIndex) const override
+    computeBodyState(const skygate::core::ObservationContext&, const std::size_t bodyIndex) const override
     {
-        return computeBodyState(skygate::ephemeris::EphemerisRequest{}, static_cast<std::size_t>(bodyIndex));
+        return computeBodyState(skygate::ephemeris::EphemerisRequest{}, bodyIndex);
     }
 
     [[nodiscard]] int requestComputeCount() const noexcept
