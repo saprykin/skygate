@@ -53,6 +53,11 @@ public:
         return engineOptions;
     }
 
+    // Request-based overloads treat request.epoch as the authoritative
+    // computation instant. Engines must use the explicit epoch rather than
+    // request.context.utcTime. An engine that cannot honor an explicit non-UTC
+    // epoch must report an unsupported-input result instead of falling back to
+    // context.utcTime.
     [[nodiscard]] virtual EphemerisSnapshot compute(const EphemerisRequest& request) const = 0;
 
     [[nodiscard]] virtual std::optional<CelestialBodyState>
@@ -64,9 +69,11 @@ public:
     // Observation-context overloads are a convenience API for callers that
     // only have an observer and a UTC instant. They construct an
     // EphemerisRequest from the engine's current options and a UTC epoch
-    // derived from context.utcTime, so they intentionally use defaults for
-    // corrections, precision, and fallback. Callers that need explicit epoch
-    // or correction control should build an EphemerisRequest instead.
+    // derived from context.utcTime (EphemerisRequestFactory::requestFromContext),
+    // so they intentionally use defaults for corrections, precision, and
+    // fallback. The derived UTC epoch is the authoritative instant. Callers
+    // that need explicit epoch or correction control should build an
+    // EphemerisRequest instead.
     [[nodiscard]] virtual EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const = 0;
     [[nodiscard]] virtual std::optional<CelestialBodyState>
     computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const = 0;

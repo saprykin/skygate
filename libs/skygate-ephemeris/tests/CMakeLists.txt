@@ -419,6 +419,10 @@ add_skygate_ephemeris_qtest(
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-request-TimeContract-tests
+    engine/EphemerisRequestTimeContractTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-engine-fallback-tests
     engine/EphemerisEngineFallbackTests.cpp
     LABELS integration
