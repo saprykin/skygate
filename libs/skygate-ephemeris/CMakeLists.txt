@@ -191,6 +191,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogLoader.hpp
     src/catalog/CatalogParseRequest.hpp
     src/catalog/CatalogPayloadParser.hpp
+    src/composition/EphemerisBackendResourceCache.hpp
     src/CelestialReferenceCalculator.hpp
     src/catalog/constellation/ConstellationData.hpp
     src/catalog/constellation/ConstellationDataCodec.hpp
@@ -219,6 +220,7 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisFactoryFallbackPolicy.hpp
     src/factory/EphemerisEngineFactoryRequest.hpp
     src/factory/EphemerisEngineFactoryResult.hpp
+    src/factory/EphemerisEngineReplacementPolicy.hpp
     src/factory/EphemerisFactoryCreationDiagnostic.hpp
     src/factory/IEphemerisDiagnosticsSink.hpp
     src/engine/EphemerisEngineQueries.hpp
@@ -353,6 +355,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumAnchorGroupExtractor.cpp
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
     src/CelestialReferenceCalculator.cpp
+    src/composition/EphemerisBackendResourceCache.cpp
     src/ConstellationReferenceCalculator.cpp
     src/factory/EphemerisEngineFactory.cpp
     src/factory/EphemerisFactoryCreationDiagnosticCode.cpp
@@ -361,6 +364,7 @@ add_library(skygate-ephemeris STATIC
     src/factory/EphemerisFactoryFallbackPolicy.cpp
     src/factory/EphemerisEngineFactoryRequest.cpp
     src/factory/EphemerisEngineFactoryResult.cpp
+    src/factory/EphemerisEngineReplacementPolicy.cpp
     src/factory/EphemerisFactoryCreationDiagnostic.cpp
     src/engine/EphemerisEngineQueries.cpp
     src/engine/EphemerisPrecisionPolicy.cpp

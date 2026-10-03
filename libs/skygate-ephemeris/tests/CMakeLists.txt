@@ -187,6 +187,14 @@ add_skygate_ephemeris_qtest(
     skygate-ephemeris-time-scale-provider-loader-tests
     engine/TimeScaleProviderLoaderTests.cpp
 )
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-backend-resource-cache-tests
+    engine/EphemerisBackendResourceCacheTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-engine-replacement-policy-tests
+    engine/EphemerisEngineReplacementPolicyTests.cpp
+)
 
 if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
     add_skygate_ephemeris_qtest(
