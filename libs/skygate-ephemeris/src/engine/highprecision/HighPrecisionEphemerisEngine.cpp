@@ -32,9 +32,13 @@ namespace {
 
 constexpr std::string_view kHighPrecisionEngineName = "High-precision ephemeris engine";
 
+// The request epoch is the single authoritative computation instant. A
+// non-explicit (default/zero) epoch is rejected instead of being derived from
+// context.utcTime. Non-UTC explicit epochs are honored: TDB is used directly
+// and other scales are converted by the injected time-scale service.
 [[nodiscard]] bool hasValidEpoch(const skygate::core::AstronomicalEpoch& epoch) noexcept
 {
-    return std::isfinite(epoch.julianDatePart1) && std::isfinite(epoch.julianDatePart2);
+    return epoch.hasExplicit();
 }
 
 [[nodiscard]] bool isSolarSystemBody(const BaseCelestialBody& body) noexcept
