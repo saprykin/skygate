@@ -570,20 +570,38 @@ void EphemerisAcceptanceMatrixTests::factorySelectionStrictFailureAndFallbackRem
     strictRequest.catalog = makeCatalogHandle(bodies);
     strictRequest.options = makeOptions(EphemerisCorrectionFlags::apparentTopocentric());
     strictRequest.options.setFallbackToSimpleEngine(false);
+    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     const EphemerisEngineFactoryResult strictResult = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
     QVERIFY(strictResult.isFailure());
     QVERIFY(strictResult.engine == nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(strictResult.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(strictResult.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
     QVERIFY(strictResult.hasErrors());
     QVERIFY(!strictResult.diagnostics.empty());
     QVERIFY(!strictResult.diagnostics.front().displayText().empty());
 
     EphemerisEngineFactoryRequest fallbackRequest = strictRequest;
     fallbackRequest.options.setFallbackToSimpleEngine(true);
+    fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
     const EphemerisEngineFactoryResult fallbackResult =
         skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
     QVERIFY(fallbackResult.isSuccess());
     QVERIFY(fallbackResult.usedSimpleEngineFallback());
     QVERIFY(fallbackResult.engine != nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallbackResult.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallbackResult.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
     QCOMPARE(
         static_cast<std::uint8_t>(fallbackResult.engine->kind()),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)

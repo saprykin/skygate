@@ -421,6 +421,14 @@ void EphemerisEngineFactoryBehaviorTests::resultHelpersDistinguishSuccessFallbac
     QVERIFY(success.isSuccess());
     QVERIFY(!success.isFailure());
     QVERIFY(!success.usedSimpleEngineFallback());
+    QCOMPARE(
+        static_cast<std::uint8_t>(success.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(success.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
     QVERIFY(!success.hasDiagnostics());
     QVERIFY(!success.hasErrors());
 
@@ -428,20 +436,32 @@ void EphemerisEngineFactoryBehaviorTests::resultHelpersDistinguishSuccessFallbac
     auto fallback = skygate::ephemeris::EphemerisEngineFactoryResult::success(
         std::move(fallbackEngine.engine),
         skygate::ephemeris::EphemerisFactoryCreationStatus::CreatedSimpleFallback,
-        {warning}
+        {warning},
+        skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision
     );
     QVERIFY(fallback.isSuccess());
     QVERIFY(fallback.usedSimpleEngineFallback());
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallback.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallback.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
     QVERIFY(fallback.hasDiagnostics());
     QVERIFY(!fallback.hasErrors());
     QVERIFY(!fallback.diagnostics.front().displayText().empty());
 
+    constexpr auto invalidRequestedKind = static_cast<skygate::ephemeris::EphemerisEngineKind::Type>(std::uint8_t{255});
     auto failure = skygate::ephemeris::EphemerisEngineFactoryResult::failure(
-        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest, {error}
+        skygate::ephemeris::EphemerisFactoryCreationStatus::FailedInvalidRequest, {error}, invalidRequestedKind
     );
     QVERIFY(!failure.isSuccess());
     QVERIFY(failure.isFailure());
     QVERIFY(!failure.usedSimpleEngineFallback());
+    QCOMPARE(static_cast<std::uint8_t>(failure.requestedKind()), static_cast<std::uint8_t>(invalidRequestedKind));
+    QCOMPARE(static_cast<std::uint8_t>(failure.effectiveKind()), static_cast<std::uint8_t>(invalidRequestedKind));
     QVERIFY(failure.hasDiagnostics());
     QVERIFY(failure.hasErrors());
     QVERIFY(failure.diagnostics.front().displayText() == std::string_view{"invalid engine kind"});
@@ -561,6 +581,14 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestConstructsEngineWh
     QVERIFY(!result.usedSimpleEngineFallback());
     QVERIFY(!result.hasDiagnostics());
     QCOMPARE(
+        static_cast<std::uint8_t>(result.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
         static_cast<std::uint8_t>(result.engine->kind()),
         static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
     );
@@ -636,6 +664,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestRequiresDatasetInf
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.options.setFallbackToSimpleEngine(false);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
     request.calcephKernelProvider =
@@ -666,6 +695,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestHandlesNullKernelP
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.options.setFallbackToSimpleEngine(false);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     request.datasetManifest = &datasetManifest;
     request.timeScaleService = std::make_shared<TestTimeScaleService>();
     request.earthOrientationProvider = std::make_shared<TestEarthOrientationProvider>();
@@ -860,6 +890,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionDefaultProviderReportsUna
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::geometric());
     request.options.setFallbackToSimpleEngine(false);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     const skygate::ephemeris::EphemerisDataManifest manifest =
         makeFactoryManifest(kernelPayload, static_cast<std::uint64_t>(kernelPayload.size()));
     request.dataManifest = &manifest;
@@ -904,6 +935,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     fallbackRequest.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     fallbackRequest.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparent());
     fallbackRequest.options.setFallbackToSimpleEngine(true);
+    fallbackRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
     fallbackRequest.diagnosticsSink = &fallbackDiagnosticsSink;
 
     auto fallback = skygate::ephemeris::EphemerisEngineFactory::create(fallbackRequest);
@@ -911,6 +943,14 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     QVERIFY(fallback.isSuccess());
     QVERIFY(fallback.usedSimpleEngineFallback());
     QVERIFY(fallback.engine != nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallback.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(fallback.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
     QVERIFY(fallback.hasDiagnostics());
     QVERIFY(!fallback.hasErrors());
     QCOMPARE(
@@ -926,6 +966,7 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     RecordingEphemerisDiagnosticsSink strictDiagnosticsSink;
     skygate::ephemeris::EphemerisEngineFactoryRequest strictRequest = fallbackRequest;
     strictRequest.options.setFallbackToSimpleEngine(false);
+    strictRequest.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
     strictRequest.diagnosticsSink = &strictDiagnosticsSink;
 
     const auto strict = skygate::ephemeris::EphemerisEngineFactory::create(strictRequest);
@@ -934,6 +975,14 @@ void EphemerisEngineFactoryBehaviorTests::highPrecisionRequestFallsBackOnlyWhenA
     QVERIFY(strict.isFailure());
     QVERIFY(strict.engine == nullptr);
     QVERIFY(!strict.usedSimpleEngineFallback());
+    QCOMPARE(
+        static_cast<std::uint8_t>(strict.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(strict.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
     QVERIFY(strict.hasDiagnostics());
     QVERIFY(strict.hasErrors());
     QCOMPARE(

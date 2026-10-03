@@ -168,12 +168,21 @@ void EphemerisFallbackValidationTests::highPrecisionUnavailableFallbackProducesW
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setFallbackToSimpleEngine(true);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::AllowSimpleEngineFallback;
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isSuccess());
     QVERIFY(result.usedSimpleEngineFallback());
     QVERIFY(result.engine != nullptr);
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
     QVERIFY(result.hasDiagnostics());
     QVERIFY(!result.hasErrors());
     QCOMPARE(
@@ -195,12 +204,21 @@ void EphemerisFallbackValidationTests::strictHighPrecisionUnavailableProducesErr
     request.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setFallbackToSimpleEngine(false);
+    request.fallbackPolicy = skygate::ephemeris::EphemerisFactoryFallbackPolicy::StrictHighPrecision;
 
     const auto result = skygate::ephemeris::EphemerisEngineFactory::create(request);
 
     QVERIFY(result.isFailure());
     QVERIFY(result.engine == nullptr);
     QVERIFY(!result.usedSimpleEngineFallback());
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.requestedKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+    QCOMPARE(
+        static_cast<std::uint8_t>(result.effectiveKind()),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
     QVERIFY(result.hasDiagnostics());
     QVERIFY(result.hasErrors());
     QCOMPARE(
