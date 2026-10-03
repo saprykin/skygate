@@ -1,4 +1,5 @@
 #include "PreparedRequestStateBuilder.hpp"
+#include "EphemerisTimeScaleMetadataMerger.hpp"
 #include "engine/EarthOrientationSampler.hpp"
 #include "EphemerisMetadataFailurePolicy.hpp"
 #include "EphemerisMetadataMerger.hpp"
@@ -33,20 +34,6 @@ constexpr int kNaifSolarSystemBarycenter = 0;
     );
 }
 
-void mergeKernelEpochTimeScaleMetadata(
-    EphemerisEngineQueryResult& metadata, const TimeScaleConversionResult& conversion
-) noexcept
-{
-    constexpr std::uint32_t kTdbApproximationWarning =
-        TimeScaleConversionDiagnostics::warningMask(TimeScaleConversionWarningCode::TdbApproximationApplied);
-    if (conversion.status == TimeScaleConversionStatus::Degraded
-        && (conversion.warningCodeMask & ~kTdbApproximationWarning) == 0U) {
-        return;
-    }
-
-    EphemerisMetadataMerger::mergeTimeScale(metadata, conversion);
-}
-
 }  // namespace
 
 PreparedRequestStateBuilder::PreparedRequestStateBuilder(Dependencies dependencies)
@@ -67,7 +54,9 @@ PreparedRequestStateBuilder::build(const EphemerisRequest& request) const
         } else {
             const TimeScaleConversionResult conversion =
                 m_dependencies.timeScaleService->convert(request.epoch, skygate::core::TimeScale::Tdb);
-            mergeKernelEpochTimeScaleMetadata(preparedState->tdbKernelEpochMetadata, conversion);
+            EphemerisTimeScaleMetadataMerger::mergeKernelEpochTimeScaleMetadata(
+                preparedState->tdbKernelEpochMetadata, conversion
+            );
             if (conversion.isSuccess()) {
                 preparedState->tdbKernelEpoch = conversion.epoch.normalized();
             }
