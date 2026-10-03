@@ -1,8 +1,10 @@
 #pragma once
 
+#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "NightConditions.hpp"
 
 #include <cstdint>
+#include <memory>
 
 namespace skygate::ephemeris {
 
@@ -12,6 +14,9 @@ class IEphemerisEngine;
 
 class NightConditionsCalculator final {
 public:
+    NightConditionsCalculator();
+    explicit NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy);
+
     enum class EventSearchMode : std::uint8_t {
         Approximate,
         Verified
@@ -26,6 +31,9 @@ public:
         const BaseCelestialBody* moonBody,
         EventSearchMode eventSearchMode = EventSearchMode::Approximate
     ) const;
+
+private:
+    std::shared_ptr<IEphemerisGuidanceStrategy> m_guidanceStrategy;
 };
 
 }  // namespace skygate::ephemeris

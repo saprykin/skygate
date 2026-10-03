@@ -5,7 +5,7 @@
 #include "SkyPerformanceLogging.hpp"
 #include "SkyRenderLabels.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "factory/EphemerisEngineFactory.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "math/LinePattern.hpp"
 #include "math/ProjectedPolylineBuilder.hpp"
 #include "math/SphericalGeometry.hpp"
@@ -438,8 +438,12 @@ void appendAdaptiveHighPrecisionAnchors(
 )
 {
     const skygate::ephemeris::CelestialBodyCatalog catalog = makeSingleBodyCatalog(*input.targetBody);
+    if (input.guidanceStrategy == nullptr) {
+        return std::nullopt;
+    }
+
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> guidanceEngine =
-        std::move(skygate::ephemeris::EphemerisEngineFactory::create(catalog).engine);
+        input.guidanceStrategy->createGuidanceEngine(catalog);
     if (guidanceEngine == nullptr) {
         return std::nullopt;
     }
@@ -581,6 +585,7 @@ SkyObjectTrailBuilder::TrailSampleCacheKey SkyObjectTrailBuilder::sampleCacheKey
         input.ephemerisRequest.has_value() ? input.ephemerisRequest->context : input.skyContext;
     return TrailSampleCacheKey{
         .ephemerisEngine = input.ephemerisEngine,
+        .guidanceStrategy = input.guidanceStrategy.get(),
         .context = context,
         .requestEpoch = input.ephemerisRequest.has_value() ? std::make_optional(input.ephemerisRequest->epoch)
                                                            : std::optional<skygate::core::AstronomicalEpoch>{},
@@ -598,8 +603,9 @@ bool SkyObjectTrailBuilder::sampleCacheKeysEqual(
     const TrailSampleCacheKey& lhs, const TrailSampleCacheKey& rhs
 ) noexcept
 {
-    return lhs.ephemerisEngine == rhs.ephemerisEngine && lhs.targetBodyIndex == rhs.targetBodyIndex
-           && lhs.context.utcTime == rhs.context.utcTime && observersEqual(lhs.context.observer, rhs.context.observer)
+    return lhs.ephemerisEngine == rhs.ephemerisEngine && lhs.guidanceStrategy == rhs.guidanceStrategy
+           && lhs.targetBodyIndex == rhs.targetBodyIndex && lhs.context.utcTime == rhs.context.utcTime
+           && observersEqual(lhs.context.observer, rhs.context.observer)
            && optionalEpochsEqual(lhs.requestEpoch, rhs.requestEpoch)
            && optionalOptionsEqual(lhs.requestOptions, rhs.requestOptions)
            && optionalEquatorialsEqual(lhs.targetEquatorial, rhs.targetEquatorial);

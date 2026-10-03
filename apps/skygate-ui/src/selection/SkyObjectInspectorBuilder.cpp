@@ -99,7 +99,7 @@ skygate::ephemeris::ObservationEventSummary observationEventsForInspector(
     const std::uint32_t bodyIndex
 )
 {
-    const skygate::ephemeris::ObservationEventCalculator calculator;
+    const skygate::ephemeris::ObservationEventCalculator calculator(input.guidanceStrategy);
     const skygate::ephemeris::ObservationEventCalculator::SearchMode searchMode =
         observationEventSearchModeForInspector(input, body);
     if (input.ephemerisRequest.has_value()) {

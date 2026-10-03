@@ -2,6 +2,8 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SkyObjectTrailBuilder.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
+#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "math/ViewportMath.hpp"
 
@@ -15,6 +17,7 @@
 #include <numbers>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -272,6 +275,72 @@ public:
     }
 };
 
+class MarkerTrailGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit MarkerTrailGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        return compute(request.context);
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t bodyIndex) const override
+    {
+        ++*m_sampleCount;
+        const auto offsetMinutes = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::minutes>(request.context.utcTime.time_since_epoch()).count()
+        );
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = static_cast<std::uint32_t>(bodyIndex),
+            .horizontal = {
+                .altitudeDeg = 45.0 + (static_cast<double>(offsetMinutes) / 6000.0),
+                .azimuthDeg = 180.0 + (static_cast<double>(offsetMinutes) / 6000.0)
+            }
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot compute(const skygate::core::ObservationContext&) const override
+    {
+        return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    {
+        return std::nullopt;
+    }
+
+private:
+    std::shared_ptr<int> m_sampleCount;
+};
+
+class MarkerTrailGuidanceStrategy final : public skygate::ephemeris::IEphemerisGuidanceStrategy {
+public:
+    [[nodiscard]] std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+    createGuidanceEngine(const skygate::ephemeris::CelestialBodyCatalog&) const override
+    {
+        ++createCount;
+        return std::make_unique<MarkerTrailGuidanceEngine>(m_sampleCount);
+    }
+
+    mutable int createCount = 0;
+    std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
+};
+
 skygate::ui::internal::SkyThemeRenderPalette makeRenderTheme()
 {
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
@@ -343,6 +412,7 @@ private slots:
     void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
     void thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples();
     void highPrecisionNonFixedTargetTrailUsesGuidanceEngine();
+    void guidanceStrategyInjectionIsHonored();
     void highPrecisionTrailRefinesCurvedInterpolation();
     void longProjectedJumpsAreDropped();
     void offscreenTrailSamplesStillRenderCrossingSegment();
@@ -586,6 +656,7 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     input.preparedProjection = &*anchoredProjection;
     input.targetBody = &bodyCatalog.bodyAt(0U);
     input.targetState = &state;
+    input.guidanceStrategy = std::make_shared<skygate::ephemeris::SimpleEphemerisGuidanceStrategy>();
 
     builder.appendTrail(frame, input);
 
@@ -602,6 +673,52 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     QVERIFY(std::none_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
         return lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0) && lineLength(line) > 50.0;
     }));
+}
+
+void SkyObjectTrailBuilderTests::guidanceStrategyInjectionIsHonored()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    engine.setHighPrecisionTraits(true);
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    input.ephemerisRequest = request;
+
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "moon";
+    body.displayName = "Moon";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 12.0},
+        .horizontal = skygate::core::HorizontalCoordinate{.altitudeDeg = 45.0, .azimuthDeg = 180.0}
+    };
+    input.targetBody = &bodyCatalog.bodyAt(0U);
+    input.targetState = &state;
+
+    const auto strategy = std::make_shared<MarkerTrailGuidanceStrategy>();
+    input.guidanceStrategy = strategy;
+
+    builder.appendTrail(frame, input);
+
+    QCOMPARE(strategy->createCount, 1);
+    QVERIFY(*strategy->m_sampleCount > 0);
+    QCOMPARE(engine.requestBodyStateCalls(), 0);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+    QVERIFY(!frame.lines.empty());
 }
 
 void SkyObjectTrailBuilderTests::highPrecisionTrailRefinesCurvedInterpolation()

@@ -1,6 +1,7 @@
 #include "EphemerisEngineTestDoubles.hpp"
 #include "EphemerisRequestFactory.hpp"
 #include "NightConditionsCalculator.hpp"
+#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
@@ -8,6 +9,7 @@
 #include <QtTest/QtTest>
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <span>
@@ -120,6 +122,72 @@ makeGuidedNightEngine(std::shared_ptr<const skygate::ephemeris::CelestialBodyCat
     );
 }
 
+class MarkerNightGuidanceEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit MarkerNightGuidanceEngine(std::shared_ptr<int> sampleCount) : m_sampleCount(std::move(sampleCount)) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest&) const override
+    {
+        return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::string_view) const override
+    {
+        return computeBodyState(request, std::size_t{0U});
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest& request, const std::size_t) const override
+    {
+        ++*m_sampleCount;
+        const auto seconds =
+            std::chrono::duration_cast<std::chrono::seconds>(request.context.utcTime.time_since_epoch()).count();
+        const double phase = std::fmod(static_cast<double>(seconds), 86400.0) / 86400.0;
+        return skygate::ephemeris::CelestialBodyState{
+            .bodyIndex = 0U,
+            .equatorial = {.rightAscensionHours = 0.0, .declinationDeg = 0.0},
+            .horizontal = {
+                .altitudeDeg = 35.0 * std::sin(2.0 * 3.14159265358979323846 * (phase - 0.25)), .azimuthDeg = 180.0
+            }
+        };
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot compute(const skygate::core::ObservationContext&) const override
+    {
+        return {};
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, const std::uint32_t) const override
+    {
+        return std::nullopt;
+    }
+
+private:
+    std::shared_ptr<int> m_sampleCount;
+};
+
+class MarkerNightGuidanceStrategy final : public skygate::ephemeris::IEphemerisGuidanceStrategy {
+public:
+    [[nodiscard]] std::unique_ptr<skygate::ephemeris::IEphemerisEngine>
+    createGuidanceEngine(const skygate::ephemeris::CelestialBodyCatalog&) const override
+    {
+        ++createCount;
+        return std::make_unique<MarkerNightGuidanceEngine>(m_sampleCount);
+    }
+
+    mutable int createCount = 0;
+    std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
+};
+
 }  // namespace
 
 class NightConditionsCalculatorTests final : public QObject {
@@ -133,6 +201,7 @@ private slots:
     void lunarPhaseBucketsAreDeterministic();
     void requestEpochControlsLunarPhaseWhenContextTimeDiffers();
     void highPrecisionNightConditionsUseGuidedEventSearch();
+    void guidanceStrategyInjectionIsHonored();
     void approximateHighPrecisionSunMoonEventsUseSimpleEstimates();
     void verifiedHighPrecisionNightConditionsUseSelectedEngineSamples();
 };
@@ -313,6 +382,27 @@ void NightConditionsCalculatorTests::highPrecisionNightConditionsUseGuidedEventS
     QCOMPARE(verifiedEngine.contextSampleCount(), 0);
     QCOMPARE(approximateEngine.requestSampleCount(), 2);
     QVERIFY(approximateEngine.requestSampleCount() < verifiedEngine.requestSampleCount());
+}
+
+void NightConditionsCalculatorTests::guidanceStrategyInjectionIsHonored()
+{
+    const auto bodies = makeCatalog({
+        skygate::ephemeris::tests::makeFixedAltitudeBody("sun", 8.0, 20.0),
+        skygate::ephemeris::tests::makeFixedAltitudeBody("moon", 14.0, -8.0),
+    });
+    const auto engine = makeGuidedNightEngine(bodies);
+    const auto strategy = std::make_shared<MarkerNightGuidanceStrategy>();
+    const skygate::ephemeris::NightConditionsCalculator calculator(strategy);
+    const skygate::ephemeris::EphemerisRequest request =
+        skygate::ephemeris::EphemerisRequestFactory::requestFromContext(makeZurichContext(), engine.options());
+
+    const auto conditions = calculator.compute(engine, request, 0U, &bodies->bodyAt(0), 1U, &bodies->bodyAt(1));
+
+    QVERIFY(conditions.valid);
+    QCOMPARE(strategy->createCount, 5);
+    QVERIFY(*strategy->m_sampleCount > 0);
+    QCOMPARE(engine.requestSampleCount(), 2);
+    QCOMPARE(engine.contextSampleCount(), 0);
 }
 
 void NightConditionsCalculatorTests::approximateHighPrecisionSunMoonEventsUseSimpleEstimates()

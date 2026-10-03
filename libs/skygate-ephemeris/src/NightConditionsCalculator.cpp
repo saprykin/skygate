@@ -5,8 +5,11 @@
 #include "ObservationEventCalculator.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
+#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 
 #include <cstdint>
+#include <memory>
+#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
@@ -53,6 +56,19 @@ observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noe
 
 }  // namespace
 
+NightConditionsCalculator::NightConditionsCalculator()
+    : m_guidanceStrategy(std::make_shared<SimpleEphemerisGuidanceStrategy>())
+{
+}
+
+NightConditionsCalculator::NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
+    : m_guidanceStrategy(
+          guidanceStrategy != nullptr ? std::move(guidanceStrategy)
+                                      : std::make_shared<SimpleEphemerisGuidanceStrategy>()
+      )
+{
+}
+
 NightConditions NightConditionsCalculator::compute(
     const IEphemerisEngine& ephemerisEngine,
     const EphemerisRequest& request,
@@ -87,7 +103,7 @@ NightConditions NightConditionsCalculator::compute(
         return conditions;
     }
 
-    const ObservationEventCalculator eventCalculator;
+    const ObservationEventCalculator eventCalculator(m_guidanceStrategy);
     const auto sunHorizon = computeEventSummaryForNightConditions(
         eventCalculator, ephemerisEngine, request, sunBodyIndex, sunBody, kSunriseSunsetAltitudeDeg, eventSearchMode
     );

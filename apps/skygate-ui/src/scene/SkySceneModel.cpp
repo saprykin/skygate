@@ -430,7 +430,8 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
         .inspectorPinnedY = m_selectedObjectInspectorPinnedY,
         .inspectorPinned = m_selectedObjectInspectorPinned,
         .viewportWidth = m_viewportWidth,
-        .viewportHeight = m_viewportHeight
+        .viewportHeight = m_viewportHeight,
+        .guidanceStrategy = m_skyContextController->ephemerisGuidanceStrategy()
     };
 }
 

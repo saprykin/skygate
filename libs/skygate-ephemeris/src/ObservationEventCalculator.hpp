@@ -1,8 +1,10 @@
 #pragma once
 
+#include "engine/IEphemerisGuidanceStrategy.hpp"
 #include "ObservationEventSummary.hpp"
 
 #include <cstdint>
+#include <memory>
 
 namespace skygate::ephemeris {
 
@@ -12,6 +14,9 @@ class IEphemerisEngine;
 
 class ObservationEventCalculator final {
 public:
+    ObservationEventCalculator();
+    explicit ObservationEventCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy);
+
     enum class SearchMode : std::uint8_t {
         Guided,
         GuidedApproximate,
@@ -26,6 +31,9 @@ public:
         double crossingAltitudeDeg,
         SearchMode searchMode
     ) const;
+
+private:
+    std::shared_ptr<IEphemerisGuidanceStrategy> m_guidanceStrategy;
 };
 
 }  // namespace skygate::ephemeris

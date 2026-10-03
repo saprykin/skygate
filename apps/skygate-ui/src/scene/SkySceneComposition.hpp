@@ -15,6 +15,7 @@
 #include <QStringList>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <vector>
@@ -46,6 +47,7 @@ struct SkySceneCompositionInput final {
     bool inspectorPinned = false;
     double viewportWidth = 0.0;
     double viewportHeight = 0.0;
+    std::shared_ptr<skygate::ephemeris::IEphemerisGuidanceStrategy> guidanceStrategy;
 };
 
 struct SkySceneCompositionResult final {
