@@ -51,7 +51,7 @@ ObservationEventCalculator::SearchMode EphemerisComputationPolicy::inspectorEven
 ) noexcept
 {
     (void)request;
-    if (engine.traits().supportsGuidedApproximateEventSearch && body != nullptr
+    if (engine.traits().supportsGuidedEventSearch && body != nullptr
         && !body->fixedEquatorialValue().has_value()) {
         return ObservationEventCalculator::SearchMode::GuidedApproximate;
     }
