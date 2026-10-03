@@ -9,8 +9,7 @@ bool EphemerisEngineReplacementPolicy::shouldKeepCurrentEngine(
     const EphemerisEngineKind::Type currentEngineKind
 ) noexcept
 {
-    return requestedKind == EphemerisEngineKind::Type::HighPrecision && creationResult.usedSimpleEngineFallback()
-           && currentEngineKind == EphemerisEngineKind::Type::HighPrecision;
+    return creationResult.usedSimpleEngineFallback() && currentEngineKind == requestedKind;
 }
 
 }  // namespace skygate::ephemeris
