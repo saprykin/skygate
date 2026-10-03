@@ -2,6 +2,7 @@
 #include "EphemerisCorrectionFlags.hpp"
 
 #include <array>
+#include <optional>
 
 namespace skygate::ephemeris {
 namespace {
@@ -42,6 +43,7 @@ namespace {
             .defaultOptions = highPrecisionDefaultOptions(),
             .supportsCorrections = true,
             .supportsAtmosphereSettings = true,
+            .requiresBackendResources = true,
         },
     }};
     return kDescriptors;
@@ -67,7 +69,7 @@ std::size_t EphemerisEngineDescriptorRegistry::count() noexcept
     return descriptors().size();
 }
 
-std::size_t EphemerisEngineDescriptorRegistry::indexOf(const EphemerisEngineKind::Type kind) noexcept
+std::optional<std::size_t> EphemerisEngineDescriptorRegistry::indexOf(const EphemerisEngineKind::Type kind) noexcept
 {
     const auto& all = descriptors();
     for (std::size_t index = 0; index < all.size(); ++index) {
@@ -75,7 +77,7 @@ std::size_t EphemerisEngineDescriptorRegistry::indexOf(const EphemerisEngineKind
             return index;
         }
     }
-    return 0U;
+    return std::nullopt;
 }
 
 const EphemerisEngineDescriptor* EphemerisEngineDescriptorRegistry::findById(const std::string_view id) noexcept

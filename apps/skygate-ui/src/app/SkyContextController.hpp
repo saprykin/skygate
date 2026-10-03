@@ -314,6 +314,8 @@ public:
     [[nodiscard]] QStringList ephemerisEngineLabels() const;
     Q_INVOKABLE bool ephemerisEngineSupportsCorrections(int engineKindIndex) const noexcept;
     Q_INVOKABLE bool ephemerisEngineSupportsAtmosphereSettings(int engineKindIndex) const noexcept;
+    Q_INVOKABLE int ephemerisEngineDefaultCorrectionPresetIndex(int engineKindIndex) const noexcept;
+    Q_INVOKABLE bool ephemerisEngineDefaultRefractionEnabled(int engineKindIndex) const noexcept;
     [[nodiscard]] int ephemerisCorrectionPresetIndex() const noexcept;
     [[nodiscard]] bool ephemerisRefractionEnabled() const noexcept;
     [[nodiscard]] QString ephemerisAtmosphericPressureText() const;
