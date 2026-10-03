@@ -23,6 +23,12 @@ public:
     /// sampling.
     explicit ObservationEventCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy);
 
+    /// Search-mode semantics for event computation:
+    /// - Guided: guidance samples are refined against the primary engine.
+    /// - GuidedApproximate: the guidance answer may be returned directly only
+    ///   when the engine traits grant `trustsGuidedSearchResult`; otherwise it
+    ///   is refined like Guided.
+    /// - Direct: primary engine only.
     enum class SearchMode : std::uint8_t {
         Guided,
         GuidedApproximate,

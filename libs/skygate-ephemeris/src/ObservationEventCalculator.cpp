@@ -375,9 +375,17 @@ shouldUseGuidanceEngine(const IEphemerisEngine& engine, const BaseCelestialBody*
            && engine.traits().supportsGuidedEventSearch;
 }
 
-[[nodiscard]] bool
-isTrustingGuidanceModel(const BaseCelestialBody* body, const EphemerisRequest& request, SearchMode searchMode) noexcept
+[[nodiscard]] bool isTrustingGuidanceModel(
+    const IEphemerisEngine& engine,
+    const BaseCelestialBody* body,
+    const EphemerisRequest& request,
+    SearchMode searchMode
+) noexcept
 {
+    if (!engine.traits().trustsGuidedSearchResult) {
+        return false;
+    }
+
     return searchMode == SearchMode::GuidedApproximate
            || (body != nullptr && body->fixedEquatorialValue().has_value()
                && request.options.correctionFlags().hasCorrections());
@@ -386,11 +394,12 @@ isTrustingGuidanceModel(const BaseCelestialBody* body, const EphemerisRequest& r
 [[nodiscard]] bool shouldFallBackToDirect(
     SearchMode searchMode,
     const BaseCelestialBody* body,
+    const bool trustGuidance,
     const ObservationEvent& nextRise,
     const ObservationEvent& nextSet
 ) noexcept
 {
-    if (searchMode == SearchMode::GuidedApproximate) {
+    if (searchMode == SearchMode::GuidedApproximate && trustGuidance) {
         return false;
     }
 
@@ -474,13 +483,15 @@ ObservationEventSummary ObservationEventCalculator::compute(
     }
 
     const auto provenFixedStatus = search.fixedHorizonStatus();
-    const bool trustGuidance = sampleRole == SampleRole::Guidance && isTrustingGuidanceModel(body, request, searchMode);
+    const bool trustGuidance =
+        sampleRole == SampleRole::Guidance && isTrustingGuidanceModel(ephemerisEngine, body, request, searchMode);
 
     ObservationEvent nextRise = search.findCrossing(samples, sampleRole, trustGuidance, true, provenFixedStatus);
     ObservationEvent nextSet = search.findCrossing(samples, sampleRole, trustGuidance, false, provenFixedStatus);
     ObservationEvent culmination = search.findCulmination(samples, trustGuidance);
 
-    if (sampleRole == SampleRole::Guidance && shouldFallBackToDirect(searchMode, body, nextRise, nextSet)) {
+    if (sampleRole == SampleRole::Guidance
+        && shouldFallBackToDirect(searchMode, body, trustGuidance, nextRise, nextSet)) {
         samples = search.sampleAltitudes(ephemerisEngine, request, bodyIndex);
         if (samples.empty()) {
             return ObservationEventSummary{};
