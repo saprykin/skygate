@@ -240,6 +240,11 @@ if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
         LABELS "unit;highprecision"
     )
     add_skygate_ephemeris_qtest(
+        skygate-ephemeris-runtime-fallback-time-contract-tests
+        highprecision/EphemerisRuntimeFallbackTimeContractTests.cpp
+        LABELS "unit;highprecision"
+    )
+    add_skygate_ephemeris_qtest(
         skygate-ephemeris-prepared-request-state-builder-tests
         highprecision/PreparedRequestStateBuilderTests.cpp
         LABELS "unit;highprecision"
