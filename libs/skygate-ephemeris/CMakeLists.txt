@@ -198,6 +198,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogParseRequest.hpp
     src/catalog/CatalogPayloadParser.hpp
     src/composition/EphemerisBackendResourceCache.hpp
+    src/composition/EphemerisGuidanceComposition.hpp
     src/CelestialReferenceCalculator.hpp
     src/catalog/constellation/ConstellationData.hpp
     src/catalog/constellation/ConstellationDataCodec.hpp
@@ -362,6 +363,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/stellarium/StellariumLineRefExtractor.cpp
     src/CelestialReferenceCalculator.cpp
     src/composition/EphemerisBackendResourceCache.cpp
+    src/composition/EphemerisGuidanceComposition.cpp
     src/ConstellationReferenceCalculator.cpp
     src/factory/EphemerisEngineFactory.cpp
     src/factory/EphemerisFactoryCreationDiagnosticCode.cpp

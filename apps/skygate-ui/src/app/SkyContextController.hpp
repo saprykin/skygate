@@ -17,9 +17,9 @@
 #include "SystemTimeSource.hpp"
 #include "UtcTimePoint.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "composition/EphemerisGuidanceComposition.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "engine/IEphemerisGuidanceStrategy.hpp"
-#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 

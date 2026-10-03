@@ -5,7 +5,6 @@
 #include "ObservationEventCalculator.hpp"
 #include "engine/EphemerisPrecisionPolicy.hpp"
 #include "engine/IEphemerisEngine.hpp"
-#include "engine/SimpleEphemerisGuidanceStrategy.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -56,16 +55,10 @@ observationSearchMode(const NightConditionsCalculator::EventSearchMode mode) noe
 
 }  // namespace
 
-NightConditionsCalculator::NightConditionsCalculator()
-    : m_guidanceStrategy(std::make_shared<SimpleEphemerisGuidanceStrategy>())
-{
-}
+NightConditionsCalculator::NightConditionsCalculator() = default;
 
 NightConditionsCalculator::NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy)
-    : m_guidanceStrategy(
-          guidanceStrategy != nullptr ? std::move(guidanceStrategy)
-                                      : std::make_shared<SimpleEphemerisGuidanceStrategy>()
-      )
+    : m_guidanceStrategy(std::move(guidanceStrategy))
 {
 }
 

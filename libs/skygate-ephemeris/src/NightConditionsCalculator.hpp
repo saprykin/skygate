@@ -14,7 +14,13 @@ class IEphemerisEngine;
 
 class NightConditionsCalculator final {
 public:
+    /// Constructs a calculator with no guidance strategy. `compute` falls back
+    /// to direct sampling whenever guidance is unavailable.
     NightConditionsCalculator();
+
+    /// Constructs a calculator with the supplied guidance strategy. Passing
+    /// nullptr is equivalent to no guidance and also falls back to direct
+    /// sampling.
     explicit NightConditionsCalculator(std::shared_ptr<IEphemerisGuidanceStrategy> guidanceStrategy);
 
     enum class EventSearchMode : std::uint8_t {

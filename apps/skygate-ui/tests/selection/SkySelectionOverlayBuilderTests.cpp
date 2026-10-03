@@ -5,6 +5,7 @@
 #include "SkyTimeController.hpp"
 #include "UtcTimeCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "composition/EphemerisGuidanceComposition.hpp"
 #include "engine/IEphemerisEngine.hpp"
 #include "factory/EphemerisEngineFactory.hpp"
 #include "math/ViewportMath.hpp"
@@ -650,6 +651,7 @@ void SkySelectionOverlayBuilderTests::inspectorAvoidsSynchronousHighPrecisionEve
     const auto* enginePtr = engine.get();
     fixture.ephemerisEngine = std::move(engine);
     auto input = makeInput(fixture);
+    input.guidanceStrategy = skygate::ephemeris::EphemerisGuidanceComposition::defaultGuidanceStrategy();
     input.selectedObjectTargetId = "mars";
     input.ephemerisRequest = skygate::ephemeris::EphemerisRequest{
         .epoch = *skygate::core::CalendarTime::astronomicalEpochFromCivilDateTime(
