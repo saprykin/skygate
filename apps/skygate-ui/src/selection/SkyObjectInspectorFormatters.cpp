@@ -173,6 +173,8 @@ QString correctionName(const skygate::ephemeris::EphemerisCorrectionFlags correc
         return "radial velocity";
     case EphemerisCorrectionFlags::Type::StellarParallax:
         return "stellar parallax";
+    case EphemerisCorrectionFlags::Type::Geometric:
+        return "geometric";
     case EphemerisCorrectionFlags::Type::NoCorrections:
     case EphemerisCorrectionFlags::Type::Astrometric:
     case EphemerisCorrectionFlags::Type::Apparent:
@@ -189,6 +191,7 @@ QStringList correctionNames(const skygate::ephemeris::EphemerisCorrectionFlags f
     using skygate::ephemeris::EphemerisCorrectionFlags;
 
     constexpr std::array corrections{
+        EphemerisCorrectionFlags::geometric(),
         EphemerisCorrectionFlags::lightTime(),
         EphemerisCorrectionFlags::stellarAberration(),
         EphemerisCorrectionFlags::gravitationalLightDeflection(),
