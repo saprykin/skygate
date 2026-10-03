@@ -4,6 +4,9 @@
 
 #include <QtTest/QtTest>
 
+#include <optional>
+#include <string_view>
+
 namespace {
 
 [[nodiscard]] skygate::ephemeris::EphemerisRequest makeRequest(
@@ -28,6 +31,69 @@ namespace {
     body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
     return body;
 }
+
+class ConfigurableTraitsEngine final : public skygate::ephemeris::IEphemerisEngine {
+public:
+    explicit ConfigurableTraitsEngine(skygate::ephemeris::EphemerisEngineTraits traits) : m_traits(traits) {}
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override
+    {
+        return static_cast<skygate::ephemeris::EphemerisEngineKind::Type>(42);
+    }
+
+    [[nodiscard]] std::string_view name() const noexcept override
+    {
+        return "Configurable traits test engine";
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
+    {
+        return m_traits;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::ephemeris::EphemerisRequest& request) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = request.context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest&, std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::ephemeris::EphemerisRequest&, std::size_t) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] skygate::ephemeris::EphemerisSnapshot
+    compute(const skygate::core::ObservationContext& context) const override
+    {
+        skygate::ephemeris::EphemerisSnapshot snapshot;
+        snapshot.context = context;
+        return snapshot;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::string_view) const override
+    {
+        return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<skygate::ephemeris::CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext&, std::size_t) const override
+    {
+        return std::nullopt;
+    }
+
+private:
+    skygate::ephemeris::EphemerisEngineTraits m_traits;
+};
 
 }  // namespace
 
@@ -105,6 +171,16 @@ void EphemerisComputationPolicyTests::inspectorEventSearchModeFollowsTraitsAndBo
 
     const skygate::ephemeris::OwnGalaxyCelestialBody fixedBody = makeFixedBody();
 
+    skygate::ephemeris::EphemerisEngineTraits supportedUntrusted =
+        skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    supportedUntrusted.supportsGuidedEventSearch = true;
+    const ConfigurableTraitsEngine supportedUntrustedEngine(supportedUntrusted);
+
+    skygate::ephemeris::EphemerisEngineTraits trustedUnsupported =
+        skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    trustedUnsupported.trustsGuidedSearchResult = true;
+    const ConfigurableTraitsEngine trustedUnsupportedEngine(trustedUnsupported);
+
     QCOMPARE(
         skygate::ephemeris::EphemerisComputationPolicy::inspectorEventSearchMode(
             noTraitsEngine, request, &nonFixedBody
@@ -123,6 +199,18 @@ void EphemerisComputationPolicyTests::inspectorEventSearchModeFollowsTraitsAndBo
         ),
         skygate::ephemeris::ObservationEventCalculator::SearchMode::Guided
     );
+    QCOMPARE(
+        skygate::ephemeris::EphemerisComputationPolicy::inspectorEventSearchMode(
+            supportedUntrustedEngine, request, &nonFixedBody
+        ),
+        skygate::ephemeris::ObservationEventCalculator::SearchMode::Guided
+    );
+    QCOMPARE(
+        skygate::ephemeris::EphemerisComputationPolicy::inspectorEventSearchMode(
+            trustedUnsupportedEngine, request, &nonFixedBody
+        ),
+        skygate::ephemeris::ObservationEventCalculator::SearchMode::Guided
+    );
 }
 
 void EphemerisComputationPolicyTests::trailSamplingAndGuidanceFollowTraits()
@@ -132,10 +220,28 @@ void EphemerisComputationPolicyTests::trailSamplingAndGuidanceFollowTraits()
     const auto request = makeRequest(highPrecisionTraitsEngine.kind());
     const skygate::ephemeris::OwnGalaxyCelestialBody fixedBody = makeFixedBody();
 
+    skygate::ephemeris::EphemerisEngineTraits adaptiveWithoutPermission =
+        skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    adaptiveWithoutPermission.prefersAdaptiveTrailSampling = true;
+    const ConfigurableTraitsEngine adaptiveWithoutPermissionEngine(adaptiveWithoutPermission);
+
+    skygate::ephemeris::EphemerisEngineTraits permissionWithoutAdaptive =
+        skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    permissionWithoutAdaptive.allowsTrailGuidanceApproximation = true;
+    const ConfigurableTraitsEngine permissionWithoutAdaptiveEngine(permissionWithoutAdaptive);
+
     QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailSamplingIsAdaptive(noTraitsEngine, request));
     QVERIFY(
         skygate::ephemeris::EphemerisComputationPolicy::trailSamplingIsAdaptive(highPrecisionTraitsEngine, request)
     );
+    QVERIFY(
+        skygate::ephemeris::EphemerisComputationPolicy::trailSamplingIsAdaptive(
+            adaptiveWithoutPermissionEngine, request
+        )
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailSamplingIsAdaptive(
+        permissionWithoutAdaptiveEngine, request
+    ));
 
     QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailUsesGuidance(noTraitsEngine, request, &fixedBody));
     QVERIFY(
@@ -145,6 +251,25 @@ void EphemerisComputationPolicyTests::trailSamplingAndGuidanceFollowTraits()
     );
     QVERIFY(
         !skygate::ephemeris::EphemerisComputationPolicy::trailUsesGuidance(highPrecisionTraitsEngine, request, nullptr)
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailUsesGuidance(
+        adaptiveWithoutPermissionEngine, request, &fixedBody
+    ));
+    QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailUsesGuidance(
+        permissionWithoutAdaptiveEngine, request, &fixedBody
+    ));
+
+    QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailAllowsGuidanceApproximation(noTraitsEngine));
+    QVERIFY(
+        skygate::ephemeris::EphemerisComputationPolicy::trailAllowsGuidanceApproximation(highPrecisionTraitsEngine)
+    );
+    QVERIFY(!skygate::ephemeris::EphemerisComputationPolicy::trailAllowsGuidanceApproximation(
+        adaptiveWithoutPermissionEngine
+    ));
+    QVERIFY(
+        skygate::ephemeris::EphemerisComputationPolicy::trailAllowsGuidanceApproximation(
+            permissionWithoutAdaptiveEngine
+        )
     );
 }
 

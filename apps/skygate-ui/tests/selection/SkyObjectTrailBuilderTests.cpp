@@ -39,13 +39,18 @@ public:
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineTraits traits() const noexcept override
     {
-        return m_highPrecisionTraits ? skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine()
-                                     : skygate::ephemeris::EphemerisEngineTraits::noTraits();
+        return m_traits;
     }
 
     void setHighPrecisionTraits(const bool highPrecisionTraits) noexcept
     {
-        m_highPrecisionTraits = highPrecisionTraits;
+        m_traits = highPrecisionTraits ? skygate::ephemeris::EphemerisEngineTraits::highPrecisionEngine()
+                                       : skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    }
+
+    void setTraits(const skygate::ephemeris::EphemerisEngineTraits traits) noexcept
+    {
+        m_traits = traits;
     }
 
     void setNonEnumeratedKind(const bool nonEnumeratedKind) noexcept
@@ -152,7 +157,7 @@ public:
 
 private:
     std::uint32_t m_expectedBodyIndex = 0;
-    bool m_highPrecisionTraits = false;
+    skygate::ephemeris::EphemerisEngineTraits m_traits = skygate::ephemeris::EphemerisEngineTraits::noTraits();
     bool m_nonEnumeratedKind = false;
     bool m_gapAtPresent = false;
     mutable bool m_sawExpectedBodyIndex = false;
@@ -378,6 +383,13 @@ public:
     std::shared_ptr<int> m_sampleCount = std::make_shared<int>(0);
 };
 
+skygate::ephemeris::EphemerisEngineTraits adaptiveTrailWithoutGuidanceApprovalTraits()
+{
+    skygate::ephemeris::EphemerisEngineTraits traits = skygate::ephemeris::EphemerisEngineTraits::noTraits();
+    traits.prefersAdaptiveTrailSampling = true;
+    return traits;
+}
+
 skygate::ui::internal::SkyThemeRenderPalette makeRenderTheme()
 {
     skygate::ui::internal::SkyThemeRenderPalette renderTheme;
@@ -449,6 +461,8 @@ private slots:
     void highPrecisionRequestTrailUsesSparseInterpolatedSamples();
     void thirdIdentityHighPrecisionTraitsTrailUsesSparseInterpolatedSamples();
     void highPrecisionNonFixedTargetTrailUsesGuidanceEngine();
+    void adaptiveTrailWithoutGuidanceApprovalUsesDirectSamplingForNonFixedTarget();
+    void adaptiveTrailWithoutGuidanceApprovalSkipsFixedEquatorialShortcut();
     void guidanceStrategyInjectionIsHonored();
     void highPrecisionTrailRefinesCurvedInterpolation();
     void longProjectedJumpsAreDropped();
@@ -710,6 +724,97 @@ void SkyObjectTrailBuilderTests::highPrecisionNonFixedTargetTrailUsesGuidanceEng
     QVERIFY(std::none_of(frame.lines.begin(), frame.lines.end(), [&](const SkyRenderLine& line) {
         return lineTouchesPoint(line, selectedPoint.x, selectedPoint.y, 1.0) && lineLength(line) > 50.0;
     }));
+}
+
+void SkyObjectTrailBuilderTests::adaptiveTrailWithoutGuidanceApprovalUsesDirectSamplingForNonFixedTarget()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    engine.setTraits(adaptiveTrailWithoutGuidanceApprovalTraits());
+    engine.setNonEnumeratedKind(true);
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    request.options.setEngineKind(engine.kind());
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    request.options.setEnableAtmosphericRefraction(false);
+    input.ephemerisRequest = request;
+
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "moon";
+    body.displayName = "Moon";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Moon;
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.0, .declinationDeg = 12.0},
+        .horizontal = skygate::core::HorizontalCoordinate{.altitudeDeg = 45.0, .azimuthDeg = 180.0}
+    };
+    input.targetBody = &bodyCatalog.bodyAt(0U);
+    input.targetState = &state;
+
+    const auto strategy = std::make_shared<MarkerTrailGuidanceStrategy>();
+    input.guidanceStrategy = strategy;
+
+    builder.appendTrail(frame, input);
+
+    QCOMPARE(strategy->createCount, 0);
+    QCOMPARE(engine.requestBodyStateCalls(), 25);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+    QVERIFY(engine.sawExpectedBodyIndex());
+    QVERIFY(!frame.lines.empty());
+}
+
+void SkyObjectTrailBuilderTests::adaptiveTrailWithoutGuidanceApprovalSkipsFixedEquatorialShortcut()
+{
+    const auto projection = makeProjection();
+    QVERIFY(projection.has_value());
+    TrailEngine engine;
+    engine.setTraits(adaptiveTrailWithoutGuidanceApprovalTraits());
+    engine.setNonEnumeratedKind(true);
+    const SkyObjectTrailBuilder builder;
+    SkyRenderFrame frame;
+    auto input = makeInput(engine, *projection);
+    skygate::ephemeris::EphemerisRequest request;
+    request.context = input.skyContext;
+    request.context.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(600));
+    request.epoch = skygate::core::AstronomicalEpoch{
+        .julianDatePart1 = 2'451'545.0, .julianDatePart2 = 0.25, .timeScale = skygate::core::TimeScale::Utc
+    };
+    request.options.setEngineKind(engine.kind());
+    request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
+    request.options.setEnableAtmosphericRefraction(false);
+    input.ephemerisRequest = request;
+
+    skygate::ephemeris::OwnGalaxyCelestialBody body;
+    body.id = "fixed-star";
+    body.displayName = "Fixed Star";
+    body.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0};
+    const skygate::ephemeris::CelestialBodyCatalog bodyCatalog(
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{std::move(body)}
+    );
+    const skygate::ephemeris::CelestialBodyState state{
+        .bodyIndex = input.targetBodyIndex,
+        .equatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.75, .declinationDeg = 2.0}
+    };
+    input.targetBody = &bodyCatalog.bodyAt(0U);
+    input.targetState = &state;
+
+    builder.appendTrail(frame, input);
+
+    QVERIFY(engine.requestBodyStateCalls() > 0);
+    QCOMPARE(engine.contextBodyStateCalls(), 0);
+    QVERIFY(!frame.lines.empty());
 }
 
 void SkyObjectTrailBuilderTests::guidanceStrategyInjectionIsHonored()
