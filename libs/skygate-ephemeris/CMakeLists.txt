@@ -231,6 +231,8 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisDatasetInfo.hpp
     src/engine/EphemerisEngineKind.hpp
     src/engine/EphemerisEngineOptions.hpp
+    src/engine/EphemerisEngineTraits.hpp
+    src/engine/EphemerisComputationPolicy.hpp
     src/engine/EphemerisEngineQueryResult.hpp
     src/engine/EphemerisEngineWarning.hpp
     src/engine/EphemerisEngineQueryStatus.hpp
@@ -365,6 +367,8 @@ add_library(skygate-ephemeris STATIC
     src/engine/EphemerisDatasetInfo.cpp
     src/engine/EphemerisEngineKind.cpp
     src/engine/EphemerisEngineOptions.cpp
+    src/engine/EphemerisEngineTraits.cpp
+    src/engine/EphemerisComputationPolicy.cpp
     src/engine/EphemerisLogging.hpp
     src/engine/EphemerisLogging.cpp
     src/engine/EphemerisEngineQueryResult.cpp

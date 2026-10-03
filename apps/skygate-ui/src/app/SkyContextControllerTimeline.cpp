@@ -1,4 +1,5 @@
 #include "SkyContextController.hpp"
+#include "engine/EphemerisComputationPolicy.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "SkyTimeController.hpp"
 #include "math/ViewportMath.hpp"
@@ -49,7 +50,8 @@ void SkyContextController::setLive(bool live)
 
 bool SkyContextController::liveRecomputeThrottleApplies() const
 {
-    return activeEphemerisEngineKind() == skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    const auto* engine = ephemerisEngine();
+    return engine != nullptr && skygate::ephemeris::EphemerisComputationPolicy::liveRecomputeThrottleApplies(*engine);
 }
 
 bool SkyContextController::liveRecomputeThrottled(const skygate::core::UtcTimePoint& nextUtc) const

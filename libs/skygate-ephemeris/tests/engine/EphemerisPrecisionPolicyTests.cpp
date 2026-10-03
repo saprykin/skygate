@@ -1,6 +1,6 @@
 #include "EphemerisRequest.hpp"
+#include "EphemerisEngineTestDoubles.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
-#include "engine/EphemerisEngineKind.hpp"
 
 #include <QtTest/QtTest>
 
@@ -14,16 +14,17 @@ private slots:
 
 void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanTopocentricCorrections()
 {
+    const skygate::ephemeris::tests::NonEnumeratedHighPrecisionTraitsEngine engine;
     skygate::ephemeris::EphemerisRequest request;
-    request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
+    request.options.setEngineKind(engine.kind());
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::apparentTopocentric());
     request.options.setEnableAtmosphericRefraction(true);
 
     const auto sceneRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
-        request, skygate::ephemeris::EphemerisPrecisionPolicy::SceneRender
+        request, skygate::ephemeris::EphemerisPrecisionPolicy::SceneRender, engine
     );
     const auto trailRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(
-        request, skygate::ephemeris::EphemerisPrecisionPolicy::Trail
+        request, skygate::ephemeris::EphemerisPrecisionPolicy::Trail, engine
     );
 
     const auto expectedCorrections = skygate::ephemeris::EphemerisCorrectionFlags::precessionNutation()
@@ -42,6 +43,7 @@ void EphemerisPrecisionPolicyTests::sceneRenderAndTrailsUseLeanTopocentricCorrec
 
 void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveRequestedCorrections()
 {
+    const skygate::ephemeris::tests::FixedAltitudeEngine engine(0.0);
     skygate::ephemeris::EphemerisRequest request;
     request.options.setEngineKind(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision);
     request.options.setCorrectionFlags(skygate::ephemeris::EphemerisCorrectionFlags::astrometric());
@@ -53,7 +55,7 @@ void EphemerisPrecisionPolicyTests::detailAndEventPoliciesPreserveRequestedCorre
              skygate::ephemeris::EphemerisPrecisionPolicy::NightConditionsApproximate,
              skygate::ephemeris::EphemerisPrecisionPolicy::NightConditionsVerified,
          }) {
-        const auto policyRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(request, policy);
+        const auto policyRequest = skygate::ephemeris::EphemerisRequest::fromPrecisionPolicy(request, policy, engine);
         QCOMPARE(
             static_cast<std::uint32_t>(policyRequest.options.correctionFlags()),
             static_cast<std::uint32_t>(request.options.correctionFlags())

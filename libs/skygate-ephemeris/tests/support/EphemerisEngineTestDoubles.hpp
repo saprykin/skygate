@@ -57,6 +57,7 @@ public:
     );
 
     [[nodiscard]] skygate::ephemeris::EphemerisEngineKind::Type kind() const noexcept override;
+    [[nodiscard]] EphemerisEngineTraits traits() const noexcept override;
     [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
     [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const override;
 
@@ -85,6 +86,30 @@ private:
     std::shared_ptr<const CelestialBodyCatalog> m_catalogBodies;
     mutable int m_requestSampleCount = 0;
     mutable int m_contextSampleCount = 0;
+};
+
+class NonEnumeratedHighPrecisionTraitsEngine final : public IEphemerisEngine {
+public:
+    [[nodiscard]] EphemerisEngineKind::Type kind() const noexcept override;
+    [[nodiscard]] std::string_view name() const noexcept override;
+    [[nodiscard]] EphemerisEngineTraits traits() const noexcept override;
+    [[nodiscard]] EphemerisEngineOptions options() const noexcept override;
+
+    [[nodiscard]] EphemerisSnapshot compute(const EphemerisRequest& request) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, std::string_view bodyId) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const EphemerisRequest& request, std::size_t bodyIndex) const override;
+
+    [[nodiscard]] EphemerisSnapshot compute(const skygate::core::ObservationContext& context) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext& context, std::string_view bodyId) const override;
+
+    [[nodiscard]] std::optional<CelestialBodyState>
+    computeBodyState(const skygate::core::ObservationContext& context, std::uint32_t bodyIndex) const override;
 };
 
 [[nodiscard]] EphemerisEngineOptions highPrecisionLightTimeOptions() noexcept;

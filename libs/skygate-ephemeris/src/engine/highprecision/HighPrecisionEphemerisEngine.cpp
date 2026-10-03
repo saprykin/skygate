@@ -258,6 +258,11 @@ public:
         return caps;
     }
 
+    [[nodiscard]] EphemerisEngineTraits traits() const noexcept
+    {
+        return EphemerisEngineTraits::highPrecisionEngine();
+    }
+
     [[nodiscard]] std::span<const EphemerisDateRange> supportedDateRanges() const noexcept
     {
         return m_dependencies.dataSetInfo.dateRanges;
@@ -537,6 +542,11 @@ std::string_view HighPrecisionEphemerisEngine::name() const noexcept
 EphemerisCapabilities HighPrecisionEphemerisEngine::capabilities() const noexcept
 {
     return m_impl->capabilities();
+}
+
+EphemerisEngineTraits HighPrecisionEphemerisEngine::traits() const noexcept
+{
+    return m_impl->traits();
 }
 
 std::span<const EphemerisDateRange> HighPrecisionEphemerisEngine::supportedDateRanges() const noexcept

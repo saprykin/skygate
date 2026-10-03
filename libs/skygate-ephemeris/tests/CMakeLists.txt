@@ -401,6 +401,10 @@ add_skygate_ephemeris_qtest(
     engine/EphemerisPrecisionPolicyTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-computation-policy-tests
+    engine/EphemerisComputationPolicyTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-observation-event-calculator-tests
     events/ObservationEventCalculatorTests.cpp
 )
