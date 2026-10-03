@@ -258,6 +258,9 @@ private slots:
     void requestContextUsesSimpleEngineDefaults();
     void requestContextCombinesRestoredSettingsObserverTimeAndDataRevision();
     void requestContextConvertsBceUtcToAstronomicalEpoch();
+    void ephemerisEngineKindIndexRejectsOutOfRangeValues();
+    void ephemerisEngineSwitchResetsCorrectionPresetFromDescriptorDefaults();
+    void ephemerisEngineModelExposesRegistryDrivenLabelsAndCapabilities();
 
 private:
     skygate::ui::tests::SettingsTestFixture m_settings;
@@ -487,6 +490,59 @@ void SkyContextControllerEphemerisSettingsTests::requestContextConvertsBceUtcToA
     const auto requestContext = controller->ephemerisRequestContext();
 
     compareEpoch(requestContext.request.epoch, expectedUtcEpoch(-43, 3, 15, 12, 0, 0));
+}
+
+void SkyContextControllerEphemerisSettingsTests::ephemerisEngineKindIndexRejectsOutOfRangeValues()
+{
+    const auto controller = createController(false);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+
+    controller->setEphemerisEngineKindIndex(-1);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+
+    controller->setEphemerisEngineKindIndex(99);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+}
+
+void SkyContextControllerEphemerisSettingsTests::ephemerisEngineSwitchResetsCorrectionPresetFromDescriptorDefaults()
+{
+    const auto controller = createController(false);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+
+    controller->setEphemerisEngineKindIndex(1);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
+    QVERIFY(controller->ephemerisRefractionEnabled());
+
+    controller->setEphemerisCorrectionPresetIndex(1);
+    controller->setEphemerisRefractionEnabled(false);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 1);
+    QVERIFY(!controller->ephemerisRefractionEnabled());
+
+    controller->setEphemerisEngineKindIndex(0);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 0);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 0);
+    QVERIFY(!controller->ephemerisRefractionEnabled());
+
+    controller->setEphemerisEngineKindIndex(1);
+    QCOMPARE(controller->ephemerisEngineKindIndex(), 1);
+    QCOMPARE(controller->ephemerisCorrectionPresetIndex(), 3);
+    QVERIFY(controller->ephemerisRefractionEnabled());
+}
+
+void SkyContextControllerEphemerisSettingsTests::ephemerisEngineModelExposesRegistryDrivenLabelsAndCapabilities()
+{
+    const auto controller = createController(false);
+
+    const QStringList labels = controller->ephemerisEngineLabels();
+    QCOMPARE(labels.size(), 2);
+    QCOMPARE(labels.at(0), QString("Simple"));
+    QCOMPARE(labels.at(1), QString("High precision"));
+
+    QVERIFY(!controller->ephemerisEngineSupportsCorrections(0));
+    QVERIFY(!controller->ephemerisEngineSupportsAtmosphereSettings(0));
+    QVERIFY(controller->ephemerisEngineSupportsCorrections(1));
+    QVERIFY(controller->ephemerisEngineSupportsAtmosphereSettings(1));
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerEphemerisSettingsTests)

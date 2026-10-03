@@ -35,6 +35,9 @@ private slots:
     void stateSnapshotLoadRequiresVersionAndAppliesDefaults();
     void stateSnapshotLoadMigratesLegacyShortRangeProfileId();
     void savingBlankLogPathStoresDefaultPath();
+    void ephemerisEngineKindRoundTripsBothStableIds();
+    void ephemerisEngineKindParsesLegacyAliasesAndCaseInsensitive();
+    void ephemerisEngineKindUnknownIdFallsBackToDefaultDescriptor();
 };
 
 void SkySettingsCodecsTests::boolCodecAcceptsStrictBooleanSpellings()
@@ -220,6 +223,83 @@ void SkySettingsCodecsTests::savingBlankLogPathStoresDefaultPath()
     QCOMPARE(loaded->ephemeris.correctionPresetId, QString("apparent-topocentric"));
     QCOMPARE(loaded->ephemeris.preferredDataProfileId, QString("de440s-short-range"));
     QCOMPARE(loaded->ephemerisSettingsPresent, true);
+}
+
+void SkySettingsCodecsTests::ephemerisEngineKindRoundTripsBothStableIds()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings settings = makeSettings(dir);
+
+    SkySettingsStore::StateSnapshot snapshot;
+    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::Simple;
+    skygate::ui::internal::saveStateSnapshot(settings, snapshot);
+    auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    QVERIFY(loaded.has_value());
+    QCOMPARE(settings.value("skyContext/ephemeris/engineKind").toString(), QString("simple"));
+    QCOMPARE(
+        static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
+
+    snapshot.ephemeris.engineKind = skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision;
+    skygate::ui::internal::saveStateSnapshot(settings, snapshot);
+    loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    QVERIFY(loaded.has_value());
+    QCOMPARE(settings.value("skyContext/ephemeris/engineKind").toString(), QString("highPrecision"));
+    QCOMPARE(
+        static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+    );
+}
+
+void SkySettingsCodecsTests::ephemerisEngineKindParsesLegacyAliasesAndCaseInsensitive()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings settings = makeSettings(dir);
+    settings.setValue("skyContext/version", 3);
+
+    const QStringList highPrecisionAliases{
+        QStringLiteral("highPrecision"),
+        QStringLiteral("HighPrecision"),
+        QStringLiteral("HIGHPRECISION"),
+        QStringLiteral("highprecision"),
+        QStringLiteral("high-precision"),
+    };
+    for (const QString& alias : highPrecisionAliases) {
+        settings.setValue("skyContext/ephemeris/engineKind", alias);
+        const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+        QVERIFY(loaded.has_value());
+        QCOMPARE(
+            static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
+            static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::HighPrecision)
+        );
+    }
+
+    settings.setValue("skyContext/ephemeris/engineKind", QStringLiteral("SIMPLE"));
+    const auto simpleLoaded = skygate::ui::internal::loadStateSnapshot(settings);
+    QVERIFY(simpleLoaded.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(simpleLoaded->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
+}
+
+void SkySettingsCodecsTests::ephemerisEngineKindUnknownIdFallsBackToDefaultDescriptor()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QSettings settings = makeSettings(dir);
+    settings.setValue("skyContext/version", 3);
+    settings.setValue("skyContext/ephemeris/engineKind", QStringLiteral("experimental"));
+
+    const auto loaded = skygate::ui::internal::loadStateSnapshot(settings);
+    QVERIFY(loaded.has_value());
+    QCOMPARE(
+        static_cast<std::uint8_t>(loaded->ephemeris.engineKind),
+        static_cast<std::uint8_t>(skygate::ephemeris::EphemerisEngineKind::Type::Simple)
+    );
 }
 
 QTEST_APPLESS_MAIN(SkySettingsCodecsTests)

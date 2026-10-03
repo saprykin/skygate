@@ -104,6 +104,7 @@ class SkyContextController final : public QObject {
     Q_PROPERTY(bool logToFile READ logToFile WRITE setLogToFile NOTIFY loggingChanged)
     Q_PROPERTY(QString logFilePath READ logFilePath WRITE setLogFilePath NOTIFY loggingChanged)
     Q_PROPERTY(int ephemerisEngineKindIndex READ ephemerisEngineKindIndex WRITE setEphemerisEngineKindIndex NOTIFY ephemerisSettingsChanged)
+    Q_PROPERTY(QStringList ephemerisEngineLabels READ ephemerisEngineLabels CONSTANT)
     Q_PROPERTY(int ephemerisCorrectionPresetIndex READ ephemerisCorrectionPresetIndex WRITE setEphemerisCorrectionPresetIndex NOTIFY ephemerisSettingsChanged)
     Q_PROPERTY(bool ephemerisRefractionEnabled READ ephemerisRefractionEnabled WRITE setEphemerisRefractionEnabled NOTIFY ephemerisSettingsChanged)
     Q_PROPERTY(QString ephemerisAtmosphericPressureText READ ephemerisAtmosphericPressureText WRITE setEphemerisAtmosphericPressureText NOTIFY ephemerisSettingsChanged)
@@ -309,6 +310,9 @@ public:
     [[nodiscard]] bool logToFile() const noexcept;
     [[nodiscard]] QString logFilePath() const;
     [[nodiscard]] int ephemerisEngineKindIndex() const noexcept;
+    [[nodiscard]] QStringList ephemerisEngineLabels() const;
+    Q_INVOKABLE bool ephemerisEngineSupportsCorrections(int engineKindIndex) const noexcept;
+    Q_INVOKABLE bool ephemerisEngineSupportsAtmosphereSettings(int engineKindIndex) const noexcept;
     [[nodiscard]] int ephemerisCorrectionPresetIndex() const noexcept;
     [[nodiscard]] bool ephemerisRefractionEnabled() const noexcept;
     [[nodiscard]] QString ephemerisAtmosphericPressureText() const;

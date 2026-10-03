@@ -2,15 +2,18 @@
 #include "SkyContextControllerSupport.hpp"
 #include "SkyLogging.hpp"
 #include "SkySettingsValueCodecs.hpp"
+#include "engine/EphemerisEngineDescriptorRegistry.hpp"
 
 #include <QSettings>
 
+#include <cstddef>
 #include <cstdint>
 
 namespace skygate::ui::internal {
 namespace {
 
 using skygate::ephemeris::EphemerisCorrectionFlags;
+using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
 
 QString settingsKey(const char* name)
@@ -182,28 +185,26 @@ SkyLoggingSettingsSnapshot loadLoggingSettings(QSettings& settings)
 
 [[nodiscard]] QString ephemerisEngineKindToString(const EphemerisEngineKind::Type engineKind)
 {
-    switch (engineKind) {
-    case EphemerisEngineKind::Type::Simple:
-        return QStringLiteral("simple");
-    case EphemerisEngineKind::Type::HighPrecision:
-        return QStringLiteral("highPrecision");
-    case EphemerisEngineKind::Type::Last:
-        break;
-    }
-    return QStringLiteral("simple");
+    const auto* descriptor = EphemerisEngineDescriptorRegistry::findByKind(engineKind);
+    const auto& resolved = descriptor != nullptr ? *descriptor : EphemerisEngineDescriptorRegistry::defaultDescriptor();
+    return QString::fromStdString(resolved.id);
 }
 
-[[nodiscard]] EphemerisEngineKind::Type
-ephemerisEngineKindFromString(const QString& text, const EphemerisEngineKind::Type fallback)
+[[nodiscard]] EphemerisEngineKind::Type ephemerisEngineKindFromString(const QString& text)
 {
     const QString normalizedText = text.trimmed().toLower();
-    if (normalizedText == QStringLiteral("simple")) {
-        return EphemerisEngineKind::Type::Simple;
+    for (std::size_t index = 0; index < EphemerisEngineDescriptorRegistry::count(); ++index) {
+        const auto& descriptor = EphemerisEngineDescriptorRegistry::descriptorAt(index);
+        if (QString::fromStdString(descriptor.id).toLower() == normalizedText) {
+            return descriptor.kind;
+        }
     }
+
     if (normalizedText == QStringLiteral("highprecision") || normalizedText == QStringLiteral("high-precision")) {
         return EphemerisEngineKind::Type::HighPrecision;
     }
-    return fallback;
+
+    return EphemerisEngineDescriptorRegistry::defaultDescriptor().kind;
 }
 
 [[nodiscard]] QString normalizedNonBlankSetting(QSettings& settings, const QString& key, const QString& fallback)
@@ -249,9 +250,7 @@ SkySettingsStore::EphemerisUserSettingsSnapshot loadEphemerisUserSettings(QSetti
 {
     SkySettingsStore::EphemerisUserSettingsSnapshot snapshot;
     snapshot.engineKind = ephemerisEngineKindFromString(
-        settings.value(settingsKey("ephemeris/engineKind"), ephemerisEngineKindToString(snapshot.engineKind))
-            .toString(),
-        snapshot.engineKind
+        settings.value(settingsKey("ephemeris/engineKind"), ephemerisEngineKindToString(snapshot.engineKind)).toString()
     );
     snapshot.correctionFlags =
         readCorrectionFlags(settings, settingsKey("ephemeris/correctionFlags"), snapshot.correctionFlags);

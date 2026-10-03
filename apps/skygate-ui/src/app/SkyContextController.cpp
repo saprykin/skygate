@@ -12,6 +12,7 @@
 #include "factory/EphemerisEngineFactory.hpp"
 #include "time/CalendarTime.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "engine/EphemerisEngineDescriptorRegistry.hpp"
 #include "engine/IEphemerisDataSnapshot.hpp"
 #include "engine/TimeScaleProviderLoader.hpp"
 #include "engine/highprecision/CalcephKernelProvider.hpp"
@@ -42,6 +43,7 @@ Q_LOGGING_CATEGORY(skygateEphemerisUpdateLog, "skygate.ephemeris.update")
 constexpr std::uint64_t kMaxEphemerisManifestBytes = 4ULL * 1024ULL * 1024ULL;
 
 using skygate::ephemeris::EphemerisCorrectionFlags;
+using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
 
 [[nodiscard]] qint64 floorMod(const qint64 numerator, const qint64 denominator) noexcept
@@ -83,12 +85,15 @@ astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcep
 
 [[nodiscard]] EphemerisEngineKind::Type engineKindFromIndex(const int index) noexcept
 {
-    return index == 1 ? EphemerisEngineKind::Type::HighPrecision : EphemerisEngineKind::Type::Simple;
+    if (index < 0) {
+        return EphemerisEngineDescriptorRegistry::defaultDescriptor().kind;
+    }
+    return EphemerisEngineDescriptorRegistry::descriptorAt(static_cast<std::size_t>(index)).kind;
 }
 
 [[nodiscard]] int engineKindIndex(const EphemerisEngineKind::Type kind) noexcept
 {
-    return kind == EphemerisEngineKind::Type::HighPrecision ? 1 : 0;
+    return static_cast<int>(EphemerisEngineDescriptorRegistry::indexOf(kind));
 }
 
 [[nodiscard]] QString cacheSizeText(const std::uint64_t bytes)
@@ -697,6 +702,34 @@ int SkyContextController::ephemerisEngineKindIndex() const noexcept
     return engineKindIndex(m_ephemerisEngineKind);
 }
 
+QStringList SkyContextController::ephemerisEngineLabels() const
+{
+    QStringList labels;
+    labels.reserve(static_cast<qsizetype>(EphemerisEngineDescriptorRegistry::count()));
+    for (std::size_t index = 0; index < EphemerisEngineDescriptorRegistry::count(); ++index) {
+        labels.append(QString::fromStdString(EphemerisEngineDescriptorRegistry::descriptorAt(index).displayName));
+    }
+    return labels;
+}
+
+bool SkyContextController::ephemerisEngineSupportsCorrections(const int engineKindIndex) const noexcept
+{
+    if (engineKindIndex < 0) {
+        return false;
+    }
+    return EphemerisEngineDescriptorRegistry::descriptorAt(static_cast<std::size_t>(engineKindIndex))
+        .supportsCorrections;
+}
+
+bool SkyContextController::ephemerisEngineSupportsAtmosphereSettings(const int engineKindIndex) const noexcept
+{
+    if (engineKindIndex < 0) {
+        return false;
+    }
+    return EphemerisEngineDescriptorRegistry::descriptorAt(static_cast<std::size_t>(engineKindIndex))
+        .supportsAtmosphereSettings;
+}
+
 int SkyContextController::ephemerisCorrectionPresetIndex() const noexcept
 {
     return correctionPresetIndex(m_ephemerisEngineOptions.correctionFlags());
@@ -1248,24 +1281,23 @@ void SkyContextController::applyEphemerisUserSettings(const SkySettingsStore::Ep
 
 void SkyContextController::setEphemerisEngineKindIndex(const int engineKindIndex)
 {
-    if (engineKindIndex < 0 || engineKindIndex > 1) {
+    if (engineKindIndex < 0
+        || static_cast<std::size_t>(engineKindIndex) >= EphemerisEngineDescriptorRegistry::count()) {
         emit ephemerisSettingsChanged();
         return;
     }
 
     auto settings = m_ephemerisUserSettings;
-    settings.engineKind = engineKindFromIndex(engineKindIndex);
-    if (settings.engineKind == EphemerisEngineKind::Type::Simple) {
-        settings.correctionPresetId = correctionPresetId(0);
-        settings.correctionFlags = EphemerisCorrectionFlags::noCorrections();
-        settings.refractionEnabled = false;
-    } else if (
-        m_ephemerisEngineKind == EphemerisEngineKind::Type::Simple
-        && m_ephemerisEngineOptions.correctionFlags() == EphemerisCorrectionFlags::noCorrections()
-    ) {
-        settings.correctionPresetId = correctionPresetId(3);
-        settings.refractionEnabled = true;
-        settings.correctionFlags = EphemerisCorrectionFlags::apparentTopocentric();
+    const EphemerisEngineKind::Type targetKind = engineKindFromIndex(engineKindIndex);
+    settings.engineKind = targetKind;
+    if (targetKind != m_ephemerisEngineKind) {
+        const auto* descriptor = EphemerisEngineDescriptorRegistry::findByKind(targetKind);
+        if (descriptor != nullptr) {
+            const auto& defaults = descriptor->defaultOptions;
+            settings.correctionFlags = defaults.correctionFlags();
+            settings.refractionEnabled = defaults.enableAtmosphericRefraction();
+            settings.correctionPresetId = correctionPresetId(correctionPresetIndex(defaults.correctionFlags()));
+        }
     }
     applyEphemerisUserSettings(settings);
 }
