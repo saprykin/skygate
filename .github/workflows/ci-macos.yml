@@ -63,7 +63,7 @@ jobs:
 
       - name: Test full suite
         run: >
-          ctest --test-dir build-make/core-debug
+          ctest --test-dir build-ninja/core-debug
           --parallel 2
           --output-on-failure
           --no-tests=error
