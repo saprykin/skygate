@@ -14,6 +14,7 @@ struct EphemerisEngineDescriptor final {
     EphemerisEngineOptions defaultOptions;
     bool supportsCorrections = false;
     bool supportsAtmosphereSettings = false;
+    bool requiresBackendResources = false;
 };
 
 }  // namespace skygate::ephemeris

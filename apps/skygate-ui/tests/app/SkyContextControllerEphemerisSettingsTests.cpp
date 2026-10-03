@@ -542,6 +542,15 @@ void SkyContextControllerEphemerisSettingsTests::ephemerisEngineModelExposesRegi
     QVERIFY(!controller->ephemerisEngineSupportsAtmosphereSettings(0));
     QVERIFY(controller->ephemerisEngineSupportsCorrections(1));
     QVERIFY(controller->ephemerisEngineSupportsAtmosphereSettings(1));
+
+    QCOMPARE(controller->ephemerisEngineDefaultCorrectionPresetIndex(0), 0);
+    QVERIFY(!controller->ephemerisEngineDefaultRefractionEnabled(0));
+    QCOMPARE(controller->ephemerisEngineDefaultCorrectionPresetIndex(1), 3);
+    QVERIFY(controller->ephemerisEngineDefaultRefractionEnabled(1));
+    QCOMPARE(controller->ephemerisEngineDefaultCorrectionPresetIndex(-1), 0);
+    QVERIFY(!controller->ephemerisEngineDefaultRefractionEnabled(-1));
+    QCOMPARE(controller->ephemerisEngineDefaultCorrectionPresetIndex(99), 0);
+    QVERIFY(!controller->ephemerisEngineDefaultRefractionEnabled(99));
 }
 
 QTEST_GUILESS_MAIN(SkyContextControllerEphemerisSettingsTests)

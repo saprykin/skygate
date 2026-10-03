@@ -93,7 +93,14 @@ astronomicalEpochFromUtcTime(const skygate::core::UtcTimePoint& utcTime) noexcep
 
 [[nodiscard]] int engineKindIndex(const EphemerisEngineKind::Type kind) noexcept
 {
-    return static_cast<int>(EphemerisEngineDescriptorRegistry::indexOf(kind));
+    const std::optional<std::size_t> index = EphemerisEngineDescriptorRegistry::indexOf(kind);
+    if (index.has_value()) {
+        return static_cast<int>(*index);
+    }
+
+    qCWarning(skygateEphemerisUpdateLog).noquote()
+        << "Ephemeris engine kind is not registered; using the default descriptor index.";
+    return 0;
 }
 
 [[nodiscard]] QString cacheSizeText(const std::uint64_t bytes)
@@ -736,6 +743,25 @@ bool SkyContextController::ephemerisEngineSupportsAtmosphereSettings(const int e
         .supportsAtmosphereSettings;
 }
 
+int SkyContextController::ephemerisEngineDefaultCorrectionPresetIndex(const int engineKindIndex) const noexcept
+{
+    if (engineKindIndex < 0) {
+        return 0;
+    }
+    const auto& defaults =
+        EphemerisEngineDescriptorRegistry::descriptorAt(static_cast<std::size_t>(engineKindIndex)).defaultOptions;
+    return correctionPresetIndex(defaults.correctionFlags());
+}
+
+bool SkyContextController::ephemerisEngineDefaultRefractionEnabled(const int engineKindIndex) const noexcept
+{
+    if (engineKindIndex < 0) {
+        return false;
+    }
+    return EphemerisEngineDescriptorRegistry::descriptorAt(static_cast<std::size_t>(engineKindIndex))
+        .defaultOptions.enableAtmosphericRefraction();
+}
+
 int SkyContextController::ephemerisCorrectionPresetIndex() const noexcept
 {
     return correctionPresetIndex(m_ephemerisEngineOptions.correctionFlags());
@@ -1045,7 +1071,8 @@ void SkyContextController::rebuildEphemerisEngine()
     const std::shared_ptr<const skygate::ephemeris::IEphemerisDataSnapshot> activeDataSnapshot =
         activeEphemerisDataSnapshot();
     const skygate::ephemeris::EphemerisDataManifest* dataManifest = activeEphemerisDataManifest();
-    if (m_ephemerisEngineKind == EphemerisEngineKind::Type::HighPrecision) {
+    const auto* selectedDescriptor = EphemerisEngineDescriptorRegistry::findByKind(m_ephemerisEngineKind);
+    if (selectedDescriptor != nullptr && selectedDescriptor->requiresBackendResources) {
         m_ephemerisBackendResourceCache->refresh(activeDataSnapshot, dataManifest, ephemerisDataRevision());
     }
 

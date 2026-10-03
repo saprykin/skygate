@@ -67,13 +67,10 @@ Item {
 
                     onActivated: {
                         preferencesDraft.ephemerisEngineKindIndex = currentIndex;
-                        if (currentIndex === 0) {
-                            preferencesDraft.ephemerisCorrectionPresetIndex = 0;
-                            preferencesDraft.ephemerisRefractionEnabled = false;
-                        } else if (preferencesDraft.ephemerisCorrectionPresetIndex === 0) {
-                            preferencesDraft.ephemerisCorrectionPresetIndex = 3;
-                            preferencesDraft.ephemerisRefractionEnabled = true;
-                        }
+                        preferencesDraft.ephemerisCorrectionPresetIndex =
+                            skyContextController.ephemerisEngineDefaultCorrectionPresetIndex(currentIndex);
+                        preferencesDraft.ephemerisRefractionEnabled =
+                            skyContextController.ephemerisEngineDefaultRefractionEnabled(currentIndex);
                     }
                 }
 
