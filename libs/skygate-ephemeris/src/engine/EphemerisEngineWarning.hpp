@@ -23,6 +23,7 @@ public:
         EpochOutsideLeapSecondTable,
         LeapSecondFallbackApplied,
         UnsupportedTimeScaleConversion,
+        InvalidExplicitEpoch,
         InvalidTimeScaleInput,
         TdbApproximationApplied,
         EarthOrientationDataMissing,
@@ -90,6 +91,8 @@ public:
             return "A degraded leap-second fallback offset was applied.";
         case Code::UnsupportedTimeScaleConversion:
             return "The requested time-scale conversion is not supported.";
+        case Code::InvalidExplicitEpoch:
+            return "The requested explicit epoch has non-finite Julian date parts.";
         case Code::InvalidTimeScaleInput:
             return "The requested time-scale conversion input is invalid.";
         case Code::TdbApproximationApplied:
