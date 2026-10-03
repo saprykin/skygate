@@ -2,6 +2,19 @@ cmake_minimum_required(VERSION 3.24)
 
 set(SKYGATE_APP_VERSION "1.1.0")
 
+# Qt Creator's vcpkg auto-setup installs the manifest without activating
+# features, so derive the vcpkg.json feature from this option before
+# project() loads the vcpkg toolchain.
+option(
+    SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS
+    "Enable high-precision ephemeris dependency gates and tests"
+    OFF
+)
+if(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    set(VCPKG_MANIFEST_FEATURES "high-precision-ephemeris" CACHE STRING
+        "vcpkg manifest features to activate during manifest installs")
+endif()
+
 project(skygate VERSION ${SKYGATE_APP_VERSION} LANGUAGES CXX)
 
 set(SKYGATE_QML_MODULE_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
@@ -34,11 +47,6 @@ include(SkyGateCoverage)
 option(SKYGATE_BUILD_UI "Build Qt UI application" ON)
 option(SKYGATE_BUILD_TESTS "Build tests" ON)
 option(SKYGATE_ENABLE_COVERAGE "Build tests with coverage instrumentation" OFF)
-option(
-    SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS
-    "Enable high-precision ephemeris dependency gates and tests"
-    OFF
-)
 # High-precision builds use ERFA through the repo-local vcpkg overlay port when
 # configured with a vcpkg preset, or through a system ERFA package found by
 # cmake/FindERFA.cmake for non-vcpkg builds.
