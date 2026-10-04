@@ -58,25 +58,6 @@ std::vector<std::string> aliasKeys(const BaseCelestialBody& body)
     return keys;
 }
 
-void addKey(KeyMap& map, const std::string& key, const std::size_t resultIndex)
-{
-    if (key.empty()) {
-        return;
-    }
-
-    std::vector<std::size_t>& entries = map[key];
-    if (std::find(entries.begin(), entries.end(), resultIndex) == entries.end()) {
-        entries.push_back(resultIndex);
-    }
-}
-
-void addKeys(KeyMap& map, const std::vector<std::string>& keys, const std::size_t resultIndex)
-{
-    for (const std::string& key : keys) {
-        addKey(map, key, resultIndex);
-    }
-}
-
 void collectMatches(const KeyMap& map, const std::vector<std::string>& keys, std::vector<std::size_t>& matches)
 {
     for (const std::string& key : keys) {
@@ -107,13 +88,75 @@ bool CatalogIdentityIndex::Resolution::isAmbiguous() const noexcept
     return kind == MatchKind::AmbiguousAuthoritative || kind == MatchKind::AmbiguousAlias;
 }
 
+CatalogIdentityIndex::KeyMap& CatalogIdentityIndex::keyMap(const KeyFamily family) noexcept
+{
+    switch (family) {
+    case KeyFamily::Canonical:
+        return m_canonicalIndex;
+    case KeyFamily::ExternalIdentifier:
+        return m_identifierIndex;
+    case KeyFamily::Alias:
+        return m_aliasIndex;
+    }
+    return m_canonicalIndex;
+}
+
+void CatalogIdentityIndex::registerKey(const std::size_t resultIndex, const KeyFamily family, const std::string& key)
+{
+    if (key.empty()) {
+        return;
+    }
+
+    if (m_keysByPosition.size() <= resultIndex) {
+        m_keysByPosition.resize(resultIndex + 1U);
+    }
+
+    std::vector<RegisteredKey>& registered = m_keysByPosition[resultIndex];
+    const bool alreadyRegistered =
+        std::any_of(registered.begin(), registered.end(), [&family, &key](const RegisteredKey& entry) {
+            return entry.family == family && entry.key == key;
+        });
+    if (alreadyRegistered) {
+        return;
+    }
+
+    registered.push_back(RegisteredKey{.family = family, .key = key});
+    keyMap(family)[key].push_back(resultIndex);
+}
+
 void CatalogIdentityIndex::add(const BaseCelestialBody& body, const std::size_t resultIndex)
 {
-    addKey(m_canonicalIndex, canonicalKey(body), resultIndex);
-    addKeys(m_identifierIndex, externalIdentifierKeys(body), resultIndex);
-    if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
-        addKeys(m_aliasIndex, aliasKeys(body), resultIndex);
+    registerKey(resultIndex, KeyFamily::Canonical, canonicalKey(body));
+    for (const std::string& key : externalIdentifierKeys(body)) {
+        registerKey(resultIndex, KeyFamily::ExternalIdentifier, key);
     }
+    if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
+        for (const std::string& key : aliasKeys(body)) {
+            registerKey(resultIndex, KeyFamily::Alias, key);
+        }
+    }
+}
+
+void CatalogIdentityIndex::remove(const std::size_t resultIndex)
+{
+    if (resultIndex >= m_keysByPosition.size()) {
+        return;
+    }
+
+    for (const RegisteredKey& registered : m_keysByPosition[resultIndex]) {
+        KeyMap& map = keyMap(registered.family);
+        const auto found = map.find(registered.key);
+        if (found == map.end()) {
+            continue;
+        }
+
+        std::vector<std::size_t>& positions = found->second;
+        positions.erase(std::remove(positions.begin(), positions.end(), resultIndex), positions.end());
+        if (positions.empty()) {
+            map.erase(found);
+        }
+    }
+    m_keysByPosition[resultIndex].clear();
 }
 
 void CatalogIdentityIndex::reserve(const std::size_t bodyCount)
@@ -121,6 +164,7 @@ void CatalogIdentityIndex::reserve(const std::size_t bodyCount)
     m_canonicalIndex.reserve(bodyCount);
     m_identifierIndex.reserve(bodyCount * 2U);
     m_aliasIndex.reserve(bodyCount);
+    m_keysByPosition.reserve(bodyCount);
 }
 
 CatalogIdentityIndex::Resolution CatalogIdentityIndex::resolve(const BaseCelestialBody& body) const
@@ -160,6 +204,31 @@ CatalogIdentityIndex::Resolution CatalogIdentityIndex::resolve(const BaseCelesti
         resolution.candidates = std::move(aliases);
     }
     return resolution;
+}
+
+std::vector<CatalogIdentityIndex::DuplicateIdentity> CatalogIdentityIndex::duplicateAuthoritativeIdentities() const
+{
+    std::vector<DuplicateIdentity> duplicates;
+    const auto collectDuplicates = [&duplicates](const KeyMap& map) {
+        for (const auto& [key, positions] : map) {
+            if (positions.size() > 1U) {
+                duplicates.push_back(DuplicateIdentity{.key = key, .positions = positions});
+            }
+        }
+    };
+    collectDuplicates(m_canonicalIndex);
+    collectDuplicates(m_identifierIndex);
+
+    for (DuplicateIdentity& duplicate : duplicates) {
+        dedupeAndSort(duplicate.positions);
+    }
+    std::sort(duplicates.begin(), duplicates.end(), [](const DuplicateIdentity& lhs, const DuplicateIdentity& rhs) {
+        if (lhs.key != rhs.key) {
+            return lhs.key < rhs.key;
+        }
+        return lhs.positions < rhs.positions;
+    });
+    return duplicates;
 }
 
 }  // namespace skygate::ephemeris
