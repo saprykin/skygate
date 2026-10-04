@@ -50,6 +50,10 @@ std::string CatalogIdentifier::normalizeValue(const std::string_view namespaceNa
         return normalized;
     }
 
+    // Catalog numbers are case-insensitive: NGC 1234A and ngc1234a denote the
+    // same object, so fold the alphabetic component suffix together with the
+    // namespace before padding/stripping is applied.
+    normalized = StringUtilities::toLowerAscii(normalized);
     normalized = stripLeadingZeros(std::move(normalized));
     if (namespaceName == "messier" && normalized.size() < 3U) {
         normalized.insert(0U, 3U - normalized.size(), '0');

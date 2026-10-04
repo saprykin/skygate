@@ -10,9 +10,10 @@ namespace skygate::ephemeris {
 //
 // The namespace separates identifiers whose numeric values would otherwise
 // collide: HIP 32349 and HYG 32349 are different source records. Values are
-// normalized per namespace (leading zeros are stripped; Messier numbers are
-// padded to three digits) so equivalent spellings compare equal within a
-// namespace, while equal numerics in different namespaces never collide.
+// normalized per namespace (ASCII case is folded, leading zeros are stripped;
+// Messier numbers are padded to three digits) so equivalent spellings such as
+// NGC 1234A and ngc1234a compare equal within a namespace, while equal
+// numerics in different namespaces never collide.
 struct CatalogIdentifier {
     std::string namespaceName;
     std::string value;

@@ -195,14 +195,54 @@ void mergeIdentityInto(CatalogObjectIdentity& winner, const CatalogObjectIdentit
     mergeAliasesInto(winner.aliases, loser.aliases);
 }
 
+// Namespaces whose canonical deep-sky ids are recognized designations:
+// ngc_<n>, ic_<n>, and messier_<nnn>.
+constexpr std::string_view kDeepSkyDesignationNamespaces[] = {"ngc", "ic", "messier"};
+
+// The designations a record authoritatively carries. Explicit external
+// identifiers come first; a recognized deep-sky canonical id contributes the
+// designation it was derived from, because the identity contract treats that
+// id as a global identity even when a producer supplied no matching external
+// identifier.
+std::vector<CatalogIdentifier> authoritativeDesignations(const BaseCelestialBody& body)
+{
+    std::vector<CatalogIdentifier> designations;
+    designations.reserve(body.identity.externalIdentifiers.size() + 1U);
+    for (const CatalogIdentifier& identifier : body.identity.externalIdentifiers) {
+        if (!identifier.empty()) {
+            designations.push_back(identifier);
+        }
+    }
+
+    for (const std::string_view designationNamespace : kDeepSkyDesignationNamespaces) {
+        const std::string prefix = std::string(designationNamespace) + "_";
+        if (!body.id.starts_with(prefix)) {
+            continue;
+        }
+
+        CatalogIdentifier designation =
+            CatalogIdentifier::make(std::string(designationNamespace), body.id.substr(prefix.size()));
+        if (std::find(designations.begin(), designations.end(), designation) == designations.end()) {
+            designations.push_back(std::move(designation));
+        }
+        break;
+    }
+    return designations;
+}
+
 // True when two records disagree about an authoritative namespace: both claim
 // at least one value for the namespace but their value sets do not overlap.
 // An overlapping value would already have been resolved authoritatively, so
-// this only distinguishes otherwise non-authoritative alias matches.
-bool hasContradictoryIdentifiers(const CatalogObjectIdentity& lhs, const CatalogObjectIdentity& rhs)
+// this only distinguishes otherwise non-authoritative alias matches. Only
+// explicit cross-identifications may bridge two conflicting recognized
+// designations; a shared descriptive name must keep them distinct.
+bool hasContradictoryIdentifiers(const BaseCelestialBody& lhs, const BaseCelestialBody& rhs)
 {
+    const std::vector<CatalogIdentifier> lhsDesignations = authoritativeDesignations(lhs);
+    const std::vector<CatalogIdentifier> rhsDesignations = authoritativeDesignations(rhs);
+
     std::vector<std::string_view> checkedNamespaces;
-    for (const CatalogIdentifier& lhsIdentifier : lhs.externalIdentifiers) {
+    for (const CatalogIdentifier& lhsIdentifier : lhsDesignations) {
         if (lhsIdentifier.empty()) {
             continue;
         }
@@ -214,12 +254,12 @@ bool hasContradictoryIdentifiers(const CatalogObjectIdentity& lhs, const Catalog
 
         std::vector<std::string_view> lhsValues;
         std::vector<std::string_view> rhsValues;
-        for (const CatalogIdentifier& identifier : lhs.externalIdentifiers) {
+        for (const CatalogIdentifier& identifier : lhsDesignations) {
             if (!identifier.empty() && identifier.namespaceName == lhsIdentifier.namespaceName) {
                 lhsValues.push_back(identifier.value);
             }
         }
-        for (const CatalogIdentifier& identifier : rhs.externalIdentifiers) {
+        for (const CatalogIdentifier& identifier : rhsDesignations) {
             if (!identifier.empty() && identifier.namespaceName == lhsIdentifier.namespaceName) {
                 rhsValues.push_back(identifier.value);
             }
@@ -364,7 +404,7 @@ evaluateMatch(const MergeAccumulator& accumulator, const CatalogIdentityIndex& i
         }
 
         if (resolution.kind == CatalogIdentityIndex::Resolution::MatchKind::Alias
-            && hasContradictoryIdentifiers(existing.identity, incoming.identity)) {
+            && hasContradictoryIdentifiers(existing, incoming)) {
             logAmbiguousAlias(existing, incoming);
             return decision;
         }

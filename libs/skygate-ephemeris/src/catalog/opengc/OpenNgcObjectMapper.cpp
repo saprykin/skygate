@@ -6,8 +6,37 @@
 #include <QRegularExpression>
 #include <QStringList>
 
+#include <algorithm>
+#include <optional>
+
 namespace skygate::ephemeris {
 namespace {
+
+struct RecognizedDesignation final {
+    QString identifierNamespace;
+    QString value;
+};
+
+// Recognizes a primary NGC or IC designation, including supported component
+// suffixes ("NGC0001", "ngc 1", "NGC1234A"). The value drops the catalog
+// prefix and the zero padding but keeps the suffix; CatalogIdentifier applies
+// the remaining per-namespace normalization.
+std::optional<RecognizedDesignation> recognizedDesignation(const QString& text)
+{
+    static const QRegularExpression designationPattern(
+        QStringLiteral("^(NGC|IC)\\s*(\\d+)([A-Za-z]*)$"), QRegularExpression::CaseInsensitiveOption
+    );
+
+    const QRegularExpressionMatch match = designationPattern.match(text.trimmed());
+    if (!match.hasMatch()) {
+        return std::nullopt;
+    }
+
+    return RecognizedDesignation{
+        .identifierNamespace = match.captured(1).toLower(),
+        .value = OpenNgcObjectMapper::withoutLeadingZeros(match.captured(2)) + match.captured(3).toLower(),
+    };
+}
 
 QString normalizedCatalogAlias(QString text)
 {
@@ -70,6 +99,16 @@ void appendAlias(std::vector<std::string>& aliases, const QString& alias)
     }
 
     StringUtilities::appendUniqueIgnoreAsciiCase(aliases, CatalogParsingUtilities::toUtf8String(normalized));
+}
+
+void appendIdentifierUnique(std::vector<CatalogIdentifier>& identifiers, const CatalogIdentifier& identifier)
+{
+    if (identifier.empty()) {
+        return;
+    }
+    if (std::find(identifiers.begin(), identifiers.end(), identifier) == identifiers.end()) {
+        identifiers.push_back(identifier);
+    }
 }
 
 void appendDelimitedAliases(std::vector<std::string>& aliases, const QString& text)
@@ -145,6 +184,18 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     if (!ic.isEmpty()) {
         appendAlias(mapping.aliases, "IC " + ic);
         mapping.externalIdentifiers.push_back(CatalogIdentifier::make("ic", CatalogParsingUtilities::toUtf8String(ic)));
+    }
+    // The primary Name column is itself a designation column: a recognized
+    // NGC/IC name is authoritative even when the optional cross-reference
+    // columns are absent.
+    if (const std::optional<RecognizedDesignation> designation = recognizedDesignation(name); designation.has_value()) {
+        appendIdentifierUnique(
+            mapping.externalIdentifiers,
+            CatalogIdentifier::make(
+                CatalogParsingUtilities::toUtf8String(designation->identifierNamespace),
+                CatalogParsingUtilities::toUtf8String(designation->value)
+            )
+        );
     }
     mapping.sourceRecordId = CatalogParsingUtilities::toUtf8String(name.trimmed());
     appendAlias(mapping.aliases, name);
