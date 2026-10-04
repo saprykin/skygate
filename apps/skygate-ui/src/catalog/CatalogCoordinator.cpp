@@ -26,7 +26,7 @@ QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadResult:
     case skygate::ephemeris::CatalogLoadResult::ErrorCode::UnsupportedFormat:
         return "unsupported format";
     case skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns:
-        return "missing required HYG columns";
+        return "missing required columns";
     case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidHygCsv:
         return "invalid HYG CSV payload";
     case skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv:
