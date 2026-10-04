@@ -1,7 +1,9 @@
 #pragma once
 
+#include "SkyCatalogSourceInstance.hpp"
 #include "SkySettingsStore.hpp"
 
+#include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
@@ -9,6 +11,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +27,7 @@ class SkyCatalogRuntime;
 struct SkyCatalogRuntimeBuildOptions;
 struct SkyCatalogRuntimeResult;
 struct SkyCatalogImportResult;
+struct SkyCatalogSourceImportResult;
 struct SkyDeepSkyCatalogImportResult;
 struct SkyConstellationLineImportResult;
 struct SkyCatalogSourceInstance;
@@ -58,6 +62,9 @@ public:
     [[nodiscard]] std::size_t constellationCount() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
     [[nodiscard]] const skygate::ephemeris::IStarCatalog* starCatalog() const noexcept;
+    [[nodiscard]] std::size_t sourceCount() const noexcept;
+    [[nodiscard]] QStringList sourceInstanceIds() const;
+    [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
     [[nodiscard]] QStringList sourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
@@ -73,6 +80,14 @@ public:
     void downloadCatalogFromUrl(const QString& urlText);
     void loadDeepSkyCatalogPreset(const QString& presetId);
     void downloadDeepSkyCatalogFromUrl(const QString& urlText);
+    void loadSource(
+        const skygate::ui::internal::SkyCatalogSourceInstance& source,
+        skygate::ephemeris::CatalogCompositionPolicy policy
+    );
+    void enableSource(const QString& instanceId);
+    void disableSource(const QString& instanceId);
+    void removeSource(const QString& instanceId);
+    void retrySource(const QString& instanceId);
     void cancelCatalogDownload();
     bool clearCatalogCache();
     bool clearDeepSkyCatalogCache();
@@ -87,35 +102,53 @@ signals:
     void catalogChanged();
 
 private:
-    void applyCatalog(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-        const QString& sourceLabel,
-        bool persistCatalog = true
+    struct SourceOperation final {
+        skygate::ui::internal::SkyCatalogSourceInstance instance;
+        skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+        QByteArray payload;
+        std::uint64_t revision = 0;
+        bool constellationPending = false;
+    };
+
+    void loadSourceInstance(
+        const skygate::ui::internal::SkyCatalogSourceInstance& source,
+        skygate::ephemeris::CatalogCompositionPolicy policy
     );
-    void applyDeepSkyCatalog(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-        const QString& sourceLabel,
-        std::size_t foundObjectCount = 0,
-        bool persistCatalog = true
+    void applyBundledSource(const SourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy);
+    void applySourceResult(
+        skygate::ui::internal::SkyCatalogSourceImportResult result, skygate::ephemeris::CatalogCompositionPolicy policy
     );
-    void downloadCatalogFromUrls(const skygate::ui::internal::SkyCatalogSourceInstance& source);
-    void downloadDeepSkyCatalogFromUrls(const skygate::ui::internal::SkyCatalogSourceInstance& source);
+    void handleSourceImportFinished(
+        const QString& instanceId,
+        std::uint64_t revision,
+        skygate::ui::internal::SkyCatalogSourceImportResult result,
+        skygate::ephemeris::CatalogCompositionPolicy policy,
+        const QStringList& relatedDatasetUrls
+    );
+    [[nodiscard]] SourceOperation* upsertOperation(
+        const skygate::ui::internal::SkyCatalogSourceInstance& source,
+        skygate::ephemeris::CatalogCompositionPolicy policy
+    );
+    [[nodiscard]] SourceOperation* findOperation(const QString& instanceId);
+    [[nodiscard]] const SourceOperation* findOperation(const QString& instanceId) const;
+    void removeOperation(const QString& instanceId);
+    [[nodiscard]] bool isOperationCurrent(const QString& instanceId, std::uint64_t revision) const;
+    void invalidatePendingSourceWork();
+    void setSourceEnabled(const QString& instanceId, bool enabled);
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
     void setCatalogProcessing(bool catalogProcessing);
     void handleCatalogImportStatus(const QString& statusText);
-    void handleCatalogImportFinished(
-        skygate::ui::internal::SkyCatalogImportResult result, const QStringList& constellationLineUrlTexts
-    );
     void downloadConstellationLinesAfterCatalog(
-        const QStringList& constellationLineUrlTexts, const QString& catalogSummaryText
+        const QString& instanceId,
+        std::uint64_t revision,
+        const QStringList& constellationLineUrlTexts,
+        const QString& catalogSummaryText
     );
     void handleConstellationLineImportStatus(const QString& catalogSummaryText, const QString& statusText);
     void handleConstellationLineImportFinished(
         const QString& catalogSummaryText, skygate::ui::internal::SkyConstellationLineImportResult lineResult
     );
-    void invalidateConstellationDownload();
-    void handleDeepSkyImportFinished(skygate::ui::internal::SkyDeepSkyCatalogImportResult result);
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
     void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
     void resetConstellationLineRefs();
@@ -133,9 +166,9 @@ private:
     QString m_deepSkyCatalogUrlText;
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
-    std::uint64_t m_catalogDownloadGeneration = 0U;
-    std::uint64_t m_constellationDownloadGeneration = 0U;
     bool m_constellationDownloadPending = false;
+    QString m_activeDownloadInstanceId;
+    QVector<SourceOperation> m_sourceOperations;
     QByteArray m_cachedCatalogPayload;
     QByteArray m_cachedDeepSkyCatalogPayload;
 };

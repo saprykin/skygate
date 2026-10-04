@@ -26,6 +26,7 @@ private slots:
     void fallsBackForMalformedConstellationPayload();
     void rejectsDeepSkyCatalogWithoutDsos();
     void reportsDeepSkyObjectCount();
+    void unifiedDownloadSourceKeepsStarCatalogsUnfiltered();
 };
 
 void SkyCatalogImportWorkflowTests::parsesConstellationPayloads()
@@ -178,6 +179,44 @@ void SkyCatalogImportWorkflowTests::reportsDeepSkyObjectCount()
     QCOMPARE(finalResult.sourceVersion, QString("v20260307"));
     QCOMPARE(finalResult.sourceUrl, QString("https://example.test/open-ngc.csv"));
     QCOMPARE(finalResult.foundObjectCount, 1U);
+    QVERIFY(finalResult.errorText.isEmpty());
+}
+
+void SkyCatalogImportWorkflowTests::unifiedDownloadSourceKeepsStarCatalogsUnfiltered()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        "https://example.test/stars.csv",
+        {.payload = sampleHygCsvPayload({.hip = 1234, .properName = "Unified Star", .mag = "1.0"})}
+    );
+    const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source;
+    source.instanceId = QStringLiteral("custom:stars");
+    source.title = QStringLiteral("Unified Stars");
+    source.version = QStringLiteral("v1");
+    source.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
+
+    skygate::ui::internal::SkyCatalogSourceImportResult finalResult;
+    runAsync([&](QEventLoop& loop) {
+        workflow.downloadSource(
+            source,
+            skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            this,
+            {},
+            [&finalResult, &loop](skygate::ui::internal::SkyCatalogSourceImportResult result) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(finalResult.catalog != nullptr);
+    QCOMPARE(finalResult.foundObjectCount, std::size_t{0});
+    QCOMPARE(finalResult.sourceLabel, QString("Unified Stars"));
+    QCOMPARE(finalResult.sourceId, QString("custom:stars"));
+    QCOMPARE(finalResult.sourceVersion, QString("v1"));
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/stars.csv"));
     QVERIFY(finalResult.errorText.isEmpty());
 }
 

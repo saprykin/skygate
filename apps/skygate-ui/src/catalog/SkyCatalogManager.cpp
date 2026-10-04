@@ -1,5 +1,6 @@
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogSourceInstance.hpp"
+#include "SkyCatalogSourceRecord.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
@@ -16,6 +17,9 @@
 using namespace skygate::ui::internal;
 
 namespace {
+
+constexpr const char* kPrimarySlotId = "primary";
+constexpr const char* kDeepSkySlotId = "deep-sky";
 
 SkyCatalogRuntimeResult& operator|=(SkyCatalogRuntimeResult& target, const SkyCatalogRuntimeResult& source)
 {
@@ -120,6 +124,21 @@ const skygate::ephemeris::IStarCatalog* SkyCatalogManager::starCatalog() const n
     return m_runtime->starCatalog();
 }
 
+std::size_t SkyCatalogManager::sourceCount() const noexcept
+{
+    return m_runtime->sourceCount();
+}
+
+QStringList SkyCatalogManager::sourceInstanceIds() const
+{
+    return m_runtime->sourceInstanceIds();
+}
+
+bool SkyCatalogManager::isSourceEnabled(const QString& instanceId) const
+{
+    return m_runtime->isSourceEnabled(instanceId);
+}
+
 QStringList SkyCatalogManager::sourceLabels() const
 {
     return m_runtime->sourceLabels();
@@ -190,16 +209,12 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
     }
 
     setCatalogPresetIndex(descriptor->legacyPresetIndex);
-    if (descriptor->bundled) {
-        m_cachedCatalogPayload.clear();
-        invalidateConstellationDownload();
-        resetConstellationLineRefs();
-        applyCatalog(skygate::ephemeris::CatalogFactory::createBundledStarCatalog(), descriptor->title);
-        return;
+    auto source = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
+    source.instanceId = QString::fromLatin1(kPrimarySlotId);
+    if (!descriptor->bundled) {
+        setCatalogUrlText(descriptor->defaultUrl());
     }
-
-    setCatalogUrlText(descriptor->defaultUrl());
-    downloadCatalogFromUrls(SkyCatalogSourceInstance::fromDescriptor(*descriptor));
+    loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
 }
 
 void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
@@ -216,30 +231,73 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
     }
 
     setDeepSkyCatalogPresetIndex(descriptor->legacyPresetIndex);
-    if (descriptor->bundled) {
-        m_cachedDeepSkyCatalogPayload.clear();
-        const SkyCatalogRuntimeResult result = m_runtime->clearDeepSkyCatalog(descriptor->title, runtimeBuildOptions());
-        persistCatalogCache();
-        applyRuntimeResult(result);
-        return;
+    auto source = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
+    source.instanceId = QString::fromLatin1(kDeepSkySlotId);
+    if (!descriptor->bundled) {
+        setDeepSkyCatalogUrlText(descriptor->defaultUrl());
     }
-
-    setDeepSkyCatalogUrlText(descriptor->defaultUrl());
-    downloadDeepSkyCatalogFromUrls(SkyCatalogSourceInstance::fromDescriptor(*descriptor));
+    loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
 }
 
 void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
 {
     setCatalogPresetIndex(2);
     setCatalogUrlText(urlText);
-    downloadCatalogFromUrls(SkyCatalogSourceInstance::createCustom(urlText));
+    auto source = SkyCatalogSourceInstance::createCustom(urlText);
+    source.instanceId = QString::fromLatin1(kPrimarySlotId);
+    loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
 }
 
 void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 {
     setDeepSkyCatalogPresetIndex(2);
     setDeepSkyCatalogUrlText(urlText);
-    downloadDeepSkyCatalogFromUrls(SkyCatalogSourceInstance::createCustom(urlText));
+    auto source = SkyCatalogSourceInstance::createCustom(urlText);
+    source.instanceId = QString::fromLatin1(kDeepSkySlotId);
+    loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+}
+
+void SkyCatalogManager::loadSource(
+    const SkyCatalogSourceInstance& source, const skygate::ephemeris::CatalogCompositionPolicy policy
+)
+{
+    loadSourceInstance(source, policy);
+}
+
+void SkyCatalogManager::enableSource(const QString& instanceId)
+{
+    setSourceEnabled(instanceId, true);
+}
+
+void SkyCatalogManager::disableSource(const QString& instanceId)
+{
+    setSourceEnabled(instanceId, false);
+}
+
+void SkyCatalogManager::removeSource(const QString& instanceId)
+{
+    if (m_downloadingCatalog) {
+        return;
+    }
+
+    invalidatePendingSourceWork();
+    removeOperation(instanceId);
+    const SkyCatalogRuntimeResult result = m_runtime->removeSource(instanceId, runtimeBuildOptions());
+    persistCatalogCache();
+    applyRuntimeResult(result);
+}
+
+void SkyCatalogManager::retrySource(const QString& instanceId)
+{
+    if (m_downloadingCatalog) {
+        return;
+    }
+
+    const SourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr) {
+        return;
+    }
+    loadSourceInstance(operation->instance, operation->policy);
 }
 
 void SkyCatalogManager::cancelCatalogDownload()
@@ -248,8 +306,8 @@ void SkyCatalogManager::cancelCatalogDownload()
         return;
     }
 
-    ++m_catalogDownloadGeneration;
-    invalidateConstellationDownload();
+    invalidatePendingSourceWork();
+    m_activeDownloadInstanceId.clear();
     if (m_networkAccessManager != nullptr) {
         const QList<QNetworkReply*> replies = m_networkAccessManager->findChildren<QNetworkReply*>();
         for (QNetworkReply* reply : replies) {
@@ -356,9 +414,25 @@ bool SkyCatalogManager::restoreCatalogCache()
     return true;
 }
 
-void SkyCatalogManager::downloadCatalogFromUrls(const SkyCatalogSourceInstance& source)
+void SkyCatalogManager::loadSourceInstance(
+    const SkyCatalogSourceInstance& source, const skygate::ephemeris::CatalogCompositionPolicy policy
+)
 {
     if (m_downloadingCatalog) {
+        return;
+    }
+
+    SourceOperation* operation = upsertOperation(source, policy);
+    invalidatePendingSourceWork();
+
+    if (source.urls.isEmpty()) {
+        if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
+            m_cachedCatalogPayload.clear();
+            resetConstellationLineRefs();
+        } else {
+            m_cachedDeepSkyCatalogPayload.clear();
+        }
+        applyBundledSource(*operation, policy);
         return;
     }
 
@@ -367,99 +441,89 @@ void SkyCatalogManager::downloadCatalogFromUrls(const SkyCatalogSourceInstance& 
         return;
     }
 
+    const std::uint64_t revision = operation->revision;
+    m_activeDownloadInstanceId = source.instanceId;
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
-    const std::uint64_t downloadGeneration = ++m_catalogDownloadGeneration;
-    invalidateConstellationDownload();
 
-    m_importWorkflow->downloadCatalog(
+    m_importWorkflow->downloadSource(
         source,
+        policy,
         this,
-        [this, downloadGeneration](const QString& statusText) {
-            if (downloadGeneration == m_catalogDownloadGeneration) {
+        [this, instanceId = source.instanceId, revision](const QString& statusText) {
+            if (isOperationCurrent(instanceId, revision)) {
                 handleCatalogImportStatus(statusText);
             }
         },
-        [this,
-         constellationLineUrlTexts = source.relatedDatasetUrls,
-         downloadGeneration](SkyCatalogImportResult result) {
-            if (downloadGeneration != m_catalogDownloadGeneration) {
+        [this, instanceId = source.instanceId, revision, policy, relatedDatasetUrls = source.relatedDatasetUrls](
+            SkyCatalogSourceImportResult result
+        ) {
+            if (!isOperationCurrent(instanceId, revision)) {
                 return;
             }
-            handleCatalogImportFinished(std::move(result), constellationLineUrlTexts);
+            if (m_activeDownloadInstanceId == instanceId) {
+                m_activeDownloadInstanceId.clear();
+            }
+            handleSourceImportFinished(instanceId, revision, std::move(result), policy, relatedDatasetUrls);
         }
     );
 }
 
-void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(const SkyCatalogSourceInstance& source)
+void SkyCatalogManager::applyBundledSource(
+    const SourceOperation& operation, const skygate::ephemeris::CatalogCompositionPolicy policy
+)
 {
-    if (m_downloadingCatalog) {
+    auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    if (bundledCatalog == nullptr) {
+        setStatusText(QStringLiteral("Catalog: Failed to load"));
         return;
     }
 
-    if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
-        setStatusText(QStringLiteral("Catalog: Network unavailable"));
-        return;
-    }
+    SkyCatalogSourceRecord record;
+    record.instanceId = operation.instance.instanceId;
+    record.title = operation.instance.title;
+    record.version = operation.instance.version;
+    record.policy = policy;
+    record.enabled = true;
+    record.catalog = std::move(bundledCatalog);
+    record.foundObjectCount = 0;
 
-    setCatalogProcessing(false);
-    setDownloadingCatalog(true);
-    const std::uint64_t downloadGeneration = ++m_catalogDownloadGeneration;
-
-    m_importWorkflow->downloadDeepSkyCatalog(
-        source,
-        this,
-        [this, downloadGeneration](const QString& statusText) {
-            if (downloadGeneration == m_catalogDownloadGeneration) {
-                handleCatalogImportStatus(statusText);
-            }
-        },
-        [this, downloadGeneration](SkyDeepSkyCatalogImportResult result) {
-            if (downloadGeneration != m_catalogDownloadGeneration) {
-                return;
-            }
-            handleDeepSkyImportFinished(std::move(result));
-        }
-    );
+    const SkyCatalogRuntimeResult result = m_runtime->applySource(std::move(record), runtimeBuildOptions());
+    persistCatalogCache();
+    applyRuntimeResult(result);
 }
 
-void SkyCatalogManager::setStatusText(const QString& statusText)
+void SkyCatalogManager::applySourceResult(
+    SkyCatalogSourceImportResult result, const skygate::ephemeris::CatalogCompositionPolicy policy
+)
 {
-    m_statusText = statusText;
-    emit statusTextChanged();
+    SkyCatalogSourceRecord record;
+    record.instanceId = result.sourceId;
+    record.title = result.sourceLabel;
+    record.version = result.sourceVersion;
+    record.policy = policy;
+    record.enabled = true;
+    record.catalog = std::move(result.catalog);
+    record.foundObjectCount = result.foundObjectCount;
+
+    const SkyCatalogRuntimeResult runtimeResult = m_runtime->applySource(std::move(record), runtimeBuildOptions());
+    persistCatalogCache();
+    applyRuntimeResult(runtimeResult);
 }
 
-void SkyCatalogManager::setDownloadingCatalog(const bool downloadingCatalog)
-{
-    if (m_downloadingCatalog == downloadingCatalog) {
-        return;
-    }
-
-    m_downloadingCatalog = downloadingCatalog;
-    emit downloadingCatalogChanged();
-}
-
-void SkyCatalogManager::setCatalogProcessing(const bool catalogProcessing)
-{
-    if (m_catalogProcessing == catalogProcessing) {
-        return;
-    }
-
-    m_catalogProcessing = catalogProcessing;
-    emit catalogProcessingChanged();
-}
-
-void SkyCatalogManager::handleCatalogImportStatus(const QString& statusText)
-{
-    setStatusText(statusText);
-    setCatalogProcessing(SkyCatalogText::isProcessingStatus(statusText));
-}
-
-void SkyCatalogManager::handleCatalogImportFinished(
-    SkyCatalogImportResult result, const QStringList& constellationLineUrlTexts
+void SkyCatalogManager::handleSourceImportFinished(
+    const QString& instanceId,
+    const std::uint64_t revision,
+    SkyCatalogSourceImportResult result,
+    const skygate::ephemeris::CatalogCompositionPolicy policy,
+    const QStringList& relatedDatasetUrls
 )
 {
     setCatalogProcessing(false);
+    SourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr || operation->revision != revision) {
+        return;
+    }
 
     if (result.catalog == nullptr) {
         setDownloadingCatalog(false);
@@ -467,44 +531,68 @@ void SkyCatalogManager::handleCatalogImportFinished(
         return;
     }
 
-    m_cachedCatalogPayload = std::move(result.payload);
-    applyCatalog(std::move(result.catalog), result.sourceLabel);
-    if (result.diagnostics.truncatedBodyCount > 0U) {
+    operation->payload = result.payload;
+    const std::size_t foundObjectCount = result.foundObjectCount;
+    const auto diagnostics = result.diagnostics;
+    const QString sourceLabel = result.sourceLabel;
+    if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
+        m_cachedCatalogPayload = result.payload;
+    } else {
+        m_cachedDeepSkyCatalogPayload = result.payload;
+    }
+
+    applySourceResult(std::move(result), policy);
+
+    if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge && diagnostics.truncatedBodyCount > 0U) {
         setStatusText(
             SkyCatalogText::brightnessFilterSummary(
-                m_statusText, result.diagnostics.selectedBodyCount, result.diagnostics.parsedBodyCount
+                m_statusText, diagnostics.selectedBodyCount, diagnostics.parsedBodyCount
             )
         );
+    } else if (policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly && foundObjectCount > 0U) {
+        setStatusText(SkyCatalogText::deepSkyFoundSummary(m_statusText, sourceLabel, foundObjectCount));
     }
+
     setDownloadingCatalog(false);
 
-    if (!constellationLineUrlTexts.isEmpty()) {
+    if (!relatedDatasetUrls.isEmpty()) {
         resetConstellationLineRefs();
-        downloadConstellationLinesAfterCatalog(constellationLineUrlTexts, m_statusText);
+        downloadConstellationLinesAfterCatalog(instanceId, revision, relatedDatasetUrls, m_statusText);
     }
 }
 
 void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
-    const QStringList& constellationLineUrlTexts, const QString& catalogSummaryText
+    const QString& instanceId,
+    const std::uint64_t revision,
+    const QStringList& constellationLineUrlTexts,
+    const QString& catalogSummaryText
 )
 {
     if (m_importWorkflow == nullptr || constellationLineUrlTexts.isEmpty()) {
         return;
     }
 
-    const std::uint64_t constellationGeneration = m_constellationDownloadGeneration;
+    SourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr || operation->revision != revision) {
+        return;
+    }
+
+    operation->constellationPending = true;
     m_constellationDownloadPending = true;
     m_importWorkflow->downloadConstellationLines(
         constellationLineUrlTexts,
         this,
-        [this, catalogSummaryText, constellationGeneration](const QString& statusText) {
-            if (constellationGeneration == m_constellationDownloadGeneration) {
+        [this, catalogSummaryText, instanceId, revision](const QString& statusText) {
+            if (isOperationCurrent(instanceId, revision)) {
                 handleConstellationLineImportStatus(catalogSummaryText, statusText);
             }
         },
-        [this, catalogSummaryText, constellationGeneration](SkyConstellationLineImportResult lineResult) {
-            if (constellationGeneration != m_constellationDownloadGeneration) {
+        [this, catalogSummaryText, instanceId, revision](SkyConstellationLineImportResult lineResult) {
+            if (!isOperationCurrent(instanceId, revision)) {
                 return;
+            }
+            if (SourceOperation* operation = findOperation(instanceId)) {
+                operation->constellationPending = false;
             }
             m_constellationDownloadPending = false;
             handleConstellationLineImportFinished(catalogSummaryText, std::move(lineResult));
@@ -544,27 +632,56 @@ void SkyCatalogManager::handleConstellationLineImportFinished(
     persistCatalogCache();
 }
 
-void SkyCatalogManager::invalidateConstellationDownload()
+void SkyCatalogManager::invalidatePendingSourceWork()
 {
-    ++m_constellationDownloadGeneration;
+    for (SourceOperation& operation : m_sourceOperations) {
+        ++operation.revision;
+        operation.constellationPending = false;
+    }
     m_constellationDownloadPending = false;
 }
 
-void SkyCatalogManager::handleDeepSkyImportFinished(SkyDeepSkyCatalogImportResult result)
+void SkyCatalogManager::setSourceEnabled(const QString& instanceId, const bool enabled)
 {
-    setCatalogProcessing(false);
-    setDownloadingCatalog(false);
-
-    if (result.catalog == nullptr) {
-        setStatusText(result.errorText);
+    if (m_downloadingCatalog) {
         return;
     }
 
-    m_cachedDeepSkyCatalogPayload = std::move(result.payload);
-    applyDeepSkyCatalog(std::move(result.catalog), result.sourceLabel, result.foundObjectCount);
-    if (result.foundObjectCount > 0U) {
-        setStatusText(SkyCatalogText::deepSkyFoundSummary(m_statusText, result.sourceLabel, result.foundObjectCount));
+    const SkyCatalogRuntimeResult result = m_runtime->setSourceEnabled(instanceId, enabled, runtimeBuildOptions());
+    persistCatalogCache();
+    applyRuntimeResult(result);
+}
+
+void SkyCatalogManager::setStatusText(const QString& statusText)
+{
+    m_statusText = statusText;
+    emit statusTextChanged();
+}
+
+void SkyCatalogManager::setDownloadingCatalog(const bool downloadingCatalog)
+{
+    if (m_downloadingCatalog == downloadingCatalog) {
+        return;
     }
+
+    m_downloadingCatalog = downloadingCatalog;
+    emit downloadingCatalogChanged();
+}
+
+void SkyCatalogManager::setCatalogProcessing(const bool catalogProcessing)
+{
+    if (m_catalogProcessing == catalogProcessing) {
+        return;
+    }
+
+    m_catalogProcessing = catalogProcessing;
+    emit catalogProcessingChanged();
+}
+
+void SkyCatalogManager::handleCatalogImportStatus(const QString& statusText)
+{
+    setStatusText(statusText);
+    setCatalogProcessing(SkyCatalogText::isProcessingStatus(statusText));
 }
 
 SkyCatalogRuntimeBuildOptions SkyCatalogManager::runtimeBuildOptions() const
@@ -605,29 +722,56 @@ void SkyCatalogManager::persistCatalogCache() const
     }
 }
 
-void SkyCatalogManager::applyCatalog(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog, const QString& sourceLabel, const bool persistCatalog
+SkyCatalogManager::SourceOperation* SkyCatalogManager::upsertOperation(
+    const SkyCatalogSourceInstance& source, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
 {
-    const SkyCatalogRuntimeResult result =
-        m_runtime->applyCatalog(std::move(catalog), sourceLabel, runtimeBuildOptions());
-    if (persistCatalog) {
-        persistCatalogCache();
+    SourceOperation* existing = findOperation(source.instanceId);
+    if (existing != nullptr) {
+        existing->instance = source;
+        existing->policy = policy;
+        return existing;
     }
-    applyRuntimeResult(result);
+
+    SourceOperation operation;
+    operation.instance = source;
+    operation.policy = policy;
+    m_sourceOperations.push_back(std::move(operation));
+    return &m_sourceOperations.back();
 }
 
-void SkyCatalogManager::applyDeepSkyCatalog(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-    const QString& sourceLabel,
-    const std::size_t foundObjectCount,
-    const bool persistCatalog
-)
+SkyCatalogManager::SourceOperation* SkyCatalogManager::findOperation(const QString& instanceId)
 {
-    const SkyCatalogRuntimeResult result =
-        m_runtime->applyDeepSkyCatalog(std::move(catalog), sourceLabel, foundObjectCount, runtimeBuildOptions());
-    if (persistCatalog) {
-        persistCatalogCache();
+    for (SourceOperation& operation : m_sourceOperations) {
+        if (operation.instance.instanceId == instanceId) {
+            return &operation;
+        }
     }
-    applyRuntimeResult(result);
+    return nullptr;
+}
+
+const SkyCatalogManager::SourceOperation* SkyCatalogManager::findOperation(const QString& instanceId) const
+{
+    for (const SourceOperation& operation : m_sourceOperations) {
+        if (operation.instance.instanceId == instanceId) {
+            return &operation;
+        }
+    }
+    return nullptr;
+}
+
+void SkyCatalogManager::removeOperation(const QString& instanceId)
+{
+    for (int index = 0; index < m_sourceOperations.size(); ++index) {
+        if (m_sourceOperations[index].instance.instanceId == instanceId) {
+            m_sourceOperations.removeAt(index);
+            return;
+        }
+    }
+}
+
+bool SkyCatalogManager::isOperationCurrent(const QString& instanceId, const std::uint64_t revision) const
+{
+    const SourceOperation* operation = findOperation(instanceId);
+    return operation != nullptr && operation->revision == revision;
 }

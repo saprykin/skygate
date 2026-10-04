@@ -2,6 +2,7 @@
 
 #include "SkyCatalogSourceInstance.hpp"
 
+#include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogLoadResult.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
@@ -20,6 +21,18 @@ class QObject;
 class CatalogCoordinator;
 
 namespace skygate::ui::internal {
+
+struct SkyCatalogSourceImportResult final {
+    QByteArray payload;
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
+    skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
+    std::size_t foundObjectCount = 0;
+    QString sourceLabel;
+    QString sourceId;
+    QString sourceVersion;
+    QString sourceUrl;
+    QString errorText;
+};
 
 struct SkyCatalogImportResult final {
     QByteArray payload;
@@ -55,6 +68,7 @@ struct SkyConstellationLineImportResult final {
 class SkyCatalogImportWorkflow final {
 public:
     using StatusHandler = std::function<void(const QString&)>;
+    using SourceCompletionHandler = std::function<void(SkyCatalogSourceImportResult)>;
     using CatalogCompletionHandler = std::function<void(SkyCatalogImportResult)>;
     using DeepSkyCompletionHandler = std::function<void(SkyDeepSkyCatalogImportResult)>;
     using ConstellationCompletionHandler = std::function<void(SkyConstellationLineImportResult)>;
@@ -64,6 +78,14 @@ public:
     ~SkyCatalogImportWorkflow();
 
     [[nodiscard]] bool isAvailable() const noexcept;
+
+    void downloadSource(
+        const SkyCatalogSourceInstance& source,
+        skygate::ephemeris::CatalogCompositionPolicy policy,
+        QObject* callbackContext,
+        StatusHandler statusHandler,
+        SourceCompletionHandler completionHandler
+    ) const;
 
     void downloadCatalog(
         const SkyCatalogSourceInstance& source,

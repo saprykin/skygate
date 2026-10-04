@@ -6,6 +6,7 @@
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogPresets.hpp"
 #include "SkyCatalogSourceDescriptor.hpp"
+#include "SkyCatalogSourceInstance.hpp"
 #include "SkySettingsStore.hpp"
 
 #include <QFile>
@@ -85,6 +86,8 @@ private slots:
     void staleConstellationResponseIgnoredAfterCustomSwitch();
     void cancelDuringConstellationLoadingIgnoresStaleCompletion();
     void currentConstellationResponseAppliesOnce();
+    void collectionSourcesLoadEnableDisableAndRemoveIndependently();
+    void failedCollectionLoadPreservesPriorDataAndRetrySucceeds();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -493,6 +496,125 @@ void SkyCatalogManagerTests::currentConstellationResponseAppliesOnce()
     QCOMPARE(manager.constellationAnchorGroups().size(), 1U);
     QCOMPARE(manager.catalogRevision(), revisionAfterApply);
     QCOMPARE(catalogSpy.count(), catalogChangesAfterApply);
+}
+
+void SkyCatalogManagerTests::collectionSourcesLoadEnableDisableAndRemoveIndependently()
+{
+    const auto writeSourceFile = [&](const QString& fileName, const char* properName, const int hip) -> QString {
+        const QString path = m_settings.filePath(fileName);
+        if (!writeFile(
+                path,
+                skygate::ui::tests::sampleHygCsvPayload(
+                    {.id = hip, .hip = hip, .properName = QByteArray(properName), .mag = QByteArray("1.0")}
+                )
+            )) {
+            return QString();
+        }
+        return QUrl::fromLocalFile(path).toString();
+    };
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+    QCOMPARE(manager.sourceCount(), std::size_t{1});
+
+    const auto loadLocalSource = [&](const QString& url) {
+        manager.loadSource(
+            skygate::ui::internal::SkyCatalogSourceInstance::createCustom(url),
+            skygate::ephemeris::CatalogCompositionPolicy::Merge
+        );
+        QTRY_VERIFY(!manager.downloadingCatalog());
+    };
+
+    const QString sourceAUrl = writeSourceFile(QStringLiteral("collection-a.csv"), "Collection Star A", 901001);
+    const QString sourceBUrl = writeSourceFile(QStringLiteral("collection-b.csv"), "Collection Star B", 901002);
+    const QString sourceCUrl = writeSourceFile(QStringLiteral("collection-c.csv"), "Collection Star C", 901003);
+    QVERIFY(!sourceAUrl.isEmpty());
+    QVERIFY(!sourceBUrl.isEmpty());
+    QVERIFY(!sourceCUrl.isEmpty());
+
+    loadLocalSource(sourceAUrl);
+    loadLocalSource(sourceBUrl);
+    loadLocalSource(sourceCUrl);
+
+    QCOMPARE(manager.sourceCount(), std::size_t{4});
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star B")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
+
+    const QString sourceAId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceAUrl).instanceId;
+
+    manager.disableSource(sourceAId);
+    QVERIFY(!manager.isSourceEnabled(sourceAId));
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star B")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
+
+    manager.enableSource(sourceAId);
+    QVERIFY(manager.isSourceEnabled(sourceAId));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
+
+    manager.removeSource(sourceAId);
+    QCOMPARE(manager.sourceCount(), std::size_t{3});
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star B")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
+}
+
+void SkyCatalogManagerTests::failedCollectionLoadPreservesPriorDataAndRetrySucceeds()
+{
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+
+    const QString sourceAPath = m_settings.filePath(QStringLiteral("retry-source-a.csv"));
+    QVERIFY(writeFile(
+        sourceAPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 901010, .hip = 901010, .properName = "Retry Source A", .mag = "1.0"}
+        )
+    ));
+    const QString sourceAUrl = QUrl::fromLocalFile(sourceAPath).toString();
+
+    const auto loadLocalSource = [&](const QString& url) {
+        manager.loadSource(
+            skygate::ui::internal::SkyCatalogSourceInstance::createCustom(url),
+            skygate::ephemeris::CatalogCompositionPolicy::Merge
+        );
+        QTRY_VERIFY(!manager.downloadingCatalog());
+    };
+
+    loadLocalSource(sourceAUrl);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Retry Source A")));
+    const std::uint64_t revisionAfterA = manager.catalogRevision();
+
+    const QString retryPath = m_settings.filePath(QStringLiteral("retry-source-b.csv"));
+    const QString retryUrl = QUrl::fromLocalFile(retryPath).toString();
+    const QString retrySourceId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(retryUrl).instanceId;
+
+    QTest::ignoreMessage(
+        QtWarningMsg, QRegularExpression("Catalog source failed file://.*/retry-source-b\\.csv .* HTTP 0")
+    );
+    manager.loadSource(
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(retryUrl),
+        skygate::ephemeris::CatalogCompositionPolicy::Merge
+    );
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    // A failed source operation leaves the prior valid active data untouched.
+    QCOMPARE(manager.catalogRevision(), revisionAfterA);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Retry Source A")));
+    QCOMPARE(manager.sourceCount(), std::size_t{2});
+
+    QVERIFY(writeFile(
+        retryPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 901011, .hip = 901011, .properName = "Retry Source B", .mag = "1.0"}
+        )
+    ));
+    manager.retrySource(retrySourceId);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Retry Source B")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Retry Source A")));
+    QCOMPARE(manager.sourceCount(), std::size_t{3});
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)
