@@ -1,5 +1,6 @@
 #include "OpenNgcCatalogParser.hpp"
 #include "OpenNgcObjectMapper.hpp"
+#include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 #include "catalog/io/DelimitedCatalogParser.hpp"
 
@@ -26,17 +27,19 @@ constexpr std::string_view kOpenNgcInvalidCategoryLabels[] = {
 CatalogBodyParseResult
 OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgressCallback& progressCallback) const
 {
+    const CatalogSchemaDescriptor* schema = CatalogSchemaRegistry::find(CatalogSourceType::OpenNgcCsv);
+    if (schema == nullptr) {
+        CatalogBodyParseResult result;
+        result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
+        result.errorDetail = "OpenNGC CSV schema is not registered.";
+        return result;
+    }
+
     return DelimitedCatalogParser::run(
         data,
         DelimitedCatalogReaderOptions{
-            .separator = ';',
-            .requiredColumns =
-                {
-                    QStringLiteral("Name"),
-                    QStringLiteral("Type"),
-                    QStringLiteral("RA"),
-                    QStringLiteral("Dec"),
-                },
+            .separator = schema->delimiter,
+            .requiredColumns = schema->requiredColumns,
             .invalidErrorCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
             .rowCountLimitFloor = kOpenNgcRowCountLimitFloor,
             .minExpectedBytesPerDataRow = kOpenNgcMinExpectedBytesPerDataRow,
@@ -48,7 +51,7 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
         DelimitedCatalogParserOptions{
             .zeroResultCode = CatalogLoadResult::ErrorCode::InvalidOpenNgcCsv,
             .zeroResultDetail = "OpenNGC CSV payload does not contain any valid deep-sky object rows.",
-            .formatName = "OpenNGC CSV",
+            .formatName = schema->diagnosticName,
         },
         kOpenNgcInvalidCategoryLabels,
         [](const DelimitedCatalogRow& row, std::size_t rowNumber) -> RowParseOutcome {

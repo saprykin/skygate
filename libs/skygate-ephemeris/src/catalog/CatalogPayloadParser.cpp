@@ -1,5 +1,6 @@
 #include "CatalogPayloadParser.hpp"
 #include "CatalogLoader.hpp"
+#include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 
 #include <QLoggingCategory>
@@ -16,21 +17,15 @@ Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 QString catalogSourceTypeText(const CatalogSourceType type)
 {
     switch (type) {
-    case CatalogSourceType::HygCsv:
-        return QStringLiteral("HYG CSV");
     case CatalogSourceType::HygCsvGzip:
-        return QStringLiteral("HYG CSV gzip");
+        return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(CatalogSourceType::HygCsv))
+               + QStringLiteral(" gzip");
     case CatalogSourceType::HygCsvZip:
-        return QStringLiteral("HYG CSV ZIP");
-    case CatalogSourceType::OpenNgcCsv:
-        return QStringLiteral("OpenNGC CSV");
-    case CatalogSourceType::Bundled:
-        return QStringLiteral("bundled");
-    case CatalogSourceType::Unknown:
-        return QStringLiteral("unknown");
+        return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(CatalogSourceType::HygCsv))
+               + QStringLiteral(" ZIP");
+    default:
+        return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(type));
     }
-
-    return QStringLiteral("unknown");
 }
 
 CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
