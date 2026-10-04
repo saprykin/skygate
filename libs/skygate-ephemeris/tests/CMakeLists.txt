@@ -482,6 +482,12 @@ add_skygate_ephemeris_qtest(
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-composition-collection-tests
+    catalog/CatalogCompositionCollectionTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-constellation-data-codec-tests
     catalog/constellation/ConstellationDataCodecTests.cpp
 )

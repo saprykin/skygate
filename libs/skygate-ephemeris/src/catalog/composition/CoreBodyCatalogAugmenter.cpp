@@ -1,13 +1,18 @@
 #include "CoreBodyCatalogAugmenter.hpp"
+
 #include "CelestialBodyCatalog.hpp"
-#include "StringUtilities.hpp"
+#include "catalog/CatalogCompositionMerger.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentity.hpp"
+#include "catalog/InMemoryStarCatalog.hpp"
 
-#include <algorithm>
 #include <array>
+#include <cstddef>
+#include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace skygate::ephemeris {
 namespace {
@@ -31,93 +36,79 @@ constexpr std::array<BundledBrightStar, 8> kBundledBrightStars{{
     {"betelgeuse", "Betelgeuse", 5.9195, 7.4071, 0.42},
 }};
 
-bool isSunOrMoonType(const BaseCelestialBody::Kind type)
-{
-    return type == BaseCelestialBody::Kind::Sun || type == BaseCelestialBody::Kind::Moon;
-}
-
-CatalogCompositionSource sourceKindForBody(const BaseCelestialBody& body)
-{
-    return CatalogIdentity::isAnalyticSolarSystemBody(body) ? CatalogCompositionSource::BuiltInEphemeris
-                                                            : CatalogCompositionSource::Primary;
-}
-
-bool containsBodyId(const std::span<const OwnGalaxyCelestialBody> bodies, const std::string_view id)
-{
-    return std::any_of(bodies.begin(), bodies.end(), [id](const OwnGalaxyCelestialBody& body) {
-        return StringUtilities::equalsIgnoreAsciiCase(body.id, id);
-    });
-}
-
 }  // namespace
 
 CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<const BaseCelestialBody* const> bodies)
 {
-    CatalogAugmentationResult result;
-    result.bodies.reserve(bodies.size());
-    result.sourceKinds.reserve(result.bodies.size());
-    for (const BaseCelestialBody* body : bodies) {
-        if (body == nullptr || body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            continue;
-        }
-        result.bodies.push_back(CelestialBodyCatalog::copyOwnGalaxyBody(*body));
-        result.sourceKinds.push_back(sourceKindForBody(*body));
-    }
+    // Express the legacy single-slot augmentation as an ordered source
+    // collection and delegate to the authoritative collection merge. The
+    // primary slot contributes every body kind; the bundled catalog is the
+    // explicit AugmentCore source that gap-fills non-deep-sky bodies and
+    // enables the bright-star fallback.
+    CelestialBodyCatalog primaryCatalog(bodies);
+    InMemoryStarCatalog primarySource(std::move(primaryCatalog));
 
-    const std::size_t starCount = static_cast<std::size_t>(
-        std::count_if(result.bodies.begin(), result.bodies.end(), [](const OwnGalaxyCelestialBody& body) {
-            return body.kind == BaseCelestialBody::Kind::Star;
-        })
+    CatalogCompositionRequest request;
+    request.sources.reserve(2U);
+    request.sources.push_back(
+        CatalogCompositionSourceEntry{
+            .sourceId = std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::Primary)),
+            .enabled = true,
+            .catalog = &primarySource,
+            .policy = CatalogCompositionPolicy::Merge,
+        }
     );
 
     std::unique_ptr<IStarCatalog> bundledCatalog = CatalogFactory::createBundledStarCatalog();
-    if (bundledCatalog == nullptr) {
-        return result;
-    }
-
-    for (const BaseCelestialBody* body : bundledCatalog->bodies()) {
-        if (body == nullptr) {
-            continue;
-        }
-
-        if (!isSunOrMoonType(body->kind) && body->kind != BaseCelestialBody::Kind::Planet
-            && body->kind != BaseCelestialBody::Kind::DeepSkyObject) {
-            continue;
-        }
-
-        if (body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            continue;
-        }
-
-        if (containsBodyId(result.bodies, body->id)) {
-            continue;
-        }
-
-        result.sourceKinds.push_back(sourceKindForBody(*body));
-        result.bodies.push_back(CelestialBodyCatalog::copyOwnGalaxyBody(*body));
-    }
-
-    if (starCount == 0U) {
-        for (const BundledBrightStar& star : kBundledBrightStars) {
-            if (containsBodyId(result.bodies, star.id)) {
-                continue;
+    if (bundledCatalog != nullptr) {
+        request.sources.push_back(
+            CatalogCompositionSourceEntry{
+                .sourceId =
+                    std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::BuiltInEphemeris)),
+                .enabled = true,
+                .catalog = bundledCatalog.get(),
+                .policy = CatalogCompositionPolicy::AugmentCore,
             }
-
-            OwnGalaxyCelestialBody body;
-            body.id = star.id;
-            body.displayName = star.displayName;
-            body.kind = BaseCelestialBody::Kind::Star;
-            body.visualMagnitude = star.visualMagnitude;
-            body.fixedEquatorial = skygate::core::EquatorialCoordinate{
-                .rightAscensionHours = star.rightAscensionHours, .declinationDeg = star.declinationDeg
-            };
-
-            result.sourceKinds.push_back(CatalogCompositionSource::BuiltInEphemeris);
-            result.bodies.push_back(std::move(body));
-        }
+        );
     }
 
+    CatalogCompositionMergeResult merged = CatalogCompositionMerger::mergeCollection(request);
+
+    CatalogAugmentationResult result;
+    result.sourceKinds.reserve(merged.ownGalaxyBodies.size());
+    for (std::size_t position = 0; position < merged.orderedBodyIndexes.size(); ++position) {
+        const CelestialBodyCatalog::OrderEntry& orderEntry = merged.orderedBodyIndexes[position];
+        if (orderEntry.domain != CelestialBodyCatalog::BodyDomain::OwnGalaxy) {
+            continue;
+        }
+
+        const OwnGalaxyCelestialBody& body = merged.ownGalaxyBodies[orderEntry.bodyIndex];
+        if (CatalogIdentity::isAnalyticSolarSystemBody(body)) {
+            result.sourceKinds.push_back(CatalogCompositionSource::BuiltInEphemeris);
+            continue;
+        }
+        result.sourceKinds.push_back(CatalogCompositionMerger::sourceKindFromId(merged.sourceIds[position]));
+    }
+    result.bodies = std::move(merged.ownGalaxyBodies);
     return result;
+}
+
+std::vector<OwnGalaxyCelestialBody> CoreBodyCatalogAugmenter::bundledBrightStars()
+{
+    std::vector<OwnGalaxyCelestialBody> bodies;
+    bodies.reserve(kBundledBrightStars.size());
+    for (const BundledBrightStar& star : kBundledBrightStars) {
+        OwnGalaxyCelestialBody body;
+        body.id = star.id;
+        body.displayName = star.displayName;
+        body.kind = BaseCelestialBody::Kind::Star;
+        body.visualMagnitude = star.visualMagnitude;
+        body.fixedEquatorial = skygate::core::EquatorialCoordinate{
+            .rightAscensionHours = star.rightAscensionHours, .declinationDeg = star.declinationDeg
+        };
+        bodies.push_back(std::move(body));
+    }
+    return bodies;
 }
 
 }  // namespace skygate::ephemeris
