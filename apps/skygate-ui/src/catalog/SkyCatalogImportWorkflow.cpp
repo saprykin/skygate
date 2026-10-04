@@ -1,11 +1,10 @@
 #include "SkyCatalogImportWorkflow.hpp"
 #include "CatalogCoordinator.hpp"
+#include "catalog/CatalogIdentity.hpp"
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
 #include <QLoggingCategory>
 
-#include <algorithm>
-#include <span>
 #include <string_view>
 #include <utility>
 
@@ -13,15 +12,6 @@ namespace skygate::ui::internal {
 namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
-
-std::size_t countDeepSkyObjects(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies)
-{
-    return static_cast<std::size_t>(
-        std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
-            return body != nullptr && body->kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
-        })
-    );
-}
 
 std::string_view payloadView(const QByteArray& payload)
 {
@@ -116,8 +106,8 @@ void SkyCatalogImportWorkflow::downloadDeepSkyCatalog(
             const auto bodies = result.catalog->bodies();
             result.foundObjectCount = downloadResult.diagnostics.parsedBodyCount > 0U
                                           ? downloadResult.diagnostics.parsedBodyCount
-                                          : countDeepSkyObjects(bodies);
-            if (countDeepSkyObjects(bodies) == 0U) {
+                                          : skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies);
+            if (skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies) == 0U) {
                 result.catalog.reset();
                 result.errorText = "Catalog: Downloaded deep-sky catalog contains no DSOs";
             }

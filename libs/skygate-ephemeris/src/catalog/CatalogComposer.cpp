@@ -21,35 +21,15 @@ void assignCompositionCounts(
 )
 {
     std::size_t catalogConstellationCount = 0;
-    std::size_t deepSkyObjectCount = 0;
     for (const BaseCelestialBody* body : bodies) {
-        if (body == nullptr) {
-            continue;
-        }
-
-        if (body->kind == BaseCelestialBody::Kind::Constellation) {
+        if (body != nullptr && body->kind == BaseCelestialBody::Kind::Constellation) {
             ++catalogConstellationCount;
-        }
-        if (body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            ++deepSkyObjectCount;
         }
     }
 
     result.bodyCount = bodies.size();
     result.constellationCount = std::max(catalogConstellationCount, currentConstellationCount);
-    result.deepSkyObjectCount = deepSkyObjectCount;
-}
-
-DistantCelestialBody toDistantBody(const BaseCelestialBody& body)
-{
-    DistantCelestialBody distantBody;
-    distantBody.id = body.id;
-    distantBody.displayName = body.displayName;
-    distantBody.kind = body.kind;
-    distantBody.visualMagnitude = body.visualMagnitude;
-    distantBody.fixedEquatorial = body.fixedEquatorialValue();
-    distantBody.deepSkyObject = body.deepSkyObjectValue();
-    return distantBody;
+    result.deepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(bodies);
 }
 
 std::vector<DistantCelestialBody>
@@ -58,7 +38,7 @@ collectPrimaryDeepSkyBodies(const std::span<const BaseCelestialBody* const> sour
     std::vector<DistantCelestialBody> bodies;
     for (const BaseCelestialBody* body : sourceBodies) {
         if (body != nullptr && body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            bodies.push_back(toDistantBody(*body));
+            bodies.push_back(CelestialBodyCatalog::copyDistantBody(*body));
         }
     }
     return bodies;

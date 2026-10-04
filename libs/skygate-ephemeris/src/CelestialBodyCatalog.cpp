@@ -6,9 +6,8 @@
 #include <utility>
 
 namespace skygate::ephemeris {
-namespace {
 
-[[nodiscard]] OwnGalaxyCelestialBody toOwnGalaxyBody(const BaseCelestialBody& body)
+OwnGalaxyCelestialBody CelestialBodyCatalog::copyOwnGalaxyBody(const BaseCelestialBody& body)
 {
     OwnGalaxyCelestialBody ownGalaxyBody;
     ownGalaxyBody.id = body.id;
@@ -24,7 +23,7 @@ namespace {
     return ownGalaxyBody;
 }
 
-[[nodiscard]] DistantCelestialBody toDistantBody(const BaseCelestialBody& body)
+DistantCelestialBody CelestialBodyCatalog::copyDistantBody(const BaseCelestialBody& body)
 {
     DistantCelestialBody distantBody;
     distantBody.id = body.id;
@@ -40,7 +39,23 @@ namespace {
     return distantBody;
 }
 
-}  // namespace
+void CelestialBodyCatalog::appendBodyEntry(const BaseCelestialBody& body)
+{
+    if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
+        m_orderedBodyIndexes.push_back(OrderEntry{.domain = BodyDomain::Distant, .bodyIndex = m_distantBodies.size()});
+        m_distantBodies.push_back(copyDistantBody(body));
+        return;
+    }
+
+    m_orderedBodyIndexes.push_back(OrderEntry{.domain = BodyDomain::OwnGalaxy, .bodyIndex = m_ownGalaxyBodies.size()});
+    m_ownGalaxyBodies.push_back(copyOwnGalaxyBody(body));
+}
+
+void CelestialBodyCatalog::appendBody(const BaseCelestialBody& body)
+{
+    appendBodyEntry(body);
+    rebuildOrderedBodies();
+}
 
 CelestialBodyCatalog::CelestialBodyCatalog(const CelestialBodyCatalog& other)
     : m_ownGalaxyBodies(other.m_ownGalaxyBodies), m_distantBodies(other.m_distantBodies),
@@ -92,18 +107,7 @@ CelestialBodyCatalog::CelestialBodyCatalog(const std::span<const BaseCelestialBo
             continue;
         }
 
-        if (body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            m_orderedBodyIndexes.push_back(
-                OrderEntry{.domain = BodyDomain::Distant, .bodyIndex = m_distantBodies.size()}
-            );
-            m_distantBodies.push_back(toDistantBody(*body));
-            continue;
-        }
-
-        m_orderedBodyIndexes.push_back(
-            OrderEntry{.domain = BodyDomain::OwnGalaxy, .bodyIndex = m_ownGalaxyBodies.size()}
-        );
-        m_ownGalaxyBodies.push_back(toOwnGalaxyBody(*body));
+        appendBodyEntry(*body);
     }
     rebuildOrderedBodies();
 }

@@ -2,7 +2,6 @@
 #include "catalog/CatalogIdentity.hpp"
 
 #include <algorithm>
-#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
@@ -12,35 +11,21 @@ void pushBody(
 )
 {
     if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
-        DistantCelestialBody distantBody;
-        distantBody.id = body.id;
-        distantBody.displayName = body.displayName;
-        distantBody.kind = body.kind;
-        distantBody.visualMagnitude = body.visualMagnitude;
-        distantBody.fixedEquatorial = body.fixedEquatorialValue();
-        distantBody.deepSkyObject = body.deepSkyObjectValue();
         result.orderedBodyIndexes.push_back(
             CelestialBodyCatalog::OrderEntry{
                 .domain = CelestialBodyCatalog::BodyDomain::Distant,
                 .bodyIndex = result.distantBodies.size(),
             }
         );
-        result.distantBodies.push_back(std::move(distantBody));
+        result.distantBodies.push_back(CelestialBodyCatalog::copyDistantBody(body));
     } else {
-        OwnGalaxyCelestialBody ownGalaxyBody;
-        ownGalaxyBody.id = body.id;
-        ownGalaxyBody.displayName = body.displayName;
-        ownGalaxyBody.kind = body.kind;
-        ownGalaxyBody.visualMagnitude = body.visualMagnitude;
-        ownGalaxyBody.fixedEquatorial = body.fixedEquatorialValue();
-        ownGalaxyBody.starAstrometry = body.starAstrometryValue();
         result.orderedBodyIndexes.push_back(
             CelestialBodyCatalog::OrderEntry{
                 .domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy,
                 .bodyIndex = result.ownGalaxyBodies.size(),
             }
         );
-        result.ownGalaxyBodies.push_back(std::move(ownGalaxyBody));
+        result.ownGalaxyBodies.push_back(CelestialBodyCatalog::copyOwnGalaxyBody(body));
     }
 
     result.sourceKinds.push_back(sourceKind);

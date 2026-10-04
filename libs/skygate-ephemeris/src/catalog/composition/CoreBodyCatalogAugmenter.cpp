@@ -1,4 +1,5 @@
 #include "CoreBodyCatalogAugmenter.hpp"
+#include "CelestialBodyCatalog.hpp"
 #include "StringUtilities.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentity.hpp"
@@ -41,18 +42,6 @@ CatalogCompositionSource sourceKindForBody(const BaseCelestialBody& body)
                                                             : CatalogCompositionSource::Primary;
 }
 
-OwnGalaxyCelestialBody toOwnGalaxyBody(const BaseCelestialBody& body)
-{
-    OwnGalaxyCelestialBody ownGalaxyBody;
-    ownGalaxyBody.id = body.id;
-    ownGalaxyBody.displayName = body.displayName;
-    ownGalaxyBody.kind = body.kind;
-    ownGalaxyBody.visualMagnitude = body.visualMagnitude;
-    ownGalaxyBody.fixedEquatorial = body.fixedEquatorialValue();
-    ownGalaxyBody.starAstrometry = body.starAstrometryValue();
-    return ownGalaxyBody;
-}
-
 bool containsBodyId(const std::span<const OwnGalaxyCelestialBody> bodies, const std::string_view id)
 {
     return std::any_of(bodies.begin(), bodies.end(), [id](const OwnGalaxyCelestialBody& body) {
@@ -71,7 +60,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
         if (body == nullptr || body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
             continue;
         }
-        result.bodies.push_back(toOwnGalaxyBody(*body));
+        result.bodies.push_back(CelestialBodyCatalog::copyOwnGalaxyBody(*body));
         result.sourceKinds.push_back(sourceKindForBody(*body));
     }
 
@@ -105,7 +94,7 @@ CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<cons
         }
 
         result.sourceKinds.push_back(sourceKindForBody(*body));
-        result.bodies.push_back(toOwnGalaxyBody(*body));
+        result.bodies.push_back(CelestialBodyCatalog::copyOwnGalaxyBody(*body));
     }
 
     if (starCount == 0U) {
