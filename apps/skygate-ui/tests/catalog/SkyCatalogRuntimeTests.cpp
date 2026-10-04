@@ -1,4 +1,5 @@
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 #include "catalog/SkyCatalogRuntime.hpp"
 
 #include <QtTest/QtTest>
@@ -28,6 +29,29 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> makeCatalog()
     );
 }
 
+skygate::ephemeris::OwnGalaxyCelestialBody
+makeHipCrossIdentifiedBody(std::string id, std::string hip, std::string displayName, const double magnitude = 1.0)
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody body = makeFixedBody(std::move(id), std::move(displayName), magnitude);
+    body.identity.externalIdentifiers.push_back(skygate::ephemeris::CatalogIdentifier::make("hip", std::move(hip)));
+    return body;
+}
+
+std::unique_ptr<skygate::ephemeris::IStarCatalog> makeCrossIdentifiedCatalog()
+{
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
+        {makeHipCrossIdentifiedBody("catalog_a_1", "1", "Alpha"),
+         makeHipCrossIdentifiedBody("catalog_a_2", "2", "Beta", 2.0)}
+    );
+}
+
+std::unique_ptr<skygate::ephemeris::IStarCatalog> makeCatalogWithoutHipCrossIds()
+{
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
+        {makeFixedBody("other_1", "Other 1"), makeFixedBody("other_2", "Other 2", 2.0)}
+    );
+}
+
 }  // namespace
 
 class SkyCatalogRuntimeTests final : public QObject {
@@ -36,6 +60,7 @@ class SkyCatalogRuntimeTests final : public QObject {
 private slots:
     void initializeBuildsActiveCatalogAndCacheRequest();
     void restoreConstellationRefsUpdatesRevisionAndCount();
+    void resolvedRefsTrackIdentityAndInvalidateOnSourceChange();
     void nullCatalogReportsFailureWithoutCatalogChange();
 };
 
@@ -72,6 +97,38 @@ void SkyCatalogRuntimeTests::restoreConstellationRefsUpdatesRevisionAndCount()
     QCOMPARE(runtime.constellationCount(), 1U);
     QCOMPARE(runtime.constellationLineRefs().size(), 1U);
     QCOMPARE(runtime.constellationAnchorGroups().size(), 1U);
+}
+
+void SkyCatalogRuntimeTests::resolvedRefsTrackIdentityAndInvalidateOnSourceChange()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCrossIdentifiedCatalog());
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
+    static_cast<void>(runtime.restoreConstellationRefs({{"hip_1", "hip_2"}}, {{"Orion", {"hip_1", "hip_2"}}}, 1U));
+
+    // The adapter-visible references keep their HIP spelling.
+    QCOMPARE(runtime.constellationLineRefs().size(), 1U);
+    QVERIFY(runtime.constellationLineRefs()[0].first == "hip_1");
+    QVERIFY(runtime.constellationLineRefs()[0].second == "hip_2");
+
+    // Consumers receive references resolved to the canonical body IDs.
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].first == "catalog_a_1");
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].second == "catalog_a_2");
+    QCOMPARE(runtime.resolvedConstellationAnchorGroups().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationAnchorGroups()[0].first == "Orion");
+    QCOMPARE(runtime.resolvedConstellationAnchorGroups()[0].second.size(), 2U);
+    QVERIFY(runtime.resolvedConstellationAnchorGroups()[0].second[0] == "catalog_a_1");
+    QVERIFY(runtime.resolvedConstellationAnchorGroups()[0].second[1] == "catalog_a_2");
+
+    // Replacing the source invalidates the previous resolutions.
+    const auto revisionBeforeReplace = runtime.catalogRevision();
+    const auto replaceResult = runtime.applyCatalog(
+        makeCatalogWithoutHipCrossIds(), QStringLiteral("Other"), {.useBundledDeepSkyCatalog = false}
+    );
+    QVERIFY(replaceResult.catalogChanged);
+    QVERIFY(runtime.catalogRevision() > revisionBeforeReplace);
+    QVERIFY(runtime.resolvedConstellationLineRefs().empty());
+    QVERIFY(runtime.resolvedConstellationAnchorGroups().empty());
 }
 
 void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()

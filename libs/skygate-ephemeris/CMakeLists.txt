@@ -213,6 +213,7 @@ add_library(skygate-ephemeris STATIC
     src/CelestialReferenceCalculator.hpp
     src/catalog/constellation/ConstellationData.hpp
     src/catalog/constellation/ConstellationDataCodec.hpp
+    src/catalog/constellation/ConstellationReferenceResolver.hpp
     src/ConstellationReferenceCalculator.hpp
     src/engine/DeltaTDataLoader.hpp
     src/engine/IEarthOrientationProvider.hpp
@@ -366,6 +367,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/DelimitedCatalogParserOptions.cpp
     src/catalog/io/RowParseOutcome.cpp
     src/catalog/constellation/ConstellationDataCodec.cpp
+    src/catalog/constellation/ConstellationReferenceResolver.cpp
     src/catalog/composition/CatalogAugmentationResult.cpp
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
     src/catalog/composition/DeepSkyCatalogMerger.cpp

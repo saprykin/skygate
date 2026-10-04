@@ -378,6 +378,8 @@ public:
     [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
+    [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
 
     Q_INVOKABLE void setLive(bool live);
     Q_INVOKABLE void setTimelineToolbarCollapsed(bool timelineToolbarCollapsed);

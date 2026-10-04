@@ -414,8 +414,8 @@ std::optional<SkySceneCompositionInput> SkySceneModel::buildSceneInput() const
                 .themeId = m_skyContextController->themeId(),
                 .renderTheme = m_skyContextController->renderTheme(),
                 .overlayLayers = m_skyContextController->overlayLayerVisibility(),
-                .constellationLineRefs = m_skyContextController->constellationLineRefs(),
-                .constellationAnchorGroups = m_skyContextController->constellationAnchorGroups()
+                .constellationLineRefs = m_skyContextController->resolvedConstellationLineRefs(),
+                .constellationAnchorGroups = m_skyContextController->resolvedConstellationAnchorGroups()
             },
         .selectionEphemerisRequest = ephemerisRequestContext.request,
         .catalogSourceIds = m_skyContextController->catalogSourceIds(),

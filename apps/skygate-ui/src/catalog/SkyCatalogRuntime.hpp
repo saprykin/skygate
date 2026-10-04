@@ -48,6 +48,8 @@ public:
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
+    [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
 
     [[nodiscard]] SkyCatalogRuntimeResult initialize(const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult applyCatalog(
@@ -79,6 +81,7 @@ public:
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
     [[nodiscard]] SkyCatalogRuntimeResult failedDeepSkyCatalogResult(const QString& statusText);
+    void refreshResolvedConstellationRefs() const;
 
 private:
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
@@ -93,6 +96,9 @@ private:
     QStringList m_sourceLabels;
     std::vector<std::uint8_t> m_sourceIds;
     SkyCatalogConstellationStore m_constellationRefs;
+    mutable std::vector<ConstellationLineRef> m_resolvedLineRefs;
+    mutable std::vector<ConstellationAnchorGroup> m_resolvedAnchorGroups;
+    mutable std::uint64_t m_resolvedRevision = 0U;
 };
 
 }  // namespace skygate::ui::internal

@@ -54,6 +54,11 @@ public:
     // safely after its identity union has grown.
     void add(const BaseCelestialBody& body, std::size_t resultIndex);
 
+    // Pre-sizes the internal key maps for the expected number of registered
+    // bodies. Registration without an up-front reserve remains correct; this
+    // only avoids repeated rehashing when a large catalog is indexed at once.
+    void reserve(std::size_t bodyCount);
+
     // Resolves `body` against the bodies registered so far. Authoritative keys
     // (canonical id and external identifiers) are preferred over deep-sky
     // aliases.

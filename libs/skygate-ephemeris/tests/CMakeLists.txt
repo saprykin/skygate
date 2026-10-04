@@ -492,6 +492,10 @@ add_skygate_ephemeris_qtest(
     catalog/constellation/ConstellationDataCodecTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-constellation-reference-resolver-tests
+    catalog/constellation/ConstellationReferenceResolverTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-body-trail-calculator-tests
     engine/BodyTrailCalculatorTests.cpp
 )

@@ -106,7 +106,7 @@ bool SkyContextController::focusSearchTarget(const QString& targetKind, const QS
         const auto snapshot = engine->compute(requestContext.request);
         const qint64 snapshotNs = skygate::ui::performanceElapsedNanoseconds(timer);
         const auto center = skygate::ephemeris::ConstellationReferenceCalculator::anchorCentroid(
-            snapshot, constellationAnchorGroups(), targetId.toStdString()
+            snapshot, resolvedConstellationAnchorGroups(), targetId.toStdString()
         );
         const qint64 centerLookupNs = skygate::ui::performanceElapsedNanoseconds(timer);
         if (!center.has_value()) {
