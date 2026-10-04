@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SkyCatalogSourceInstance.hpp"
+#include "SkyCatalogSourceRecord.hpp"
 #include "SkySettingsStore.hpp"
 
 #include "catalog/CatalogCompositionPolicy.hpp"
@@ -40,6 +41,19 @@ public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
     using ConstellationAnchorGroup = skygate::ephemeris::ConstellationAnchorGroup;
 
+    struct SourceViewEntry final {
+        QString instanceId;
+        QString title;
+        QString version;
+        skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+        bool enabled = true;
+        bool bundled = false;
+        bool busy = false;
+        bool hasError = false;
+        QString statusText;
+        std::size_t objectCount = 0;
+    };
+
     explicit SkyCatalogManager(
         SkySettingsStore* settingsStore,
         std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
@@ -66,6 +80,7 @@ public:
     [[nodiscard]] QStringList sourceInstanceIds() const;
     [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
     [[nodiscard]] QStringList sourceLabels() const;
+    [[nodiscard]] QVector<SourceViewEntry> sourceViewEntries() const;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
@@ -84,13 +99,17 @@ public:
         const skygate::ui::internal::SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy
     );
+    void addSourcePreset(const QString& presetId);
+    void addSourceUrl(const QString& urlText, const QString& category);
     void enableSource(const QString& instanceId);
     void disableSource(const QString& instanceId);
     void removeSource(const QString& instanceId);
+    void moveSource(const QString& instanceId, int targetIndex);
     void retrySource(const QString& instanceId);
     void cancelCatalogDownload();
     bool clearCatalogCache();
     bool clearDeepSkyCatalogCache();
+    bool clearSourceCache(const QString& instanceId);
     bool restoreCatalogCache();
 
 signals:
@@ -100,6 +119,7 @@ signals:
     void downloadingCatalogChanged();
     void catalogProcessingChanged();
     void catalogChanged();
+    void sourcesChanged();
 
 private:
     struct SourceOperation final {
@@ -108,13 +128,16 @@ private:
         QByteArray payload;
         std::uint64_t revision = 0;
         bool constellationPending = false;
+        bool busy = false;
+        bool hasError = false;
+        QString statusText;
     };
 
     void loadSourceInstance(
         const skygate::ui::internal::SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy
     );
-    void applyBundledSource(const SourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy);
+    void applyBundledSource(SourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy);
     void applySourceResult(
         skygate::ui::internal::SkyCatalogSourceImportResult result, skygate::ephemeris::CatalogCompositionPolicy policy
     );
@@ -138,7 +161,7 @@ private:
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
     void setCatalogProcessing(bool catalogProcessing);
-    void handleCatalogImportStatus(const QString& statusText);
+    void handleCatalogImportStatus(const QString& instanceId, const QString& statusText);
     void downloadConstellationLinesAfterCatalog(
         const QString& instanceId,
         std::uint64_t revision,

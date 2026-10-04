@@ -50,8 +50,9 @@ class ICalcephKernelProvider;
 }  // namespace skygate::ephemeris
 
 namespace skygate::ui::internal {
+class SkyCatalogSourceCollectionModel;
 class SkyCatalogSourcePresetModel;
-}
+}  // namespace skygate::ui::internal
 
 class QDateTime;
 class QGeoPositionInfo;
@@ -201,7 +202,7 @@ class SkyContextController final : public QObject {
     )
     Q_PROPERTY(QAbstractItemModel* objectSearchModel READ objectSearchModel CONSTANT)
     Q_PROPERTY(QAbstractItemModel* catalogSourcePresetModel READ catalogSourcePresetModel CONSTANT)
-    Q_PROPERTY(QAbstractItemModel* deepSkySourcePresetModel READ deepSkySourcePresetModel CONSTANT)
+    Q_PROPERTY(QAbstractItemModel* catalogSourceCollectionModel READ catalogSourceCollectionModel CONSTANT)
     Q_PROPERTY(bool downloadingCatalog READ downloadingCatalog NOTIFY downloadingCatalogChanged)
     Q_PROPERTY(bool catalogProcessing READ catalogProcessing NOTIFY catalogProcessingChanged)
     Q_PROPERTY(
@@ -348,7 +349,7 @@ public:
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
     [[nodiscard]] QAbstractItemModel* catalogSourcePresetModel() const noexcept;
-    [[nodiscard]] QAbstractItemModel* deepSkySourcePresetModel() const noexcept;
+    [[nodiscard]] QAbstractItemModel* catalogSourceCollectionModel() const noexcept;
     [[nodiscard]] bool downloadingCatalog() const noexcept;
     [[nodiscard]] bool catalogProcessing() const noexcept;
     [[nodiscard]] QString selectedSearchTargetKind() const;
@@ -432,6 +433,14 @@ public:
     Q_INVOKABLE void downloadCatalogFromUrl(const QString& urlText);
     Q_INVOKABLE void loadDeepSkyCatalogPreset(const QString& presetId);
     Q_INVOKABLE void downloadDeepSkyCatalogFromUrl(const QString& urlText);
+    Q_INVOKABLE void addCatalogSourcePreset(const QString& presetId);
+    Q_INVOKABLE void addCatalogSourceUrl(const QString& urlText, const QString& category);
+    Q_INVOKABLE void enableCatalogSource(const QString& instanceId);
+    Q_INVOKABLE void disableCatalogSource(const QString& instanceId);
+    Q_INVOKABLE void removeCatalogSource(const QString& instanceId);
+    Q_INVOKABLE void moveCatalogSource(const QString& instanceId, int targetIndex);
+    Q_INVOKABLE void retryCatalogSource(const QString& instanceId);
+    Q_INVOKABLE bool clearCatalogSourceCache(const QString& instanceId);
     Q_INVOKABLE int catalogPresetIndex() const noexcept;
     Q_INVOKABLE void setCatalogPresetIndex(int catalogPresetIndex);
     Q_INVOKABLE QString catalogUrlText() const;
@@ -441,9 +450,8 @@ public:
     Q_INVOKABLE QString deepSkyCatalogUrlText() const;
     Q_INVOKABLE void setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUrlText);
     Q_INVOKABLE QString catalogSourcePresetId(int index) const;
-    Q_INVOKABLE QString catalogSourcePresetUrl(int index) const;
-    Q_INVOKABLE QString deepSkySourcePresetId(int index) const;
-    Q_INVOKABLE QString deepSkySourcePresetUrl(int index) const;
+    Q_INVOKABLE QString catalogSourcePresetCategory(int index) const;
+    Q_INVOKABLE bool catalogSourcePresetIsCustom(int index) const;
     Q_INVOKABLE bool focusSearchTarget(const QString& targetKind, const QString& targetId);
     Q_INVOKABLE void clearSelectedSearchTarget();
     Q_INVOKABLE bool trackSearchTarget(const QString& targetKind, const QString& targetId);
@@ -508,6 +516,7 @@ private:
     void updateLocationStatusText();
     void setProjectionType(skygate::core::ProjectionType projectionType);
     void refreshObjectSearchModel();
+    void refreshCatalogSourceCollectionModel();
     void applyLoggingConfiguration();
     void setSelectedSearchTarget(const QString& targetKind, const QString& targetId);
     void setTrackedTarget(const QString& targetKind, const QString& targetId, const QString& displayText);
@@ -565,7 +574,7 @@ private:
     std::unique_ptr<SkyCatalogManager> m_catalogManager;
     std::unique_ptr<SkyObjectSearchModel> m_objectSearchModel;
     std::unique_ptr<skygate::ui::internal::SkyCatalogSourcePresetModel> m_catalogSourcePresetModel;
-    std::unique_ptr<skygate::ui::internal::SkyCatalogSourcePresetModel> m_deepSkySourcePresetModel;
+    std::unique_ptr<skygate::ui::internal::SkyCatalogSourceCollectionModel> m_catalogSourceCollectionModel;
     QVariantList m_themeOptions;
     bool m_logToTerminal = true;
     bool m_logToFile = false;

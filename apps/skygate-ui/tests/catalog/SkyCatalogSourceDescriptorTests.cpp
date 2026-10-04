@@ -5,6 +5,8 @@
 
 #include <QtTest/QtTest>
 
+#include <utility>
+
 class SkyCatalogSourceDescriptorTests final : public QObject {
     Q_OBJECT
 
@@ -17,7 +19,9 @@ private slots:
     void identicalLabelsDoNotCollapseCustomInstances();
     void customInstanceCarriesHonestMetadata();
     void descriptorCarriesArchiveAndRelatedDatasetHints();
+    void presetDescriptorsCarryCategories();
     void presetModelExposesTitlesUrlsAndCustomRow();
+    void presetModelExposesCategoryAndCustomRows();
     void presetModelKeepsSameTitledSourcesDistinct();
 };
 
@@ -179,6 +183,61 @@ void SkyCatalogSourceDescriptorTests::descriptorCarriesArchiveAndRelatedDatasetH
     QCOMPARE(descriptor.relatedDatasetUrls.first(), QString("https://example.test/lines.json"));
     QCOMPARE(descriptor.attribution, QString("Demo data"));
     QVERIFY(descriptor.isKnown());
+}
+
+void SkyCatalogSourceDescriptorTests::presetDescriptorsCarryCategories()
+{
+    using skygate::ui::internal::SkyCatalogPresets;
+
+    const auto star = SkyCatalogPresets::starSourceDescriptor(QStringLiteral("hyg_v42"));
+    QVERIFY(star.has_value());
+    QCOMPARE(star->category, QStringLiteral("Star"));
+
+    const auto deepSky = SkyCatalogPresets::deepSkySourceDescriptor(QStringLiteral("open_ngc"));
+    QVERIFY(deepSky.has_value());
+    QCOMPARE(deepSky->category, QStringLiteral("Deep sky"));
+}
+
+void SkyCatalogSourceDescriptorTests::presetModelExposesCategoryAndCustomRows()
+{
+    using skygate::ui::internal::SkyCatalogSourceDescriptor;
+    using skygate::ui::internal::SkyCatalogSourcePresetModel;
+
+    QVector<SkyCatalogSourceDescriptor> descriptors;
+    SkyCatalogSourceDescriptor hyg;
+    hyg.sourceId = QStringLiteral("hyg_v42");
+    hyg.title = QStringLiteral("HYG v4.2");
+    hyg.category = QStringLiteral("Star");
+    descriptors.push_back(std::move(hyg));
+
+    SkyCatalogSourceDescriptor openNgc;
+    openNgc.sourceId = QStringLiteral("open_ngc");
+    openNgc.title = QStringLiteral("OpenNGC");
+    openNgc.category = QStringLiteral("Deep sky");
+    descriptors.push_back(std::move(openNgc));
+
+    SkyCatalogSourcePresetModel model(
+        std::move(descriptors),
+        QVector<SkyCatalogSourcePresetModel::CustomOption>{
+            {QStringLiteral("Custom star catalog URL"), QStringLiteral("Star")},
+            {QStringLiteral("Custom deep-sky catalog URL"), QStringLiteral("Deep sky")},
+        }
+    );
+
+    QCOMPARE(model.rowCount(), 4);
+    QCOMPARE(model.categoryAt(0), QStringLiteral("Star"));
+    QCOMPARE(model.categoryAt(1), QStringLiteral("Deep sky"));
+    QCOMPARE(model.categoryAt(2), QStringLiteral("Star"));
+    QCOMPARE(model.categoryAt(3), QStringLiteral("Deep sky"));
+    QVERIFY(!model.isCustomAt(0));
+    QVERIFY(!model.isCustomAt(1));
+    QVERIFY(model.isCustomAt(2));
+    QVERIFY(model.isCustomAt(3));
+    QCOMPARE(model.sourceIdAt(0), QStringLiteral("hyg_v42"));
+    QCOMPARE(model.sourceIdAt(1), QStringLiteral("open_ngc"));
+    QVERIFY(model.sourceIdAt(2).isEmpty());
+    QVERIFY(model.sourceIdAt(3).isEmpty());
+    QVERIFY(model.roleNames().values().contains("category"));
 }
 
 void SkyCatalogSourceDescriptorTests::presetModelExposesTitlesUrlsAndCustomRow()

@@ -84,6 +84,7 @@ private slots:
     void resolvedRefsTrackIdentityAndInvalidateOnSourceChange();
     void nullCatalogReportsFailureWithoutCatalogChange();
     void sourcesLoadReplaceEnableDisableAndRemoveIndependently();
+    void moveSourceReordersAndClampsTarget();
 };
 
 void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndExposesSources()
@@ -252,6 +253,74 @@ void SkyCatalogRuntimeTests::sourcesLoadReplaceEnableDisableAndRemoveIndependent
     QVERIFY(runtimeContainsBody(runtime, "custom_c_1"));
     QVERIFY(runtimeContainsBody(runtime, "hip_1"));
     QCOMPARE(runtime.sourceCount(), std::size_t{3});
+}
+
+void SkyCatalogRuntimeTests::moveSourceReordersAndClampsTarget()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
+
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{.useBundledDeepSkyCatalog = false};
+    const auto applyStarSource = [&](const QString& instanceId, std::string bodyId) {
+        const auto result = runtime.applySource(
+            skygate::ui::internal::SkyCatalogSourceRecord{
+                .instanceId = instanceId,
+                .title = instanceId,
+                .version = QString(),
+                .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+                .enabled = true,
+                .catalog = makeSingleStarCatalog(bodyId, "Star"),
+                .foundObjectCount = 0,
+            },
+            options
+        );
+        QVERIFY(result.catalogChanged);
+    };
+
+    applyStarSource(QStringLiteral("custom-a"), "custom_a_1");
+    applyStarSource(QStringLiteral("custom-b"), "custom_b_1");
+    applyStarSource(QStringLiteral("custom-c"), "custom_c_1");
+
+    QCOMPARE(
+        runtime.sourceInstanceIds(),
+        QStringList(
+            {QStringLiteral("primary"),
+             QStringLiteral("custom-a"),
+             QStringLiteral("custom-b"),
+             QStringLiteral("custom-c")}
+        )
+    );
+
+    const auto moveResult = runtime.moveSource(QStringLiteral("custom-c"), 1U, options);
+    QVERIFY(moveResult.catalogChanged);
+    QCOMPARE(
+        runtime.sourceInstanceIds(),
+        QStringList(
+            {QStringLiteral("primary"),
+             QStringLiteral("custom-c"),
+             QStringLiteral("custom-a"),
+             QStringLiteral("custom-b")}
+        )
+    );
+
+    // Moving to an out-of-range target clamps to the last position.
+    const auto clampResult = runtime.moveSource(QStringLiteral("primary"), 999U, options);
+    QVERIFY(clampResult.catalogChanged);
+    QCOMPARE(
+        runtime.sourceInstanceIds(),
+        QStringList(
+            {QStringLiteral("custom-c"),
+             QStringLiteral("custom-a"),
+             QStringLiteral("custom-b"),
+             QStringLiteral("primary")}
+        )
+    );
+
+    // Moving a source to its current index does not rebuild the catalog.
+    const std::uint64_t revisionBeforeNoOp = runtime.catalogRevision();
+    const auto noOpResult = runtime.moveSource(QStringLiteral("custom-a"), 1U, options);
+    QVERIFY(!noOpResult.catalogChanged);
+    QCOMPARE(runtime.catalogRevision(), revisionBeforeNoOp);
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogRuntimeTests)

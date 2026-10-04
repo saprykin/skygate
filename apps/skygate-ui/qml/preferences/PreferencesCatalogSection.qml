@@ -6,8 +6,8 @@ import com.skygate.app 1.0
 Item {
     id: catalogSection
     required property var skyContextController
-    required property var preferencesDraft
-    readonly property bool catalogBusy: skyContextController.downloadingCatalog || skyContextController.catalogProcessing
+    readonly property bool catalogBusy: skyContextController.downloadingCatalog
+                                        || skyContextController.catalogProcessing
 
     ColumnLayout {
         anchors.fill: parent
@@ -19,52 +19,16 @@ Item {
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-            GridLayout {
+            ColumnLayout {
                 width: catalogSection.width
-                columns: 2
-                rowSpacing: 6
-                columnSpacing: 8
+                spacing: 6
 
                 PreferencesGroupTitle {
-                    columnSpan: 2
-                    text: "Star Catalog"
-                }
-
-                PreferencesComboBox {
-                    id: catalogPresetCombo
-                    objectName: "starCatalogPresetCombo"
-                    Layout.fillWidth: true
-                    model: skyContextController.catalogSourcePresetModel
-                    textRole: "title"
-
-                    Binding on currentIndex {
-                        value: Math.max(0, Math.min(catalogPresetCombo.count - 1, preferencesDraft.catalogPresetIndex))
-                    }
-
-                    onActivated: preferencesDraft.catalogPresetIndex = currentIndex
-                }
-
-                PreferencesActionButton {
-                    objectName: "starCatalogUseButton"
-                    Layout.preferredWidth: 150
-                    text: "Use catalog"
-                    enabled: !catalogBusy && catalogPresetCombo.currentIndex !== 2
-                    onClicked: {
-                        preferencesDraft.catalogPresetIndex = catalogPresetCombo.currentIndex;
-                        const presetId = skyContextController.catalogSourcePresetId(catalogPresetCombo.currentIndex);
-                        const presetUrl = skyContextController.catalogSourcePresetUrl(catalogPresetCombo.currentIndex);
-                        if (presetUrl.length > 0) {
-                            preferencesDraft.catalogUrlText = presetUrl;
-                        }
-                        if (presetId.length > 0) {
-                            skyContextController.loadCatalogPreset(presetId);
-                        }
-                    }
+                    text: "Active Catalog Sources"
                 }
 
                 Label {
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignVCenter
                     text: skyContextController.catalogDatasetInfoText
                     color: skyContext.theme.listItemPrimaryText
                     font.pixelSize: 11
@@ -73,183 +37,195 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                 }
 
-                PreferencesActionButton {
-                    objectName: "starCatalogClearCacheButton"
-                    Layout.preferredWidth: 150
-                    Layout.alignment: Qt.AlignVCenter
-                    text: "Clear Catalog Cache"
-                    enabled: !skyContextController.downloadingCatalog && !skyContextController.catalogProcessing
-                    onClicked: {
-                        preferencesDraft.catalogPresetIndex = 0;
-                        skyContextController.loadCatalogPreset("bundled");
-                        skyContextController.clearCatalogCache();
-                    }
-                }
+                Repeater {
+                    id: sourceRepeater
+                    model: skyContextController.catalogSourceCollectionModel
 
-                Label {
-                    visible: catalogPresetCombo.currentIndex === 2
-                    Layout.columnSpan: 2
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: "Catalog URL"
-                    color: skyContext.theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 11
-                }
+                    delegate: Rectangle {
+                        required property string instanceId
+                        required property string title
+                        required property string version
+                        required property string category
+                        required property bool sourceEnabled
+                        required property bool bundled
+                        required property bool busy
+                        required property bool hasError
+                        required property string status
+                        required property int objectCount
+                        required property int index
 
-                PreferencesTextField {
-                    id: catalogUrlInput
-                    objectName: "starCatalogUrlInput"
-                    visible: catalogPresetCombo.currentIndex === 2
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    Layout.fillWidth: true
-                    placeholderText: "https://example.com/skygate-catalog.txt or HYG CSV URL"
-                    Component.onCompleted: cursorPosition = 0
+                        objectName: "catalogSourceRow_" + index
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: sourceRowColumn.implicitHeight + 16
+                        radius: 6
+                        color: skyContext.theme.cardBackground
+                        border.width: 1
+                        border.color: skyContext.theme.cardBorder
 
-                    Binding on text {
-                        when: !catalogUrlInput.activeFocus
-                        restoreMode: Binding.RestoreNone
-                        value: preferencesDraft.catalogUrlText
-                    }
+                        ColumnLayout {
+                            id: sourceRowColumn
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 5
 
-                    onTextEdited: preferencesDraft.catalogUrlText = text
-                    onActiveFocusChanged: {
-                        if (!activeFocus) {
-                            cursorPosition = 0;
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                PreferencesCheckBox {
+                                    objectName: "catalogSourceEnableCheckBox_" + index
+                                    visible: !bundled
+                                    checked: sourceEnabled
+                                    enabled: !catalogBusy
+                                    onClicked: {
+                                        if (checked) {
+                                            skyContextController.enableCatalogSource(instanceId)
+                                        } else {
+                                            skyContextController.disableCatalogSource(instanceId)
+                                        }
+                                    }
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: version.length > 0 ? title + " " + version : title
+                                    color: skyContext.theme.listItemPrimaryText
+                                    font.family: "Avenir Next"
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
+
+                                Label {
+                                    text: category
+                                    color: skyContext.theme.textMuted
+                                    font.family: "Avenir Next"
+                                    font.pixelSize: 9
+                                }
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: objectCount > 0 ? status + " | " + objectCount + " objects" : status
+                                color: hasError ? skyContext.theme.errorText : skyContext.theme.listItemPrimaryText
+                                font.family: "Avenir Next"
+                                font.pixelSize: 9
+                                elide: Text.ElideRight
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                PreferencesCompactActionButton {
+                                    objectName: "catalogSourceUpButton_" + index
+                                    text: "Up"
+                                    enabled: !catalogBusy && index > 0
+                                    onClicked: skyContextController.moveCatalogSource(instanceId, index - 1)
+                                }
+
+                                PreferencesCompactActionButton {
+                                    objectName: "catalogSourceDownButton_" + index
+                                    text: "Down"
+                                    enabled: !catalogBusy && index < sourceRepeater.count - 1
+                                    onClicked: skyContextController.moveCatalogSource(instanceId, index + 1)
+                                }
+
+                                PreferencesCompactActionButton {
+                                    objectName: "catalogSourceRetryButton_" + index
+                                    text: "Retry"
+                                    visible: hasError
+                                    enabled: !catalogBusy
+                                    onClicked: skyContextController.retryCatalogSource(instanceId)
+                                }
+
+                                PreferencesCompactActionButton {
+                                    objectName: "catalogSourceCancelButton_" + index
+                                    text: "Cancel"
+                                    visible: busy
+                                    enabled: catalogBusy
+                                    onClicked: skyContextController.cancelActiveDownload()
+                                }
+
+                                PreferencesCompactActionButton {
+                                    objectName: "catalogSourceClearCacheButton_" + index
+                                    text: "Clear cache"
+                                    visible: !bundled
+                                    enabled: !catalogBusy && !busy
+                                    onClicked: skyContextController.clearCatalogSourceCache(instanceId)
+                                }
+
+                                PreferencesCompactActionButton {
+                                    objectName: "catalogSourceRemoveButton_" + index
+                                    text: "Remove"
+                                    visible: !bundled
+                                    enabled: !catalogBusy
+                                    onClicked: skyContextController.removeCatalogSource(instanceId)
+                                }
+                            }
                         }
-                    }
-                    onTextChanged: {
-                        if (!activeFocus) {
-                            cursorPosition = 0;
-                        }
-                    }
-                }
-
-                PreferencesActionButton {
-                    objectName: "starCatalogDownloadButton"
-                    visible: catalogPresetCombo.currentIndex === 2
-                    Layout.preferredWidth: 150
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: skyContextController.downloadingCatalog ? "Downloading..." : "Download"
-                    enabled: !catalogBusy
-                    onClicked: {
-                        preferencesDraft.catalogPresetIndex = 2;
-                        skyContextController.downloadCatalogFromUrl(preferencesDraft.catalogUrlText);
                     }
                 }
 
                 PreferencesGroupTitle {
-                    columnSpan: 2
                     Layout.topMargin: 8
-                    text: "Deep-Sky Catalog"
+                    text: "Add Catalog Source"
                 }
 
-                PreferencesComboBox {
-                    id: deepSkyCatalogPresetCombo
-                    objectName: "deepSkyCatalogPresetCombo"
+                RowLayout {
                     Layout.fillWidth: true
-                    model: skyContextController.deepSkySourcePresetModel
-                    textRole: "title"
+                    spacing: 6
 
-                    Binding on currentIndex {
-                        value: Math.max(0, Math.min(deepSkyCatalogPresetCombo.count - 1, preferencesDraft.deepSkyCatalogPresetIndex))
+                    PreferencesComboBox {
+                        id: sourcePresetCombo
+                        objectName: "catalogSourcePresetCombo"
+                        Layout.fillWidth: true
+                        model: skyContextController.catalogSourcePresetModel
+                        textRole: "title"
                     }
 
-                    onActivated: preferencesDraft.deepSkyCatalogPresetIndex = currentIndex
-                }
-
-                PreferencesActionButton {
-                    objectName: "deepSkyCatalogUseButton"
-                    Layout.preferredWidth: 150
-                    text: "Use catalog"
-                    enabled: !catalogBusy && deepSkyCatalogPresetCombo.currentIndex !== 2
-                    onClicked: {
-                        preferencesDraft.deepSkyCatalogPresetIndex = deepSkyCatalogPresetCombo.currentIndex;
-                        const presetId = skyContextController.deepSkySourcePresetId(deepSkyCatalogPresetCombo.currentIndex);
-                        const presetUrl = skyContextController.deepSkySourcePresetUrl(deepSkyCatalogPresetCombo.currentIndex);
-                        if (presetUrl.length > 0) {
-                            preferencesDraft.deepSkyCatalogUrlText = presetUrl;
-                        }
-                        if (presetId.length > 0) {
-                            skyContextController.loadDeepSkyCatalogPreset(presetId);
-                        }
-                    }
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignVCenter
-                    text: skyContextController.deepSkyCatalogInfoText
-                    color: skyContext.theme.listItemPrimaryText
-                    font.pixelSize: 11
-                    font.family: "Avenir Next"
-                    elide: Text.ElideRight
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                PreferencesActionButton {
-                    objectName: "deepSkyCatalogClearCacheButton"
-                    Layout.preferredWidth: 150
-                    Layout.alignment: Qt.AlignVCenter
-                    text: "Clear Catalog Cache"
-                    enabled: !catalogBusy
-                    onClicked: {
-                        preferencesDraft.deepSkyCatalogPresetIndex = 0;
-                        skyContextController.loadDeepSkyCatalogPreset("bundled_messier");
-                        skyContextController.clearDeepSkyCatalogCache();
-                    }
-                }
-
-                Label {
-                    visible: deepSkyCatalogPresetCombo.currentIndex === 2
-                    Layout.columnSpan: 2
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: "Catalog URL"
-                    color: skyContext.theme.formLabelText
-                    font.family: "Avenir Next"
-                    font.pixelSize: 11
-                }
-
-                PreferencesTextField {
-                    id: deepSkyCatalogUrlInput
-                    objectName: "deepSkyCatalogUrlInput"
-                    visible: deepSkyCatalogPresetCombo.currentIndex === 2
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    Layout.fillWidth: true
-                    placeholderText: "https://raw.githubusercontent.com/mattiaverga/OpenNGC/.../NGC.csv"
-                    Component.onCompleted: cursorPosition = 0
-
-                    Binding on text {
-                        when: !deepSkyCatalogUrlInput.activeFocus
-                        restoreMode: Binding.RestoreNone
-                        value: preferencesDraft.deepSkyCatalogUrlText
-                    }
-
-                    onTextEdited: preferencesDraft.deepSkyCatalogUrlText = text
-                    onActiveFocusChanged: {
-                        if (!activeFocus) {
-                            cursorPosition = 0;
-                        }
-                    }
-                    onTextChanged: {
-                        if (!activeFocus) {
-                            cursorPosition = 0;
-                        }
+                    PreferencesTextField {
+                        id: sourceUrlInput
+                        objectName: "catalogSourceUrlInput"
+                        Layout.fillWidth: true
+                        visible: catalogSection.customPresetSelected
+                        placeholderText: "https://example.com/catalog.csv"
+                        Component.onCompleted: cursorPosition = 0
                     }
                 }
 
                 PreferencesActionButton {
-                    objectName: "deepSkyCatalogDownloadButton"
-                    visible: deepSkyCatalogPresetCombo.currentIndex === 2
-                    Layout.preferredWidth: 150
-                    Layout.preferredHeight: visible ? implicitHeight : 0
-                    text: skyContextController.downloadingCatalog ? "Downloading..." : "Download"
-                    enabled: !catalogBusy
-                    onClicked: {
-                        preferencesDraft.deepSkyCatalogPresetIndex = 2;
-                        skyContextController.downloadDeepSkyCatalogFromUrl(preferencesDraft.deepSkyCatalogUrlText);
-                    }
+                    id: addSourceButton
+                    objectName: "catalogAddSourceButton"
+                    Layout.preferredWidth: 116
+                    text: "Add"
+                    enabled: !catalogBusy && catalogSection.canAddSelectedSource
+                    onClicked: catalogSection.addSelectedSource()
                 }
             }
+        }
+    }
+
+    readonly property bool customPresetSelected: sourcePresetCombo.currentIndex >= 0
+        && skyContextController.catalogSourcePresetIsCustom(sourcePresetCombo.currentIndex)
+
+    readonly property bool canAddSelectedSource: sourcePresetCombo.currentIndex >= 0
+        && (customPresetSelected ? sourceUrlInput.text.trim().length > 0 : true)
+
+    function addSelectedSource() {
+        if (sourcePresetCombo.currentIndex < 0) {
+            return
+        }
+
+        if (customPresetSelected) {
+            skyContextController.addCatalogSourceUrl(
+                sourceUrlInput.text,
+                skyContextController.catalogSourcePresetCategory(sourcePresetCombo.currentIndex)
+            )
+        } else {
+            skyContextController.addCatalogSourcePreset(
+                skyContextController.catalogSourcePresetId(sourcePresetCombo.currentIndex)
+            )
         }
     }
 }

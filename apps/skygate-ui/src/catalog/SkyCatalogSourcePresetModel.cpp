@@ -7,19 +7,35 @@ namespace skygate::ui::internal {
 SkyCatalogSourcePresetModel::SkyCatalogSourcePresetModel(
     QVector<SkyCatalogSourceDescriptor> descriptors, const bool includeCustomOption, QObject* parent
 )
+    : SkyCatalogSourcePresetModel(
+          std::move(descriptors),
+          includeCustomOption ? QVector<CustomOption>{{QStringLiteral("Custom URL"), QString()}}
+                              : QVector<CustomOption>{},
+          parent
+      )
+{
+}
+
+SkyCatalogSourcePresetModel::SkyCatalogSourcePresetModel(
+    QVector<SkyCatalogSourceDescriptor> descriptors, QVector<CustomOption> customOptions, QObject* parent
+)
     : QAbstractListModel(parent)
 {
-    m_rows.reserve(descriptors.size() + (includeCustomOption ? 1 : 0));
+    m_rows.reserve(descriptors.size() + customOptions.size());
     for (SkyCatalogSourceDescriptor& descriptor : descriptors) {
-        m_rows.push_back(Row{.descriptor = std::move(descriptor)});
+        Row row;
+        row.descriptor = std::move(descriptor);
+        row.category = row.descriptor.category;
+        m_rows.push_back(std::move(row));
     }
 
-    if (includeCustomOption) {
-        Row customRow;
-        customRow.custom = true;
-        customRow.descriptor.title = QStringLiteral("Custom URL");
-        customRow.descriptor.legacyPresetIndex = 2;
-        m_rows.push_back(std::move(customRow));
+    for (const CustomOption& option : customOptions) {
+        Row row;
+        row.custom = true;
+        row.descriptor.title = option.title;
+        row.descriptor.legacyPresetIndex = 2;
+        row.category = option.category;
+        m_rows.push_back(std::move(row));
     }
 }
 
@@ -61,6 +77,8 @@ QVariant SkyCatalogSourcePresetModel::data(const QModelIndex& index, const int r
         return !row->custom && row->descriptor.bundled;
     case CustomRole:
         return row->custom;
+    case CategoryRole:
+        return row->category;
     default:
         return {};
     }
@@ -77,6 +95,7 @@ QHash<int, QByteArray> SkyCatalogSourcePresetModel::roleNames() const
         {LegacyPresetIndexRole, "legacyPresetIndex"},
         {BundledRole, "bundled"},
         {CustomRole, "custom"},
+        {CategoryRole, "category"},
     };
 }
 
@@ -102,6 +121,12 @@ QString SkyCatalogSourcePresetModel::versionAt(const int row) const
 {
     const Row* entry = rowAt(row);
     return entry == nullptr ? QString() : entry->descriptor.version;
+}
+
+QString SkyCatalogSourcePresetModel::categoryAt(const int row) const
+{
+    const Row* entry = rowAt(row);
+    return entry == nullptr ? QString() : entry->category;
 }
 
 int SkyCatalogSourcePresetModel::legacyPresetIndexAt(const int row) const
