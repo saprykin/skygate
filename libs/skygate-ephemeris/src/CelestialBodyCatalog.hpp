@@ -10,6 +10,31 @@
 
 namespace skygate::ephemeris {
 
+// Eager, immutable snapshot of catalog bodies with two storage domains.
+//
+// The catalog owns its bodies by value. bodies() is the common body view for
+// consumers: a span of BaseCelestialBody pointers in the append/order
+// sequence. ownGalaxyBodies(), distantBodies(), and orderedBodyIndexes() are
+// representation-specific accessors used by model construction and
+// serialization; ordinary consumers should read bodies().
+//
+// The two storage domains are operational, not a statement of physical
+// membership:
+//
+//   - OwnGalaxy holds non-deep-sky bodies (stars, planets, moons, the Sun,
+//     and constellations), whose optional metadata is a fixed equatorial
+//     coordinate and/or star astrometry.
+//   - Distant holds deep-sky objects, whose optional metadata is a
+//     DeepSkyObjectInfo record. Galactic nebulae and clusters are deep-sky
+//     objects and therefore live in Distant, even though they are members of
+//     our galaxy.
+//
+// Lifecycle: bodies(), bodyAt(), and the domain spans point into the catalog's
+// internal vectors and remain valid until the catalog is destroyed, moved
+// from, or mutated by appendBody(). Copying or moving the catalog transfers
+// that storage, so the new owner's spans refer to the transferred vectors.
+// Constructing a catalog from a body span deep-copies each body, so a
+// materialized snapshot stays valid independently of the source owner.
 class CelestialBodyCatalog final {
 public:
     enum class BodyDomain {

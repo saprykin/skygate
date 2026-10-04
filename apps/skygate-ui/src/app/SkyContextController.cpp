@@ -1081,7 +1081,7 @@ void SkyContextController::rebuildEphemerisEngine()
     request.engineKind = m_ephemerisEngineKind;
     const auto* starCatalog = m_catalogManager != nullptr ? m_catalogManager->starCatalog() : nullptr;
     if (starCatalog != nullptr) {
-        request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(starCatalog->catalog());
+        request.catalog = std::make_shared<const skygate::ephemeris::CelestialBodyCatalog>(starCatalog->bodies());
     }
     request.options = m_ephemerisEngineOptions;
     request.options.setEngineKind(m_ephemerisEngineKind);

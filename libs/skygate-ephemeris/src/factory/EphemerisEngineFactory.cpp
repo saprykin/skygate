@@ -422,7 +422,10 @@ EphemerisEngineFactoryResult EphemerisEngineFactory::create()
 
 EphemerisEngineFactoryResult EphemerisEngineFactory::create(const IStarCatalog& catalog)
 {
-    return create(catalog.catalog());
+    EphemerisEngineFactoryRequest request;
+    request.catalog = std::make_shared<CelestialBodyCatalog>(catalog.bodies());
+    request.options = SimpleEphemerisEngine::defaultOptions();
+    return create(request);
 }
 
 EphemerisEngineFactoryResult EphemerisEngineFactory::create(std::initializer_list<OwnGalaxyCelestialBody> bodies)
