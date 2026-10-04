@@ -1,3 +1,4 @@
+#include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogLoader.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
 
@@ -5,6 +6,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 
 namespace {
 
@@ -29,6 +31,21 @@ bool hasAlias(const skygate::ephemeris::BaseCelestialBody& body, const std::stri
                   != body.deepSkyObjectValue()->aliases.end();
 }
 
+bool hasIdentifier(
+    const skygate::ephemeris::BaseCelestialBody& body,
+    const std::string_view namespaceName,
+    const std::string_view value
+)
+{
+    return std::any_of(
+        body.identity.externalIdentifiers.begin(),
+        body.identity.externalIdentifiers.end(),
+        [&](const skygate::ephemeris::CatalogIdentifier& identifier) {
+            return identifier.namespaceName == namespaceName && identifier.value == value;
+        }
+    );
+}
+
 }  // namespace
 
 class OpenNgcParserEdgeTests final : public QObject {
@@ -41,6 +58,7 @@ private slots:
     void mapsSupportedObjectKinds();
     void preservesValidGeometryFields();
     void normalizesAndDeduplicatesAliases();
+    void preservesPrimaryNameDesignationsWithoutOptionalColumns();
 };
 
 void OpenNgcParserEdgeTests::rejectsMissingRequiredColumns()
@@ -198,6 +216,30 @@ void OpenNgcParserEdgeTests::normalizesAndDeduplicatesAliases()
         std::string("Andromeda Galaxy")
     ));
     QCOMPARE(duplicateCount, 1);
+}
+
+void OpenNgcParserEdgeTests::preservesPrimaryNameDesignationsWithoutOptionalColumns()
+{
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(
+        "Name;Type;RA;Dec;Common names\n"
+        "NGC0001;G;01:00:00;+02:00:00;Shared region\n"
+        "NGC0002;G;10:00:00;+20:00:00;Shared region\n"
+    );
+    QVERIFY(result.isSuccess());
+    QVERIFY(result.catalog != nullptr);
+
+    const auto bodies = result.catalog->bodies();
+    QCOMPARE(bodies.size(), std::size_t{2});
+
+    const auto* first = findBody(bodies, "ngc_1");
+    const auto* second = findBody(bodies, "ngc_2");
+    QVERIFY(first != nullptr);
+    QVERIFY(second != nullptr);
+    QVERIFY(hasIdentifier(*first, "ngc", "1"));
+    QVERIFY(hasIdentifier(*second, "ngc", "2"));
+    QVERIFY(hasAlias(*first, "Shared region"));
+    QVERIFY(hasAlias(*second, "Shared region"));
 }
 
 QTEST_APPLESS_MAIN(OpenNgcParserEdgeTests)
