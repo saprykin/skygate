@@ -157,6 +157,53 @@ QStringList SkyCatalogManager::sourceLabels() const
     return m_runtime->sourceLabels();
 }
 
+QVector<SkyCatalogManager::SourceViewEntry> SkyCatalogManager::sourceViewEntries() const
+{
+    QVector<SourceViewEntry> entries;
+    entries.reserve(static_cast<int>(m_runtime->sourceCount()) + m_sourceOperations.size());
+
+    for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
+        SourceViewEntry entry;
+        entry.instanceId = source.instanceId;
+        entry.title = source.title;
+        entry.version = source.version;
+        entry.policy = source.policy;
+        entry.enabled = source.enabled;
+        entry.bundled = source.bundled;
+        entry.objectCount = source.catalog != nullptr ? source.catalog->bodies().size() : 0U;
+
+        const SourceOperation* operation = findOperation(source.instanceId);
+        if (operation != nullptr && !operation->statusText.isEmpty()) {
+            entry.busy = operation->busy;
+            entry.hasError = operation->hasError;
+            entry.statusText = operation->statusText;
+        } else {
+            entry.statusText = source.enabled ? QStringLiteral("Active") : QStringLiteral("Disabled");
+        }
+        entries.push_back(std::move(entry));
+    }
+
+    for (const SourceOperation& operation : m_sourceOperations) {
+        if (m_runtime->hasSource(operation.instance.instanceId)) {
+            continue;
+        }
+
+        SourceViewEntry entry;
+        entry.instanceId = operation.instance.instanceId;
+        entry.title = operation.instance.title;
+        entry.version = operation.instance.version;
+        entry.policy = operation.policy;
+        entry.enabled = false;
+        entry.bundled = false;
+        entry.busy = operation.busy;
+        entry.hasError = operation.hasError;
+        entry.statusText = operation.statusText.isEmpty() ? QStringLiteral("Pending") : operation.statusText;
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
 std::span<const std::uint8_t> SkyCatalogManager::sourceIds() const noexcept
 {
     return m_runtime->sourceIds();
@@ -277,6 +324,39 @@ void SkyCatalogManager::loadSource(
     loadSourceInstance(source, policy);
 }
 
+void SkyCatalogManager::addSourcePreset(const QString& presetId)
+{
+    if (m_downloadingCatalog) {
+        return;
+    }
+
+    std::optional<SkyCatalogSourceDescriptor> descriptor = SkyCatalogPresets::starSourceDescriptor(presetId);
+    auto policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    if (!descriptor.has_value()) {
+        descriptor = SkyCatalogPresets::deepSkySourceDescriptor(presetId);
+        policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly;
+    }
+    if (!descriptor.has_value()) {
+        m_statusText = SkyCatalogText::unknownSourcePreset(presetId);
+        emit statusTextChanged();
+        return;
+    }
+
+    loadSourceInstance(SkyCatalogSourceInstance::fromDescriptor(*descriptor), policy);
+}
+
+void SkyCatalogManager::addSourceUrl(const QString& urlText, const QString& category)
+{
+    if (m_downloadingCatalog) {
+        return;
+    }
+
+    const auto policy = category == SkyCatalogPresets::deepSkyCategory()
+                            ? skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+                            : skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    loadSourceInstance(SkyCatalogSourceInstance::createCustom(urlText), policy);
+}
+
 void SkyCatalogManager::enableSource(const QString& instanceId)
 {
     setSourceEnabled(instanceId, true);
@@ -296,6 +376,18 @@ void SkyCatalogManager::removeSource(const QString& instanceId)
     invalidatePendingSourceWork();
     removeOperation(instanceId);
     const SkyCatalogRuntimeResult result = m_runtime->removeSource(instanceId, runtimeBuildOptions());
+    persistCatalogCache();
+    applyRuntimeResult(result);
+}
+
+void SkyCatalogManager::moveSource(const QString& instanceId, const int targetIndex)
+{
+    if (m_downloadingCatalog || targetIndex < 0) {
+        return;
+    }
+
+    const SkyCatalogRuntimeResult result =
+        m_runtime->moveSource(instanceId, static_cast<std::size_t>(targetIndex), runtimeBuildOptions());
     persistCatalogCache();
     applyRuntimeResult(result);
 }
@@ -320,6 +412,7 @@ void SkyCatalogManager::cancelCatalogDownload()
     }
 
     invalidatePendingSourceWork();
+    const QString activeInstanceId = m_activeDownloadInstanceId;
     m_activeDownloadInstanceId.clear();
     if (m_networkAccessManager != nullptr) {
         const QList<QNetworkReply*> replies = m_networkAccessManager->findChildren<QNetworkReply*>();
@@ -332,6 +425,12 @@ void SkyCatalogManager::cancelCatalogDownload()
     setDownloadingCatalog(false);
     setCatalogProcessing(false);
     setStatusText(QStringLiteral("Catalog: Download canceled."));
+    if (SourceOperation* operation = findOperation(activeInstanceId)) {
+        operation->busy = false;
+        operation->hasError = false;
+        operation->statusText = QStringLiteral("Canceled");
+    }
+    emit sourcesChanged();
 }
 
 bool SkyCatalogManager::clearCatalogCache()
@@ -382,6 +481,22 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
         cacheCleared = m_cacheController->clearDeepSkyCatalogCache() && cacheCleared;
     }
     m_statusText = SkyCatalogText::deepSkyCacheClearResult(cacheCleared);
+    emit statusTextChanged();
+    return cacheCleared;
+}
+
+bool SkyCatalogManager::clearSourceCache(const QString& instanceId)
+{
+    if (m_downloadingCatalog || m_catalogProcessing) {
+        m_statusText = SkyCatalogText::cacheClearBlocked();
+        emit statusTextChanged();
+        return false;
+    }
+
+    const SourceOperation* operation = findOperation(instanceId);
+    const QString persistedId = operation != nullptr ? stableSourceInstanceId(operation->instance) : instanceId;
+    const bool cacheCleared = m_cacheController != nullptr && m_cacheController->clearSourceCache(persistedId);
+    m_statusText = SkyCatalogText::sourceCacheClearResult(cacheCleared);
     emit statusTextChanged();
     return cacheCleared;
 }
@@ -451,6 +566,10 @@ void SkyCatalogManager::loadSourceInstance(
 
     SourceOperation* operation = upsertOperation(source, policy);
     invalidatePendingSourceWork();
+    operation->busy = true;
+    operation->hasError = false;
+    operation->statusText = source.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading...");
+    emit sourcesChanged();
 
     if (source.urls.isEmpty()) {
         operation->payload.clear();
@@ -462,7 +581,11 @@ void SkyCatalogManager::loadSourceInstance(
     }
 
     if (m_importWorkflow == nullptr || !m_importWorkflow->isAvailable()) {
+        operation->busy = false;
+        operation->hasError = true;
+        operation->statusText = QStringLiteral("Network unavailable");
         setStatusText(QStringLiteral("Catalog: Network unavailable"));
+        emit sourcesChanged();
         return;
     }
 
@@ -477,7 +600,7 @@ void SkyCatalogManager::loadSourceInstance(
         this,
         [this, instanceId = source.instanceId, revision](const QString& statusText) {
             if (isOperationCurrent(instanceId, revision)) {
-                handleCatalogImportStatus(statusText);
+                handleCatalogImportStatus(instanceId, statusText);
             }
         },
         [this, instanceId = source.instanceId, revision, policy, relatedDatasetUrls = source.relatedDatasetUrls](
@@ -495,12 +618,16 @@ void SkyCatalogManager::loadSourceInstance(
 }
 
 void SkyCatalogManager::applyBundledSource(
-    const SourceOperation& operation, const skygate::ephemeris::CatalogCompositionPolicy policy
+    SourceOperation& operation, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
 {
     auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (bundledCatalog == nullptr) {
+        operation.busy = false;
+        operation.hasError = true;
+        operation.statusText = QStringLiteral("Failed to load");
         setStatusText(QStringLiteral("Catalog: Failed to load"));
+        emit sourcesChanged();
         return;
     }
 
@@ -510,10 +637,14 @@ void SkyCatalogManager::applyBundledSource(
     record.version = operation.instance.version;
     record.policy = policy;
     record.enabled = true;
+    record.bundled = true;
     record.catalog = std::move(bundledCatalog);
     record.foundObjectCount = 0;
 
     const SkyCatalogRuntimeResult result = m_runtime->applySource(std::move(record), runtimeBuildOptions());
+    operation.busy = false;
+    operation.hasError = false;
+    operation.statusText = QStringLiteral("Active");
     persistCatalogCache();
     applyRuntimeResult(result);
 }
@@ -551,12 +682,19 @@ void SkyCatalogManager::handleSourceImportFinished(
     }
 
     if (result.catalog == nullptr) {
+        operation->busy = false;
+        operation->hasError = true;
+        operation->statusText = result.errorText;
         setDownloadingCatalog(false);
         setStatusText(result.errorText);
+        emit sourcesChanged();
         return;
     }
 
     operation->payload = result.payload;
+    operation->busy = false;
+    operation->hasError = false;
+    operation->statusText = QStringLiteral("Active");
     const std::size_t foundObjectCount = result.foundObjectCount;
     const auto diagnostics = result.diagnostics;
     const QString sourceLabel = result.sourceLabel;
@@ -698,10 +836,16 @@ void SkyCatalogManager::setCatalogProcessing(const bool catalogProcessing)
     emit catalogProcessingChanged();
 }
 
-void SkyCatalogManager::handleCatalogImportStatus(const QString& statusText)
+void SkyCatalogManager::handleCatalogImportStatus(const QString& instanceId, const QString& statusText)
 {
     setStatusText(statusText);
     setCatalogProcessing(SkyCatalogText::isProcessingStatus(statusText));
+    if (SourceOperation* operation = findOperation(instanceId)) {
+        operation->busy = true;
+        operation->hasError = false;
+        operation->statusText = statusText;
+    }
+    emit sourcesChanged();
 }
 
 SkyCatalogRuntimeBuildOptions SkyCatalogManager::runtimeBuildOptions() const
@@ -723,6 +867,7 @@ void SkyCatalogManager::applyRuntimeResult(const SkyCatalogRuntimeResult& result
     if (result.catalogChanged) {
         emit catalogChanged();
     }
+    emit sourcesChanged();
 }
 
 void SkyCatalogManager::resetConstellationLineRefs()

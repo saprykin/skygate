@@ -19,6 +19,7 @@ struct SkyCatalogSourceDescriptor final {
     QString archiveSelector;
     QStringList relatedDatasetUrls;
     QString attribution;
+    QString category;
     int legacyPresetIndex = 0;
     bool bundled = false;
 

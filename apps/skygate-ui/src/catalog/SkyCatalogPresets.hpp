@@ -15,6 +15,8 @@ public:
     [[nodiscard]] static int normalizeDeepSkyCatalogPresetIndex(int presetIndex) noexcept;
     [[nodiscard]] static QString defaultCatalogUrlText();
     [[nodiscard]] static QString defaultDeepSkyCatalogUrlText();
+    [[nodiscard]] static QString starCategory();
+    [[nodiscard]] static QString deepSkyCategory();
     [[nodiscard]] static std::optional<SkyCatalogSourceDescriptor> starSourceDescriptor(const QString& presetId);
     [[nodiscard]] static std::optional<SkyCatalogSourceDescriptor> deepSkySourceDescriptor(const QString& presetId);
     [[nodiscard]] static QVector<SkyCatalogSourceDescriptor> starSourceDescriptors();

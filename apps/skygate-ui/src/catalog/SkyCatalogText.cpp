@@ -30,6 +30,11 @@ QString SkyCatalogText::unknownDeepSkyPreset(const QString& presetId)
     return QString("Catalog: Unknown deep-sky preset '%1'").arg(presetId);
 }
 
+QString SkyCatalogText::unknownSourcePreset(const QString& presetId)
+{
+    return QString("Catalog: Unknown source preset '%1'").arg(presetId);
+}
+
 QString SkyCatalogText::cacheClearBlocked()
 {
     return "Catalog: Cannot clear cache while download is in progress";
@@ -43,6 +48,11 @@ QString SkyCatalogText::starCacheClearResult(const bool cacheCleared)
 QString SkyCatalogText::deepSkyCacheClearResult(const bool cacheCleared)
 {
     return cacheCleared ? "Catalog: Deep-sky catalog cache cleared" : "Catalog: Deep-sky catalog cache clear failed";
+}
+
+QString SkyCatalogText::sourceCacheClearResult(const bool cacheCleared)
+{
+    return cacheCleared ? "Catalog: Source cache cleared" : "Catalog: Source cache clear failed";
 }
 
 bool SkyCatalogText::isProcessingStatus(const QString& statusText)

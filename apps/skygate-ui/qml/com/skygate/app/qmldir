@@ -13,6 +13,7 @@ PreferencesCityPicker 1.0 ../../../preferences/PreferencesCityPicker.qml
 PreferencesTimeZonePicker 1.0 ../../../preferences/PreferencesTimeZonePicker.qml
 PreferencesActionButton 1.0 ../../../controls/PreferencesActionButton.qml
 PreferencesCheckBox 1.0 ../../../controls/PreferencesCheckBox.qml
+PreferencesCompactActionButton 1.0 ../../../controls/PreferencesCompactActionButton.qml
 PreferencesComboBox 1.0 ../../../controls/PreferencesComboBox.qml
 PreferencesGroupTitle 1.0 ../../../controls/PreferencesGroupTitle.qml
 PreferencesSectionButton 1.0 ../../../controls/PreferencesSectionButton.qml

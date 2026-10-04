@@ -12,9 +12,11 @@ public:
     [[nodiscard]] static QString deepSkyCatalogInfo(std::size_t foundObjectCount);
     [[nodiscard]] static QString unknownCatalogPreset(const QString& presetId);
     [[nodiscard]] static QString unknownDeepSkyPreset(const QString& presetId);
+    [[nodiscard]] static QString unknownSourcePreset(const QString& presetId);
     [[nodiscard]] static QString cacheClearBlocked();
     [[nodiscard]] static QString starCacheClearResult(bool cacheCleared);
     [[nodiscard]] static QString deepSkyCacheClearResult(bool cacheCleared);
+    [[nodiscard]] static QString sourceCacheClearResult(bool cacheCleared);
     [[nodiscard]] static bool isProcessingStatus(const QString& statusText);
     [[nodiscard]] static QString
     brightnessFilterSummary(const QString& baseStatusText, std::size_t selectedBodyCount, std::size_t parsedBodyCount);

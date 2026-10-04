@@ -23,6 +23,7 @@ struct SkyCatalogSourceRecord final {
     QString version;
     skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
     bool enabled = true;
+    bool bundled = false;
     std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
     std::size_t foundObjectCount = 0;
 };

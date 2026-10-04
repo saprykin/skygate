@@ -48,6 +48,7 @@ public:
     [[nodiscard]] std::size_t sourceCount() const noexcept;
     [[nodiscard]] QStringList sourceInstanceIds() const;
     [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
+    [[nodiscard]] bool hasSource(const QString& instanceId) const;
     [[nodiscard]] QStringList sourceLabels() const;
     [[nodiscard]] std::span<const SkyCatalogSourceRecord> sources() const noexcept;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
@@ -63,6 +64,8 @@ public:
     setSourceEnabled(const QString& instanceId, bool enabled, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult
     removeSource(const QString& instanceId, const SkyCatalogRuntimeBuildOptions& options);
+    [[nodiscard]] SkyCatalogRuntimeResult
+    moveSource(const QString& instanceId, std::size_t targetIndex, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult
     replaceSources(std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult applyCatalog(

@@ -36,6 +36,7 @@ SkyCatalogRuntime::SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCa
                 .version = QString(),
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
                 .enabled = true,
+                .bundled = true,
                 .catalog = std::move(sourceCatalog),
                 .foundObjectCount = 0,
             }
@@ -106,6 +107,11 @@ bool SkyCatalogRuntime::isSourceEnabled(const QString& instanceId) const
 {
     const SkyCatalogSourceRecord* source = findSource(instanceId);
     return source != nullptr && source->enabled;
+}
+
+bool SkyCatalogRuntime::hasSource(const QString& instanceId) const
+{
+    return findSource(instanceId) != nullptr;
 }
 
 QStringList SkyCatalogRuntime::sourceLabels() const
@@ -202,6 +208,30 @@ SkyCatalogRuntime::removeSource(const QString& instanceId, const SkyCatalogRunti
     return rebuildActiveCatalog(options);
 }
 
+SkyCatalogRuntimeResult SkyCatalogRuntime::moveSource(
+    const QString& instanceId, const std::size_t targetIndex, const SkyCatalogRuntimeBuildOptions& options
+)
+{
+    const auto existing =
+        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
+            return candidate.instanceId == instanceId;
+        });
+    if (existing == m_sources.end()) {
+        return SkyCatalogRuntimeResult{};
+    }
+
+    const auto currentIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
+    const std::size_t clampedTarget = std::min(targetIndex, m_sources.size() - 1);
+    if (currentIndex == clampedTarget) {
+        return SkyCatalogRuntimeResult{};
+    }
+
+    SkyCatalogSourceRecord moved = std::move(*existing);
+    m_sources.erase(existing);
+    m_sources.insert(m_sources.begin() + static_cast<std::ptrdiff_t>(clampedTarget), std::move(moved));
+    return rebuildActiveCatalog(options);
+}
+
 SkyCatalogRuntimeResult SkyCatalogRuntime::replaceSources(
     std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options
 )
@@ -280,6 +310,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
                 .version = QString(),
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
                 .enabled = true,
+                .bundled = true,
                 .catalog = std::move(bundledCatalog),
                 .foundObjectCount = 0,
             }

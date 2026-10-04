@@ -2,6 +2,7 @@
 #include "LocationCatalogModel.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogPresets.hpp"
+#include "SkyCatalogSourceCollectionModel.hpp"
 #include "SkyCatalogSourcePresetModel.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkyLogging.hpp"
@@ -48,6 +49,30 @@ constexpr std::uint64_t kMaxEphemerisManifestBytes = 4ULL * 1024ULL * 1024ULL;
 using skygate::ephemeris::EphemerisCorrectionFlags;
 using skygate::ephemeris::EphemerisEngineDescriptorRegistry;
 using skygate::ephemeris::EphemerisEngineKind;
+
+[[nodiscard]] QVector<SkyCatalogSourceDescriptor> combinedSourcePresetDescriptors()
+{
+    QVector<SkyCatalogSourceDescriptor> descriptors;
+    for (const SkyCatalogSourceDescriptor& descriptor : SkyCatalogPresets::starSourceDescriptors()) {
+        if (!descriptor.bundled) {
+            descriptors.push_back(descriptor);
+        }
+    }
+    for (const SkyCatalogSourceDescriptor& descriptor : SkyCatalogPresets::deepSkySourceDescriptors()) {
+        if (!descriptor.bundled) {
+            descriptors.push_back(descriptor);
+        }
+    }
+    return descriptors;
+}
+
+[[nodiscard]] QVector<SkyCatalogSourcePresetModel::CustomOption> combinedCustomSourceOptions()
+{
+    return {
+        {QStringLiteral("Custom star catalog URL"), SkyCatalogPresets::starCategory()},
+        {QStringLiteral("Custom deep-sky catalog URL"), SkyCatalogPresets::deepSkyCategory()},
+    };
+}
 
 [[nodiscard]] qint64 floorMod(const qint64 numerator, const qint64 denominator) noexcept
 {
@@ -420,11 +445,11 @@ SkyContextController::SkyContextController(
       m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
       m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this)),
       m_catalogSourcePresetModel(
-          std::make_unique<SkyCatalogSourcePresetModel>(SkyCatalogPresets::starSourceDescriptors(), true, this)
+          std::make_unique<SkyCatalogSourcePresetModel>(
+              combinedSourcePresetDescriptors(), combinedCustomSourceOptions(), this
+          )
       ),
-      m_deepSkySourcePresetModel(
-          std::make_unique<SkyCatalogSourcePresetModel>(SkyCatalogPresets::deepSkySourceDescriptors(), true, this)
-      )
+      m_catalogSourceCollectionModel(std::make_unique<SkyCatalogSourceCollectionModel>(this))
 {
     m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
     m_location.setPositionSource(initializationOptions.positionSource);
@@ -520,7 +545,11 @@ SkyContextController::SkyContextController(
             emit skyContextChanged();
         }
     });
+    connect(m_catalogManager.get(), &SkyCatalogManager::sourcesChanged, this, [this] {
+        refreshCatalogSourceCollectionModel();
+    });
     refreshObjectSearchModel();
+    refreshCatalogSourceCollectionModel();
 
     m_location.setUtcTime(m_timeSource->nowUtc());
     m_timeController->setUtcTimePoint(m_location.utcTime());
@@ -973,9 +1002,9 @@ QAbstractItemModel* SkyContextController::catalogSourcePresetModel() const noexc
     return m_catalogSourcePresetModel.get();
 }
 
-QAbstractItemModel* SkyContextController::deepSkySourcePresetModel() const noexcept
+QAbstractItemModel* SkyContextController::catalogSourceCollectionModel() const noexcept
 {
-    return m_deepSkySourcePresetModel.get();
+    return m_catalogSourceCollectionModel.get();
 }
 
 bool SkyContextController::downloadingCatalog() const noexcept
@@ -1186,6 +1215,34 @@ void SkyContextController::refreshObjectSearchModel()
     }
 
     m_objectSearchModel->setCatalogData(catalogBodies(), resolvedConstellationAnchorGroups());
+}
+
+void SkyContextController::refreshCatalogSourceCollectionModel()
+{
+    if (m_catalogSourceCollectionModel == nullptr || m_catalogManager == nullptr) {
+        return;
+    }
+
+    QVector<SkyCatalogSourceCollectionModel::SourceEntry> entries;
+    const QVector<SkyCatalogManager::SourceViewEntry> sourceView = m_catalogManager->sourceViewEntries();
+    entries.reserve(sourceView.size());
+    for (const SkyCatalogManager::SourceViewEntry& viewEntry : sourceView) {
+        SkyCatalogSourceCollectionModel::SourceEntry entry;
+        entry.instanceId = viewEntry.instanceId;
+        entry.title = viewEntry.title;
+        entry.version = viewEntry.version;
+        entry.category = viewEntry.policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly
+                             ? SkyCatalogPresets::deepSkyCategory()
+                             : SkyCatalogPresets::starCategory();
+        entry.enabled = viewEntry.enabled;
+        entry.bundled = viewEntry.bundled;
+        entry.busy = viewEntry.busy;
+        entry.hasError = viewEntry.hasError;
+        entry.statusText = viewEntry.statusText;
+        entry.objectCount = static_cast<int>(viewEntry.objectCount);
+        entries.push_back(std::move(entry));
+    }
+    m_catalogSourceCollectionModel->replaceEntries(std::move(entries));
 }
 
 void SkyContextController::setCatalogPresetIndex(const int catalogPresetIndex)
@@ -1873,19 +1930,14 @@ QString SkyContextController::catalogSourcePresetId(const int index) const
     return m_catalogSourcePresetModel != nullptr ? m_catalogSourcePresetModel->sourceIdAt(index) : QString();
 }
 
-QString SkyContextController::catalogSourcePresetUrl(const int index) const
+QString SkyContextController::catalogSourcePresetCategory(const int index) const
 {
-    return m_catalogSourcePresetModel != nullptr ? m_catalogSourcePresetModel->defaultUrlAt(index) : QString();
+    return m_catalogSourcePresetModel != nullptr ? m_catalogSourcePresetModel->categoryAt(index) : QString();
 }
 
-QString SkyContextController::deepSkySourcePresetId(const int index) const
+bool SkyContextController::catalogSourcePresetIsCustom(const int index) const
 {
-    return m_deepSkySourcePresetModel != nullptr ? m_deepSkySourcePresetModel->sourceIdAt(index) : QString();
-}
-
-QString SkyContextController::deepSkySourcePresetUrl(const int index) const
-{
-    return m_deepSkySourcePresetModel != nullptr ? m_deepSkySourcePresetModel->defaultUrlAt(index) : QString();
+    return m_catalogSourcePresetModel != nullptr && m_catalogSourcePresetModel->isCustomAt(index);
 }
 
 void SkyContextController::clearSelectedCity()

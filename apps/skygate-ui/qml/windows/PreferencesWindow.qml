@@ -333,7 +333,6 @@ Window {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 skyContextController: preferencesWindow.skyContextController
-                                preferencesDraft: preferencesDraft
                             }
                         }
                     }

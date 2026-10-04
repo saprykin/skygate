@@ -29,6 +29,7 @@ QVector<SkyCatalogSourceDescriptor> buildStarSourceDescriptors()
     bundled.title = QStringLiteral("Bundled");
     bundled.schemaHint = skygate::ephemeris::CatalogSourceType::Bundled;
     bundled.attribution = QStringLiteral("Built-in bright star catalog");
+    bundled.category = SkyCatalogPresets::starCategory();
     bundled.legacyPresetIndex = 0;
     bundled.bundled = true;
     descriptors.push_back(std::move(bundled));
@@ -45,6 +46,7 @@ QVector<SkyCatalogSourceDescriptor> buildStarSourceDescriptors()
         QString::fromUtf8(kStellariumConstellationLinesCdnUrl)
     };
     hyg.attribution = QStringLiteral("HYG Database v4.2 (astronexus.com)");
+    hyg.category = SkyCatalogPresets::starCategory();
     hyg.legacyPresetIndex = 1;
     descriptors.push_back(std::move(hyg));
 
@@ -61,6 +63,7 @@ QVector<SkyCatalogSourceDescriptor> buildDeepSkySourceDescriptors()
     bundledMessier.title = QStringLiteral("Bundled Messier");
     bundledMessier.schemaHint = skygate::ephemeris::CatalogSourceType::Bundled;
     bundledMessier.attribution = QStringLiteral("Built-in Messier catalog");
+    bundledMessier.category = SkyCatalogPresets::deepSkyCategory();
     bundledMessier.legacyPresetIndex = 0;
     bundledMessier.bundled = true;
     descriptors.push_back(std::move(bundledMessier));
@@ -73,6 +76,7 @@ QVector<SkyCatalogSourceDescriptor> buildDeepSkySourceDescriptors()
         QStringList{QString::fromUtf8(kOpenNgcCatalogPrimaryUrl), QString::fromUtf8(kOpenNgcCatalogMirrorUrl)};
     openNgc.schemaHint = skygate::ephemeris::CatalogSourceType::OpenNgcCsv;
     openNgc.attribution = QStringLiteral("OpenNGC (github.com/mattiaverga/OpenNGC)");
+    openNgc.category = SkyCatalogPresets::deepSkyCategory();
     openNgc.legacyPresetIndex = 1;
     descriptors.push_back(std::move(openNgc));
 
@@ -141,6 +145,16 @@ QString SkyCatalogPresets::defaultDeepSkyCatalogUrlText()
 {
     const std::optional<SkyCatalogSourceDescriptor> descriptor = deepSkySourceDescriptor(QStringLiteral("open_ngc"));
     return descriptor.has_value() ? descriptor->defaultUrl() : QString();
+}
+
+QString SkyCatalogPresets::starCategory()
+{
+    return QStringLiteral("Star");
+}
+
+QString SkyCatalogPresets::deepSkyCategory()
+{
+    return QStringLiteral("Deep sky");
 }
 
 std::optional<SkyCatalogSourceDescriptor> SkyCatalogPresets::starSourceDescriptor(const QString& presetId)

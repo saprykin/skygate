@@ -102,15 +102,9 @@ void QmlComponentLoadTests::keyComponentsLoadWithoutWarnings_data()
             Item {
                 width: 900
                 height: 520
-                PreferencesDraft {
-                    id: draft
-                    skyContextController: skyContext
-                    Component.onCompleted: resetFromContext()
-                }
                 PreferencesCatalogSection {
                     anchors.fill: parent
                     skyContextController: skyContext
-                    preferencesDraft: draft
                 }
             }
         )");
