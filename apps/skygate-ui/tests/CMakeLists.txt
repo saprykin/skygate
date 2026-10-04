@@ -257,6 +257,12 @@ add_skygate_ui_qtest(
     skygate-ui-sky-catalog-source-descriptor-tests
     catalog/SkyCatalogSourceDescriptorTests.cpp
 )
+add_skygate_ui_qtest(
+    skygate-ui-catalog-consumer-interchangeability-tests
+    catalog/CatalogConsumerInterchangeabilityTests.cpp
+    LABELS integration
+    TIMEOUT 60
+)
 add_skygate_ui_qtest(skygate-ui-sky-scene-composition-tests scene/SkySceneCompositionTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-scene-frame-pipeline-tests scene/SkySceneFramePipelineTests.cpp)
 add_skygate_ui_qtest(skygate-ui-sky-scene-overlay-adapter-tests scene/SkySceneOverlayAdapterTests.cpp)
