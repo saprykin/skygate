@@ -33,11 +33,14 @@ SkyCatalogRuntimeResult& operator|=(SkyCatalogRuntimeResult& target, const SkyCa
 }  // namespace
 
 SkyCatalogManager::SkyCatalogManager(
-    SkySettingsStore* settingsStore, std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog, QObject* parent
+    SkySettingsStore* settingsStore,
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog,
+    QObject* parent,
+    QNetworkAccessManager* networkAccessManager
 )
     : QObject(parent), m_runtime(std::make_unique<SkyCatalogRuntime>(std::move(starCatalog)))
 {
-    m_networkAccessManager = new QNetworkAccessManager(this);
+    m_networkAccessManager = networkAccessManager != nullptr ? networkAccessManager : new QNetworkAccessManager(this);
     m_cacheController = std::make_unique<SkyCatalogCacheController>(settingsStore);
     m_importWorkflow = std::make_unique<SkyCatalogImportWorkflow>(m_networkAccessManager);
     applyRuntimeResult(m_runtime->initialize(runtimeBuildOptions()));
@@ -179,6 +182,7 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
     setCatalogPresetIndex(preset.presetIndex);
     if (preset.bundled) {
         m_cachedCatalogPayload.clear();
+        invalidateConstellationDownload();
         resetConstellationLineRefs();
         applyCatalog(skygate::ephemeris::CatalogFactory::createBundledStarCatalog(), preset.sourceLabel);
         return;
@@ -231,11 +235,12 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 
 void SkyCatalogManager::cancelCatalogDownload()
 {
-    if (!m_downloadingCatalog) {
+    if (!m_downloadingCatalog && !m_constellationDownloadPending) {
         return;
     }
 
     ++m_catalogDownloadGeneration;
+    invalidateConstellationDownload();
     if (m_networkAccessManager != nullptr) {
         const QList<QNetworkReply*> replies = m_networkAccessManager->findChildren<QNetworkReply*>();
         for (QNetworkReply* reply : replies) {
@@ -358,6 +363,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
     const std::uint64_t downloadGeneration = ++m_catalogDownloadGeneration;
+    invalidateConstellationDownload();
 
     m_importWorkflow->downloadCatalog(
         urlTexts,
@@ -479,13 +485,21 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
         return;
     }
 
+    const std::uint64_t constellationGeneration = m_constellationDownloadGeneration;
+    m_constellationDownloadPending = true;
     m_importWorkflow->downloadConstellationLines(
         constellationLineUrlTexts,
         this,
-        [this, catalogSummaryText](const QString& statusText) {
-            handleConstellationLineImportStatus(catalogSummaryText, statusText);
+        [this, catalogSummaryText, constellationGeneration](const QString& statusText) {
+            if (constellationGeneration == m_constellationDownloadGeneration) {
+                handleConstellationLineImportStatus(catalogSummaryText, statusText);
+            }
         },
-        [this, catalogSummaryText](SkyConstellationLineImportResult lineResult) {
+        [this, catalogSummaryText, constellationGeneration](SkyConstellationLineImportResult lineResult) {
+            if (constellationGeneration != m_constellationDownloadGeneration) {
+                return;
+            }
+            m_constellationDownloadPending = false;
             handleConstellationLineImportFinished(catalogSummaryText, std::move(lineResult));
         }
     );
@@ -521,6 +535,12 @@ void SkyCatalogManager::handleConstellationLineImportFinished(
     }
     setStatusText(SkyCatalogText::constellationLineSummary(catalogSummaryText, lineResult.statusSuffix));
     persistCatalogCache();
+}
+
+void SkyCatalogManager::invalidateConstellationDownload()
+{
+    ++m_constellationDownloadGeneration;
+    m_constellationDownloadPending = false;
 }
 
 void SkyCatalogManager::handleDeepSkyImportFinished(SkyDeepSkyCatalogImportResult result)

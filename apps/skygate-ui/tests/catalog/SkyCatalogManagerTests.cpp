@@ -1,10 +1,14 @@
 #include "CatalogCacheTestSupport.hpp"
+#include "CatalogDownloadWorkflowTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
+#include "FakeNetworkAccessManager.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
+#include "SkyCatalogPresets.hpp"
 #include "SkySettingsStore.hpp"
 
 #include <QFile>
+#include <QPointer>
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <QUrl>
@@ -35,6 +39,30 @@ bool catalogContainsDisplayName(const skygate::ephemeris::IStarCatalog* catalog,
     });
 }
 
+constexpr int kStaleConstellationDelayMs = 500;
+
+const skygate::ui::internal::SkyCatalogPreset kHygPreset =
+    skygate::ui::internal::SkyCatalogPresets::catalogPreset(QStringLiteral("hyg_v42"));
+
+skygate::ui::tests::FakeNetworkReply*
+findReplyForUrl(skygate::ui::tests::FakeNetworkAccessManager& networkAccessManager, const QString& url)
+{
+    for (skygate::ui::tests::FakeNetworkReply* reply : networkAccessManager.issuedReplies()) {
+        if (reply != nullptr && reply->url().toString() == url) {
+            return reply;
+        }
+    }
+    return nullptr;
+}
+
+bool allIssuedRepliesFinished(skygate::ui::tests::FakeNetworkAccessManager& networkAccessManager)
+{
+    const auto replies = networkAccessManager.issuedReplies();
+    return std::all_of(replies.begin(), replies.end(), [](const skygate::ui::tests::FakeNetworkReply* reply) {
+        return reply == nullptr || reply->isFinished();
+    });
+}
+
 }  // namespace
 
 class SkyCatalogManagerTests final : public QObject {
@@ -51,6 +79,10 @@ private slots:
     void localCatalogDownloadTogglesBusyProcessingAndAppliesCatalog();
     void cancelCatalogDownloadClearsBusyAndIgnoresResult();
     void failedLocalCatalogDownloadClearsBusyAndReportsStatus();
+    void staleConstellationResponseIgnoredAfterBundledSwitch();
+    void staleConstellationResponseIgnoredAfterCustomSwitch();
+    void cancelDuringConstellationLoadingIgnoresStaleCompletion();
+    void currentConstellationResponseAppliesOnce();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -242,6 +274,203 @@ void SkyCatalogManagerTests::failedLocalCatalogDownloadClearsBusyAndReportsStatu
     QCOMPARE(manager.catalogRevision(), originalRevision);
     QCOMPARE(downloadSpy.count(), 2);
     QCOMPARE(catalogSpy.count(), 0);
+}
+
+void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterBundledSwitch()
+{
+    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
+    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload =
+             skygate::ui::tests::sampleHygCsvPayload({.hip = 900010, .properName = "Pending HYG Star", .mag = "1.0"})}
+    );
+    networkAccessManager.enqueueResponse(
+        constellationUrl,
+        {.payload = skygate::ui::tests::sampleConstellationIndexJsonPayload(), .delayMs = kStaleConstellationDelayMs}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(constellationUrl));
+    QVERIFY(manager.constellationLineRefs().empty());
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> constellationReply =
+        findReplyForUrl(networkAccessManager, constellationUrl);
+    QVERIFY(!constellationReply.isNull());
+    QVERIFY(!constellationReply->isFinished());
+
+    manager.loadCatalogPreset(QStringLiteral("bundled"));
+    QCOMPARE(manager.sourceLabel(), QStringLiteral("Bundled"));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    const auto revisionAfterSwitch = manager.catalogRevision();
+    const int catalogChangesAfterSwitch = catalogSpy.count();
+    const QString statusAfterSwitch = manager.statusText();
+    const int statusChangesAfterSwitch = statusSpy.count();
+
+    if (!constellationReply.isNull()) {
+        skygate::ui::tests::waitForFakeReplyFinished(constellationReply.data());
+    }
+    QCoreApplication::processEvents();
+
+    QCOMPARE(manager.sourceLabel(), QStringLiteral("Bundled"));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.catalogRevision(), revisionAfterSwitch);
+    QCOMPARE(manager.statusText(), statusAfterSwitch);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterSwitch);
+    QCOMPARE(statusSpy.count(), statusChangesAfterSwitch);
+}
+
+void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterCustomSwitch()
+{
+    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
+    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    const QString customUrl = QStringLiteral("https://example.test/custom-stars.csv");
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload =
+             skygate::ui::tests::sampleHygCsvPayload({.hip = 900011, .properName = "Pending HYG Star", .mag = "1.0"})}
+    );
+    networkAccessManager.enqueueResponse(
+        constellationUrl,
+        {.payload = skygate::ui::tests::sampleConstellationIndexJsonPayload(), .delayMs = kStaleConstellationDelayMs}
+    );
+    networkAccessManager.enqueueResponse(
+        customUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 900012, .properName = "Custom Star", .mag = "2.0"})}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(constellationUrl));
+    QVERIFY(manager.constellationLineRefs().empty());
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> constellationReply =
+        findReplyForUrl(networkAccessManager, constellationUrl);
+    QVERIFY(!constellationReply.isNull());
+    QVERIFY(!constellationReply->isFinished());
+
+    manager.downloadCatalogFromUrl(customUrl);
+    QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("Downloaded"));
+    QVERIFY(manager.constellationLineRefs().empty());
+    const auto revisionAfterSwitch = manager.catalogRevision();
+    const int catalogChangesAfterSwitch = catalogSpy.count();
+    const QString statusAfterSwitch = manager.statusText();
+    const int statusChangesAfterSwitch = statusSpy.count();
+
+    if (!constellationReply.isNull()) {
+        skygate::ui::tests::waitForFakeReplyFinished(constellationReply.data());
+    }
+    QCoreApplication::processEvents();
+
+    QCOMPARE(manager.sourceLabel(), QStringLiteral("Downloaded"));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.catalogRevision(), revisionAfterSwitch);
+    QCOMPARE(manager.statusText(), statusAfterSwitch);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterSwitch);
+    QCOMPARE(statusSpy.count(), statusChangesAfterSwitch);
+
+    const auto cacheSnapshot = store.loadCatalogCache();
+    QVERIFY(cacheSnapshot.has_value());
+    QVERIFY(cacheSnapshot->constellationLineRows.isEmpty());
+    QVERIFY(cacheSnapshot->constellationAnchorGroupRows.isEmpty());
+}
+
+void SkyCatalogManagerTests::cancelDuringConstellationLoadingIgnoresStaleCompletion()
+{
+    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
+    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.hip = 900013, .properName = "Cancel Pending HYG Star", .mag = "1.0"}
+         )}
+    );
+    networkAccessManager.enqueueResponse(
+        constellationUrl,
+        {.payload = skygate::ui::tests::sampleConstellationIndexJsonPayload(), .delayMs = kStaleConstellationDelayMs}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(constellationUrl));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(!manager.downloadingCatalog());
+
+    const auto revisionBeforeCancel = manager.catalogRevision();
+    const int catalogChangesBeforeCancel = catalogSpy.count();
+
+    manager.cancelCatalogDownload();
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
+    QVERIFY(manager.constellationLineRefs().empty());
+
+    QTRY_VERIFY(networkAccessManager.requestedUrls().size() >= 4);
+    QTRY_VERIFY(allIssuedRepliesFinished(networkAccessManager));
+    QCoreApplication::processEvents();
+
+    QCOMPARE(manager.statusText(), QStringLiteral("Catalog: Download canceled."));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.catalogRevision(), revisionBeforeCancel);
+    QCOMPARE(catalogSpy.count(), catalogChangesBeforeCancel);
+}
+
+void SkyCatalogManagerTests::currentConstellationResponseAppliesOnce()
+{
+    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
+    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        catalogUrl,
+        {.payload =
+             skygate::ui::tests::sampleHygCsvPayload({.hip = 900014, .properName = "Current HYG Star", .mag = "1.0"})}
+    );
+    networkAccessManager.enqueueResponse(
+        constellationUrl, {.payload = skygate::ui::tests::sampleConstellationIndexJsonPayload()}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+
+    manager.loadCatalogPreset(QStringLiteral("hyg_v42"));
+    QTRY_VERIFY(manager.sourceLabel() == QStringLiteral("HYG v4.2"));
+    QTRY_VERIFY(manager.constellationLineRefs().size() == 2U);
+
+    QCOMPARE(manager.constellationLineRefs().size(), 2U);
+    QCOMPARE(manager.constellationAnchorGroups().size(), 1U);
+    QCOMPARE(manager.constellationCount(), 1U);
+
+    const auto revisionAfterApply = manager.catalogRevision();
+    const int catalogChangesAfterApply = catalogSpy.count();
+
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    QCOMPARE(manager.constellationLineRefs().size(), 2U);
+    QCOMPARE(manager.constellationAnchorGroups().size(), 1U);
+    QCOMPARE(manager.catalogRevision(), revisionAfterApply);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterApply);
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)

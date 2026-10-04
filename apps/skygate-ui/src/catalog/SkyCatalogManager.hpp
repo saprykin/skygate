@@ -38,7 +38,8 @@ public:
     explicit SkyCatalogManager(
         SkySettingsStore* settingsStore,
         std::unique_ptr<skygate::ephemeris::IStarCatalog> starCatalog = nullptr,
-        QObject* parent = nullptr
+        QObject* parent = nullptr,
+        QNetworkAccessManager* networkAccessManager = nullptr
     );
     ~SkyCatalogManager() override;
 
@@ -112,6 +113,7 @@ private:
     void handleConstellationLineImportFinished(
         const QString& catalogSummaryText, skygate::ui::internal::SkyConstellationLineImportResult lineResult
     );
+    void invalidateConstellationDownload();
     void handleDeepSkyImportFinished(skygate::ui::internal::SkyDeepSkyCatalogImportResult result);
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
     void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
@@ -131,6 +133,8 @@ private:
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
     std::uint64_t m_catalogDownloadGeneration = 0U;
+    std::uint64_t m_constellationDownloadGeneration = 0U;
+    bool m_constellationDownloadPending = false;
     QByteArray m_cachedCatalogPayload;
     QByteArray m_cachedDeepSkyCatalogPayload;
 };
