@@ -11,6 +11,7 @@ OwnGalaxyCelestialBody CelestialBodyCatalog::copyOwnGalaxyBody(const BaseCelesti
 {
     OwnGalaxyCelestialBody ownGalaxyBody;
     ownGalaxyBody.id = body.id;
+    ownGalaxyBody.identity = body.identity;
     ownGalaxyBody.displayName = body.displayName;
     ownGalaxyBody.kind = body.kind;
     ownGalaxyBody.visualMagnitude = body.visualMagnitude;
@@ -27,6 +28,7 @@ DistantCelestialBody CelestialBodyCatalog::copyDistantBody(const BaseCelestialBo
 {
     DistantCelestialBody distantBody;
     distantBody.id = body.id;
+    distantBody.identity = body.identity;
     distantBody.displayName = body.displayName;
     distantBody.kind = body.kind;
     distantBody.visualMagnitude = body.visualMagnitude;

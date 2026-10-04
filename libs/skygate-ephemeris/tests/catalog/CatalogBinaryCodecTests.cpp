@@ -197,18 +197,29 @@ void writeBinaryHeader(QDataStream& stream)
     stream << kTestBinaryCatalogMagic << skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion;
 }
 
+void writeEmptyIdentity(QDataStream& stream)
+{
+    writePayloadString(stream, "");
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(0U);
+}
+
 void writeOwnGalaxyBodyWithKind(QDataStream& stream, const std::uint8_t kind)
 {
     writePayloadString(stream, "hip_test");
     writePayloadString(stream, "Test");
-    stream << kind << 0.0 << false << false;
+    stream << kind << 0.0;
+    writeEmptyIdentity(stream);
+    stream << false << false;
 }
 
 void writeDistantBodyWithKind(QDataStream& stream, const std::uint8_t kind)
 {
     writePayloadString(stream, "ngc_test");
     writePayloadString(stream, "Test");
-    stream << kind << 0.0 << false << false;
+    stream << kind << 0.0;
+    writeEmptyIdentity(stream);
+    stream << false << false;
 }
 
 void writeDistantBodyWithDeepSkyInfoKind(QDataStream& stream, const std::uint8_t infoKind)
@@ -217,6 +228,7 @@ void writeDistantBodyWithDeepSkyInfoKind(QDataStream& stream, const std::uint8_t
     writePayloadString(stream, "Test");
     stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject);
     stream << 0.0;
+    writeEmptyIdentity(stream);
     stream << false;
     stream << true;
     stream << infoKind;
@@ -230,6 +242,7 @@ void writeStarBodyWithTimeScale(QDataStream& stream, const std::uint8_t timeScal
     writePayloadString(stream, "Test");
     stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star);
     stream << 0.0;
+    writeEmptyIdentity(stream);
     stream << false;
     stream << true;
     stream << 0.0 << 0.0;

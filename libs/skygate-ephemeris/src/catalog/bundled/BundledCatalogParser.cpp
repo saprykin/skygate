@@ -1,4 +1,5 @@
 #include "catalog/bundled/BundledCatalogParser.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 
 #include <QObject>
 
@@ -1165,6 +1166,30 @@ std::optional<double> positiveOptional(const double value)
     return value;
 }
 
+bool isAsciiDigit(const char character)
+{
+    return character >= '0' && character <= '9';
+}
+
+std::vector<CatalogIdentifier> bundledMessierExternalIdentifiers(const std::string_view aliases)
+{
+    std::vector<CatalogIdentifier> identifiers;
+    for (const std::string& alias : splitAliases(aliases)) {
+        if (alias.size() >= 2U && alias[0] == 'M' && isAsciiDigit(alias[1])) {
+            identifiers.push_back(CatalogIdentifier::make("messier", alias.substr(1U)));
+            continue;
+        }
+        if (alias.starts_with("NGC ")) {
+            identifiers.push_back(CatalogIdentifier::make("ngc", alias.substr(4U)));
+            continue;
+        }
+        if (alias.starts_with("IC ")) {
+            identifiers.push_back(CatalogIdentifier::make("ic", alias.substr(3U)));
+        }
+    }
+    return identifiers;
+}
+
 }  // namespace
 
 CatalogBodyParseResult
@@ -1180,6 +1205,7 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
     for (const auto& entry : kBundledCatalogEntries) {
         OwnGalaxyCelestialBody body;
         body.id = std::string(entry.id);
+        body.identity.sourceRecordId = std::string(entry.id);
         body.displayName = std::string(entry.displayName);
         body.kind = entry.type;
         body.visualMagnitude = entry.visualMagnitude;
@@ -1195,15 +1221,19 @@ BundledCatalogParser::parse(const std::string_view data, const CatalogParseProgr
     for (const auto& entry : kBundledMessierEntries) {
         DistantCelestialBody body;
         body.id = std::string(entry.id);
+        body.identity.sourceRecordId = std::string(entry.id);
+        body.identity.externalIdentifiers = bundledMessierExternalIdentifiers(entry.aliases);
         body.displayName = std::string(entry.displayName);
         body.kind = BaseCelestialBody::Kind::DeepSkyObject;
         body.visualMagnitude = entry.visualMagnitude;
         body.fixedEquatorial = skygate::core::EquatorialCoordinate{
             .rightAscensionHours = entry.rightAscensionHours, .declinationDeg = entry.declinationDeg
         };
+        std::vector<std::string> aliases = splitAliases(entry.aliases);
+        body.identity.aliases = aliases;
         body.deepSkyObject = DeepSkyObjectInfo{
             .kind = entry.kind,
-            .aliases = splitAliases(entry.aliases),
+            .aliases = std::move(aliases),
             .majorAxisArcmin = positiveOptional(entry.majorAxisArcmin),
             .minorAxisArcmin = positiveOptional(entry.minorAxisArcmin),
             .positionAngleDeg = positiveOptional(entry.positionAngleDeg),

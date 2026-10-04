@@ -22,6 +22,7 @@ private slots:
     void persistRoundTripsConstellationRows();
     void restoresBinaryCatalogPayloads();
     void corruptBinaryPayloadFallsBackToCsvParsing();
+    void legacyBinarySchemaVersionFallsBackToCsvParsing();
     void logsCacheLifecycleSummariesAtInfoLevel();
 
 private:
@@ -186,6 +187,24 @@ void SkyCatalogCacheControllerTests::corruptBinaryPayloadFallsBackToCsvParsing()
     QVERIFY(result.catalog != nullptr);
     QVERIFY(result.deepSkyCatalog != nullptr);
     QVERIFY(result.requiresBinaryUpgrade);
+}
+
+void SkyCatalogCacheControllerTests::legacyBinarySchemaVersionFallsBackToCsvParsing()
+{
+    auto snapshot = makeValidCacheSnapshot();
+    snapshot.catalogBinaryPayload = "legacy version 2 binary payload";
+    snapshot.catalogBinarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion) - 1;
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCache(snapshot));
+
+    const skygate::ui::internal::SkyCatalogCacheController controller(&store);
+    const auto result = controller.restore(1, 0);
+
+    QVERIFY(result.restored);
+    QVERIFY(result.catalog != nullptr);
+    QVERIFY(result.requiresBinaryUpgrade);
+    QCOMPARE(result.catalog->bodies().size(), 1U);
 }
 
 void SkyCatalogCacheControllerTests::logsCacheLifecycleSummariesAtInfoLevel()

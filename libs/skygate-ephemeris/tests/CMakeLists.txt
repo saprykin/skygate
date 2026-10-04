@@ -454,6 +454,10 @@ add_skygate_ephemeris_qtest(
     catalog/CelestialBodyCatalogTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-object-identity-tests
+    catalog/CatalogObjectIdentityTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-snapshot-boundary-tests
     catalog/CatalogSnapshotBoundaryTests.cpp
 )

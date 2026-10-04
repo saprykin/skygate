@@ -1,5 +1,6 @@
 #include "OpenNgcObjectMapper.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 #include "catalog/io/CatalogParsingUtilities.hpp"
 
 #include <QRegularExpression>
@@ -131,13 +132,21 @@ OpenNgcObjectMapping OpenNgcObjectMapper::mapObject(
     OpenNgcObjectMapping mapping;
     if (!messier.isEmpty()) {
         appendAlias(mapping.aliases, "M " + messier);
+        mapping.externalIdentifiers.push_back(
+            CatalogIdentifier::make("messier", CatalogParsingUtilities::toUtf8String(messier))
+        );
     }
     if (!ngc.isEmpty()) {
         appendAlias(mapping.aliases, "NGC " + ngc);
+        mapping.externalIdentifiers.push_back(
+            CatalogIdentifier::make("ngc", CatalogParsingUtilities::toUtf8String(ngc))
+        );
     }
     if (!ic.isEmpty()) {
         appendAlias(mapping.aliases, "IC " + ic);
+        mapping.externalIdentifiers.push_back(CatalogIdentifier::make("ic", CatalogParsingUtilities::toUtf8String(ic)));
     }
+    mapping.sourceRecordId = CatalogParsingUtilities::toUtf8String(name.trimmed());
     appendAlias(mapping.aliases, name);
     appendDelimitedAliases(mapping.aliases, identifiers);
     appendDelimitedAliases(mapping.aliases, commonNames);

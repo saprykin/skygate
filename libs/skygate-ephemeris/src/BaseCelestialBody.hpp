@@ -2,6 +2,7 @@
 
 #include "DeepSkyObjectInfo.hpp"
 #include "EquatorialCoordinate.hpp"
+#include "catalog/CatalogObjectIdentity.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 
 #include <cstdint>
@@ -31,10 +32,13 @@ public:
     [[nodiscard]] virtual const CatalogStarAstrometry* catalogStarAstrometry() const noexcept;
     [[nodiscard]] virtual const DeepSkyObjectInfo* deepSkyObjectInfo() const noexcept;
 
+    // Canonical domain object identity. Never derived from displayName or sky
+    // position; planet IDs such as "mercury" remain their domain identity.
     std::string id;
     std::string displayName;
     Kind kind = Kind::Star;
     double visualMagnitude = 0.0;
+    CatalogObjectIdentity identity;
 };
 
 }  // namespace skygate::ephemeris
