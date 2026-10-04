@@ -23,6 +23,58 @@ constexpr std::uint32_t kBinaryCatalogMagic = 0x53474243U;  // "SGBC"
 constexpr std::uint64_t kMaxBodyCount = 5'000'000ULL;
 constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
 
+[[nodiscard]] bool isKnownBodyDomain(const std::uint8_t domain)
+{
+    switch (static_cast<skygate::ephemeris::CelestialBodyCatalog::BodyDomain>(domain)) {
+    case skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy:
+    case skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant:
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool isKnownBodyKind(const std::uint8_t kind)
+{
+    switch (static_cast<skygate::ephemeris::BaseCelestialBody::Kind>(kind)) {
+    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
+    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
+    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool isKnownDeepSkyObjectKind(const std::uint8_t kind)
+{
+    switch (static_cast<skygate::ephemeris::DeepSkyObjectInfo::Kind>(kind)) {
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
+    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism:
+        return true;
+    }
+    return false;
+}
+
+[[nodiscard]] bool isKnownTimeScale(const std::uint8_t timeScale)
+{
+    switch (static_cast<skygate::core::TimeScale>(timeScale)) {
+    case skygate::core::TimeScale::Utc:
+    case skygate::core::TimeScale::Tai:
+    case skygate::core::TimeScale::Tt:
+    case skygate::core::TimeScale::Tdb:
+    case skygate::core::TimeScale::Ut1:
+        return true;
+    }
+    return false;
+}
+
 void writeString(QDataStream& stream, const std::string& value)
 {
     stream << QString::fromStdString(value);
@@ -76,7 +128,7 @@ void writeEpoch(QDataStream& stream, const skygate::core::AstronomicalEpoch& epo
 {
     std::uint8_t timeScale = 0U;
     stream >> epoch.julianDatePart1 >> epoch.julianDatePart2 >> timeScale;
-    if (stream.status() != QDataStream::Ok) {
+    if (stream.status() != QDataStream::Ok || !isKnownTimeScale(timeScale)) {
         return false;
     }
     epoch.timeScale = static_cast<skygate::core::TimeScale>(timeScale);
@@ -167,7 +219,7 @@ void writeDeepSkyInfo(QDataStream& stream, const skygate::ephemeris::DeepSkyObje
     std::uint8_t kind = 0U;
     std::uint64_t aliasCount = 0U;
     stream >> kind >> aliasCount;
-    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount) {
+    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount || !isKnownDeepSkyObjectKind(kind)) {
         return false;
     }
     info.kind = static_cast<skygate::ephemeris::DeepSkyObjectInfo::Kind>(kind);
@@ -268,7 +320,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
         }
         std::uint8_t kind = 0U;
         stream >> kind >> body.visualMagnitude;
-        if (stream.status() != QDataStream::Ok) {
+        if (stream.status() != QDataStream::Ok || !isKnownBodyKind(kind)) {
             return nullptr;
         }
         body.kind = static_cast<skygate::ephemeris::BaseCelestialBody::Kind>(kind);
@@ -309,7 +361,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
         }
         std::uint8_t kind = 0U;
         stream >> kind >> body.visualMagnitude;
-        if (stream.status() != QDataStream::Ok) {
+        if (stream.status() != QDataStream::Ok || !isKnownBodyKind(kind)) {
             return nullptr;
         }
         body.kind = static_cast<skygate::ephemeris::BaseCelestialBody::Kind>(kind);
@@ -348,7 +400,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
         std::uint8_t domain = 0U;
         std::uint64_t bodyIndex = 0U;
         stream >> domain >> bodyIndex;
-        if (stream.status() != QDataStream::Ok) {
+        if (stream.status() != QDataStream::Ok || !isKnownBodyDomain(domain)) {
             return nullptr;
         }
         const bool indexOutOfRange =

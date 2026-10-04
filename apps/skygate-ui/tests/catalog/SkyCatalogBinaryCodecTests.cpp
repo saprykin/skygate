@@ -7,8 +7,13 @@
 #include "time/AstronomicalEpoch.hpp"
 #include "time/EphemerisDateRange.hpp"
 
+#include <QDataStream>
+#include <QIODevice>
+#include <QString>
 #include <QtTest/QtTest>
 
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -176,6 +181,140 @@ void verifyDistantBody(
     }
 }
 
+constexpr std::uint32_t kTestBinaryCatalogMagic = 0x53474243U;  // "SGBC"
+
+void writePayloadString(QDataStream& stream, const std::string& value)
+{
+    stream << QString::fromStdString(value);
+}
+
+void writeBinaryHeader(QDataStream& stream)
+{
+    stream << kTestBinaryCatalogMagic << skygate::ui::internal::SkyCatalogBinaryCodec::kSchemaVersion;
+}
+
+void writeOwnGalaxyBodyWithKind(QDataStream& stream, const std::uint8_t kind)
+{
+    writePayloadString(stream, "hip_test");
+    writePayloadString(stream, "Test");
+    stream << kind << 0.0 << false << false;
+}
+
+void writeDistantBodyWithKind(QDataStream& stream, const std::uint8_t kind)
+{
+    writePayloadString(stream, "ngc_test");
+    writePayloadString(stream, "Test");
+    stream << kind << 0.0 << false << false;
+}
+
+void writeDistantBodyWithDeepSkyInfoKind(QDataStream& stream, const std::uint8_t infoKind)
+{
+    writePayloadString(stream, "ngc_test");
+    writePayloadString(stream, "Test");
+    stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject);
+    stream << 0.0;
+    stream << false;
+    stream << true;
+    stream << infoKind;
+    stream << static_cast<std::uint64_t>(0U);
+    stream << false << false << false;
+}
+
+void writeStarBodyWithTimeScale(QDataStream& stream, const std::uint8_t timeScale)
+{
+    writePayloadString(stream, "hip_test");
+    writePayloadString(stream, "Test");
+    stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star);
+    stream << 0.0;
+    stream << false;
+    stream << true;
+    stream << 0.0 << 0.0;
+    stream << 0.0 << 0.0 << timeScale;
+    stream << false << false << false << false << false;
+}
+
+QByteArray makeOrderEntryPayload(const std::uint8_t domain, const std::uint64_t bodyIndex)
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(1U);
+    stream << domain << bodyIndex;
+    return buffer;
+}
+
+QByteArray
+makeSingleBodyOrderPayload(const std::uint8_t domain, const std::uint64_t bodyIndex, const bool ownGalaxyBody)
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    if (ownGalaxyBody) {
+        stream << static_cast<std::uint64_t>(1U);
+        writeOwnGalaxyBodyWithKind(
+            stream, static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star)
+        );
+        stream << static_cast<std::uint64_t>(0U);
+    } else {
+        stream << static_cast<std::uint64_t>(0U);
+        stream << static_cast<std::uint64_t>(1U);
+        writeDistantBodyWithKind(
+            stream, static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject)
+        );
+    }
+    stream << static_cast<std::uint64_t>(1U);
+    stream << domain << bodyIndex;
+    return buffer;
+}
+
+QByteArray makeInvalidOwnGalaxyKindPayload(const std::uint8_t kind)
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    stream << static_cast<std::uint64_t>(1U);
+    writeOwnGalaxyBodyWithKind(stream, kind);
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(0U);
+    return buffer;
+}
+
+QByteArray makeInvalidDeepSkyKindPayload(const std::uint8_t kind)
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(1U);
+    writeDistantBodyWithDeepSkyInfoKind(stream, kind);
+    stream << static_cast<std::uint64_t>(0U);
+    return buffer;
+}
+
+QByteArray makeInvalidTimeScalePayload(const std::uint8_t timeScale)
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    stream << static_cast<std::uint64_t>(1U);
+    writeStarBodyWithTimeScale(stream, timeScale);
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(0U);
+    return buffer;
+}
+
 }  // namespace
 
 class SkyCatalogBinaryCodecTests final : public QObject {
@@ -185,6 +324,12 @@ private slots:
     void roundTripsCatalogContents();
     void rejectsEmptyPayload();
     void rejectsCorruptPayload();
+    void rejectsUnknownOrderDomainWithEmptyVectors();
+    void rejectsUnknownOrderDomainWithExtremeIndex();
+    void rejectsInvalidOwnGalaxyBodyKind();
+    void rejectsInvalidDeepSkyObjectKind();
+    void rejectsInvalidTimeScale();
+    void rejectsKnownDomainIndexOutOfRange();
 };
 
 void SkyCatalogBinaryCodecTests::roundTripsCatalogContents()
@@ -243,6 +388,49 @@ void SkyCatalogBinaryCodecTests::rejectsCorruptPayload()
     QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload.mid(0, payload.size() / 2)) == nullptr);
     payload[4] = static_cast<char>(payload[4] ^ 0xFF);
     QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void SkyCatalogBinaryCodecTests::rejectsUnknownOrderDomainWithEmptyVectors()
+{
+    const QByteArray payload = makeOrderEntryPayload(0xFFU, 0U);
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void SkyCatalogBinaryCodecTests::rejectsUnknownOrderDomainWithExtremeIndex()
+{
+    const QByteArray payload = makeOrderEntryPayload(0xFFU, std::numeric_limits<std::uint64_t>::max());
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void SkyCatalogBinaryCodecTests::rejectsInvalidOwnGalaxyBodyKind()
+{
+    const QByteArray payload = makeInvalidOwnGalaxyKindPayload(0xFFU);
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void SkyCatalogBinaryCodecTests::rejectsInvalidDeepSkyObjectKind()
+{
+    const QByteArray payload = makeInvalidDeepSkyKindPayload(0xFFU);
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void SkyCatalogBinaryCodecTests::rejectsInvalidTimeScale()
+{
+    const QByteArray payload = makeInvalidTimeScalePayload(0xFFU);
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void SkyCatalogBinaryCodecTests::rejectsKnownDomainIndexOutOfRange()
+{
+    const auto ownGalaxyDomain =
+        static_cast<std::uint8_t>(skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy);
+    const auto distantDomain = static_cast<std::uint8_t>(skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant);
+
+    const QByteArray ownGalaxyPayload = makeSingleBodyOrderPayload(ownGalaxyDomain, 1U, true);
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(ownGalaxyPayload) == nullptr);
+
+    const QByteArray distantPayload = makeSingleBodyOrderPayload(distantDomain, 1U, false);
+    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(distantPayload) == nullptr);
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogBinaryCodecTests)
