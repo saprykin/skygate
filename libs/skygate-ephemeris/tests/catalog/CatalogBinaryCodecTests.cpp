@@ -197,11 +197,19 @@ void writeBinaryHeader(QDataStream& stream)
     stream << kTestBinaryCatalogMagic << skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion;
 }
 
-void writeEmptyIdentity(QDataStream& stream)
+void writeIdentityWithScope(QDataStream& stream, const std::uint8_t idScope)
 {
     writePayloadString(stream, "");
+    stream << idScope;
     stream << static_cast<std::uint64_t>(0U);
     stream << static_cast<std::uint64_t>(0U);
+}
+
+void writeEmptyIdentity(QDataStream& stream)
+{
+    writeIdentityWithScope(
+        stream, static_cast<std::uint8_t>(skygate::ephemeris::CatalogObjectIdentity::IdScope::Global)
+    );
 }
 
 void writeOwnGalaxyBodyWithKind(QDataStream& stream, const std::uint8_t kind)
@@ -210,6 +218,16 @@ void writeOwnGalaxyBodyWithKind(QDataStream& stream, const std::uint8_t kind)
     writePayloadString(stream, "Test");
     stream << kind << 0.0;
     writeEmptyIdentity(stream);
+    stream << false << false;
+}
+
+void writeOwnGalaxyBodyWithIdScope(QDataStream& stream, const std::uint8_t idScope)
+{
+    writePayloadString(stream, "hip_test");
+    writePayloadString(stream, "Test");
+    stream << static_cast<std::uint8_t>(skygate::ephemeris::BaseCelestialBody::Kind::Star);
+    stream << 0.0;
+    writeIdentityWithScope(stream, idScope);
     stream << false << false;
 }
 
@@ -304,6 +322,20 @@ QByteArray makeInvalidOwnGalaxyKindPayload(const std::uint8_t kind)
     return buffer;
 }
 
+QByteArray makeInvalidIdScopePayload(const std::uint8_t idScope)
+{
+    QByteArray buffer;
+    QDataStream stream(&buffer, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_5);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    writeBinaryHeader(stream);
+    stream << static_cast<std::uint64_t>(1U);
+    writeOwnGalaxyBodyWithIdScope(stream, idScope);
+    stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(0U);
+    return buffer;
+}
+
 QByteArray makeInvalidDeepSkyKindPayload(const std::uint8_t kind)
 {
     QByteArray buffer;
@@ -345,6 +377,7 @@ private slots:
     void rejectsUnknownOrderDomainWithExtremeIndex();
     void rejectsInvalidOwnGalaxyBodyKind();
     void rejectsInvalidDeepSkyObjectKind();
+    void rejectsInvalidIdScope();
     void rejectsInvalidTimeScale();
     void rejectsKnownDomainIndexOutOfRange();
 };
@@ -428,6 +461,12 @@ void CatalogBinaryCodecTests::rejectsInvalidOwnGalaxyBodyKind()
 void CatalogBinaryCodecTests::rejectsInvalidDeepSkyObjectKind()
 {
     const QByteArray payload = makeInvalidDeepSkyKindPayload(0xFFU);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
+}
+
+void CatalogBinaryCodecTests::rejectsInvalidIdScope()
+{
+    const QByteArray payload = makeInvalidIdScopePayload(0xFFU);
     QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 

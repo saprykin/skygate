@@ -135,6 +135,7 @@ void CatalogObjectIdentityTests::hygParserPreservesCrossIdentifiersAndAliases()
     const auto* body = skygate::ephemeris::tests::findBodyById(bodies, "hip_32349");
     QVERIFY(body != nullptr);
     QCOMPARE(QString::fromStdString(body->identity.sourceRecordId), QStringLiteral("1"));
+    QCOMPARE(body->identity.idScope, CatalogObjectIdentity::IdScope::Global);
     QVERIFY(hasIdentifier(body->identity, "hip", "32349"));
     QVERIFY(hasIdentifier(body->identity, "hyg", "1"));
     QVERIFY(hasAlias(body->identity.aliases, "Sirius"));
@@ -156,6 +157,7 @@ void CatalogObjectIdentityTests::hygParserFallsBackWithoutCrossIdentifiers()
     QVERIFY(body != nullptr);
     QVERIFY(body->identity.sourceRecordId.empty());
     QVERIFY(body->identity.externalIdentifiers.empty());
+    QCOMPARE(body->identity.idScope, CatalogObjectIdentity::IdScope::SourceLocal);
     QVERIFY(hasAlias(body->identity.aliases, "Unnamed"));
 }
 

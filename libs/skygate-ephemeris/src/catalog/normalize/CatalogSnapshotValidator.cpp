@@ -212,6 +212,16 @@ bool CatalogSnapshotValidator::isKnownDeepSkyObjectKind(const DeepSkyObjectInfo:
     return false;
 }
 
+bool CatalogSnapshotValidator::isKnownIdScope(const CatalogObjectIdentity::IdScope idScope) noexcept
+{
+    switch (idScope) {
+    case CatalogObjectIdentity::IdScope::Global:
+    case CatalogObjectIdentity::IdScope::SourceLocal:
+        return true;
+    }
+    return false;
+}
+
 bool CatalogSnapshotValidator::isKnownTimeScale(const skygate::core::TimeScale timeScale) noexcept
 {
     switch (timeScale) {

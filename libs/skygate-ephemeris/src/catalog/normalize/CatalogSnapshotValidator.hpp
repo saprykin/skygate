@@ -43,6 +43,7 @@ public:
     // the binary codec does not keep a second copy of the same policy.
     [[nodiscard]] static bool isKnownBodyKind(BaseCelestialBody::Kind kind) noexcept;
     [[nodiscard]] static bool isKnownDeepSkyObjectKind(DeepSkyObjectInfo::Kind kind) noexcept;
+    [[nodiscard]] static bool isKnownIdScope(CatalogObjectIdentity::IdScope idScope) noexcept;
     [[nodiscard]] static bool isKnownTimeScale(skygate::core::TimeScale timeScale) noexcept;
     [[nodiscard]] static bool isOrderEntryValid(
         CelestialBodyCatalog::BodyDomain domain,

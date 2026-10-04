@@ -14,6 +14,12 @@ namespace skygate::ephemeris {
 // body and absorbs the earlier body's non-conflicting identifiers, aliases,
 // and metadata. AugmentCore sources contribute only non-deep-sky bodies as a
 // gap-fill and enable the bundled bright-star fallback when no star is present.
+//
+// A canonical id whose CatalogObjectIdentity::idScope is SourceLocal is a
+// record key of one source instance only. The merge qualifies it with the
+// owning source instance id ("hyg_auto_1@<sourceId>") before identity
+// resolution, so equal generated counters from unrelated sources never match
+// while a reload of the same instance keeps the same object key.
 class CatalogCompositionMerger final {
 public:
     [[nodiscard]] static CatalogCompositionMergeResult mergeCollection(const CatalogCompositionRequest& request);

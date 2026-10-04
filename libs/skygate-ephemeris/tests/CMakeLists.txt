@@ -476,6 +476,12 @@ add_skygate_ephemeris_qtest(
     TIMEOUT 45
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-source-local-identity-tests
+    catalog/CatalogSourceLocalIdentityTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-snapshot-boundary-tests
     catalog/CatalogSnapshotBoundaryTests.cpp
 )
