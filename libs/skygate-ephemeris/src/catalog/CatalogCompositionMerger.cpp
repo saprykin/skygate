@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,6 +24,61 @@ namespace {
 Q_LOGGING_CATEGORY(skygateCatalogCompositionLog, "skygate.catalog.composition")
 
 constexpr double kCoordinateTolerance = 1e-9;
+
+// A source-local id is a record key of exactly one source instance: the
+// generator restarts in every payload (for example hyg_auto_1 for every
+// anonymous HYG parse), so the bare id must not act as a cross-source object
+// key. Appending the owning source instance id yields a key that is stable
+// across reloads of that instance (the instance id is durable) and distinct
+// from every other instance. Generated ids never contain '@', so the first
+// '@' always separates the generated id from the instance id and equal
+// generated ids from different instances can never qualify to the same key.
+[[nodiscard]] std::string qualifiedSourceLocalId(const std::string_view generatedId, const std::string_view sourceId)
+{
+    std::string qualified;
+    qualified.reserve(generatedId.size() + sourceId.size() + 1U);
+    qualified.append(generatedId);
+    qualified.push_back('@');
+    qualified.append(sourceId);
+    return qualified;
+}
+
+// Owns the instance-qualified copy of a body whose canonical id is source
+// local. Bodies with global identities are referenced without copying, so the
+// qualification cost applies only to the generated-id rows that need it.
+class SourceScopedBody final {
+public:
+    SourceScopedBody(const BaseCelestialBody& body, const std::string_view sourceId)
+    {
+        if (body.identity.idScope != CatalogObjectIdentity::IdScope::SourceLocal) {
+            m_body = &body;
+            return;
+        }
+
+        if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
+            m_distant = CelestialBodyCatalog::copyDistantBody(body);
+            m_distant->id = qualifiedSourceLocalId(m_distant->id, sourceId);
+            m_distant->identity.idScope = CatalogObjectIdentity::IdScope::Global;
+            m_body = &*m_distant;
+            return;
+        }
+
+        m_ownGalaxy = CelestialBodyCatalog::copyOwnGalaxyBody(body);
+        m_ownGalaxy->id = qualifiedSourceLocalId(m_ownGalaxy->id, sourceId);
+        m_ownGalaxy->identity.idScope = CatalogObjectIdentity::IdScope::Global;
+        m_body = &*m_ownGalaxy;
+    }
+
+    [[nodiscard]] const BaseCelestialBody& body() const noexcept
+    {
+        return *m_body;
+    }
+
+private:
+    std::optional<OwnGalaxyCelestialBody> m_ownGalaxy;
+    std::optional<DistantCelestialBody> m_distant;
+    const BaseCelestialBody* m_body = nullptr;
+};
 
 // Accumulates deduplicated bodies of one or more sources while keeping logical
 // positions stable so an identity index can address each survivor by value.
@@ -324,14 +380,18 @@ evaluateMatch(const MergeAccumulator& accumulator, const CatalogIdentityIndex& i
 }
 
 // Appends `body` into `accumulator`, merging into the first matching survivor
-// (earlier-wins) within a single source.
+// (earlier-wins) within a single source. Source-local generated ids are
+// qualified with `sourceId` before resolution so equal counters from other
+// sources never match.
 std::size_t appendDeduped(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
-    const BaseCelestialBody& body,
+    const BaseCelestialBody& incoming,
     const std::string_view sourceId
 )
 {
+    const SourceScopedBody scoped{incoming, sourceId};
+    const BaseCelestialBody& body = scoped.body();
     const MatchDecision decision = evaluateMatch(accumulator, index, body);
     if (decision.action == MatchDecision::Action::Merge) {
         bool conflict = false;
@@ -471,11 +531,12 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                 if (body->kind == BaseCelestialBody::Kind::Star) {
                     hasStar = true;
                 }
-                if (hasAnyMatch(index, *body)) {
+                const SourceScopedBody scoped{*body, source.sourceId};
+                if (hasAnyMatch(index, scoped.body())) {
                     continue;
                 }
-                const std::size_t position = accumulator.append(*body, source.sourceId);
-                index.add(*body, position);
+                const std::size_t position = accumulator.append(scoped.body(), source.sourceId);
+                index.add(scoped.body(), position);
             }
             continue;
         }

@@ -3,10 +3,15 @@
 #include "CatalogCompositionMerger.hpp"
 #include "CatalogFactory.hpp"
 #include "CatalogIdentity.hpp"
+#include "StringUtilities.hpp"
+
+#include <QLoggingCategory>
+#include <QString>
 
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -14,6 +19,8 @@
 
 namespace skygate::ephemeris {
 namespace {
+
+Q_LOGGING_CATEGORY(skygateCatalogCompositionLog, "skygate.catalog.composition")
 
 void assignCompositionCounts(
     CatalogCompositionResult& result,
@@ -67,6 +74,31 @@ void assignCompositionCounts(
     }
 }
 
+// Returns a diagnostic when the collection violates the documented source
+// identity contract: every source instance must have a non-empty identity that
+// is unique within the collection. Identities are compared through the same
+// normalization used for composed identity keys (trimmed, ASCII case folded),
+// so two entries that would still resolve to the same key are rejected as
+// duplicates.
+[[nodiscard]] std::optional<std::string> invalidSourceIdentityDetail(const CatalogCompositionRequest& request)
+{
+    std::vector<std::string> seenKeys;
+    seenKeys.reserve(request.sources.size());
+    for (std::size_t index = 0; index < request.sources.size(); ++index) {
+        const std::string& sourceId = request.sources[index].sourceId;
+        const std::string identityKey = StringUtilities::normalizedLookupKey(sourceId);
+        if (identityKey.empty()) {
+            return "catalog composition rejected source " + std::to_string(index) + ": the source identity is empty.";
+        }
+        if (std::find(seenKeys.begin(), seenKeys.end(), identityKey) != seenKeys.end()) {
+            return "catalog composition rejected source " + std::to_string(index) + ": source identity '" + sourceId
+                   + "' duplicates another source in the collection.";
+        }
+        seenKeys.push_back(identityKey);
+    }
+    return std::nullopt;
+}
+
 std::size_t countDeepSkyObjects(const IStarCatalog* catalog)
 {
     return catalog != nullptr ? CatalogIdentity::countDeepSkyObjects(catalog->bodies()) : 0U;
@@ -77,6 +109,14 @@ std::size_t countDeepSkyObjects(const IStarCatalog* catalog)
 CatalogCompositionResult CatalogComposer::composeCollection(const CatalogCompositionRequest& request)
 {
     CatalogCompositionResult result;
+    if (const std::optional<std::string> invalidSourceDetail = invalidSourceIdentityDetail(request);
+        invalidSourceDetail.has_value()) {
+        result.errorCode = CatalogCompositionResult::ErrorCode::InvalidSourceIdentity;
+        result.errorDetail = *invalidSourceDetail;
+        qCWarning(skygateCatalogCompositionLog).noquote() << QString::fromStdString(*invalidSourceDetail);
+        return result;
+    }
+
     CatalogCompositionMergeResult merged = CatalogCompositionMerger::mergeCollection(request);
     result.catalog = CatalogFactory::createStarCatalogFromBodies(
         std::move(merged.ownGalaxyBodies), std::move(merged.distantBodies), std::move(merged.orderedBodyIndexes)

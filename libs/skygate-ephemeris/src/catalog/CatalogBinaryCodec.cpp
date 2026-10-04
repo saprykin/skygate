@@ -77,6 +77,7 @@ void writeOptionalDouble(QDataStream& stream, const std::optional<double>& value
 void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& identity)
 {
     writeString(stream, identity.sourceRecordId);
+    stream << static_cast<std::uint8_t>(identity.idScope);
     stream << static_cast<std::uint64_t>(identity.externalIdentifiers.size());
     for (const CatalogIdentifier& identifier : identity.externalIdentifiers) {
         writeString(stream, identifier.namespaceName);
@@ -93,6 +94,14 @@ void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& ident
     if (!readString(stream, identity.sourceRecordId)) {
         return false;
     }
+
+    std::uint8_t idScope = 0U;
+    stream >> idScope;
+    if (stream.status() != QDataStream::Ok
+        || !CatalogSnapshotValidator::isKnownIdScope(static_cast<CatalogObjectIdentity::IdScope>(idScope))) {
+        return false;
+    }
+    identity.idScope = static_cast<CatalogObjectIdentity::IdScope>(idScope);
 
     std::uint64_t identifierCount = 0U;
     stream >> identifierCount;

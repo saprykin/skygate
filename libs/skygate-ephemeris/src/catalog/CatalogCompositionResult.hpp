@@ -3,6 +3,7 @@
 #include "IStarCatalog.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,7 +23,16 @@ namespace skygate::ephemeris {
 // number of unique surviving objects; sourceOrder/sourceRowCounts describe how
 // many surviving rows each source contributed; the per-kind counts describe
 // the surviving snapshot by object kind.
+//
+// A rejected collection leaves catalog null, isSuccess() false, and records
+// the reason in errorCode/errorDetail. errorCode is NoError and errorDetail is
+// empty for every accepted collection.
 struct CatalogCompositionResult final {
+    enum class ErrorCode : std::uint8_t {
+        NoError,
+        InvalidSourceIdentity
+    };
+
     std::unique_ptr<IStarCatalog> catalog;
     std::vector<std::string> sourceIds;
     std::vector<std::vector<std::string>> contributorSourceIds;
@@ -36,6 +46,8 @@ struct CatalogCompositionResult final {
     std::size_t sunCount = 0;
     std::vector<std::string> sourceOrder;
     std::vector<std::size_t> sourceRowCounts;
+    ErrorCode errorCode = ErrorCode::NoError;
+    std::string errorDetail;
 
     [[nodiscard]] bool isSuccess() const noexcept;
 };

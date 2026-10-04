@@ -2,6 +2,7 @@
 
 #include "catalog/CatalogIdentifier.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -32,10 +33,29 @@ namespace skygate::ephemeris {
 //     For deep-sky objects DeepSkyObjectInfo::aliases mirrors this list so
 //     existing DSO consumers keep reading the legacy field; the body-level
 //     list is authoritative for identity resolution and merging.
+//
+//   - idScope: whether the canonical id is a global astronomical identity or
+//     a record key that is only meaningful inside one source instance.
 struct CatalogObjectIdentity {
+    // The scope of the canonical body id.
+    enum class IdScope : std::uint8_t {
+        // A recognized designation or domain identity (hip_..., ngc_...,
+        // mercury, ...). Equal global ids from independent catalogs describe
+        // the same object and are authoritative during composition.
+        Global,
+        // A parser-generated record key for a row without any recognized
+        // designation, for example hyg_auto_<n> for an anonymous HYG row. The
+        // generator restarts for every payload, so the id matches only inside
+        // the source instance that produced it. Composition qualifies the id
+        // with the source instance identity before identity resolution; equal
+        // counters from unrelated sources must never match.
+        SourceLocal
+    };
+
     std::string sourceRecordId;
     std::vector<CatalogIdentifier> externalIdentifiers;
     std::vector<std::string> aliases;
+    IdScope idScope = IdScope::Global;
 };
 
 }  // namespace skygate::ephemeris
