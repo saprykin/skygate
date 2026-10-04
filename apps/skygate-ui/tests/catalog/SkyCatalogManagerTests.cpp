@@ -74,6 +74,7 @@ private slots:
     void unknownPresetsUpdateStatus();
     void bundledPresetResetsCatalogAndConstellationRefs();
     void bundledDeepSkyPresetRebuildsActiveCatalog();
+    void customDeepSkyDownloadUsesGenericSourceLabel();
     void clearCacheReportsStatusAndSignals();
     void restoreCachePathThroughManager();
     void localCatalogDownloadTogglesBusyProcessingAndAppliesCatalog();
@@ -155,6 +156,26 @@ void SkyCatalogManagerTests::bundledDeepSkyPresetRebuildsActiveCatalog()
     QVERIFY(manager.catalogRevision() > originalRevision);
     QVERIFY(manager.deepSkyCatalogInfoText().contains("Objects:"));
     QVERIFY(infoSpy.count() >= 1);
+}
+
+void SkyCatalogManagerTests::customDeepSkyDownloadUsesGenericSourceLabel()
+{
+    const QString catalogPath = m_settings.filePath(QStringLiteral("manager-local-deep-sky.csv"));
+    QVERIFY(writeFile(catalogPath, skygate::ui::tests::sampleOpenNgcCsvPayload()));
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+    const QString catalogUrl = QUrl::fromLocalFile(catalogPath).toString();
+
+    manager.downloadDeepSkyCatalogFromUrl(catalogUrl);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    QCOMPARE(manager.deepSkyCatalogPresetIndex(), 2);
+    QCOMPARE(manager.deepSkyCatalogUrlText(), catalogUrl);
+    QVERIFY(manager.sourceLabels().contains(QStringLiteral("Downloaded")));
+    QVERIFY(!manager.sourceLabels().contains(QStringLiteral("OpenNGC")));
+    QVERIFY(manager.statusText().contains(QStringLiteral("Downloaded")));
+    QVERIFY(!manager.statusText().contains(QStringLiteral("OpenNGC")));
 }
 
 void SkyCatalogManagerTests::clearCacheReportsStatusAndSignals()

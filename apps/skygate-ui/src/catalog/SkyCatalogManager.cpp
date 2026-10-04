@@ -230,7 +230,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 {
     setDeepSkyCatalogPresetIndex(2);
     setDeepSkyCatalogUrlText(urlText);
-    downloadDeepSkyCatalogFromUrls(QStringList{urlText}, "OpenNGC");
+    downloadDeepSkyCatalogFromUrls(QStringList{urlText}, "Downloaded");
 }
 
 void SkyCatalogManager::cancelCatalogDownload()
