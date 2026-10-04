@@ -472,6 +472,10 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogSnapshotBoundaryTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-snapshot-validator-tests
+    catalog/CatalogSnapshotValidatorTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-composer-tests
     catalog/CatalogComposerTests.cpp
     LABELS integration

@@ -280,6 +280,7 @@ add_library(skygate-ephemeris STATIC
     src/StringUtilities.hpp
     src/catalog/CatalogStarAstrometry.hpp
     src/catalog/normalize/CatalogBodyNormalization.hpp
+    src/catalog/normalize/CatalogSnapshotValidator.hpp
     src/catalog/CatalogBodyParseResult.hpp
     src/catalog/bundled/BundledCatalogParser.hpp
     src/catalog/CatalogIdentifier.hpp
@@ -321,6 +322,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogStarAstrometry.cpp
     src/catalog/CatalogBodyParseResult.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
+    src/catalog/normalize/CatalogSnapshotValidator.cpp
     src/catalog/CatalogIdentifier.cpp
     src/catalog/CatalogIdentity.cpp
     src/catalog/CatalogIdentityIndex.cpp
