@@ -11,6 +11,7 @@
 #include "catalog/InMemoryStarCatalog.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/EphemerisDateRange.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
 
 #include <QDataStream>
 #include <QIODevice>
@@ -28,58 +29,6 @@ namespace {
 constexpr std::uint32_t kBinaryCatalogMagic = 0x53474243U;  // "SGBC"
 constexpr std::uint64_t kMaxBodyCount = 5'000'000ULL;
 constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
-
-[[nodiscard]] bool isKnownBodyDomain(const std::uint8_t domain)
-{
-    switch (static_cast<CelestialBodyCatalog::BodyDomain>(domain)) {
-    case CelestialBodyCatalog::BodyDomain::OwnGalaxy:
-    case CelestialBodyCatalog::BodyDomain::Distant:
-        return true;
-    }
-    return false;
-}
-
-[[nodiscard]] bool isKnownBodyKind(const std::uint8_t kind)
-{
-    switch (static_cast<BaseCelestialBody::Kind>(kind)) {
-    case BaseCelestialBody::Kind::Star:
-    case BaseCelestialBody::Kind::Planet:
-    case BaseCelestialBody::Kind::Moon:
-    case BaseCelestialBody::Kind::Sun:
-    case BaseCelestialBody::Kind::Constellation:
-    case BaseCelestialBody::Kind::DeepSkyObject:
-        return true;
-    }
-    return false;
-}
-
-[[nodiscard]] bool isKnownDeepSkyObjectKind(const std::uint8_t kind)
-{
-    switch (static_cast<DeepSkyObjectInfo::Kind>(kind)) {
-    case DeepSkyObjectInfo::Kind::Unknown:
-    case DeepSkyObjectInfo::Kind::Galaxy:
-    case DeepSkyObjectInfo::Kind::OpenCluster:
-    case DeepSkyObjectInfo::Kind::GlobularCluster:
-    case DeepSkyObjectInfo::Kind::Nebula:
-    case DeepSkyObjectInfo::Kind::PlanetaryNebula:
-    case DeepSkyObjectInfo::Kind::Asterism:
-        return true;
-    }
-    return false;
-}
-
-[[nodiscard]] bool isKnownTimeScale(const std::uint8_t timeScale)
-{
-    switch (static_cast<skygate::core::TimeScale>(timeScale)) {
-    case skygate::core::TimeScale::Utc:
-    case skygate::core::TimeScale::Tai:
-    case skygate::core::TimeScale::Tt:
-    case skygate::core::TimeScale::Tdb:
-    case skygate::core::TimeScale::Ut1:
-        return true;
-    }
-    return false;
-}
 
 void writeString(QDataStream& stream, const std::string& value)
 {
@@ -189,10 +138,14 @@ void writeEpoch(QDataStream& stream, const skygate::core::AstronomicalEpoch& epo
 {
     std::uint8_t timeScale = 0U;
     stream >> epoch.julianDatePart1 >> epoch.julianDatePart2 >> timeScale;
-    if (stream.status() != QDataStream::Ok || !isKnownTimeScale(timeScale)) {
+    if (stream.status() != QDataStream::Ok) {
         return false;
     }
-    epoch.timeScale = static_cast<skygate::core::TimeScale>(timeScale);
+    const auto parsedTimeScale = static_cast<skygate::core::TimeScale>(timeScale);
+    if (!CatalogSnapshotValidator::isKnownTimeScale(parsedTimeScale)) {
+        return false;
+    }
+    epoch.timeScale = parsedTimeScale;
     return true;
 }
 
@@ -280,7 +233,8 @@ void writeDeepSkyInfo(QDataStream& stream, const DeepSkyObjectInfo& info)
     std::uint8_t kind = 0U;
     std::uint64_t aliasCount = 0U;
     stream >> kind >> aliasCount;
-    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount || !isKnownDeepSkyObjectKind(kind)) {
+    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount
+        || !CatalogSnapshotValidator::isKnownDeepSkyObjectKind(static_cast<DeepSkyObjectInfo::Kind>(kind))) {
         return false;
     }
     info.kind = static_cast<DeepSkyObjectInfo::Kind>(kind);
@@ -383,7 +337,8 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
         }
         std::uint8_t kind = 0U;
         stream >> kind >> body.visualMagnitude;
-        if (stream.status() != QDataStream::Ok || !isKnownBodyKind(kind)) {
+        if (stream.status() != QDataStream::Ok
+            || !CatalogSnapshotValidator::isKnownBodyKind(static_cast<BaseCelestialBody::Kind>(kind))) {
             return nullptr;
         }
         body.kind = static_cast<BaseCelestialBody::Kind>(kind);
@@ -427,7 +382,8 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
         }
         std::uint8_t kind = 0U;
         stream >> kind >> body.visualMagnitude;
-        if (stream.status() != QDataStream::Ok || !isKnownBodyKind(kind)) {
+        if (stream.status() != QDataStream::Ok
+            || !CatalogSnapshotValidator::isKnownBodyKind(static_cast<BaseCelestialBody::Kind>(kind))) {
             return nullptr;
         }
         body.kind = static_cast<BaseCelestialBody::Kind>(kind);
@@ -469,23 +425,27 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
         std::uint8_t domain = 0U;
         std::uint64_t bodyIndex = 0U;
         stream >> domain >> bodyIndex;
-        if (stream.status() != QDataStream::Ok || !isKnownBodyDomain(domain)) {
+        if (stream.status() != QDataStream::Ok) {
             return nullptr;
         }
-        const bool indexOutOfRange =
-            (domain == static_cast<std::uint8_t>(CelestialBodyCatalog::BodyDomain::Distant)
-             && bodyIndex >= distantBodies.size())
-            || (domain == static_cast<std::uint8_t>(CelestialBodyCatalog::BodyDomain::OwnGalaxy)
-                && bodyIndex >= ownGalaxyBodies.size());
-        if (indexOutOfRange) {
+        const auto bodyDomain = static_cast<CelestialBodyCatalog::BodyDomain>(domain);
+        if (!CatalogSnapshotValidator::isOrderEntryValid(
+                bodyDomain, static_cast<std::size_t>(bodyIndex), ownGalaxyBodies.size(), distantBodies.size()
+            )) {
             return nullptr;
         }
         orderedIndexes.push_back({
-            .domain = static_cast<CelestialBodyCatalog::BodyDomain>(domain),
+            .domain = bodyDomain,
             .bodyIndex = static_cast<std::size_t>(bodyIndex),
         });
     }
     if (!stream.atEnd()) {
+        return nullptr;
+    }
+
+    const CatalogSnapshotValidator::Report report =
+        CatalogSnapshotValidator::validate(ownGalaxyBodies, distantBodies, orderedIndexes);
+    if (!report.ok) {
         return nullptr;
     }
 

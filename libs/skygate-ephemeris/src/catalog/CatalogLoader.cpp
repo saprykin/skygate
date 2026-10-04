@@ -2,7 +2,10 @@
 #include "CatalogBodyParseResult.hpp"
 #include "CatalogFactory.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
-#include "catalog/normalize/CatalogBodyNormalization.hpp"
+#include "catalog/normalize/CatalogSnapshotValidator.hpp"
+
+#include <QLoggingCategory>
+#include <QString>
 
 #include <algorithm>
 #include <utility>
@@ -10,6 +13,8 @@
 
 namespace skygate::ephemeris {
 namespace {
+
+Q_LOGGING_CATEGORY(skygateCatalogLoadLog, "skygate.catalog.load")
 
 CatalogLoadResult
 finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionOptions& selectionOptions)
@@ -25,9 +30,19 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
     std::vector<OwnGalaxyCelestialBody> bodies = std::move(parsedBodies.bodies);
     std::vector<DistantCelestialBody> distantBodies = std::move(parsedBodies.distantBodies);
     const std::size_t parsedBodyCount = bodies.size() + distantBodies.size();
+
+    const CatalogSnapshotValidator::Report report =
+        CatalogSnapshotValidator::validate(bodies, distantBodies, parsedBodies.orderedBodyIndexes);
+    if (!report.ok) {
+        result.errorCode = CatalogLoadResult::ErrorCode::NoBodies;
+        result.errorDetail = report.errorDetail;
+        qCWarning(skygateCatalogLoadLog).noquote()
+            << "Catalog snapshot validation failed:" << QString::fromStdString(result.errorDetail);
+        return result;
+    }
+
     if (selectionOptions.isEnabled() && selectionOptions.mode == CatalogSelectionMode::BrightestByVisualMagnitude
         && selectionOptions.maxBodyCount < parsedBodyCount) {
-        CatalogBodyNormalization::apply(bodies);
         CelestialBodyCatalog sourceCatalog(
             std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
         );
