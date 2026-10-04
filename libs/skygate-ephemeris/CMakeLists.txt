@@ -282,7 +282,9 @@ add_library(skygate-ephemeris STATIC
     src/catalog/normalize/CatalogBodyNormalization.hpp
     src/catalog/CatalogBodyParseResult.hpp
     src/catalog/bundled/BundledCatalogParser.hpp
+    src/catalog/CatalogIdentifier.hpp
     src/catalog/CatalogIdentity.hpp
+    src/catalog/CatalogObjectIdentity.hpp
     src/catalog/io/CatalogParsingUtilities.hpp
     src/catalog/io/CatalogHeaderPolicy.hpp
     src/catalog/io/CatalogPayloadFormatDetector.hpp
@@ -318,7 +320,9 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogStarAstrometry.cpp
     src/catalog/CatalogBodyParseResult.cpp
     src/catalog/normalize/CatalogBodyNormalization.cpp
+    src/catalog/CatalogIdentifier.cpp
     src/catalog/CatalogIdentity.cpp
+    src/catalog/CatalogObjectIdentity.cpp
     src/catalog/ActiveCatalogCompositionRequest.cpp
     src/catalog/ActiveCatalogCompositionResult.cpp
     src/catalog/CatalogComposer.cpp

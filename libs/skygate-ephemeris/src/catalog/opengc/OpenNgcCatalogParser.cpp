@@ -106,6 +106,9 @@ OpenNgcCatalogParser::parse(const std::string_view data, const CatalogParseProgr
             body.visualMagnitude = visualMagnitude.value_or(std::numeric_limits<double>::quiet_NaN());
             body.fixedEquatorial =
                 skygate::core::EquatorialCoordinate{.rightAscensionHours = *raHours, .declinationDeg = *decDeg};
+            body.identity.sourceRecordId = std::move(mapping.sourceRecordId);
+            body.identity.externalIdentifiers = std::move(mapping.externalIdentifiers);
+            body.identity.aliases = mapping.aliases;
             body.deepSkyObject = DeepSkyObjectInfo{
                 .kind = mapping.kind,
                 .aliases = std::move(mapping.aliases),

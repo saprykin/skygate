@@ -6,6 +6,7 @@
 #include "DistantCelestialBody.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 #include "catalog/InMemoryStarCatalog.hpp"
 #include "time/AstronomicalEpoch.hpp"
@@ -121,6 +122,61 @@ void writeOptionalDouble(QDataStream& stream, const std::optional<double>& value
         return false;
     }
     value = rawValue;
+    return true;
+}
+
+void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& identity)
+{
+    writeString(stream, identity.sourceRecordId);
+    stream << static_cast<std::uint64_t>(identity.externalIdentifiers.size());
+    for (const CatalogIdentifier& identifier : identity.externalIdentifiers) {
+        writeString(stream, identifier.namespaceName);
+        writeString(stream, identifier.value);
+    }
+    stream << static_cast<std::uint64_t>(identity.aliases.size());
+    for (const std::string& alias : identity.aliases) {
+        writeString(stream, alias);
+    }
+}
+
+[[nodiscard]] bool readObjectIdentity(QDataStream& stream, CatalogObjectIdentity& identity)
+{
+    if (!readString(stream, identity.sourceRecordId)) {
+        return false;
+    }
+
+    std::uint64_t identifierCount = 0U;
+    stream >> identifierCount;
+    if (stream.status() != QDataStream::Ok || identifierCount > kMaxBodyCount) {
+        return false;
+    }
+    identity.externalIdentifiers.clear();
+    identity.externalIdentifiers.reserve(static_cast<std::size_t>(identifierCount));
+    for (std::uint64_t index = 0; index < identifierCount; ++index) {
+        CatalogIdentifier identifier;
+        if (!readString(stream, identifier.namespaceName) || !readString(stream, identifier.value)) {
+            return false;
+        }
+        if (identifier.namespaceName.empty() || identifier.value.empty()) {
+            return false;
+        }
+        identity.externalIdentifiers.push_back(std::move(identifier));
+    }
+
+    std::uint64_t aliasCount = 0U;
+    stream >> aliasCount;
+    if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount) {
+        return false;
+    }
+    identity.aliases.clear();
+    identity.aliases.reserve(static_cast<std::size_t>(aliasCount));
+    for (std::uint64_t index = 0; index < aliasCount; ++index) {
+        std::string alias;
+        if (!readString(stream, alias)) {
+            return false;
+        }
+        identity.aliases.push_back(std::move(alias));
+    }
     return true;
 }
 
@@ -264,6 +320,7 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
         writeString(stream, body.id);
         writeString(stream, body.displayName);
         stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
+        writeObjectIdentity(stream, body.identity);
         stream << body.fixedEquatorial.has_value();
         if (body.fixedEquatorial.has_value()) {
             writeEquatorial(stream, *body.fixedEquatorial);
@@ -280,6 +337,7 @@ QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
         writeString(stream, body.id);
         writeString(stream, body.displayName);
         stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
+        writeObjectIdentity(stream, body.identity);
         stream << body.fixedEquatorial.has_value();
         if (body.fixedEquatorial.has_value()) {
             writeEquatorial(stream, *body.fixedEquatorial);
@@ -329,6 +387,9 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
             return nullptr;
         }
         body.kind = static_cast<BaseCelestialBody::Kind>(kind);
+        if (!readObjectIdentity(stream, body.identity)) {
+            return nullptr;
+        }
         bool hasFixedEquatorial = false;
         stream >> hasFixedEquatorial;
         if (hasFixedEquatorial) {
@@ -370,6 +431,9 @@ std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& 
             return nullptr;
         }
         body.kind = static_cast<BaseCelestialBody::Kind>(kind);
+        if (!readObjectIdentity(stream, body.identity)) {
+            return nullptr;
+        }
         bool hasFixedEquatorial = false;
         stream >> hasFixedEquatorial;
         if (hasFixedEquatorial) {
