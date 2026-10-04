@@ -4,6 +4,7 @@
 
 #include <QtTest/QtTest>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -52,6 +53,26 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> makeCatalogWithoutHipCrossIds(
     );
 }
 
+std::unique_ptr<skygate::ephemeris::IStarCatalog> makeSingleStarCatalog(std::string id, std::string displayName)
+{
+    return skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
+        {makeFixedBody(std::move(id), std::move(displayName))}
+    );
+}
+
+bool runtimeContainsBody(const skygate::ui::internal::SkyCatalogRuntime& runtime, const std::string& id)
+{
+    const skygate::ephemeris::IStarCatalog* catalog = runtime.starCatalog();
+    if (catalog == nullptr) {
+        return false;
+    }
+
+    const auto bodies = catalog->bodies();
+    return std::any_of(bodies.begin(), bodies.end(), [&id](const skygate::ephemeris::BaseCelestialBody* body) {
+        return body != nullptr && body->id == id;
+    });
+}
+
 }  // namespace
 
 class SkyCatalogRuntimeTests final : public QObject {
@@ -62,6 +83,7 @@ private slots:
     void restoreConstellationRefsUpdatesRevisionAndCount();
     void resolvedRefsTrackIdentityAndInvalidateOnSourceChange();
     void nullCatalogReportsFailureWithoutCatalogChange();
+    void sourcesLoadReplaceEnableDisableAndRemoveIndependently();
 };
 
 void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndCacheRequest()
@@ -142,6 +164,91 @@ void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()
     QVERIFY(!result.catalogChanged);
     QCOMPARE(result.statusText, QString("Catalog: Failed to load"));
     QCOMPARE(runtime.bodyCount(), 0U);
+}
+
+void SkyCatalogRuntimeTests::sourcesLoadReplaceEnableDisableAndRemoveIndependently()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
+
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{.useBundledDeepSkyCatalog = false};
+    const auto applyStarSource = [&](const QString& instanceId, const QString& title, std::string bodyId) {
+        const auto result = runtime.applySource(
+            skygate::ui::internal::SkyCatalogSourceRecord{
+                .instanceId = instanceId,
+                .title = title,
+                .version = QString(),
+                .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+                .enabled = true,
+                .catalog = makeSingleStarCatalog(bodyId, "Star"),
+                .foundObjectCount = 0,
+            },
+            options
+        );
+        QVERIFY(result.catalogChanged);
+    };
+
+    applyStarSource(QStringLiteral("custom-a"), QStringLiteral("Custom A"), "custom_a_1");
+    applyStarSource(QStringLiteral("custom-b"), QStringLiteral("Custom B"), "custom_b_1");
+    applyStarSource(QStringLiteral("custom-c"), QStringLiteral("Custom C"), "custom_c_1");
+
+    QCOMPARE(runtime.sourceCount(), std::size_t{4});
+    QCOMPARE(
+        runtime.sourceInstanceIds(),
+        QStringList(
+            {QStringLiteral("primary"),
+             QStringLiteral("custom-a"),
+             QStringLiteral("custom-b"),
+             QStringLiteral("custom-c")}
+        )
+    );
+    QVERIFY(runtimeContainsBody(runtime, "hip_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_a_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_b_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_c_1"));
+
+    // Disabling one source removes only its contribution.
+    const auto disableResult = runtime.setSourceEnabled(QStringLiteral("custom-a"), false, options);
+    QVERIFY(disableResult.catalogChanged);
+    QVERIFY(!runtimeContainsBody(runtime, "custom_a_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_b_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_c_1"));
+    QVERIFY(runtimeContainsBody(runtime, "hip_1"));
+    QVERIFY(!runtime.isSourceEnabled(QStringLiteral("custom-a")));
+
+    // Re-enabling restores the contribution without reloading the catalog.
+    const auto enableResult = runtime.setSourceEnabled(QStringLiteral("custom-a"), true, options);
+    QVERIFY(enableResult.catalogChanged);
+    QVERIFY(runtimeContainsBody(runtime, "custom_a_1"));
+    QVERIFY(runtime.isSourceEnabled(QStringLiteral("custom-a")));
+
+    // Replacing one source keeps unrelated sources intact.
+    const auto replaceResult = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("custom-a"),
+            .title = QStringLiteral("Custom A2"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("custom_a_2", "Star"),
+            .foundObjectCount = 0,
+        },
+        options
+    );
+    QVERIFY(replaceResult.catalogChanged);
+    QVERIFY(!runtimeContainsBody(runtime, "custom_a_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_a_2"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_b_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_c_1"));
+
+    // Removing one source leaves the remaining sources unchanged.
+    const auto removeResult = runtime.removeSource(QStringLiteral("custom-b"), options);
+    QVERIFY(removeResult.catalogChanged);
+    QVERIFY(!runtimeContainsBody(runtime, "custom_b_1"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_a_2"));
+    QVERIFY(runtimeContainsBody(runtime, "custom_c_1"));
+    QVERIFY(runtimeContainsBody(runtime, "hip_1"));
+    QCOMPARE(runtime.sourceCount(), std::size_t{3});
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogRuntimeTests)

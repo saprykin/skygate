@@ -37,15 +37,16 @@ bool SkyCatalogImportWorkflow::isAvailable() const noexcept
     return m_catalogCoordinator != nullptr;
 }
 
-void SkyCatalogImportWorkflow::downloadCatalog(
+void SkyCatalogImportWorkflow::downloadSource(
     const SkyCatalogSourceInstance& source,
+    const skygate::ephemeris::CatalogCompositionPolicy policy,
     QObject* callbackContext,
     StatusHandler statusHandler,
-    CatalogCompletionHandler completionHandler
+    SourceCompletionHandler completionHandler
 ) const
 {
     if (m_catalogCoordinator == nullptr) {
-        SkyCatalogImportResult result;
+        SkyCatalogSourceImportResult result;
         result.sourceLabel = source.title;
         result.sourceId = source.instanceId;
         result.sourceVersion = source.version;
@@ -59,8 +60,9 @@ void SkyCatalogImportWorkflow::downloadCatalog(
         callbackContext,
         std::move(statusHandler),
         [source,
+         policy,
          completionHandler = std::move(completionHandler)](CatalogCoordinator::DownloadResult downloadResult) mutable {
-            SkyCatalogImportResult result;
+            SkyCatalogSourceImportResult result;
             result.payload = std::move(downloadResult.payload);
             result.catalog = std::move(downloadResult.catalog);
             result.diagnostics = downloadResult.diagnostics;
@@ -69,7 +71,48 @@ void SkyCatalogImportWorkflow::downloadCatalog(
             result.sourceVersion = source.version;
             result.sourceUrl = std::move(downloadResult.sourceUrl);
             result.errorText = std::move(downloadResult.errorText);
+
+            if (result.catalog == nullptr || policy != skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
+                completionHandler(std::move(result));
+                return;
+            }
+
+            const auto bodies = result.catalog->bodies();
+            result.foundObjectCount = result.diagnostics.parsedBodyCount > 0U
+                                          ? result.diagnostics.parsedBodyCount
+                                          : skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies);
+            if (skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies) == 0U) {
+                result.catalog.reset();
+                result.errorText = "Catalog: Downloaded deep-sky catalog contains no DSOs";
+            }
             completionHandler(std::move(result));
+        }
+    );
+}
+
+void SkyCatalogImportWorkflow::downloadCatalog(
+    const SkyCatalogSourceInstance& source,
+    QObject* callbackContext,
+    StatusHandler statusHandler,
+    CatalogCompletionHandler completionHandler
+) const
+{
+    downloadSource(
+        source,
+        skygate::ephemeris::CatalogCompositionPolicy::Merge,
+        callbackContext,
+        std::move(statusHandler),
+        [completionHandler = std::move(completionHandler)](SkyCatalogSourceImportResult result) mutable {
+            SkyCatalogImportResult legacyResult;
+            legacyResult.payload = std::move(result.payload);
+            legacyResult.catalog = std::move(result.catalog);
+            legacyResult.diagnostics = result.diagnostics;
+            legacyResult.sourceLabel = std::move(result.sourceLabel);
+            legacyResult.sourceId = std::move(result.sourceId);
+            legacyResult.sourceVersion = std::move(result.sourceVersion);
+            legacyResult.sourceUrl = std::move(result.sourceUrl);
+            legacyResult.errorText = std::move(result.errorText);
+            completionHandler(std::move(legacyResult));
         }
     );
 }
@@ -81,45 +124,22 @@ void SkyCatalogImportWorkflow::downloadDeepSkyCatalog(
     DeepSkyCompletionHandler completionHandler
 ) const
 {
-    if (m_catalogCoordinator == nullptr) {
-        SkyDeepSkyCatalogImportResult result;
-        result.sourceLabel = source.title;
-        result.sourceId = source.instanceId;
-        result.sourceVersion = source.version;
-        result.errorText = "Catalog: Network unavailable";
-        completionHandler(std::move(result));
-        return;
-    }
-
-    m_catalogCoordinator->downloadCatalogFromUrls(
-        source.urls,
+    downloadSource(
+        source,
+        skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
         callbackContext,
         std::move(statusHandler),
-        [source,
-         completionHandler = std::move(completionHandler)](CatalogCoordinator::DownloadResult downloadResult) mutable {
-            SkyDeepSkyCatalogImportResult result;
-            result.payload = std::move(downloadResult.payload);
-            result.catalog = std::move(downloadResult.catalog);
-            result.sourceLabel = source.title;
-            result.sourceId = source.instanceId;
-            result.sourceVersion = source.version;
-            result.sourceUrl = std::move(downloadResult.sourceUrl);
-            result.errorText = std::move(downloadResult.errorText);
-
-            if (result.catalog == nullptr) {
-                completionHandler(std::move(result));
-                return;
-            }
-
-            const auto bodies = result.catalog->bodies();
-            result.foundObjectCount = downloadResult.diagnostics.parsedBodyCount > 0U
-                                          ? downloadResult.diagnostics.parsedBodyCount
-                                          : skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies);
-            if (skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies) == 0U) {
-                result.catalog.reset();
-                result.errorText = "Catalog: Downloaded deep-sky catalog contains no DSOs";
-            }
-            completionHandler(std::move(result));
+        [completionHandler = std::move(completionHandler)](SkyCatalogSourceImportResult result) mutable {
+            SkyDeepSkyCatalogImportResult legacyResult;
+            legacyResult.payload = std::move(result.payload);
+            legacyResult.catalog = std::move(result.catalog);
+            legacyResult.foundObjectCount = result.foundObjectCount;
+            legacyResult.sourceLabel = std::move(result.sourceLabel);
+            legacyResult.sourceId = std::move(result.sourceId);
+            legacyResult.sourceVersion = std::move(result.sourceVersion);
+            legacyResult.sourceUrl = std::move(result.sourceUrl);
+            legacyResult.errorText = std::move(result.errorText);
+            completionHandler(std::move(legacyResult));
         }
     );
 }

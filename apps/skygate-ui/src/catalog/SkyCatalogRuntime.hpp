@@ -2,6 +2,7 @@
 
 #include "SkyCatalogCacheController.hpp"
 #include "SkyCatalogConstellationStore.hpp"
+#include "SkyCatalogSourceRecord.hpp"
 
 #include "catalog/IStarCatalog.hpp"
 
@@ -13,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace skygate::ui::internal {
@@ -44,6 +46,9 @@ public:
     [[nodiscard]] std::size_t deepSkyObjectCount() const noexcept;
     [[nodiscard]] std::size_t deepSkyCatalogFoundObjectCount() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;
+    [[nodiscard]] std::size_t sourceCount() const noexcept;
+    [[nodiscard]] QStringList sourceInstanceIds() const;
+    [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
     [[nodiscard]] QStringList sourceLabels() const;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
@@ -52,6 +57,12 @@ public:
     [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
 
     [[nodiscard]] SkyCatalogRuntimeResult initialize(const SkyCatalogRuntimeBuildOptions& options);
+    [[nodiscard]] SkyCatalogRuntimeResult
+    applySource(SkyCatalogSourceRecord source, const SkyCatalogRuntimeBuildOptions& options);
+    [[nodiscard]] SkyCatalogRuntimeResult
+    setSourceEnabled(const QString& instanceId, bool enabled, const SkyCatalogRuntimeBuildOptions& options);
+    [[nodiscard]] SkyCatalogRuntimeResult
+    removeSource(const QString& instanceId, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult applyCatalog(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
         const QString& sourceLabel,
@@ -81,14 +92,17 @@ public:
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
     [[nodiscard]] SkyCatalogRuntimeResult failedDeepSkyCatalogResult(const QString& statusText);
+    [[nodiscard]] QString buildStatusText() const;
+    [[nodiscard]] QString deepSkySourceLabel() const;
+    [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;
+    [[nodiscard]] const SkyCatalogSourceRecord*
+    firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy policy, bool requireEnabled) const;
+    void rebuildSourceProvenance(const std::vector<std::string>& composedSourceIds);
     void refreshResolvedConstellationRefs() const;
 
 private:
     std::unique_ptr<skygate::ephemeris::IStarCatalog> m_starCatalog;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_sourceCatalog;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> m_deepSkyCatalog;
-    QString m_sourceLabel = QStringLiteral("Bundled");
-    QString m_deepSkySourceLabel = QStringLiteral("Bundled Messier");
+    std::vector<SkyCatalogSourceRecord> m_sources;
     std::uint64_t m_catalogRevision = 0;
     std::size_t m_bodyCount = 0;
     std::size_t m_deepSkyObjectCount = 0;
