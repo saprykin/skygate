@@ -45,18 +45,6 @@ public:
     static constexpr const char* kDeepSkyCatalogCacheFileName = "deep-sky-catalog-cache-v1.txt";
     static constexpr const char* kCatalogBinaryCacheFileName = "catalog-cache-v3.bin";
     static constexpr const char* kDeepSkyBinaryCatalogCacheFileName = "deep-sky-catalog-cache-v2.bin";
-    static constexpr const char* kHygCatalogPrimaryUrl =
-        "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
-    static constexpr const char* kOpenNgcCatalogPrimaryUrl =
-        "https://raw.githubusercontent.com/mattiaverga/OpenNGC/refs/tags/v20260307/database_files/NGC.csv";
-    static constexpr const char* kOpenNgcCatalogMirrorUrl =
-        "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv";
-    static constexpr const char* kStellariumConstellationLinesPrimaryUrl =
-        "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/master/western/index.json";
-    static constexpr const char* kStellariumConstellationLinesMirrorUrl =
-        "https://raw.githubusercontent.com/Stellarium/stellarium-skycultures/main/western/index.json";
-    static constexpr const char* kStellariumConstellationLinesCdnUrl =
-        "https://cdn.jsdelivr.net/gh/Stellarium/stellarium-skycultures@master/western/index.json";
 };
 
 class SkyContextTextFormatter final {

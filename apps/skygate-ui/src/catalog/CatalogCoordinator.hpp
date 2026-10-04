@@ -21,6 +21,7 @@ public:
         QByteArray payload;
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
         skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
+        QString sourceUrl;
         QString errorText;
     };
 

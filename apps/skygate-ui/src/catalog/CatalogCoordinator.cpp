@@ -90,6 +90,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                 DownloadResult result;
                 result.errorText =
                     downloadResult.errorText.isEmpty() ? QString("Catalog: Download failed") : downloadResult.errorText;
+                result.sourceUrl = downloadResult.sourceUrl;
                 completionHandler(std::move(result));
                 return;
             }
@@ -103,6 +104,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             if (contextObject == nullptr) {
                 DownloadResult result;
                 result.errorText = "Catalog: Callback context unavailable";
+                result.sourceUrl = downloadResult.sourceUrl;
                 completionHandler(std::move(result));
                 return;
             }
@@ -127,6 +129,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     if (!loadResult.isSuccess()) {
                         DownloadResult result;
                         result.errorText = catalogLoadErrorText(loadResult, sourceUrl);
+                        result.sourceUrl = sourceUrl;
                         qCWarning(skygateCatalogParseLog).noquote() << result.errorText;
                         if (statusHandler) {
                             statusHandler(result.errorText);
@@ -139,6 +142,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
                     result.payload = payload;
                     result.catalog = std::move(loadResult.catalog);
                     result.diagnostics = loadResult.diagnostics;
+                    result.sourceUrl = sourceUrl;
                     completionHandler(std::move(result));
                 }
             );

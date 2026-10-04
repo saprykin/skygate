@@ -34,7 +34,8 @@ Item {
                     id: catalogPresetCombo
                     objectName: "starCatalogPresetCombo"
                     Layout.fillWidth: true
-                    model: ["Bundled (recommended)", "HYG v4.2 stars + Stellarium lines", "Custom URL"]
+                    model: skyContextController.catalogSourcePresetModel
+                    textRole: "title"
 
                     Binding on currentIndex {
                         value: Math.max(0, Math.min(catalogPresetCombo.count - 1, preferencesDraft.catalogPresetIndex))
@@ -50,11 +51,13 @@ Item {
                     enabled: !catalogBusy && catalogPresetCombo.currentIndex !== 2
                     onClicked: {
                         preferencesDraft.catalogPresetIndex = catalogPresetCombo.currentIndex;
-                        if (catalogPresetCombo.currentIndex === 0) {
-                            skyContextController.loadCatalogPreset("bundled");
-                        } else if (catalogPresetCombo.currentIndex === 1) {
-                            preferencesDraft.catalogUrlText = "https://www.astronexus.com/downloads/catalogs/hygdata_v42.csv.gz";
-                            skyContextController.loadCatalogPreset("hyg_v42");
+                        const presetId = skyContextController.catalogSourcePresetId(catalogPresetCombo.currentIndex);
+                        const presetUrl = skyContextController.catalogSourcePresetUrl(catalogPresetCombo.currentIndex);
+                        if (presetUrl.length > 0) {
+                            preferencesDraft.catalogUrlText = presetUrl;
+                        }
+                        if (presetId.length > 0) {
+                            skyContextController.loadCatalogPreset(presetId);
                         }
                     }
                 }
@@ -144,7 +147,8 @@ Item {
                     id: deepSkyCatalogPresetCombo
                     objectName: "deepSkyCatalogPresetCombo"
                     Layout.fillWidth: true
-                    model: ["Bundled Messier", "OpenNGC", "Custom URL"]
+                    model: skyContextController.deepSkySourcePresetModel
+                    textRole: "title"
 
                     Binding on currentIndex {
                         value: Math.max(0, Math.min(deepSkyCatalogPresetCombo.count - 1, preferencesDraft.deepSkyCatalogPresetIndex))
@@ -160,11 +164,13 @@ Item {
                     enabled: !catalogBusy && deepSkyCatalogPresetCombo.currentIndex !== 2
                     onClicked: {
                         preferencesDraft.deepSkyCatalogPresetIndex = deepSkyCatalogPresetCombo.currentIndex;
-                        if (deepSkyCatalogPresetCombo.currentIndex === 0) {
-                            skyContextController.loadDeepSkyCatalogPreset("bundled_messier");
-                        } else {
-                            skyContextController.loadDeepSkyCatalogPreset("open_ngc");
-                            preferencesDraft.deepSkyCatalogUrlText = skyContextController.deepSkyCatalogUrlText();
+                        const presetId = skyContextController.deepSkySourcePresetId(deepSkyCatalogPresetCombo.currentIndex);
+                        const presetUrl = skyContextController.deepSkySourcePresetUrl(deepSkyCatalogPresetCombo.currentIndex);
+                        if (presetUrl.length > 0) {
+                            preferencesDraft.deepSkyCatalogUrlText = presetUrl;
+                        }
+                        if (presetId.length > 0) {
+                            skyContextController.loadDeepSkyCatalogPreset(presetId);
                         }
                     }
                 }

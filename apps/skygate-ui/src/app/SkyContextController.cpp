@@ -1,6 +1,8 @@
 #include "SkyContextController.hpp"
 #include "LocationCatalogModel.hpp"
 #include "SkyCatalogManager.hpp"
+#include "SkyCatalogPresets.hpp"
+#include "SkyCatalogSourcePresetModel.hpp"
 #include "SkyEphemerisDataManager.hpp"
 #include "SkyLogging.hpp"
 #include "SkyObjectSearchModel.hpp"
@@ -416,7 +418,13 @@ SkyContextController::SkyContextController(
       ),
       m_ephemerisDiagnosticsSink(initializationOptions.ephemerisFactoryInputs.diagnosticsSink),
       m_catalogManager(std::make_unique<SkyCatalogManager>(m_settingsStore.get(), std::move(starCatalog), this)),
-      m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this))
+      m_objectSearchModel(std::make_unique<SkyObjectSearchModel>(this)),
+      m_catalogSourcePresetModel(
+          std::make_unique<SkyCatalogSourcePresetModel>(SkyCatalogPresets::starSourceDescriptors(), true, this)
+      ),
+      m_deepSkySourcePresetModel(
+          std::make_unique<SkyCatalogSourcePresetModel>(SkyCatalogPresets::deepSkySourceDescriptors(), true, this)
+      )
 {
     m_logFilePath = skygate::ui::SkyLogging::defaultLogFilePath();
     m_location.setPositionSource(initializationOptions.positionSource);
@@ -958,6 +966,16 @@ QString SkyContextController::deepSkyCatalogInfoText() const
 QAbstractItemModel* SkyContextController::objectSearchModel() const noexcept
 {
     return m_objectSearchModel.get();
+}
+
+QAbstractItemModel* SkyContextController::catalogSourcePresetModel() const noexcept
+{
+    return m_catalogSourcePresetModel.get();
+}
+
+QAbstractItemModel* SkyContextController::deepSkySourcePresetModel() const noexcept
+{
+    return m_deepSkySourcePresetModel.get();
 }
 
 bool SkyContextController::downloadingCatalog() const noexcept
@@ -1835,6 +1853,26 @@ void SkyContextController::setDeepSkyCatalogUrlText(const QString& deepSkyCatalo
     if (m_catalogManager != nullptr) {
         m_catalogManager->setDeepSkyCatalogUrlText(deepSkyCatalogUrlText);
     }
+}
+
+QString SkyContextController::catalogSourcePresetId(const int index) const
+{
+    return m_catalogSourcePresetModel != nullptr ? m_catalogSourcePresetModel->sourceIdAt(index) : QString();
+}
+
+QString SkyContextController::catalogSourcePresetUrl(const int index) const
+{
+    return m_catalogSourcePresetModel != nullptr ? m_catalogSourcePresetModel->defaultUrlAt(index) : QString();
+}
+
+QString SkyContextController::deepSkySourcePresetId(const int index) const
+{
+    return m_deepSkySourcePresetModel != nullptr ? m_deepSkySourcePresetModel->sourceIdAt(index) : QString();
+}
+
+QString SkyContextController::deepSkySourcePresetUrl(const int index) const
+{
+    return m_deepSkySourcePresetModel != nullptr ? m_deepSkySourcePresetModel->defaultUrlAt(index) : QString();
 }
 
 void SkyContextController::clearSelectedCity()

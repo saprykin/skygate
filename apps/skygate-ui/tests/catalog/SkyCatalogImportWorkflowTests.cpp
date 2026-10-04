@@ -5,6 +5,7 @@
 #include "LogCapture.hpp"
 
 #include "catalog/SkyCatalogImportWorkflow.hpp"
+#include "catalog/SkyCatalogSourceInstance.hpp"
 
 #include <QtTest/QtTest>
 
@@ -124,14 +125,16 @@ void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
     networkAccessManager.enqueueResponse("https://example.test/stars.csv", {.payload = sampleHygCsvPayload()});
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
+    skygate::ui::internal::SkyCatalogSourceInstance source;
+    source.instanceId = QStringLiteral("preset:hyg");
+    source.title = QStringLiteral("HYG");
+    source.version = QStringLiteral("v4.2");
+    source.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
+
     skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
     runAsync([&](QEventLoop& loop) {
         workflow.downloadDeepSkyCatalog(
-            {"https://example.test/stars.csv"},
-            "HYG",
-            this,
-            {},
-            [&finalResult, &loop](skygate::ui::internal::SkyDeepSkyCatalogImportResult result) {
+            source, this, {}, [&finalResult, &loop](skygate::ui::internal::SkyDeepSkyCatalogImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }
@@ -140,6 +143,9 @@ void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
 
     QVERIFY(finalResult.catalog == nullptr);
     QCOMPARE(finalResult.sourceLabel, QString("HYG"));
+    QCOMPARE(finalResult.sourceId, QString("preset:hyg"));
+    QCOMPARE(finalResult.sourceVersion, QString("v4.2"));
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/stars.csv"));
     QCOMPARE(finalResult.foundObjectCount, 1U);
     QCOMPARE(finalResult.errorText, QString("Catalog: Downloaded deep-sky catalog contains no DSOs"));
 }
@@ -150,14 +156,16 @@ void SkyCatalogImportWorkflowTests::reportsDeepSkyObjectCount()
     networkAccessManager.enqueueResponse("https://example.test/open-ngc.csv", {.payload = sampleOpenNgcCsvPayload()});
     const skygate::ui::internal::SkyCatalogImportWorkflow workflow(&networkAccessManager);
 
+    skygate::ui::internal::SkyCatalogSourceInstance source;
+    source.instanceId = QStringLiteral("preset:open_ngc");
+    source.title = QStringLiteral("OpenNGC");
+    source.version = QStringLiteral("v20260307");
+    source.urls = QStringList{QStringLiteral("https://example.test/open-ngc.csv")};
+
     skygate::ui::internal::SkyDeepSkyCatalogImportResult finalResult;
     runAsync([&](QEventLoop& loop) {
         workflow.downloadDeepSkyCatalog(
-            {"https://example.test/open-ngc.csv"},
-            "OpenNGC",
-            this,
-            {},
-            [&finalResult, &loop](skygate::ui::internal::SkyDeepSkyCatalogImportResult result) {
+            source, this, {}, [&finalResult, &loop](skygate::ui::internal::SkyDeepSkyCatalogImportResult result) {
                 finalResult = std::move(result);
                 loop.quit();
             }
@@ -166,6 +174,9 @@ void SkyCatalogImportWorkflowTests::reportsDeepSkyObjectCount()
 
     QVERIFY(finalResult.catalog != nullptr);
     QCOMPARE(finalResult.sourceLabel, QString("OpenNGC"));
+    QCOMPARE(finalResult.sourceId, QString("preset:open_ngc"));
+    QCOMPARE(finalResult.sourceVersion, QString("v20260307"));
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/open-ngc.csv"));
     QCOMPARE(finalResult.foundObjectCount, 1U);
     QVERIFY(finalResult.errorText.isEmpty());
 }

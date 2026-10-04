@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SkyCatalogSourceInstance.hpp"
+
 #include "catalog/CatalogLoadResult.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
@@ -24,6 +26,9 @@ struct SkyCatalogImportResult final {
     std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
     skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
     QString sourceLabel;
+    QString sourceId;
+    QString sourceVersion;
+    QString sourceUrl;
     QString errorText;
 };
 
@@ -32,6 +37,9 @@ struct SkyDeepSkyCatalogImportResult final {
     std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
     std::size_t foundObjectCount = 0;
     QString sourceLabel;
+    QString sourceId;
+    QString sourceVersion;
+    QString sourceUrl;
     QString errorText;
 };
 
@@ -58,16 +66,14 @@ public:
     [[nodiscard]] bool isAvailable() const noexcept;
 
     void downloadCatalog(
-        const QStringList& urlTexts,
-        const QString& sourceLabel,
+        const SkyCatalogSourceInstance& source,
         QObject* callbackContext,
         StatusHandler statusHandler,
         CatalogCompletionHandler completionHandler
     ) const;
 
     void downloadDeepSkyCatalog(
-        const QStringList& urlTexts,
-        const QString& sourceLabel,
+        const SkyCatalogSourceInstance& source,
         QObject* callbackContext,
         StatusHandler statusHandler,
         DeepSkyCompletionHandler completionHandler

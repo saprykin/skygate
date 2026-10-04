@@ -88,6 +88,12 @@ qt_add_library(skygate-ui-lib STATIC
     src/catalog/SkyCatalogImportWorkflow.hpp
     src/catalog/SkyCatalogPresets.cpp
     src/catalog/SkyCatalogPresets.hpp
+    src/catalog/SkyCatalogSourceDescriptor.cpp
+    src/catalog/SkyCatalogSourceDescriptor.hpp
+    src/catalog/SkyCatalogSourceInstance.cpp
+    src/catalog/SkyCatalogSourceInstance.hpp
+    src/catalog/SkyCatalogSourcePresetModel.cpp
+    src/catalog/SkyCatalogSourcePresetModel.hpp
     src/catalog/SkyCatalogText.cpp
     src/catalog/SkyCatalogText.hpp
     src/catalog/CatalogPayloadParseService.cpp

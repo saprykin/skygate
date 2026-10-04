@@ -26,6 +26,7 @@ struct SkyCatalogRuntimeResult;
 struct SkyCatalogImportResult;
 struct SkyDeepSkyCatalogImportResult;
 struct SkyConstellationLineImportResult;
+struct SkyCatalogSourceInstance;
 }  // namespace skygate::ui::internal
 
 class SkyCatalogManager final : public QObject {
@@ -95,10 +96,8 @@ private:
         std::size_t foundObjectCount = 0,
         bool persistCatalog = true
     );
-    void downloadCatalogFromUrls(
-        const QStringList& urlTexts, const QString& sourceLabel, const QStringList& constellationLineUrlTexts = {}
-    );
-    void downloadDeepSkyCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel);
+    void downloadCatalogFromUrls(const skygate::ui::internal::SkyCatalogSourceInstance& source);
+    void downloadDeepSkyCatalogFromUrls(const skygate::ui::internal::SkyCatalogSourceInstance& source);
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
     void setCatalogProcessing(bool catalogProcessing);
