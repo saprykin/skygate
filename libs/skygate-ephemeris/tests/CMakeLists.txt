@@ -446,6 +446,10 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogFactoryTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-celestial-body-catalog-tests
+    catalog/CelestialBodyCatalogTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-composer-tests
     catalog/CatalogComposerTests.cpp
     LABELS integration

@@ -49,7 +49,17 @@ public:
     [[nodiscard]] std::span<const OrderEntry> orderedBodyIndexes() const noexcept;
     [[nodiscard]] const BaseCelestialBody& bodyAt(std::size_t bodyIndex) const noexcept;
 
+    // Copies `body` into the storage domain matching its kind and appends an
+    // order entry, preserving the append sequence as the observable body
+    // order. This is the authoritative body copy/append operation used by
+    // snapshot construction, selection, augmentation, and merging.
+    void appendBody(const BaseCelestialBody& body);
+
+    [[nodiscard]] static OwnGalaxyCelestialBody copyOwnGalaxyBody(const BaseCelestialBody& body);
+    [[nodiscard]] static DistantCelestialBody copyDistantBody(const BaseCelestialBody& body);
+
 private:
+    void appendBodyEntry(const BaseCelestialBody& body);
     void rebuildOrderedBodies();
     void rebuildSequentialOrder();
 

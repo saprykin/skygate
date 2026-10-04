@@ -5,66 +5,11 @@
 #include "catalog/normalize/CatalogBodyNormalization.hpp"
 
 #include <algorithm>
-#include <memory>
-#include <span>
 #include <utility>
 #include <vector>
 
 namespace skygate::ephemeris {
 namespace {
-
-[[nodiscard]] std::unique_ptr<IStarCatalog>
-createCatalogFromSelectedBodies(const std::span<const BaseCelestialBody* const> selectedBodies)
-{
-    std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
-    std::vector<DistantCelestialBody> distantBodies;
-    std::vector<CelestialBodyCatalog::OrderEntry> orderedBodyIndexes;
-    ownGalaxyBodies.reserve(selectedBodies.size());
-    distantBodies.reserve(selectedBodies.size());
-    orderedBodyIndexes.reserve(selectedBodies.size());
-
-    for (const BaseCelestialBody* body : selectedBodies) {
-        if (body == nullptr) {
-            continue;
-        }
-
-        if (body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            DistantCelestialBody distantBody;
-            distantBody.id = body->id;
-            distantBody.displayName = body->displayName;
-            distantBody.kind = body->kind;
-            distantBody.visualMagnitude = body->visualMagnitude;
-            distantBody.fixedEquatorial = body->fixedEquatorialValue();
-            distantBody.deepSkyObject = body->deepSkyObjectValue();
-            orderedBodyIndexes.push_back(
-                CelestialBodyCatalog::OrderEntry{
-                    .domain = CelestialBodyCatalog::BodyDomain::Distant,
-                    .bodyIndex = distantBodies.size(),
-                }
-            );
-            distantBodies.push_back(std::move(distantBody));
-        } else {
-            OwnGalaxyCelestialBody ownGalaxyBody;
-            ownGalaxyBody.id = body->id;
-            ownGalaxyBody.displayName = body->displayName;
-            ownGalaxyBody.kind = body->kind;
-            ownGalaxyBody.visualMagnitude = body->visualMagnitude;
-            ownGalaxyBody.fixedEquatorial = body->fixedEquatorialValue();
-            ownGalaxyBody.starAstrometry = body->starAstrometryValue();
-            orderedBodyIndexes.push_back(
-                CelestialBodyCatalog::OrderEntry{
-                    .domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy,
-                    .bodyIndex = ownGalaxyBodies.size(),
-                }
-            );
-            ownGalaxyBodies.push_back(std::move(ownGalaxyBody));
-        }
-    }
-
-    return CatalogFactory::createStarCatalogFromBodies(
-        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(orderedBodyIndexes)
-    );
-}
 
 CatalogLoadResult
 finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionOptions& selectionOptions)
@@ -99,7 +44,7 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
             }
         );
         selectedBodies.resize(selectionOptions.maxBodyCount);
-        result.catalog = createCatalogFromSelectedBodies(selectedBodies);
+        result.catalog = CatalogFactory::createStarCatalogFromCatalog(CelestialBodyCatalog(selectedBodies));
     } else {
         result.catalog = CatalogFactory::createStarCatalogFromBodies(
             std::move(bodies), std::move(distantBodies), std::move(parsedBodies.orderedBodyIndexes)
