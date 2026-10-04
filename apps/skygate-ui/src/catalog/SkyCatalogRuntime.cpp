@@ -3,6 +3,7 @@
 #include "SkyActiveCatalogBuilder.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/constellation/ConstellationReferenceResolver.hpp"
 
 #include <utility>
 
@@ -68,6 +69,19 @@ std::span<const SkyCatalogRuntime::ConstellationAnchorGroup>
 SkyCatalogRuntime::constellationAnchorGroups() const noexcept
 {
     return m_constellationRefs.anchorGroups();
+}
+
+std::span<const SkyCatalogRuntime::ConstellationLineRef> SkyCatalogRuntime::resolvedConstellationLineRefs() const
+{
+    refreshResolvedConstellationRefs();
+    return std::span<const ConstellationLineRef>(m_resolvedLineRefs);
+}
+
+std::span<const SkyCatalogRuntime::ConstellationAnchorGroup>
+SkyCatalogRuntime::resolvedConstellationAnchorGroups() const
+{
+    refreshResolvedConstellationRefs();
+    return std::span<const ConstellationAnchorGroup>(m_resolvedAnchorGroups);
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::initialize(const SkyCatalogRuntimeBuildOptions& options)
@@ -241,6 +255,22 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& st
     m_sourceLabels.clear();
     m_sourceIds.clear();
     return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .datasetInfoChanged = true};
+}
+
+void SkyCatalogRuntime::refreshResolvedConstellationRefs() const
+{
+    if (m_resolvedRevision == m_catalogRevision) {
+        return;
+    }
+
+    m_resolvedLineRefs.clear();
+    m_resolvedAnchorGroups.clear();
+    if (m_starCatalog != nullptr) {
+        const skygate::ephemeris::ConstellationReferenceResolver resolver(m_starCatalog->bodies());
+        m_resolvedLineRefs = resolver.resolveLines(m_constellationRefs.lineRefs());
+        m_resolvedAnchorGroups = resolver.resolveAnchors(m_constellationRefs.anchorGroups());
+    }
+    m_resolvedRevision = m_catalogRevision;
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::failedDeepSkyCatalogResult(const QString& statusText)

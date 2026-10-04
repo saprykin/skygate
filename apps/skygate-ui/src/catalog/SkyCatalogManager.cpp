@@ -141,6 +141,17 @@ SkyCatalogManager::constellationAnchorGroups() const noexcept
     return m_runtime->constellationAnchorGroups();
 }
 
+std::span<const SkyCatalogManager::ConstellationLineRef> SkyCatalogManager::resolvedConstellationLineRefs() const
+{
+    return m_runtime->resolvedConstellationLineRefs();
+}
+
+std::span<const SkyCatalogManager::ConstellationAnchorGroup>
+SkyCatalogManager::resolvedConstellationAnchorGroups() const
+{
+    return m_runtime->resolvedConstellationAnchorGroups();
+}
+
 void SkyCatalogManager::setCatalogPresetIndex(const int catalogPresetIndex)
 {
     m_catalogPresetIndex = SkyCatalogPresets::normalizeCatalogPresetIndex(catalogPresetIndex);

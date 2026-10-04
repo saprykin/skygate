@@ -1156,6 +1156,19 @@ SkyContextController::constellationAnchorGroups() const noexcept
                                        : std::span<const ConstellationAnchorGroup>{};
 }
 
+std::span<const SkyContextController::ConstellationLineRef> SkyContextController::resolvedConstellationLineRefs() const
+{
+    return m_catalogManager != nullptr ? m_catalogManager->resolvedConstellationLineRefs()
+                                       : std::span<const ConstellationLineRef>{};
+}
+
+std::span<const SkyContextController::ConstellationAnchorGroup>
+SkyContextController::resolvedConstellationAnchorGroups() const
+{
+    return m_catalogManager != nullptr ? m_catalogManager->resolvedConstellationAnchorGroups()
+                                       : std::span<const ConstellationAnchorGroup>{};
+}
+
 int SkyContextController::catalogPresetIndex() const noexcept
 {
     return m_catalogManager != nullptr ? m_catalogManager->catalogPresetIndex() : 0;
@@ -1172,7 +1185,7 @@ void SkyContextController::refreshObjectSearchModel()
         return;
     }
 
-    m_objectSearchModel->setCatalogData(catalogBodies(), constellationAnchorGroups());
+    m_objectSearchModel->setCatalogData(catalogBodies(), resolvedConstellationAnchorGroups());
 }
 
 void SkyContextController::setCatalogPresetIndex(const int catalogPresetIndex)

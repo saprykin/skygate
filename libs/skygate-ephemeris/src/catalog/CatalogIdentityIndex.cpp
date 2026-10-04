@@ -116,6 +116,13 @@ void CatalogIdentityIndex::add(const BaseCelestialBody& body, const std::size_t 
     }
 }
 
+void CatalogIdentityIndex::reserve(const std::size_t bodyCount)
+{
+    m_canonicalIndex.reserve(bodyCount);
+    m_identifierIndex.reserve(bodyCount * 2U);
+    m_aliasIndex.reserve(bodyCount);
+}
+
 CatalogIdentityIndex::Resolution CatalogIdentityIndex::resolve(const BaseCelestialBody& body) const
 {
     Resolution resolution;

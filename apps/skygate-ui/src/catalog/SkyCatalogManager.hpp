@@ -62,6 +62,8 @@ public:
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
+    [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
+    [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
 
     void setCatalogPresetIndex(int catalogPresetIndex);
     void setCatalogUrlText(const QString& catalogUrlText);
