@@ -2,6 +2,8 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
 add_library(skygate-ephemeris-test-support STATIC
     support/EphemerisEngineTestDoubles.cpp
+    support/CatalogSemanticFixtureAdapter.cpp
+    support/CatalogSemanticFixtureCorpus.cpp
     support/StaticCalcephKernelProvider.cpp
     support/TestCalcephKernel.cpp
 )
@@ -182,6 +184,12 @@ add_skygate_ephemeris_qtest(
 add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-fixture-corpus-tests
     catalog/CatalogFixtureCorpusTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-interchangeability-tests
+    catalog/CatalogInterchangeabilityTests.cpp
     LABELS integration
     TIMEOUT 45
 )
