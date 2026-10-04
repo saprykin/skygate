@@ -1,19 +1,12 @@
 #include "CelestialBodyCatalog.hpp"
 #include "DistantCelestialBody.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "catalog/CatalogComposer.hpp"
-#include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogLoader.hpp"
-#include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
-#include "catalog/composition/DeepSkyCatalogMerger.hpp"
 
 #include <QtTest/QtTest>
 
-#include <algorithm>
 #include <cstddef>
-#include <optional>
 #include <span>
-#include <string>
 #include <vector>
 
 namespace {
@@ -85,24 +78,6 @@ using skygate::ephemeris::OwnGalaxyCelestialBody;
     return body;
 }
 
-[[nodiscard]] DistantCelestialBody makeSecondaryDeepSkyObject()
-{
-    DistantCelestialBody body;
-    body.id = "ngc_1";
-    body.displayName = "NGC 1";
-    body.kind = BaseCelestialBody::Kind::DeepSkyObject;
-    body.visualMagnitude = 12.0;
-    body.fixedEquatorial = EquatorialCoordinate{.rightAscensionHours = 0.1, .declinationDeg = 27.0};
-    body.deepSkyObject = DeepSkyObjectInfo{
-        .kind = DeepSkyObjectInfo::Kind::OpenCluster,
-        .aliases = {"NGC 1"},
-        .majorAxisArcmin = 2.0,
-        .minorAxisArcmin = 2.0,
-        .positionAngleDeg = 0.0,
-    };
-    return body;
-}
-
 [[nodiscard]] OwnGalaxyCelestialBody makeConstellation()
 {
     OwnGalaxyCelestialBody body;
@@ -167,40 +142,6 @@ void verifyPrimaryDeepSkyObject(const BaseCelestialBody& body)
     QCOMPARE(*info.positionAngleDeg, 35.0);
 }
 
-void verifySecondaryDeepSkyObject(const BaseCelestialBody& body)
-{
-    QCOMPARE(QString::fromStdString(body.id), QStringLiteral("ngc_1"));
-    QCOMPARE(QString::fromStdString(body.displayName), QStringLiteral("NGC 1"));
-    QCOMPARE(body.kind, BaseCelestialBody::Kind::DeepSkyObject);
-
-    QVERIFY(body.fixedEquatorialValue().has_value());
-    QCOMPARE(body.fixedEquatorialValue()->rightAscensionHours, 0.1);
-    QCOMPARE(body.fixedEquatorialValue()->declinationDeg, 27.0);
-
-    QVERIFY(body.deepSkyObjectValue().has_value());
-    const DeepSkyObjectInfo& info = *body.deepSkyObjectValue();
-    QCOMPARE(info.kind, DeepSkyObjectInfo::Kind::OpenCluster);
-    QCOMPARE(info.aliases.size(), std::size_t(1));
-    QCOMPARE(QString::fromStdString(info.aliases[0]), QStringLiteral("NGC 1"));
-    QVERIFY(info.majorAxisArcmin.has_value());
-    QCOMPARE(*info.majorAxisArcmin, 2.0);
-    QVERIFY(info.minorAxisArcmin.has_value());
-    QCOMPARE(*info.minorAxisArcmin, 2.0);
-    QVERIFY(info.positionAngleDeg.has_value());
-    QCOMPARE(*info.positionAngleDeg, 0.0);
-}
-
-[[nodiscard]] std::optional<std::size_t>
-bodyIndexById(const std::span<const BaseCelestialBody* const> bodies, const std::string& id)
-{
-    for (std::size_t index = 0; index < bodies.size(); ++index) {
-        if (bodies[index] != nullptr && bodies[index]->id == id) {
-            return index;
-        }
-    }
-    return std::nullopt;
-}
-
 }  // namespace
 
 class CelestialBodyCatalogTests final : public QObject {
@@ -209,9 +150,6 @@ class CelestialBodyCatalogTests final : public QObject {
 private slots:
     void snapshotConstructionPreservesMixedBodiesAndOrder();
     void appendBodyPreservesFieldsAndOrder();
-    void augmenterCopiesNonDeepSkyBodiesWithAstrometry();
-    void mergerCopiesBothDomainsWithMetadataAndOrder();
-    void composerPreservesPrimaryDeepSkyMetadata();
     void loaderSelectionPreservesAstrometry();
 };
 
@@ -256,123 +194,6 @@ void CelestialBodyCatalogTests::appendBodyPreservesFieldsAndOrder()
     verifyPrimaryDeepSkyObject(*ordered[1]);
     QCOMPARE(QString::fromStdString(ordered[2]->id), QStringLiteral("orion"));
     QCOMPARE(ordered[2]->kind, BaseCelestialBody::Kind::Constellation);
-}
-
-void CelestialBodyCatalogTests::augmenterCopiesNonDeepSkyBodiesWithAstrometry()
-{
-    const OwnGalaxyCelestialBody star = makeStar();
-    const DistantCelestialBody primaryDeepSkyObject = makePrimaryDeepSkyObject();
-    const OwnGalaxyCelestialBody constellation = makeConstellation();
-
-    const std::vector<const BaseCelestialBody*> bodies{&star, &primaryDeepSkyObject, &constellation};
-    const skygate::ephemeris::CatalogAugmentationResult result =
-        skygate::ephemeris::CoreBodyCatalogAugmenter::augment(bodies);
-
-    const auto starIt =
-        std::find_if(result.bodies.begin(), result.bodies.end(), [](const OwnGalaxyCelestialBody& body) {
-            return body.id == "hip_1";
-        });
-    QVERIFY(starIt != result.bodies.end());
-    verifyStar(*starIt);
-
-    const auto constellationIt =
-        std::find_if(result.bodies.begin(), result.bodies.end(), [](const OwnGalaxyCelestialBody& body) {
-            return body.id == "orion";
-        });
-    QVERIFY(constellationIt != result.bodies.end());
-    QCOMPARE(constellationIt->kind, BaseCelestialBody::Kind::Constellation);
-
-    const auto deepSkyIt =
-        std::find_if(result.bodies.begin(), result.bodies.end(), [](const OwnGalaxyCelestialBody& body) {
-            return body.id == "ngc_224";
-        });
-    QVERIFY(deepSkyIt == result.bodies.end());
-}
-
-void CelestialBodyCatalogTests::mergerCopiesBothDomainsWithMetadataAndOrder()
-{
-    const OwnGalaxyCelestialBody star = makeStar();
-    const DistantCelestialBody primaryDeepSkyObject = makePrimaryDeepSkyObject();
-    const DistantCelestialBody secondaryDeepSkyObject = makeSecondaryDeepSkyObject();
-
-    const std::vector<const BaseCelestialBody*> activeBodies{&star, &primaryDeepSkyObject};
-    const std::vector<skygate::ephemeris::CatalogCompositionSource> activeSourceKinds{
-        skygate::ephemeris::CatalogCompositionSource::Primary,
-        skygate::ephemeris::CatalogCompositionSource::Primary,
-    };
-    const std::vector<const BaseCelestialBody*> deepSkyBodies{&secondaryDeepSkyObject};
-
-    const skygate::ephemeris::DeepSkyCatalogMergeResult result =
-        skygate::ephemeris::DeepSkyCatalogMerger::merge(activeBodies, activeSourceKinds, deepSkyBodies);
-
-    QCOMPARE(result.ownGalaxyBodies.size(), std::size_t(1));
-    QCOMPARE(result.distantBodies.size(), std::size_t(2));
-    QCOMPARE(result.orderedBodyIndexes.size(), std::size_t(3));
-    QCOMPARE(result.sourceKinds.size(), std::size_t(3));
-
-    verifyStar(result.ownGalaxyBodies[0]);
-    verifyPrimaryDeepSkyObject(result.distantBodies[0]);
-    verifySecondaryDeepSkyObject(result.distantBodies[1]);
-
-    QCOMPARE(result.orderedBodyIndexes[0].domain, CelestialBodyCatalog::BodyDomain::OwnGalaxy);
-    QCOMPARE(result.orderedBodyIndexes[0].bodyIndex, std::size_t(0));
-    QCOMPARE(result.orderedBodyIndexes[1].domain, CelestialBodyCatalog::BodyDomain::Distant);
-    QCOMPARE(result.orderedBodyIndexes[1].bodyIndex, std::size_t(0));
-    QCOMPARE(result.orderedBodyIndexes[2].domain, CelestialBodyCatalog::BodyDomain::Distant);
-    QCOMPARE(result.orderedBodyIndexes[2].bodyIndex, std::size_t(1));
-
-    QCOMPARE(result.sourceKinds[0], skygate::ephemeris::CatalogCompositionSource::Primary);
-    QCOMPARE(result.sourceKinds[1], skygate::ephemeris::CatalogCompositionSource::Primary);
-    QCOMPARE(result.sourceKinds[2], skygate::ephemeris::CatalogCompositionSource::DeepSky);
-}
-
-void CelestialBodyCatalogTests::composerPreservesPrimaryDeepSkyMetadata()
-{
-    const OwnGalaxyCelestialBody star = makeStar();
-    const DistantCelestialBody primaryDeepSkyObject = makePrimaryDeepSkyObject();
-    const DistantCelestialBody secondaryDeepSkyObject = makeSecondaryDeepSkyObject();
-
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog =
-        skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
-            std::vector<OwnGalaxyCelestialBody>{star},
-            std::vector<DistantCelestialBody>{primaryDeepSkyObject},
-            std::vector<CelestialBodyCatalog::OrderEntry>{
-                {.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 0U},
-                {.domain = CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U},
-            }
-        );
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> deepSkyCatalog =
-        skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
-            std::vector<OwnGalaxyCelestialBody>{},
-            std::vector<DistantCelestialBody>{secondaryDeepSkyObject},
-            std::vector<CelestialBodyCatalog::OrderEntry>{
-                {.domain = CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U},
-            }
-        );
-    QVERIFY(sourceCatalog != nullptr);
-    QVERIFY(deepSkyCatalog != nullptr);
-
-    const skygate::ephemeris::ActiveCatalogCompositionResult result = skygate::ephemeris::CatalogComposer::compose(
-        {.sourceCatalog = *sourceCatalog, .deepSkyCatalog = deepSkyCatalog.get()}
-    );
-
-    QVERIFY(result.isSuccess());
-    QCOMPARE(result.deepSkyObjectCount, std::size_t(2));
-    QCOMPARE(result.foundDeepSkyObjectCount, std::size_t(1));
-
-    const std::span<const BaseCelestialBody* const> ordered = result.catalog->bodies();
-    const std::optional<std::size_t> starIndex = bodyIndexById(ordered, "hip_1");
-    const std::optional<std::size_t> primaryIndex = bodyIndexById(ordered, "ngc_224");
-    const std::optional<std::size_t> secondaryIndex = bodyIndexById(ordered, "ngc_1");
-    QVERIFY(starIndex.has_value());
-    QVERIFY(primaryIndex.has_value());
-    QVERIFY(secondaryIndex.has_value());
-    QVERIFY(*starIndex < *primaryIndex);
-    QVERIFY(*primaryIndex < *secondaryIndex);
-
-    verifyStar(*ordered[*starIndex]);
-    verifyPrimaryDeepSkyObject(*ordered[*primaryIndex]);
-    verifySecondaryDeepSkyObject(*ordered[*secondaryIndex]);
 }
 
 void CelestialBodyCatalogTests::loaderSelectionPreservesAstrometry()

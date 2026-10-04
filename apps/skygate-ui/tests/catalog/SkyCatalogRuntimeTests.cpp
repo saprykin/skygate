@@ -151,8 +151,17 @@ void SkyCatalogRuntimeTests::resolvedRefsTrackIdentityAndInvalidateOnSourceChang
 
     // Replacing the source invalidates the previous resolutions.
     const auto revisionBeforeReplace = runtime.catalogRevision();
-    const auto replaceResult = runtime.applyCatalog(
-        makeCatalogWithoutHipCrossIds(), QStringLiteral("Other"), {.useBundledDeepSkyCatalog = false}
+    const auto replaceResult = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("primary"),
+            .title = QStringLiteral("Other"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeCatalogWithoutHipCrossIds(),
+            .foundObjectCount = 0,
+        },
+        {.useBundledDeepSkyCatalog = false}
     );
     QVERIFY(replaceResult.catalogChanged);
     QVERIFY(runtime.catalogRevision() > revisionBeforeReplace);
@@ -164,7 +173,18 @@ void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
 
-    const auto result = runtime.applyCatalog(nullptr, QStringLiteral("Broken"), {.useBundledDeepSkyCatalog = false});
+    const auto result = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("primary"),
+            .title = QStringLiteral("Broken"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = nullptr,
+            .foundObjectCount = 0,
+        },
+        {.useBundledDeepSkyCatalog = false}
+    );
 
     QVERIFY(result.statusTextChanged);
     QVERIFY(result.datasetInfoChanged);

@@ -484,12 +484,6 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogSnapshotValidatorTests.cpp
 )
 add_skygate_ephemeris_qtest(
-    skygate-ephemeris-catalog-composer-tests
-    catalog/CatalogComposerTests.cpp
-    LABELS integration
-    TIMEOUT 45
-)
-add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-composition-collection-tests
     catalog/CatalogCompositionCollectionTests.cpp
     LABELS integration

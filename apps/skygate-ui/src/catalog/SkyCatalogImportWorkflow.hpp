@@ -34,28 +34,6 @@ struct SkyCatalogSourceImportResult final {
     QString errorText;
 };
 
-struct SkyCatalogImportResult final {
-    QByteArray payload;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
-    skygate::ephemeris::CatalogLoadDiagnostics diagnostics;
-    QString sourceLabel;
-    QString sourceId;
-    QString sourceVersion;
-    QString sourceUrl;
-    QString errorText;
-};
-
-struct SkyDeepSkyCatalogImportResult final {
-    QByteArray payload;
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
-    std::size_t foundObjectCount = 0;
-    QString sourceLabel;
-    QString sourceId;
-    QString sourceVersion;
-    QString sourceUrl;
-    QString errorText;
-};
-
 struct SkyConstellationLineImportResult final {
     std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs;
     std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
@@ -69,8 +47,6 @@ class SkyCatalogImportWorkflow final {
 public:
     using StatusHandler = std::function<void(const QString&)>;
     using SourceCompletionHandler = std::function<void(SkyCatalogSourceImportResult)>;
-    using CatalogCompletionHandler = std::function<void(SkyCatalogImportResult)>;
-    using DeepSkyCompletionHandler = std::function<void(SkyDeepSkyCatalogImportResult)>;
     using ConstellationCompletionHandler = std::function<void(SkyConstellationLineImportResult)>;
 
 public:
@@ -85,20 +61,6 @@ public:
         QObject* callbackContext,
         StatusHandler statusHandler,
         SourceCompletionHandler completionHandler
-    ) const;
-
-    void downloadCatalog(
-        const SkyCatalogSourceInstance& source,
-        QObject* callbackContext,
-        StatusHandler statusHandler,
-        CatalogCompletionHandler completionHandler
-    ) const;
-
-    void downloadDeepSkyCatalog(
-        const SkyCatalogSourceInstance& source,
-        QObject* callbackContext,
-        StatusHandler statusHandler,
-        DeepSkyCompletionHandler completionHandler
     ) const;
 
     void downloadConstellationLines(

@@ -71,6 +71,9 @@ public:
         bool ephemerisSettingsPresent = false;
     };
 
+    // Legacy two-slot catalog cache. Retained so existing installations can
+    // be migrated to CatalogCollectionCacheSnapshot by
+    // SkyCatalogCacheController::migrateLegacy; no new writes use it.
     struct CatalogCacheSnapshot final {
         QString sourceLabel;
         QByteArray catalogPayload;

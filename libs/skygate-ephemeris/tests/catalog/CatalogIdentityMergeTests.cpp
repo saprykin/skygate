@@ -18,6 +18,10 @@
 namespace {
 
 using skygate::ephemeris::BaseCelestialBody;
+using skygate::ephemeris::CatalogComposer;
+using skygate::ephemeris::CatalogCompositionPolicy;
+using skygate::ephemeris::CatalogCompositionRequest;
+using skygate::ephemeris::CatalogCompositionResult;
 using skygate::ephemeris::CatalogIdentifier;
 using skygate::ephemeris::DistantCelestialBody;
 using skygate::ephemeris::OwnGalaxyCelestialBody;
@@ -100,6 +104,27 @@ createCatalog(std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies, std::vector<D
     );
 }
 
+CatalogCompositionResult composePrimary(const skygate::ephemeris::IStarCatalog& source)
+{
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary", .enabled = true, .catalog = &source, .policy = CatalogCompositionPolicy::Merge},
+    };
+    return CatalogComposer::composeCollection(request);
+}
+
+CatalogCompositionResult composePrimaryWithDeepSky(
+    const skygate::ephemeris::IStarCatalog& source, const skygate::ephemeris::IStarCatalog& deepSky
+)
+{
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary", .enabled = true, .catalog = &source, .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "deep-sky", .enabled = true, .catalog = &deepSky, .policy = CatalogCompositionPolicy::DeepSkyOnly},
+    };
+    return CatalogComposer::composeCollection(request);
+}
+
 const BaseCelestialBody* findBodyById(const std::span<const BaseCelestialBody* const> bodies, const std::string_view id)
 {
     const auto it = std::find_if(bodies.begin(), bodies.end(), [id](const BaseCelestialBody* body) {
@@ -161,7 +186,7 @@ void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
     QVERIFY(parsed.isSuccess());
     QVERIFY(parsed.catalog != nullptr);
 
-    const auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *parsed.catalog});
+    const auto result = composePrimary(*parsed.catalog);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(countBodiesById(result.catalog->bodies(), "hip_123"), std::size_t{1});
@@ -180,9 +205,7 @@ void CatalogIdentityMergeTests::deduplicatesDuplicateOpenNgcRows()
     QVERIFY(deepSky.isSuccess());
     QVERIFY(deepSky.catalog != nullptr);
 
-    const auto result = skygate::ephemeris::CatalogComposer::compose(
-        {.sourceCatalog = *primary, .deepSkyCatalog = deepSky.catalog.get()}
-    );
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky.catalog);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
@@ -202,8 +225,7 @@ void CatalogIdentityMergeTests::keepsSameNameUnrelatedObjectsDistinct()
     QVERIFY(primary != nullptr);
     QVERIFY(deepSky != nullptr);
 
-    const auto result =
-        skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *primary, .deepSkyCatalog = deepSky.get()});
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
@@ -224,8 +246,7 @@ void CatalogIdentityMergeTests::keepsAmbiguousAliasMatchesDistinct()
     QVERIFY(primary != nullptr);
     QVERIFY(deepSky != nullptr);
 
-    const auto result =
-        skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *primary, .deepSkyCatalog = deepSky.get()});
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
@@ -256,8 +277,7 @@ void CatalogIdentityMergeTests::mergesAuthoritativeMatchesWithDeepSkyPrecedence(
     QVERIFY(primary != nullptr);
     QVERIFY(deepSky != nullptr);
 
-    const auto result =
-        skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *primary, .deepSkyCatalog = deepSky.get()});
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
@@ -284,7 +304,7 @@ void CatalogIdentityMergeTests::resolvesIdentifierChainsWithinSource()
     );
     QVERIFY(source != nullptr);
 
-    const auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *source});
+    const auto result = composePrimary(*source);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(countBodiesById(result.catalog->bodies(), "cat_a_1"), std::size_t{1});
@@ -305,7 +325,7 @@ void CatalogIdentityMergeTests::keepsIncompatibleKindsDistinct()
     );
     QVERIFY(source != nullptr);
 
-    const auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *source});
+    const auto result = composePrimary(*source);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(countBodiesById(result.catalog->bodies(), "hip_123"), std::size_t{1});
@@ -330,7 +350,7 @@ void CatalogIdentityMergeTests::keepsWinnerCoordinatesOverConflictingAstrometry(
     );
     QVERIFY(source != nullptr);
 
-    const auto result = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *source});
+    const auto result = composePrimary(*source);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(countBodiesById(result.catalog->bodies(), "hip_1"), std::size_t{1});
@@ -365,8 +385,7 @@ void CatalogIdentityMergeTests::fillsMissingMetadataWithoutDiscardingWinnerValue
     QVERIFY(primary != nullptr);
     QVERIFY(deepSky != nullptr);
 
-    const auto result =
-        skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *primary, .deepSkyCatalog = deepSky.get()});
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky);
 
     QVERIFY(result.isSuccess());
     const BaseCelestialBody* merged = findBodyById(result.catalog->bodies(), "open_ngc_m31");
@@ -403,8 +422,7 @@ void CatalogIdentityMergeTests::preservesStableOrdering()
     QVERIFY(primary != nullptr);
     QVERIFY(deepSky != nullptr);
 
-    const auto result =
-        skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *primary, .deepSkyCatalog = deepSky.get()});
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky);
 
     QVERIFY(result.isSuccess());
 
@@ -459,8 +477,7 @@ void CatalogIdentityMergeTests::mergesLargeFixtureWithoutAllPairsScan()
     QVERIFY(primary != nullptr);
     QVERIFY(deepSky != nullptr);
 
-    const auto result =
-        skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *primary, .deepSkyCatalog = deepSky.get()});
+    const auto result = composePrimaryWithDeepSky(*primary, *deepSky);
 
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, kFixtureSize);

@@ -90,6 +90,9 @@ private:
     ) const;
     [[nodiscard]] SkyCatalogCollectionRestoreResult
     restoreFromRecords(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot) const;
+    // Converts the legacy two-slot cache into source records. Retained so
+    // existing installations keep their saved catalog data; the collection
+    // format is authoritative for new writes.
     [[nodiscard]] SkyCatalogCollectionRestoreResult migrateLegacy(
         const SkySettingsStore::CatalogCacheSnapshot& legacy,
         int catalogPresetIndex,

@@ -71,19 +71,6 @@ public:
     moveSource(const QString& instanceId, std::size_t targetIndex, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult
     replaceSources(std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options);
-    [[nodiscard]] SkyCatalogRuntimeResult applyCatalog(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-        const QString& sourceLabel,
-        const SkyCatalogRuntimeBuildOptions& options
-    );
-    [[nodiscard]] SkyCatalogRuntimeResult applyDeepSkyCatalog(
-        std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-        const QString& sourceLabel,
-        std::size_t foundObjectCount,
-        const SkyCatalogRuntimeBuildOptions& options
-    );
-    [[nodiscard]] SkyCatalogRuntimeResult
-    clearDeepSkyCatalog(const QString& sourceLabel, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult resetConstellationLineRefs();
     [[nodiscard]] SkyCatalogRuntimeResult setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
@@ -97,7 +84,6 @@ public:
 
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
-    [[nodiscard]] SkyCatalogRuntimeResult failedDeepSkyCatalogResult(const QString& statusText);
     [[nodiscard]] QString buildStatusText() const;
     [[nodiscard]] QString deepSkySourceLabel() const;
     [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;

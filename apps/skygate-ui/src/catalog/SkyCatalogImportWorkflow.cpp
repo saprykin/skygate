@@ -88,60 +88,6 @@ void SkyCatalogImportWorkflow::downloadSource(
     );
 }
 
-void SkyCatalogImportWorkflow::downloadCatalog(
-    const SkyCatalogSourceInstance& source,
-    QObject* callbackContext,
-    StatusHandler statusHandler,
-    CatalogCompletionHandler completionHandler
-) const
-{
-    downloadSource(
-        source,
-        skygate::ephemeris::CatalogCompositionPolicy::Merge,
-        callbackContext,
-        std::move(statusHandler),
-        [completionHandler = std::move(completionHandler)](SkyCatalogSourceImportResult result) mutable {
-            SkyCatalogImportResult legacyResult;
-            legacyResult.payload = std::move(result.payload);
-            legacyResult.catalog = std::move(result.catalog);
-            legacyResult.diagnostics = result.diagnostics;
-            legacyResult.sourceLabel = std::move(result.sourceLabel);
-            legacyResult.sourceId = std::move(result.sourceId);
-            legacyResult.sourceVersion = std::move(result.sourceVersion);
-            legacyResult.sourceUrl = std::move(result.sourceUrl);
-            legacyResult.errorText = std::move(result.errorText);
-            completionHandler(std::move(legacyResult));
-        }
-    );
-}
-
-void SkyCatalogImportWorkflow::downloadDeepSkyCatalog(
-    const SkyCatalogSourceInstance& source,
-    QObject* callbackContext,
-    StatusHandler statusHandler,
-    DeepSkyCompletionHandler completionHandler
-) const
-{
-    downloadSource(
-        source,
-        skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
-        callbackContext,
-        std::move(statusHandler),
-        [completionHandler = std::move(completionHandler)](SkyCatalogSourceImportResult result) mutable {
-            SkyDeepSkyCatalogImportResult legacyResult;
-            legacyResult.payload = std::move(result.payload);
-            legacyResult.catalog = std::move(result.catalog);
-            legacyResult.foundObjectCount = result.foundObjectCount;
-            legacyResult.sourceLabel = std::move(result.sourceLabel);
-            legacyResult.sourceId = std::move(result.sourceId);
-            legacyResult.sourceVersion = std::move(result.sourceVersion);
-            legacyResult.sourceUrl = std::move(result.sourceUrl);
-            legacyResult.errorText = std::move(result.errorText);
-            completionHandler(std::move(legacyResult));
-        }
-    );
-}
-
 void SkyCatalogImportWorkflow::downloadConstellationLines(
     const QStringList& urlTexts,
     QObject* callbackContext,

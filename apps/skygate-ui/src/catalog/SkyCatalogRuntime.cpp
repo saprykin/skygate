@@ -14,7 +14,6 @@ namespace skygate::ui::internal {
 namespace {
 
 constexpr const char* kPrimarySourceId = "primary";
-constexpr const char* kDeepSkySourceId = "deep-sky";
 constexpr const char* kBundledCoreSourceId = "bundled-core";
 constexpr const char* kBundledDeepSkySourceId = "bundled-deep-sky";
 
@@ -254,62 +253,6 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::replaceSources(
     return rebuildActiveCatalog(options);
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::applyCatalog(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-    const QString& sourceLabel,
-    const SkyCatalogRuntimeBuildOptions& options
-)
-{
-    if (catalog == nullptr) {
-        return failedCatalogResult(QStringLiteral("Catalog: Failed to load"));
-    }
-
-    return applySource(
-        SkyCatalogSourceRecord{
-            .instanceId = QString::fromLatin1(kPrimarySourceId),
-            .title = sourceLabel,
-            .version = QString(),
-            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
-            .enabled = true,
-            .catalog = std::move(catalog),
-            .foundObjectCount = 0,
-        },
-        options
-    );
-}
-
-SkyCatalogRuntimeResult SkyCatalogRuntime::applyDeepSkyCatalog(
-    std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
-    const QString& sourceLabel,
-    const std::size_t foundObjectCount,
-    const SkyCatalogRuntimeBuildOptions& options
-)
-{
-    if (catalog == nullptr) {
-        return failedDeepSkyCatalogResult(QStringLiteral("Catalog: Failed to load deep-sky catalog"));
-    }
-
-    return applySource(
-        SkyCatalogSourceRecord{
-            .instanceId = QString::fromLatin1(kDeepSkySourceId),
-            .title = sourceLabel,
-            .version = QString(),
-            .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
-            .enabled = true,
-            .catalog = std::move(catalog),
-            .foundObjectCount = foundObjectCount,
-        },
-        options
-    );
-}
-
-SkyCatalogRuntimeResult
-SkyCatalogRuntime::clearDeepSkyCatalog(const QString& sourceLabel, const SkyCatalogRuntimeBuildOptions& options)
-{
-    static_cast<void>(sourceLabel);
-    return removeSource(QString::fromLatin1(kDeepSkySourceId), options);
-}
-
 SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options)
 {
     if (m_sources.empty()) {
@@ -453,11 +396,6 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& st
     m_sourceIds.clear();
     m_contributorSourceIds.clear();
     return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .datasetInfoChanged = true};
-}
-
-SkyCatalogRuntimeResult SkyCatalogRuntime::failedDeepSkyCatalogResult(const QString& statusText)
-{
-    return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true};
 }
 
 QString SkyCatalogRuntime::buildStatusText() const

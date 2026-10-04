@@ -265,6 +265,9 @@ void SkyCatalogManager::setDeepSkyCatalogUrlText(const QString& deepSkyCatalogUr
         normalizedUrlText.isEmpty() ? SkyCatalogPresets::defaultDeepSkyCatalogUrlText() : normalizedUrlText;
 }
 
+// Legacy two-slot QML entry point retained for compatibility. Delegates to
+// loadSourceInstance with the fixed primary slot ID; new callers use
+// addSourcePreset.
 void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
 {
     if (m_downloadingCatalog) {
@@ -287,6 +290,9 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
     loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
 }
 
+// Legacy two-slot QML entry point retained for compatibility. Delegates to
+// loadSourceInstance with the fixed deep-sky slot ID; new callers use
+// addSourcePreset.
 void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
 {
     if (m_downloadingCatalog) {
@@ -309,6 +315,9 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
     loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
 }
 
+// Legacy two-slot QML entry point retained for compatibility. Delegates to
+// loadSourceInstance with the fixed primary slot ID; new callers use
+// addSourceUrl.
 void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
 {
     setCatalogPresetIndex(2);
@@ -318,6 +327,9 @@ void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
     loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
 }
 
+// Legacy two-slot QML entry point retained for compatibility. Delegates to
+// loadSourceInstance with the fixed deep-sky slot ID; new callers use
+// addSourceUrl.
 void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 {
     setDeepSkyCatalogPresetIndex(2);
