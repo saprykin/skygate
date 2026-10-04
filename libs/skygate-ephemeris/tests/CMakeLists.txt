@@ -378,6 +378,10 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogPayloadFormatDetectorTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-schema-registry-tests
+    catalog/CatalogSchemaRegistryTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-archive-codec-tests
     catalog/io/CatalogArchiveCodecTests.cpp
     TIMEOUT 45

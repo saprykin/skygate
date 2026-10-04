@@ -2,12 +2,10 @@
 #include "CatalogBodyParseResult.hpp"
 #include "CatalogFactory.hpp"
 #include "ICatalogParser.hpp"
-#include "catalog/bundled/BundledCatalogParser.hpp"
-#include "catalog/hyg/HygCatalogParser.hpp"
+#include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/GzipCatalogParser.hpp"
-#include "catalog/normalize/CatalogBodyNormalization.hpp"
-#include "catalog/opengc/OpenNgcCatalogParser.hpp"
 #include "catalog/io/zip/ZipCatalogParser.hpp"
+#include "catalog/normalize/CatalogBodyNormalization.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -125,21 +123,13 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
 [[nodiscard]] std::unique_ptr<ICatalogParser> createParser(const CatalogSourceType type)
 {
     switch (type) {
-    case CatalogSourceType::Bundled:
-        return std::make_unique<BundledCatalogParser>();
-    case CatalogSourceType::HygCsv:
-        return std::make_unique<HygCatalogParser>();
     case CatalogSourceType::HygCsvGzip:
-        return std::make_unique<GzipCatalogParser>(std::make_unique<HygCatalogParser>());
+        return std::make_unique<GzipCatalogParser>(CatalogSchemaRegistry::createParser(CatalogSourceType::HygCsv));
     case CatalogSourceType::HygCsvZip:
-        return std::make_unique<ZipCatalogParser>();
-    case CatalogSourceType::OpenNgcCsv:
-        return std::make_unique<OpenNgcCatalogParser>();
-    case CatalogSourceType::Unknown:
-        return nullptr;
+        return std::make_unique<ZipCatalogParser>(CatalogSchemaRegistry::createParser(CatalogSourceType::HygCsv));
+    default:
+        return CatalogSchemaRegistry::createParser(type);
     }
-
-    return nullptr;
 }
 
 }  // namespace

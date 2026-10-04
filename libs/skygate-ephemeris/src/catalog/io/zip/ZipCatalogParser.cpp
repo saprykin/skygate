@@ -1,10 +1,11 @@
 #include "ZipCatalogParser.hpp"
 #include "ZipCodec.hpp"
 #include "catalog/CatalogLoadResult.hpp"
-#include "catalog/hyg/HygCatalogParser.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
+
+#include <utility>
 
 namespace skygate::ephemeris {
 namespace {
@@ -12,6 +13,10 @@ namespace {
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
 }  // namespace
+
+ZipCatalogParser::ZipCatalogParser(std::unique_ptr<ICatalogParser> innerParser) : m_innerParser{std::move(innerParser)}
+{
+}
 
 CatalogBodyParseResult
 ZipCatalogParser::parse(const std::string_view data, const CatalogParseProgressCallback& progressCallback) const
@@ -27,8 +32,7 @@ ZipCatalogParser::parse(const std::string_view data, const CatalogParseProgressC
         return result;
     }
 
-    const HygCatalogParser hygParser;
-    return hygParser.parse(*extractedCsv, progressCallback);
+    return m_innerParser->parse(*extractedCsv, progressCallback);
 }
 
 }  // namespace skygate::ephemeris

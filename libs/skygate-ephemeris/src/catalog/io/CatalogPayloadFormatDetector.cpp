@@ -1,26 +1,14 @@
 #include "CatalogPayloadFormatDetector.hpp"
 #include "CatalogHeaderPolicy.hpp"
+#include "catalog/CatalogSchemaRegistry.hpp"
 
 #include <QHash>
 #include <QString>
 
-#include <vector>
+#include <string_view>
 
 namespace skygate::ephemeris {
 namespace {
-
-const std::vector<QString> kHygRequiredColumns = {
-    QStringLiteral("ra"),
-    QStringLiteral("dec"),
-    QStringLiteral("mag"),
-};
-
-const std::vector<QString> kOpenNgcRequiredColumns = {
-    QStringLiteral("Name"),
-    QStringLiteral("Type"),
-    QStringLiteral("RA"),
-    QStringLiteral("Dec"),
-};
 
 bool hasGzipSignature(const std::string_view payload) noexcept
 {
@@ -66,14 +54,18 @@ CatalogSourceType CatalogPayloadFormatDetector::detect(const std::string_view pa
         return CatalogSourceType::Unknown;
     }
 
-    const QHash<QString, qsizetype> commaHeader = CatalogHeaderPolicy::decodeHeaderLine(headerLine, QChar{','});
-    if (CatalogHeaderPolicy::hasRequiredColumns(commaHeader, kHygRequiredColumns)) {
-        return CatalogSourceType::HygCsv;
-    }
+    // Schemas without required header columns (for example the bundled data)
+    // cannot be identified by their header and are skipped here.
+    for (const CatalogSchemaDescriptor& descriptor : CatalogSchemaRegistry::descriptors()) {
+        if (descriptor.requiredColumns.empty()) {
+            continue;
+        }
 
-    const QHash<QString, qsizetype> semicolonHeader = CatalogHeaderPolicy::decodeHeaderLine(headerLine, QChar{';'});
-    if (CatalogHeaderPolicy::hasRequiredColumns(semicolonHeader, kOpenNgcRequiredColumns)) {
-        return CatalogSourceType::OpenNgcCsv;
+        const QHash<QString, qsizetype> header =
+            CatalogHeaderPolicy::decodeHeaderLine(headerLine, descriptor.delimiter);
+        if (CatalogHeaderPolicy::hasRequiredColumns(header, descriptor.requiredColumns)) {
+            return descriptor.type;
+        }
     }
 
     return CatalogSourceType::Unknown;
