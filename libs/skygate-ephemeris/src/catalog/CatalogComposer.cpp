@@ -81,31 +81,24 @@ ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompo
     }
 
     result.foundDeepSkyObjectCount = request.knownDeepSkyObjectCount;
-    if (deepSkyCatalog != nullptr) {
-        if (result.foundDeepSkyObjectCount == 0U || request.useBundledDeepSkyCatalog) {
-            result.foundDeepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(deepSkyCatalog->bodies());
-        }
-
-        const CelestialBodyCatalog activeCatalog(active.bodies, primaryDeepSkyBodies, augmentedOrder);
-        DeepSkyCatalogMergeResult merged =
-            DeepSkyCatalogMerger::merge(activeCatalog.bodies(), active.sourceKinds, deepSkyCatalog->bodies());
-        result.catalog = CatalogFactory::createStarCatalogFromBodies(
-            std::move(merged.ownGalaxyBodies), std::move(merged.distantBodies), std::move(merged.orderedBodyIndexes)
-        );
-        active.sourceKinds = std::move(merged.sourceKinds);
+    if (deepSkyCatalog != nullptr && (result.foundDeepSkyObjectCount == 0U || request.useBundledDeepSkyCatalog)) {
+        result.foundDeepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(deepSkyCatalog->bodies());
     }
 
-    if (result.catalog == nullptr) {
-        result.catalog = CatalogFactory::createStarCatalogFromBodies(
-            std::move(active.bodies), std::move(primaryDeepSkyBodies), std::move(augmentedOrder)
-        );
-    }
+    const CelestialBodyCatalog activeCatalog(active.bodies, primaryDeepSkyBodies, augmentedOrder);
+    const std::span<const BaseCelestialBody* const> deepSkyBodies =
+        deepSkyCatalog != nullptr ? deepSkyCatalog->bodies() : std::span<const BaseCelestialBody* const>{};
+    DeepSkyCatalogMergeResult merged =
+        DeepSkyCatalogMerger::merge(activeCatalog.bodies(), active.sourceKinds, deepSkyBodies);
+    result.catalog = CatalogFactory::createStarCatalogFromBodies(
+        std::move(merged.ownGalaxyBodies), std::move(merged.distantBodies), std::move(merged.orderedBodyIndexes)
+    );
     if (result.catalog == nullptr) {
         result.sourceKinds.clear();
         return result;
     }
 
-    result.sourceKinds = std::move(active.sourceKinds);
+    result.sourceKinds = std::move(merged.sourceKinds);
     assignCompositionCounts(result, result.catalog->bodies(), request.currentConstellationCount);
     return result;
 }
