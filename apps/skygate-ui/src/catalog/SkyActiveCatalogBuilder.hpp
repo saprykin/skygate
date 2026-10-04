@@ -2,11 +2,11 @@
 
 #include "catalog/IStarCatalog.hpp"
 
+#include <QHash>
 #include <QString>
 #include <QStringList>
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -22,6 +22,10 @@ struct SkyActiveCatalogBuildRequest final {
     QString deepSkySourceLabel;
 };
 
+// Two-slot legacy build result. Provenance is expressed with stable source
+// instance IDs rather than byte-sized label indexes: sourceIds and
+// contributorSourceIds are parallel to the composed catalog's bodies, and
+// sourceTitles maps each stable ID to its presentation title.
 struct SkyActiveCatalogBuildResult final {
     std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
     QString statusText;
@@ -30,8 +34,9 @@ struct SkyActiveCatalogBuildResult final {
     std::size_t constellationCount = 0;
     std::size_t deepSkyObjectCount = 0;
     std::size_t foundDeepSkyObjectCount = 0;
-    QStringList sourceLabels;
-    std::vector<std::uint8_t> sourceIds;
+    std::vector<QString> sourceIds;
+    std::vector<QStringList> contributorSourceIds;
+    QHash<QString, QString> sourceTitles;
 
     [[nodiscard]] bool isSuccess() const noexcept;
 };

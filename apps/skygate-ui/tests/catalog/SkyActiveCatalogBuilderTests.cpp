@@ -62,10 +62,13 @@ void SkyActiveCatalogBuilderTests::assignsSourceIdsAndFallbackLabels()
     );
 
     QVERIFY(result.isSuccess());
-    QCOMPARE(result.sourceLabels, QStringList({"Catalog", "Deep sky catalog", "Built-in ephemeris"}));
     QCOMPARE(result.sourceIds.size(), result.bodyCount);
-    QCOMPARE(result.sourceIds[0], 2U);
-    QCOMPARE(result.sourceIds[1], 0U);
+    QCOMPARE(result.sourceIds[0], QStringLiteral("primary"));
+    QCOMPARE(result.sourceIds[1], QStringLiteral("primary"));
+    QCOMPARE(result.contributorSourceIds.size(), result.bodyCount);
+    QCOMPARE(result.sourceTitles.value(QStringLiteral("primary")), QStringLiteral("Catalog"));
+    QCOMPARE(result.sourceTitles.value(QStringLiteral("deep-sky")), QStringLiteral("Deep sky catalog"));
+    QCOMPARE(result.sourceTitles.value(QStringLiteral("bundled-core")), QStringLiteral("Bundled core"));
 }
 
 QTEST_APPLESS_MAIN(SkyActiveCatalogBuilderTests)

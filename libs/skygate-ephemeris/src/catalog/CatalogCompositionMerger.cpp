@@ -32,11 +32,13 @@ struct MergeAccumulator final {
     std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
     std::vector<DistantCelestialBody> distantBodies;
     std::vector<std::string> sourceIds;
+    std::vector<std::vector<std::string>> contributorSourceIds;
     std::vector<bool> isDistant;
     std::vector<std::size_t> domainIndex;
     std::vector<bool> active;
 
-    [[nodiscard]] std::size_t append(const BaseCelestialBody& body, std::string sourceId)
+    [[nodiscard]] std::size_t
+    append(const BaseCelestialBody& body, std::string sourceId, std::vector<std::string> priorContributors = {})
     {
         if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
             distantBodies.push_back(CelestialBodyCatalog::copyDistantBody(body));
@@ -48,6 +50,16 @@ struct MergeAccumulator final {
             isDistant.push_back(false);
         }
         sourceIds.push_back(std::move(sourceId));
+
+        std::vector<std::string> contributors;
+        contributors.reserve(priorContributors.size() + 1U);
+        contributors.push_back(sourceIds.back());
+        for (std::string& prior : priorContributors) {
+            if (std::find(contributors.begin(), contributors.end(), prior) == contributors.end()) {
+                contributors.push_back(std::move(prior));
+            }
+        }
+        contributorSourceIds.push_back(std::move(contributors));
         active.push_back(true);
         return sourceIds.size() - 1U;
     }
@@ -368,7 +380,10 @@ bool hasAnyMatch(const CatalogIdentityIndex& index, const BaseCelestialBody& bod
 }
 
 void pushOwnGalaxyBody(
-    CatalogCompositionMergeResult& result, const OwnGalaxyCelestialBody& body, const std::string_view sourceId
+    CatalogCompositionMergeResult& result,
+    const OwnGalaxyCelestialBody& body,
+    const std::string_view sourceId,
+    const std::vector<std::string>& contributorSourceIds
 )
 {
     result.orderedBodyIndexes.push_back(
@@ -378,10 +393,14 @@ void pushOwnGalaxyBody(
     );
     result.ownGalaxyBodies.push_back(body);
     result.sourceIds.emplace_back(sourceId);
+    result.contributorSourceIds.push_back(contributorSourceIds);
 }
 
 void pushDistantBody(
-    CatalogCompositionMergeResult& result, const DistantCelestialBody& body, const std::string_view sourceId
+    CatalogCompositionMergeResult& result,
+    const DistantCelestialBody& body,
+    const std::string_view sourceId,
+    const std::vector<std::string>& contributorSourceIds
 )
 {
     result.orderedBodyIndexes.push_back(
@@ -391,6 +410,7 @@ void pushDistantBody(
     );
     result.distantBodies.push_back(body);
     result.sourceIds.emplace_back(sourceId);
+    result.contributorSourceIds.push_back(contributorSourceIds);
 }
 
 void assembleResult(CatalogCompositionMergeResult& result, const MergeAccumulator& accumulator)
@@ -399,6 +419,7 @@ void assembleResult(CatalogCompositionMergeResult& result, const MergeAccumulato
     result.distantBodies.reserve(accumulator.distantBodies.size());
     result.orderedBodyIndexes.reserve(accumulator.sourceIds.size());
     result.sourceIds.reserve(accumulator.sourceIds.size());
+    result.contributorSourceIds.reserve(accumulator.sourceIds.size());
 
     for (std::size_t position = 0; position < accumulator.sourceIds.size(); ++position) {
         if (!accumulator.active[position]) {
@@ -406,11 +427,17 @@ void assembleResult(CatalogCompositionMergeResult& result, const MergeAccumulato
         }
         if (accumulator.isDistant[position]) {
             pushDistantBody(
-                result, accumulator.distantBodies[accumulator.domainIndex[position]], accumulator.sourceIds[position]
+                result,
+                accumulator.distantBodies[accumulator.domainIndex[position]],
+                accumulator.sourceIds[position],
+                accumulator.contributorSourceIds[position]
             );
         } else {
             pushOwnGalaxyBody(
-                result, accumulator.ownGalaxyBodies[accumulator.domainIndex[position]], accumulator.sourceIds[position]
+                result,
+                accumulator.ownGalaxyBodies[accumulator.domainIndex[position]],
+                accumulator.sourceIds[position],
+                accumulator.contributorSourceIds[position]
             );
         }
     }
@@ -495,6 +522,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             const MatchDecision decision = evaluateMatch(accumulator, activeIndex, body);
             if (decision.action == MatchDecision::Action::Merge) {
                 const BaseCelestialBody& loser = accumulator.at(decision.matchIndex);
+                std::vector<std::string> priorContributors = accumulator.contributorSourceIds[decision.matchIndex];
                 bool conflict = false;
                 if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
                     DistantCelestialBody winner = CelestialBodyCatalog::copyDistantBody(body);
@@ -503,7 +531,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     if (conflict) {
                         logConflictingAstrometry(winner, loser);
                     }
-                    accumulator.append(winner, source.sourceId);
+                    static_cast<void>(accumulator.append(winner, source.sourceId, std::move(priorContributors)));
                 } else {
                     OwnGalaxyCelestialBody winner = CelestialBodyCatalog::copyOwnGalaxyBody(body);
                     mergeSurvivorInPlace(winner, loser, conflict);
@@ -511,11 +539,11 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     if (conflict) {
                         logConflictingAstrometry(winner, loser);
                     }
-                    accumulator.append(winner, source.sourceId);
+                    static_cast<void>(accumulator.append(winner, source.sourceId, std::move(priorContributors)));
                 }
                 continue;
             }
-            accumulator.append(body, source.sourceId);
+            static_cast<void>(accumulator.append(body, source.sourceId));
         }
     }
 

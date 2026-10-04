@@ -21,6 +21,7 @@ struct SkyCatalogSourceRecord final {
     QString instanceId;
     QString title;
     QString version;
+    QString url;
     skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
     bool enabled = true;
     bool bundled = false;

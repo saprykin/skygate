@@ -1162,14 +1162,20 @@ void SkyContextController::rebuildEphemerisEngine()
     }
 }
 
-QStringList SkyContextController::catalogSourceLabels() const
+QHash<QString, QString> SkyContextController::catalogSourceTitles() const
 {
-    return m_catalogManager != nullptr ? m_catalogManager->sourceLabels() : QStringList{};
+    return m_catalogManager != nullptr ? m_catalogManager->sourceTitles() : QHash<QString, QString>{};
 }
 
-std::span<const std::uint8_t> SkyContextController::catalogSourceIds() const noexcept
+std::span<const QString> SkyContextController::catalogSourceIds() const noexcept
 {
-    return m_catalogManager != nullptr ? m_catalogManager->sourceIds() : std::span<const std::uint8_t>{};
+    return m_catalogManager != nullptr ? m_catalogManager->sourceIds() : std::span<const QString>{};
+}
+
+const std::vector<QStringList>& SkyContextController::catalogSourceContributorIds() const noexcept
+{
+    static const std::vector<QStringList> kEmptyContributors;
+    return m_catalogManager != nullptr ? m_catalogManager->contributorSourceIds() : kEmptyContributors;
 }
 
 std::span<const SkyContextController::ConstellationLineRef> SkyContextController::constellationLineRefs() const noexcept

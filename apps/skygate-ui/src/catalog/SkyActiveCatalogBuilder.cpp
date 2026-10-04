@@ -1,12 +1,19 @@
 #include "SkyActiveCatalogBuilder.hpp"
 
 #include "catalog/CatalogComposer.hpp"
+#include "catalog/CatalogFactory.hpp"
 
-#include <cstdint>
+#include <QString>
+
+#include <string>
 #include <utility>
 
 namespace skygate::ui::internal {
 namespace {
+
+constexpr const char* kPrimarySourceId = "primary";
+constexpr const char* kDeepSkySourceId = "deep-sky";
+constexpr const char* kBundledCoreSourceId = "bundled-core";
 
 QString normalizedSourceLabel(const QString& sourceLabel, const QString& fallbackLabel)
 {
@@ -24,60 +31,89 @@ bool SkyActiveCatalogBuildResult::isSuccess() const noexcept
 SkyActiveCatalogBuildResult SkyActiveCatalogBuilder::build(const SkyActiveCatalogBuildRequest& request)
 {
     SkyActiveCatalogBuildResult result;
-    auto activeCatalog = skygate::ephemeris::CatalogComposer::compose(
-        {.sourceCatalog = request.sourceCatalog,
-         .deepSkyCatalog = request.deepSkyCatalog,
-         .useBundledDeepSkyCatalog = request.useBundledDeepSkyCatalog,
-         .currentConstellationCount = request.currentConstellationCount,
-         .knownDeepSkyObjectCount = request.knownDeepSkyObjectCount}
+
+    std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledCatalog =
+        skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    const skygate::ephemeris::IStarCatalog* deepSkyCatalog = request.deepSkyCatalog;
+    if (deepSkyCatalog == nullptr && request.useBundledDeepSkyCatalog) {
+        deepSkyCatalog = bundledCatalog.get();
+    }
+
+    skygate::ephemeris::CatalogCompositionRequest collectionRequest;
+    collectionRequest.currentConstellationCount = request.currentConstellationCount;
+    collectionRequest.knownDeepSkyObjectCount = request.knownDeepSkyObjectCount;
+    collectionRequest.sources.push_back(
+        skygate::ephemeris::CatalogCompositionSourceEntry{
+            .sourceId = std::string(kPrimarySourceId),
+            .enabled = true,
+            .catalog = &request.sourceCatalog,
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+        }
     );
-    if (!activeCatalog.isSuccess()) {
+    if (bundledCatalog != nullptr) {
+        collectionRequest.sources.push_back(
+            skygate::ephemeris::CatalogCompositionSourceEntry{
+                .sourceId = std::string(kBundledCoreSourceId),
+                .enabled = true,
+                .catalog = bundledCatalog.get(),
+                .policy = skygate::ephemeris::CatalogCompositionPolicy::AugmentCore,
+            }
+        );
+    }
+    if (deepSkyCatalog != nullptr) {
+        collectionRequest.sources.push_back(
+            skygate::ephemeris::CatalogCompositionSourceEntry{
+                .sourceId = std::string(kDeepSkySourceId),
+                .enabled = true,
+                .catalog = deepSkyCatalog,
+                .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
+            }
+        );
+    }
+
+    skygate::ephemeris::CatalogCompositionResult composed =
+        skygate::ephemeris::CatalogComposer::composeCollection(collectionRequest);
+    if (!composed.isSuccess()) {
         result.errorText = "Catalog: Failed to load";
         return result;
     }
 
-    const auto sourceIdForLabel = [&result](const QString& label) {
-        const int existingIndex = result.sourceLabels.indexOf(label);
-        if (existingIndex >= 0) {
-            return static_cast<std::uint8_t>(existingIndex);
+    result.sourceIds.reserve(composed.sourceIds.size());
+    for (const std::string& sourceId : composed.sourceIds) {
+        result.sourceIds.push_back(QString::fromStdString(sourceId));
+    }
+    result.contributorSourceIds.reserve(composed.contributorSourceIds.size());
+    for (const std::vector<std::string>& contributors : composed.contributorSourceIds) {
+        QStringList contributorIds;
+        contributorIds.reserve(static_cast<int>(contributors.size()));
+        for (const std::string& sourceId : contributors) {
+            contributorIds.push_back(QString::fromStdString(sourceId));
         }
-
-        result.sourceLabels.push_back(label);
-        return static_cast<std::uint8_t>(result.sourceLabels.size() - 1);
-    };
-    const std::uint8_t primarySourceId = sourceIdForLabel(normalizedSourceLabel(request.sourceLabel, "Catalog"));
-    const std::uint8_t deepSkySourceId =
-        sourceIdForLabel(normalizedSourceLabel(request.deepSkySourceLabel, "Deep sky catalog"));
-    const std::uint8_t builtInSourceId = sourceIdForLabel("Built-in ephemeris");
-
-    result.sourceIds.reserve(activeCatalog.sourceKinds.size());
-    for (const auto sourceKind : activeCatalog.sourceKinds) {
-        switch (sourceKind) {
-        case skygate::ephemeris::CatalogCompositionSource::Primary:
-            result.sourceIds.push_back(primarySourceId);
-            break;
-        case skygate::ephemeris::CatalogCompositionSource::DeepSky:
-            result.sourceIds.push_back(deepSkySourceId);
-            break;
-        case skygate::ephemeris::CatalogCompositionSource::BuiltInEphemeris:
-            result.sourceIds.push_back(builtInSourceId);
-            break;
-        }
+        result.contributorSourceIds.push_back(std::move(contributorIds));
     }
 
-    result.bodyCount = activeCatalog.bodyCount;
-    result.constellationCount = activeCatalog.constellationCount;
-    result.deepSkyObjectCount = activeCatalog.deepSkyObjectCount;
-    result.foundDeepSkyObjectCount = activeCatalog.foundDeepSkyObjectCount;
+    result.sourceTitles.insert(
+        QString::fromLatin1(kPrimarySourceId), normalizedSourceLabel(request.sourceLabel, QStringLiteral("Catalog"))
+    );
+    result.sourceTitles.insert(
+        QString::fromLatin1(kDeepSkySourceId),
+        normalizedSourceLabel(request.deepSkySourceLabel, QStringLiteral("Deep sky catalog"))
+    );
+    result.sourceTitles.insert(QString::fromLatin1(kBundledCoreSourceId), QStringLiteral("Bundled core"));
+
+    result.bodyCount = composed.bodyCount;
+    result.constellationCount = composed.constellationCount;
+    result.deepSkyObjectCount = composed.deepSkyObjectCount;
+    result.foundDeepSkyObjectCount = composed.foundDeepSkyObjectCount;
     result.statusText = QString("Catalog: %1 + %2 (%3 objects, %4 deep sky, %5 constellations)")
                             .arg(
-                                request.sourceLabel,
-                                request.deepSkySourceLabel,
+                                result.sourceTitles.value(QString::fromLatin1(kPrimarySourceId)),
+                                result.sourceTitles.value(QString::fromLatin1(kDeepSkySourceId)),
                                 QString::number(static_cast<qulonglong>(result.bodyCount)),
                                 QString::number(static_cast<qulonglong>(result.deepSkyObjectCount)),
                                 QString::number(static_cast<qulonglong>(result.constellationCount))
                             );
-    result.catalog = std::move(activeCatalog.catalog);
+    result.catalog = std::move(composed.catalog);
     return result;
 }
 

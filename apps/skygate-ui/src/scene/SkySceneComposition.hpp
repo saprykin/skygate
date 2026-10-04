@@ -11,6 +11,7 @@
 #include "SkySceneOverlayData.hpp"
 #include "SkySelectionOverlayBuilder.hpp"
 
+#include <QHash>
 #include <QString>
 #include <QStringList>
 
@@ -34,8 +35,9 @@ struct SkySceneFrameData final {
 struct SkySceneCompositionInput final {
     SkySceneFramePipelineInput frameInput;
     std::optional<skygate::ephemeris::EphemerisRequest> selectionEphemerisRequest;
-    std::span<const std::uint8_t> catalogSourceIds;
-    QStringList catalogSourceLabels;
+    std::span<const QString> catalogSourceIds;
+    const std::vector<QStringList>* catalogSourceContributors = nullptr;
+    QHash<QString, QString> catalogSourceTitles;
     const SkyTimeController* timeController = nullptr;
     QString selectedObjectTargetId;
     QString selectedSearchTargetKind;

@@ -47,7 +47,7 @@ void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
     QCOMPARE(inspector.value("title").toString(), QString("M31"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
     QVERIFY(inspectorFieldValue(inspector, "Angular size").contains("arcmin"));
-    QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Bundled Messier"));
+    QVERIFY(inspectorFieldValue(inspector, "Source").contains("Bundled Messier"));
     QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
 
     QVERIFY(controller.focusSearchTarget("body", "messier_031"));
@@ -79,11 +79,6 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
     QVERIFY(buildResult.isSuccess());
     QCOMPARE(buildResult.sourceIds.size(), buildResult.catalog->bodies().size());
 
-    const int primarySourceIndex = buildResult.sourceLabels.indexOf("Primary");
-    const int deepSkySourceIndex = buildResult.sourceLabels.indexOf("OpenNGC");
-    QVERIFY(primarySourceIndex >= 0);
-    QVERIFY(deepSkySourceIndex >= 0);
-
     bool sawPrimaryDso = false;
     bool sawOpenNgcM31 = false;
     for (std::size_t index = 0; index < buildResult.catalog->bodies().size(); ++index) {
@@ -91,10 +86,10 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
         QVERIFY(body != nullptr);
         if (body->id == "primary_dso") {
             sawPrimaryDso = true;
-            QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(primarySourceIndex));
+            QCOMPARE(buildResult.sourceIds[index], QStringLiteral("primary"));
         } else if (body->id == "open_ngc_m31") {
             sawOpenNgcM31 = true;
-            QCOMPARE(buildResult.sourceIds[index], static_cast<std::uint8_t>(deepSkySourceIndex));
+            QCOMPARE(buildResult.sourceIds[index], QStringLiteral("deep-sky"));
         } else if (body->id == "messier_031") {
             QFAIL("Merged catalog should replace the primary M31 with the OpenNGC body");
         }

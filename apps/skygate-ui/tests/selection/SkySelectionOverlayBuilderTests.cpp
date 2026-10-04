@@ -64,8 +64,9 @@ struct OverlayFixture final {
     QHash<QString, std::size_t> stateIndexByBodyId;
     std::optional<skygate::core::PreparedProjection> projection;
     std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
-    std::vector<std::uint8_t> sourceIds;
-    QStringList sourceLabels;
+    std::vector<QString> sourceIds;
+    std::vector<QStringList> sourceContributors;
+    QHash<QString, QString> sourceTitles;
     skygate::core::ObservationContext skyContext;
     std::unique_ptr<skygate::ephemeris::IEphemerisEngine> ephemerisEngine;
 };
@@ -366,8 +367,22 @@ OverlayFixture makeFixture()
         skygate::core::ViewportMath::buildProjectionParams(1000.0, 800.0, 45.0, 180.0, 90.0)
     );
     fixture.anchorGroups = {{"Orion", {"selected", "tracked"}}};
-    fixture.sourceIds = {0U, 0U, 0U, 2U, 0U};
-    fixture.sourceLabels = {"Catalog", "", "Deep Sky"};
+    fixture.sourceIds = {
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("deep-sky"),
+        QStringLiteral("primary"),
+    };
+    fixture.sourceContributors = {
+        {QStringLiteral("primary")},
+        {QStringLiteral("primary")},
+        {QStringLiteral("primary")},
+        {QStringLiteral("deep-sky")},
+        {QStringLiteral("primary")},
+    };
+    fixture.sourceTitles.insert(QStringLiteral("primary"), QStringLiteral("Catalog"));
+    fixture.sourceTitles.insert(QStringLiteral("deep-sky"), QStringLiteral("Deep Sky"));
     fixture.skyContext.observer = {.latitudeDeg = 47.0, .longitudeDeg = 8.0, .elevationMeters = 400.0};
     fixture.skyContext.utcTime = skygate::core::UtcTimePoint(std::chrono::seconds(1'717'276'800));
     return fixture;
@@ -383,7 +398,8 @@ SkySelectionOverlayInput makeInput(const OverlayFixture& fixture)
         .skyContext = fixture.skyContext,
         .constellationAnchorGroups = fixture.anchorGroups,
         .catalogSourceIds = fixture.sourceIds,
-        .catalogSourceLabels = fixture.sourceLabels
+        .catalogSourceContributors = &fixture.sourceContributors,
+        .catalogSourceTitles = fixture.sourceTitles
     };
 }
 
@@ -461,7 +477,14 @@ void SkySelectionOverlayBuilderTests::inspectorFormatsSourceAliasesAndFallbacks(
     QVERIFY(inspector.aliases.contains("Andromeda Galaxy"));
     QVERIFY(!inspector.aliases.contains("M31"));
 
-    fixture.sourceIds = {0U, 0U, 0U, 99U};
+    fixture.sourceIds = {
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("primary"),
+        QStringLiteral("unknown-source"),
+        QStringLiteral("primary"),
+    };
+    fixture.sourceContributors[3] = {QStringLiteral("unknown-source")};
     input = makeInput(fixture);
     input.selectedObjectTargetId = "messier_031";
     QCOMPARE(overlayInspectorFieldValue(builder.buildSelectedObjectInspectorData(input), "Source"), QString("Catalog"));

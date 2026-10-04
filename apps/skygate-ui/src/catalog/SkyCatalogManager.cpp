@@ -152,9 +152,14 @@ bool SkyCatalogManager::isSourceEnabled(const QString& instanceId) const
     return m_runtime->isSourceEnabled(instanceId);
 }
 
-QStringList SkyCatalogManager::sourceLabels() const
+QHash<QString, QString> SkyCatalogManager::sourceTitles() const
 {
-    return m_runtime->sourceLabels();
+    return m_runtime->sourceTitles();
+}
+
+QString SkyCatalogManager::sourceTitle(const QString& instanceId) const
+{
+    return m_runtime->sourceTitle(instanceId);
 }
 
 QVector<SkyCatalogManager::SourceViewEntry> SkyCatalogManager::sourceViewEntries() const
@@ -204,9 +209,14 @@ QVector<SkyCatalogManager::SourceViewEntry> SkyCatalogManager::sourceViewEntries
     return entries;
 }
 
-std::span<const std::uint8_t> SkyCatalogManager::sourceIds() const noexcept
+std::span<const QString> SkyCatalogManager::sourceIds() const noexcept
 {
     return m_runtime->sourceIds();
+}
+
+const std::vector<QStringList>& SkyCatalogManager::contributorSourceIds() const noexcept
+{
+    return m_runtime->contributorSourceIds();
 }
 
 std::span<const SkyCatalogManager::ConstellationLineRef> SkyCatalogManager::constellationLineRefs() const noexcept
@@ -657,6 +667,7 @@ void SkyCatalogManager::applySourceResult(
     record.instanceId = result.sourceId;
     record.title = result.sourceLabel;
     record.version = result.sourceVersion;
+    record.url = result.sourceUrl;
     record.policy = policy;
     record.enabled = true;
     record.catalog = std::move(result.catalog);
@@ -895,6 +906,7 @@ void SkyCatalogManager::persistCatalogCache() const
         entry.descriptorId = operation->instance.descriptorId;
         entry.title = operation->instance.title;
         entry.version = operation->instance.version;
+        entry.url = source.url;
         entry.urls = operation->instance.urls;
         entry.relatedDatasetUrls = operation->instance.relatedDatasetUrls;
         entry.archiveSelector = operation->instance.archiveSelector;

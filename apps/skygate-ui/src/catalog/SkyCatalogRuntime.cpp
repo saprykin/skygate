@@ -15,7 +15,7 @@ namespace {
 
 constexpr const char* kPrimarySourceId = "primary";
 constexpr const char* kDeepSkySourceId = "deep-sky";
-constexpr const char* kBuiltInSourceId = "built-in-ephemeris";
+constexpr const char* kBundledCoreSourceId = "bundled-core";
 constexpr const char* kBundledDeepSkySourceId = "bundled-deep-sky";
 
 QString normalizedTitle(const QString& title, const QString& fallback)
@@ -114,9 +114,18 @@ bool SkyCatalogRuntime::hasSource(const QString& instanceId) const
     return findSource(instanceId) != nullptr;
 }
 
-QStringList SkyCatalogRuntime::sourceLabels() const
+QHash<QString, QString> SkyCatalogRuntime::sourceTitles() const
 {
-    return m_sourceLabels;
+    return m_sourceTitles;
+}
+
+QString SkyCatalogRuntime::sourceTitle(const QString& instanceId) const
+{
+    const auto it = m_sourceTitles.constFind(instanceId);
+    if (it == m_sourceTitles.cend()) {
+        return normalizedTitle(instanceId, QStringLiteral("Catalog"));
+    }
+    return it.value();
 }
 
 std::span<const SkyCatalogSourceRecord> SkyCatalogRuntime::sources() const noexcept
@@ -124,9 +133,14 @@ std::span<const SkyCatalogSourceRecord> SkyCatalogRuntime::sources() const noexc
     return std::span<const SkyCatalogSourceRecord>(m_sources);
 }
 
-std::span<const std::uint8_t> SkyCatalogRuntime::sourceIds() const noexcept
+std::span<const QString> SkyCatalogRuntime::sourceIds() const noexcept
 {
-    return std::span<const std::uint8_t>(m_sourceIds);
+    return std::span<const QString>(m_sourceIds);
+}
+
+const std::vector<QStringList>& SkyCatalogRuntime::contributorSourceIds() const noexcept
+{
+    return m_contributorSourceIds;
 }
 
 std::span<const SkyCatalogRuntime::ConstellationLineRef> SkyCatalogRuntime::constellationLineRefs() const noexcept
@@ -346,7 +360,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     if (bundledCore != nullptr) {
         request.sources.push_back(
             skygate::ephemeris::CatalogCompositionSourceEntry{
-                .sourceId = std::string(kBuiltInSourceId),
+                .sourceId = std::string(kBundledCoreSourceId),
                 .enabled = true,
                 .catalog = bundledCore.get(),
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::AugmentCore,
@@ -376,7 +390,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     m_constellationRefs.setCount(composed.constellationCount);
     m_deepSkyObjectCount = composed.deepSkyObjectCount;
     m_deepSkyCatalogFoundObjectCount = composed.foundDeepSkyObjectCount;
-    rebuildSourceProvenance(composed.sourceIds);
+    rebuildSourceProvenance(composed.sourceIds, composed.contributorSourceIds);
 
     return SkyCatalogRuntimeResult{
         .statusText = buildStatusText(),
@@ -435,8 +449,9 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& st
     m_bodyCount = 0;
     m_constellationRefs.setCount(0);
     m_deepSkyObjectCount = 0;
-    m_sourceLabels.clear();
+    m_sourceTitles.clear();
     m_sourceIds.clear();
+    m_contributorSourceIds.clear();
     return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .datasetInfoChanged = true};
 }
 
@@ -493,19 +508,19 @@ const SkyCatalogSourceRecord* SkyCatalogRuntime::firstSourceWithPolicy(
     return nullptr;
 }
 
-void SkyCatalogRuntime::rebuildSourceProvenance(const std::vector<std::string>& composedSourceIds)
+void SkyCatalogRuntime::rebuildSourceProvenance(
+    const std::vector<std::string>& composedSourceIds, const std::vector<std::vector<std::string>>& contributorSourceIds
+)
 {
-    QStringList labels;
-    QHash<QString, std::uint8_t> indexBySourceId;
-    labels.reserve(static_cast<int>(m_sources.size()) + 1);
+    m_sourceTitles.clear();
 
-    const auto labelForSourceId = [this](const QString& instanceId) {
+    const auto titleForSourceId = [this](const QString& instanceId) {
         const SkyCatalogSourceRecord* source = findSource(instanceId);
         if (source != nullptr) {
             return normalizedTitle(source->title, QStringLiteral("Catalog"));
         }
-        if (instanceId == QString::fromLatin1(kBuiltInSourceId)) {
-            return QStringLiteral("Built-in ephemeris");
+        if (instanceId == QString::fromLatin1(kBundledCoreSourceId)) {
+            return QStringLiteral("Bundled core");
         }
         if (instanceId == QString::fromLatin1(kBundledDeepSkySourceId)) {
             return QStringLiteral("Bundled Messier");
@@ -513,23 +528,32 @@ void SkyCatalogRuntime::rebuildSourceProvenance(const std::vector<std::string>& 
         return QStringLiteral("Catalog");
     };
 
-    const auto indexForSourceId = [&](const QString& instanceId) {
-        const auto existing = indexBySourceId.constFind(instanceId);
-        if (existing != indexBySourceId.constEnd()) {
-            return existing.value();
+    const auto recordTitle = [&](const QString& instanceId) {
+        if (!m_sourceTitles.contains(instanceId)) {
+            m_sourceTitles.insert(instanceId, titleForSourceId(instanceId));
         }
-        const auto index = static_cast<std::uint8_t>(labels.size());
-        labels.push_back(labelForSourceId(instanceId));
-        indexBySourceId.insert(instanceId, index);
-        return index;
     };
 
     m_sourceIds.clear();
     m_sourceIds.reserve(composedSourceIds.size());
     for (const std::string& sourceId : composedSourceIds) {
-        m_sourceIds.push_back(indexForSourceId(QString::fromStdString(sourceId)));
+        const QString instanceId = QString::fromStdString(sourceId);
+        recordTitle(instanceId);
+        m_sourceIds.push_back(instanceId);
     }
-    m_sourceLabels = std::move(labels);
+
+    m_contributorSourceIds.clear();
+    m_contributorSourceIds.reserve(contributorSourceIds.size());
+    for (const std::vector<std::string>& contributors : contributorSourceIds) {
+        QStringList instanceIds;
+        instanceIds.reserve(static_cast<int>(contributors.size()));
+        for (const std::string& sourceId : contributors) {
+            const QString instanceId = QString::fromStdString(sourceId);
+            recordTitle(instanceId);
+            instanceIds.push_back(instanceId);
+        }
+        m_contributorSourceIds.push_back(std::move(instanceIds));
+    }
 }
 
 void SkyCatalogRuntime::refreshResolvedConstellationRefs() const

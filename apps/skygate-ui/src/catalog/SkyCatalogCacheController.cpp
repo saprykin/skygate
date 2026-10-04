@@ -3,6 +3,7 @@
 #include "SkyCatalogPresets.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
+#include "catalog/CatalogIdentity.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
 
 #include <QLoggingCategory>
@@ -121,10 +122,12 @@ void SkyCatalogCacheController::appendRestoredSource(
     entry.record.instanceId = sourceRecord.instanceId;
     entry.record.title = savedLabel(sourceRecord.title, QStringLiteral("Saved"));
     entry.record.version = sourceRecord.version;
+    entry.record.url = sourceRecord.url;
     entry.record.policy = sourceRecord.policy;
     entry.record.enabled = sourceRecord.enabled;
     entry.record.catalog = std::move(decoded.catalog);
-    entry.record.foundObjectCount = entry.record.catalog->bodies().size();
+    entry.record.foundObjectCount =
+        skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(entry.record.catalog->bodies());
 
     entry.instance.instanceId = sourceRecord.instanceId;
     entry.instance.descriptorId = sourceRecord.descriptorId;
@@ -307,6 +310,7 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
         record.descriptorId = source.descriptorId;
         record.title = source.title;
         record.version = source.version;
+        record.url = source.url;
         record.urls = source.urls;
         record.relatedDatasetUrls = source.relatedDatasetUrls;
         record.archiveSelector = source.archiveSelector;

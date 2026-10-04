@@ -110,6 +110,7 @@ private slots:
     void filtersPlanetStarHipAndConstellationTargets();
     void normalizesHipQueries();
     void filtersDeepSkyAliases();
+    void resolvesStarAliasesToCanonicalObject();
     void deduplicatesDisplayNamesPreferringBodies();
     void ranksExactPrefixAndContainsMatches();
     void ranksLargerMixedCatalogWithCollisions();
@@ -212,6 +213,35 @@ void SkyObjectSearchModelTests::filtersDeepSkyAliases()
     QCOMPARE(detailTextAt(model, 0), QString("Deep sky • Galaxy • messier_031"));
     QCOMPARE(targetKindAt(model, 0), QString("body"));
     QCOMPARE(targetIdAt(model, 0), QString("messier_031"));
+}
+
+void SkyObjectSearchModelTests::resolvesStarAliasesToCanonicalObject()
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody sirius = makeBody(
+        "hip_32349",
+        "Sirius",
+        skygate::ephemeris::BaseCelestialBody::Kind::Star,
+        -1.46,
+        skygate::core::EquatorialCoordinate{.rightAscensionHours = 6.7525, .declinationDeg = -16.7161}
+    );
+    sirius.identity.aliases = {"Alpha Canis Majoris", "Dog Star"};
+
+    SkyObjectSearchModel model;
+    setCatalogData(
+        model,
+        std::vector<skygate::ephemeris::OwnGalaxyCelestialBody>{sirius},
+        std::vector<skygate::ephemeris::ConstellationAnchorGroup>{}
+    );
+
+    model.setFilterText("dog star");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(displayTextAt(model, 0), QString("Dog Star"));
+    QCOMPARE(targetKindAt(model, 0), QString("body"));
+    QCOMPARE(targetIdAt(model, 0), QString("hip_32349"));
+
+    model.setFilterText("alpha canis");
+    QCOMPARE(model.rowCount(), 1);
+    QCOMPARE(targetIdAt(model, 0), QString("hip_32349"));
 }
 
 void SkyObjectSearchModelTests::deduplicatesDisplayNamesPreferringBodies()

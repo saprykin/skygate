@@ -5,6 +5,7 @@
 
 #include "catalog/IStarCatalog.hpp"
 
+#include <QHash>
 #include <QString>
 #include <QStringList>
 
@@ -49,9 +50,11 @@ public:
     [[nodiscard]] QStringList sourceInstanceIds() const;
     [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
     [[nodiscard]] bool hasSource(const QString& instanceId) const;
-    [[nodiscard]] QStringList sourceLabels() const;
+    [[nodiscard]] QHash<QString, QString> sourceTitles() const;
+    [[nodiscard]] QString sourceTitle(const QString& instanceId) const;
     [[nodiscard]] std::span<const SkyCatalogSourceRecord> sources() const noexcept;
-    [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
+    [[nodiscard]] std::span<const QString> sourceIds() const noexcept;
+    [[nodiscard]] const std::vector<QStringList>& contributorSourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
@@ -100,7 +103,10 @@ private:
     [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;
     [[nodiscard]] const SkyCatalogSourceRecord*
     firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy policy, bool requireEnabled) const;
-    void rebuildSourceProvenance(const std::vector<std::string>& composedSourceIds);
+    void rebuildSourceProvenance(
+        const std::vector<std::string>& composedSourceIds,
+        const std::vector<std::vector<std::string>>& contributorSourceIds
+    );
     void refreshResolvedConstellationRefs() const;
 
 private:
@@ -110,8 +116,9 @@ private:
     std::size_t m_bodyCount = 0;
     std::size_t m_deepSkyObjectCount = 0;
     std::size_t m_deepSkyCatalogFoundObjectCount = 0;
-    QStringList m_sourceLabels;
-    std::vector<std::uint8_t> m_sourceIds;
+    QHash<QString, QString> m_sourceTitles;
+    std::vector<QString> m_sourceIds;
+    std::vector<QStringList> m_contributorSourceIds;
     SkyCatalogConstellationStore m_constellationRefs;
     mutable std::vector<ConstellationLineRef> m_resolvedLineRefs;
     mutable std::vector<ConstellationAnchorGroup> m_resolvedAnchorGroups;
