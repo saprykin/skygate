@@ -1,22 +1,26 @@
 #include "CatalogPayloadFormatDetector.hpp"
-#include "StringUtilities.hpp"
-#include "text/HighPrecisionTextParser.hpp"
+#include "CatalogHeaderPolicy.hpp"
+
+#include <QHash>
+#include <QString>
+
+#include <vector>
 
 namespace skygate::ephemeris {
 namespace {
 
-std::string_view firstNonEmptyLine(std::string_view payload)
-{
-    const HighPrecisionTextParser parser;
-    while (!payload.empty()) {
-        const std::string_view line = parser.trimAsciiWhitespace(parser.takeLine(payload));
-        if (!line.empty() && line.front() != '#') {
-            return line;
-        }
-    }
+const std::vector<QString> kHygRequiredColumns = {
+    QStringLiteral("ra"),
+    QStringLiteral("dec"),
+    QStringLiteral("mag"),
+};
 
-    return {};
-}
+const std::vector<QString> kOpenNgcRequiredColumns = {
+    QStringLiteral("Name"),
+    QStringLiteral("Type"),
+    QStringLiteral("RA"),
+    QStringLiteral("Dec"),
+};
 
 bool hasGzipSignature(const std::string_view payload) noexcept
 {
@@ -56,21 +60,19 @@ CatalogSourceType CatalogPayloadFormatDetector::detect(const std::string_view pa
         return CatalogSourceType::HygCsvZip;
     }
 
-    const std::string_view headerLine = firstNonEmptyLine(payload);
+    std::string_view remaining = payload;
+    const std::string_view headerLine = CatalogHeaderPolicy::findHeaderLine(remaining);
     if (headerLine.empty()) {
         return CatalogSourceType::Unknown;
     }
 
-    if (headerLine.find(',') != std::string_view::npos && StringUtilities::containsIgnoreAsciiCase(headerLine, "ra")
-        && StringUtilities::containsIgnoreAsciiCase(headerLine, "dec")
-        && StringUtilities::containsIgnoreAsciiCase(headerLine, "mag")) {
+    const QHash<QString, qsizetype> commaHeader = CatalogHeaderPolicy::decodeHeaderLine(headerLine, QChar{','});
+    if (CatalogHeaderPolicy::hasRequiredColumns(commaHeader, kHygRequiredColumns)) {
         return CatalogSourceType::HygCsv;
     }
 
-    if (headerLine.find(';') != std::string_view::npos && StringUtilities::containsIgnoreAsciiCase(headerLine, "Name")
-        && StringUtilities::containsIgnoreAsciiCase(headerLine, "Type")
-        && StringUtilities::containsIgnoreAsciiCase(headerLine, "RA")
-        && StringUtilities::containsIgnoreAsciiCase(headerLine, "Dec")) {
+    const QHash<QString, qsizetype> semicolonHeader = CatalogHeaderPolicy::decodeHeaderLine(headerLine, QChar{';'});
+    if (CatalogHeaderPolicy::hasRequiredColumns(semicolonHeader, kOpenNgcRequiredColumns)) {
         return CatalogSourceType::OpenNgcCsv;
     }
 
