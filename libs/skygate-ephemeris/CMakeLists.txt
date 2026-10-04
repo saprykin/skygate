@@ -281,6 +281,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/bundled/BundledCatalogParser.hpp
     src/catalog/CatalogIdentity.hpp
     src/catalog/io/CatalogParsingUtilities.hpp
+    src/catalog/io/CatalogHeaderPolicy.hpp
     src/catalog/io/CatalogPayloadFormatDetector.hpp
     src/catalog/io/CatalogZipEntrySelector.hpp
     src/catalog/io/CompressedDataInflater.hpp
@@ -327,6 +328,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoadDiagnostics.cpp
     src/catalog/CatalogLoader.cpp
+    src/catalog/io/CatalogHeaderPolicy.cpp
     src/catalog/io/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogParseRequest.cpp
     src/catalog/CatalogPayloadParser.cpp

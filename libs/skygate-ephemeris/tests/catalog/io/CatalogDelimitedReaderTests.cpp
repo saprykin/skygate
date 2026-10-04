@@ -1,3 +1,4 @@
+#include "CatalogHeaderCorpus.hpp"
 #include "catalog/io/CsvRowTokenizer.hpp"
 #include "catalog/io/DelimitedCatalogReader.hpp"
 
@@ -16,6 +17,8 @@ private slots:
     void decodesUnterminatedQuotesAsBestEffortField();
     void readerHandlesBomBlankRowsCrlfAndFinalLineWithoutNewline();
     void readerRejectsMissingRequiredColumns();
+    void readerRejectsSubstringLookalikeHeaders();
+    void readerSkipsLeadingCommentsAndPreservesQuotedHash();
     void readerStopsOnHandlerFailureAndPreservesPartialResult();
 };
 
@@ -95,6 +98,52 @@ void CatalogDelimitedReaderTests::readerRejectsMissingRequiredColumns()
 
     QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
     QCOMPARE(result.errorDetail, std::string("missing value"));
+}
+
+void CatalogDelimitedReaderTests::readerRejectsSubstringLookalikeHeaders()
+{
+    skygate::ephemeris::DelimitedCatalogReaderOptions options;
+    options.requiredColumns = {QStringLiteral("ra"), QStringLiteral("dec"), QStringLiteral("mag")};
+    options.emptyInputDetail = "empty";
+    options.missingColumnsDetail = "missing";
+
+    const auto result = skygate::ephemeris::DelimitedCatalogReader::read(
+        skygate::ephemeris::tests::CatalogHeaderCorpus::kHygLookalikeHeader, options, {}
+    );
+
+    QCOMPARE(result.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::MissingRequiredColumns);
+    QCOMPARE(result.errorDetail, std::string("missing"));
+}
+
+void CatalogDelimitedReaderTests::readerSkipsLeadingCommentsAndPreservesQuotedHash()
+{
+    skygate::ephemeris::DelimitedCatalogReaderOptions options;
+    options.separator = ',';
+    options.requiredColumns = {QStringLiteral("ra"), QStringLiteral("dec"), QStringLiteral("mag")};
+    options.emptyInputDetail = "empty";
+    options.missingColumnsDetail = "missing";
+
+    const auto commentResult = skygate::ephemeris::DelimitedCatalogReader::read(
+        skygate::ephemeris::tests::CatalogHeaderCorpus::kHygLeadingComment,
+        options,
+        [](const skygate::ephemeris::DelimitedCatalogRow&, skygate::ephemeris::CatalogBodyParseResult&) { return true; }
+    );
+    QVERIFY(commentResult.isSuccess());
+    QCOMPARE(commentResult.diagnostics.processedRowCount, 1U);
+
+    std::vector<QString> quotedIds;
+    const auto quotedResult = skygate::ephemeris::DelimitedCatalogReader::read(
+        skygate::ephemeris::tests::CatalogHeaderCorpus::kHygQuotedHash,
+        options,
+        [&quotedIds](const skygate::ephemeris::DelimitedCatalogRow& row, skygate::ephemeris::CatalogBodyParseResult&) {
+            quotedIds.push_back(row.decodeColumn(QStringLiteral("#id")));
+            return true;
+        }
+    );
+    QVERIFY(quotedResult.isSuccess());
+    QCOMPARE(quotedResult.diagnostics.processedRowCount, 1U);
+    QCOMPARE(quotedIds.size(), 1U);
+    QCOMPARE(quotedIds.at(0), QString("1"));
 }
 
 void CatalogDelimitedReaderTests::readerStopsOnHandlerFailureAndPreservesPartialResult()

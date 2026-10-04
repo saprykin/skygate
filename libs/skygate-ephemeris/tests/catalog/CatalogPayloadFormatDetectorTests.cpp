@@ -1,3 +1,4 @@
+#include "CatalogHeaderCorpus.hpp"
 #include "catalog/CatalogSourceType.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
 
@@ -11,6 +12,9 @@ class CatalogPayloadFormatDetectorTests final : public QObject {
 
 private slots:
     void detectsTextPayloadFormats();
+    void detectsLeadingCommentAndBomPayloads();
+    void preservesHashInsideQuotedHeaderFields();
+    void rejectsSubstringLookalikeHeaders();
     void detectsCompressedPayloadFormats();
     void returnsUnknownForUnrecognizedPayloads();
 };
@@ -18,13 +22,40 @@ private slots:
 void CatalogPayloadFormatDetectorTests::detectsTextPayloadFormats()
 {
     using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+
+    QCOMPARE(CatalogPayloadFormatDetector::detect("id,ra,dec,mag\n"), CatalogSourceType::HygCsv);
+    QCOMPARE(CatalogPayloadFormatDetector::detect("Name;Type;RA;Dec\n"), CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygLeadingComment), CatalogSourceType::HygCsv);
+    QCOMPARE(
+        CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kOpenNgcLeadingComment), CatalogSourceType::OpenNgcCsv
+    );
+}
+
+void CatalogPayloadFormatDetectorTests::detectsLeadingCommentAndBomPayloads()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+
+    QCOMPARE(CatalogPayloadFormatDetector::detect("# comment\nid,ra,dec,mag\n"), CatalogSourceType::HygCsv);
+    QCOMPARE(CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygBom), CatalogSourceType::HygCsv);
+}
+
+void CatalogPayloadFormatDetectorTests::preservesHashInsideQuotedHeaderFields()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+
+    QCOMPARE(CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygQuotedHash), CatalogSourceType::HygCsv);
+}
+
+void CatalogPayloadFormatDetectorTests::rejectsSubstringLookalikeHeaders()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
 
     QCOMPARE(
-        CatalogPayloadFormatDetector::detect("# comment\nid,ra,dec,mag\n"),
-        skygate::ephemeris::CatalogSourceType::HygCsv
-    );
-    QCOMPARE(
-        CatalogPayloadFormatDetector::detect("Name;Type;RA;Dec\n"), skygate::ephemeris::CatalogSourceType::OpenNgcCsv
+        CatalogPayloadFormatDetector::detect(CatalogHeaderCorpus::kHygLookalikeHeader), CatalogSourceType::Unknown
     );
 }
 
