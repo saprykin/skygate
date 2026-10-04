@@ -76,8 +76,6 @@ qt_add_library(skygate-ui-lib STATIC
     src/time/TimeZoneCatalogModel.hpp
     src/catalog/SkyActiveCatalogBuilder.cpp
     src/catalog/SkyActiveCatalogBuilder.hpp
-    src/catalog/SkyCatalogBinaryCodec.cpp
-    src/catalog/SkyCatalogBinaryCodec.hpp
     src/catalog/SkyCatalogCacheController.cpp
     src/catalog/SkyCatalogCacheController.hpp
     src/catalog/SkyCatalogConstellationStore.cpp
