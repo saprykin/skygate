@@ -1,5 +1,6 @@
 #include "SkyCatalogManager.hpp"
-
+#include "SkyCatalogSourceInstance.hpp"
+#include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
 #include "catalog/SkyCatalogPresets.hpp"
@@ -8,8 +9,6 @@
 
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-
-#include "catalog/CatalogFactory.hpp"
 
 #include <optional>
 #include <utility>
@@ -172,24 +171,24 @@ void SkyCatalogManager::loadCatalogPreset(const QString& presetId)
         return;
     }
 
-    const SkyCatalogPreset preset = SkyCatalogPresets::catalogPreset(presetId);
-    if (!preset.known) {
+    const std::optional<SkyCatalogSourceDescriptor> descriptor = SkyCatalogPresets::starSourceDescriptor(presetId);
+    if (!descriptor.has_value()) {
         m_statusText = SkyCatalogText::unknownCatalogPreset(presetId);
         emit statusTextChanged();
         return;
     }
 
-    setCatalogPresetIndex(preset.presetIndex);
-    if (preset.bundled) {
+    setCatalogPresetIndex(descriptor->legacyPresetIndex);
+    if (descriptor->bundled) {
         m_cachedCatalogPayload.clear();
         invalidateConstellationDownload();
         resetConstellationLineRefs();
-        applyCatalog(skygate::ephemeris::CatalogFactory::createBundledStarCatalog(), preset.sourceLabel);
+        applyCatalog(skygate::ephemeris::CatalogFactory::createBundledStarCatalog(), descriptor->title);
         return;
     }
 
-    setCatalogUrlText(preset.defaultUrlText);
-    downloadCatalogFromUrls(preset.catalogUrls, preset.sourceLabel, preset.constellationLineUrls);
+    setCatalogUrlText(descriptor->defaultUrl());
+    downloadCatalogFromUrls(SkyCatalogSourceInstance::fromDescriptor(*descriptor));
 }
 
 void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
@@ -198,39 +197,38 @@ void SkyCatalogManager::loadDeepSkyCatalogPreset(const QString& presetId)
         return;
     }
 
-    const SkyDeepSkyCatalogPreset preset = SkyCatalogPresets::deepSkyCatalogPreset(presetId);
-    if (!preset.known) {
+    const std::optional<SkyCatalogSourceDescriptor> descriptor = SkyCatalogPresets::deepSkySourceDescriptor(presetId);
+    if (!descriptor.has_value()) {
         m_statusText = SkyCatalogText::unknownDeepSkyPreset(presetId);
         emit statusTextChanged();
         return;
     }
 
-    setDeepSkyCatalogPresetIndex(preset.presetIndex);
-    if (preset.bundled) {
+    setDeepSkyCatalogPresetIndex(descriptor->legacyPresetIndex);
+    if (descriptor->bundled) {
         m_cachedDeepSkyCatalogPayload.clear();
-        const SkyCatalogRuntimeResult result =
-            m_runtime->clearDeepSkyCatalog(preset.sourceLabel, runtimeBuildOptions());
+        const SkyCatalogRuntimeResult result = m_runtime->clearDeepSkyCatalog(descriptor->title, runtimeBuildOptions());
         persistCatalogCache();
         applyRuntimeResult(result);
         return;
     }
 
-    setDeepSkyCatalogUrlText(preset.defaultUrlText);
-    downloadDeepSkyCatalogFromUrls(preset.catalogUrls, preset.sourceLabel);
+    setDeepSkyCatalogUrlText(descriptor->defaultUrl());
+    downloadDeepSkyCatalogFromUrls(SkyCatalogSourceInstance::fromDescriptor(*descriptor));
 }
 
 void SkyCatalogManager::downloadCatalogFromUrl(const QString& urlText)
 {
     setCatalogPresetIndex(2);
     setCatalogUrlText(urlText);
-    downloadCatalogFromUrls(QStringList{urlText}, "Downloaded");
+    downloadCatalogFromUrls(SkyCatalogSourceInstance::createCustom(urlText));
 }
 
 void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
 {
     setDeepSkyCatalogPresetIndex(2);
     setDeepSkyCatalogUrlText(urlText);
-    downloadDeepSkyCatalogFromUrls(QStringList{urlText}, "Downloaded");
+    downloadDeepSkyCatalogFromUrls(SkyCatalogSourceInstance::createCustom(urlText));
 }
 
 void SkyCatalogManager::cancelCatalogDownload()
@@ -347,9 +345,7 @@ bool SkyCatalogManager::restoreCatalogCache()
     return true;
 }
 
-void SkyCatalogManager::downloadCatalogFromUrls(
-    const QStringList& urlTexts, const QString& sourceLabel, const QStringList& constellationLineUrlTexts
-)
+void SkyCatalogManager::downloadCatalogFromUrls(const SkyCatalogSourceInstance& source)
 {
     if (m_downloadingCatalog) {
         return;
@@ -366,15 +362,16 @@ void SkyCatalogManager::downloadCatalogFromUrls(
     invalidateConstellationDownload();
 
     m_importWorkflow->downloadCatalog(
-        urlTexts,
-        sourceLabel,
+        source,
         this,
         [this, downloadGeneration](const QString& statusText) {
             if (downloadGeneration == m_catalogDownloadGeneration) {
                 handleCatalogImportStatus(statusText);
             }
         },
-        [this, constellationLineUrlTexts, downloadGeneration](SkyCatalogImportResult result) {
+        [this,
+         constellationLineUrlTexts = source.relatedDatasetUrls,
+         downloadGeneration](SkyCatalogImportResult result) {
             if (downloadGeneration != m_catalogDownloadGeneration) {
                 return;
             }
@@ -383,7 +380,7 @@ void SkyCatalogManager::downloadCatalogFromUrls(
     );
 }
 
-void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(const QStringList& urlTexts, const QString& sourceLabel)
+void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(const SkyCatalogSourceInstance& source)
 {
     if (m_downloadingCatalog) {
         return;
@@ -399,8 +396,7 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrls(const QStringList& urlTex
     const std::uint64_t downloadGeneration = ++m_catalogDownloadGeneration;
 
     m_importWorkflow->downloadDeepSkyCatalog(
-        urlTexts,
-        sourceLabel,
+        source,
         this,
         [this, downloadGeneration](const QString& statusText) {
             if (downloadGeneration == m_catalogDownloadGeneration) {

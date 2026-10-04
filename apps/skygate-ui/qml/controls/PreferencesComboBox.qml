@@ -63,11 +63,27 @@ ComboBox {
 
     delegate: ItemDelegate {
         id: preferencesComboDelegate
+        required property var model
+        required property int index
+
+        readonly property string labelText: {
+            if (typeof modelData !== "undefined") {
+                return modelData;
+            }
+            if (comboControl.textRole.length > 0
+                && typeof model === "object"
+                && model !== null
+                && model[comboControl.textRole] !== undefined) {
+                return model[comboControl.textRole];
+            }
+            return "";
+        }
+
         width: comboControl.width - 8
         highlighted: comboControl.highlightedIndex === index
 
         contentItem: Text {
-            text: modelData
+            text: preferencesComboDelegate.labelText
             color: highlighted
                 ? comboControl.theme.textPrimary
                 : comboControl.theme.listItemPrimaryText

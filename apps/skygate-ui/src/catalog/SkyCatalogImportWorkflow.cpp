@@ -38,8 +38,7 @@ bool SkyCatalogImportWorkflow::isAvailable() const noexcept
 }
 
 void SkyCatalogImportWorkflow::downloadCatalog(
-    const QStringList& urlTexts,
-    const QString& sourceLabel,
+    const SkyCatalogSourceInstance& source,
     QObject* callbackContext,
     StatusHandler statusHandler,
     CatalogCompletionHandler completionHandler
@@ -47,23 +46,28 @@ void SkyCatalogImportWorkflow::downloadCatalog(
 {
     if (m_catalogCoordinator == nullptr) {
         SkyCatalogImportResult result;
-        result.sourceLabel = sourceLabel;
+        result.sourceLabel = source.title;
+        result.sourceId = source.instanceId;
+        result.sourceVersion = source.version;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
         return;
     }
 
     m_catalogCoordinator->downloadCatalogFromUrls(
-        urlTexts,
+        source.urls,
         callbackContext,
         std::move(statusHandler),
-        [sourceLabel,
+        [source,
          completionHandler = std::move(completionHandler)](CatalogCoordinator::DownloadResult downloadResult) mutable {
             SkyCatalogImportResult result;
             result.payload = std::move(downloadResult.payload);
             result.catalog = std::move(downloadResult.catalog);
             result.diagnostics = downloadResult.diagnostics;
-            result.sourceLabel = sourceLabel;
+            result.sourceLabel = source.title;
+            result.sourceId = source.instanceId;
+            result.sourceVersion = source.version;
+            result.sourceUrl = std::move(downloadResult.sourceUrl);
             result.errorText = std::move(downloadResult.errorText);
             completionHandler(std::move(result));
         }
@@ -71,8 +75,7 @@ void SkyCatalogImportWorkflow::downloadCatalog(
 }
 
 void SkyCatalogImportWorkflow::downloadDeepSkyCatalog(
-    const QStringList& urlTexts,
-    const QString& sourceLabel,
+    const SkyCatalogSourceInstance& source,
     QObject* callbackContext,
     StatusHandler statusHandler,
     DeepSkyCompletionHandler completionHandler
@@ -80,22 +83,27 @@ void SkyCatalogImportWorkflow::downloadDeepSkyCatalog(
 {
     if (m_catalogCoordinator == nullptr) {
         SkyDeepSkyCatalogImportResult result;
-        result.sourceLabel = sourceLabel;
+        result.sourceLabel = source.title;
+        result.sourceId = source.instanceId;
+        result.sourceVersion = source.version;
         result.errorText = "Catalog: Network unavailable";
         completionHandler(std::move(result));
         return;
     }
 
     m_catalogCoordinator->downloadCatalogFromUrls(
-        urlTexts,
+        source.urls,
         callbackContext,
         std::move(statusHandler),
-        [sourceLabel,
+        [source,
          completionHandler = std::move(completionHandler)](CatalogCoordinator::DownloadResult downloadResult) mutable {
             SkyDeepSkyCatalogImportResult result;
             result.payload = std::move(downloadResult.payload);
             result.catalog = std::move(downloadResult.catalog);
-            result.sourceLabel = sourceLabel;
+            result.sourceLabel = source.title;
+            result.sourceId = source.instanceId;
+            result.sourceVersion = source.version;
+            result.sourceUrl = std::move(downloadResult.sourceUrl);
             result.errorText = std::move(downloadResult.errorText);
 
             if (result.catalog == nullptr) {

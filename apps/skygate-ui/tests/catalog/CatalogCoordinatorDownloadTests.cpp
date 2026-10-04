@@ -43,6 +43,7 @@ void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
 
     QVERIFY(finalResult.catalog != nullptr);
     QCOMPARE(finalResult.diagnostics.parsedBodyCount, 1U);
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/catalog.csv"));
     QVERIFY(finalResult.errorText.isEmpty());
     QVERIFY(std::any_of(statuses.begin(), statuses.end(), [](const QString& status) {
         return status.startsWith("Catalog: Processing");

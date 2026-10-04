@@ -5,6 +5,7 @@
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogPresets.hpp"
+#include "SkyCatalogSourceDescriptor.hpp"
 #include "SkySettingsStore.hpp"
 
 #include <QFile>
@@ -41,8 +42,8 @@ bool catalogContainsDisplayName(const skygate::ephemeris::IStarCatalog* catalog,
 
 constexpr int kStaleConstellationDelayMs = 500;
 
-const skygate::ui::internal::SkyCatalogPreset kHygPreset =
-    skygate::ui::internal::SkyCatalogPresets::catalogPreset(QStringLiteral("hyg_v42"));
+const skygate::ui::internal::SkyCatalogSourceDescriptor kHygPreset =
+    skygate::ui::internal::SkyCatalogPresets::starSourceDescriptor(QStringLiteral("hyg_v42")).value();
 
 skygate::ui::tests::FakeNetworkReply*
 findReplyForUrl(skygate::ui::tests::FakeNetworkAccessManager& networkAccessManager, const QString& url)
@@ -299,8 +300,8 @@ void SkyCatalogManagerTests::failedLocalCatalogDownloadClearsBusyAndReportsStatu
 
 void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterBundledSwitch()
 {
-    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
-    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    const QString catalogUrl = kHygPreset.urls.value(0);
+    const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         catalogUrl,
@@ -352,8 +353,8 @@ void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterBundledSwitch
 
 void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterCustomSwitch()
 {
-    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
-    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    const QString catalogUrl = kHygPreset.urls.value(0);
+    const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
     const QString customUrl = QStringLiteral("https://example.test/custom-stars.csv");
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
@@ -414,8 +415,8 @@ void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterCustomSwitch(
 
 void SkyCatalogManagerTests::cancelDuringConstellationLoadingIgnoresStaleCompletion()
 {
-    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
-    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    const QString catalogUrl = kHygPreset.urls.value(0);
+    const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         catalogUrl,
@@ -458,8 +459,8 @@ void SkyCatalogManagerTests::cancelDuringConstellationLoadingIgnoresStaleComplet
 
 void SkyCatalogManagerTests::currentConstellationResponseAppliesOnce()
 {
-    const QString catalogUrl = kHygPreset.catalogUrls.value(0);
-    const QString constellationUrl = kHygPreset.constellationLineUrls.value(0);
+    const QString catalogUrl = kHygPreset.urls.value(0);
+    const QString constellationUrl = kHygPreset.relatedDatasetUrls.value(0);
     skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
     networkAccessManager.enqueueResponse(
         catalogUrl,

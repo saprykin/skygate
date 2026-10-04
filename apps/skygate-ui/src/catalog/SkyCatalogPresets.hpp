@@ -1,28 +1,13 @@
 #pragma once
 
+#include "SkyCatalogSourceDescriptor.hpp"
+
 #include <QString>
-#include <QStringList>
+#include <QVector>
+
+#include <optional>
 
 namespace skygate::ui::internal {
-
-struct SkyCatalogPreset final {
-    bool known = false;
-    bool bundled = false;
-    int presetIndex = 0;
-    QString defaultUrlText;
-    QString sourceLabel;
-    QStringList catalogUrls;
-    QStringList constellationLineUrls;
-};
-
-struct SkyDeepSkyCatalogPreset final {
-    bool known = false;
-    bool bundled = false;
-    int presetIndex = 0;
-    QString defaultUrlText;
-    QString sourceLabel;
-    QStringList catalogUrls;
-};
 
 class SkyCatalogPresets final {
 public:
@@ -30,8 +15,10 @@ public:
     [[nodiscard]] static int normalizeDeepSkyCatalogPresetIndex(int presetIndex) noexcept;
     [[nodiscard]] static QString defaultCatalogUrlText();
     [[nodiscard]] static QString defaultDeepSkyCatalogUrlText();
-    [[nodiscard]] static SkyCatalogPreset catalogPreset(const QString& presetId);
-    [[nodiscard]] static SkyDeepSkyCatalogPreset deepSkyCatalogPreset(const QString& presetId);
+    [[nodiscard]] static std::optional<SkyCatalogSourceDescriptor> starSourceDescriptor(const QString& presetId);
+    [[nodiscard]] static std::optional<SkyCatalogSourceDescriptor> deepSkySourceDescriptor(const QString& presetId);
+    [[nodiscard]] static QVector<SkyCatalogSourceDescriptor> starSourceDescriptors();
+    [[nodiscard]] static QVector<SkyCatalogSourceDescriptor> deepSkySourceDescriptors();
 };
 
 }  // namespace skygate::ui::internal
