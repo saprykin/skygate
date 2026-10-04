@@ -391,20 +391,37 @@ QString formatCorrectionSummary(const skygate::ephemeris::EphemerisEngineQueryRe
 }
 
 QString sourceLabelForBodyIndex(
-    const std::span<const std::uint8_t> sourceIds, const QStringList& sourceLabels, const std::uint32_t bodyIndex
+    const std::span<const QString> sourceIds,
+    const std::vector<QStringList>* contributorSourceIds,
+    const QHash<QString, QString>& sourceTitles,
+    const std::uint32_t bodyIndex
 )
 {
     if (bodyIndex >= sourceIds.size()) {
         return "Catalog";
     }
 
-    const int sourceId = sourceIds[bodyIndex];
-    if (sourceId < 0 || sourceId >= sourceLabels.size()) {
-        return "Catalog";
-    }
+    const auto resolveTitle = [&sourceTitles](const QString& instanceId) {
+        const auto it = sourceTitles.constFind(instanceId);
+        if (it == sourceTitles.cend()) {
+            return QStringLiteral("Catalog");
+        }
+        const QString title = it.value().trimmed();
+        return title.isEmpty() ? QStringLiteral("Catalog") : title;
+    };
 
-    const QString label = sourceLabels.at(sourceId).trimmed();
-    return label.isEmpty() ? QString("Catalog") : label;
+    QStringList contributorTitles;
+    if (contributorSourceIds != nullptr && bodyIndex < contributorSourceIds->size()) {
+        const QStringList& contributorIds = (*contributorSourceIds)[bodyIndex];
+        contributorTitles.reserve(contributorIds.size());
+        for (const QString& instanceId : contributorIds) {
+            contributorTitles.push_back(resolveTitle(instanceId));
+        }
+    }
+    if (contributorTitles.isEmpty()) {
+        contributorTitles.push_back(resolveTitle(sourceIds[bodyIndex]));
+    }
+    return contributorTitles.join(QStringLiteral(" + "));
 }
 
 }  // namespace skygate::ui::internal

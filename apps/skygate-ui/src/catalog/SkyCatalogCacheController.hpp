@@ -41,6 +41,7 @@ struct SkyCatalogSourcePersistEntry final {
     QString descriptorId;
     QString title;
     QString version;
+    QString url;
     QStringList urls;
     QStringList relatedDatasetUrls;
     QString archiveSelector;

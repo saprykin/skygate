@@ -20,6 +20,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 class SkyTimeController;
 
@@ -32,8 +33,9 @@ struct SkySelectionOverlayInput final {
     std::optional<skygate::core::ObservationContext> skyContext;
     std::optional<skygate::ephemeris::EphemerisRequest> ephemerisRequest;
     std::span<const skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
-    std::span<const std::uint8_t> catalogSourceIds;
-    QStringList catalogSourceLabels;
+    std::span<const QString> catalogSourceIds;
+    const std::vector<QStringList>* catalogSourceContributors = nullptr;
+    QHash<QString, QString> catalogSourceTitles;
     QString selectedObjectTargetId;
     QString selectedSearchTargetKind;
     QString selectedSearchTargetId;

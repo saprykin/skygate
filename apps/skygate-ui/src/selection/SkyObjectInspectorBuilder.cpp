@@ -238,7 +238,7 @@ SkySelectedObjectInspector SkyObjectInspectorBuilder::build(const SkySelectionOv
     fields.push_back(inspectorField(
         "Source",
         skygate::ui::internal::sourceLabelForBodyIndex(
-            input.catalogSourceIds, input.catalogSourceLabels, sceneState.bodyIndex
+            input.catalogSourceIds, input.catalogSourceContributors, input.catalogSourceTitles, sceneState.bodyIndex
         )
     ));
     const qint64 fieldsNs = skygate::ui::performanceLoggingEnabled() ? timer.nsecsElapsed() : detailStateNs;

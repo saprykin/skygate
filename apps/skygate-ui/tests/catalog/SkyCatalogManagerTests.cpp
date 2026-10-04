@@ -180,8 +180,8 @@ void SkyCatalogManagerTests::customDeepSkyDownloadUsesGenericSourceLabel()
 
     QCOMPARE(manager.deepSkyCatalogPresetIndex(), 2);
     QCOMPARE(manager.deepSkyCatalogUrlText(), catalogUrl);
-    QVERIFY(manager.sourceLabels().contains(QStringLiteral("Downloaded")));
-    QVERIFY(!manager.sourceLabels().contains(QStringLiteral("OpenNGC")));
+    QVERIFY(manager.sourceTitles().values().contains(QStringLiteral("Downloaded")));
+    QVERIFY(!manager.sourceTitles().values().contains(QStringLiteral("OpenNGC")));
     QVERIFY(manager.statusText().contains(QStringLiteral("Downloaded")));
     QVERIFY(!manager.statusText().contains(QStringLiteral("OpenNGC")));
 }

@@ -254,11 +254,31 @@ void SkyObjectSearchModel::setCatalogData(
             }
         );
 
+        for (const std::string& alias : body.identity.aliases) {
+            if (alias.empty() || alias == body.displayName) {
+                continue;
+            }
+
+            upsertEntry(
+                SourceEntry{
+                    .displayText = QString::fromStdString(alias),
+                    .detailText = bodyDetailText(body),
+                    .targetKind = "body",
+                    .targetId = targetId,
+                    .brightnessMagnitude = body.visualMagnitude,
+                    .selectable = true,
+                    .isBody = true,
+                }
+            );
+        }
+
+        // The legacy DSO alias field mirrors the body-level list in production
+        // parsers; keep reading it so DSO-only fixtures and callers remain
+        // searchable without duplicating the aliases in both places.
         if (body.kind != skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject
             || !body.deepSkyObjectValue().has_value()) {
             continue;
         }
-
         for (const std::string& alias : body.deepSkyObjectValue()->aliases) {
             if (alias.empty() || alias == body.displayName) {
                 continue;

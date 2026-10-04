@@ -157,6 +157,23 @@ std::optional<std::string> sourceIdFor(
     return std::nullopt;
 }
 
+std::optional<std::vector<std::string>> contributorsFor(
+    const CatalogCompositionResult& result,
+    const std::span<const BaseCelestialBody* const> bodies,
+    const std::string_view id
+)
+{
+    for (std::size_t index = 0; index < bodies.size(); ++index) {
+        if (bodies[index] != nullptr && bodies[index]->id == id) {
+            if (index >= result.contributorSourceIds.size()) {
+                return std::nullopt;
+            }
+            return result.contributorSourceIds[index];
+        }
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 class CatalogCompositionCollectionTests final : public QObject {
@@ -169,6 +186,7 @@ private slots:
     void reorderingSourcesChangesWinners();
     void preservesStableSourceOrdering();
     void reportsDeterministicCounts();
+    void reportsSourceRowAndPerKindCounts();
     void bundledAugmentationCarriesOwnProvenance();
 };
 
@@ -245,6 +263,9 @@ void CatalogCompositionCollectionTests::composesTwoStarAndTwoDsoSourcesWithOverl
     QCOMPARE(mergedStar->fixedEquatorialValue()->rightAscensionHours, 5.0);
     QCOMPARE(mergedStar->fixedEquatorialValue()->declinationDeg, 6.0);
     QCOMPARE(*sourceIdFor(result, bodies, "b_hip_1"), std::string("star-b"));
+    const auto starContributors = contributorsFor(result, bodies, "b_hip_1");
+    QVERIFY(starContributors.has_value());
+    QCOMPARE(*starContributors, (std::vector<std::string>{"star-b", "star-a"}));
 
     // DSO overlap: the later source wins, identifiers/aliases/coordinates merge.
     QCOMPARE(countBodiesById(bodies, "a_ngc_224"), std::size_t{0});
@@ -263,6 +284,9 @@ void CatalogCompositionCollectionTests::composesTwoStarAndTwoDsoSourcesWithOverl
     QVERIFY(dsoInfo->majorAxisArcmin.has_value());
     QCOMPARE(*dsoInfo->majorAxisArcmin, 178.0);
     QCOMPARE(*sourceIdFor(result, bodies, "b_ngc_224"), std::string("dso-b"));
+    const auto dsoContributors = contributorsFor(result, bodies, "b_ngc_224");
+    QVERIFY(dsoContributors.has_value());
+    QCOMPARE(*dsoContributors, (std::vector<std::string>{"dso-b", "dso-a"}));
 
     // Non-overlapping and mixed-source bodies survive with their provenance.
     QCOMPARE(countBodiesById(bodies, "a_hip_2"), std::size_t{1});
@@ -462,6 +486,49 @@ void CatalogCompositionCollectionTests::reportsDeterministicCounts()
     const CatalogCompositionResult withKnownCount = skygate::ephemeris::CatalogComposer::composeCollection(request);
     QVERIFY(withKnownCount.isSuccess());
     QCOMPARE(withKnownCount.foundDeepSkyObjectCount, std::size_t{41});
+}
+
+void CatalogCompositionCollectionTests::reportsSourceRowAndPerKindCounts()
+{
+    auto mixed = createCatalog(
+        {
+            makeStar("mixed_hip_1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0),
+            makeStar("mixed_hip_2", "Beta", {CatalogIdentifier::make("hip", "2")}, 3.0, 4.0),
+        },
+        {
+            makeDeepSkyObject("mixed_ngc_224", "M31", {"M31"}, {CatalogIdentifier::make("ngc", "224")}),
+        }
+    );
+    auto deepSky = createCatalog(
+        {},
+        {
+            makeDeepSkyObject("dso_ngc_598", "M33", {"M33"}, {CatalogIdentifier::make("ngc", "598")}),
+        }
+    );
+    QVERIFY(mixed != nullptr);
+    QVERIFY(deepSky != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "mixed", .enabled = true, .catalog = mixed.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "deep-sky",
+         .enabled = true,
+         .catalog = deepSky.get(),
+         .policy = CatalogCompositionPolicy::DeepSkyOnly},
+    };
+
+    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{4});
+    QCOMPARE(result.starCount, std::size_t{2});
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
+    QCOMPARE(result.planetCount, std::size_t{0});
+    QCOMPARE(result.moonCount, std::size_t{0});
+    QCOMPARE(result.sunCount, std::size_t{0});
+
+    QCOMPARE(result.sourceOrder, (std::vector<std::string>{"mixed", "deep-sky"}));
+    QCOMPARE(result.sourceRowCounts, (std::vector<std::size_t>{3U, 1U}));
 }
 
 void CatalogCompositionCollectionTests::bundledAugmentationCarriesOwnProvenance()

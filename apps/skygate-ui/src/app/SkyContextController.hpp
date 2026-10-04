@@ -24,6 +24,7 @@
 #include "engine/EphemerisDataManifest.hpp"
 
 #include <QAbstractItemModel>
+#include <QHash>
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
@@ -375,8 +376,9 @@ public:
     [[nodiscard]] std::uint64_t ephemerisDataRevision() const noexcept;
     [[nodiscard]] EphemerisRequestContext ephemerisRequestContext() const;
     [[nodiscard]] std::span<const skygate::ephemeris::BaseCelestialBody* const> catalogBodies() const noexcept;
-    [[nodiscard]] QStringList catalogSourceLabels() const;
-    [[nodiscard]] std::span<const std::uint8_t> catalogSourceIds() const noexcept;
+    [[nodiscard]] QHash<QString, QString> catalogSourceTitles() const;
+    [[nodiscard]] std::span<const QString> catalogSourceIds() const noexcept;
+    [[nodiscard]] const std::vector<QStringList>& catalogSourceContributorIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;

@@ -85,6 +85,9 @@ private slots:
     void nullCatalogReportsFailureWithoutCatalogChange();
     void sourcesLoadReplaceEnableDisableAndRemoveIndependently();
     void moveSourceReordersAndClampsTarget();
+    void provenanceKeepsStableIdentitiesBeyondByteRange();
+    void identicalTitlesStayDistinctAndTitleChangesKeepIdentity();
+    void bundledBrightStarsCarryDataProvenance();
 };
 
 void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndExposesSources()
@@ -321,6 +324,130 @@ void SkyCatalogRuntimeTests::moveSourceReordersAndClampsTarget()
     const auto noOpResult = runtime.moveSource(QStringLiteral("custom-a"), 1U, options);
     QVERIFY(!noOpResult.catalogChanged);
     QCOMPARE(runtime.catalogRevision(), revisionBeforeNoOp);
+}
+
+void SkyCatalogRuntimeTests::provenanceKeepsStableIdentitiesBeyondByteRange()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
+
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{.useBundledDeepSkyCatalog = false};
+    for (int index = 0; index < 300; ++index) {
+        const QString instanceId = QStringLiteral("custom-%1").arg(index);
+        const auto result = runtime.applySource(
+            skygate::ui::internal::SkyCatalogSourceRecord{
+                .instanceId = instanceId,
+                .title = QStringLiteral("Source %1").arg(index),
+                .version = QString(),
+                .url = QString(),
+                .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+                .enabled = true,
+                .catalog = makeSingleStarCatalog("custom_" + std::to_string(index) + "_star", "Star"),
+                .foundObjectCount = 0,
+            },
+            options
+        );
+        QVERIFY(result.catalogChanged);
+    }
+
+    QCOMPARE(runtime.sourceIds().size(), runtime.bodyCount());
+    QVERIFY(runtime.sourceTitles().contains(QStringLiteral("custom-0")));
+    QVERIFY(runtime.sourceTitles().contains(QStringLiteral("custom-299")));
+
+    const auto bodies = runtime.starCatalog()->bodies();
+    bool sawFirst = false;
+    bool sawLast = false;
+    for (std::size_t index = 0; index < bodies.size(); ++index) {
+        const skygate::ephemeris::BaseCelestialBody* body = bodies[index];
+        if (body == nullptr) {
+            continue;
+        }
+        if (body->id == "custom_0_star") {
+            sawFirst = true;
+            QCOMPARE(runtime.sourceIds()[index], QStringLiteral("custom-0"));
+        } else if (body->id == "custom_299_star") {
+            sawLast = true;
+            QCOMPARE(runtime.sourceIds()[index], QStringLiteral("custom-299"));
+        }
+    }
+    QVERIFY(sawFirst);
+    QVERIFY(sawLast);
+}
+
+void SkyCatalogRuntimeTests::identicalTitlesStayDistinctAndTitleChangesKeepIdentity()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
+
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{.useBundledDeepSkyCatalog = false};
+    const auto apply = [&](const QString& instanceId, const QString& title, std::string bodyId) {
+        return runtime.applySource(
+            skygate::ui::internal::SkyCatalogSourceRecord{
+                .instanceId = instanceId,
+                .title = title,
+                .version = QString(),
+                .url = QString(),
+                .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+                .enabled = true,
+                .catalog = makeSingleStarCatalog(std::move(bodyId), "Star"),
+                .foundObjectCount = 0,
+            },
+            options
+        );
+    };
+
+    QVERIFY(apply(QStringLiteral("custom-a"), QStringLiteral("Same title"), "custom_a_1").catalogChanged);
+    QVERIFY(apply(QStringLiteral("custom-b"), QStringLiteral("Same title"), "custom_b_1").catalogChanged);
+
+    QCOMPARE(runtime.sourceTitle(QStringLiteral("custom-a")), QStringLiteral("Same title"));
+    QCOMPARE(runtime.sourceTitle(QStringLiteral("custom-b")), QStringLiteral("Same title"));
+    QVERIFY(runtime.sourceTitle(QStringLiteral("custom-a")) == runtime.sourceTitle(QStringLiteral("custom-b")));
+
+    const auto findBodyIndex = [&](const std::string& id) {
+        const auto bodies = runtime.starCatalog()->bodies();
+        for (std::size_t index = 0; index < bodies.size(); ++index) {
+            if (bodies[index] != nullptr && bodies[index]->id == id) {
+                return static_cast<int>(index);
+            }
+        }
+        return -1;
+    };
+    QCOMPARE(runtime.sourceIds()[findBodyIndex("custom_a_1")], QStringLiteral("custom-a"));
+    QCOMPARE(runtime.sourceIds()[findBodyIndex("custom_b_1")], QStringLiteral("custom-b"));
+
+    // Renaming a source must not change its stable identity.
+    QVERIFY(apply(QStringLiteral("custom-a"), QStringLiteral("Renamed A"), "custom_a_2").catalogChanged);
+    QCOMPARE(runtime.sourceTitle(QStringLiteral("custom-a")), QStringLiteral("Renamed A"));
+    QCOMPARE(runtime.sourceIds()[findBodyIndex("custom_a_2")], QStringLiteral("custom-a"));
+}
+
+void SkyCatalogRuntimeTests::bundledBrightStarsCarryDataProvenance()
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody constellation;
+    constellation.id = "constellation_orion";
+    constellation.displayName = "Orion";
+    constellation.kind = skygate::ephemeris::BaseCelestialBody::Kind::Constellation;
+    auto catalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies({std::move(constellation)});
+    QVERIFY(catalog != nullptr);
+
+    skygate::ui::internal::SkyCatalogRuntime runtime(std::move(catalog));
+    static_cast<void>(runtime.initialize({.useBundledDeepSkyCatalog = false}));
+
+    const auto bodies = runtime.starCatalog()->bodies();
+    bool sawSirius = false;
+    for (std::size_t index = 0; index < bodies.size(); ++index) {
+        const skygate::ephemeris::BaseCelestialBody* body = bodies[index];
+        if (body == nullptr) {
+            continue;
+        }
+        if (body->id == "sirius") {
+            sawSirius = true;
+            QCOMPARE(runtime.sourceIds()[index], QStringLiteral("bundled-core"));
+            QCOMPARE(runtime.sourceTitle(QStringLiteral("bundled-core")), QStringLiteral("Bundled core"));
+        }
+    }
+    QVERIFY(sawSirius);
+    QVERIFY(!runtime.sourceTitles().contains(QStringLiteral("built-in-ephemeris")));
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogRuntimeTests)

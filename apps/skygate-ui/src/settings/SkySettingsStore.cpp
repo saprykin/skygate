@@ -190,6 +190,7 @@ void saveCatalogSourceRecord(
     settings.setValue(QStringLiteral("descriptorId"), record.descriptorId);
     settings.setValue(QStringLiteral("title"), record.title);
     settings.setValue(QStringLiteral("version"), record.version);
+    settings.setValue(QStringLiteral("url"), record.url);
     settings.setValue(QStringLiteral("urls"), record.urls);
     settings.setValue(QStringLiteral("relatedDatasetUrls"), record.relatedDatasetUrls);
     settings.setValue(QStringLiteral("archiveSelector"), record.archiveSelector);
@@ -219,6 +220,7 @@ SkySettingsStore::CatalogSourceCacheRecord loadCatalogSourceRecord(QSettings& se
     record.descriptorId = settings.value(QStringLiteral("descriptorId")).toString();
     record.title = settings.value(QStringLiteral("title")).toString();
     record.version = settings.value(QStringLiteral("version")).toString();
+    record.url = settings.value(QStringLiteral("url")).toString();
     record.urls = settings.value(QStringLiteral("urls")).toStringList();
     record.relatedDatasetUrls = settings.value(QStringLiteral("relatedDatasetUrls")).toStringList();
     record.archiveSelector = settings.value(QStringLiteral("archiveSelector")).toString();

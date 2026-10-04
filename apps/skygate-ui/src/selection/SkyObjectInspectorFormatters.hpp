@@ -8,11 +8,13 @@
 #include "UtcTimePoint.hpp"
 #include "engine/EphemerisEngineQueryResult.hpp"
 
+#include <QHash>
 #include <QString>
 #include <QStringList>
 
 #include <cstdint>
 #include <span>
+#include <vector>
 
 class SkyTimeController;
 
@@ -38,7 +40,10 @@ formatObservationEvent(const skygate::ephemeris::ObservationEvent& event, const 
 [[nodiscard]] QString formatAngularUncertaintyArcsec(double arcsec);
 [[nodiscard]] QString formatCorrectionSummary(const skygate::ephemeris::EphemerisEngineQueryResult& metadata);
 [[nodiscard]] QString sourceLabelForBodyIndex(
-    std::span<const std::uint8_t> sourceIds, const QStringList& sourceLabels, std::uint32_t bodyIndex
+    std::span<const QString> sourceIds,
+    const std::vector<QStringList>* contributorSourceIds,
+    const QHash<QString, QString>& sourceTitles,
+    std::uint32_t bodyIndex
 );
 
 }  // namespace skygate::ui::internal

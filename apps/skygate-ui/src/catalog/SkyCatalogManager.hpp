@@ -9,6 +9,7 @@
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
+#include <QHash>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -18,6 +19,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <vector>
 
 class QNetworkAccessManager;
 
@@ -79,9 +81,11 @@ public:
     [[nodiscard]] std::size_t sourceCount() const noexcept;
     [[nodiscard]] QStringList sourceInstanceIds() const;
     [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
-    [[nodiscard]] QStringList sourceLabels() const;
+    [[nodiscard]] QHash<QString, QString> sourceTitles() const;
+    [[nodiscard]] QString sourceTitle(const QString& instanceId) const;
     [[nodiscard]] QVector<SourceViewEntry> sourceViewEntries() const;
-    [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
+    [[nodiscard]] std::span<const QString> sourceIds() const noexcept;
+    [[nodiscard]] const std::vector<QStringList>& contributorSourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;

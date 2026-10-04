@@ -147,7 +147,7 @@ void SkyCatalogImportWorkflowTests::rejectsDeepSkyCatalogWithoutDsos()
     QCOMPARE(finalResult.sourceId, QString("preset:hyg"));
     QCOMPARE(finalResult.sourceVersion, QString("v4.2"));
     QCOMPARE(finalResult.sourceUrl, QString("https://example.test/stars.csv"));
-    QCOMPARE(finalResult.foundObjectCount, 1U);
+    QCOMPARE(finalResult.foundObjectCount, std::size_t{0});
     QCOMPARE(finalResult.errorText, QString("Catalog: Downloaded deep-sky catalog contains no DSOs"));
 }
 

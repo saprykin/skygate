@@ -1,5 +1,7 @@
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
+#include "DeepSkyObjectInfo.hpp"
+#include "DistantCelestialBody.hpp"
 #include "LogCapture.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SettingsTestFixture.hpp"
@@ -146,6 +148,7 @@ private slots:
     void roundTripsThreeEnabledSourcesPlusDisabledSource();
     void clearSourceCacheVersusClearCollectionCache();
     void migratesLegacyBundledCustomAndMixedConfigurations();
+    void derivesDeepSkyFoundCountFromMixedSourceAfterRestore();
     void repeatedMigrationIsIdempotent();
     void failedCollectionWritePreservesPriorData();
     void logsCollectionLifecycleSummariesAtInfoLevel();
@@ -409,6 +412,55 @@ void SkyCatalogCacheControllerTests::migratesLegacyBundledCustomAndMixedConfigur
         QCOMPARE(result.sources.size(), std::size_t{1});
         QCOMPARE(result.sources[0].record.instanceId, QString("preset:open_ngc"));
     }
+}
+
+void SkyCatalogCacheControllerTests::derivesDeepSkyFoundCountFromMixedSourceAfterRestore()
+{
+    skygate::ephemeris::OwnGalaxyCelestialBody star;
+    star.id = "hip_1";
+    star.displayName = "Star";
+    star.kind = skygate::ephemeris::BaseCelestialBody::Kind::Star;
+    star.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0};
+
+    skygate::ephemeris::DistantCelestialBody dso;
+    dso.id = "messier_031";
+    dso.displayName = "M31";
+    dso.kind = skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+    dso.fixedEquatorial = skygate::core::EquatorialCoordinate{.rightAscensionHours = 3.0, .declinationDeg = 4.0};
+    dso.deepSkyObject = skygate::ephemeris::DeepSkyObjectInfo{
+        .kind = skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy,
+        .aliases = {"Andromeda Galaxy"},
+    };
+
+    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> order;
+    order.push_back({.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = 0U});
+    order.push_back({.domain = skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = 0U});
+    auto mixedCatalog = skygate::ephemeris::CatalogFactory::createStarCatalogFromBodies(
+        {std::move(star)}, {std::move(dso)}, std::move(order)
+    );
+    QVERIFY(mixedCatalog != nullptr);
+
+    SkyCatalogCollectionPersistRequest request;
+    SkyCatalogSourcePersistEntry entry;
+    entry.instanceId = QStringLiteral("custom:mixed");
+    entry.title = QStringLiteral("Mixed source");
+    entry.urls = QStringList{QStringLiteral("https://example.test/mixed.csv")};
+    entry.policy = CatalogCompositionPolicy::DeepSkyOnly;
+    entry.enabled = true;
+    entry.catalog = mixedCatalog.get();
+    request.sources.push_back(std::move(entry));
+
+    SkySettingsStore store;
+    const SkyCatalogCacheController controller(&store);
+    controller.persistCollection(request);
+
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(result.restored);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    QVERIFY(result.sources[0].record.catalog != nullptr);
+    // The found-object count reports only the deep-sky objects contributed by
+    // the mixed source, not its stars, and stays correct after restoration.
+    QCOMPARE(result.sources[0].record.foundObjectCount, std::size_t{1});
 }
 
 void SkyCatalogCacheControllerTests::repeatedMigrationIsIdempotent()

@@ -78,10 +78,8 @@ void SkyCatalogImportWorkflow::downloadSource(
             }
 
             const auto bodies = result.catalog->bodies();
-            result.foundObjectCount = result.diagnostics.parsedBodyCount > 0U
-                                          ? result.diagnostics.parsedBodyCount
-                                          : skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies);
-            if (skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies) == 0U) {
+            result.foundObjectCount = skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bodies);
+            if (result.foundObjectCount == 0U) {
                 result.catalog.reset();
                 result.errorText = "Catalog: Downloaded deep-sky catalog contains no DSOs";
             }
