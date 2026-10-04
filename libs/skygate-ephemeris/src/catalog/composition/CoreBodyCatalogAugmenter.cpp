@@ -1,15 +1,6 @@
 #include "CoreBodyCatalogAugmenter.hpp"
 
-#include "CelestialBodyCatalog.hpp"
-#include "catalog/CatalogCompositionMerger.hpp"
-#include "catalog/CatalogFactory.hpp"
-#include "catalog/CatalogIdentity.hpp"
-#include "catalog/InMemoryStarCatalog.hpp"
-
 #include <array>
-#include <cstddef>
-#include <memory>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -37,61 +28,6 @@ constexpr std::array<BundledBrightStar, 8> kBundledBrightStars{{
 }};
 
 }  // namespace
-
-CatalogAugmentationResult CoreBodyCatalogAugmenter::augment(const std::span<const BaseCelestialBody* const> bodies)
-{
-    // Express the legacy single-slot augmentation as an ordered source
-    // collection and delegate to the authoritative collection merge. The
-    // primary slot contributes every body kind; the bundled catalog is the
-    // explicit AugmentCore source that gap-fills non-deep-sky bodies and
-    // enables the bright-star fallback.
-    CelestialBodyCatalog primaryCatalog(bodies);
-    InMemoryStarCatalog primarySource(std::move(primaryCatalog));
-
-    CatalogCompositionRequest request;
-    request.sources.reserve(2U);
-    request.sources.push_back(
-        CatalogCompositionSourceEntry{
-            .sourceId = std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::Primary)),
-            .enabled = true,
-            .catalog = &primarySource,
-            .policy = CatalogCompositionPolicy::Merge,
-        }
-    );
-
-    std::unique_ptr<IStarCatalog> bundledCatalog = CatalogFactory::createBundledStarCatalog();
-    if (bundledCatalog != nullptr) {
-        request.sources.push_back(
-            CatalogCompositionSourceEntry{
-                .sourceId =
-                    std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::BuiltInEphemeris)),
-                .enabled = true,
-                .catalog = bundledCatalog.get(),
-                .policy = CatalogCompositionPolicy::AugmentCore,
-            }
-        );
-    }
-
-    CatalogCompositionMergeResult merged = CatalogCompositionMerger::mergeCollection(request);
-
-    CatalogAugmentationResult result;
-    result.sourceKinds.reserve(merged.ownGalaxyBodies.size());
-    for (std::size_t position = 0; position < merged.orderedBodyIndexes.size(); ++position) {
-        const CelestialBodyCatalog::OrderEntry& orderEntry = merged.orderedBodyIndexes[position];
-        if (orderEntry.domain != CelestialBodyCatalog::BodyDomain::OwnGalaxy) {
-            continue;
-        }
-
-        const OwnGalaxyCelestialBody& body = merged.ownGalaxyBodies[orderEntry.bodyIndex];
-        if (CatalogIdentity::isAnalyticSolarSystemBody(body)) {
-            result.sourceKinds.push_back(CatalogCompositionSource::BuiltInEphemeris);
-            continue;
-        }
-        result.sourceKinds.push_back(CatalogCompositionMerger::sourceKindFromId(merged.sourceIds[position]));
-    }
-    result.bodies = std::move(merged.ownGalaxyBodies);
-    return result;
-}
 
 std::vector<OwnGalaxyCelestialBody> CoreBodyCatalogAugmenter::bundledBrightStars()
 {

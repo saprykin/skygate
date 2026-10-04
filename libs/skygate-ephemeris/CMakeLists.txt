@@ -182,9 +182,6 @@ add_library(skygate-ephemeris STATIC
     ${SKYGATE_EPHEMERIS_SIMPLE_ENGINE_SOURCES}
     ${SKYGATE_EPHEMERIS_REFERENCE_SOURCES}
     ${SKYGATE_EPHEMERIS_HIGHPRECISION_ENGINE_SOURCES}
-    src/catalog/ActiveCatalogCompositionRequest.hpp
-    src/catalog/ActiveCatalogCompositionResult.hpp
-    src/catalog/CatalogCompositionSource.hpp
     src/catalog/CatalogCompositionPolicy.hpp
     src/catalog/CatalogCompositionSourceEntry.hpp
     src/catalog/CatalogCompositionRequest.hpp
@@ -301,10 +298,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/CatalogZipEntrySelector.hpp
     src/catalog/io/CompressedDataInflater.hpp
     src/catalog/io/CompressedDataInflateOptions.hpp
-    src/catalog/composition/CatalogAugmentationResult.hpp
     src/catalog/composition/CoreBodyCatalogAugmenter.hpp
-    src/catalog/composition/DeepSkyCatalogMerger.hpp
-    src/catalog/composition/DeepSkyCatalogMergeResult.hpp
     src/catalog/io/DelimitedCatalogParser.hpp
     src/catalog/io/DelimitedCatalogParserOptions.hpp
     src/catalog/io/DelimitedCatalogReader.hpp
@@ -334,10 +328,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogIdentity.cpp
     src/catalog/CatalogIdentityIndex.cpp
     src/catalog/CatalogObjectIdentity.cpp
-    src/catalog/ActiveCatalogCompositionRequest.cpp
-    src/catalog/ActiveCatalogCompositionResult.cpp
     src/catalog/CatalogComposer.cpp
-    src/catalog/CatalogCompositionSource.cpp
     src/catalog/CatalogCompositionPolicy.cpp
     src/catalog/CatalogCompositionSourceEntry.cpp
     src/catalog/CatalogCompositionRequest.cpp
@@ -368,10 +359,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/RowParseOutcome.cpp
     src/catalog/constellation/ConstellationDataCodec.cpp
     src/catalog/constellation/ConstellationReferenceResolver.cpp
-    src/catalog/composition/CatalogAugmentationResult.cpp
     src/catalog/composition/CoreBodyCatalogAugmenter.cpp
-    src/catalog/composition/DeepSkyCatalogMerger.cpp
-    src/catalog/composition/DeepSkyCatalogMergeResult.cpp
     src/catalog/io/DelimitedCatalogReader.cpp
     src/catalog/io/DelimitedCatalogReaderOptions.cpp
     src/catalog/io/DelimitedCatalogRow.cpp

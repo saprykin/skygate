@@ -11,6 +11,8 @@ namespace skygate::ui::internal {
 
 class SkyCatalogPresets final {
 public:
+    // Legacy preset-index normalization retained for the settings/cache
+    // migration path. New sources are addressed by stable source IDs.
     [[nodiscard]] static int normalizeCatalogPresetIndex(int presetIndex) noexcept;
     [[nodiscard]] static int normalizeDeepSkyCatalogPresetIndex(int presetIndex) noexcept;
     [[nodiscard]] static QString defaultCatalogUrlText();

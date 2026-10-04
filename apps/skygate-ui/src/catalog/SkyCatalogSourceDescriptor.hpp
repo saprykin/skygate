@@ -20,6 +20,7 @@ struct SkyCatalogSourceDescriptor final {
     QStringList relatedDatasetUrls;
     QString attribution;
     QString category;
+    // Legacy preset-index mapping retained for the settings migration path.
     int legacyPresetIndex = 0;
     bool bundled = false;
 

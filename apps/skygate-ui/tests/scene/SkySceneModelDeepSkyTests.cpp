@@ -1,4 +1,5 @@
 #include "SkySceneModelTestSupport.hpp"
+#include "catalog/CatalogComposer.hpp"
 
 #include <QtTest>
 
@@ -68,14 +69,18 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
     });
     QVERIFY(deepSkyCatalog != nullptr);
 
-    const auto buildResult = skygate::ui::internal::SkyActiveCatalogBuilder::build(
-        skygate::ui::internal::SkyActiveCatalogBuildRequest{
-            .sourceCatalog = *primaryCatalog,
-            .deepSkyCatalog = deepSkyCatalog.get(),
-            .sourceLabel = "Primary",
-            .deepSkySourceLabel = "OpenNGC"
-        }
-    );
+    skygate::ephemeris::CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary",
+         .enabled = true,
+         .catalog = primaryCatalog.get(),
+         .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge},
+        {.sourceId = "deep-sky",
+         .enabled = true,
+         .catalog = deepSkyCatalog.get(),
+         .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly},
+    };
+    const auto buildResult = skygate::ephemeris::CatalogComposer::composeCollection(request);
     QVERIFY(buildResult.isSuccess());
     QCOMPARE(buildResult.sourceIds.size(), buildResult.catalog->bodies().size());
 
@@ -86,10 +91,10 @@ void SkySceneModelDeepSkyTests::primaryDeepSkyObjectKeepsSourceWhenMergingDeepSk
         QVERIFY(body != nullptr);
         if (body->id == "primary_dso") {
             sawPrimaryDso = true;
-            QCOMPARE(buildResult.sourceIds[index], QStringLiteral("primary"));
+            QCOMPARE(QString::fromStdString(buildResult.sourceIds[index]), QStringLiteral("primary"));
         } else if (body->id == "open_ngc_m31") {
             sawOpenNgcM31 = true;
-            QCOMPARE(buildResult.sourceIds[index], QStringLiteral("deep-sky"));
+            QCOMPARE(QString::fromStdString(buildResult.sourceIds[index]), QStringLiteral("deep-sky"));
         } else if (body->id == "messier_031") {
             QFAIL("Merged catalog should replace the primary M31 with the OpenNGC body");
         }

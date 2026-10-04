@@ -1,13 +1,7 @@
 #pragma once
 
-#include "BaseCelestialBody.hpp"
 #include "catalog/CatalogCompositionMergeResult.hpp"
 #include "catalog/CatalogCompositionRequest.hpp"
-#include "catalog/CatalogCompositionSource.hpp"
-#include "catalog/composition/DeepSkyCatalogMergeResult.hpp"
-
-#include <span>
-#include <string_view>
 
 namespace skygate::ephemeris {
 
@@ -23,17 +17,6 @@ namespace skygate::ephemeris {
 class CatalogCompositionMerger final {
 public:
     [[nodiscard]] static CatalogCompositionMergeResult mergeCollection(const CatalogCompositionRequest& request);
-
-    // Legacy two-slot merge retained for DeepSkyCatalogMerger compatibility.
-    [[nodiscard]] static DeepSkyCatalogMergeResult mergeTwoSlot(
-        std::span<const BaseCelestialBody* const> activeBodies,
-        std::span<const CatalogCompositionSource> activeSourceKinds,
-        std::span<const BaseCelestialBody* const> deepSkyBodies
-    );
-
-    // Stable source-ID spelling for the legacy composition source categories.
-    [[nodiscard]] static std::string_view sourceKindId(CatalogCompositionSource source) noexcept;
-    [[nodiscard]] static CatalogCompositionSource sourceKindFromId(std::string_view sourceId) noexcept;
 };
 
 }  // namespace skygate::ephemeris

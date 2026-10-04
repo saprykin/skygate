@@ -188,6 +188,10 @@ private slots:
     void reportsDeterministicCounts();
     void reportsSourceRowAndPerKindCounts();
     void bundledAugmentationCarriesOwnProvenance();
+    void doesNotDuplicatePrimarySolarSystemBodies();
+    void bundledBrightStarsOnlyAddedWhenNoStarsPresent();
+    void usesCurrentConstellationCountWhenLarger();
+    void ignoresNonDeepSkyRowsFromDeepSkySource();
 };
 
 void CatalogCompositionCollectionTests::composesTwoStarAndTwoDsoSourcesWithOverlapsAndMixedSource()
@@ -564,6 +568,119 @@ void CatalogCompositionCollectionTests::bundledAugmentationCarriesOwnProvenance(
     const BaseCelestialBody* orion = findBodyById(bodies, "constellation_orion");
     QVERIFY(orion != nullptr);
     QCOMPARE(*sourceIdFor(result, bodies, "constellation_orion"), std::string("primary"));
+}
+
+void CatalogCompositionCollectionTests::doesNotDuplicatePrimarySolarSystemBodies()
+{
+    OwnGalaxyCelestialBody sun;
+    sun.id = "sun";
+    sun.kind = BaseCelestialBody::Kind::Sun;
+    OwnGalaxyCelestialBody moon;
+    moon.id = "moon";
+    moon.kind = BaseCelestialBody::Kind::Moon;
+    OwnGalaxyCelestialBody mars;
+    mars.id = "mars";
+    mars.kind = BaseCelestialBody::Kind::Planet;
+
+    auto primary = createCatalog({std::move(sun), std::move(moon), std::move(mars)}, {});
+    QVERIFY(primary != nullptr);
+    auto bundledCore = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    QVERIFY(bundledCore != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary", .enabled = true, .catalog = primary.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "bundled-core",
+         .enabled = true,
+         .catalog = bundledCore.get(),
+         .policy = CatalogCompositionPolicy::AugmentCore},
+    };
+
+    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(countBodiesById(bodies, "sun"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "moon"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "mars"), std::size_t{1});
+}
+
+void CatalogCompositionCollectionTests::bundledBrightStarsOnlyAddedWhenNoStarsPresent()
+{
+    OwnGalaxyCelestialBody constellation;
+    constellation.id = "constellation_orion";
+    constellation.kind = BaseCelestialBody::Kind::Constellation;
+
+    auto noStars = createCatalog({std::move(constellation)}, {});
+    QVERIFY(noStars != nullptr);
+    auto withStars = createCatalog({makeStar("hip_1", "HIP 1", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    QVERIFY(withStars != nullptr);
+    auto bundledCore = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    QVERIFY(bundledCore != nullptr);
+
+    const auto compose = [&](const skygate::ephemeris::IStarCatalog* source) {
+        CatalogCompositionRequest request;
+        request.sources = {
+            {.sourceId = "primary", .enabled = true, .catalog = source, .policy = CatalogCompositionPolicy::Merge},
+            {.sourceId = "bundled-core",
+             .enabled = true,
+             .catalog = bundledCore.get(),
+             .policy = CatalogCompositionPolicy::AugmentCore},
+        };
+        return skygate::ephemeris::CatalogComposer::composeCollection(request);
+    };
+
+    const CatalogCompositionResult withoutStars = compose(noStars.get());
+    QVERIFY(withoutStars.isSuccess());
+    QVERIFY(findBodyById(withoutStars.catalog->bodies(), "sirius") != nullptr);
+
+    const CatalogCompositionResult withStarResult = compose(withStars.get());
+    QVERIFY(withStarResult.isSuccess());
+    QVERIFY(findBodyById(withStarResult.catalog->bodies(), "sirius") == nullptr);
+}
+
+void CatalogCompositionCollectionTests::usesCurrentConstellationCountWhenLarger()
+{
+    auto primary = createCatalog({makeStar("hip_1", "HIP 1", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    QVERIFY(primary != nullptr);
+
+    CatalogCompositionRequest request;
+    request.currentConstellationCount = 12U;
+    request.sources = {
+        {.sourceId = "primary", .enabled = true, .catalog = primary.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.constellationCount, std::size_t{12});
+}
+
+void CatalogCompositionCollectionTests::ignoresNonDeepSkyRowsFromDeepSkySource()
+{
+    auto primary = createCatalog({makeStar("hip_1", "HIP 1", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    QVERIFY(primary != nullptr);
+    auto deepSky = createCatalog(
+        {makeStar("hip_bad", "Not Deep Sky", {CatalogIdentifier::make("hip", "2")}, 1.0, 2.0)},
+        {makeDeepSkyObject("ngc_1", "NGC 1", {"NGC 1"}, {CatalogIdentifier::make("ngc", "1")})}
+    );
+    QVERIFY(deepSky != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary", .enabled = true, .catalog = primary.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "deep-sky",
+         .enabled = true,
+         .catalog = deepSky.get(),
+         .policy = CatalogCompositionPolicy::DeepSkyOnly},
+    };
+
+    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QVERIFY(findBodyById(bodies, "hip_bad") == nullptr);
+    QVERIFY(findBodyById(bodies, "ngc_1") != nullptr);
 }
 
 QTEST_APPLESS_MAIN(CatalogCompositionCollectionTests)

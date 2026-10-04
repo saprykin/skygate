@@ -184,7 +184,21 @@ void EphemerisEngineBaselineTests::computesCatalogOwnedReferenceStarCoordinates(
     });
     QVERIFY(sourceCatalog != nullptr);
 
-    auto activeCatalog = skygate::ephemeris::CatalogComposer::compose({.sourceCatalog = *sourceCatalog});
+    auto bundledCore = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    QVERIFY(bundledCore != nullptr);
+
+    skygate::ephemeris::CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary",
+         .enabled = true,
+         .catalog = sourceCatalog.get(),
+         .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge},
+        {.sourceId = "bundled-core",
+         .enabled = true,
+         .catalog = bundledCore.get(),
+         .policy = skygate::ephemeris::CatalogCompositionPolicy::AugmentCore},
+    };
+    auto activeCatalog = skygate::ephemeris::CatalogComposer::composeCollection(request);
     QVERIFY(activeCatalog.isSuccess());
 
     using namespace skygate::ephemeris::tests;

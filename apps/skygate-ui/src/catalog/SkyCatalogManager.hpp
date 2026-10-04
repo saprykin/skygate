@@ -29,9 +29,7 @@ class SkyCatalogImportWorkflow;
 class SkyCatalogRuntime;
 struct SkyCatalogRuntimeBuildOptions;
 struct SkyCatalogRuntimeResult;
-struct SkyCatalogImportResult;
 struct SkyCatalogSourceImportResult;
-struct SkyDeepSkyCatalogImportResult;
 struct SkyConstellationLineImportResult;
 struct SkyCatalogSourceInstance;
 }  // namespace skygate::ui::internal

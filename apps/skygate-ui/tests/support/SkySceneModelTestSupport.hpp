@@ -9,7 +9,6 @@
 #include "SkySceneModelTestHarness.hpp"
 #include "SkyTheme.hpp"
 #include "SkyTimeController.hpp"
-#include "catalog/SkyActiveCatalogBuilder.hpp"
 #include "math/ViewportMath.hpp"
 
 #include <QtTest>
