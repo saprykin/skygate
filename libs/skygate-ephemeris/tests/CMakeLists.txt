@@ -458,6 +458,16 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogObjectIdentityTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-identity-index-tests
+    catalog/CatalogIdentityIndexTests.cpp
+)
+add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-identity-merge-tests
+    catalog/CatalogIdentityMergeTests.cpp
+    LABELS integration
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-snapshot-boundary-tests
     catalog/CatalogSnapshotBoundaryTests.cpp
 )
