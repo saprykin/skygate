@@ -111,6 +111,10 @@ private slots:
     void reportsUnknownInnerSchemaAfterSuccessfulContainerDecode();
     void rejectsNestedArchivesWithoutRecursiveDecoding();
     void rejectsArchiveEntriesBeyondDecompressionLimits();
+    void unrelatedCsvBeforeCatalogIsIgnored();
+    void selectsExplicitArchiveMember();
+    void reportsAmbiguousArchiveMembers();
+    void reportsMissingArchiveMember();
 };
 
 void CatalogContainerDecodingTests::hygProducesEquivalentBodiesAcrossContainers()
@@ -244,6 +248,83 @@ void CatalogContainerDecodingTests::rejectsArchiveEntriesBeyondDecompressionLimi
     const auto result = parser.parseResult(oversizedZip);
     QVERIFY(!result.isSuccess());
     QCOMPARE(result.errorCode, CatalogLoadResult::ErrorCode::InvalidZipData);
+}
+
+void CatalogContainerDecodingTests::unrelatedCsvBeforeCatalogIsIgnored()
+{
+    using namespace skygate::ephemeris;
+
+    const std::string zipData = tests::makeZip({
+        tests::ZipEntrySpec{.path = "readme.csv", .data = "not,a,catalog\n1,2,3\n"},
+        tests::ZipEntrySpec{.path = "catalog/hyg.csv", .data = std::string(kHygCsv)},
+    });
+
+    const CatalogPayloadParser parser;
+    const auto result = parser.parseResult(zipData);
+    QCOMPARE(result.detectedFormat, CatalogSourceType::HygCsv);
+    const std::string error = verifyHygResult(result);
+    QVERIFY2(error.empty(), error.c_str());
+}
+
+void CatalogContainerDecodingTests::selectsExplicitArchiveMember()
+{
+    using namespace skygate::ephemeris;
+
+    const std::string zipData = tests::makeZip({
+        tests::ZipEntrySpec{.path = "readme.csv", .data = "not,a,catalog\n1,2,3\n"},
+        tests::ZipEntrySpec{.path = "catalog/hyg.csv", .data = std::string(kHygCsv)},
+    });
+
+    const CatalogPayloadParser parser;
+    const auto result = parser.parseResult(
+        CatalogParseRequest{
+            .payload = zipData,
+            .memberSelector = std::string("catalog/hyg.csv"),
+        }
+    );
+    QCOMPARE(result.detectedFormat, CatalogSourceType::HygCsv);
+    const std::string error = verifyHygResult(result);
+    QVERIFY2(error.empty(), error.c_str());
+}
+
+void CatalogContainerDecodingTests::reportsAmbiguousArchiveMembers()
+{
+    using namespace skygate::ephemeris;
+
+    const std::string zipData = tests::makeZip({
+        tests::ZipEntrySpec{.path = "a.csv", .data = std::string(kHygCsv)},
+        tests::ZipEntrySpec{.path = "b.csv", .data = std::string(kHygCsv)},
+    });
+
+    const CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg, "Catalog ZIP parse failed: ZIP catalog payload contains multiple supported catalog members."
+    );
+    const auto result = parser.parseResult(zipData);
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(result.errorCode, CatalogLoadResult::ErrorCode::AmbiguousArchiveMember);
+}
+
+void CatalogContainerDecodingTests::reportsMissingArchiveMember()
+{
+    using namespace skygate::ephemeris;
+
+    const std::string zipData = tests::makeZip({
+        tests::ZipEntrySpec{.path = "hyg.csv", .data = std::string(kHygCsv)},
+    });
+
+    const CatalogPayloadParser parser;
+    QTest::ignoreMessage(
+        QtWarningMsg, "Catalog ZIP parse failed: ZIP catalog payload does not contain member 'nope.csv'."
+    );
+    const auto result = parser.parseResult(
+        CatalogParseRequest{
+            .payload = zipData,
+            .memberSelector = std::string("nope.csv"),
+        }
+    );
+    QVERIFY(!result.isSuccess());
+    QCOMPARE(result.errorCode, CatalogLoadResult::ErrorCode::ArchiveMemberNotFound);
 }
 
 QTEST_APPLESS_MAIN(CatalogContainerDecodingTests)

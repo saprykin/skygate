@@ -285,6 +285,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/CatalogParsingUtilities.hpp
     src/catalog/io/CatalogHeaderPolicy.hpp
     src/catalog/io/CatalogPayloadFormatDetector.hpp
+    src/catalog/io/CatalogZipEntrySelection.hpp
     src/catalog/io/CatalogZipEntrySelector.hpp
     src/catalog/io/CompressedDataInflater.hpp
     src/catalog/io/CompressedDataInflateOptions.hpp
@@ -335,6 +336,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/io/CatalogPayloadFormatDetector.cpp
     src/catalog/CatalogParseRequest.cpp
     src/catalog/CatalogPayloadParser.cpp
+    src/catalog/io/CatalogZipEntrySelection.cpp
     src/catalog/io/CatalogZipEntrySelector.cpp
     src/catalog/io/CompressedDataInflater.cpp
     src/catalog/io/CompressedDataInflateOptions.cpp

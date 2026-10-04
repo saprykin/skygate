@@ -20,7 +20,9 @@ struct CatalogLoadResult {
         InvalidOpenNgcCsv,
         InvalidGzipData,
         InvalidZipData,
-        NoBodies
+        NoBodies,
+        ArchiveMemberNotFound,
+        AmbiguousArchiveMember
     };
 
     std::unique_ptr<IStarCatalog> catalog;
