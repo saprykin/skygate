@@ -13,6 +13,9 @@ struct ZipEntrySpec final {
     std::string data;
     std::uint16_t compressionMethod = 0;
     std::uint16_t generalPurposeFlag = 0;
+    // When non-zero, overrides the stored uncompressed-size metadata. Used to
+    // exercise decompression limits without allocating oversized fixture data.
+    std::size_t uncompressedSize = 0;
 };
 
 inline void appendLe16(std::string& data, const std::uint16_t value)
@@ -35,6 +38,7 @@ inline void appendLe32(std::string& data, const std::uint32_t value)
 
     for (const ZipEntrySpec& entry : entries) {
         localHeaderOffsets.push_back(static_cast<std::uint32_t>(zipData.size()));
+        const std::size_t uncompressedSize = entry.uncompressedSize != 0U ? entry.uncompressedSize : entry.data.size();
         appendLe32(zipData, 0x04034b50U);
         appendLe16(zipData, 20U);
         appendLe16(zipData, entry.generalPurposeFlag);
@@ -43,7 +47,7 @@ inline void appendLe32(std::string& data, const std::uint32_t value)
         appendLe16(zipData, 0U);
         appendLe32(zipData, 0U);
         appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
+        appendLe32(zipData, static_cast<std::uint32_t>(uncompressedSize));
         appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
         appendLe16(zipData, 0U);
         zipData += entry.path;
@@ -53,6 +57,7 @@ inline void appendLe32(std::string& data, const std::uint32_t value)
     const std::uint32_t centralDirectoryOffset = static_cast<std::uint32_t>(zipData.size());
     for (std::size_t index = 0; index < entries.size(); ++index) {
         const ZipEntrySpec& entry = entries[index];
+        const std::size_t uncompressedSize = entry.uncompressedSize != 0U ? entry.uncompressedSize : entry.data.size();
         appendLe32(zipData, 0x02014b50U);
         appendLe16(zipData, 20U);
         appendLe16(zipData, 20U);
@@ -62,7 +67,7 @@ inline void appendLe32(std::string& data, const std::uint32_t value)
         appendLe16(zipData, 0U);
         appendLe32(zipData, 0U);
         appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
-        appendLe32(zipData, static_cast<std::uint32_t>(entry.data.size()));
+        appendLe32(zipData, static_cast<std::uint32_t>(uncompressedSize));
         appendLe16(zipData, static_cast<std::uint16_t>(entry.path.size()));
         appendLe16(zipData, 0U);
         appendLe16(zipData, 0U);

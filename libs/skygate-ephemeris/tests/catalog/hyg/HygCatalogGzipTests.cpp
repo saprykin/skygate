@@ -1,9 +1,10 @@
 #include "TestHelpers.hpp"
-#include "catalog/CatalogLoader.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
 
 #include <QtTest/QtTest>
 
 #include <array>
+#include <string_view>
 
 class HygCatalogGzipTests final : public QObject {
     Q_OBJECT
@@ -24,9 +25,10 @@ void HygCatalogGzipTests::parsesValidGzipCatalog()
     };
     const std::string_view compressedData(reinterpret_cast<const char*>(kCompressedCsv.data()), kCompressedCsv.size());
 
-    auto result =
-        skygate::ephemeris::CatalogLoader::load(skygate::ephemeris::CatalogSourceType::HygCsvGzip, compressedData);
-    QVERIFY(result.isSuccess());
+    const skygate::ephemeris::CatalogPayloadParser parser;
+    const auto result = parser.parseResult(compressedData);
+    QVERIFY2(result.isSuccess(), result.errorDetail.c_str());
+
     const auto& catalog = result.catalog;
     QVERIFY(catalog != nullptr);
 
@@ -42,15 +44,19 @@ void HygCatalogGzipTests::parsesValidGzipCatalog()
 
 void HygCatalogGzipTests::rejectsInvalidGzipCatalog()
 {
-    QTest::ignoreMessage(QtWarningMsg, "Gzip catalog parse failed: Gzip catalog payload is empty.");
-    const auto emptyResult =
-        skygate::ephemeris::CatalogLoader::load(skygate::ephemeris::CatalogSourceType::HygCsvGzip, "");
-    QVERIFY(!emptyResult.isSuccess());
+    const skygate::ephemeris::CatalogPayloadParser parser;
 
+    QTest::ignoreMessage(QtWarningMsg, "Catalog payload parse failed: Catalog payload is empty.");
+    const auto emptyResult = parser.parseResult("");
+    QVERIFY(!emptyResult.isSuccess());
+    QCOMPARE(emptyResult.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::EmptyInput);
+
+    constexpr std::array<unsigned char, 4> kInvalidGzip{{0x1f, 0x8b, 0x00, 0x00}};
+    const std::string_view malformedData(reinterpret_cast<const char*>(kInvalidGzip.data()), kInvalidGzip.size());
     QTest::ignoreMessage(QtWarningMsg, "Gzip catalog parse failed: Gzip catalog payload could not be decompressed.");
-    const auto malformedResult =
-        skygate::ephemeris::CatalogLoader::load(skygate::ephemeris::CatalogSourceType::HygCsvGzip, "not-a-gzip-stream");
+    const auto malformedResult = parser.parseResult(malformedData);
     QVERIFY(!malformedResult.isSuccess());
+    QCOMPARE(malformedResult.errorCode, skygate::ephemeris::CatalogLoadResult::ErrorCode::InvalidGzipData);
 }
 
 QTEST_APPLESS_MAIN(HygCatalogGzipTests)

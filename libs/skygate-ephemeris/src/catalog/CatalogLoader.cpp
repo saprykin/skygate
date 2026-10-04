@@ -1,10 +1,7 @@
 #include "CatalogLoader.hpp"
 #include "CatalogBodyParseResult.hpp"
 #include "CatalogFactory.hpp"
-#include "ICatalogParser.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
-#include "catalog/io/GzipCatalogParser.hpp"
-#include "catalog/io/zip/ZipCatalogParser.hpp"
 #include "catalog/normalize/CatalogBodyNormalization.hpp"
 
 #include <algorithm>
@@ -120,23 +117,11 @@ finalizeCatalogLoad(CatalogBodyParseResult parsedBodies, const CatalogSelectionO
     return result;
 }
 
-[[nodiscard]] std::unique_ptr<ICatalogParser> createParser(const CatalogSourceType type)
-{
-    switch (type) {
-    case CatalogSourceType::HygCsvGzip:
-        return std::make_unique<GzipCatalogParser>(CatalogSchemaRegistry::createParser(CatalogSourceType::HygCsv));
-    case CatalogSourceType::HygCsvZip:
-        return std::make_unique<ZipCatalogParser>(CatalogSchemaRegistry::createParser(CatalogSourceType::HygCsv));
-    default:
-        return CatalogSchemaRegistry::createParser(type);
-    }
-}
-
 }  // namespace
 
 CatalogLoadResult CatalogLoader::load(const CatalogSourceRequest& request)
 {
-    const auto parser = createParser(request.type);
+    const auto parser = CatalogSchemaRegistry::createParser(request.type);
     if (parser == nullptr) {
         CatalogLoadResult result;
         result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;

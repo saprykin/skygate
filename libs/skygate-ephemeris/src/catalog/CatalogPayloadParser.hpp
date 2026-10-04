@@ -13,6 +13,8 @@ namespace skygate::ephemeris {
 
 class CatalogPayloadParser final {
 public:
+    // Detects the catalog schema of an already-decoded (plain-text) payload.
+    // Container payloads are not recognized here; parseResult decodes them first.
     [[nodiscard]] CatalogSourceType detectFormat(std::string_view payload) const noexcept;
 
     [[nodiscard]] CatalogLoadResult parseResult(const CatalogParseRequest& request) const;

@@ -65,9 +65,15 @@ void CatalogFixtureCorpusTests::parsesFixtureCorpus_data()
                                   << skygate::ephemeris::CatalogSourceType::OpenNgcCsv << QStringLiteral("messier_031")
                                   << 3;
     QTest::newRow("hyg-gzip") << QStringLiteral("catalogs/realistic-hyg.csv.gz")
-                              << skygate::ephemeris::CatalogSourceType::HygCsvGzip << QStringLiteral("hip_32349") << 3;
+                              << skygate::ephemeris::CatalogSourceType::HygCsv << QStringLiteral("hip_32349") << 3;
     QTest::newRow("hyg-zip") << QStringLiteral("catalogs/realistic-hyg.zip")
-                             << skygate::ephemeris::CatalogSourceType::HygCsvZip << QStringLiteral("hip_32349") << 3;
+                             << skygate::ephemeris::CatalogSourceType::HygCsv << QStringLiteral("hip_32349") << 3;
+    QTest::newRow("open-ngc-gzip") << QStringLiteral("catalogs/realistic-openngc.csv.gz")
+                                   << skygate::ephemeris::CatalogSourceType::OpenNgcCsv << QStringLiteral("messier_031")
+                                   << 3;
+    QTest::newRow("open-ngc-zip") << QStringLiteral("catalogs/realistic-openngc.zip")
+                                  << skygate::ephemeris::CatalogSourceType::OpenNgcCsv << QStringLiteral("messier_031")
+                                  << 3;
     QTest::newRow("hyg-extra-columns") << QStringLiteral("catalogs/realistic-hyg-extra-columns.csv")
                                        << skygate::ephemeris::CatalogSourceType::HygCsv << QStringLiteral("hip_7588")
                                        << 2;
@@ -87,7 +93,6 @@ void CatalogFixtureCorpusTests::parsesFixtureCorpus()
     QVERIFY(!payload.isEmpty());
 
     const skygate::ephemeris::CatalogPayloadParser parser;
-    QCOMPARE(parser.detectFormat(payloadView(payload)), expectedFormat);
 
     if (fixturePath == QStringLiteral("catalogs/realistic-hyg.csv")
         || fixturePath == QStringLiteral("catalogs/realistic-hyg.csv.gz")
@@ -100,6 +105,7 @@ void CatalogFixtureCorpusTests::parsesFixtureCorpus()
     const auto parseResult = parser.parseResult(payloadView(payload));
     QVERIFY2(parseResult.isSuccess(), parseResult.errorDetail.c_str());
     QVERIFY(parseResult.catalog != nullptr);
+    QCOMPARE(parseResult.detectedFormat, expectedFormat);
 
     const auto bodies = parseResult.catalog->bodies();
     QCOMPARE(static_cast<int>(bodies.size()), expectedBodyCount);

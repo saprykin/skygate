@@ -15,7 +15,7 @@ private slots:
     void detectsLeadingCommentAndBomPayloads();
     void preservesHashInsideQuotedHeaderFields();
     void rejectsSubstringLookalikeHeaders();
-    void detectsCompressedPayloadFormats();
+    void returnsUnknownForContainerPayloads();
     void returnsUnknownForUnrecognizedPayloads();
 };
 
@@ -59,7 +59,7 @@ void CatalogPayloadFormatDetectorTests::rejectsSubstringLookalikeHeaders()
     );
 }
 
-void CatalogPayloadFormatDetectorTests::detectsCompressedPayloadFormats()
+void CatalogPayloadFormatDetectorTests::returnsUnknownForContainerPayloads()
 {
     using namespace skygate::ephemeris;
 
@@ -68,13 +68,13 @@ void CatalogPayloadFormatDetectorTests::detectsCompressedPayloadFormats()
         CatalogPayloadFormatDetector::detect(
             std::string_view(reinterpret_cast<const char*>(kGzip.data()), kGzip.size())
         ),
-        skygate::ephemeris::CatalogSourceType::HygCsvGzip
+        CatalogSourceType::Unknown
     );
 
     constexpr std::array<unsigned char, 4> kZip{{0x50, 0x4b, 0x03, 0x04}};
     QCOMPARE(
         CatalogPayloadFormatDetector::detect(std::string_view(reinterpret_cast<const char*>(kZip.data()), kZip.size())),
-        skygate::ephemeris::CatalogSourceType::HygCsvZip
+        CatalogSourceType::Unknown
     );
 }
 

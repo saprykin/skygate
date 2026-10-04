@@ -17,7 +17,7 @@ class CatalogCoordinatorDownloadTests final : public QObject {
 private slots:
     void parsesSuccessfulDownloadedCatalog();
     void reportsParseFailureWithSourceUrl();
-    void missingRequiredColumnsUseFormatNeutralWording();
+    void gzipWithUnknownInnerSchemaUsesFormatNeutralWording();
     void missingOpenNgcColumnsDoNotClaimHyg();
 };
 
@@ -87,9 +87,10 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
     QCOMPARE(statuses.back(), finalResult.errorText);
 }
 
-void CatalogCoordinatorDownloadTests::missingRequiredColumnsUseFormatNeutralWording()
+void CatalogCoordinatorDownloadTests::gzipWithUnknownInnerSchemaUsesFormatNeutralWording()
 {
-    // A gzip-compressed HYG CSV that is missing the required "mag" column.
+    // A gzip-compressed CSV that is missing the required HYG "mag" column, so
+    // the decoded inner payload is not recognized as any supported schema.
     constexpr std::array<unsigned char, 70> kHygGzipMissingMag{
         0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xcb, 0x4c, 0xd1, 0xc9, 0xc8, 0x2c, 0xd0, 0x29,
         0x28, 0xca, 0x2f, 0x48, 0x2d, 0xd2, 0x29, 0x4a, 0xd4, 0x49, 0x49, 0x4d, 0xe6, 0x32, 0xd4, 0x31, 0x31, 0xd2,
@@ -108,12 +109,14 @@ void CatalogCoordinatorDownloadTests::missingRequiredColumnsUseFormatNeutralWord
 
     CatalogCoordinator::DownloadResult finalResult;
     QTest::ignoreMessage(
-        QtWarningMsg, "HYG CSV parse failed: HYG CSV payload is missing one of the required columns: ra, dec, mag."
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog container decoded, but the inner payload is not a recognized catalog "
+        "format."
     );
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Catalog: Source https://example.test/missing-mag.csv.gz parse failed: missing required columns (HYG CSV "
-        "payload is missing one of the required columns: ra, dec, mag.)"
+        "Catalog: Source https://example.test/missing-mag.csv.gz parse failed: unsupported format (Catalog container "
+        "decoded, but the inner payload is not a recognized catalog format.)"
     );
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
@@ -128,9 +131,8 @@ void CatalogCoordinatorDownloadTests::missingRequiredColumnsUseFormatNeutralWord
     });
 
     QVERIFY(finalResult.catalog == nullptr);
-    QVERIFY(finalResult.errorText.contains("missing required columns"));
-    QVERIFY(finalResult.errorText.contains("HYG CSV payload is missing one of the required columns: ra, dec, mag."));
-    QVERIFY(!finalResult.errorText.contains("missing required HYG columns"));
+    QVERIFY(finalResult.errorText.contains("unsupported format"));
+    QVERIFY(!finalResult.errorText.contains("HYG"));
 }
 
 void CatalogCoordinatorDownloadTests::missingOpenNgcColumnsDoNotClaimHyg()
