@@ -356,6 +356,14 @@ void SkyContextControllerEphemerisSettingsTests::cachedProvidersRebuildAndInvali
     const skygate::ephemeris::EphemerisDataManifest manifest = makeInstalledEphemerisManifest(kernelPayload);
     SkyContextController::InitializationOptions options = controllerInitializationOptions(true);
     options.ephemerisFactoryInputs.dataManifest = &manifest;
+#if !defined(SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS)
+    // The simple backend build has no CALCEPH runtime, so the real installed
+    // kernel cannot be opened. Inject the established fake kernel provider to
+    // exercise the cached-provider rebuild/invalidation contract
+    // deterministically. The high-precision build keeps the real
+    // installed-kernel integration path below.
+    options.ephemerisFactoryInputs.calcephKernelProvider = makeTestCalcephKernelProvider();
+#endif
     const auto controller = createControllerWithOptions(options);
 
     QCOMPARE(

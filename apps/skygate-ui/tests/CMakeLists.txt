@@ -142,6 +142,7 @@ add_skygate_ui_qtest(
 target_compile_definitions(skygate-ui-context-controller-ephemeris-settings-tests
     PRIVATE
         SKYGATE_EPHEMERIS_TESTDATA_DIR="${CMAKE_SOURCE_DIR}/libs/skygate-ephemeris/tests/fixtures"
+        $<$<BOOL:${SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS}>:SKYGATE_ENABLE_HIGH_PRECISION_EPHEMERIS=1>
 )
 add_skygate_ui_qtest(
     skygate-ui-context-controller-timeline-tests
