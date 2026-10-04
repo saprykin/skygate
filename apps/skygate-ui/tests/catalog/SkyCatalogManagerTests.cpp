@@ -202,8 +202,12 @@ void SkyCatalogManagerTests::restoreCachePathThroughManager()
 
     SkyCatalogManager manager(&store);
     QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    const QString starUrl = QStringLiteral("https://example.test/custom-stars.csv");
+    const QString deepSkyUrl = QStringLiteral("https://example.test/custom-dso.csv");
     manager.setCatalogPresetIndex(2);
+    manager.setCatalogUrlText(starUrl);
     manager.setDeepSkyCatalogPresetIndex(2);
+    manager.setDeepSkyCatalogUrlText(deepSkyUrl);
 
     QVERIFY(manager.restoreCatalogCache());
     QCOMPARE(manager.sourceLabel(), QString("Custom (saved)"));
@@ -410,10 +414,11 @@ void SkyCatalogManagerTests::staleConstellationResponseIgnoredAfterCustomSwitch(
     QCOMPARE(catalogSpy.count(), catalogChangesAfterSwitch);
     QCOMPARE(statusSpy.count(), statusChangesAfterSwitch);
 
-    const auto cacheSnapshot = store.loadCatalogCache();
+    const auto cacheSnapshot = store.loadCatalogCollectionCache();
     QVERIFY(cacheSnapshot.has_value());
-    QVERIFY(cacheSnapshot->constellationLineRows.isEmpty());
-    QVERIFY(cacheSnapshot->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(cacheSnapshot->sources.size(), 1);
+    QVERIFY(cacheSnapshot->sources[0].constellationLineRows.isEmpty());
+    QVERIFY(cacheSnapshot->sources[0].constellationAnchorGroupRows.isEmpty());
 }
 
 void SkyCatalogManagerTests::cancelDuringConstellationLoadingIgnoresStaleCompletion()

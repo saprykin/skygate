@@ -79,14 +79,14 @@ class SkyCatalogRuntimeTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void initializeBuildsActiveCatalogAndCacheRequest();
+    void initializeBuildsActiveCatalogAndExposesSources();
     void restoreConstellationRefsUpdatesRevisionAndCount();
     void resolvedRefsTrackIdentityAndInvalidateOnSourceChange();
     void nullCatalogReportsFailureWithoutCatalogChange();
     void sourcesLoadReplaceEnableDisableAndRemoveIndependently();
 };
 
-void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndCacheRequest()
+void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndExposesSources()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
 
@@ -99,10 +99,13 @@ void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndCacheRequest()
     QVERIFY(runtime.bodyCount() >= 2U);
     QCOMPARE(runtime.sourceIds().size(), runtime.bodyCount());
 
-    const auto request = runtime.cachePersistRequest("stars", {});
-    QVERIFY(request.has_value());
-    QCOMPARE(request->sourceLabel, QString("Bundled"));
-    QCOMPARE(request->catalogPayload, QByteArray("stars"));
+    const auto sources = runtime.sources();
+    QCOMPARE(sources.size(), std::size_t{1});
+    QCOMPARE(sources[0].instanceId, QString("primary"));
+    QCOMPARE(sources[0].title, QString("Bundled"));
+    QCOMPARE(sources[0].policy, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QVERIFY(sources[0].enabled);
+    QVERIFY(sources[0].catalog != nullptr);
 }
 
 void SkyCatalogRuntimeTests::restoreConstellationRefsUpdatesRevisionAndCount()

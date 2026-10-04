@@ -3,13 +3,16 @@
 #include "SettingsTestFixture.hpp"
 #include "SkyLogging.hpp"
 #include "SkySettingsStore.hpp"
+#include "catalog/CatalogBinaryCodec.hpp"
 
+#include <QDir>
 #include <QFile>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QtTest>
 
 #include <cstdint>
+#include <utility>
 
 namespace {
 
@@ -18,6 +21,45 @@ void ignoreSkySettingsFallbackWarnings(const int count)
     for (int index = 0; index < count; ++index) {
         QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid .*setting skyContext/.* - using fallback .*"));
     }
+}
+
+SkySettingsStore::CatalogCollectionCacheSnapshot sampleCollectionSnapshot()
+{
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = 1;
+    snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
+
+    SkySettingsStore::CatalogSourceCacheRecord star;
+    star.instanceId = QStringLiteral("preset:hyg_v42");
+    star.descriptorId = QStringLiteral("hyg_v42");
+    star.title = QStringLiteral("HYG v4.2");
+    star.version = QStringLiteral("v4.2");
+    star.urls = QStringList{QStringLiteral("https://example.test/hyg.csv.gz")};
+    star.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/lines.json")};
+    star.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    star.enabled = true;
+    star.order = 0;
+    star.payload = skygate::ui::tests::sampleHygCsvPayload();
+    star.binaryPayload = QByteArray("binary-star");
+    star.constellationLineRows = "hip_1|hip_2\n";
+    star.constellationAnchorGroupRows = "Demo|hip_1,hip_2\n";
+    star.constellationLineSchemaVersion = 4;
+    star.constellationCount = 1;
+    snapshot.sources.push_back(std::move(star));
+
+    SkySettingsStore::CatalogSourceCacheRecord deepSky;
+    deepSky.instanceId = QStringLiteral("preset:open_ngc");
+    deepSky.descriptorId = QStringLiteral("open_ngc");
+    deepSky.title = QStringLiteral("OpenNGC");
+    deepSky.version = QStringLiteral("v20260307");
+    deepSky.urls = QStringList{QStringLiteral("https://example.test/NGC.csv")};
+    deepSky.policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly;
+    deepSky.enabled = true;
+    deepSky.order = 1;
+    deepSky.payload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload();
+    deepSky.binaryPayload = QByteArray("binary-dso");
+    snapshot.sources.push_back(std::move(deepSky));
+    return snapshot;
 }
 
 }  // namespace
@@ -34,6 +76,8 @@ private slots:
     void malformedStateValuesFallBackToDefaults();
     void partialStateAndUnknownOverlayKeysAreTolerated();
     void savesLoadsAndClearsCatalogCachesIndependently();
+    void savesLoadsAndClearsCatalogCollectionCache();
+    void clearCatalogSourceCacheKeepsPeerRecords();
     void partialCatalogCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
     void savesLoadsAndClearsEphemerisDataCacheMetadata();
@@ -322,6 +366,63 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCachesIndependently()
 
     QVERIFY(store.clearDeepSkyCatalogCache());
     QVERIFY(!store.loadCatalogCache().has_value());
+}
+
+void SkySettingsStoreTests::savesLoadsAndClearsCatalogCollectionCache()
+{
+    m_settings.resetSettingsWithCatalogCachePaths();
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("skyContext/catalogCollectionCachePath"), m_settings.filePath(QStringLiteral("collection-cache"))
+    );
+    QDir(m_settings.filePath(QStringLiteral("collection-cache"))).removeRecursively();
+
+    SkySettingsStore store;
+    const auto savedSnapshot = sampleCollectionSnapshot();
+    QVERIFY(store.saveCatalogCollectionCache(savedSnapshot));
+
+    const auto loadedSnapshot = store.loadCatalogCollectionCache();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->schemaVersion, savedSnapshot.schemaVersion);
+    QCOMPARE(loadedSnapshot->binarySchemaVersion, savedSnapshot.binarySchemaVersion);
+    QCOMPARE(loadedSnapshot->sources.size(), 2);
+    QCOMPARE(loadedSnapshot->sources[0].instanceId, savedSnapshot.sources[0].instanceId);
+    QCOMPARE(loadedSnapshot->sources[0].descriptorId, savedSnapshot.sources[0].descriptorId);
+    QCOMPARE(loadedSnapshot->sources[0].title, savedSnapshot.sources[0].title);
+    QCOMPARE(loadedSnapshot->sources[0].urls, savedSnapshot.sources[0].urls);
+    QCOMPARE(loadedSnapshot->sources[0].relatedDatasetUrls, savedSnapshot.sources[0].relatedDatasetUrls);
+    QCOMPARE(static_cast<int>(loadedSnapshot->sources[0].policy), static_cast<int>(savedSnapshot.sources[0].policy));
+    QCOMPARE(loadedSnapshot->sources[0].enabled, savedSnapshot.sources[0].enabled);
+    QCOMPARE(loadedSnapshot->sources[0].payload, savedSnapshot.sources[0].payload);
+    QCOMPARE(loadedSnapshot->sources[0].binaryPayload, savedSnapshot.sources[0].binaryPayload);
+    QCOMPARE(loadedSnapshot->sources[0].constellationLineRows, savedSnapshot.sources[0].constellationLineRows);
+    QCOMPARE(loadedSnapshot->sources[0].constellationCount, savedSnapshot.sources[0].constellationCount);
+    QCOMPARE(loadedSnapshot->sources[1].instanceId, savedSnapshot.sources[1].instanceId);
+    QCOMPARE(loadedSnapshot->sources[1].payload, savedSnapshot.sources[1].payload);
+    QCOMPARE(loadedSnapshot->sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
+
+    QVERIFY(store.clearCatalogCollectionCache());
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+}
+
+void SkySettingsStoreTests::clearCatalogSourceCacheKeepsPeerRecords()
+{
+    m_settings.resetSettingsWithCatalogCachePaths();
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("skyContext/catalogCollectionCachePath"), m_settings.filePath(QStringLiteral("collection-cache"))
+    );
+    QDir(m_settings.filePath(QStringLiteral("collection-cache"))).removeRecursively();
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(sampleCollectionSnapshot()));
+    QVERIFY(store.clearCatalogSourceCache(QStringLiteral("preset:hyg_v42")));
+
+    const auto loadedSnapshot = store.loadCatalogCollectionCache();
+    QVERIFY(loadedSnapshot.has_value());
+    QCOMPARE(loadedSnapshot->sources.size(), 1);
+    QCOMPARE(loadedSnapshot->sources[0].instanceId, QString("preset:open_ngc"));
+    QCOMPARE(loadedSnapshot->sources[0].payload, skygate::ui::tests::sampleCompactOpenNgcCsvPayload());
 }
 
 void SkySettingsStoreTests::partialCatalogCacheSavePreservesConfiguredPeerPath()

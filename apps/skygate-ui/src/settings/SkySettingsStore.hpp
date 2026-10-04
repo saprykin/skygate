@@ -6,12 +6,15 @@
 #include "EphemerisSnapshot.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
+#include "catalog/CatalogCompositionPolicy.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 
 #include <QByteArray>
 #include <QSize>
 #include <QString>
+#include <QStringList>
+#include <QVector>
 #include <QtGlobal>
 
 #include <cstddef>
@@ -82,6 +85,35 @@ public:
         std::size_t constellationCount = 0;
     };
 
+    // One persisted catalog source. instanceId is the durable identity; the
+    // remaining fields reconstruct the configured source without re-downloading
+    // it. payload/binaryPayload are written to sidecar cache files rather than
+    // stored inline, so the QSettings file stays small.
+    struct CatalogSourceCacheRecord final {
+        QString instanceId;
+        QString descriptorId;
+        QString title;
+        QString version;
+        QStringList urls;
+        QStringList relatedDatasetUrls;
+        QString archiveSelector;
+        skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+        bool enabled = true;
+        int order = 0;
+        QByteArray payload;
+        QByteArray binaryPayload;
+        QByteArray constellationLineRows;
+        QByteArray constellationAnchorGroupRows;
+        int constellationLineSchemaVersion = 0;
+        std::size_t constellationCount = 0;
+    };
+
+    struct CatalogCollectionCacheSnapshot final {
+        int schemaVersion = 0;
+        int binarySchemaVersion = 0;
+        QVector<CatalogSourceCacheRecord> sources;
+    };
+
     struct EphemerisDataCacheSnapshot final {
         QString installedKernelAssetId;
         QString installedKernelProfileId;
@@ -106,6 +138,10 @@ public:
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
     [[nodiscard]] bool saveCatalogCache(const CatalogCacheSnapshot& snapshot) const;
     [[nodiscard]] std::optional<CatalogCacheSnapshot> loadCatalogCache() const;
+    [[nodiscard]] bool saveCatalogCollectionCache(const CatalogCollectionCacheSnapshot& snapshot) const;
+    [[nodiscard]] std::optional<CatalogCollectionCacheSnapshot> loadCatalogCollectionCache() const;
+    [[nodiscard]] bool clearCatalogCollectionCache() const;
+    [[nodiscard]] bool clearCatalogSourceCache(const QString& instanceId) const;
     [[nodiscard]] bool saveEphemerisDataCache(const EphemerisDataCacheSnapshot& snapshot) const;
     [[nodiscard]] EphemerisDataCacheSnapshot loadEphemerisDataCache() const;
     [[nodiscard]] bool clearEphemerisDataCache() const;

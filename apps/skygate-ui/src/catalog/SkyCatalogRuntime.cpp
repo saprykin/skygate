@@ -1,6 +1,5 @@
 #include "SkyCatalogRuntime.hpp"
 
-#include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogComposer.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/constellation/ConstellationReferenceResolver.hpp"
@@ -114,6 +113,11 @@ QStringList SkyCatalogRuntime::sourceLabels() const
     return m_sourceLabels;
 }
 
+std::span<const SkyCatalogSourceRecord> SkyCatalogRuntime::sources() const noexcept
+{
+    return std::span<const SkyCatalogSourceRecord>(m_sources);
+}
+
 std::span<const std::uint8_t> SkyCatalogRuntime::sourceIds() const noexcept
 {
     return std::span<const std::uint8_t>(m_sourceIds);
@@ -195,6 +199,14 @@ SkyCatalogRuntime::removeSource(const QString& instanceId, const SkyCatalogRunti
     }
 
     m_sources.erase(existing);
+    return rebuildActiveCatalog(options);
+}
+
+SkyCatalogRuntimeResult SkyCatalogRuntime::replaceSources(
+    std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options
+)
+{
+    m_sources = std::move(sources);
     return rebuildActiveCatalog(options);
 }
 
@@ -385,40 +397,6 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::restoreConstellationRefs(
         result.datasetInfoChanged = true;
     }
     return result;
-}
-
-std::optional<SkyCatalogCachePersistRequest>
-SkyCatalogRuntime::cachePersistRequest(const QByteArray& catalogPayload, const QByteArray& deepSkyCatalogPayload) const
-{
-    if (m_starCatalog == nullptr || (catalogPayload.isEmpty() && deepSkyCatalogPayload.isEmpty())) {
-        return std::nullopt;
-    }
-
-    const auto bodies = m_starCatalog->bodies();
-    if (bodies.empty()) {
-        return std::nullopt;
-    }
-
-    const SkyCatalogSourceRecord* primary =
-        firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy::Merge, false);
-    const SkyCatalogSourceRecord* deepSky =
-        firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly, false);
-
-    SkyCatalogCachePersistRequest request;
-    request.sourceLabel = primary != nullptr ? primary->title : QStringLiteral("Bundled");
-    request.deepSkySourceLabel = deepSky != nullptr ? deepSky->title : QStringLiteral("Bundled Messier");
-    request.catalogPayload = catalogPayload;
-    request.deepSkyCatalogPayload = deepSkyCatalogPayload;
-    if (primary != nullptr && primary->catalog != nullptr) {
-        request.catalogBinaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(primary->catalog->catalog());
-    }
-    if (deepSky != nullptr && deepSky->catalog != nullptr) {
-        request.deepSkyBinaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(deepSky->catalog->catalog());
-    }
-    request.constellationLineRefs = m_constellationRefs.lineRefVector();
-    request.constellationAnchorGroups = m_constellationRefs.anchorGroupVector();
-    request.constellationCount = m_constellationRefs.count();
-    return request;
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& statusText)

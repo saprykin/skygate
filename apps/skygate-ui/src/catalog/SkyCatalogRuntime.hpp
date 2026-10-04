@@ -1,6 +1,5 @@
 #pragma once
 
-#include "SkyCatalogCacheController.hpp"
 #include "SkyCatalogConstellationStore.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 
@@ -50,6 +49,7 @@ public:
     [[nodiscard]] QStringList sourceInstanceIds() const;
     [[nodiscard]] bool isSourceEnabled(const QString& instanceId) const;
     [[nodiscard]] QStringList sourceLabels() const;
+    [[nodiscard]] std::span<const SkyCatalogSourceRecord> sources() const noexcept;
     [[nodiscard]] std::span<const std::uint8_t> sourceIds() const noexcept;
     [[nodiscard]] std::span<const ConstellationLineRef> constellationLineRefs() const noexcept;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> constellationAnchorGroups() const noexcept;
@@ -63,6 +63,8 @@ public:
     setSourceEnabled(const QString& instanceId, bool enabled, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult
     removeSource(const QString& instanceId, const SkyCatalogRuntimeBuildOptions& options);
+    [[nodiscard]] SkyCatalogRuntimeResult
+    replaceSources(std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult applyCatalog(
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog,
         const QString& sourceLabel,
@@ -86,8 +88,6 @@ public:
         std::vector<ConstellationAnchorGroup> anchorGroups,
         std::optional<std::size_t> constellationCount
     );
-    [[nodiscard]] std::optional<SkyCatalogCachePersistRequest>
-    cachePersistRequest(const QByteArray& catalogPayload, const QByteArray& deepSkyCatalogPayload) const;
 
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);

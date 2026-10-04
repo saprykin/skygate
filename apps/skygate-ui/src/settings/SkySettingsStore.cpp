@@ -4,6 +4,7 @@
 #include "SkySettingsSnapshotCodecs.hpp"
 #include "SkySettingsValueCodecs.hpp"
 
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -11,7 +12,9 @@
 #include <QSaveFile>
 #include <QSettings>
 
+#include <algorithm>
 #include <optional>
+#include <utility>
 
 using namespace skygate::ui::internal;
 
@@ -75,6 +78,169 @@ bool removeCacheFiles(const QStringList& cachePaths)
 QString readTrimmedStringSetting(QSettings& settings, const QString& key, const QString& fallback = {})
 {
     return settings.value(key, fallback).toString().trimmed();
+}
+
+QString catalogCollectionCacheDirectory(QSettings& settings)
+{
+    const QString configuredPath = settings
+                                       .value(
+                                           SkyContextSettings::key("catalogCollectionCachePath"),
+                                           SkyContextSettings::defaultCatalogCollectionCachePath()
+                                       )
+                                       .toString();
+    return configuredPath.isEmpty() ? SkyContextSettings::defaultCatalogCollectionCachePath() : configuredPath;
+}
+
+QString catalogSourceFileStem(const QString& instanceId)
+{
+    const QByteArray digest = QCryptographicHash::hash(instanceId.toUtf8(), QCryptographicHash::Sha256).toHex();
+    return QStringLiteral("catalog-source-") + QString::fromLatin1(digest.left(16));
+}
+
+QString catalogSourceRawPath(const QString& directory, const QString& instanceId)
+{
+    return QDir(directory).filePath(catalogSourceFileStem(instanceId) + QStringLiteral(".txt"));
+}
+
+QString catalogSourceBinaryPath(const QString& directory, const QString& instanceId)
+{
+    return QDir(directory).filePath(catalogSourceFileStem(instanceId) + QStringLiteral(".bin"));
+}
+
+QString catalogSourceSettingsGroup(const QString& instanceId)
+{
+    return QStringLiteral("catalogSources/") + catalogSourceFileStem(instanceId);
+}
+
+bool writeCatalogSourceFile(const QString& path, const QByteArray& payload)
+{
+    if (path.isEmpty() || payload.isEmpty()) {
+        return true;
+    }
+
+    const QFileInfo targetInfo(path);
+    QDir targetDir(targetInfo.absolutePath());
+    if (!targetDir.mkpath(".")) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to create catalog collection cache directory" << targetDir.absolutePath();
+        return false;
+    }
+
+    QSaveFile cacheFile(path);
+    if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open catalog source cache for writing" << path << cacheFile.errorString();
+        return false;
+    }
+
+    const qint64 writtenBytes = cacheFile.write(payload);
+    if (writtenBytes != payload.size()) {
+        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to write complete catalog source cache" << path
+                                                    << "written" << writtenBytes << "expected" << payload.size();
+        cacheFile.cancelWriting();
+        return false;
+    }
+
+    if (!cacheFile.commit()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to commit catalog source cache" << path << cacheFile.errorString();
+        return false;
+    }
+    return true;
+}
+
+QByteArray readCatalogSourceFile(const QString& path)
+{
+    if (path.isEmpty()) {
+        return {};
+    }
+
+    QFile cacheFile(path);
+    if (!cacheFile.exists()) {
+        return {};
+    }
+    if (!cacheFile.open(QIODevice::ReadOnly)) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open catalog source cache" << path << cacheFile.errorString();
+        return {};
+    }
+    return cacheFile.readAll();
+}
+
+void appendCatalogCollectionDirFiles(QStringList& cachePaths, const QString& directory)
+{
+    if (directory.isEmpty()) {
+        return;
+    }
+
+    const QDir dir(directory);
+    const QStringList entries =
+        dir.entryList(QStringList{QStringLiteral("catalog-source-*")}, QDir::Files | QDir::Readable);
+    for (const QString& entryName : entries) {
+        appendCachePath(cachePaths, dir.filePath(entryName));
+    }
+}
+
+void saveCatalogSourceRecord(
+    QSettings& settings, const SkySettingsStore::CatalogSourceCacheRecord& record, const QString& directory
+)
+{
+    settings.beginGroup(catalogSourceSettingsGroup(record.instanceId));
+    settings.setValue(QStringLiteral("instanceId"), record.instanceId);
+    settings.setValue(QStringLiteral("descriptorId"), record.descriptorId);
+    settings.setValue(QStringLiteral("title"), record.title);
+    settings.setValue(QStringLiteral("version"), record.version);
+    settings.setValue(QStringLiteral("urls"), record.urls);
+    settings.setValue(QStringLiteral("relatedDatasetUrls"), record.relatedDatasetUrls);
+    settings.setValue(QStringLiteral("archiveSelector"), record.archiveSelector);
+    settings.setValue(QStringLiteral("policy"), static_cast<int>(record.policy));
+    settings.setValue(QStringLiteral("enabled"), record.enabled);
+    settings.setValue(QStringLiteral("order"), record.order);
+    settings.setValue(
+        QStringLiteral("payloadPath"),
+        record.payload.isEmpty() ? QString() : catalogSourceRawPath(directory, record.instanceId)
+    );
+    settings.setValue(
+        QStringLiteral("binaryPayloadPath"),
+        record.binaryPayload.isEmpty() ? QString() : catalogSourceBinaryPath(directory, record.instanceId)
+    );
+    settings.setValue(QStringLiteral("constellationLineRows"), record.constellationLineRows);
+    settings.setValue(QStringLiteral("constellationAnchorGroupRows"), record.constellationAnchorGroupRows);
+    settings.setValue(QStringLiteral("constellationLineSchemaVersion"), record.constellationLineSchemaVersion);
+    settings.setValue(QStringLiteral("constellationCount"), static_cast<qulonglong>(record.constellationCount));
+    settings.endGroup();
+}
+
+SkySettingsStore::CatalogSourceCacheRecord loadCatalogSourceRecord(QSettings& settings, const QString& group)
+{
+    SkySettingsStore::CatalogSourceCacheRecord record;
+    settings.beginGroup(group);
+    record.instanceId = settings.value(QStringLiteral("instanceId")).toString();
+    record.descriptorId = settings.value(QStringLiteral("descriptorId")).toString();
+    record.title = settings.value(QStringLiteral("title")).toString();
+    record.version = settings.value(QStringLiteral("version")).toString();
+    record.urls = settings.value(QStringLiteral("urls")).toStringList();
+    record.relatedDatasetUrls = settings.value(QStringLiteral("relatedDatasetUrls")).toStringList();
+    record.archiveSelector = settings.value(QStringLiteral("archiveSelector")).toString();
+    record.policy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(readIntSetting(
+        settings, QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
+    ));
+    record.enabled = readBoolSetting(settings, QStringLiteral("enabled"), true);
+    record.order = readIntSetting(settings, QStringLiteral("order"), 0);
+    record.constellationLineRows = settings.value(QStringLiteral("constellationLineRows")).toByteArray();
+    record.constellationAnchorGroupRows = settings.value(QStringLiteral("constellationAnchorGroupRows")).toByteArray();
+    record.constellationLineSchemaVersion =
+        readIntSetting(settings, QStringLiteral("constellationLineSchemaVersion"), 0);
+    record.constellationCount = static_cast<std::size_t>(
+        readULongLongSetting(settings, QStringLiteral("constellationCount"), static_cast<qulonglong>(0))
+    );
+    const QString rawPath = settings.value(QStringLiteral("payloadPath")).toString();
+    const QString binaryPath = settings.value(QStringLiteral("binaryPayloadPath")).toString();
+    settings.endGroup();
+
+    record.payload = readCatalogSourceFile(rawPath);
+    record.binaryPayload = readCatalogSourceFile(binaryPath);
+    return record;
 }
 
 }  // namespace
@@ -380,6 +546,140 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
         << snapshot.deepSkyCatalogPayload.size() << "starBinaryBytes" << snapshot.catalogBinaryPayload.size()
         << "deepSkyBinaryBytes" << snapshot.deepSkyBinaryPayload.size();
     return snapshot;
+}
+
+bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSnapshot& snapshot) const
+{
+    if (snapshot.sources.isEmpty()) {
+        return clearCatalogCollectionCache();
+    }
+
+    QSettings settings;
+    const QString directory = catalogCollectionCacheDirectory(settings);
+
+    // Write sidecar payload files before touching QSettings so a failed write
+    // leaves the previously persisted collection recoverable.
+    for (const CatalogSourceCacheRecord& record : snapshot.sources) {
+        if (!record.payload.isEmpty()
+            && !writeCatalogSourceFile(catalogSourceRawPath(directory, record.instanceId), record.payload)) {
+            return false;
+        }
+        if (!record.binaryPayload.isEmpty()
+            && !writeCatalogSourceFile(catalogSourceBinaryPath(directory, record.instanceId), record.binaryPayload)) {
+            return false;
+        }
+    }
+
+    settings.remove(QStringLiteral("catalogSources"));
+    settings.setValue(
+        SkyContextSettings::key("catalogCollectionVersion"),
+        snapshot.schemaVersion > 0 ? snapshot.schemaVersion
+                                   : SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+    );
+    settings.setValue(SkyContextSettings::key("catalogBinarySchemaVersion"), snapshot.binarySchemaVersion);
+
+    int order = 0;
+    for (const CatalogSourceCacheRecord& record : snapshot.sources) {
+        CatalogSourceCacheRecord orderedRecord = record;
+        orderedRecord.order = order++;
+        saveCatalogSourceRecord(settings, orderedRecord, directory);
+    }
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to save catalog collection cache settings";
+        return false;
+    }
+    qCInfo(skygateCatalogCacheLog).noquote() << "Catalog collection cache saved: sources" << snapshot.sources.size();
+    return true;
+}
+
+std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> SkySettingsStore::loadCatalogCollectionCache() const
+{
+    QSettings settings;
+    if (!settings.contains(SkyContextSettings::key("catalogCollectionVersion"))) {
+        return std::nullopt;
+    }
+
+    CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = readIntSetting(
+        settings,
+        SkyContextSettings::key("catalogCollectionVersion"),
+        SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+    );
+    snapshot.binarySchemaVersion = readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+
+    QVector<CatalogSourceCacheRecord> records;
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList groups = settings.childGroups();
+    for (const QString& group : groups) {
+        CatalogSourceCacheRecord record = loadCatalogSourceRecord(settings, group);
+        if (!record.instanceId.isEmpty()) {
+            records.push_back(std::move(record));
+        }
+    }
+    settings.endGroup();
+
+    std::stable_sort(
+        records.begin(), records.end(), [](const CatalogSourceCacheRecord& lhs, const CatalogSourceCacheRecord& rhs) {
+            return lhs.order < rhs.order;
+        }
+    );
+    snapshot.sources = std::move(records);
+    qCInfo(skygateCatalogCacheLog).noquote() << "Catalog collection cache loaded: sources" << snapshot.sources.size();
+    return snapshot;
+}
+
+bool SkySettingsStore::clearCatalogCollectionCache() const
+{
+    QSettings settings;
+    const QString configuredDirectory = catalogCollectionCacheDirectory(settings);
+    const QString defaultDirectory = SkyContextSettings::defaultCatalogCollectionCachePath();
+
+    QStringList cachePaths;
+    appendCatalogCollectionDirFiles(cachePaths, configuredDirectory);
+    appendCatalogCollectionDirFiles(cachePaths, defaultDirectory);
+    const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
+
+    settings.remove(QStringLiteral("catalogSources"));
+    settings.remove(SkyContextSettings::key("catalogCollectionVersion"));
+    settings.remove(SkyContextSettings::key("catalogBinarySchemaVersion"));
+    settings.remove(SkyContextSettings::key("catalogCollectionCachePath"));
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to clear catalog collection cache settings";
+        return false;
+    }
+    if (removedAllCacheFiles) {
+        qCInfo(skygateCatalogCacheLog).noquote() << "Catalog collection cache cleared: files" << cachePaths.size();
+    }
+    return removedAllCacheFiles;
+}
+
+bool SkySettingsStore::clearCatalogSourceCache(const QString& instanceId) const
+{
+    if (instanceId.isEmpty()) {
+        return false;
+    }
+
+    QSettings settings;
+    const QString group = catalogSourceSettingsGroup(instanceId);
+    settings.beginGroup(group);
+    const QString rawPath = settings.value(QStringLiteral("payloadPath")).toString();
+    const QString binaryPath = settings.value(QStringLiteral("binaryPayloadPath")).toString();
+    settings.endGroup();
+
+    QStringList cachePaths;
+    appendCachePath(cachePaths, rawPath);
+    appendCachePath(cachePaths, binaryPath);
+    const bool removedAllCacheFiles = removeCacheFiles(cachePaths);
+
+    settings.remove(group);
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to clear catalog source cache settings";
+        return false;
+    }
+    return removedAllCacheFiles;
 }
 
 bool SkySettingsStore::saveEphemerisDataCache(const EphemerisDataCacheSnapshot& snapshot) const

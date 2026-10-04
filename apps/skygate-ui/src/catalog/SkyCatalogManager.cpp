@@ -1,6 +1,7 @@
 #include "SkyCatalogManager.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceRecord.hpp"
+#include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 #include "catalog/SkyCatalogImportWorkflow.hpp"
@@ -13,6 +14,7 @@
 
 #include <optional>
 #include <utility>
+#include <vector>
 
 using namespace skygate::ui::internal;
 
@@ -20,6 +22,17 @@ namespace {
 
 constexpr const char* kPrimarySlotId = "primary";
 constexpr const char* kDeepSkySlotId = "deep-sky";
+
+QString stableSourceInstanceId(const SkyCatalogSourceInstance& instance)
+{
+    if (!instance.descriptorId.isEmpty()) {
+        return QStringLiteral("preset:") + instance.descriptorId;
+    }
+    if (!instance.urls.isEmpty()) {
+        return SkyCatalogSourceInstance::createCustom(instance.urls.first()).instanceId;
+    }
+    return instance.instanceId;
+}
 
 SkyCatalogRuntimeResult& operator|=(SkyCatalogRuntimeResult& target, const SkyCatalogRuntimeResult& source)
 {
@@ -329,9 +342,18 @@ bool SkyCatalogManager::clearCatalogCache()
         return false;
     }
 
-    const bool cacheCleared = m_cacheController != nullptr && m_cacheController->clearCatalogCache();
-    if (cacheCleared) {
-        m_cachedCatalogPayload.clear();
+    bool cacheCleared = true;
+    if (m_cacheController != nullptr) {
+        for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
+            if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::Merge) {
+                continue;
+            }
+            const SourceOperation* operation = findOperation(source.instanceId);
+            const QString persistedId =
+                operation != nullptr ? stableSourceInstanceId(operation->instance) : source.instanceId;
+            cacheCleared = m_cacheController->clearSourceCache(persistedId) && cacheCleared;
+        }
+        cacheCleared = m_cacheController->clearCatalogCache() && cacheCleared;
     }
     m_statusText = SkyCatalogText::starCacheClearResult(cacheCleared);
     emit statusTextChanged();
@@ -346,9 +368,18 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
         return false;
     }
 
-    const bool cacheCleared = m_cacheController != nullptr && m_cacheController->clearDeepSkyCatalogCache();
-    if (cacheCleared) {
-        m_cachedDeepSkyCatalogPayload.clear();
+    bool cacheCleared = true;
+    if (m_cacheController != nullptr) {
+        for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
+            if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
+                continue;
+            }
+            const SourceOperation* operation = findOperation(source.instanceId);
+            const QString persistedId =
+                operation != nullptr ? stableSourceInstanceId(operation->instance) : source.instanceId;
+            cacheCleared = m_cacheController->clearSourceCache(persistedId) && cacheCleared;
+        }
+        cacheCleared = m_cacheController->clearDeepSkyCatalogCache() && cacheCleared;
     }
     m_statusText = SkyCatalogText::deepSkyCacheClearResult(cacheCleared);
     emit statusTextChanged();
@@ -361,36 +392,32 @@ bool SkyCatalogManager::restoreCatalogCache()
         return false;
     }
 
-    auto restoreResult = m_cacheController->restore(m_catalogPresetIndex, m_deepSkyCatalogPresetIndex);
-    if (restoreResult.savedCatalogUnreadable) {
-        m_cachedCatalogPayload.clear();
-        m_statusText = restoreResult.statusText;
-        emit statusTextChanged();
-        return false;
-    }
-    if (!restoreResult.restored) {
+    auto restoreResult = m_cacheController->restoreCollection(
+        m_catalogPresetIndex, m_deepSkyCatalogPresetIndex, m_catalogUrlText, m_deepSkyCatalogUrlText
+    );
+    if (restoreResult.sources.empty() && restoreResult.constellationLineRefs.empty()
+        && !restoreResult.resetConstellationLineRefs) {
         return false;
     }
 
-    // Apply every restored piece into a merged runtime result and emit the
-    // change signals once, so the controller does not rebuild the ephemeris
-    // engine and search model for each restored catalog component.
-    SkyCatalogRuntimeResult mergedResult;
-    if (restoreResult.catalog != nullptr) {
-        m_cachedCatalogPayload = restoreResult.catalogPayload;
-        mergedResult |=
-            m_runtime->applyCatalog(std::move(restoreResult.catalog), restoreResult.sourceLabel, runtimeBuildOptions());
+    // Apply every restored source into a single runtime replacement and emit
+    // the change signals once, so the controller does not rebuild the
+    // ephemeris engine and search model per restored source.
+    std::vector<SkyCatalogSourceRecord> restoredSources;
+    restoredSources.reserve(restoreResult.sources.size());
+    bool requiresPersist = restoreResult.migratedLegacy;
+    for (SkyCatalogSourceRestoreEntry& entry : restoreResult.sources) {
+        requiresPersist = requiresPersist || entry.requiresBinaryUpgrade;
+
+        SourceOperation* operation = upsertOperation(entry.instance, entry.record.policy);
+        operation->payload = entry.payload;
+
+        SkyCatalogSourceRecord record = std::move(entry.record);
+        record.instanceId = stableSourceInstanceId(entry.instance);
+        restoredSources.push_back(std::move(record));
     }
 
-    if (restoreResult.deepSkyCatalog != nullptr) {
-        m_cachedDeepSkyCatalogPayload = restoreResult.deepSkyCatalogPayload;
-        mergedResult |= m_runtime->applyDeepSkyCatalog(
-            std::move(restoreResult.deepSkyCatalog),
-            restoreResult.deepSkySourceLabel,
-            restoreResult.deepSkyObjectCount,
-            runtimeBuildOptions()
-        );
-    }
+    SkyCatalogRuntimeResult mergedResult = m_runtime->replaceSources(std::move(restoredSources), runtimeBuildOptions());
 
     if (!restoreResult.constellationLineRefs.empty()) {
         mergedResult |= m_runtime->restoreConstellationRefs(
@@ -406,9 +433,9 @@ bool SkyCatalogManager::restoreCatalogCache()
 
     applyRuntimeResult(mergedResult);
 
-    // First restore from a legacy (gzip-only) cache upgrades it with binary
-    // payloads so subsequent startups skip the CSV re-parse.
-    if (restoreResult.requiresBinaryUpgrade) {
+    // First restore from a legacy or raw-only cache upgrades it into the
+    // versioned binary collection so subsequent startups skip the CSV re-parse.
+    if (requiresPersist) {
         persistCatalogCache();
     }
     return true;
@@ -426,11 +453,9 @@ void SkyCatalogManager::loadSourceInstance(
     invalidatePendingSourceWork();
 
     if (source.urls.isEmpty()) {
+        operation->payload.clear();
         if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
-            m_cachedCatalogPayload.clear();
             resetConstellationLineRefs();
-        } else {
-            m_cachedDeepSkyCatalogPayload.clear();
         }
         applyBundledSource(*operation, policy);
         return;
@@ -535,11 +560,6 @@ void SkyCatalogManager::handleSourceImportFinished(
     const std::size_t foundObjectCount = result.foundObjectCount;
     const auto diagnostics = result.diagnostics;
     const QString sourceLabel = result.sourceLabel;
-    if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
-        m_cachedCatalogPayload = result.payload;
-    } else {
-        m_cachedDeepSkyCatalogPayload = result.payload;
-    }
 
     applySourceResult(std::move(result), policy);
 
@@ -716,10 +736,45 @@ void SkyCatalogManager::persistCatalogCache() const
         return;
     }
 
-    const auto request = m_runtime->cachePersistRequest(m_cachedCatalogPayload, m_cachedDeepSkyCatalogPayload);
-    if (request.has_value()) {
-        m_cacheController->persist(request.value());
+    SkyCatalogCollectionPersistRequest request;
+    for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
+        const SourceOperation* operation = findOperation(source.instanceId);
+        if (operation == nullptr || operation->instance.urls.isEmpty()) {
+            // Bundled/synthesized sources are reconstructed at startup; only
+            // configured sources with their own data need persistence.
+            continue;
+        }
+
+        SkyCatalogSourcePersistEntry entry;
+        entry.instanceId = stableSourceInstanceId(operation->instance);
+        entry.descriptorId = operation->instance.descriptorId;
+        entry.title = operation->instance.title;
+        entry.version = operation->instance.version;
+        entry.urls = operation->instance.urls;
+        entry.relatedDatasetUrls = operation->instance.relatedDatasetUrls;
+        entry.archiveSelector = operation->instance.archiveSelector;
+        entry.policy = source.policy;
+        entry.enabled = source.enabled;
+        entry.catalog = source.catalog.get();
+        entry.payload = operation->payload;
+
+        if (source.policy == skygate::ephemeris::CatalogCompositionPolicy::Merge
+            && !operation->instance.relatedDatasetUrls.isEmpty()) {
+            std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs(
+                m_runtime->constellationLineRefs().begin(), m_runtime->constellationLineRefs().end()
+            );
+            std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups(
+                m_runtime->constellationAnchorGroups().begin(), m_runtime->constellationAnchorGroups().end()
+            );
+            entry.constellationLineRows = SkyContextCatalogCodec::serializeConstellationLineRows(lineRefs);
+            entry.constellationAnchorGroupRows =
+                SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(anchorGroups);
+            entry.constellationLineSchemaVersion = SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+            entry.constellationCount = m_runtime->constellationCount();
+        }
+        request.sources.push_back(std::move(entry));
     }
+    m_cacheController->persistCollection(request);
 }
 
 SkyCatalogManager::SourceOperation* SkyCatalogManager::upsertOperation(
