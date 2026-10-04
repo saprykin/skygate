@@ -192,6 +192,9 @@ private slots:
     void bundledBrightStarsOnlyAddedWhenNoStarsPresent();
     void usesCurrentConstellationCountWhenLarger();
     void ignoresNonDeepSkyRowsFromDeepSkySource();
+    void reorderedBridgeSourcesKeepSingleWinnerAndCompleteContributors();
+    void repeatedImportsKeepDeterministicWinnerAndContributors();
+    void reimportedDescriptorReplacesAbsorbedRecord();
 };
 
 void CatalogCompositionCollectionTests::composesTwoStarAndTwoDsoSourcesWithOverlapsAndMixedSource()
@@ -681,6 +684,174 @@ void CatalogCompositionCollectionTests::ignoresNonDeepSkyRowsFromDeepSkySource()
     const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
     QVERIFY(findBodyById(bodies, "hip_bad") == nullptr);
     QVERIFY(findBodyById(bodies, "ngc_1") != nullptr);
+}
+
+void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepSingleWinnerAndCompleteContributors()
+{
+    // Source A knows HIP 1, source C knows HD 2, and source B carries both
+    // identifiers, so B is the bridge no matter where it appears in the
+    // collection. Every order must produce one survivor whose contributor list
+    // covers all three sources; which source wins follows the documented
+    // precedence: because every source matches the established object, the
+    // last source of the order supplies the survivor.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    const auto sourceB = createCatalog(
+        {makeStar(
+            "b_bridge", "Bridge", {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, 1.0, 2.0
+        )},
+        {}
+    );
+    const auto sourceC =
+        createCatalog({makeStar("c_hd2", "Gamma", {CatalogIdentifier::make("hd", "2")}, 1.0, 2.0)}, {});
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    struct ExpectedOutcome final {
+        std::vector<std::size_t> order;
+        std::string winnerId;
+        std::vector<std::string> contributors;
+    };
+
+    const std::vector<std::string> sourceIds = {"source-a", "source-b", "source-c"};
+    const std::vector<std::string> rowIds = {"a_hip1", "b_bridge", "c_hd2"};
+    const std::vector<const skygate::ephemeris::IStarCatalog*> catalogs = {sourceA.get(), sourceB.get(), sourceC.get()};
+    const std::vector<ExpectedOutcome> outcomes = {
+        {{0U, 1U, 2U}, "c_hd2", {"source-c", "source-b", "source-a"}},
+        {{0U, 2U, 1U}, "b_bridge", {"source-b", "source-a", "source-c"}},
+        {{1U, 0U, 2U}, "c_hd2", {"source-c", "source-a", "source-b"}},
+        {{1U, 2U, 0U}, "a_hip1", {"source-a", "source-c", "source-b"}},
+        {{2U, 0U, 1U}, "b_bridge", {"source-b", "source-c", "source-a"}},
+        {{2U, 1U, 0U}, "a_hip1", {"source-a", "source-b", "source-c"}},
+    };
+
+    for (const ExpectedOutcome& outcome : outcomes) {
+        CatalogCompositionRequest request;
+        request.sources.reserve(outcome.order.size());
+        for (const std::size_t catalogIndex : outcome.order) {
+            request.sources.push_back(
+                CatalogCompositionSourceEntry{
+                    .sourceId = sourceIds[catalogIndex],
+                    .enabled = true,
+                    .catalog = catalogs[catalogIndex],
+                    .policy = CatalogCompositionPolicy::Merge,
+                }
+            );
+        }
+
+        const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+        QVERIFY(result.isSuccess());
+        QCOMPARE(result.bodyCount, std::size_t{1});
+        QCOMPARE(result.starCount, std::size_t{1});
+
+        const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+        const BaseCelestialBody* winner = findBodyById(bodies, outcome.winnerId);
+        QVERIFY2(winner != nullptr, qPrintable(QString::fromStdString(outcome.winnerId)));
+        QVERIFY(hasIdentifier(*winner, "hip", "1"));
+        QVERIFY(hasIdentifier(*winner, "hd", "2"));
+        QCOMPARE(*sourceIdFor(result, bodies, outcome.winnerId), outcome.contributors.front());
+        QCOMPARE(*contributorsFor(result, bodies, outcome.winnerId), outcome.contributors);
+
+        for (const std::string& rowId : rowIds) {
+            if (rowId != outcome.winnerId) {
+                QCOMPARE(countBodiesById(bodies, rowId), std::size_t{0});
+            }
+        }
+    }
+}
+
+void CatalogCompositionCollectionTests::repeatedImportsKeepDeterministicWinnerAndContributors()
+{
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    const auto reloadedA =
+        createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    const auto sourceB = createCatalog(
+        {makeStar(
+            "b_bridge", "Bridge", {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, 1.0, 2.0
+        )},
+        {}
+    );
+    const auto sourceC =
+        createCatalog({makeStar("c_hd2", "Gamma", {CatalogIdentifier::make("hd", "2")}, 1.0, 2.0)}, {});
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(reloadedA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    const auto compose = [&](const skygate::ephemeris::IStarCatalog* sourceACatalog) {
+        CatalogCompositionRequest request;
+        request.sources = {
+            {.sourceId = "source-a",
+             .enabled = true,
+             .catalog = sourceACatalog,
+             .policy = CatalogCompositionPolicy::Merge},
+            {.sourceId = "source-b",
+             .enabled = true,
+             .catalog = sourceB.get(),
+             .policy = CatalogCompositionPolicy::Merge},
+            {.sourceId = "source-c",
+             .enabled = true,
+             .catalog = sourceC.get(),
+             .policy = CatalogCompositionPolicy::Merge},
+        };
+        return skygate::ephemeris::CatalogComposer::composeCollection(request);
+    };
+
+    const CatalogCompositionResult first = compose(sourceA.get());
+    const CatalogCompositionResult repeated = compose(sourceA.get());
+    const CatalogCompositionResult afterReload = compose(reloadedA.get());
+
+    for (const CatalogCompositionResult* result : {&first, &repeated, &afterReload}) {
+        QVERIFY(result->isSuccess());
+        QCOMPARE(result->bodyCount, std::size_t{1});
+        QCOMPARE(result->starCount, std::size_t{1});
+
+        const std::span<const BaseCelestialBody* const> bodies = result->catalog->bodies();
+        const BaseCelestialBody* winner = findBodyById(bodies, "c_hd2");
+        QVERIFY(winner != nullptr);
+        QVERIFY(hasIdentifier(*winner, "hip", "1"));
+        QVERIFY(hasIdentifier(*winner, "hd", "2"));
+        QCOMPARE(*sourceIdFor(*result, bodies, "c_hd2"), std::string("source-c"));
+        QCOMPARE(
+            *contributorsFor(*result, bodies, "c_hd2"), (std::vector<std::string>{"source-c", "source-b", "source-a"})
+        );
+    }
+}
+
+void CatalogCompositionCollectionTests::reimportedDescriptorReplacesAbsorbedRecord()
+{
+    // Two instances of one descriptor describe the same record key. The later
+    // instance replaces the absorbed record instead of adding a survivor, and
+    // its own source instance stays the winner.
+    const auto firstImport =
+        createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    const auto secondImport =
+        createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
+    QVERIFY(firstImport != nullptr);
+    QVERIFY(secondImport != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a",
+         .enabled = true,
+         .catalog = firstImport.get(),
+         .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-a-reload",
+         .enabled = true,
+         .catalog = secondImport.get(),
+         .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "a_hip1"), std::size_t{1});
+    QCOMPARE(*sourceIdFor(result, bodies, "a_hip1"), std::string("source-a-reload"));
+    QCOMPARE(*contributorsFor(result, bodies, "a_hip1"), (std::vector<std::string>{"source-a-reload", "source-a"}));
 }
 
 QTEST_APPLESS_MAIN(CatalogCompositionCollectionTests)

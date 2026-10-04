@@ -8,6 +8,7 @@
 
 #include <QLoggingCategory>
 #include <QString>
+#include <QStringList>
 
 #include <algorithm>
 #include <cmath>
@@ -145,11 +146,16 @@ struct MergeAccumulator final {
 struct MatchDecision final {
     enum class Action {
         Append,
-        Merge
+        Merge,
+        Bridge
     };
 
     Action action = Action::Append;
+    // Position of the single matched survivor; meaningful when action is Merge.
     std::size_t matchIndex = 0;
+    // Same-kind survivors an ambiguous authoritative match bridged; non-empty
+    // only when action is Bridge.
+    std::vector<std::size_t> bridgeCandidates;
 };
 
 QString bodyLabel(const BaseCelestialBody& body)
@@ -388,8 +394,77 @@ void logConflictingAstrometry(const BaseCelestialBody& winner, const BaseCelesti
         << bodyLabel(loser) << ".";
 }
 
+// Contributor source ids of the absorbed positions in position order, so the
+// survivor records every absorbed body and each prior contributor.
+std::vector<std::string>
+collectContributors(const MergeAccumulator& accumulator, const std::vector<std::size_t>& positions)
+{
+    std::vector<std::string> contributors;
+    for (const std::size_t position : positions) {
+        for (const std::string& sourceId : accumulator.contributorSourceIds[position]) {
+            contributors.push_back(sourceId);
+        }
+    }
+    return contributors;
+}
+
+// Merges every absorbed survivor into `winner` in position order, reporting the
+// metadata conflicts that the winner overrides.
+void absorbSurvivors(
+    BaseCelestialBody& winner, const MergeAccumulator& accumulator, const std::vector<std::size_t>& positions
+)
+{
+    for (const std::size_t position : positions) {
+        const BaseCelestialBody& loser = accumulator.at(position);
+        bool conflict = false;
+        mergeSurvivorInPlace(winner, loser, conflict);
+        if (conflict) {
+            logConflictingAstrometry(winner, loser);
+        }
+    }
+}
+
+// Appends `incoming` as the survivor of every absorbed position. The incoming
+// record wins because it is the later record that establishes the shared
+// authoritative identity or replaces an earlier source's survivor. Absorbed
+// positions are vacated and removed from the index before the winner is
+// registered, so later rows resolve to the winner and never to a vacated body.
+std::size_t absorbSurvivorsAndAppend(
+    MergeAccumulator& accumulator,
+    CatalogIdentityIndex& index,
+    const BaseCelestialBody& incoming,
+    const std::vector<std::size_t>& absorbedPositions,
+    std::string sourceId
+)
+{
+    std::vector<std::string> priorContributors = collectContributors(accumulator, absorbedPositions);
+    std::size_t position = 0;
+    if (incoming.kind == BaseCelestialBody::Kind::DeepSkyObject) {
+        DistantCelestialBody winner = CelestialBodyCatalog::copyDistantBody(incoming);
+        absorbSurvivors(winner, accumulator, absorbedPositions);
+        for (const std::size_t absorbed : absorbedPositions) {
+            accumulator.vacate(absorbed);
+            index.remove(absorbed);
+        }
+        position = accumulator.append(winner, std::move(sourceId), std::move(priorContributors));
+    } else {
+        OwnGalaxyCelestialBody winner = CelestialBodyCatalog::copyOwnGalaxyBody(incoming);
+        absorbSurvivors(winner, accumulator, absorbedPositions);
+        for (const std::size_t absorbed : absorbedPositions) {
+            accumulator.vacate(absorbed);
+            index.remove(absorbed);
+        }
+        position = accumulator.append(winner, std::move(sourceId), std::move(priorContributors));
+    }
+    index.add(accumulator.at(position), position);
+    return position;
+}
+
 // Decides how `incoming` resolves against the bodies already indexed, logging
-// any keep-distinct decision.
+// every keep-distinct decision. An ambiguous authoritative match of the same
+// kind is a bridge: the incoming record becomes the survivor of all matched
+// same-kind bodies. Matched bodies of an incompatible kind stay distinct and
+// are diagnosed.
 MatchDecision
 evaluateMatch(const MergeAccumulator& accumulator, const CatalogIdentityIndex& index, const BaseCelestialBody& incoming)
 {
@@ -410,6 +485,21 @@ evaluateMatch(const MergeAccumulator& accumulator, const CatalogIdentityIndex& i
         }
 
         decision.action = MatchDecision::Action::Merge;
+        return decision;
+    }
+
+    if (resolution.kind == CatalogIdentityIndex::Resolution::MatchKind::AmbiguousAuthoritative) {
+        for (const std::size_t candidate : resolution.candidates) {
+            const BaseCelestialBody& existing = accumulator.at(candidate);
+            if (existing.kind == incoming.kind) {
+                decision.bridgeCandidates.push_back(candidate);
+                continue;
+            }
+            logIncompatibleKind(existing, incoming);
+        }
+        if (!decision.bridgeCandidates.empty()) {
+            decision.action = MatchDecision::Action::Bridge;
+        }
         return decision;
     }
 
@@ -439,25 +529,19 @@ std::size_t appendDeduped(
         if (conflict) {
             logConflictingAstrometry(accumulator.at(decision.matchIndex), body);
         }
+        // Registers the merged record's keys as well, so a later record with
+        // the same record key resolves to this survivor.
         index.add(body, decision.matchIndex);
         return decision.matchIndex;
+    }
+
+    if (decision.action == MatchDecision::Action::Bridge) {
+        return absorbSurvivorsAndAppend(accumulator, index, body, decision.bridgeCandidates, std::string(sourceId));
     }
 
     const std::size_t position = accumulator.append(body, std::string(sourceId));
     index.add(body, position);
     return position;
-}
-
-// Builds an identity index over the currently active (non-vacated) positions.
-CatalogIdentityIndex buildActiveIndex(const MergeAccumulator& accumulator)
-{
-    CatalogIdentityIndex index;
-    for (std::size_t position = 0; position < accumulator.active.size(); ++position) {
-        if (accumulator.active[position]) {
-            index.add(accumulator.at(position), position);
-        }
-    }
-    return index;
 }
 
 bool participates(const CatalogCompositionPolicy policy, const BaseCelestialBody& body)
@@ -477,6 +561,64 @@ bool hasAnyMatch(const CatalogIdentityIndex& index, const BaseCelestialBody& bod
 {
     const CatalogIdentityIndex::Resolution resolution = index.resolve(body);
     return resolution.hasSingleMatch() || resolution.isAmbiguous();
+}
+
+// Positions in `positions` that share their object kind with another position.
+// A shared authoritative identity across incompatible kinds is a deliberate,
+// already diagnosed conflict; the same identity across survivors of one kind
+// is an internal merge error.
+std::vector<std::size_t>
+sameKindDuplicates(const MergeAccumulator& accumulator, const std::vector<std::size_t>& positions)
+{
+    std::vector<std::size_t> duplicates;
+    for (const std::size_t position : positions) {
+        const BaseCelestialBody::Kind kind = accumulator.at(position).kind;
+        const bool sharesKind = std::any_of(positions.begin(), positions.end(), [&](const std::size_t other) {
+            return other != position && accumulator.at(other).kind == kind;
+        });
+        if (sharesKind) {
+            duplicates.push_back(position);
+        }
+    }
+    return duplicates;
+}
+
+// Merge validation: no authoritative identity may be shared by two active
+// survivors of the same kind. The validated index is rebuilt from the active
+// survivors rather than reused from the merge, so the check also catches an
+// index that fell out of step with the merged collection.
+void logUnexpectedDuplicateIdentities(const MergeAccumulator& accumulator)
+{
+    CatalogIdentityIndex validationIndex;
+    validationIndex.reserve(accumulator.active.size());
+    for (std::size_t position = 0; position < accumulator.active.size(); ++position) {
+        if (accumulator.active[position]) {
+            validationIndex.add(accumulator.at(position), position);
+        }
+    }
+
+    for (const CatalogIdentityIndex::DuplicateIdentity& duplicate :
+         validationIndex.duplicateAuthoritativeIdentities()) {
+        const std::vector<std::size_t> conflicting = sameKindDuplicates(accumulator, duplicate.positions);
+        if (conflicting.empty()) {
+            continue;
+        }
+
+        QStringList labels;
+        labels.reserve(static_cast<qsizetype>(conflicting.size()));
+        for (const std::size_t position : conflicting) {
+            labels.append(bodyLabel(accumulator.at(position)));
+        }
+
+        const QString message = QStringLiteral(
+                                    "Catalog composition validation found unexpected duplicate authoritative "
+                                    "identity %1 across %2 active survivors of the same kind: %3."
+        )
+                                    .arg(QString::fromStdString(duplicate.key))
+                                    .arg(static_cast<qulonglong>(conflicting.size()))
+                                    .arg(labels.join(QStringLiteral(", ")));
+        qCWarning(skygateCatalogCompositionLog).noquote() << message;
+    }
 }
 
 void pushOwnGalaxyBody(
@@ -548,6 +690,7 @@ void assembleResult(CatalogCompositionMergeResult& result, const MergeAccumulato
 CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const CatalogCompositionRequest& request)
 {
     MergeAccumulator accumulator;
+    CatalogIdentityIndex activeIndex;
     bool augmentCoreEnabled = false;
     std::string augmentCoreSourceId;
     bool hasStar = false;
@@ -563,7 +706,6 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                 augmentCoreSourceId = source.sourceId;
             }
 
-            CatalogIdentityIndex index = buildActiveIndex(accumulator);
             for (const BaseCelestialBody* body : source.catalog->bodies()) {
                 if (body == nullptr || !participates(source.policy, *body)) {
                     continue;
@@ -572,11 +714,11 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     hasStar = true;
                 }
                 const SourceScopedBody scoped{*body, source.sourceId};
-                if (hasAnyMatch(index, scoped.body())) {
+                if (hasAnyMatch(activeIndex, scoped.body())) {
                     continue;
                 }
                 const std::size_t position = accumulator.append(scoped.body(), source.sourceId);
-                index.add(scoped.body(), position);
+                activeIndex.add(accumulator.at(position), position);
             }
             continue;
         }
@@ -593,47 +735,61 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             appendDeduped(sourceBodies, sourceIndex, *body, source.sourceId);
         }
 
-        const CatalogIdentityIndex activeIndex = buildActiveIndex(accumulator);
+        // Positions from this pass start here, so a match at or above this
+        // boundary belongs to the source currently being merged.
+        const std::size_t passStartPosition = accumulator.sourceIds.size();
         for (std::size_t position = 0; position < sourceBodies.sourceIds.size(); ++position) {
+            if (!sourceBodies.active[position]) {
+                continue;
+            }
+
             const BaseCelestialBody& body = sourceBodies.at(position);
             const MatchDecision decision = evaluateMatch(accumulator, activeIndex, body);
             if (decision.action == MatchDecision::Action::Merge) {
-                const BaseCelestialBody& loser = accumulator.at(decision.matchIndex);
-                std::vector<std::string> priorContributors = accumulator.contributorSourceIds[decision.matchIndex];
-                bool conflict = false;
-                if (body.kind == BaseCelestialBody::Kind::DeepSkyObject) {
-                    DistantCelestialBody winner = CelestialBodyCatalog::copyDistantBody(body);
-                    mergeSurvivorInPlace(winner, loser, conflict);
-                    accumulator.vacate(decision.matchIndex);
+                if (decision.matchIndex >= passStartPosition) {
+                    // This pass already produced the survivor: the first record
+                    // of a source is authoritative and later records of the
+                    // same pass only fill its missing metadata.
+                    bool conflict = false;
+                    mergeSurvivorInPlace(accumulator.at(decision.matchIndex), body, conflict);
                     if (conflict) {
-                        logConflictingAstrometry(winner, loser);
+                        logConflictingAstrometry(accumulator.at(decision.matchIndex), body);
                     }
-                    static_cast<void>(accumulator.append(winner, source.sourceId, std::move(priorContributors)));
-                } else {
-                    OwnGalaxyCelestialBody winner = CelestialBodyCatalog::copyOwnGalaxyBody(body);
-                    mergeSurvivorInPlace(winner, loser, conflict);
-                    accumulator.vacate(decision.matchIndex);
-                    if (conflict) {
-                        logConflictingAstrometry(winner, loser);
-                    }
-                    static_cast<void>(accumulator.append(winner, source.sourceId, std::move(priorContributors)));
+                    activeIndex.add(body, decision.matchIndex);
+                    continue;
                 }
+
+                // A later source wins over an earlier source's survivor and
+                // absorbs its non-conflicting identity and metadata.
+                static_cast<void>(
+                    absorbSurvivorsAndAppend(accumulator, activeIndex, body, {decision.matchIndex}, source.sourceId)
+                );
                 continue;
             }
-            static_cast<void>(accumulator.append(body, source.sourceId));
+
+            if (decision.action == MatchDecision::Action::Bridge) {
+                static_cast<void>(
+                    absorbSurvivorsAndAppend(accumulator, activeIndex, body, decision.bridgeCandidates, source.sourceId)
+                );
+                continue;
+            }
+
+            const std::size_t appendedPosition = accumulator.append(body, source.sourceId);
+            activeIndex.add(accumulator.at(appendedPosition), appendedPosition);
         }
     }
 
     if (augmentCoreEnabled && !hasStar) {
-        CatalogIdentityIndex index = buildActiveIndex(accumulator);
         for (const OwnGalaxyCelestialBody& brightStar : CoreBodyCatalogAugmenter::bundledBrightStars()) {
-            if (hasAnyMatch(index, brightStar)) {
+            if (hasAnyMatch(activeIndex, brightStar)) {
                 continue;
             }
             const std::size_t position = accumulator.append(brightStar, augmentCoreSourceId);
-            index.add(brightStar, position);
+            activeIndex.add(accumulator.at(position), position);
         }
     }
+
+    logUnexpectedDuplicateIdentities(accumulator);
 
     CatalogCompositionMergeResult result;
     assembleResult(result, accumulator);

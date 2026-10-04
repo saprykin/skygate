@@ -56,6 +56,11 @@ private slots:
     void reportsAmbiguousAliasMatch();
     void resolvesIdentifierChainsIncrementally();
     void ignoresBodiesWithoutIdentity();
+    void removesVacatedPositionKeys();
+    void keepsOtherPositionsWhenRemovingSharedKey();
+    void removesDeepSkyAliasKeys();
+    void reportsDuplicateAuthoritativeIdentities();
+    void doesNotReportDistinctAuthoritativeIdentities();
 };
 
 void CatalogIdentityIndexTests::resolvesCanonicalIdCaseInsensitively()
@@ -197,6 +202,86 @@ void CatalogIdentityIndexTests::ignoresBodiesWithoutIdentity()
     const OwnGalaxyCelestialBody incoming = makeStar("hip_2");
     const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
     QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+}
+
+void CatalogIdentityIndexTests::removesVacatedPositionKeys()
+{
+    const OwnGalaxyCelestialBody registered = makeStar("hip_123", {CatalogIdentifier::make("hip", "123")});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    index.remove(0U);
+
+    QCOMPARE(index.resolve(registered).kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+
+    index.add(registered, 1U);
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(registered);
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.index, std::size_t{1});
+}
+
+void CatalogIdentityIndexTests::keepsOtherPositionsWhenRemovingSharedKey()
+{
+    const OwnGalaxyCelestialBody star = makeStar("hip_1", {CatalogIdentifier::make("hip", "123")});
+    const DistantCelestialBody deepSkyObject =
+        makeDeepSkyObject("ngc_123", {}, {CatalogIdentifier::make("hip", "123")});
+    CatalogIdentityIndex index;
+    index.add(star, 0U);
+    index.add(deepSkyObject, 1U);
+    QVERIFY(index.resolve(star).isAmbiguous());
+
+    index.remove(0U);
+
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(star);
+    QVERIFY(resolution.hasSingleMatch());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::ExternalIdentifier);
+    QCOMPARE(resolution.index, std::size_t{1});
+}
+
+void CatalogIdentityIndexTests::removesDeepSkyAliasKeys()
+{
+    const DistantCelestialBody registered = makeDeepSkyObject("ngc_224", {"M31"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    index.remove(0U);
+
+    const DistantCelestialBody incoming = makeDeepSkyObject("open_ngc_m31", {"M 31"});
+    QCOMPARE(index.resolve(incoming).kind, CatalogIdentityIndex::Resolution::MatchKind::None);
+}
+
+void CatalogIdentityIndexTests::reportsDuplicateAuthoritativeIdentities()
+{
+    CatalogIdentityIndex index;
+    index.add(makeStar("hip_1", {CatalogIdentifier::make("hip", "123")}), 0U);
+    index.add(makeStar("catalog_b_1", {CatalogIdentifier::make("hip", "0123")}), 1U);
+
+    const std::vector<CatalogIdentityIndex::DuplicateIdentity> duplicates = index.duplicateAuthoritativeIdentities();
+    QCOMPARE(duplicates.size(), std::size_t{1});
+    QCOMPARE(duplicates.front().key, std::string("hip:123"));
+    QCOMPARE(duplicates.front().positions, (std::vector<std::size_t>{0U, 1U}));
+
+    // A vacated position no longer participates in the validation.
+    index.remove(1U);
+    QVERIFY(index.duplicateAuthoritativeIdentities().empty());
+
+    CatalogIdentityIndex canonicalIndex;
+    canonicalIndex.add(makeStar("hip_123"), 0U);
+    canonicalIndex.add(makeStar("HIP_123"), 1U);
+    const std::vector<CatalogIdentityIndex::DuplicateIdentity> canonicalDuplicates =
+        canonicalIndex.duplicateAuthoritativeIdentities();
+    QCOMPARE(canonicalDuplicates.size(), std::size_t{1});
+    QCOMPARE(canonicalDuplicates.front().key, std::string("hip_123"));
+    QCOMPARE(canonicalDuplicates.front().positions, (std::vector<std::size_t>{0U, 1U}));
+}
+
+void CatalogIdentityIndexTests::doesNotReportDistinctAuthoritativeIdentities()
+{
+    CatalogIdentityIndex index;
+    index.add(makeStar("hip_1", {CatalogIdentifier::make("hip", "1")}), 0U);
+    index.add(makeStar("hip_2", {CatalogIdentifier::make("hip", "2")}), 1U);
+
+    QVERIFY(index.duplicateAuthoritativeIdentities().empty());
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityIndexTests)

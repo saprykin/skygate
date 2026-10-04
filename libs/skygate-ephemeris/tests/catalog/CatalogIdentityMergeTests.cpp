@@ -180,6 +180,10 @@ private slots:
     void keepsSuffixDesignationsDistinct();
     void mergesExplicitCrossIdentifications();
     void primaryDesignationSurvivesBinaryRoundTrip();
+    void bridgesIdentifiersAcquiredEarlierInTheSameSourcePass();
+    void bridgesAmbiguousAuthoritativeIdentifiersIntoSingleSurvivor();
+    void keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors();
+    void bridgesDeepSkyObjectsWithMetadataUnion();
 };
 
 void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
@@ -654,6 +658,228 @@ void CatalogIdentityMergeTests::primaryDesignationSurvivesBinaryRoundTrip()
     QVERIFY(result.isSuccess());
     QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
     QCOMPARE(countBodiesById(result.catalog->bodies(), "external_ngc_1"), std::size_t{1});
+}
+
+void CatalogIdentityMergeTests::bridgesIdentifiersAcquiredEarlierInTheSameSourcePass()
+{
+    // R3: source A establishes that HIP 1 and HD 2 are one object. Source B's
+    // first record replaces A and acquires HD 2; its later record resolves
+    // through that acquired identifier instead of appending a second survivor.
+    const auto sourceA = createCatalog(
+        {makeStar(
+            "a_hip1_hd2",
+            "Established",
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")},
+            {},
+            1.0,
+            2.0
+        )},
+        {}
+    );
+    const auto sourceB = createCatalog(
+        {
+            makeStar("b_hip1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0),
+            makeStar(
+                "b_hd2",
+                "Later record",
+                {CatalogIdentifier::make("hd", "2"), CatalogIdentifier::make("hyg", "5")},
+                {},
+                1.0,
+                2.0
+            ),
+        },
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(result.starCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "a_hip1_hd2"), std::size_t{0});
+    QCOMPARE(countBodiesById(bodies, "b_hd2"), std::size_t{0});
+
+    const BaseCelestialBody* winner = findBodyById(bodies, "b_hip1");
+    QVERIFY(winner != nullptr);
+    QVERIFY(hasIdentifier(*winner, "hip", "1"));
+    QVERIFY(hasIdentifier(*winner, "hd", "2"));
+    // b_hd2 was merged into the survivor, so its own identifier survives too.
+    QVERIFY(hasIdentifier(*winner, "hyg", "5"));
+    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("Established"));
+    QVERIFY(winner->fixedEquatorialValue().has_value());
+    QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(result.sourceIds.front(), std::string("source-b"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a"}));
+}
+
+void CatalogIdentityMergeTests::bridgesAmbiguousAuthoritativeIdentifiersIntoSingleSurvivor()
+{
+    // The bridging record carries both authoritative identifiers. It resolves
+    // each of them to a different survivor of an earlier source, so it becomes
+    // the single survivor of all three records instead of a third object.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceC =
+        createCatalog({makeStar("c_hd2", "Gamma", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB = createCatalog(
+        {makeStar(
+            "b_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceC != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "a_hip1"), std::size_t{0});
+    QCOMPARE(countBodiesById(bodies, "c_hd2"), std::size_t{0});
+
+    const BaseCelestialBody* winner = findBodyById(bodies, "b_bridge");
+    QVERIFY(winner != nullptr);
+    QVERIFY(hasIdentifier(*winner, "hip", "1"));
+    QVERIFY(hasIdentifier(*winner, "hd", "2"));
+    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("Alpha"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-b"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a", "source-c"}));
+}
+
+void CatalogIdentityMergeTests::keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors()
+{
+    const auto stars =
+        createCatalog({makeStar("star_a", {}, {CatalogIdentifier::make("hip", "123")}, {}, 1.0, 2.0)}, {});
+    const auto conflictingDeepSky = createCatalog(
+        {}, {makeDeepSkyObject("dso_hip_123", "Conflicting DSO", {}, {CatalogIdentifier::make("hip", "123")}, 1.0, 2.0)}
+    );
+    const auto starBridge =
+        createCatalog({makeStar("star_bridge", {}, {CatalogIdentifier::make("hip", "123")}, {}, 1.0, 2.0)}, {});
+    QVERIFY(stars != nullptr);
+    QVERIFY(conflictingDeepSky != nullptr);
+    QVERIFY(starBridge != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept dso_hip_123 distinct from star_a because the shared identity is used by "
+        "incompatible object kinds."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept star_bridge distinct from dso_hip_123 because the shared identity is used by "
+        "incompatible object kinds."
+    );
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "stars", .enabled = true, .catalog = stars.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "conflicting-deep-sky",
+         .enabled = true,
+         .catalog = conflictingDeepSky.get(),
+         .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "star-bridge",
+         .enabled = true,
+         .catalog = starBridge.get(),
+         .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{2});
+    QCOMPARE(result.starCount, std::size_t{1});
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "star_a"), std::size_t{0});
+
+    const BaseCelestialBody* bridgedStar = findBodyById(bodies, "star_bridge");
+    QVERIFY(bridgedStar != nullptr);
+    QVERIFY(hasIdentifier(*bridgedStar, "hip", "123"));
+    const BaseCelestialBody* conflicting = findBodyById(bodies, "dso_hip_123");
+    QVERIFY(conflicting != nullptr);
+    QCOMPARE(conflicting->kind, BaseCelestialBody::Kind::DeepSkyObject);
+    QVERIFY(hasIdentifier(*conflicting, "hip", "123"));
+}
+
+void CatalogIdentityMergeTests::bridgesDeepSkyObjectsWithMetadataUnion()
+{
+    const auto sourceA = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "a_ngc_224", "A Andromeda", {"Andromeda Galaxy"}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 178.0
+        )}
+    );
+    const auto sourceC = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "c_messier_31", "C Triangulum", {"Triangulum"}, {CatalogIdentifier::make("messier", "31")}, 1.0, 2.0, 60.0
+        )}
+    );
+    const auto sourceB = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "b_bridge",
+            {},
+            {},
+            {CatalogIdentifier::make("ngc", "224"), CatalogIdentifier::make("messier", "31")},
+            std::nullopt,
+            std::nullopt,
+            std::nullopt
+        )}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceC != nullptr);
+    QVERIFY(sourceB != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "a_ngc_224"), std::size_t{0});
+    QCOMPARE(countBodiesById(bodies, "c_messier_31"), std::size_t{0});
+
+    const BaseCelestialBody* winner = findBodyById(bodies, "b_bridge");
+    QVERIFY(winner != nullptr);
+    QVERIFY(hasIdentifier(*winner, "ngc", "224"));
+    QVERIFY(hasIdentifier(*winner, "messier", "031"));
+    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("A Andromeda"));
+    QVERIFY(hasAlias(winner->identity.aliases, "Andromeda Galaxy"));
+    QVERIFY(hasAlias(winner->identity.aliases, "Triangulum"));
+    QVERIFY(winner->fixedEquatorialValue().has_value());
+    QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    const auto* deepSkyInfo = winner->deepSkyObjectInfo();
+    QVERIFY(deepSkyInfo != nullptr);
+    QVERIFY(deepSkyInfo->majorAxisArcmin.has_value());
+    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 178.0);
+    QCOMPARE(result.sourceIds.front(), std::string("source-b"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a", "source-c"}));
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMergeTests)
