@@ -1,9 +1,13 @@
+#include "catalog/CatalogBinaryCodec.hpp"
+
+#include "BaseCelestialBody.hpp"
 #include "CelestialBodyCatalog.hpp"
+#include "DeepSkyObjectInfo.hpp"
 #include "DistantCelestialBody.hpp"
 #include "EquatorialCoordinate.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
-#include "SkyCatalogBinaryCodec.hpp"
-#include "catalog/InMemoryStarCatalog.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
+#include "catalog/IStarCatalog.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/EphemerisDateRange.hpp"
 
@@ -190,7 +194,7 @@ void writePayloadString(QDataStream& stream, const std::string& value)
 
 void writeBinaryHeader(QDataStream& stream)
 {
-    stream << kTestBinaryCatalogMagic << skygate::ui::internal::SkyCatalogBinaryCodec::kSchemaVersion;
+    stream << kTestBinaryCatalogMagic << skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion;
 }
 
 void writeOwnGalaxyBodyWithKind(QDataStream& stream, const std::uint8_t kind)
@@ -317,7 +321,7 @@ QByteArray makeInvalidTimeScalePayload(const std::uint8_t timeScale)
 
 }  // namespace
 
-class SkyCatalogBinaryCodecTests final : public QObject {
+class CatalogBinaryCodecTests final : public QObject {
     Q_OBJECT
 
 private slots:
@@ -332,14 +336,14 @@ private slots:
     void rejectsKnownDomainIndexOutOfRange();
 };
 
-void SkyCatalogBinaryCodecTests::roundTripsCatalogContents()
+void CatalogBinaryCodecTests::roundTripsCatalogContents()
 {
     const skygate::ephemeris::CelestialBodyCatalog source = makeTestCatalog();
-    const QByteArray payload = skygate::ui::internal::SkyCatalogBinaryCodec::serialize(source);
+    const QByteArray payload = skygate::ephemeris::CatalogBinaryCodec::serialize(source);
     QVERIFY(!payload.isEmpty());
 
     const std::unique_ptr<skygate::ephemeris::IStarCatalog> restored =
-        skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload);
+        skygate::ephemeris::CatalogBinaryCodec::deserialize(payload);
     QVERIFY(restored != nullptr);
     QCOMPARE(restored->catalog().ownGalaxyBodies().size(), source.ownGalaxyBodies().size());
     QCOMPARE(restored->catalog().distantBodies().size(), source.distantBodies().size());
@@ -375,64 +379,64 @@ void SkyCatalogBinaryCodecTests::roundTripsCatalogContents()
     }
 }
 
-void SkyCatalogBinaryCodecTests::rejectsEmptyPayload()
+void CatalogBinaryCodecTests::rejectsEmptyPayload()
 {
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(QByteArray{}) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(QByteArray{}) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsCorruptPayload()
+void CatalogBinaryCodecTests::rejectsCorruptPayload()
 {
     const skygate::ephemeris::CelestialBodyCatalog source = makeTestCatalog();
-    QByteArray payload = skygate::ui::internal::SkyCatalogBinaryCodec::serialize(source);
+    QByteArray payload = skygate::ephemeris::CatalogBinaryCodec::serialize(source);
 
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload.mid(0, payload.size() / 2)) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload.mid(0, payload.size() / 2)) == nullptr);
     payload[4] = static_cast<char>(payload[4] ^ 0xFF);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsUnknownOrderDomainWithEmptyVectors()
+void CatalogBinaryCodecTests::rejectsUnknownOrderDomainWithEmptyVectors()
 {
     const QByteArray payload = makeOrderEntryPayload(0xFFU, 0U);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsUnknownOrderDomainWithExtremeIndex()
+void CatalogBinaryCodecTests::rejectsUnknownOrderDomainWithExtremeIndex()
 {
     const QByteArray payload = makeOrderEntryPayload(0xFFU, std::numeric_limits<std::uint64_t>::max());
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsInvalidOwnGalaxyBodyKind()
+void CatalogBinaryCodecTests::rejectsInvalidOwnGalaxyBodyKind()
 {
     const QByteArray payload = makeInvalidOwnGalaxyKindPayload(0xFFU);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsInvalidDeepSkyObjectKind()
+void CatalogBinaryCodecTests::rejectsInvalidDeepSkyObjectKind()
 {
     const QByteArray payload = makeInvalidDeepSkyKindPayload(0xFFU);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsInvalidTimeScale()
+void CatalogBinaryCodecTests::rejectsInvalidTimeScale()
 {
     const QByteArray payload = makeInvalidTimeScalePayload(0xFFU);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(payload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(payload) == nullptr);
 }
 
-void SkyCatalogBinaryCodecTests::rejectsKnownDomainIndexOutOfRange()
+void CatalogBinaryCodecTests::rejectsKnownDomainIndexOutOfRange()
 {
     const auto ownGalaxyDomain =
         static_cast<std::uint8_t>(skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy);
     const auto distantDomain = static_cast<std::uint8_t>(skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant);
 
     const QByteArray ownGalaxyPayload = makeSingleBodyOrderPayload(ownGalaxyDomain, 1U, true);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(ownGalaxyPayload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(ownGalaxyPayload) == nullptr);
 
     const QByteArray distantPayload = makeSingleBodyOrderPayload(distantDomain, 1U, false);
-    QVERIFY(skygate::ui::internal::SkyCatalogBinaryCodec::deserialize(distantPayload) == nullptr);
+    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(distantPayload) == nullptr);
 }
 
-QTEST_GUILESS_MAIN(SkyCatalogBinaryCodecTests)
+QTEST_APPLESS_MAIN(CatalogBinaryCodecTests)
 
-#include "SkyCatalogBinaryCodecTests.moc"
+#include "CatalogBinaryCodecTests.moc"

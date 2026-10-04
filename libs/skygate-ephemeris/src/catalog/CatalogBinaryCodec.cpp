@@ -1,7 +1,12 @@
-#include "SkyCatalogBinaryCodec.hpp"
+#include "catalog/CatalogBinaryCodec.hpp"
 
+#include "BaseCelestialBody.hpp"
 #include "CelestialBodyCatalog.hpp"
+#include "DeepSkyObjectInfo.hpp"
+#include "DistantCelestialBody.hpp"
 #include "EquatorialCoordinate.hpp"
+#include "OwnGalaxyCelestialBody.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 #include "catalog/InMemoryStarCatalog.hpp"
 #include "time/AstronomicalEpoch.hpp"
 #include "time/EphemerisDateRange.hpp"
@@ -16,7 +21,7 @@
 #include <utility>
 #include <vector>
 
-namespace skygate::ui::internal {
+namespace skygate::ephemeris {
 namespace {
 
 constexpr std::uint32_t kBinaryCatalogMagic = 0x53474243U;  // "SGBC"
@@ -25,9 +30,9 @@ constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
 
 [[nodiscard]] bool isKnownBodyDomain(const std::uint8_t domain)
 {
-    switch (static_cast<skygate::ephemeris::CelestialBodyCatalog::BodyDomain>(domain)) {
-    case skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy:
-    case skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant:
+    switch (static_cast<CelestialBodyCatalog::BodyDomain>(domain)) {
+    case CelestialBodyCatalog::BodyDomain::OwnGalaxy:
+    case CelestialBodyCatalog::BodyDomain::Distant:
         return true;
     }
     return false;
@@ -35,13 +40,13 @@ constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
 
 [[nodiscard]] bool isKnownBodyKind(const std::uint8_t kind)
 {
-    switch (static_cast<skygate::ephemeris::BaseCelestialBody::Kind>(kind)) {
-    case skygate::ephemeris::BaseCelestialBody::Kind::Star:
-    case skygate::ephemeris::BaseCelestialBody::Kind::Planet:
-    case skygate::ephemeris::BaseCelestialBody::Kind::Moon:
-    case skygate::ephemeris::BaseCelestialBody::Kind::Sun:
-    case skygate::ephemeris::BaseCelestialBody::Kind::Constellation:
-    case skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject:
+    switch (static_cast<BaseCelestialBody::Kind>(kind)) {
+    case BaseCelestialBody::Kind::Star:
+    case BaseCelestialBody::Kind::Planet:
+    case BaseCelestialBody::Kind::Moon:
+    case BaseCelestialBody::Kind::Sun:
+    case BaseCelestialBody::Kind::Constellation:
+    case BaseCelestialBody::Kind::DeepSkyObject:
         return true;
     }
     return false;
@@ -49,14 +54,14 @@ constexpr std::uint64_t kMaxOrderEntryCount = 10'000'000ULL;
 
 [[nodiscard]] bool isKnownDeepSkyObjectKind(const std::uint8_t kind)
 {
-    switch (static_cast<skygate::ephemeris::DeepSkyObjectInfo::Kind>(kind)) {
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Unknown:
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Galaxy:
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::OpenCluster:
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::GlobularCluster:
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Nebula:
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::PlanetaryNebula:
-    case skygate::ephemeris::DeepSkyObjectInfo::Kind::Asterism:
+    switch (static_cast<DeepSkyObjectInfo::Kind>(kind)) {
+    case DeepSkyObjectInfo::Kind::Unknown:
+    case DeepSkyObjectInfo::Kind::Galaxy:
+    case DeepSkyObjectInfo::Kind::OpenCluster:
+    case DeepSkyObjectInfo::Kind::GlobularCluster:
+    case DeepSkyObjectInfo::Kind::Nebula:
+    case DeepSkyObjectInfo::Kind::PlanetaryNebula:
+    case DeepSkyObjectInfo::Kind::Asterism:
         return true;
     }
     return false;
@@ -146,7 +151,7 @@ void writeEquatorial(QDataStream& stream, const skygate::core::EquatorialCoordin
     return stream.status() == QDataStream::Ok;
 }
 
-void writeDateRange(QDataStream& stream, const skygate::ephemeris::EphemerisDateRange& range)
+void writeDateRange(QDataStream& stream, const EphemerisDateRange& range)
 {
     writeString(stream, range.id);
     writeString(stream, range.displayName);
@@ -154,13 +159,13 @@ void writeDateRange(QDataStream& stream, const skygate::ephemeris::EphemerisDate
     writeEpoch(stream, range.end);
 }
 
-[[nodiscard]] bool readDateRange(QDataStream& stream, skygate::ephemeris::EphemerisDateRange& range)
+[[nodiscard]] bool readDateRange(QDataStream& stream, EphemerisDateRange& range)
 {
     return readString(stream, range.id) && readString(stream, range.displayName) && readEpoch(stream, range.start)
            && readEpoch(stream, range.end);
 }
 
-void writeStarAstrometry(QDataStream& stream, const skygate::ephemeris::CatalogStarAstrometry& astrometry)
+void writeStarAstrometry(QDataStream& stream, const CatalogStarAstrometry& astrometry)
 {
     writeEquatorial(stream, astrometry.referenceEquatorial);
     writeEpoch(stream, astrometry.referenceEpoch);
@@ -174,7 +179,7 @@ void writeStarAstrometry(QDataStream& stream, const skygate::ephemeris::CatalogS
     }
 }
 
-[[nodiscard]] bool readStarAstrometry(QDataStream& stream, skygate::ephemeris::CatalogStarAstrometry& astrometry)
+[[nodiscard]] bool readStarAstrometry(QDataStream& stream, CatalogStarAstrometry& astrometry)
 {
     if (!readEquatorial(stream, astrometry.referenceEquatorial) || !readEpoch(stream, astrometry.referenceEpoch)) {
         return false;
@@ -194,7 +199,7 @@ void writeStarAstrometry(QDataStream& stream, const skygate::ephemeris::CatalogS
         astrometry.validityRange = std::nullopt;
         return true;
     }
-    skygate::ephemeris::EphemerisDateRange range;
+    EphemerisDateRange range;
     if (!readDateRange(stream, range)) {
         return false;
     }
@@ -202,7 +207,7 @@ void writeStarAstrometry(QDataStream& stream, const skygate::ephemeris::CatalogS
     return true;
 }
 
-void writeDeepSkyInfo(QDataStream& stream, const skygate::ephemeris::DeepSkyObjectInfo& info)
+void writeDeepSkyInfo(QDataStream& stream, const DeepSkyObjectInfo& info)
 {
     stream << static_cast<std::uint8_t>(info.kind);
     stream << static_cast<std::uint64_t>(info.aliases.size());
@@ -214,7 +219,7 @@ void writeDeepSkyInfo(QDataStream& stream, const skygate::ephemeris::DeepSkyObje
     writeOptionalDouble(stream, info.positionAngleDeg);
 }
 
-[[nodiscard]] bool readDeepSkyInfo(QDataStream& stream, skygate::ephemeris::DeepSkyObjectInfo& info)
+[[nodiscard]] bool readDeepSkyInfo(QDataStream& stream, DeepSkyObjectInfo& info)
 {
     std::uint8_t kind = 0U;
     std::uint64_t aliasCount = 0U;
@@ -222,7 +227,7 @@ void writeDeepSkyInfo(QDataStream& stream, const skygate::ephemeris::DeepSkyObje
     if (stream.status() != QDataStream::Ok || aliasCount > kMaxBodyCount || !isKnownDeepSkyObjectKind(kind)) {
         return false;
     }
-    info.kind = static_cast<skygate::ephemeris::DeepSkyObjectInfo::Kind>(kind);
+    info.kind = static_cast<DeepSkyObjectInfo::Kind>(kind);
     info.aliases.clear();
     info.aliases.reserve(static_cast<std::size_t>(aliasCount));
     for (std::uint64_t index = 0; index < aliasCount; ++index) {
@@ -244,7 +249,7 @@ void writeDeepSkyInfo(QDataStream& stream, const skygate::ephemeris::DeepSkyObje
 
 }  // namespace
 
-QByteArray SkyCatalogBinaryCodec::serialize(const skygate::ephemeris::CelestialBodyCatalog& catalog)
+QByteArray CatalogBinaryCodec::serialize(const CelestialBodyCatalog& catalog)
 {
     QByteArray buffer;
     QDataStream stream(&buffer, QIODevice::WriteOnly);
@@ -255,7 +260,7 @@ QByteArray SkyCatalogBinaryCodec::serialize(const skygate::ephemeris::CelestialB
 
     const auto ownGalaxyBodies = catalog.ownGalaxyBodies();
     stream << static_cast<std::uint64_t>(ownGalaxyBodies.size());
-    for (const skygate::ephemeris::OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
+    for (const OwnGalaxyCelestialBody& body : ownGalaxyBodies) {
         writeString(stream, body.id);
         writeString(stream, body.displayName);
         stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
@@ -271,7 +276,7 @@ QByteArray SkyCatalogBinaryCodec::serialize(const skygate::ephemeris::CelestialB
 
     const auto distantBodies = catalog.distantBodies();
     stream << static_cast<std::uint64_t>(distantBodies.size());
-    for (const skygate::ephemeris::DistantCelestialBody& body : distantBodies) {
+    for (const DistantCelestialBody& body : distantBodies) {
         writeString(stream, body.id);
         writeString(stream, body.displayName);
         stream << static_cast<std::uint8_t>(body.kind) << body.visualMagnitude;
@@ -287,14 +292,14 @@ QByteArray SkyCatalogBinaryCodec::serialize(const skygate::ephemeris::CelestialB
 
     const auto orderedIndexes = catalog.orderedBodyIndexes();
     stream << static_cast<std::uint64_t>(orderedIndexes.size());
-    for (const skygate::ephemeris::CelestialBodyCatalog::OrderEntry& entry : orderedIndexes) {
+    for (const CelestialBodyCatalog::OrderEntry& entry : orderedIndexes) {
         stream << static_cast<std::uint8_t>(entry.domain) << static_cast<std::uint64_t>(entry.bodyIndex);
     }
 
     return buffer;
 }
 
-std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deserialize(const QByteArray& payload)
+std::unique_ptr<IStarCatalog> CatalogBinaryCodec::deserialize(const QByteArray& payload)
 {
     QDataStream stream(payload);
     stream.setVersion(QDataStream::Qt_6_5);
@@ -311,10 +316,10 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
     if (!readBodyCount(stream, ownGalaxyCount)) {
         return nullptr;
     }
-    std::vector<skygate::ephemeris::OwnGalaxyCelestialBody> ownGalaxyBodies;
+    std::vector<OwnGalaxyCelestialBody> ownGalaxyBodies;
     ownGalaxyBodies.reserve(static_cast<std::size_t>(ownGalaxyCount));
     for (std::uint64_t index = 0; index < ownGalaxyCount; ++index) {
-        skygate::ephemeris::OwnGalaxyCelestialBody body;
+        OwnGalaxyCelestialBody body;
         if (!readString(stream, body.id) || !readString(stream, body.displayName)) {
             return nullptr;
         }
@@ -323,7 +328,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
         if (stream.status() != QDataStream::Ok || !isKnownBodyKind(kind)) {
             return nullptr;
         }
-        body.kind = static_cast<skygate::ephemeris::BaseCelestialBody::Kind>(kind);
+        body.kind = static_cast<BaseCelestialBody::Kind>(kind);
         bool hasFixedEquatorial = false;
         stream >> hasFixedEquatorial;
         if (hasFixedEquatorial) {
@@ -339,7 +344,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
             return nullptr;
         }
         if (hasStarAstrometry) {
-            skygate::ephemeris::CatalogStarAstrometry astrometry;
+            CatalogStarAstrometry astrometry;
             if (!readStarAstrometry(stream, astrometry)) {
                 return nullptr;
             }
@@ -352,10 +357,10 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
     if (!readBodyCount(stream, distantCount)) {
         return nullptr;
     }
-    std::vector<skygate::ephemeris::DistantCelestialBody> distantBodies;
+    std::vector<DistantCelestialBody> distantBodies;
     distantBodies.reserve(static_cast<std::size_t>(distantCount));
     for (std::uint64_t index = 0; index < distantCount; ++index) {
-        skygate::ephemeris::DistantCelestialBody body;
+        DistantCelestialBody body;
         if (!readString(stream, body.id) || !readString(stream, body.displayName)) {
             return nullptr;
         }
@@ -364,7 +369,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
         if (stream.status() != QDataStream::Ok || !isKnownBodyKind(kind)) {
             return nullptr;
         }
-        body.kind = static_cast<skygate::ephemeris::BaseCelestialBody::Kind>(kind);
+        body.kind = static_cast<BaseCelestialBody::Kind>(kind);
         bool hasFixedEquatorial = false;
         stream >> hasFixedEquatorial;
         if (hasFixedEquatorial) {
@@ -380,7 +385,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
             return nullptr;
         }
         if (hasDeepSkyInfo) {
-            skygate::ephemeris::DeepSkyObjectInfo info;
+            DeepSkyObjectInfo info;
             if (!readDeepSkyInfo(stream, info)) {
                 return nullptr;
             }
@@ -394,7 +399,7 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
     if (stream.status() != QDataStream::Ok || orderEntryCount > kMaxOrderEntryCount) {
         return nullptr;
     }
-    std::vector<skygate::ephemeris::CelestialBodyCatalog::OrderEntry> orderedIndexes;
+    std::vector<CelestialBodyCatalog::OrderEntry> orderedIndexes;
     orderedIndexes.reserve(static_cast<std::size_t>(orderEntryCount));
     for (std::uint64_t index = 0; index < orderEntryCount; ++index) {
         std::uint8_t domain = 0U;
@@ -404,15 +409,15 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
             return nullptr;
         }
         const bool indexOutOfRange =
-            (domain == static_cast<std::uint8_t>(skygate::ephemeris::CelestialBodyCatalog::BodyDomain::Distant)
+            (domain == static_cast<std::uint8_t>(CelestialBodyCatalog::BodyDomain::Distant)
              && bodyIndex >= distantBodies.size())
-            || (domain == static_cast<std::uint8_t>(skygate::ephemeris::CelestialBodyCatalog::BodyDomain::OwnGalaxy)
+            || (domain == static_cast<std::uint8_t>(CelestialBodyCatalog::BodyDomain::OwnGalaxy)
                 && bodyIndex >= ownGalaxyBodies.size());
         if (indexOutOfRange) {
             return nullptr;
         }
         orderedIndexes.push_back({
-            .domain = static_cast<skygate::ephemeris::CelestialBodyCatalog::BodyDomain>(domain),
+            .domain = static_cast<CelestialBodyCatalog::BodyDomain>(domain),
             .bodyIndex = static_cast<std::size_t>(bodyIndex),
         });
     }
@@ -420,9 +425,9 @@ std::unique_ptr<skygate::ephemeris::IStarCatalog> SkyCatalogBinaryCodec::deseria
         return nullptr;
     }
 
-    return std::make_unique<skygate::ephemeris::InMemoryStarCatalog>(skygate::ephemeris::CelestialBodyCatalog(
-        std::move(ownGalaxyBodies), std::move(distantBodies), std::move(orderedIndexes)
-    ));
+    return std::make_unique<InMemoryStarCatalog>(
+        CelestialBodyCatalog(std::move(ownGalaxyBodies), std::move(distantBodies), std::move(orderedIndexes))
+    );
 }
 
-}  // namespace skygate::ui::internal
+}  // namespace skygate::ephemeris

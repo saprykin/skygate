@@ -5,7 +5,7 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SkySettingsStore.hpp"
 #include "SettingsTestFixture.hpp"
-#include "catalog/SkyCatalogBinaryCodec.hpp"
+#include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/SkyCatalogCacheController.hpp"
 
 #include <QtTest/QtTest>
@@ -153,7 +153,7 @@ void SkyCatalogCacheControllerTests::restoresBinaryCatalogPayloads()
     skygate::ui::internal::SkyCatalogCachePersistRequest request;
     request.sourceLabel = "Binary";
     request.catalogPayload = skygate::ui::tests::sampleHygCsvPayload();
-    request.catalogBinaryPayload = skygate::ui::internal::SkyCatalogBinaryCodec::serialize(catalog);
+    request.catalogBinaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(catalog);
     controller.persist(request);
 
     const auto result = controller.restore(1, 0);
@@ -170,8 +170,7 @@ void SkyCatalogCacheControllerTests::corruptBinaryPayloadFallsBackToCsvParsing()
     auto snapshot = makeValidCacheSnapshot();
     snapshot.catalogBinaryPayload = "corrupt binary payload";
     snapshot.deepSkyBinaryPayload = "also corrupt";
-    snapshot.catalogBinarySchemaVersion =
-        static_cast<int>(skygate::ui::internal::SkyCatalogBinaryCodec::kSchemaVersion);
+    snapshot.catalogBinarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCache(snapshot));

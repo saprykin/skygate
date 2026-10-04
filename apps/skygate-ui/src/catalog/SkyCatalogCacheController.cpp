@@ -1,8 +1,7 @@
 #include "SkyCatalogCacheController.hpp"
 
-#include "SkyCatalogBinaryCodec.hpp"
 #include "SkyContextControllerSupport.hpp"
-
+#include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
 
 #include <QLoggingCategory>
@@ -81,8 +80,8 @@ SkyCatalogCacheController::restore(const int catalogPresetIndex, const int deepS
     const skygate::ephemeris::CatalogPayloadParser parser;
     if (catalogPresetIndex != 0) {
         if (!cacheSnapshot->catalogBinaryPayload.isEmpty()
-            && cacheSnapshot->catalogBinarySchemaVersion == SkyCatalogBinaryCodec::kSchemaVersion) {
-            result.catalog = SkyCatalogBinaryCodec::deserialize(cacheSnapshot->catalogBinaryPayload);
+            && cacheSnapshot->catalogBinarySchemaVersion == skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion) {
+            result.catalog = skygate::ephemeris::CatalogBinaryCodec::deserialize(cacheSnapshot->catalogBinaryPayload);
             if (result.catalog == nullptr) {
                 qCWarning(skygateCatalogCacheLog).noquote()
                     << "Saved binary star catalog cache unreadable; falling back to payload parsing";
@@ -115,8 +114,9 @@ SkyCatalogCacheController::restore(const int catalogPresetIndex, const int deepS
 
     if (deepSkyCatalogPresetIndex != 0) {
         if (!cacheSnapshot->deepSkyBinaryPayload.isEmpty()
-            && cacheSnapshot->catalogBinarySchemaVersion == SkyCatalogBinaryCodec::kSchemaVersion) {
-            result.deepSkyCatalog = SkyCatalogBinaryCodec::deserialize(cacheSnapshot->deepSkyBinaryPayload);
+            && cacheSnapshot->catalogBinarySchemaVersion == skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion) {
+            result.deepSkyCatalog =
+                skygate::ephemeris::CatalogBinaryCodec::deserialize(cacheSnapshot->deepSkyBinaryPayload);
             if (result.deepSkyCatalog == nullptr) {
                 qCWarning(skygateCatalogCacheLog).noquote()
                     << "Saved binary deep-sky catalog cache unreadable; falling back to payload parsing";
@@ -190,7 +190,7 @@ void SkyCatalogCacheController::persist(const SkyCatalogCachePersistRequest& req
     snapshot.deepSkyCatalogPayload = request.deepSkyCatalogPayload;
     snapshot.catalogBinaryPayload = request.catalogBinaryPayload;
     snapshot.deepSkyBinaryPayload = request.deepSkyBinaryPayload;
-    snapshot.catalogBinarySchemaVersion = static_cast<int>(SkyCatalogBinaryCodec::kSchemaVersion);
+    snapshot.catalogBinarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
     snapshot.constellationLineRows =
         SkyContextCatalogCodec::serializeConstellationLineRows(request.constellationLineRefs);
     snapshot.constellationAnchorGroupRows =

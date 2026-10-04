@@ -446,6 +446,10 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogFactoryTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-binary-codec-tests
+    catalog/CatalogBinaryCodecTests.cpp
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-celestial-body-catalog-tests
     catalog/CelestialBodyCatalogTests.cpp
 )

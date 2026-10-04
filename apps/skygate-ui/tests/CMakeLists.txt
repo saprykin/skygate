@@ -205,10 +205,6 @@ add_skygate_ui_qtest(
     LABELS integration
     TIMEOUT 45
 )
-add_skygate_ui_qtest(
-    skygate-ui-catalog-binary-codec-tests
-    catalog/SkyCatalogBinaryCodecTests.cpp
-)
 add_skygate_ui_qtest(skygate-ui-active-catalog-builder-tests catalog/SkyActiveCatalogBuilderTests.cpp)
 add_skygate_ui_qtest(
     skygate-ui-catalog-download-service-tests

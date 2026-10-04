@@ -196,6 +196,7 @@ add_library(skygate-ephemeris STATIC
     src/trail/BodyTrailCalculator.hpp
     src/trail/BodyTrailOptions.hpp
     src/trail/BodyTrailSample.hpp
+    src/catalog/CatalogBinaryCodec.hpp
     src/catalog/CatalogComposer.hpp
     src/catalog/CatalogFactory.hpp
     src/catalog/CatalogLoader.hpp
@@ -329,6 +330,7 @@ add_library(skygate-ephemeris STATIC
     src/catalog/CatalogSchemaDescriptor.cpp
     src/catalog/CatalogSchemaRegistry.cpp
     src/catalog/io/CatalogParsingUtilities.cpp
+    src/catalog/CatalogBinaryCodec.cpp
     src/catalog/CatalogFactory.cpp
     src/catalog/CatalogLoadDiagnostics.cpp
     src/catalog/CatalogLoader.cpp
