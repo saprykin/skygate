@@ -169,6 +169,4 @@ private:
     bool m_constellationDownloadPending = false;
     QString m_activeDownloadInstanceId;
     QVector<SourceOperation> m_sourceOperations;
-    QByteArray m_cachedCatalogPayload;
-    QByteArray m_cachedDeepSkyCatalogPayload;
 };

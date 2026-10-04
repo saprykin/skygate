@@ -246,6 +246,16 @@ QString SkyContextSettings::defaultDeepSkyBinaryCatalogCachePath()
         .filePath(QString::fromUtf8(SkyContextControllerConstants::kDeepSkyBinaryCatalogCacheFileName));
 }
 
+QString SkyContextSettings::defaultCatalogCollectionCachePath()
+{
+    const QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        return {};
+    }
+
+    return QDir(appDataPath).filePath(QStringLiteral("catalog-source-cache"));
+}
+
 QByteArray
 SkyContextCatalogCodec::serializeConstellationLineRows(const std::vector<std::pair<std::string, std::string>>& lineRefs)
 {

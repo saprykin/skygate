@@ -37,6 +37,7 @@ public:
     static constexpr int kLocationUpdateTimeoutMs = 5000;
     static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
+    static constexpr int kCatalogCollectionCacheSchemaVersion = 1;
     static constexpr double kWheelZoomStepScale = 0.90;
     static constexpr double kWheelAngleDeltaStep = 120.0;
     static constexpr double kMagnitudeCutoffMin = -2.0;
@@ -94,6 +95,7 @@ public:
     [[nodiscard]] static QString defaultDeepSkyCatalogCachePath();
     [[nodiscard]] static QString defaultCatalogBinaryCachePath();
     [[nodiscard]] static QString defaultDeepSkyBinaryCatalogCachePath();
+    [[nodiscard]] static QString defaultCatalogCollectionCachePath();
 };
 
 class SkyContextCatalogCodec final {

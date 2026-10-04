@@ -1,7 +1,10 @@
 #include "QmlPreferencesTestSupport.hpp"
-#include "time/CalendarTime.hpp"
+#include "SkyCatalogSourceInstance.hpp"
+#include "SkySettingsStore.hpp"
 #include "engine/EphemerisDataManifest.hpp"
+#include "time/CalendarTime.hpp"
 
+#include <QDir>
 #include <QFileInfo>
 #include <QSettings>
 
@@ -230,6 +233,12 @@ void QmlPreferencesCatalogTests::initTestCase()
 void QmlPreferencesCatalogTests::init()
 {
     m_settings.resetForCurrentTest();
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("skyContext/catalogCollectionCachePath"),
+        m_settings.cachePath(QStringLiteral("catalog-collection-cache"))
+    );
+    QDir(m_settings.cachePath(QStringLiteral("catalog-collection-cache"))).removeRecursively();
 }
 
 void QmlPreferencesCatalogTests::catalogSectionBindsDraftAndControls()
@@ -615,7 +624,14 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     QVERIFY(activateControl(starDownloadButton));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
     QTRY_VERIFY(catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Downloaded Star")));
-    QVERIFY(QFileInfo::exists(m_settings.cachePath(QStringLiteral("star-cache.csv"))));
+    SkySettingsStore store;
+    const auto starCache = store.loadCatalogCollectionCache();
+    QVERIFY(starCache.has_value());
+    QCOMPARE(starCache->sources.size(), 1);
+    QCOMPARE(
+        starCache->sources[0].instanceId,
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(starCatalogUrl).instanceId
+    );
 
     draft->setProperty("deepSkyCatalogPresetIndex", 2);
     draft->setProperty("deepSkyCatalogUrlText", deepSkyCatalogUrl);
@@ -625,7 +641,9 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     QVERIFY(activateControl(deepSkyDownloadButton));
     QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
     QTRY_VERIFY(catalogContainsAlias(controller->catalogBodies(), QStringLiteral("Custom Galaxy")));
-    QVERIFY(QFileInfo::exists(m_settings.cachePath(QStringLiteral("deep-sky-cache.csv"))));
+    const auto deepSkyCache = store.loadCatalogCollectionCache();
+    QVERIFY(deepSkyCache.has_value());
+    QCOMPARE(deepSkyCache->sources.size(), 2);
 
     QVERIFY(controller->saveSettings());
     auto restoredController = makeController();
@@ -636,6 +654,27 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     QCOMPARE(restoredController->deepSkyCatalogPresetIndex(), 2);
     QCOMPARE(restoredController->deepSkyCatalogUrlText(), deepSkyCatalogUrl);
     QTRY_VERIFY(catalogContainsAlias(restoredController->catalogBodies(), QStringLiteral("Custom Galaxy")));
+
+    // Clearing one source's cache leaves the other source's record intact.
+    QObject* starClearButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogClearCacheButton"));
+    QVERIFY(starClearButton != nullptr);
+    QVERIFY(activateControl(starClearButton));
+    QTRY_VERIFY([&] {
+        const auto cache = store.loadCatalogCollectionCache();
+        return cache.has_value() && cache->sources.size() == 1
+               && cache->sources[0].instanceId
+                      == skygate::ui::internal::SkyCatalogSourceInstance::createCustom(deepSkyCatalogUrl).instanceId;
+    }());
+    QVERIFY(controller->catalogStatusText().contains("Star catalog cache cleared"));
+
+    QObject* deepSkyClearButton = firstObjectWithObjectName(root, QStringLiteral("deepSkyCatalogClearCacheButton"));
+    QVERIFY(deepSkyClearButton != nullptr);
+    QVERIFY(activateControl(deepSkyClearButton));
+    QTRY_VERIFY([&] {
+        const auto cache = store.loadCatalogCollectionCache();
+        return !cache.has_value() || cache->sources.isEmpty();
+    }());
+    QVERIFY(controller->catalogStatusText().contains("Deep-sky catalog cache cleared"));
 
     draft->setProperty("catalogPresetIndex", 0);
     draft->setProperty("deepSkyCatalogPresetIndex", 0);
@@ -651,16 +690,6 @@ void QmlPreferencesCatalogTests::catalogSectionDownloadsAppliesClearsAndRestores
     QVERIFY(activateControl(deepSkyUseButton));
     QTRY_VERIFY(!catalogContainsAlias(controller->catalogBodies(), QStringLiteral("Custom Galaxy")));
 
-    QObject* starClearButton = firstObjectWithObjectName(root, QStringLiteral("starCatalogClearCacheButton"));
-    QVERIFY(starClearButton != nullptr);
-    QVERIFY(activateControl(starClearButton));
-    QTRY_VERIFY(!QFileInfo::exists(m_settings.cachePath(QStringLiteral("star-cache.csv"))));
-    QVERIFY(controller->catalogStatusText().contains("Star catalog cache cleared"));
-
-    QObject* deepSkyClearButton = firstObjectWithObjectName(root, QStringLiteral("deepSkyCatalogClearCacheButton"));
-    QVERIFY(deepSkyClearButton != nullptr);
-    QVERIFY(activateControl(deepSkyClearButton));
-    QVERIFY(controller->catalogStatusText().contains("Deep-sky catalog cache cleared"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
