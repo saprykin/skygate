@@ -72,8 +72,6 @@ void CatalogSchemaRegistryTests::registersBuiltInSchemas()
     QVERIFY(bundled != nullptr);
     QVERIFY(bundled->requiredColumns.empty());
 
-    QVERIFY(CatalogSchemaRegistry::find(CatalogSourceType::HygCsvGzip) == nullptr);
-    QVERIFY(CatalogSchemaRegistry::find(CatalogSourceType::HygCsvZip) == nullptr);
     QVERIFY(CatalogSchemaRegistry::find(CatalogSourceType::Unknown) == nullptr);
 
     QVERIFY(CatalogSchemaRegistry::createParser(CatalogSourceType::HygCsv) != nullptr);

@@ -2,11 +2,15 @@
 #include "CatalogLoader.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
+#include "catalog/io/CompressedDataInflater.hpp"
+#include "catalog/io/zip/ZipCodec.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
 
+#include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace skygate::ephemeris {
@@ -14,18 +18,35 @@ namespace {
 
 Q_LOGGING_CATEGORY(skygateCatalogParseLog, "skygate.catalog.parse")
 
+bool hasGzipSignature(const std::string_view payload) noexcept
+{
+    if (payload.size() < 2U) {
+        return false;
+    }
+
+    const auto firstByte = static_cast<unsigned char>(payload[0]);
+    const auto secondByte = static_cast<unsigned char>(payload[1]);
+    return firstByte == 0x1fU && secondByte == 0x8bU;
+}
+
+bool hasZipSignature(const std::string_view payload) noexcept
+{
+    if (payload.size() < 4U) {
+        return false;
+    }
+
+    const auto firstByte = static_cast<unsigned char>(payload[0]);
+    const auto secondByte = static_cast<unsigned char>(payload[1]);
+    const auto thirdByte = static_cast<unsigned char>(payload[2]);
+    const auto fourthByte = static_cast<unsigned char>(payload[3]);
+    return firstByte == 0x50U && secondByte == 0x4bU
+           && ((thirdByte == 0x03U && fourthByte == 0x04U) || (thirdByte == 0x05U && fourthByte == 0x06U)
+               || (thirdByte == 0x07U && fourthByte == 0x08U));
+}
+
 QString catalogSourceTypeText(const CatalogSourceType type)
 {
-    switch (type) {
-    case CatalogSourceType::HygCsvGzip:
-        return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(CatalogSourceType::HygCsv))
-               + QStringLiteral(" gzip");
-    case CatalogSourceType::HygCsvZip:
-        return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(CatalogSourceType::HygCsv))
-               + QStringLiteral(" ZIP");
-    default:
-        return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(type));
-    }
+    return QString::fromStdString(CatalogSchemaRegistry::diagnosticName(type));
 }
 
 CatalogLoadResult logSuccessfulParse(CatalogLoadResult result)
@@ -60,17 +81,50 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         return result;
     }
 
-    const CatalogSourceType detectedType = detectFormat(request.payload);
-    if (detectedType == CatalogSourceType::Unknown) {
+    // Decode at most one archive layer before schema detection. After
+    // unwrapping, the payload must be a plain-text schema; a nested archive is
+    // reported as an unsupported inner schema rather than decoded recursively.
+    std::optional<std::string> unwrappedData;
+    std::string_view schemaPayload = request.payload;
+    bool decodedContainer = false;
+
+    if (hasGzipSignature(request.payload)) {
+        unwrappedData = CompressedDataInflater::inflate(request.payload, CompressedDataInflater::Format::Gzip);
+        if (!unwrappedData.has_value()) {
+            result.errorCode = CatalogLoadResult::ErrorCode::InvalidGzipData;
+            result.errorDetail = "Gzip catalog payload could not be decompressed.";
+            qCWarning(skygateCatalogParseLog).noquote()
+                << "Gzip catalog parse failed:" << QString::fromStdString(result.errorDetail);
+            return result;
+        }
+        schemaPayload = *unwrappedData;
+        decodedContainer = true;
+    } else if (hasZipSignature(request.payload)) {
+        unwrappedData = ZipCodec{}.extractFirstCsvEntry(request.payload);
+        if (!unwrappedData.has_value()) {
+            result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
+            result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
+            qCWarning(skygateCatalogParseLog).noquote()
+                << "Catalog ZIP parse failed:" << QString::fromStdString(result.errorDetail);
+            return result;
+        }
+        schemaPayload = *unwrappedData;
+        decodedContainer = true;
+    }
+
+    const CatalogSourceType schemaType = CatalogPayloadFormatDetector::detect(schemaPayload);
+    if (schemaType == CatalogSourceType::Unknown) {
         result.errorCode = CatalogLoadResult::ErrorCode::UnsupportedFormat;
-        result.errorDetail = "Catalog payload format is not recognized.";
+        result.errorDetail =
+            decodedContainer ? "Catalog container decoded, but the inner payload is not a recognized catalog format."
+                             : "Catalog payload format is not recognized.";
         qCWarning(skygateCatalogParseLog).noquote()
             << "Catalog payload parse failed:" << QString::fromStdString(result.errorDetail);
         return result;
     }
 
-    result = CatalogLoader::load(detectedType, request.payload, request.progressCallback, request.selectionOptions);
-    result.detectedFormat = detectedType;
+    result = CatalogLoader::load(schemaType, schemaPayload, request.progressCallback, request.selectionOptions);
+    result.detectedFormat = schemaType;
     return logSuccessfulParse(std::move(result));
 }
 

@@ -170,6 +170,11 @@ add_skygate_ephemeris_qtest(
     catalog/CatalogPayloadParserTests.cpp
 )
 add_skygate_ephemeris_qtest(
+    skygate-ephemeris-catalog-container-decoding-tests
+    catalog/CatalogContainerDecodingTests.cpp
+    TIMEOUT 45
+)
+add_skygate_ephemeris_qtest(
     skygate-ephemeris-catalog-property-tests
     catalog/CatalogPropertyTests.cpp
     TIMEOUT 45

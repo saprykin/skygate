@@ -44,11 +44,11 @@ void CatalogPayloadParserTests::detectsPayloadFormats()
 
     constexpr std::array<unsigned char, 2> kGzipPrefix{{0x1f, 0x8b}};
     const std::string_view gzipPrefix(reinterpret_cast<const char*>(kGzipPrefix.data()), kGzipPrefix.size());
-    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogSourceType::HygCsvGzip);
+    QVERIFY(parser.detectFormat(gzipPrefix) == skygate::ephemeris::CatalogSourceType::Unknown);
 
     constexpr std::array<unsigned char, 4> kZipPrefix{{0x50, 0x4b, 0x03, 0x04}};
     const std::string_view zipPrefix(reinterpret_cast<const char*>(kZipPrefix.data()), kZipPrefix.size());
-    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogSourceType::HygCsvZip);
+    QVERIFY(parser.detectFormat(zipPrefix) == skygate::ephemeris::CatalogSourceType::Unknown);
 
     QVERIFY(parser.detectFormat("just some plain text") == skygate::ephemeris::CatalogSourceType::Unknown);
 }
