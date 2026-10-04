@@ -1,5 +1,4 @@
 #include "catalog/io/CatalogZipEntrySelector.hpp"
-#include "catalog/io/zip/ZipCodec.hpp"
 #include "catalog/io/zip/ZipDirectoryReader.hpp"
 #include "catalog/io/zip/ZipEntryExtractor.hpp"
 #include "skygate/testsupport/DeterministicFuzz.hpp"
@@ -8,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -117,6 +117,7 @@ void CatalogArchivePropertyTests::generatedStoredZipEntriesRoundTripThroughDirec
         std::vector<ZipEntrySpec> specs;
         specs.reserve(static_cast<std::size_t>(entryCount));
         std::string firstCsvPayload;
+        std::size_t csvEntryCount = 0;
 
         for (int index = 0; index < entryCount; ++index) {
             const bool isCsv = index == csvIndex || rng.chance(1U, 4U);
@@ -125,8 +126,11 @@ void CatalogArchivePropertyTests::generatedStoredZipEntriesRoundTripThroughDirec
                       : "notes/readme_" + std::to_string(index) + ".txt";
             const std::string data = isCsv ? csvPayload((scenario * 100) + index)
                                            : rng.token(static_cast<std::size_t>(rng.intInRange(8, 40)), "abcXYZ0123 ");
-            if (isCsv && firstCsvPayload.empty()) {
-                firstCsvPayload = data;
+            if (isCsv) {
+                ++csvEntryCount;
+                if (firstCsvPayload.empty()) {
+                    firstCsvPayload = data;
+                }
             }
             specs.push_back(
                 ZipEntrySpec{
@@ -149,9 +153,13 @@ void CatalogArchivePropertyTests::generatedStoredZipEntriesRoundTripThroughDirec
             QCOMPARE(*extracted, specs.at(index).data);
         }
 
-        const auto selected = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(zipData);
-        QVERIFY(selected.has_value());
-        QCOMPARE(*selected, firstCsvPayload);
+        const auto selection = skygate::ephemeris::CatalogZipEntrySelector::select(zipData, std::nullopt);
+        if (csvEntryCount == 1U) {
+            QCOMPARE(selection.status, skygate::ephemeris::CatalogZipEntrySelection::Status::Selected);
+            QCOMPARE(selection.payload, firstCsvPayload);
+        } else {
+            QCOMPARE(selection.status, skygate::ephemeris::CatalogZipEntrySelection::Status::AmbiguousMember);
+        }
     }
 }
 
@@ -186,10 +194,10 @@ void CatalogArchivePropertyTests::mutatedZipStructuresFailClosedOrRemainBounded(
             }
         }
 
-        const auto selected = skygate::ephemeris::ZipCodec{}.extractFirstCsvEntry(mutated);
-        if (selected.has_value()) {
-            QVERIFY(!selected->empty());
-            QVERIFY(selected->size() <= mutated.size());
+        const auto selection = skygate::ephemeris::CatalogZipEntrySelector::select(mutated, std::nullopt);
+        if (selection.status == skygate::ephemeris::CatalogZipEntrySelection::Status::Selected) {
+            QVERIFY(!selection.payload.empty());
+            QVERIFY(selection.payload.size() <= mutated.size());
         }
     }
 }

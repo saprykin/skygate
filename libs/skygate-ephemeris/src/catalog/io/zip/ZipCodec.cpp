@@ -1,31 +1,17 @@
 #include "ZipCodec.hpp"
-#include "ZipDirectoryReader.hpp"
-#include "ZipEntryExtractor.hpp"
 #include "catalog/io/CatalogZipEntrySelector.hpp"
 
-#include <span>
+#include <utility>
 
 namespace skygate::ephemeris {
 
 std::optional<std::string> ZipCodec::extractFirstCsvEntry(const std::string_view zipData) const
 {
-    const auto entries = ZipDirectoryReader::readEntries(zipData);
-    if (!entries.has_value()) {
+    CatalogZipEntrySelection selection = CatalogZipEntrySelector::select(zipData, std::nullopt);
+    if (selection.status != CatalogZipEntrySelection::Status::Selected) {
         return std::nullopt;
     }
-
-    const ZipEntryMetadata* const entry =
-        CatalogZipEntrySelector::selectFirstCsvEntry(std::span<const ZipEntryMetadata>(*entries));
-    if (entry == nullptr) {
-        return std::nullopt;
-    }
-
-    const auto entryData = ZipEntryExtractor::extract(zipData, *entry);
-    if (!entryData.has_value() || entryData->empty()) {
-        return std::nullopt;
-    }
-
-    return entryData;
+    return std::move(selection.payload);
 }
 
 }  // namespace skygate::ephemeris

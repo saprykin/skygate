@@ -37,6 +37,10 @@ QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadResult:
         return "invalid ZIP payload";
     case skygate::ephemeris::CatalogLoadResult::ErrorCode::NoBodies:
         return "catalog contains no usable bodies";
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::ArchiveMemberNotFound:
+        return "requested archive member not found";
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::AmbiguousArchiveMember:
+        return "multiple supported archive members";
     }
 
     return "unknown parse failure";

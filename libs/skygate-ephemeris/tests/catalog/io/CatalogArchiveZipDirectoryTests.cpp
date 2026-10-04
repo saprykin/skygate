@@ -1,6 +1,5 @@
 #include "CatalogArchiveTestSupport.hpp"
 
-#include "catalog/io/CatalogZipEntrySelector.hpp"
 #include "catalog/io/zip/ZipDirectoryReader.hpp"
 
 #include <QtTest/QtTest>
@@ -8,14 +7,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <vector>
 
 class CatalogArchiveZipDirectoryTests final : public QObject {
     Q_OBJECT
 
 private slots:
     void readsCentralDirectoryEntryMetadata();
-    void selectsCsvEntriesAndFallsBackToFirstUsableEntry();
     void directoryReaderRejectsMalformedStructures();
 };
 
@@ -49,55 +46,6 @@ void CatalogArchiveZipDirectoryTests::readsCentralDirectoryEntryMetadata()
     QVERIFY(!entries->at(1).isEncrypted());
     QCOMPARE(entries->at(2).path, std::string("secret.csv"));
     QVERIFY(entries->at(2).isEncrypted());
-}
-
-void CatalogArchiveZipDirectoryTests::selectsCsvEntriesAndFallsBackToFirstUsableEntry()
-{
-    const std::vector<skygate::ephemeris::ZipEntryMetadata> entries{
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "catalog/",
-        },
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "secret.csv",
-            .generalPurposeFlag = 0x1U,
-        },
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "README.txt",
-        },
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "nested/HYG.CSV",
-        },
-    };
-
-    const auto* selected = skygate::ephemeris::CatalogZipEntrySelector::selectFirstCsvEntry(entries);
-
-    QVERIFY(selected != nullptr);
-    QCOMPARE(selected->path, std::string("nested/HYG.CSV"));
-
-    const std::vector<skygate::ephemeris::ZipEntryMetadata> fallbackEntries{
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "catalog/",
-        },
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "README.txt",
-        },
-    };
-    selected = skygate::ephemeris::CatalogZipEntrySelector::selectFirstCsvEntry(fallbackEntries);
-
-    QVERIFY(selected != nullptr);
-    QCOMPARE(selected->path, std::string("README.txt"));
-
-    const std::vector<skygate::ephemeris::ZipEntryMetadata> unusableEntries{
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "catalog/",
-        },
-        skygate::ephemeris::ZipEntryMetadata{
-            .path = "secret.csv",
-            .generalPurposeFlag = 0x1U,
-        },
-    };
-
-    QVERIFY(skygate::ephemeris::CatalogZipEntrySelector::selectFirstCsvEntry(unusableEntries) == nullptr);
 }
 
 void CatalogArchiveZipDirectoryTests::directoryReaderRejectsMalformedStructures()

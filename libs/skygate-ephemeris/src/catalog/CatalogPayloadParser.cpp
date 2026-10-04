@@ -2,8 +2,8 @@
 #include "CatalogLoader.hpp"
 #include "catalog/CatalogSchemaRegistry.hpp"
 #include "catalog/io/CatalogPayloadFormatDetector.hpp"
+#include "catalog/io/CatalogZipEntrySelector.hpp"
 #include "catalog/io/CompressedDataInflater.hpp"
-#include "catalog/io/zip/ZipCodec.hpp"
 
 #include <QLoggingCategory>
 #include <QString>
@@ -100,16 +100,45 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         schemaPayload = *unwrappedData;
         decodedContainer = true;
     } else if (hasZipSignature(request.payload)) {
-        unwrappedData = ZipCodec{}.extractFirstCsvEntry(request.payload);
-        if (!unwrappedData.has_value()) {
-            result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
-            result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
+        CatalogZipEntrySelection selection = CatalogZipEntrySelector::select(request.payload, request.memberSelector);
+        if (selection.status == CatalogZipEntrySelection::Status::Selected) {
+            unwrappedData = std::move(selection.payload);
+            schemaPayload = *unwrappedData;
+            decodedContainer = true;
+        } else {
+            switch (selection.status) {
+            case CatalogZipEntrySelection::Status::Selected:
+                break;
+            case CatalogZipEntrySelection::Status::InvalidArchive:
+                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
+                result.errorDetail = "ZIP catalog payload could not be parsed.";
+                break;
+            case CatalogZipEntrySelection::Status::MissingMember:
+                result.errorCode = CatalogLoadResult::ErrorCode::ArchiveMemberNotFound;
+                result.errorDetail = "ZIP catalog payload does not contain member '" + selection.selectedPath + "'.";
+                break;
+            case CatalogZipEntrySelection::Status::UnusableMember:
+                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
+                result.errorDetail =
+                    "ZIP catalog member '" + selection.selectedPath + "' is not a readable catalog entry.";
+                break;
+            case CatalogZipEntrySelection::Status::AmbiguousMember:
+                result.errorCode = CatalogLoadResult::ErrorCode::AmbiguousArchiveMember;
+                result.errorDetail = "ZIP catalog payload contains multiple supported catalog members.";
+                break;
+            case CatalogZipEntrySelection::Status::NoSupportedMember:
+                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
+                result.errorDetail = "ZIP catalog payload does not contain a supported catalog member.";
+                break;
+            case CatalogZipEntrySelection::Status::NoReadableEntry:
+                result.errorCode = CatalogLoadResult::ErrorCode::InvalidZipData;
+                result.errorDetail = "ZIP catalog payload does not contain a readable CSV entry.";
+                break;
+            }
             qCWarning(skygateCatalogParseLog).noquote()
                 << "Catalog ZIP parse failed:" << QString::fromStdString(result.errorDetail);
             return result;
         }
-        schemaPayload = *unwrappedData;
-        decodedContainer = true;
     }
 
     const CatalogSourceType schemaType = CatalogPayloadFormatDetector::detect(schemaPayload);
