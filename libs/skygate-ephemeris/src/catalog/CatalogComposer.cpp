@@ -1,13 +1,14 @@
 #include "CatalogComposer.hpp"
+
+#include "CatalogCompositionMerger.hpp"
 #include "CatalogFactory.hpp"
 #include "CatalogIdentity.hpp"
-#include "catalog/composition/CoreBodyCatalogAugmenter.hpp"
-#include "catalog/composition/DeepSkyCatalogMerger.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -15,7 +16,7 @@ namespace skygate::ephemeris {
 namespace {
 
 void assignCompositionCounts(
-    ActiveCatalogCompositionResult& result,
+    CatalogCompositionResult& result,
     const std::span<const BaseCelestialBody* const> bodies,
     const std::size_t currentConstellationCount
 )
@@ -32,74 +33,106 @@ void assignCompositionCounts(
     result.deepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(bodies);
 }
 
-std::vector<DistantCelestialBody>
-collectPrimaryDeepSkyBodies(const std::span<const BaseCelestialBody* const> sourceBodies)
+std::size_t countDeepSkyObjects(const IStarCatalog* catalog)
 {
-    std::vector<DistantCelestialBody> bodies;
-    for (const BaseCelestialBody* body : sourceBodies) {
-        if (body != nullptr && body->kind == BaseCelestialBody::Kind::DeepSkyObject) {
-            bodies.push_back(CelestialBodyCatalog::copyDistantBody(*body));
-        }
-    }
-    return bodies;
-}
-
-std::vector<CelestialBodyCatalog::OrderEntry>
-buildAugmentedOrder(const std::size_t ownGalaxyBodyCount, const std::size_t distantBodyCount)
-{
-    std::vector<CelestialBodyCatalog::OrderEntry> order;
-    order.reserve(ownGalaxyBodyCount + distantBodyCount);
-    for (std::size_t index = 0U; index < ownGalaxyBodyCount; ++index) {
-        order.push_back({.domain = CelestialBodyCatalog::BodyDomain::OwnGalaxy, .bodyIndex = index});
-    }
-    for (std::size_t index = 0U; index < distantBodyCount; ++index) {
-        order.push_back({.domain = CelestialBodyCatalog::BodyDomain::Distant, .bodyIndex = index});
-    }
-    return order;
+    return catalog != nullptr ? CatalogIdentity::countDeepSkyObjects(catalog->bodies()) : 0U;
 }
 
 }  // namespace
 
-ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompositionRequest& request)
+CatalogCompositionResult CatalogComposer::composeCollection(const CatalogCompositionRequest& request)
 {
-    ActiveCatalogCompositionResult result;
-    const IStarCatalog* deepSkyCatalog = request.deepSkyCatalog;
-    std::unique_ptr<IStarCatalog> bundledDeepSkyCatalog;
-    if (deepSkyCatalog == nullptr && request.useBundledDeepSkyCatalog) {
-        bundledDeepSkyCatalog = CatalogFactory::createBundledStarCatalog();
-        deepSkyCatalog = bundledDeepSkyCatalog.get();
-    }
-
-    CatalogAugmentationResult active = CoreBodyCatalogAugmenter::augment(request.sourceCatalog.bodies());
-    std::vector<DistantCelestialBody> primaryDeepSkyBodies =
-        collectPrimaryDeepSkyBodies(request.sourceCatalog.bodies());
-    std::vector<CelestialBodyCatalog::OrderEntry> augmentedOrder =
-        buildAugmentedOrder(active.bodies.size(), primaryDeepSkyBodies.size());
-    active.sourceKinds.reserve(active.sourceKinds.size() + primaryDeepSkyBodies.size());
-    for (std::size_t index = 0U; index < primaryDeepSkyBodies.size(); ++index) {
-        active.sourceKinds.push_back(CatalogCompositionSource::Primary);
-    }
-
-    result.foundDeepSkyObjectCount = request.knownDeepSkyObjectCount;
-    if (deepSkyCatalog != nullptr && (result.foundDeepSkyObjectCount == 0U || request.useBundledDeepSkyCatalog)) {
-        result.foundDeepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(deepSkyCatalog->bodies());
-    }
-
-    const CelestialBodyCatalog activeCatalog(active.bodies, primaryDeepSkyBodies, augmentedOrder);
-    const std::span<const BaseCelestialBody* const> deepSkyBodies =
-        deepSkyCatalog != nullptr ? deepSkyCatalog->bodies() : std::span<const BaseCelestialBody* const>{};
-    DeepSkyCatalogMergeResult merged =
-        DeepSkyCatalogMerger::merge(activeCatalog.bodies(), active.sourceKinds, deepSkyBodies);
+    CatalogCompositionResult result;
+    CatalogCompositionMergeResult merged = CatalogCompositionMerger::mergeCollection(request);
     result.catalog = CatalogFactory::createStarCatalogFromBodies(
         std::move(merged.ownGalaxyBodies), std::move(merged.distantBodies), std::move(merged.orderedBodyIndexes)
     );
+    if (result.catalog == nullptr) {
+        result.sourceIds.clear();
+        return result;
+    }
+
+    result.sourceIds = std::move(merged.sourceIds);
+    assignCompositionCounts(result, result.catalog->bodies(), request.currentConstellationCount);
+
+    result.foundDeepSkyObjectCount = request.knownDeepSkyObjectCount;
+    if (result.foundDeepSkyObjectCount == 0U) {
+        for (const CatalogCompositionSourceEntry& source : request.sources) {
+            if (!source.enabled || source.catalog == nullptr) {
+                continue;
+            }
+            if (source.policy == CatalogCompositionPolicy::DeepSkyOnly) {
+                result.foundDeepSkyObjectCount += countDeepSkyObjects(source.catalog);
+            }
+        }
+    }
+    return result;
+}
+
+ActiveCatalogCompositionResult CatalogComposer::compose(const ActiveCatalogCompositionRequest& request)
+{
+    std::unique_ptr<IStarCatalog> bundledCatalog = CatalogFactory::createBundledStarCatalog();
+    const IStarCatalog* deepSkyCatalog = request.deepSkyCatalog;
+    if (deepSkyCatalog == nullptr && request.useBundledDeepSkyCatalog) {
+        deepSkyCatalog = bundledCatalog.get();
+    }
+
+    CatalogCompositionRequest collectionRequest;
+    collectionRequest.currentConstellationCount = request.currentConstellationCount;
+    collectionRequest.knownDeepSkyObjectCount = request.knownDeepSkyObjectCount;
+    collectionRequest.sources.push_back(
+        CatalogCompositionSourceEntry{
+            .sourceId = std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::Primary)),
+            .enabled = true,
+            .catalog = &request.sourceCatalog,
+            .policy = CatalogCompositionPolicy::Merge,
+        }
+    );
+    collectionRequest.sources.push_back(
+        CatalogCompositionSourceEntry{
+            .sourceId = std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::BuiltInEphemeris)),
+            .enabled = true,
+            .catalog = bundledCatalog.get(),
+            .policy = CatalogCompositionPolicy::AugmentCore,
+        }
+    );
+    if (deepSkyCatalog != nullptr) {
+        collectionRequest.sources.push_back(
+            CatalogCompositionSourceEntry{
+                .sourceId = std::string(CatalogCompositionMerger::sourceKindId(CatalogCompositionSource::DeepSky)),
+                .enabled = true,
+                .catalog = deepSkyCatalog,
+                .policy = CatalogCompositionPolicy::DeepSkyOnly,
+            }
+        );
+    }
+
+    CatalogCompositionResult composed = composeCollection(collectionRequest);
+    ActiveCatalogCompositionResult result;
+    result.catalog = std::move(composed.catalog);
     if (result.catalog == nullptr) {
         result.sourceKinds.clear();
         return result;
     }
 
-    result.sourceKinds = std::move(merged.sourceKinds);
-    assignCompositionCounts(result, result.catalog->bodies(), request.currentConstellationCount);
+    result.bodyCount = composed.bodyCount;
+    result.constellationCount = composed.constellationCount;
+    result.deepSkyObjectCount = composed.deepSkyObjectCount;
+    result.foundDeepSkyObjectCount = composed.foundDeepSkyObjectCount;
+    if (deepSkyCatalog != nullptr && (request.knownDeepSkyObjectCount == 0U || request.useBundledDeepSkyCatalog)) {
+        result.foundDeepSkyObjectCount = CatalogIdentity::countDeepSkyObjects(deepSkyCatalog->bodies());
+    }
+
+    result.sourceKinds.reserve(composed.sourceIds.size());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    for (std::size_t index = 0; index < composed.sourceIds.size(); ++index) {
+        const BaseCelestialBody* body = index < bodies.size() ? bodies[index] : nullptr;
+        if (body != nullptr && CatalogIdentity::isAnalyticSolarSystemBody(*body)) {
+            result.sourceKinds.push_back(CatalogCompositionSource::BuiltInEphemeris);
+            continue;
+        }
+        result.sourceKinds.push_back(CatalogCompositionMerger::sourceKindFromId(composed.sourceIds[index]));
+    }
     return result;
 }
 

@@ -185,6 +185,12 @@ add_library(skygate-ephemeris STATIC
     src/catalog/ActiveCatalogCompositionRequest.hpp
     src/catalog/ActiveCatalogCompositionResult.hpp
     src/catalog/CatalogCompositionSource.hpp
+    src/catalog/CatalogCompositionPolicy.hpp
+    src/catalog/CatalogCompositionSourceEntry.hpp
+    src/catalog/CatalogCompositionRequest.hpp
+    src/catalog/CatalogCompositionResult.hpp
+    src/catalog/CatalogCompositionMergeResult.hpp
+    src/catalog/CatalogCompositionMerger.hpp
     src/catalog/CatalogLoadDiagnostics.hpp
     src/catalog/CatalogLoadResult.hpp
     src/catalog/CatalogSchemaDescriptor.hpp
@@ -331,6 +337,12 @@ add_library(skygate-ephemeris STATIC
     src/catalog/ActiveCatalogCompositionResult.cpp
     src/catalog/CatalogComposer.cpp
     src/catalog/CatalogCompositionSource.cpp
+    src/catalog/CatalogCompositionPolicy.cpp
+    src/catalog/CatalogCompositionSourceEntry.cpp
+    src/catalog/CatalogCompositionRequest.cpp
+    src/catalog/CatalogCompositionResult.cpp
+    src/catalog/CatalogCompositionMergeResult.cpp
+    src/catalog/CatalogCompositionMerger.cpp
     src/catalog/CatalogSelectionMode.cpp
     src/catalog/CatalogSelectionOptions.cpp
     src/catalog/CatalogSourceRequest.cpp
