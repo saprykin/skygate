@@ -51,6 +51,11 @@ QString savedLabel(const QString& sourceLabel, const QString& fallbackLabel)
     return QString("%1 (saved)").arg(normalizedSourceLabel);
 }
 
+bool hasRelatedPayload(const SkySettingsStore::CatalogSourceCacheRecord& record)
+{
+    return !record.constellationLineRows.isEmpty() || !record.constellationAnchorGroupRows.isEmpty();
+}
+
 // Two persisted records can share one instance ID (legacy two-slot migration
 // of two slots configured with the same URL, or an edited settings file).
 // Because the ID keys the settings group, payload sidecars, operations, and
@@ -173,6 +178,7 @@ SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourc
 void SkyCatalogCacheController::appendRestoredSource(
     const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord,
     DecodedCatalog decoded,
+    const RelatedDataOwnership relatedDataOwnership,
     SkyCatalogCollectionRestoreResult& result
 ) const
 {
@@ -225,27 +231,71 @@ void SkyCatalogCacheController::appendRestoredSource(
 
     // Related constellation data belongs to the star source record that
     // carries it, so restore installs it as the record's owned dataset instead
-    // of a collection-wide result.
-    if (!sourceRecord.constellationLineRows.isEmpty()
-        && sourceRecord.constellationLineSchemaVersion
-               >= SkyContextControllerConstants::kConstellationLineCacheSchemaVersion) {
-        auto parsedLineRefs =
-            SkyContextCatalogCodec::parseConstellationLineRows(payloadView(sourceRecord.constellationLineRows));
-        if (!parsedLineRefs.empty()) {
+    // of a collection-wide result. A record written before the per-source
+    // format holds a copy of the collection-wide view, so it is restored only
+    // when the snapshot established that this record is the copy's owner.
+    if (hasRelatedPayload(sourceRecord)) {
+        if (relatedDataOwnership == RelatedDataOwnership::AmbiguousLegacyCopy) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Duplicated pre-migration related constellation data cannot be attributed to one source; "
+                   "restoring source without related data:"
+                << sourceRecord.instanceId;
+        } else if (
+            sourceRecord.constellationLineSchemaVersion
+            < SkyContextControllerConstants::kConstellationLineCacheSchemaVersion
+        ) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Saved related constellation dataset predates the current row format; restoring source without "
+                   "related data:"
+                << sourceRecord.instanceId;
+        } else {
+            std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs =
+                SkyContextCatalogCodec::parseConstellationLineRows(payloadView(sourceRecord.constellationLineRows));
             std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
             if (!sourceRecord.constellationAnchorGroupRows.isEmpty()) {
                 anchorGroups = SkyContextCatalogCodec::parseConstellationAnchorGroupRows(
                     payloadView(sourceRecord.constellationAnchorGroupRows)
                 );
             }
-            static_cast<void>(entry.record.constellationData.setDataset(
-                std::move(parsedLineRefs), std::move(anchorGroups), sourceRecord.constellationCount
-            ));
+            // An unreadable line or anchor payload must not become a partial
+            // dataset, and must not affect the records owned by other sources.
+            if (lineRefs.empty() || (!sourceRecord.constellationAnchorGroupRows.isEmpty() && anchorGroups.empty())) {
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Saved related constellation dataset is unreadable; restoring source without related data:"
+                    << sourceRecord.instanceId;
+            } else {
+                static_cast<void>(entry.record.constellationData.setDataset(
+                    std::move(lineRefs), std::move(anchorGroups), sourceRecord.constellationCount
+                ));
+            }
         }
     }
 
     result.sources.push_back(std::move(entry));
     result.restored = true;
+}
+
+SkyCatalogCacheController::RelatedDataOwnership
+SkyCatalogCacheController::relatedDataOwnership(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot)
+{
+    if (snapshot.schemaVersion >= SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion) {
+        return RelatedDataOwnership::SourceOwned;
+    }
+
+    // Records written before the per-source related format copied the one
+    // composed collection-wide dataset into every eligible source. Such a copy
+    // identifies its owner only when the snapshot holds exactly one record
+    // with a related payload: no other record could then have supplied it.
+    // Several copies cannot establish ownership, so they stay unattributed
+    // instead of being assigned to an arbitrary subset of records.
+    std::size_t relatedPayloadRecordCount = 0U;
+    for (const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
+        if (hasRelatedPayload(sourceRecord)) {
+            ++relatedPayloadRecordCount;
+        }
+    }
+    return relatedPayloadRecordCount <= 1U ? RelatedDataOwnership::SourceOwned
+                                           : RelatedDataOwnership::AmbiguousLegacyCopy;
 }
 
 SkyCatalogCollectionRestoreResult
@@ -264,9 +314,10 @@ SkyCatalogCacheController::restoreFromRecords(const SkySettingsStore::CatalogCol
     result.requiresRecordUpgrade =
         snapshot.schemaVersion < SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
 
+    const RelatedDataOwnership recordOwnership = SkyCatalogCacheController::relatedDataOwnership(snapshot);
     for (const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
         DecodedCatalog decoded = decodeSourceCatalog(sourceRecord, binarySchemaVersion);
-        appendRestoredSource(sourceRecord, std::move(decoded), result);
+        appendRestoredSource(sourceRecord, std::move(decoded), recordOwnership, result);
     }
     return result;
 }
@@ -284,7 +335,9 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
 
     const auto appendRecord = [&](SkySettingsStore::CatalogSourceCacheRecord record) {
         DecodedCatalog decoded = decodeSourceCatalog(record, legacy.catalogBinarySchemaVersion);
-        appendRestoredSource(record, std::move(decoded), result);
+        // The legacy two-slot cache has a single star slot, so its related
+        // dataset has exactly one possible owner and is attributed to it.
+        appendRestoredSource(record, std::move(decoded), RelatedDataOwnership::SourceOwned, result);
     };
 
     const int starIndex = SkyCatalogPresets::normalizeCatalogPresetIndex(catalogPresetIndex);

@@ -84,6 +84,16 @@ public:
     void persistCollection(const SkyCatalogCollectionPersistRequest& request) const;
 
 private:
+    // How a restored source record's related constellation payload may be
+    // attributed. Records written before the per-source related format stored
+    // a copy of the composed collection-wide dataset instead of the owning
+    // source's own dataset, so their rows establish an owner only when the
+    // snapshot holds a single such record.
+    enum class RelatedDataOwnership {
+        SourceOwned,
+        AmbiguousLegacyCopy,
+    };
+
     struct DecodedCatalog final {
         std::unique_ptr<skygate::ephemeris::IStarCatalog> catalog;
         bool requiresBinaryUpgrade = false;
@@ -94,8 +104,13 @@ private:
     void appendRestoredSource(
         const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord,
         DecodedCatalog decoded,
+        RelatedDataOwnership relatedDataOwnership,
         SkyCatalogCollectionRestoreResult& result
     ) const;
+    // Decides whether a stored snapshot's related payloads identify their
+    // records as owners or may hold copies of the collection-wide view.
+    [[nodiscard]] static RelatedDataOwnership
+    relatedDataOwnership(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot);
     [[nodiscard]] SkyCatalogCollectionRestoreResult
     restoreFromRecords(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot) const;
     // Converts the legacy two-slot cache into source records. Retained so

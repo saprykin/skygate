@@ -37,10 +37,12 @@ public:
     static constexpr int kLocationUpdateTimeoutMs = 5000;
     static constexpr int kSettingsVersion = 3;
     static constexpr int kConstellationLineCacheSchemaVersion = 4;
-    // Collection cache record format. Version 2 records the per-source parse
-    // contract (schema hint) and descriptor attribution; version 1 records
-    // load with defined defaults and are rewritten once in the new format.
-    static constexpr int kCatalogCollectionCacheSchemaVersion = 2;
+    // Collection cache record format. Version 3 stores each source record's
+    // own related constellation dataset; version 2 records copied the composed
+    // collection-wide related view into every eligible source, and version 1
+    // records carry no parse contract. Older records are read with the defined
+    // defaults and rewritten once in the new format.
+    static constexpr int kCatalogCollectionCacheSchemaVersion = 3;
     static constexpr double kWheelZoomStepScale = 0.90;
     static constexpr double kWheelAngleDeltaStep = 120.0;
     static constexpr double kMagnitudeCutoffMin = -2.0;

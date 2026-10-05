@@ -24,6 +24,8 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -121,6 +123,40 @@ bool collectionContainsInstanceId(
     );
 }
 
+const SkySettingsStore::CatalogSourceCacheRecord*
+findCollectionRecord(const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot, const QString& instanceId)
+{
+    const auto it = std::find_if(
+        snapshot.sources.begin(),
+        snapshot.sources.end(),
+        [&instanceId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
+            return record.instanceId == instanceId;
+        }
+    );
+    return it != snapshot.sources.end() ? &*it : nullptr;
+}
+
+std::vector<skygate::ephemeris::ConstellationLineRef>
+relatedLineRefs(const SkySettingsStore::CatalogSourceCacheRecord& record)
+{
+    return skygate::ui::internal::SkyContextCatalogCodec::parseConstellationLineRows(
+        std::string_view(
+            record.constellationLineRows.constData(), static_cast<std::size_t>(record.constellationLineRows.size())
+        )
+    );
+}
+
+bool relatedLineRefsContainHip(
+    const std::vector<skygate::ephemeris::ConstellationLineRef>& lineRefs, const std::string& hipId
+)
+{
+    return std::any_of(
+        lineRefs.begin(), lineRefs.end(), [&hipId](const skygate::ephemeris::ConstellationLineRef& lineRef) {
+            return lineRef.first == hipId || lineRef.second == hipId;
+        }
+    );
+}
+
 // Finds the active related anchor group by constellation name. The returned
 // pointer stays valid until the next active-view mutation.
 const skygate::ephemeris::ConstellationAnchorGroup*
@@ -203,6 +239,11 @@ private slots:
     void lateRelatedFailureStatusFromSupersededOwnerIsIgnored();
     void outOfOrderRelatedRepliesPopulateTheirOwnSources();
     void reloadingOrRemovingAnotherSourceKeepsPendingOwnerResponse();
+    void relatedDatasetsRoundTripToTheirOwnSources();
+    void disabledOwnerRelatedDataStaysOwnedButInactiveAfterRestart();
+    void removedOwnerRelatedDataDoesNotReturnAfterRestart();
+    void corruptOwnerRelatedPayloadLeavesSiblingDatasetIntact();
+    void migratesPriorSingleOwnerRelatedPayloadOnce();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -2193,6 +2234,346 @@ void SkyCatalogManagerTests::reloadingOrRemovingAnotherSourceKeepsPendingOwnerRe
     QVERIFY(findConstellationAnchorGroup(manager, "Lyra") == nullptr);
     QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
     QCOMPARE(manager.constellationCount(), std::size_t{1});
+}
+
+void SkyCatalogManagerTests::relatedDatasetsRoundTripToTheirOwnSources()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/roundtrip-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/roundtrip-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/roundtrip-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/roundtrip-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceARelatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    const QString sourceAId = sourceA.instanceId;
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+
+    const auto snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* recordA = findCollectionRecord(*snapshot, sourceAId);
+    const SkySettingsStore::CatalogSourceCacheRecord* recordB = findCollectionRecord(*snapshot, sourceBId);
+    QVERIFY(recordA != nullptr);
+    QVERIFY(recordB != nullptr);
+
+    // Each record carries the dataset its own owner downloaded; the composed
+    // collection-wide view is not copied into both records.
+    const auto recordALines = relatedLineRefs(*recordA);
+    const auto recordBLines = relatedLineRefs(*recordB);
+    QCOMPARE(recordALines.size(), std::size_t{2});
+    QCOMPARE(recordBLines.size(), std::size_t{2});
+    QVERIFY(relatedLineRefsContainHip(recordALines, "hip_27989"));
+    QVERIFY(!relatedLineRefsContainHip(recordALines, "hip_26311"));
+    QVERIFY(relatedLineRefsContainHip(recordBLines, "hip_26311"));
+    QVERIFY(!relatedLineRefsContainHip(recordBLines, "hip_27989"));
+
+    // The restart restores each dataset to its own owner.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{4});
+    QCOMPARE(restoredManager.constellationAnchorGroups().size(), std::size_t{2});
+    QCOMPARE(restoredManager.constellationCount(), std::size_t{2});
+
+    restoredManager.disableSource(sourceAId);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Orion") == nullptr);
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
+
+    restoredManager.enableSource(sourceAId);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Orion") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") != nullptr);
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{4});
+}
+
+void SkyCatalogManagerTests::disabledOwnerRelatedDataStaysOwnedButInactiveAfterRestart()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/disabled-owner-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/disabled-owner-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/disabled-owner-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/disabled-owner-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceARelatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    const QString sourceAId = sourceA.instanceId;
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+
+    manager.disableSource(sourceAId);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+
+    const auto snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* recordA = findCollectionRecord(*snapshot, sourceAId);
+    const SkySettingsStore::CatalogSourceCacheRecord* recordB = findCollectionRecord(*snapshot, sourceBId);
+    QVERIFY(recordA != nullptr);
+    QVERIFY(recordB != nullptr);
+    QVERIFY(!recordA->enabled);
+
+    // The disabled owner keeps its own inactive dataset; the persist does not
+    // replace it with the composed view of the enabled sibling.
+    const auto recordALines = relatedLineRefs(*recordA);
+    QCOMPARE(recordALines.size(), std::size_t{2});
+    QVERIFY(relatedLineRefsContainHip(recordALines, "hip_27989"));
+    QVERIFY(!relatedLineRefsContainHip(recordALines, "hip_26311"));
+    QCOMPARE(recordA->constellationCount, std::size_t{1});
+
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QVERIFY(!restoredManager.isSourceEnabled(sourceAId));
+    QVERIFY(restoredManager.isSourceEnabled(sourceBId));
+
+    // The disabled owner's references stay inactive after the restart.
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") != nullptr);
+    QCOMPARE(restoredManager.constellationCount(), std::size_t{1});
+
+    // Re-enabling restores the owner's own dataset, not the sibling's.
+    restoredManager.enableSource(sourceAId);
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{4});
+    const skygate::ephemeris::ConstellationAnchorGroup* orionGroup =
+        findConstellationAnchorGroup(restoredManager, "Orion");
+    QVERIFY(orionGroup != nullptr);
+    QCOMPARE(orionGroup->second.size(), std::size_t{3});
+    QCOMPARE(restoredManager.constellationCount(), std::size_t{2});
+}
+
+void SkyCatalogManagerTests::removedOwnerRelatedDataDoesNotReturnAfterRestart()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/removed-owner-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/removed-owner-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/removed-owner-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/removed-owner-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceARelatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    const QString sourceAId = sourceA.instanceId;
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+
+    // A first restart restores both owners from their own records.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{4});
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") != nullptr);
+
+    // Removing one owner removes its dataset with its record.
+    restoredManager.removeSource(sourceBId);
+    QVERIFY(!restoredManager.sourceInstanceIds().contains(sourceBId));
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") == nullptr);
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
+
+    const auto afterRemoval = store.loadCatalogCollectionCache();
+    QVERIFY(afterRemoval.has_value());
+    QVERIFY(!collectionContainsInstanceId(*afterRemoval, sourceBId));
+    const SkySettingsStore::CatalogSourceCacheRecord* survivingRecord = findCollectionRecord(*afterRemoval, sourceAId);
+    QVERIFY(survivingRecord != nullptr);
+    const auto survivingLines = relatedLineRefs(*survivingRecord);
+    QVERIFY(!relatedLineRefsContainHip(survivingLines, "hip_26311"));
+
+    // The retired pre-collection two-slot cache still holds related data on
+    // disk, but a committed collection snapshot keeps that fallback unused.
+    SkySettingsStore::CatalogCacheSnapshot legacy;
+    legacy.sourceLabel = QStringLiteral("Legacy Related");
+    legacy.catalogPayload = skygate::ui::tests::orionHygCsvPayload();
+    legacy.constellationLineRows = "hip_26311|hip_26727\n";
+    legacy.constellationAnchorGroupRows = "Lyra|hip_26311,hip_26727\n";
+    legacy.constellationLineSchemaVersion =
+        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+    legacy.constellationCount = 1U;
+    QVERIFY(store.saveCatalogCache(legacy));
+
+    // The removed owner's dataset does not return through another record or
+    // through the legacy fallback.
+    SkyCatalogManager secondRestart(&store);
+    QVERIFY(secondRestart.restoreCatalogCache());
+    QVERIFY(!secondRestart.sourceInstanceIds().contains(sourceBId));
+    QVERIFY(secondRestart.sourceInstanceIds().contains(sourceAId));
+    QCOMPARE(secondRestart.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(secondRestart, "Orion") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(secondRestart, "Lyra") == nullptr);
+    QCOMPARE(secondRestart.constellationCount(), std::size_t{1});
+}
+
+void SkyCatalogManagerTests::corruptOwnerRelatedPayloadLeavesSiblingDatasetIntact()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/corrupt-owner-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/corrupt-owner-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/corrupt-owner-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/corrupt-owner-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceARelatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    const QString sourceAId = sourceA.instanceId;
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+
+    // Corrupt one owner's stored related payload in place.
+    auto corruptedSnapshot = store.loadCatalogCollectionCache();
+    QVERIFY(corruptedSnapshot.has_value());
+    const auto corruptedRecord = std::find_if(
+        corruptedSnapshot->sources.begin(),
+        corruptedSnapshot->sources.end(),
+        [&sourceAId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
+            return record.instanceId == sourceAId;
+        }
+    );
+    QVERIFY(corruptedRecord != corruptedSnapshot->sources.end());
+    corruptedRecord->constellationLineRows = "not a related line payload";
+    QVERIFY(store.saveCatalogCollectionCache(*corruptedSnapshot));
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Saved related constellation dataset is unreadable"));
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+
+    // The corrupted owner restores without related data and keeps its
+    // configuration; the sibling's dataset is untouched.
+    QVERIFY(restoredManager.isSourceEnabled(sourceAId));
+    QVERIFY(restoredManager.isSourceEnabled(sourceBId));
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") != nullptr);
+    QCOMPARE(restoredManager.constellationCount(), std::size_t{1});
+
+    restoredManager.disableSource(sourceBId);
+    QVERIFY(restoredManager.constellationLineRefs().empty());
+    restoredManager.enableSource(sourceBId);
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
+}
+
+void SkyCatalogManagerTests::migratesPriorSingleOwnerRelatedPayloadOnce()
+{
+    // A snapshot written before the per-source related format: the bundled
+    // record and one star record, where the star record holds the only copy of
+    // the then-collection-wide related dataset.
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion =
+        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion - 1;
+
+    SkySettingsStore::CatalogSourceCacheRecord bundled;
+    bundled.instanceId = QStringLiteral("primary");
+    bundled.title = QStringLiteral("Bundled");
+    bundled.bundled = true;
+    bundled.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    bundled.enabled = true;
+    bundled.order = 0;
+    snapshot.sources.push_back(std::move(bundled));
+
+    SkySettingsStore::CatalogSourceCacheRecord star;
+    star.instanceId = QStringLiteral("custom:prior-owner");
+    star.title = QStringLiteral("Prior Owner");
+    star.urls = QStringList{QStringLiteral("https://example.test/prior-owner.csv")};
+    star.relatedDatasetUrls = QStringList{QStringLiteral("https://example.test/prior-owner-lines.json")};
+    star.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    star.enabled = true;
+    star.order = 1;
+    star.payload = skygate::ui::tests::orionHygCsvPayload();
+    star.constellationLineRows = "hip_27989|hip_25336\nhip_25336|hip_25930\n";
+    star.constellationAnchorGroupRows = "Orion|hip_27989,hip_25336\n";
+    star.constellationLineSchemaVersion =
+        skygate::ui::internal::SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
+    star.constellationCount = 1U;
+    snapshot.sources.push_back(std::move(star));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+
+    // The sole related payload identifies its owner, so the migration adopts
+    // it instead of discarding it.
+    SkyCatalogManager manager(&store);
+    QVERIFY(manager.restoreCatalogCache());
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+
+    // The migration rewrite commits the record in the per-source format and
+    // keeps the adopted dataset under its owner.
+    const auto migrated = store.loadCatalogCollectionCache();
+    QVERIFY(migrated.has_value());
+    QCOMPARE(
+        migrated->schemaVersion,
+        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+    );
+    const SkySettingsStore::CatalogSourceCacheRecord* migratedRecord =
+        findCollectionRecord(*migrated, QStringLiteral("custom:prior-owner"));
+    QVERIFY(migratedRecord != nullptr);
+    QCOMPARE(relatedLineRefs(*migratedRecord).size(), std::size_t{2});
+
+    // The next start reads the migrated records without another migration and
+    // with the owner's dataset intact.
+    SkyCatalogManager restarted(&store);
+    QVERIFY(restarted.restoreCatalogCache());
+    QCOMPARE(restarted.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(restarted, "Orion") != nullptr);
+    QCOMPARE(restarted.constellationCount(), std::size_t{1});
 }
 
 void SkyCatalogManagerTests::removedBundledSourceDoesNotReturnAfterRestart()
