@@ -116,7 +116,7 @@ QByteArray lyraRelatedDatasetPayload()
 }
 
 // -------------------------------------------------------------------------
-// Interchangeability completion-gate fixture (V2-16)
+// Interchangeability completion-gate fixture
 // -------------------------------------------------------------------------
 //
 // Three configured sources exercised through the real import workflow:
@@ -3369,7 +3369,7 @@ void SkyCatalogManagerTests::sharedAliasNamesStayDistinctThroughManagerWorkflow(
     source.title = QStringLiteral("Shared Alias Source");
     source.schemaHint = skygate::ephemeris::CatalogSourceType::OpenNgcCsv;
 
-    // R2: a shared descriptive name never discards a recognized catalog
+    // A shared descriptive name never discards a recognized catalog
     // designation, even when the optional cross-reference columns are absent.
     QTest::ignoreMessage(
         QtWarningMsg,
@@ -3426,7 +3426,7 @@ void SkyCatalogManagerTests::conflictingAstrometryKeepsOneCoherentModelThroughMa
         skygate::ui::internal::SkyCatalogSourceInstance::createCustom(fixedUrl);
     fixedOnly.title = QStringLiteral("Fixed Source");
 
-    // R4: the later source wins the position and carries no astrometry, so the
+    // The later source wins the position and carries no astrometry, so the
     // contradicting astrometry of the earlier source is rejected instead of
     // being copied beside the winning fixed coordinates.
     manager.loadSource(astrometric, skygate::ephemeris::CatalogCompositionPolicy::Merge);
@@ -3482,7 +3482,7 @@ void SkyCatalogManagerTests::bundledDeepSkyFallbackFillsGapsWithoutOverridingCon
     manager.loadSource(configured, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
     QTRY_VERIFY(!manager.downloadingCatalog());
 
-    // R9: without the bundled star source the bundled deep-sky fallback joins
+    // Without the bundled star source the bundled deep-sky fallback joins
     // the composition, and it fills only the identities no configured source
     // supplies instead of overriding them.
     manager.removeSource(QStringLiteral("primary"));
@@ -3543,7 +3543,7 @@ void SkyCatalogManagerTests::crossSourceHipBridgesSurviveBinaryCollectionRestore
         return body;
     };
 
-    // R3: one source establishes that HIP 1 and HD 2 are the same object, and
+    // One source establishes that HIP 1 and HD 2 are the same object, and
     // the later source supplies both identifiers through two records. The
     // identifiers arrive only through the versioned binary cache, because no
     // shipped schema emits an HD designation.

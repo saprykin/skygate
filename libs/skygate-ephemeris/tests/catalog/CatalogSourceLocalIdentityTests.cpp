@@ -30,7 +30,7 @@ using skygate::ephemeris::CatalogLoadResult;
 using skygate::ephemeris::CatalogObjectIdentity;
 using skygate::ephemeris::IStarCatalog;
 
-// The two anonymous HYG payloads of finding R1: neither row carries an id,
+// The two anonymous HYG payloads: neither row carries an id,
 // hip, or any other recognized designation, so each parse generates its own
 // hyg_auto_1 record key.
 constexpr std::string_view kAnonymousPayloadA = "ra,dec,mag\n1,2,3\n";

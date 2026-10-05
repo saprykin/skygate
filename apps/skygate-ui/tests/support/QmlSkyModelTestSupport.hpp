@@ -22,7 +22,7 @@ namespace skygate::ui::tests {
 // time, so without a pinned time source tests drift with the wall clock and
 // the main-window rendering test failed at times of day where a bright star
 // projected close enough to the 560x640 window edge to push its
-// SkyOverlayLabel out of bounds (V2-18).
+// SkyOverlayLabel out of bounds.
 class FixedTimeSource final : public skygate::core::ITimeSource {
 public:
     [[nodiscard]] static QDateTime defaultUtc()

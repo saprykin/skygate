@@ -374,7 +374,7 @@ void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
 
 void CatalogStarAstrometryArraysTests::mergedConflictingCoordinatesExposeOnlyTheWinningPosition()
 {
-    // R4: the later source fixes the shared HIP 1 object at RA 10 while the
+    // The later source fixes the shared HIP 1 object at RA 10 while the
     // earlier source offers astrometry at RA 1. The winning fixed position and
     // the fallback seen by this consumer must agree; the unrelated reference
     // position must not survive.

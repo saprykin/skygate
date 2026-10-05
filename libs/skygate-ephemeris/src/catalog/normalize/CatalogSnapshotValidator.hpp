@@ -31,7 +31,7 @@ class OwnGalaxyCelestialBody;
 //
 // This class validates per-body source validity only. Raw duplicate source
 // rows remain legal here; deduplication to the unique active identity is the
-// responsibility of the identity index and composition merger (CAT-12).
+// responsibility of the identity index and composition merger.
 class CatalogSnapshotValidator final {
 public:
     struct Report {

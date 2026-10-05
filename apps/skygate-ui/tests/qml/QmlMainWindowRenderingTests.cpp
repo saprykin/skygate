@@ -43,7 +43,7 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
 
     // Scene times pinned for the deterministic regression: the bounds check
     // used to fail at some times of day because sky positions followed the
-    // wall clock and a star label drifted outside the 560x640 window (V2-18).
+    // wall clock and a star label drifted outside the 560x640 window.
     // 2026-05-06T06:00Z reproduces that out-of-bounds label on demand; the
     // remaining instants sample the sky rotation across one day.
     const QList<QDateTime> sceneTimes = {
