@@ -14,6 +14,7 @@
 #include <QDir>
 #include <QFile>
 #include <QList>
+#include <QLocale>
 #include <QPair>
 #include <QPointer>
 #include <QRegularExpression>
@@ -244,6 +245,8 @@ private slots:
     void removedOwnerRelatedDataDoesNotReturnAfterRestart();
     void corruptOwnerRelatedPayloadLeavesSiblingDatasetIntact();
     void migratesPriorSingleOwnerRelatedPayloadOnce();
+    void presentationSummarizesEnabledCollectionParticipation();
+    void bundledFallbackPresentationFollowsParticipationAndRestart();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -2608,6 +2611,166 @@ void SkyCatalogManagerTests::removedBundledSourceDoesNotReturnAfterRestart()
         return sourceId == QStringLiteral("primary");
     }));
     QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("Sibling Star")));
+}
+
+void SkyCatalogManagerTests::presentationSummarizesEnabledCollectionParticipation()
+{
+    const QString starAPath = m_settings.filePath(QStringLiteral("presentation-star-a.csv"));
+    const QString starBPath = m_settings.filePath(QStringLiteral("presentation-star-b.csv"));
+    const QString deepSkyPath = m_settings.filePath(QStringLiteral("presentation-dso.csv"));
+    QVERIFY(writeFile(
+        starAPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 900701, .hip = 900701, .properName = "Presentation Star A", .mag = "1.0"}
+        )
+    ));
+    QVERIFY(writeFile(
+        starBPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 900702, .hip = 900702, .properName = "Presentation Star B", .mag = "2.0"}
+        )
+    ));
+    QVERIFY(writeFile(
+        deepSkyPath,
+        skygate::ui::tests::sampleOpenNgcCsvPayload(
+            {.name = "NGC0702",
+             .type = "G",
+             .ra = "00:42:44.35",
+             .dec = "+41:16:08.6",
+             .messier = "",
+             .ngc = "0702",
+             .identifiers = "PGC 7002",
+             .commonName = "Presentation Galaxy"}
+        )
+    ));
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    // The bundled star catalog already supplies the bundled deep-sky objects,
+    // so the enabled fallback contributes nothing and is not named.
+    QVERIFY(manager.participationSummary().startsWith(QStringLiteral("Bundled")));
+    QVERIFY(!manager.participationSummary().contains(QStringLiteral("Bundled Messier")));
+
+    // Three mixed configured sources: two star sources and one deep-sky source.
+    skygate::ui::internal::SkyCatalogSourceInstance starA =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(starAPath).toString());
+    starA.title = QStringLiteral("Alpha");
+    skygate::ui::internal::SkyCatalogSourceInstance starB =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(starBPath).toString());
+    starB.title = QStringLiteral("Beta");
+    skygate::ui::internal::SkyCatalogSourceInstance deepSky =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(deepSkyPath).toString());
+    deepSky.title = QStringLiteral("Gamma");
+
+    manager.loadSource(starA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    manager.loadSource(starB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    manager.loadSource(deepSky, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    // The summary names every enabled source in visible collection order, and
+    // the status text pairs it with the active snapshot counts.
+    QCOMPARE(manager.sourceCount(), std::size_t{4});
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Bundled + Alpha + Beta + Gamma"));
+    QVERIFY(manager.statusText().startsWith(QStringLiteral("Catalog: %1 (").arg(manager.participationSummary())));
+    const QLocale locale = QLocale::system();
+    QVERIFY(manager.statusText().contains(
+        QStringLiteral("(%1 objects,").arg(locale.toString(static_cast<qulonglong>(manager.bodyCount())))
+    ));
+
+    // Disabling one source removes it from the summary and keeps its own state
+    // row, so a configured but disabled source is never presented as active.
+    const int statusChangesBeforeDisable = statusSpy.count();
+    manager.disableSource(starB.instanceId);
+    QVERIFY(statusSpy.count() > statusChangesBeforeDisable);
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Bundled + Alpha + Gamma"));
+    QVERIFY(!manager.statusText().contains(QStringLiteral("Beta")));
+
+    const auto findViewEntry = [](const QVector<SkyCatalogManager::SourceViewEntry>& entries,
+                                  const QString& instanceId) {
+        return std::find_if(
+            entries.begin(), entries.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+                return entry.instanceId == instanceId;
+            }
+        );
+    };
+    const QVector<SkyCatalogManager::SourceViewEntry> disabledView = manager.sourceViewEntries();
+    QCOMPARE(disabledView.size(), 4);
+    const auto disabledEntry = findViewEntry(disabledView, starB.instanceId);
+    QVERIFY(disabledEntry != disabledView.end());
+    QVERIFY(!disabledEntry->enabled);
+    QCOMPARE(disabledEntry->statusText, QStringLiteral("Disabled"));
+    const auto enabledEntry = findViewEntry(disabledView, starA.instanceId);
+    QVERIFY(enabledEntry != disabledView.end());
+    QVERIFY(enabledEntry->enabled);
+    QCOMPARE(enabledEntry->statusText, QStringLiteral("Active"));
+    const auto deepSkyEntry = findViewEntry(disabledView, deepSky.instanceId);
+    QVERIFY(deepSkyEntry != disabledView.end());
+    QCOMPARE(deepSkyEntry->title, QStringLiteral("Gamma"));
+    QCOMPARE(deepSkyEntry->policy, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+
+    // Re-enabling restores the source in its collection position.
+    manager.enableSource(starB.instanceId);
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Bundled + Alpha + Beta + Gamma"));
+
+    // Reordering the collection reorders the summary.
+    manager.moveSource(deepSky.instanceId, 1);
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Bundled + Gamma + Alpha + Beta"));
+
+    // Removing a source drops its row, its title, and its objects.
+    manager.removeSource(starA.instanceId);
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Bundled + Gamma + Beta"));
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Presentation Star A")));
+    QCOMPARE(manager.sourceViewEntries().size(), 3);
+}
+
+void SkyCatalogManagerTests::bundledFallbackPresentationFollowsParticipationAndRestart()
+{
+    const QString starsPath = m_settings.filePath(QStringLiteral("fallback-stars.csv"));
+    QVERIFY(writeFile(
+        starsPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 900703, .hip = 900703, .properName = "Fallback Star", .mag = "1.0"}
+        )
+    ));
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+
+    // The bundled star source supplies the bundled deep-sky objects, so the
+    // enabled fallback is not presented as the active deep-sky source.
+    QVERIFY(!manager.participationSummary().contains(QStringLiteral("Bundled Messier")));
+
+    skygate::ui::internal::SkyCatalogSourceInstance stars =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(starsPath).toString());
+    stars.title = QStringLiteral("Stars");
+    manager.loadSource(stars, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    // Without the bundled star source the explicit fallback supplies the
+    // deep-sky identities and the summary names it through its provenance.
+    manager.removeSource(QStringLiteral("primary"));
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Stars + Bundled core + Bundled Messier"));
+    QVERIFY(manager.statusText().contains(QStringLiteral("Bundled Messier")));
+
+    // Turning the fallback participation off drops its name and its objects.
+    manager.setDeepSkyCatalogPresetIndex(1);
+    manager.retrySource(stars.instanceId);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Stars + Bundled core"));
+    QVERIFY(!manager.statusText().contains(QStringLiteral("Bundled Messier")));
+
+    // A restart restores the configured collection, the source titles, and the
+    // fallback participation of the restarted configuration.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.sourceInstanceIds().size(), 1);
+    QVERIFY(restoredManager.participationSummary().startsWith(QStringLiteral("Stars (saved)")));
+    QVERIFY(restoredManager.participationSummary().contains(QStringLiteral("Bundled Messier")));
+    QVERIFY(restoredManager.statusText().startsWith(QStringLiteral("Catalog: Stars (saved)")));
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)

@@ -75,7 +75,19 @@ public:
     explicit SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCatalog> sourceCatalog);
 
     [[nodiscard]] const skygate::ephemeris::IStarCatalog* starCatalog() const noexcept;
+    // Title of the leading configured source that participates. When every
+    // configured source is disabled this is the leading implicit bundled
+    // contribution, so a disabled source is never presented as the active one.
     [[nodiscard]] QString sourceLabel() const;
+    // Presentation summary of the collection's actual participation: the
+    // enabled configured sources in visible collection order, followed by the
+    // bundled contributions whose objects survive in the active snapshot.
+    //
+    // A configured but disabled source never appears, and an implicit bundled
+    // contribution is named only while it supplies objects, so the summary
+    // never claims a source that does not participate. The bundled names come
+    // from the recorded provenance instead of a hard-coded catalog assumption.
+    [[nodiscard]] QString participationSummary() const;
     [[nodiscard]] std::size_t bodyCount() const noexcept;
     [[nodiscard]] std::size_t constellationCount() const noexcept;
     [[nodiscard]] std::size_t deepSkyObjectCount() const noexcept;
@@ -123,11 +135,8 @@ public:
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
     [[nodiscard]] QString buildStatusText() const;
-    [[nodiscard]] QString deepSkySourceLabel() const;
     [[nodiscard]] SkyCatalogSourceRecord* findSource(const QString& instanceId);
     [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;
-    [[nodiscard]] const SkyCatalogSourceRecord*
-    firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy policy, bool requireEnabled) const;
     // Composes the active related view from the owned datasets of the enabled
     // sources and returns the composed declared constellation count.
     [[nodiscard]] std::size_t buildActiveConstellationView(
@@ -139,6 +148,7 @@ private:
         const std::vector<std::string>& composedSourceIds,
         const std::vector<std::vector<std::string>>& contributorSourceIds
     );
+    void rebuildSourceParticipation(const std::vector<std::string>& contributingSourceIds);
     void refreshResolvedConstellationRefs() const;
 
 private:
@@ -151,6 +161,10 @@ private:
     std::size_t m_deepSkyCatalogFoundObjectCount = 0;
     QHash<QString, QString> m_sourceTitles;
     std::vector<QString> m_sourceIds;
+    // Instance IDs of the sources that supplied at least one object of the
+    // active snapshot, in precedence order, exactly as reported by the last
+    // accepted composition.
+    std::vector<QString> m_contributingSourceIds;
     std::vector<QStringList> m_contributorSourceIds;
     SkyCatalogConstellationStore m_constellationRefs;
     mutable std::vector<ConstellationLineRef> m_resolvedLineRefs;
