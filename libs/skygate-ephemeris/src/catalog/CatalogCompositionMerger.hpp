@@ -16,7 +16,10 @@ namespace skygate::ephemeris {
 // that resolves to a survivor this same source pass already produced fills
 // that survivor's missing metadata instead of replacing it. AugmentCore
 // sources contribute only non-deep-sky bodies as a gap-fill and enable the
-// bundled bright-star fallback when no star is present.
+// bundled bright-star fallback when no star is present; DeepSkyFallback
+// sources contribute only deep-sky bodies as a gap-fill. Gap-fill sources
+// never replace an earlier survivor, so a configured source's body always
+// keeps precedence over bundled fallback data.
 //
 // The identity-to-survivor index stays current while the collection is merged:
 // a replacement vacates the earlier survivor's index entries and registers the

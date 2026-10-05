@@ -2,6 +2,7 @@
 
 #include "catalog/CatalogComposer.hpp"
 #include "catalog/CatalogFactory.hpp"
+#include "catalog/CatalogIdentity.hpp"
 #include "catalog/constellation/ConstellationReferenceResolver.hpp"
 
 #include <QHash>
@@ -278,13 +279,11 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     request.currentConstellationCount = m_constellationRefs.count();
 
     std::size_t knownDeepSkyObjectCount = 0;
-    bool hasDeepSkyOnlySource = false;
     for (const SkyCatalogSourceRecord& source : m_sources) {
         if (!source.enabled || source.catalog == nullptr) {
             continue;
         }
         if (source.policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
-            hasDeepSkyOnlySource = true;
             knownDeepSkyObjectCount += source.foundObjectCount;
         }
         request.sources.push_back(
@@ -296,11 +295,13 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
             }
         );
     }
-    request.knownDeepSkyObjectCount = knownDeepSkyObjectCount;
 
     std::unique_ptr<skygate::ephemeris::IStarCatalog> bundledCore =
         skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
     if (bundledCore != nullptr) {
+        // Bundled core augmentation is always required: it supplies the
+        // Sun/Moon/planet bodies, and the bundled bright-star fallback when no
+        // configured source supplies a star.
         request.sources.push_back(
             skygate::ephemeris::CatalogCompositionSourceEntry{
                 .sourceId = std::string(kBundledCoreSourceId),
@@ -309,17 +310,24 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
                 .policy = skygate::ephemeris::CatalogCompositionPolicy::AugmentCore,
             }
         );
-        if (options.useBundledDeepSkyCatalog && !hasDeepSkyOnlySource) {
+
+        // The bundled deep-sky fallback participates only when the composition
+        // configuration enables it, and it only fills deep-sky identities no
+        // configured source supplies.
+        if (options.bundledDeepSkyParticipation
+            == SkyCatalogRuntimeBuildOptions::BundledDeepSkyParticipation::Fallback) {
             request.sources.push_back(
                 skygate::ephemeris::CatalogCompositionSourceEntry{
                     .sourceId = std::string(kBundledDeepSkySourceId),
                     .enabled = true,
                     .catalog = bundledCore.get(),
-                    .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
+                    .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyFallback,
                 }
             );
+            knownDeepSkyObjectCount += skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(bundledCore->bodies());
         }
     }
+    request.knownDeepSkyObjectCount = knownDeepSkyObjectCount;
 
     skygate::ephemeris::CatalogCompositionResult composed =
         skygate::ephemeris::CatalogComposer::composeCollection(request);

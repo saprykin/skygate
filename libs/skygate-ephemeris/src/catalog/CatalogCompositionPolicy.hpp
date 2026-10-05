@@ -12,12 +12,15 @@ namespace skygate::ephemeris {
 // metadata. `AugmentCore` is the bundled-core augmentation: it contributes
 // only non-deep-sky bodies as a gap-fill (existing identities are kept) and
 // enables the bundled bright-star fallback when no other source contributes a
-// star. Bundled augmentation carries its own provenance instead of being
-// attributed to the primary source.
+// star. `DeepSkyFallback` is the bundled deep-sky fallback: it contributes
+// only deep-sky bodies as a gap-fill, so it never replaces a configured
+// source's body or precedence. Bundled augmentation and fallback carry their
+// own provenance instead of being attributed to another source.
 enum class CatalogCompositionPolicy : std::uint8_t {
     Merge,
     DeepSkyOnly,
-    AugmentCore
+    AugmentCore,
+    DeepSkyFallback
 };
 
 }  // namespace skygate::ephemeris

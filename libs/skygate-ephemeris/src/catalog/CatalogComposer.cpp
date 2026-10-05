@@ -136,7 +136,8 @@ CatalogCompositionResult CatalogComposer::composeCollection(const CatalogComposi
             if (!source.enabled || source.catalog == nullptr) {
                 continue;
             }
-            if (source.policy == CatalogCompositionPolicy::DeepSkyOnly) {
+            if (source.policy == CatalogCompositionPolicy::DeepSkyOnly
+                || source.policy == CatalogCompositionPolicy::DeepSkyFallback) {
                 result.foundDeepSkyObjectCount += countDeepSkyObjects(source.catalog);
             }
         }

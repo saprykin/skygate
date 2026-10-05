@@ -864,7 +864,14 @@ void SkyCatalogManager::handleCatalogImportStatus(const QString& instanceId, con
 
 SkyCatalogRuntimeBuildOptions SkyCatalogManager::runtimeBuildOptions() const
 {
-    return SkyCatalogRuntimeBuildOptions{.useBundledDeepSkyCatalog = m_deepSkyCatalogPresetIndex == 0};
+    // The legacy deep-sky preset selects bundled Messier. That control maps to
+    // the same explicit bundled participation the composition configuration
+    // carries, instead of the runtime independently deciding a hidden source
+    // insertion from the collection's current contents.
+    const auto bundledDeepSkyParticipation = m_deepSkyCatalogPresetIndex == 0
+                                                 ? SkyCatalogRuntimeBuildOptions::BundledDeepSkyParticipation::Fallback
+                                                 : SkyCatalogRuntimeBuildOptions::BundledDeepSkyParticipation::Disabled;
+    return SkyCatalogRuntimeBuildOptions{.bundledDeepSkyParticipation = bundledDeepSkyParticipation};
 }
 
 void SkyCatalogManager::applyRuntimeResult(const SkyCatalogRuntimeResult& result)

@@ -188,6 +188,8 @@ private slots:
     void reportsDeterministicCounts();
     void reportsSourceRowAndPerKindCounts();
     void bundledAugmentationCarriesOwnProvenance();
+    void deepSkyFallbackFillsGapsWithoutReplacingConfiguredValues();
+    void deepSkyFallbackNeverOverridesReplacementOrder();
     void doesNotDuplicatePrimarySolarSystemBodies();
     void bundledBrightStarsOnlyAddedWhenNoStarsPresent();
     void usesCurrentConstellationCountWhenLarger();
@@ -571,6 +573,134 @@ void CatalogCompositionCollectionTests::bundledAugmentationCarriesOwnProvenance(
     const BaseCelestialBody* orion = findBodyById(bodies, "constellation_orion");
     QVERIFY(orion != nullptr);
     QCOMPARE(*sourceIdFor(result, bodies, "constellation_orion"), std::string("primary"));
+}
+
+void CatalogCompositionCollectionTests::deepSkyFallbackFillsGapsWithoutReplacingConfiguredValues()
+{
+    DistantCelestialBody configuredM31 =
+        makeDeepSkyObject("messier_031", "Configured M31", {"M31"}, {CatalogIdentifier::make("messier", "31")});
+    configuredM31.visualMagnitude = 0.0;
+    auto configured = createCatalog(
+        {makeStar("configured_hip_1", "Configured star", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)},
+        {configuredM31}
+    );
+    QVERIFY(configured != nullptr);
+
+    DistantCelestialBody fallbackM31 =
+        makeDeepSkyObject("messier_031", "Bundled M31", {"M31"}, {CatalogIdentifier::make("messier", "31")});
+    fallbackM31.visualMagnitude = 3.44;
+    DistantCelestialBody fallbackOnly =
+        makeDeepSkyObject("ngc_9999", "Fallback only", {"NGC 9999"}, {CatalogIdentifier::make("ngc", "9999")});
+    fallbackOnly.visualMagnitude = 9.0;
+    auto fallback = createCatalog({}, {fallbackM31, fallbackOnly});
+    QVERIFY(fallback != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "configured",
+         .enabled = true,
+         .catalog = configured.get(),
+         .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "bundled-deep-sky",
+         .enabled = true,
+         .catalog = fallback.get(),
+         .policy = CatalogCompositionPolicy::DeepSkyFallback},
+    };
+
+    const CatalogCompositionResult result = skygate::ephemeris::CatalogComposer::composeCollection(request);
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+
+    // The fallback fills gaps only: the configured M31 keeps its magnitude and
+    // its provenance.
+    const BaseCelestialBody* m31 = findBodyById(bodies, "messier_031");
+    QVERIFY(m31 != nullptr);
+    QCOMPARE(m31->visualMagnitude, 0.0);
+    QVERIFY(sourceIdFor(result, bodies, "messier_031").has_value());
+    QCOMPARE(*sourceIdFor(result, bodies, "messier_031"), std::string("configured"));
+    QVERIFY(contributorsFor(result, bodies, "messier_031").has_value());
+    QCOMPARE(*contributorsFor(result, bodies, "messier_031"), (std::vector<std::string>{"configured"}));
+
+    // An identity no configured source supplies comes from the fallback and
+    // carries the fallback's own source id.
+    QVERIFY(findBodyById(bodies, "ngc_9999") != nullptr);
+    QVERIFY(sourceIdFor(result, bodies, "ngc_9999").has_value());
+    QCOMPARE(*sourceIdFor(result, bodies, "ngc_9999"), std::string("bundled-deep-sky"));
+    QVERIFY(contributorsFor(result, bodies, "ngc_9999").has_value());
+    QCOMPARE(*contributorsFor(result, bodies, "ngc_9999"), (std::vector<std::string>{"bundled-deep-sky"}));
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
+    // The composer derives the pre-merge deep-sky count from the participating
+    // deep-sky sources, including a DeepSkyFallback source.
+    QCOMPARE(result.foundDeepSkyObjectCount, std::size_t{2});
+}
+
+void CatalogCompositionCollectionTests::deepSkyFallbackNeverOverridesReplacementOrder()
+{
+    DistantCelestialBody configuredM31 =
+        makeDeepSkyObject("messier_031", "Configured M31", {"M31"}, {CatalogIdentifier::make("messier", "31")});
+    configuredM31.visualMagnitude = 0.0;
+    auto configured = createCatalog({}, {configuredM31});
+    QVERIFY(configured != nullptr);
+
+    DistantCelestialBody fallbackM31 =
+        makeDeepSkyObject("messier_031", "Bundled M31", {"M31"}, {CatalogIdentifier::make("messier", "31")});
+    fallbackM31.visualMagnitude = 3.44;
+    auto fallback = createCatalog({}, {fallbackM31});
+    QVERIFY(fallback != nullptr);
+
+    DistantCelestialBody replacementM31 =
+        makeDeepSkyObject("messier_031", "Replacement M31", {"M31"}, {CatalogIdentifier::make("messier", "31")});
+    replacementM31.visualMagnitude = 5.0;
+    auto replacement = createCatalog({}, {replacementM31});
+    QVERIFY(replacement != nullptr);
+
+    const CatalogCompositionSourceEntry configuredEntry{
+        .sourceId = "configured",
+        .enabled = true,
+        .catalog = configured.get(),
+        .policy = CatalogCompositionPolicy::Merge
+    };
+    const CatalogCompositionSourceEntry fallbackEntry{
+        .sourceId = "bundled-deep-sky",
+        .enabled = true,
+        .catalog = fallback.get(),
+        .policy = CatalogCompositionPolicy::DeepSkyFallback
+    };
+    const CatalogCompositionSourceEntry replacementEntry{
+        .sourceId = "replacement",
+        .enabled = true,
+        .catalog = replacement.get(),
+        .policy = CatalogCompositionPolicy::DeepSkyOnly
+    };
+
+    const auto composeWithSources = [](std::vector<CatalogCompositionSourceEntry> sources) {
+        CatalogCompositionRequest request;
+        request.sources = std::move(sources);
+        return skygate::ephemeris::CatalogComposer::composeCollection(request);
+    };
+
+    // The fallback is not the last position in the request, and the later
+    // explicit replacement source still wins over it and over the configured
+    // source.
+    const CatalogCompositionResult fallbackBefore =
+        composeWithSources({configuredEntry, fallbackEntry, replacementEntry});
+    QVERIFY(fallbackBefore.isSuccess());
+    const BaseCelestialBody* beforeM31 = findBodyById(fallbackBefore.catalog->bodies(), "messier_031");
+    QVERIFY(beforeM31 != nullptr);
+    QCOMPARE(beforeM31->visualMagnitude, 5.0);
+    QVERIFY(sourceIdFor(fallbackBefore, fallbackBefore.catalog->bodies(), "messier_031").has_value());
+    QCOMPARE(*sourceIdFor(fallbackBefore, fallbackBefore.catalog->bodies(), "messier_031"), std::string("replacement"));
+
+    // Placing the fallback after the replacement source does not change the
+    // winner either: gap-fill never replaces an existing survivor.
+    const CatalogCompositionResult fallbackAfter =
+        composeWithSources({configuredEntry, replacementEntry, fallbackEntry});
+    QVERIFY(fallbackAfter.isSuccess());
+    const BaseCelestialBody* afterM31 = findBodyById(fallbackAfter.catalog->bodies(), "messier_031");
+    QVERIFY(afterM31 != nullptr);
+    QCOMPARE(afterM31->visualMagnitude, 5.0);
+    QVERIFY(sourceIdFor(fallbackAfter, fallbackAfter.catalog->bodies(), "messier_031").has_value());
+    QCOMPARE(*sourceIdFor(fallbackAfter, fallbackAfter.catalog->bodies(), "messier_031"), std::string("replacement"));
 }
 
 void CatalogCompositionCollectionTests::doesNotDuplicatePrimarySolarSystemBodies()
