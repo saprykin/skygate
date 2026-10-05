@@ -7,10 +7,11 @@
 
 namespace skygate::ui::internal {
 
-// A configured source instance. The instance ID is the durable identity and is
-// independent of the display title; the descriptor ID records which preset
-// template, if any, the instance was configured from. Two custom sources or two
-// versions of the same preset can therefore coexist without collapsing.
+// A configured source instance. instanceId is the durable identity allocated
+// when the instance is created; descriptorId records which preset template, if
+// any, the instance was configured from. Nothing in the instance ID is derived
+// from the descriptor, URL, version, or title, so two instances of one
+// descriptor and two versions or member selections at one URL remain distinct.
 struct SkyCatalogSourceInstance final {
     QString instanceId;
     QString descriptorId;
@@ -21,6 +22,17 @@ struct SkyCatalogSourceInstance final {
     QString archiveSelector;
     QStringList relatedDatasetUrls;
     QString attribution;
+
+    // Allocates a fresh durable instance ID. The ID is opaque and stays fixed
+    // for the lifetime of the configured instance: reload, reorder, cache,
+    // provenance, and restart preserve it instead of re-deriving it from
+    // source metadata.
+    [[nodiscard]] static QString allocateInstanceId();
+
+    // Deterministic identity adopted for a record migrated from pre-durable-ID
+    // persistence. The legacy preset/URL derivation is applied exactly once at
+    // this migration boundary so repeated migration keeps the same IDs.
+    [[nodiscard]] static QString migratedLegacyInstanceId(const SkyCatalogSourceInstance& instance);
 
     [[nodiscard]] static SkyCatalogSourceInstance fromDescriptor(const SkyCatalogSourceDescriptor& descriptor);
     [[nodiscard]] static SkyCatalogSourceInstance createCustom(const QString& urlText, const QString& version = {});

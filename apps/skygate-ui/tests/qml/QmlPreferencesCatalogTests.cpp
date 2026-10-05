@@ -1,6 +1,5 @@
 #include "QmlPreferencesTestSupport.hpp"
 #include "SkyCatalogSourceCollectionModel.hpp"
-#include "SkyCatalogSourceInstance.hpp"
 #include "SkySettingsStore.hpp"
 #include "engine/EphemerisDataManifest.hpp"
 #include "time/CalendarTime.hpp"
@@ -454,21 +453,17 @@ void QmlPreferencesCatalogTests::catalogSectionManagesSourcesOrderingAndRemoval(
         root, exposed.window(), *controller, presetCombo, 3, QUrl::fromLocalFile(deepSkyPath).toString()
     );
 
-    const QString bundledId = QStringLiteral("primary");
-    const QString starAId =
-        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(starAPath).toString())
-            .instanceId;
-    const QString starBId =
-        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(starBPath).toString())
-            .instanceId;
-    const QString deepSkyId =
-        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(QUrl::fromLocalFile(deepSkyPath).toString())
-            .instanceId;
-
     skygate::ui::internal::SkyCatalogSourceCollectionModel* model = sourceCollectionModel(*controller);
     QVERIFY(model != nullptr);
     QTRY_COMPARE(model->rowCount(), 4);
-    QTRY_COMPARE(sourceModelInstanceIds(*controller), QStringList({bundledId, starAId, starBId, deepSkyId}));
+    const QStringList addedIds = sourceModelInstanceIds(*controller);
+    QCOMPARE(addedIds.size(), 4);
+    const QString bundledId = addedIds[0];
+    const QString starAId = addedIds[1];
+    const QString starBId = addedIds[2];
+    const QString deepSkyId = addedIds[3];
+    QVERIFY(starAId != starBId);
+    QVERIFY(starBId != deepSkyId);
     QVERIFY(catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Ordered Star A")));
     QVERIFY(catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Ordered Star B")));
 
@@ -637,10 +632,13 @@ void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndPreservesIde
     addCustomCatalogSource(root, exposed.window(), *controller, presetCombo, 2, starBUrl);
     addCustomCatalogSource(root, exposed.window(), *controller, presetCombo, 3, deepSkyUrl);
 
-    const QString starAId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(starAUrl).instanceId;
-    const QString starBId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(starBUrl).instanceId;
-    const QString deepSkyId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(deepSkyUrl).instanceId;
     QTRY_COMPARE(sourceModelInstanceIds(*controller).size(), 4);
+    const QStringList addedIds = sourceModelInstanceIds(*controller);
+    const QString starAId = addedIds[1];
+    const QString starBId = addedIds[2];
+    const QString deepSkyId = addedIds[3];
+    QVERIFY(starAId != starBId);
+    QVERIFY(starBId != deepSkyId);
     QVERIFY(sourceModelInstanceIds(*controller).contains(starAId));
     QVERIFY(sourceModelInstanceIds(*controller).contains(starBId));
     QVERIFY(sourceModelInstanceIds(*controller).contains(deepSkyId));
