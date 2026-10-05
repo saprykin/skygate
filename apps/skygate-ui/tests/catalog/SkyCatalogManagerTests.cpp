@@ -328,14 +328,48 @@ bool hasAlias(const skygate::ephemeris::BaseCelestialBody& body, const QString& 
     );
 }
 
-// The persisted cache names each source's payload sidecars after a hash of its
-// durable instance ID, so a test can address exactly one source's payloads.
+// The committed records store the sidecar path each source was written with,
+// so a test can address exactly one source's payloads without assuming how the
+// committed generation names its files.
 QString catalogSourceSidecarPath(const QString& directory, const QString& instanceId, const QString& extension)
 {
     const QByteArray digest = QCryptographicHash::hash(instanceId.toUtf8(), QCryptographicHash::Sha256).toHex();
-    return QDir(directory).filePath(
-        QStringLiteral("catalog-source-") + QString::fromLatin1(digest.left(16)) + extension
-    );
+    const QString stem = QStringLiteral("catalog-source-") + QString::fromLatin1(digest.left(16));
+    const QString pathKey =
+        extension == QStringLiteral(".txt") ? QStringLiteral("payloadPath") : QStringLiteral("binaryPayloadPath");
+
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList topLevelGroups = settings.childGroups();
+    settings.endGroup();
+
+    QStringList recordGroups;
+    for (const QString& group : topLevelGroups) {
+        settings.beginGroup(QStringLiteral("catalogSources/") + group);
+        const QStringList nestedGroups = settings.childGroups();
+        settings.endGroup();
+        if (nestedGroups.isEmpty()) {
+            recordGroups.push_back(QStringLiteral("catalogSources/") + group);
+            continue;
+        }
+        for (const QString& nestedGroup : nestedGroups) {
+            recordGroups.push_back(QStringLiteral("catalogSources/") + group + QLatin1Char('/') + nestedGroup);
+        }
+    }
+
+    const QString directoryPath = QFileInfo(directory).absoluteFilePath();
+    for (const QString& recordGroup : recordGroups) {
+        if (!recordGroup.endsWith(QStringLiteral("/") + stem)) {
+            continue;
+        }
+        settings.beginGroup(recordGroup);
+        const QString path = settings.value(pathKey).toString();
+        settings.endGroup();
+        if (!path.isEmpty() && QFileInfo(path).absolutePath() == directoryPath) {
+            return path;
+        }
+    }
+    return {};
 }
 
 // Restore marks a restored source title with a saved suffix; the durable title
@@ -1759,7 +1793,9 @@ void SkyCatalogManagerTests::restoresArchiveSelectionAndSourceMetadataAfterBinar
     const QStringList binaryFiles =
         cacheDir.entryList(QStringList{QStringLiteral("catalog-source-*.bin")}, QDir::Files);
     QCOMPARE(binaryFiles.size(), 1);
-    QVERIFY(QFile::remove(cacheDir.filePath(binaryFiles.first())));
+    const QString binaryPath = catalogSourceSidecarPath(cacheDirectory, instanceId, QStringLiteral(".bin"));
+    QCOMPARE(binaryFiles.first(), QFileInfo(binaryPath).fileName());
+    QVERIFY(QFile::remove(binaryPath));
 
     SkyCatalogManager restoredManager(&store, nullptr, nullptr, &networkAccessManager);
     QVERIFY(restoredManager.restoreCatalogCache());

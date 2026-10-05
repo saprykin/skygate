@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QList>
 #include <QLoggingCategory>
 #include <QSaveFile>
 #include <QSettings>
@@ -119,25 +120,219 @@ QString catalogCollectionCacheDirectory(QSettings& settings)
     return configuredPath.isEmpty() ? SkyContextSettings::defaultCatalogCollectionCachePath() : configuredPath;
 }
 
-QString catalogSourceFileStem(const QString& instanceId)
+QString catalogSourceIdDigest(const QString& instanceId)
 {
     const QByteArray digest = QCryptographicHash::hash(instanceId.toUtf8(), QCryptographicHash::Sha256).toHex();
-    return QStringLiteral("catalog-source-") + QString::fromLatin1(digest.left(16));
+    return QString::fromLatin1(digest.left(16));
 }
 
-QString catalogSourceRawPath(const QString& directory, const QString& instanceId)
+QString catalogSourceFileStem(const QString& instanceId)
 {
-    return QDir(directory).filePath(catalogSourceFileStem(instanceId) + QStringLiteral(".txt"));
+    return QStringLiteral("catalog-source-") + catalogSourceIdDigest(instanceId);
 }
 
-QString catalogSourceBinaryPath(const QString& directory, const QString& instanceId)
+// Sidecar names embed the generation that produced them, so staging a new
+// snapshot never overwrites the files the committed records still reference.
+QString catalogSourceGenerationFileStem(const QString& instanceId, const quint64 generation)
 {
-    return QDir(directory).filePath(catalogSourceFileStem(instanceId) + QStringLiteral(".bin"));
+    return QStringLiteral("catalog-source-g%1-%2").arg(generation).arg(catalogSourceIdDigest(instanceId));
 }
 
+QString catalogSourceRawPath(const QString& directory, const QString& instanceId, const quint64 generation)
+{
+    return QDir(directory).filePath(catalogSourceGenerationFileStem(instanceId, generation) + QStringLiteral(".txt"));
+}
+
+QString catalogSourceBinaryPath(const QString& directory, const QString& instanceId, const quint64 generation)
+{
+    return QDir(directory).filePath(catalogSourceGenerationFileStem(instanceId, generation) + QStringLiteral(".bin"));
+}
+
+// Records written before generations were published keep their settings group
+// directly under catalogSources; committed generations nest theirs one level
+// deeper so staging cannot replace the committed records.
 QString catalogSourceSettingsGroup(const QString& instanceId)
 {
     return QStringLiteral("catalogSources/") + catalogSourceFileStem(instanceId);
+}
+
+QString catalogSourceGenerationSettingsGroup(const quint64 generation, const QString& instanceId)
+{
+    return QStringLiteral("catalogSources/%1/%2").arg(generation).arg(catalogSourceFileStem(instanceId));
+}
+
+QString catalogCollectionGenerationSettingsGroup(const quint64 generation)
+{
+    return QStringLiteral("catalogSources/%1").arg(generation);
+}
+
+QString catalogCollectionRecordsStoredKey()
+{
+    return QStringLiteral("recordsStored");
+}
+
+QString catalogCollectionManifestPath(const QString& directory)
+{
+    return QDir(directory).filePath(QStringLiteral("catalog-collection.manifest"));
+}
+
+// The manifest names the settings namespace and generation that hold the
+// committed records. It is published last, after every new payload file and
+// record is durable, so its presence alone decides which snapshot is active.
+struct CatalogCollectionManifest final {
+    int schemaVersion = 0;
+    int binarySchemaVersion = 0;
+    quint64 generation = 0;
+};
+
+bool writeCatalogCollectionManifest(const QString& path, const CatalogCollectionManifest& manifest)
+{
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    const QFileInfo targetInfo(path);
+    QDir targetDir(targetInfo.absolutePath());
+    if (!targetDir.mkpath(".")) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to create catalog collection cache directory" << targetDir.absolutePath();
+        return false;
+    }
+
+    QByteArray content;
+    content += QByteArrayLiteral("schemaVersion=") + QByteArray::number(manifest.schemaVersion) + '\n';
+    content += QByteArrayLiteral("binarySchemaVersion=") + QByteArray::number(manifest.binarySchemaVersion) + '\n';
+    content += QByteArrayLiteral("generation=") + QByteArray::number(manifest.generation) + '\n';
+
+    QSaveFile manifestFile(path);
+    if (!manifestFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open catalog collection manifest for writing" << path << manifestFile.errorString();
+        return false;
+    }
+
+    if (manifestFile.write(content) != content.size()) {
+        qCWarning(skygateCatalogCacheLog).noquote() << "Failed to write complete catalog collection manifest" << path;
+        manifestFile.cancelWriting();
+        return false;
+    }
+
+    if (!manifestFile.commit()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to commit catalog collection manifest" << path << manifestFile.errorString();
+        return false;
+    }
+    return true;
+}
+
+quint64 highestCatalogCollectionGeneration(
+    const QString& directory, QSettings& settings, const std::optional<CatalogCollectionManifest>& manifest
+)
+{
+    quint64 highest = manifest.has_value() ? manifest->generation : 0U;
+
+    // A save interrupted between its staging steps can leave records or
+    // sidecar files from a generation the manifest does not name yet. Reusing
+    // such a number would overwrite staged data, so the next save skips every
+    // generation number it can still observe.
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList recordGroups = settings.childGroups();
+    settings.endGroup();
+    for (const QString& group : recordGroups) {
+        bool ok = false;
+        const quint64 generation = group.toULongLong(&ok);
+        if (ok && generation > highest) {
+            highest = generation;
+        }
+    }
+
+    if (directory.isEmpty()) {
+        return highest;
+    }
+    const QDir dir(directory);
+    const QString prefix = QStringLiteral("catalog-source-g");
+    const QStringList sidecarNames =
+        dir.entryList(QStringList{prefix + QLatin1Char('*')}, QDir::Files | QDir::Readable);
+    for (const QString& sidecarName : sidecarNames) {
+        const int separator = sidecarName.indexOf(QLatin1Char('-'), prefix.size());
+        if (separator < 0) {
+            continue;
+        }
+        bool ok = false;
+        const quint64 generation = sidecarName.mid(prefix.size(), separator - prefix.size()).toULongLong(&ok);
+        if (ok && generation > highest) {
+            highest = generation;
+        }
+    }
+    return highest;
+}
+
+// Generation records live in a numeric group under catalogSources, while the
+// flat groups written before generations were published are named after their
+// sidecar. A numeric group therefore marks the settings file as
+// generation-format even when the manifest is gone.
+bool hasCatalogCollectionGenerationGroups(QSettings& settings)
+{
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList groups = settings.childGroups();
+    settings.endGroup();
+    for (const QString& group : groups) {
+        bool isGenerationGroup = false;
+        group.toULongLong(&isGenerationGroup);
+        if (isGenerationGroup) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<CatalogCollectionManifest> readCatalogCollectionManifest(const QString& path)
+{
+    if (path.isEmpty()) {
+        return std::nullopt;
+    }
+
+    QFile manifestFile(path);
+    if (!manifestFile.exists()) {
+        return std::nullopt;
+    }
+    if (!manifestFile.open(QIODevice::ReadOnly)) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Failed to open catalog collection manifest" << path << manifestFile.errorString();
+        return std::nullopt;
+    }
+
+    CatalogCollectionManifest manifest;
+    bool hasSchemaVersion = false;
+    bool hasBinarySchemaVersion = false;
+    bool hasGeneration = false;
+    const QList<QByteArray> lines = manifestFile.readAll().split('\n');
+    for (const QByteArray& line : lines) {
+        const int separator = line.indexOf('=');
+        if (separator <= 0) {
+            continue;
+        }
+        const QByteArray key = line.left(separator).trimmed();
+        const QByteArray value = line.mid(separator + 1).trimmed();
+        bool ok = false;
+        if (key == QByteArrayLiteral("schemaVersion")) {
+            manifest.schemaVersion = value.toInt(&ok);
+            hasSchemaVersion = ok;
+        } else if (key == QByteArrayLiteral("binarySchemaVersion")) {
+            manifest.binarySchemaVersion = value.toInt(&ok);
+            hasBinarySchemaVersion = ok;
+        } else if (key == QByteArrayLiteral("generation")) {
+            manifest.generation = value.toULongLong(&ok);
+            hasGeneration = ok;
+        }
+    }
+
+    if (!hasSchemaVersion || !hasBinarySchemaVersion || !hasGeneration) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Unreadable catalog collection manifest; no committed collection is available" << path;
+        return std::nullopt;
+    }
+    return manifest;
 }
 
 bool writeCatalogSourceFile(const QString& path, const QByteArray& payload)
@@ -207,13 +402,54 @@ void appendCatalogCollectionDirFiles(QStringList& cachePaths, const QString& dir
     for (const QString& entryName : entries) {
         appendCachePath(cachePaths, dir.filePath(entryName));
     }
+    appendCachePath(cachePaths, catalogCollectionManifestPath(directory));
+}
+
+void removeObsoleteCatalogCollectionFiles(const QString& directory, const QStringList& referencedPaths)
+{
+    if (directory.isEmpty()) {
+        return;
+    }
+
+    const QDir dir(directory);
+    const QStringList entries =
+        dir.entryList(QStringList{QStringLiteral("catalog-source-*")}, QDir::Files | QDir::Readable);
+    for (const QString& entryName : entries) {
+        const QString path = dir.filePath(entryName);
+        if (referencedPaths.contains(path)) {
+            continue;
+        }
+        QFile obsoleteFile(path);
+        if (!obsoleteFile.remove()) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Failed to remove obsolete catalog source cache" << path << obsoleteFile.errorString();
+        }
+    }
+}
+
+void removeObsoleteCatalogCollectionRecords(QSettings& settings, const quint64 committedGeneration)
+{
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList groups = settings.childGroups();
+    settings.endGroup();
+    for (const QString& group : groups) {
+        bool isGenerationGroup = false;
+        const quint64 generation = group.toULongLong(&isGenerationGroup);
+        if (isGenerationGroup && generation == committedGeneration) {
+            continue;
+        }
+        settings.remove(QStringLiteral("catalogSources/") + group);
+    }
 }
 
 void saveCatalogSourceRecord(
-    QSettings& settings, const SkySettingsStore::CatalogSourceCacheRecord& record, const QString& directory
+    QSettings& settings,
+    const SkySettingsStore::CatalogSourceCacheRecord& record,
+    const QString& directory,
+    const quint64 generation
 )
 {
-    settings.beginGroup(catalogSourceSettingsGroup(record.instanceId));
+    settings.beginGroup(catalogSourceGenerationSettingsGroup(generation, record.instanceId));
     settings.setValue(QStringLiteral("instanceId"), record.instanceId);
     settings.setValue(QStringLiteral("descriptorId"), record.descriptorId);
     settings.setValue(QStringLiteral("title"), record.title);
@@ -230,11 +466,11 @@ void saveCatalogSourceRecord(
     settings.setValue(QStringLiteral("order"), record.order);
     settings.setValue(
         QStringLiteral("payloadPath"),
-        record.payload.isEmpty() ? QString() : catalogSourceRawPath(directory, record.instanceId)
+        record.payload.isEmpty() ? QString() : catalogSourceRawPath(directory, record.instanceId, generation)
     );
     settings.setValue(
         QStringLiteral("binaryPayloadPath"),
-        record.binaryPayload.isEmpty() ? QString() : catalogSourceBinaryPath(directory, record.instanceId)
+        record.binaryPayload.isEmpty() ? QString() : catalogSourceBinaryPath(directory, record.instanceId, generation)
     );
     settings.setValue(QStringLiteral("constellationLineRows"), record.constellationLineRows);
     settings.setValue(QStringLiteral("constellationAnchorGroupRows"), record.constellationAnchorGroupRows);
@@ -588,54 +824,97 @@ bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSn
 {
     QSettings settings;
     const QString directory = catalogCollectionCacheDirectory(settings);
+    const QString manifestPath = catalogCollectionManifestPath(directory);
 
-    // Write sidecar payload files before touching QSettings so a failed write
-    // leaves the previously persisted collection recoverable.
+    // Every save writes a new generation. The committed generation keeps its
+    // records and sidecar payload files until the new generation's manifest is
+    // published, so a failure while staging any file leaves the previously
+    // committed snapshot intact instead of pairing old metadata with new
+    // payloads.
+    const std::optional<CatalogCollectionManifest> committed = readCatalogCollectionManifest(manifestPath);
+    const quint64 generation = highestCatalogCollectionGeneration(directory, settings, committed) + 1U;
+
+    QStringList stagedPaths;
+    const auto discardStagedFiles = [&stagedPaths]() { removeCacheFiles(stagedPaths); };
     for (const CatalogSourceCacheRecord& record : snapshot.sources) {
-        if (!record.payload.isEmpty()
-            && !writeCatalogSourceFile(catalogSourceRawPath(directory, record.instanceId), record.payload)) {
-            return false;
+        if (!record.payload.isEmpty()) {
+            const QString rawPath = catalogSourceRawPath(directory, record.instanceId, generation);
+            if (!writeCatalogSourceFile(rawPath, record.payload)) {
+                discardStagedFiles();
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Failed to stage catalog collection payload; the committed collection remains active:"
+                    << record.instanceId;
+                return false;
+            }
+            stagedPaths.push_back(rawPath);
         }
-        if (!record.binaryPayload.isEmpty()
-            && !writeCatalogSourceFile(catalogSourceBinaryPath(directory, record.instanceId), record.binaryPayload)) {
-            return false;
+        if (!record.binaryPayload.isEmpty()) {
+            const QString binaryPath = catalogSourceBinaryPath(directory, record.instanceId, generation);
+            if (!writeCatalogSourceFile(binaryPath, record.binaryPayload)) {
+                discardStagedFiles();
+                qCWarning(skygateCatalogCacheLog).noquote()
+                    << "Failed to stage catalog collection binary payload; the committed collection remains "
+                       "active:"
+                    << record.instanceId;
+                return false;
+            }
+            stagedPaths.push_back(binaryPath);
         }
     }
 
-    // Replace the stored records first and commit them before writing the
-    // version marker. The marker is the durable boundary between "no new
-    // configuration exists" (absent) and "the user's collection, possibly
-    // intentionally empty" (set), so it must only acknowledge a snapshot whose
-    // records were actually stored. A failed or interrupted save leaves the
-    // marker untouched and the legacy cache fallback available instead of
-    // discarding recoverable data.
-    settings.remove(QStringLiteral("catalogSources"));
+    // The new records live in their own settings namespace and are ignored
+    // until the manifest below names their generation, so an interrupted or
+    // failed publication cannot replace the committed records with metadata
+    // that references missing or partial payloads.
+    const QString generationGroup = catalogCollectionGenerationSettingsGroup(generation);
+    settings.remove(generationGroup);
+    settings.setValue(generationGroup + QLatin1Char('/') + catalogCollectionRecordsStoredKey(), true);
     int order = 0;
     for (const CatalogSourceCacheRecord& record : snapshot.sources) {
         CatalogSourceCacheRecord orderedRecord = record;
         orderedRecord.order = order++;
-        saveCatalogSourceRecord(settings, orderedRecord, directory);
+        saveCatalogSourceRecord(settings, orderedRecord, directory, generation);
     }
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        qCWarning(skygateCatalogCacheLog) << "Failed to save catalog collection cache settings";
+        settings.remove(generationGroup);
+        settings.sync();
+        discardStagedFiles();
+        qCWarning(skygateCatalogCacheLog)
+            << "Failed to store catalog collection records; the committed collection remains active";
         return false;
     }
 
-    // An empty collection keeps the marker: persisting zero sources is a
-    // committed configuration, not a cache clear, and must not re-enable the
-    // legacy two-slot fallback. Only clearCatalogCollectionCache resets the
-    // stored configuration and removes the marker.
-    settings.setValue(
-        SkyContextSettings::key("catalogCollectionVersion"),
-        snapshot.schemaVersion > 0 ? snapshot.schemaVersion
-                                   : SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
-    );
-    settings.setValue(SkyContextSettings::key("catalogBinarySchemaVersion"), snapshot.binarySchemaVersion);
+    // Publishing the manifest commits the generation. It is the durable
+    // identifier of the snapshot, so it is written only after every staged
+    // payload file and record is already in place. Until it is published the
+    // previous manifest keeps the previous generation active, and an empty
+    // collection is a committed configuration rather than a cache clear.
+    const CatalogCollectionManifest manifest{
+        .schemaVersion = snapshot.schemaVersion > 0
+                             ? snapshot.schemaVersion
+                             : SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion,
+        .binarySchemaVersion = snapshot.binarySchemaVersion,
+        .generation = generation,
+    };
+    if (!writeCatalogCollectionManifest(manifestPath, manifest)) {
+        settings.remove(generationGroup);
+        settings.sync();
+        discardStagedFiles();
+        qCWarning(skygateCatalogCacheLog)
+            << "Failed to publish the catalog collection generation manifest; the committed collection remains active";
+        return false;
+    }
+
+    // The new generation is durable, so the previous generation and any files
+    // abandoned by an interrupted save are unreferenced now. Removing them is
+    // best effort: leftovers cannot change which generation is committed.
+    removeObsoleteCatalogCollectionFiles(directory, stagedPaths);
+    removeObsoleteCatalogCollectionRecords(settings, generation);
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        qCWarning(skygateCatalogCacheLog) << "Failed to save catalog collection cache settings";
-        return false;
+        qCWarning(skygateCatalogCacheLog)
+            << "Failed to remove obsolete catalog collection records; the committed collection stays active";
     }
     qCInfo(skygateCatalogCacheLog).noquote() << "Catalog collection cache saved: sources" << snapshot.sources.size();
     return true;
@@ -644,20 +923,66 @@ bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSn
 std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> SkySettingsStore::loadCatalogCollectionCache() const
 {
     QSettings settings;
-    if (!settings.contains(SkyContextSettings::key("catalogCollectionVersion"))) {
-        return std::nullopt;
-    }
+    const QString directory = catalogCollectionCacheDirectory(settings);
+    const QString recordsStoredKey = catalogCollectionRecordsStoredKey();
 
     CatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = readIntSetting(
-        settings,
-        SkyContextSettings::key("catalogCollectionVersion"),
-        SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
-    );
-    snapshot.binarySchemaVersion = readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+    QString recordsGroup;
+    const std::optional<CatalogCollectionManifest> manifest =
+        readCatalogCollectionManifest(catalogCollectionManifestPath(directory));
+    if (manifest.has_value()) {
+        // The manifest only identifies the committed generation. Its records
+        // must also be present in the settings file: a reset settings state
+        // must not resurrect a cache directory that happens to still hold a
+        // manifest.
+        const QString generationGroup = catalogCollectionGenerationSettingsGroup(manifest->generation);
+        if (!settings.value(generationGroup + QLatin1Char('/') + recordsStoredKey).toBool()) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Catalog collection manifest names a generation without stored records"
+                << catalogCollectionManifestPath(directory);
+            return std::nullopt;
+        }
+        snapshot.schemaVersion = manifest->schemaVersion;
+        snapshot.binarySchemaVersion = manifest->binarySchemaVersion;
+        recordsGroup = generationGroup;
+    } else {
+        const bool generationRecordsExist = hasCatalogCollectionGenerationGroups(settings);
+        // Generation-format records or sidecars without a manifest mean the
+        // manifest was lost after a generation was committed. Reporting that
+        // loss keeps the fallback below diagnosable.
+        if (generationRecordsExist || highestCatalogCollectionGeneration(directory, settings, std::nullopt) > 0U) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Catalog collection manifest is missing while generation-format collection data exists"
+                << catalogCollectionManifestPath(directory);
+        }
+        // Collections written before generations were published keep their
+        // version marker and records directly in the settings file.
+        if (!settings.contains(SkyContextSettings::key("catalogCollectionVersion"))) {
+            return std::nullopt;
+        }
+        if (generationRecordsExist) {
+            // The marker outlived the migration, but the flat records it
+            // describes were replaced by generation records. Reading the flat
+            // group would report an empty collection with the stale marker's
+            // schema version, so no snapshot is returned at all; the committed
+            // generation is only reachable again through its manifest.
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Ignoring stale catalog collection version marker: generation-format records exist without a "
+                   "committed manifest";
+            return std::nullopt;
+        }
+        snapshot.schemaVersion = readIntSetting(
+            settings,
+            SkyContextSettings::key("catalogCollectionVersion"),
+            SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+        );
+        snapshot.binarySchemaVersion =
+            readIntSetting(settings, SkyContextSettings::key("catalogBinarySchemaVersion"), 0);
+        recordsGroup = QStringLiteral("catalogSources");
+    }
 
     QVector<CatalogSourceCacheRecord> records;
-    settings.beginGroup(QStringLiteral("catalogSources"));
+    settings.beginGroup(recordsGroup);
     const QStringList groups = settings.childGroups();
     for (const QString& group : groups) {
         CatalogSourceCacheRecord record = loadCatalogSourceRecord(settings, group);
@@ -710,7 +1035,14 @@ bool SkySettingsStore::clearCatalogSourceCache(const QString& instanceId) const
     }
 
     QSettings settings;
-    const QString group = catalogSourceSettingsGroup(instanceId);
+    const QString directory = catalogCollectionCacheDirectory(settings);
+    const std::optional<CatalogCollectionManifest> manifest =
+        readCatalogCollectionManifest(catalogCollectionManifestPath(directory));
+    // A published generation keeps its records in its own settings namespace;
+    // records written before generations were published keep theirs directly
+    // under catalogSources.
+    const QString group = manifest.has_value() ? catalogSourceGenerationSettingsGroup(manifest->generation, instanceId)
+                                               : catalogSourceSettingsGroup(instanceId);
     settings.beginGroup(group);
     const QString rawPath = settings.value(QStringLiteral("payloadPath")).toString();
     const QString binaryPath = settings.value(QStringLiteral("binaryPayloadPath")).toString();
