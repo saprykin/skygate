@@ -527,11 +527,21 @@ bool SkyCatalogManager::restoreCatalogCache()
     std::vector<SkyCatalogSourceRecord> restoredSources;
     restoredSources.reserve(restoreResult.sources.size());
     bool requiresPersist = restoreResult.migratedLegacy || restoreResult.requiresRecordUpgrade;
+    std::size_t unavailableSourceCount = 0U;
     for (SkyCatalogSourceRestoreEntry& entry : restoreResult.sources) {
         requiresPersist = requiresPersist || entry.requiresBinaryUpgrade;
 
         SourceOperation* operation = upsertOperation(entry.instance, entry.record.policy);
         operation->payload = entry.payload;
+        if (entry.record.catalog == nullptr) {
+            // The configured source keeps its identity, order, policy, and
+            // participation state; only its payload is unavailable, so it is
+            // restored as an explicit error instead of being omitted.
+            operation->busy = false;
+            operation->hasError = true;
+            operation->statusText = SkyCatalogText::sourcePayloadUnavailable();
+            ++unavailableSourceCount;
+        }
 
         // The restored record, operation, cache entry, and provenance all stay
         // keyed by the stored instance ID; restore never re-derives it.
@@ -552,7 +562,12 @@ bool SkyCatalogManager::restoreCatalogCache()
         mergedResult |= m_runtime->resetConstellationLineRefs();
     }
 
+    const QString runtimeStatusText = mergedResult.statusText;
     applyRuntimeResult(mergedResult);
+
+    if (unavailableSourceCount > 0U) {
+        setStatusText(SkyCatalogText::unavailableSourceSummary(runtimeStatusText, unavailableSourceCount));
+    }
 
     // First restore from a legacy or raw-only cache upgrades it into the
     // versioned binary collection so subsequent startups skip the CSV re-parse.
@@ -904,31 +919,37 @@ void SkyCatalogManager::persistCatalogCache() const
 
     SkyCatalogCollectionPersistRequest request;
     for (const SkyCatalogSourceRecord& source : m_runtime->sources()) {
-        const SourceOperation* operation = findOperation(source.instanceId);
-        if (operation == nullptr || operation->instance.urls.isEmpty()) {
-            // Bundled/synthesized sources are reconstructed at startup; only
-            // configured sources with their own data need persistence.
-            continue;
-        }
-
         SkyCatalogSourcePersistEntry entry;
-        entry.instanceId = operation->instance.instanceId;
-        entry.descriptorId = operation->instance.descriptorId;
-        entry.title = operation->instance.title;
-        entry.version = operation->instance.version;
+        entry.instanceId = source.instanceId;
+        entry.title = source.title;
+        entry.version = source.version;
         entry.url = source.url;
-        entry.urls = operation->instance.urls;
-        entry.relatedDatasetUrls = operation->instance.relatedDatasetUrls;
-        entry.archiveSelector = operation->instance.archiveSelector;
-        entry.schemaHint = operation->instance.schemaHint;
-        entry.attribution = operation->instance.attribution;
         entry.policy = source.policy;
         entry.enabled = source.enabled;
-        entry.catalog = source.catalog.get();
-        entry.payload = operation->payload;
+        entry.bundled = source.bundled;
 
-        if (source.policy == skygate::ephemeris::CatalogCompositionPolicy::Merge
-            && !operation->instance.relatedDatasetUrls.isEmpty()) {
+        // A source with its own download keeps its configured descriptor and
+        // payload. A source that needs no payload (bundled or synthesized) is
+        // persisted by configuration alone and reconstructed from the bundled
+        // factory on restore, so its identity, order, policy, and enabled
+        // state survive even when it has no operation record.
+        if (const SourceOperation* operation = findOperation(source.instanceId); operation != nullptr) {
+            entry.descriptorId = operation->instance.descriptorId;
+            entry.title = operation->instance.title;
+            entry.version = operation->instance.version;
+            entry.urls = operation->instance.urls;
+            entry.relatedDatasetUrls = operation->instance.relatedDatasetUrls;
+            entry.archiveSelector = operation->instance.archiveSelector;
+            entry.schemaHint = operation->instance.schemaHint;
+            entry.attribution = operation->instance.attribution;
+            if (!source.bundled) {
+                entry.catalog = source.catalog.get();
+                entry.payload = operation->payload;
+            }
+        }
+
+        if (!source.bundled && source.policy == skygate::ephemeris::CatalogCompositionPolicy::Merge
+            && !entry.relatedDatasetUrls.isEmpty()) {
             std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs(
                 m_runtime->constellationLineRefs().begin(), m_runtime->constellationLineRefs().end()
             );

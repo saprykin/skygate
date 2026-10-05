@@ -55,6 +55,19 @@ QString SkyCatalogText::sourceCacheClearResult(const bool cacheCleared)
     return cacheCleared ? "Catalog: Source cache cleared" : "Catalog: Source cache clear failed";
 }
 
+QString SkyCatalogText::sourcePayloadUnavailable()
+{
+    return "Payload unavailable";
+}
+
+QString
+SkyCatalogText::unavailableSourceSummary(const QString& baseStatusText, const std::size_t unavailableSourceCount)
+{
+    const QLocale locale = QLocale::system();
+    return QString("%1 | Unavailable sources: %2 (cached payload missing or unreadable)")
+        .arg(baseStatusText, locale.toString(static_cast<qulonglong>(unavailableSourceCount)));
+}
+
 bool SkyCatalogText::isProcessingStatus(const QString& statusText)
 {
     return statusText.startsWith("Catalog: Processing", Qt::CaseInsensitive);

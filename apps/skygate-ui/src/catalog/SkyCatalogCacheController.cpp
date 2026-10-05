@@ -4,6 +4,7 @@
 #include "SkyCatalogPresets.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
+#include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/CatalogParseRequest.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
@@ -117,6 +118,18 @@ SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourc
 ) const
 {
     DecodedCatalog decoded;
+    if (sourceRecord.bundled) {
+        // Bundled content is reconstructed from the bundled factory on every
+        // start instead of from a payload sidecar, so the record stays durable
+        // configuration while the catalog data stays disposable.
+        decoded.catalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+        if (decoded.catalog == nullptr) {
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Bundled catalog source could not be reconstructed:" << sourceRecord.instanceId;
+        }
+        return decoded;
+    }
+
     if (!sourceRecord.binaryPayload.isEmpty()
         && binarySchemaVersion == static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion)) {
         decoded.catalog = skygate::ephemeris::CatalogBinaryCodec::deserialize(sourceRecord.binaryPayload);
@@ -144,9 +157,15 @@ SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourc
             decoded.catalog = std::move(restoredResult.catalog);
             decoded.requiresBinaryUpgrade = true;
         } else {
-            qCWarning(skygateCatalogCacheLog).noquote() << "Saved catalog source cache unreadable; ignoring source:"
-                                                        << QString::fromStdString(restoredResult.errorDetail);
+            qCWarning(skygateCatalogCacheLog).noquote()
+                << "Saved catalog source cache unreadable; restoring configuration without payload:"
+                << QString::fromStdString(restoredResult.errorDetail);
         }
+    }
+
+    if (decoded.catalog == nullptr && sourceRecord.payload.isEmpty()) {
+        qCWarning(skygateCatalogCacheLog).noquote()
+            << "Saved catalog source cache has no payload; restoring configuration only:" << sourceRecord.instanceId;
     }
     return decoded;
 }
@@ -157,11 +176,6 @@ void SkyCatalogCacheController::appendRestoredSource(
     SkyCatalogCollectionRestoreResult& result
 ) const
 {
-    if (decoded.catalog == nullptr) {
-        // A damaged source is skipped without discarding its siblings.
-        return;
-    }
-
     SkyCatalogSourceRestoreEntry entry;
     const QString restoredInstanceId = uniqueRestoredInstanceId(sourceRecord.instanceId, result.sources);
     if (restoredInstanceId != sourceRecord.instanceId) {
@@ -169,14 +183,32 @@ void SkyCatalogCacheController::appendRestoredSource(
                                                     << sourceRecord.instanceId << "restored as" << restoredInstanceId;
     }
     entry.record.instanceId = restoredInstanceId;
-    entry.record.title = savedLabel(sourceRecord.title, QStringLiteral("Saved"));
+    // A bundled catalog is rebuilt live and a record without a readable
+    // payload has no saved catalog behind its title; neither is a saved
+    // source. The stored title is kept verbatim in both cases.
+    if (decoded.catalog == nullptr || sourceRecord.bundled) {
+        entry.record.title = stripSavedSuffixes(sourceRecord.title);
+        if (entry.record.title.isEmpty()) {
+            entry.record.title = sourceRecord.bundled ? QStringLiteral("Bundled") : restoredInstanceId;
+        }
+    } else {
+        entry.record.title = savedLabel(sourceRecord.title, QStringLiteral("Saved"));
+    }
     entry.record.version = sourceRecord.version;
     entry.record.url = sourceRecord.url;
     entry.record.policy = sourceRecord.policy;
     entry.record.enabled = sourceRecord.enabled;
+    entry.record.bundled = sourceRecord.bundled;
     entry.record.catalog = std::move(decoded.catalog);
-    entry.record.foundObjectCount =
-        skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(entry.record.catalog->bodies());
+    // Only a catalog restored from a stored payload reports its own deep-sky
+    // objects. A bundled record mirrors the live add path, which leaves the
+    // count empty because the bundled deep-sky fallback participation supplies
+    // its own count during composition; counting the rebuilt catalog here
+    // would report the bundled objects twice after a restart.
+    if (entry.record.catalog != nullptr && !sourceRecord.bundled) {
+        entry.record.foundObjectCount =
+            skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(entry.record.catalog->bodies());
+    }
 
     entry.instance.instanceId = restoredInstanceId;
     entry.instance.descriptorId = sourceRecord.descriptorId;
@@ -250,7 +282,28 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
     };
 
     const int starIndex = SkyCatalogPresets::normalizeCatalogPresetIndex(catalogPresetIndex);
-    if (starIndex != 0) {
+    if (starIndex == 0) {
+        // The legacy star slot selected the bundled source. Materialize it as
+        // a bundled record so its identity, position, and Merge participation
+        // survive the migration instead of silently disappearing once a
+        // downloaded sibling becomes the only restored record.
+        const std::optional<SkyCatalogSourceDescriptor> descriptor =
+            SkyCatalogPresets::starSourceDescriptor(QStringLiteral("bundled"));
+        if (descriptor.has_value()) {
+            SkySettingsStore::CatalogSourceCacheRecord record;
+            record.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+            record.enabled = true;
+            record.bundled = true;
+            const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
+            record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
+            record.descriptorId = descriptor->sourceId;
+            record.title = descriptor->title;
+            record.version = descriptor->version;
+            record.schemaHint = descriptor->schemaHint;
+            record.attribution = descriptor->attribution;
+            appendRecord(std::move(record));
+        }
+    } else {
         SkySettingsStore::CatalogSourceCacheRecord record;
         record.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
         record.enabled = true;
@@ -376,9 +429,12 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
         record.attribution = source.attribution;
         record.policy = source.policy;
         record.enabled = source.enabled;
-        record.payload = source.payload;
-        if (source.catalog != nullptr) {
-            record.binaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(source.catalog->catalog());
+        record.bundled = source.bundled;
+        if (!source.bundled) {
+            record.payload = source.payload;
+            if (source.catalog != nullptr) {
+                record.binaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(source.catalog->catalog());
+            }
         }
         record.constellationLineRows = source.constellationLineRows;
         record.constellationAnchorGroupRows = source.constellationAnchorGroupRows;
