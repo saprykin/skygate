@@ -16,6 +16,55 @@ void clickItemCenter(QWindow* window, QQuickItem* item)
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, clickPoint);
 }
 
+void openComboPopup(QObject* combo)
+{
+    QVERIFY(combo != nullptr);
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    QVERIFY(popup != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(popup, "open"));
+    QTRY_VERIFY(popup->property("opened").toBool());
+}
+
+void closeComboPopup(QObject* combo)
+{
+    QVERIFY(combo != nullptr);
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    QVERIFY(popup != nullptr);
+    QVERIFY(QMetaObject::invokeMethod(popup, "close"));
+    QTRY_VERIFY(!popup->property("opened").toBool());
+}
+
+QString popupDelegateText(QObject* combo, const int index)
+{
+    QObject* popup = qvariant_cast<QObject*>(combo->property("popup"));
+    if (popup == nullptr) {
+        return QString();
+    }
+
+    QObject* listView = qvariant_cast<QObject*>(popup->property("contentItem"));
+    if (listView == nullptr) {
+        return QString();
+    }
+
+    QQuickItem* delegate = nullptr;
+    if (!QMetaObject::invokeMethod(listView, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, delegate), Q_ARG(int, index))
+        || delegate == nullptr) {
+        return QString();
+    }
+
+    QObject* label = qvariant_cast<QObject*>(delegate->property("contentItem"));
+    return label != nullptr ? label->property("text").toString() : QString();
+}
+
+QStringList popupDelegateTexts(QObject* combo, const int count)
+{
+    QStringList texts;
+    for (int index = 0; index < count; ++index) {
+        texts.push_back(popupDelegateText(combo, index));
+    }
+    return texts;
+}
+
 }  // namespace
 
 class QmlPreferenceControlTests final : public QObject {
@@ -26,6 +75,7 @@ private slots:
     void init();
     void preferencesTextFieldEditsAcceptsAndTracksEnabledState();
     void preferencesComboBoxActivatesAndShowsPopup();
+    void preferencesComboBoxPopupRowsShowModelText();
     void preferencesCityPickerFiltersChoosesAndClearsModelFilter();
     void preferencesButtonCheckboxAndSectionControlsRespond();
 
@@ -147,6 +197,87 @@ void QmlPreferenceControlTests::preferencesComboBoxActivatesAndShowsPopup()
     QVERIFY(QMetaObject::invokeMethod(combo, "activated", Q_ARG(int, 2)));
     QCOMPARE(root->property("activatedIndex").toInt(), 2);
     QCOMPARE(combo->property("displayText").toString(), QString("Three"));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferenceControlTests::preferencesComboBoxPopupRowsShowModelText()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 260
+            height: 240
+            PreferencesComboBox {
+                id: arrayCombo
+                width: 220
+                model: ["One", "Two", "Three"]
+            }
+            PreferencesComboBox {
+                id: engineLabelsCombo
+                width: 220
+                model: skyContext.ephemerisEngineLabels
+            }
+            PreferencesComboBox {
+                id: titledCombo
+                width: 220
+                textRole: "title"
+                model: ListModel {
+                    ListElement { title: "Alpha" }
+                    ListElement { title: "Beta" }
+                }
+            }
+            property alias arrayCombo: arrayCombo
+            property alias engineLabelsCombo: engineLabelsCombo
+            property alias titledCombo: titledCombo
+        }
+    )"),
+        QStringLiteral("PreferencesComboBoxPopupTextTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+
+    ExposedQuickWindow exposed(root);
+    (void)exposed;
+
+    // A string-list model renders the row strings themselves. The delegate's
+    // injected required model is the per-row data, read through the combo's
+    // text role, which stays empty for string models.
+    QObject* arrayCombo = qvariant_cast<QObject*>(root->property("arrayCombo"));
+    QVERIFY(arrayCombo != nullptr);
+    openComboPopup(arrayCombo);
+    QTRY_COMPARE(
+        popupDelegateTexts(arrayCombo, 3),
+        QStringList({QStringLiteral("One"), QStringLiteral("Two"), QStringLiteral("Three")})
+    );
+    closeComboPopup(arrayCombo);
+
+    QObject* engineLabelsCombo = qvariant_cast<QObject*>(root->property("engineLabelsCombo"));
+    QVERIFY(engineLabelsCombo != nullptr);
+    const QStringList engineLabels = controller->ephemerisEngineLabels();
+    QVERIFY(!engineLabels.isEmpty());
+    QCOMPARE(engineLabelsCombo->property("count").toInt(), static_cast<int>(engineLabels.size()));
+    openComboPopup(engineLabelsCombo);
+    QTRY_COMPARE(popupDelegateTexts(engineLabelsCombo, static_cast<int>(engineLabels.size())), engineLabels);
+    closeComboPopup(engineLabelsCombo);
+
+    // Object models keep resolving their text role.
+    QObject* titledCombo = qvariant_cast<QObject*>(root->property("titledCombo"));
+    QVERIFY(titledCombo != nullptr);
+    openComboPopup(titledCombo);
+    QTRY_COMPARE(popupDelegateTexts(titledCombo, 2), QStringList({QStringLiteral("Alpha"), QStringLiteral("Beta")}));
+    closeComboPopup(titledCombo);
+
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 
