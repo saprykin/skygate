@@ -30,6 +30,8 @@ using skygate::ui::internal::SkyCatalogCollectionPersistRequest;
 using skygate::ui::internal::SkyCatalogCollectionRestoreResult;
 using skygate::ui::internal::SkyCatalogSourcePersistEntry;
 using skygate::ui::internal::SkyCatalogSourceRestoreEntry;
+using skygate::ui::tests::committedCatalogCollectionGeneration;
+using skygate::ui::tests::stagedCatalogSourceSidecarPath;
 
 constexpr int kCurrentCollectionSchemaVersion =
     skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
@@ -125,17 +127,39 @@ SkySettingsStore::CatalogSourceCacheRecord makeArchiveSourceRecord(const QString
     return record;
 }
 
+// The persisted snapshot nests its records under the committed generation
+// when one was published, and keeps them directly under catalogSources for
+// settings written by earlier releases.
+QStringList persistedSourceRecordGroups(QSettings& settings)
+{
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList topLevelGroups = settings.childGroups();
+    settings.endGroup();
+
+    QStringList recordGroups;
+    for (const QString& group : topLevelGroups) {
+        settings.beginGroup(QStringLiteral("catalogSources/") + group);
+        const QStringList nestedGroups = settings.childGroups();
+        settings.endGroup();
+        if (nestedGroups.isEmpty()) {
+            recordGroups.push_back(QStringLiteral("catalogSources/") + group);
+            continue;
+        }
+        for (const QString& nestedGroup : nestedGroups) {
+            recordGroups.push_back(QStringLiteral("catalogSources/") + group + QLatin1Char('/') + nestedGroup);
+        }
+    }
+    return recordGroups;
+}
+
 // Removes the keys a record written before the parse contract was persisted
 // cannot have, mirroring an older settings file.
 QStringList removePersistedParseOptions()
 {
     QSettings settings;
-    settings.beginGroup(QStringLiteral("catalogSources"));
-    const QStringList recordGroups = settings.childGroups();
-    settings.endGroup();
-
+    const QStringList recordGroups = persistedSourceRecordGroups(settings);
     for (const QString& group : recordGroups) {
-        settings.beginGroup(QStringLiteral("catalogSources/") + group);
+        settings.beginGroup(group);
         settings.remove(QStringLiteral("schemaHint"));
         settings.remove(QStringLiteral("attribution"));
         settings.endGroup();
@@ -720,11 +744,9 @@ void SkyCatalogCacheControllerTests::unreadableSchemaHintFallsBackToDetection()
     // A garbled hint must fall back to "no hint" so the payload is still read
     // by detection instead of failing with a synthetic mismatch.
     QSettings settings;
-    settings.beginGroup(QStringLiteral("catalogSources"));
-    const QStringList recordGroups = settings.childGroups();
-    settings.endGroup();
+    const QStringList recordGroups = persistedSourceRecordGroups(settings);
     QCOMPARE(recordGroups.size(), 1);
-    settings.beginGroup(QStringLiteral("catalogSources/") + recordGroups.first());
+    settings.beginGroup(recordGroups.first());
     settings.setValue(QStringLiteral("schemaHint"), 9);
     settings.endGroup();
     settings.sync();
@@ -1292,30 +1314,77 @@ void SkyCatalogCacheControllerTests::failedMigrationCommitKeepsLegacyCacheReadab
 
 void SkyCatalogCacheControllerTests::failedCollectionWritePreservesPriorData()
 {
-    SkySettingsStore store;
-    QVERIFY(store.saveCatalogCollectionCache(makeCollectionSnapshot()));
+    auto oldStarCatalog = makeStarCatalog("hip_11", "Old Star");
+    auto oldDeepSkyCatalog = makeStarCatalog("ngc_22", "Old Galaxy");
 
-    // Point the collection cache directory at a path under a regular file so
-    // sidecar file creation fails.
-    const QString blockerPath = m_settings.filePath(QStringLiteral("cache-blocker"));
-    QFile blocker(blockerPath);
-    QVERIFY(blocker.open(QIODevice::WriteOnly | QIODevice::Truncate));
-    blocker.write("x");
-    blocker.close();
-
-    QSettings settings;
-    settings.setValue(
-        QStringLiteral("skyContext/catalogCollectionCachePath"), blockerPath + QStringLiteral("/nested/cache")
+    // The committed collection and the attempted update differ in title, raw
+    // bytes, and binary bytes for both sources, so a mixture would be visible.
+    auto oldSnapshot = makeCollectionSnapshot();
+    oldSnapshot.sources[0].title = QStringLiteral("Old star title");
+    oldSnapshot.sources[0].payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 11, .properName = "Old Star"});
+    oldSnapshot.sources[0].binaryPayload = skygate::ephemeris::CatalogBinaryCodec::serialize(oldStarCatalog->catalog());
+    oldSnapshot.sources[1].title = QStringLiteral("Old deep sky title");
+    oldSnapshot.sources[1].payload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload(
+        {.name = "NGC0022", .messier = "", .ngc = "0022", .identifiers = "PGC 22", .commonName = "Old Galaxy"}
     );
+    oldSnapshot.sources[1].binaryPayload =
+        skygate::ephemeris::CatalogBinaryCodec::serialize(oldDeepSkyCatalog->catalog());
 
-    QVERIFY(!store.saveCatalogCollectionCache(makeCollectionSnapshot()));
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(oldSnapshot));
 
-    // The previously persisted collection is still readable.
+    // The update's second source binary sidecar is forced to fail after the
+    // first source's new files were already staged.
+    auto newStarCatalog = makeStarCatalog("hip_99", "New Star");
+    auto newDeepSkyCatalog = makeStarCatalog("ngc_99", "New Galaxy");
+    const QString cacheDirectory = m_settings.filePath(QStringLiteral("collection-cache"));
+    const QString blockedBinaryPath = stagedCatalogSourceSidecarPath(
+        cacheDirectory,
+        committedCatalogCollectionGeneration(cacheDirectory) + 1U,
+        QStringLiteral("preset:open_ngc"),
+        QStringLiteral(".bin")
+    );
+    QVERIFY(QDir().mkpath(blockedBinaryPath));
+
+    auto updatedSnapshot = makeCollectionSnapshot();
+    updatedSnapshot.sources[0].title = QStringLiteral("New star title");
+    updatedSnapshot.sources[0].payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 99, .properName = "New Star"});
+    updatedSnapshot.sources[0].binaryPayload =
+        skygate::ephemeris::CatalogBinaryCodec::serialize(newStarCatalog->catalog());
+    updatedSnapshot.sources[1].title = QStringLiteral("New deep sky title");
+    updatedSnapshot.sources[1].payload = skygate::ui::tests::sampleCompactOpenNgcCsvPayload(
+        {.name = "NGC0099", .messier = "", .ngc = "0099", .identifiers = "PGC 99", .commonName = "New Galaxy"}
+    );
+    updatedSnapshot.sources[1].binaryPayload =
+        skygate::ephemeris::CatalogBinaryCodec::serialize(newDeepSkyCatalog->catalog());
+
+    QVERIFY(!store.saveCatalogCollectionCache(updatedSnapshot));
+
+    // Every previously committed source keeps its original metadata, raw
+    // bytes, and binary bytes; nothing from the staged update is visible.
     const auto loaded = store.loadCatalogCollectionCache();
     QVERIFY(loaded.has_value());
     QCOMPARE(loaded->sources.size(), 2);
-    QVERIFY(!loaded->sources[0].payload.isEmpty());
-    QVERIFY(!loaded->sources[1].payload.isEmpty());
+    QCOMPARE(loaded->sources[0].title, oldSnapshot.sources[0].title);
+    QCOMPARE(loaded->sources[0].payload, oldSnapshot.sources[0].payload);
+    QCOMPARE(loaded->sources[0].binaryPayload, oldSnapshot.sources[0].binaryPayload);
+    QCOMPARE(loaded->sources[1].title, oldSnapshot.sources[1].title);
+    QCOMPARE(loaded->sources[1].payload, oldSnapshot.sources[1].payload);
+    QCOMPARE(loaded->sources[1].binaryPayload, oldSnapshot.sources[1].binaryPayload);
+    QVERIFY(loaded->sources[0].payload != updatedSnapshot.sources[0].payload);
+    QVERIFY(loaded->sources[0].binaryPayload != updatedSnapshot.sources[0].binaryPayload);
+
+    // A restart exposes the complete old catalogs, not old metadata with new
+    // objects.
+    const SkyCatalogCacheController controller(&store);
+    const auto restored = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(restored.restored);
+    QCOMPARE(restored.sources.size(), std::size_t{2});
+    QVERIFY(!restored.sources[0].requiresBinaryUpgrade);
+    QCOMPARE(restored.sources[0].record.title, QString("Old star title (saved)"));
+    QCOMPARE(firstBodyId(*restored.sources[0].record.catalog), QStringLiteral("hip_11"));
+    QCOMPARE(restored.sources[1].record.title, QStringLiteral("Old deep sky title (saved)"));
+    QCOMPARE(firstBodyId(*restored.sources[1].record.catalog), QStringLiteral("ngc_22"));
 }
 
 void SkyCatalogCacheControllerTests::logsCollectionLifecycleSummariesAtInfoLevel()

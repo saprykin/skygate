@@ -54,6 +54,7 @@ public:
     {
         clearSettings();
         resetCatalogCachePaths(catalogFileName, deepSkyCatalogFileName);
+        setIsolatedCatalogCollectionCachePath(filePath(QStringLiteral("catalog-collection-cache")));
     }
 
     void resetForCurrentTest() const
@@ -63,6 +64,7 @@ public:
             currentTestFilePath(QStringLiteral("star-cache.csv")),
             currentTestFilePath(QStringLiteral("deep-sky-cache.csv"))
         );
+        setIsolatedCatalogCollectionCachePath(currentTestFilePath(QStringLiteral("catalog-collection-cache")));
     }
 
     [[nodiscard]] QString filePath(const QString& fileName) const
@@ -82,6 +84,16 @@ public:
     }
 
 private:
+    // The collection cache defaults to a user-level directory shared by every
+    // process of the same application name. Pointing it at the per-run
+    // temporary directory keeps concurrently running test binaries from
+    // sharing committed generations.
+    void setIsolatedCatalogCollectionCachePath(const QString& collectionCachePath) const
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("skyContext/catalogCollectionCachePath"), collectionCachePath);
+    }
+
     QTemporaryDir m_settingsDir;
 };
 
