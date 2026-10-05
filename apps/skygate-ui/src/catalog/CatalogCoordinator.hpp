@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CatalogParseOptions.hpp"
+
 #include "catalog/CatalogLoadResult.hpp"
 #include "catalog/IStarCatalog.hpp"
 
@@ -41,6 +43,7 @@ public:
 
     void downloadCatalogFromUrls(
         const QStringList& urlTexts,
+        CatalogParseOptions parseOptions,
         QObject* callbackContext,
         StatusHandler statusHandler,
         CompletionHandler completionHandler

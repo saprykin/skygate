@@ -22,7 +22,8 @@ struct CatalogLoadResult {
         InvalidZipData,
         NoBodies,
         ArchiveMemberNotFound,
-        AmbiguousArchiveMember
+        AmbiguousArchiveMember,
+        SchemaHintMismatch
     };
 
     std::unique_ptr<IStarCatalog> catalog;

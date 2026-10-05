@@ -1,5 +1,6 @@
 #include "SkyCatalogImportWorkflow.hpp"
 #include "CatalogCoordinator.hpp"
+#include "CatalogParseOptions.hpp"
 #include "catalog/CatalogIdentity.hpp"
 #include "catalog/stellarium/StellariumConstellationParser.hpp"
 
@@ -57,6 +58,10 @@ void SkyCatalogImportWorkflow::downloadSource(
 
     m_catalogCoordinator->downloadCatalogFromUrls(
         source.urls,
+        CatalogParseOptions{
+            .archiveMember = source.archiveSelector,
+            .schemaHint = source.schemaHint,
+        },
         callbackContext,
         std::move(statusHandler),
         [source,

@@ -12,6 +12,8 @@ endif()
 qt_add_library(skygate-ui-lib STATIC
     src/catalog/CatalogCoordinator.cpp
     src/catalog/CatalogCoordinator.hpp
+    src/catalog/CatalogParseOptions.cpp
+    src/catalog/CatalogParseOptions.hpp
     src/location/LocationCatalogModel.cpp
     src/location/LocationCatalogModel.hpp
     src/search/SkyObjectSearchModel.cpp

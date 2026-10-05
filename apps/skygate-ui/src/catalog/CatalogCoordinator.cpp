@@ -41,6 +41,8 @@ QString catalogLoadErrorDescription(const skygate::ephemeris::CatalogLoadResult:
         return "requested archive member not found";
     case skygate::ephemeris::CatalogLoadResult::ErrorCode::AmbiguousArchiveMember:
         return "multiple supported archive members";
+    case skygate::ephemeris::CatalogLoadResult::ErrorCode::SchemaHintMismatch:
+        return "schema hint mismatch";
     }
 
     return "unknown parse failure";
@@ -67,6 +69,7 @@ CatalogCoordinator::~CatalogCoordinator() = default;
 
 void CatalogCoordinator::downloadCatalogFromUrls(
     const QStringList& urlTexts,
+    CatalogParseOptions parseOptions,
     QObject* callbackContext,
     StatusHandler statusHandler,
     CompletionHandler completionHandler
@@ -83,7 +86,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
         urlTexts,
         callbackContext,
         statusHandler,
-        [this, callbackContext, statusHandler, completionHandler](
+        [this, callbackContext, statusHandler, parseOptions = std::move(parseOptions), completionHandler](
             CatalogDownloadService::DownloadResult downloadResult
         ) mutable {
             if (downloadResult.payload.isEmpty()) {
@@ -114,7 +117,7 @@ void CatalogCoordinator::downloadCatalogFromUrls(
             m_parseService->parseAsync(
                 payload,
                 contextObject,
-                {},
+                std::move(parseOptions),
                 [statusHandler](const std::size_t parsedObjectCount) {
                     if (!statusHandler) {
                         return;
