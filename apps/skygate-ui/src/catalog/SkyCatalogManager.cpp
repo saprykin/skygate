@@ -526,7 +526,7 @@ bool SkyCatalogManager::restoreCatalogCache()
     // ephemeris engine and search model per restored source.
     std::vector<SkyCatalogSourceRecord> restoredSources;
     restoredSources.reserve(restoreResult.sources.size());
-    bool requiresPersist = restoreResult.migratedLegacy;
+    bool requiresPersist = restoreResult.migratedLegacy || restoreResult.requiresRecordUpgrade;
     for (SkyCatalogSourceRestoreEntry& entry : restoreResult.sources) {
         requiresPersist = requiresPersist || entry.requiresBinaryUpgrade;
 
@@ -913,6 +913,8 @@ void SkyCatalogManager::persistCatalogCache() const
         entry.urls = operation->instance.urls;
         entry.relatedDatasetUrls = operation->instance.relatedDatasetUrls;
         entry.archiveSelector = operation->instance.archiveSelector;
+        entry.schemaHint = operation->instance.schemaHint;
+        entry.attribution = operation->instance.attribution;
         entry.policy = source.policy;
         entry.enabled = source.enabled;
         entry.catalog = source.catalog.get();

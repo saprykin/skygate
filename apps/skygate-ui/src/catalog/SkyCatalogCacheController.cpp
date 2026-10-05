@@ -1,9 +1,11 @@
 #include "SkyCatalogCacheController.hpp"
 
+#include "CatalogParseOptions.hpp"
 #include "SkyCatalogPresets.hpp"
 #include "SkyContextControllerSupport.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogIdentity.hpp"
+#include "catalog/CatalogParseRequest.hpp"
 #include "catalog/CatalogPayloadParser.hpp"
 
 #include <QLoggingCategory>
@@ -111,22 +113,33 @@ bool SkyCatalogCacheController::clearCollectionCache() const
 }
 
 SkyCatalogCacheController::DecodedCatalog SkyCatalogCacheController::decodeSourceCatalog(
-    const QByteArray& payload, const QByteArray& binaryPayload, const int binarySchemaVersion
+    const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord, const int binarySchemaVersion
 ) const
 {
     DecodedCatalog decoded;
-    if (!binaryPayload.isEmpty()
+    if (!sourceRecord.binaryPayload.isEmpty()
         && binarySchemaVersion == static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion)) {
-        decoded.catalog = skygate::ephemeris::CatalogBinaryCodec::deserialize(binaryPayload);
+        decoded.catalog = skygate::ephemeris::CatalogBinaryCodec::deserialize(sourceRecord.binaryPayload);
         if (decoded.catalog == nullptr) {
             qCWarning(skygateCatalogCacheLog).noquote()
                 << "Saved binary catalog source cache unreadable; falling back to payload parsing";
         }
     }
 
-    if (decoded.catalog == nullptr && !payload.isEmpty()) {
+    if (decoded.catalog == nullptr && !sourceRecord.payload.isEmpty()) {
+        // The raw payload is reparsed with the record's own parse contract, so
+        // a restored source keeps the archive member and schema hint that
+        // produced the cached catalog. Older records keep their stored member
+        // selection and the defined defaults for the rest; options are never
+        // re-derived from a current descriptor that may have changed.
+        const CatalogParseOptions parseOptions{
+            .archiveMember = sourceRecord.archiveSelector, .schemaHint = sourceRecord.schemaHint
+        };
+        const skygate::ephemeris::CatalogParseRequest request =
+            parseOptions.makeRequest(payloadView(sourceRecord.payload));
+
         const skygate::ephemeris::CatalogPayloadParser parser;
-        auto restoredResult = parser.parseResult(payloadView(payload));
+        auto restoredResult = parser.parseResult(request);
         if (restoredResult.isSuccess() && restoredResult.catalog != nullptr) {
             decoded.catalog = std::move(restoredResult.catalog);
             decoded.requiresBinaryUpgrade = true;
@@ -172,6 +185,8 @@ void SkyCatalogCacheController::appendRestoredSource(
     entry.instance.urls = sourceRecord.urls;
     entry.instance.relatedDatasetUrls = sourceRecord.relatedDatasetUrls;
     entry.instance.archiveSelector = sourceRecord.archiveSelector;
+    entry.instance.schemaHint = sourceRecord.schemaHint;
+    entry.instance.attribution = sourceRecord.attribution;
 
     entry.payload = sourceRecord.payload;
     entry.requiresBinaryUpgrade = decoded.requiresBinaryUpgrade;
@@ -206,9 +221,13 @@ SkyCatalogCacheController::restoreFromRecords(const SkySettingsStore::CatalogCol
     SkyCatalogCollectionRestoreResult result;
     const int binarySchemaVersion = snapshot.binarySchemaVersion;
 
+    // Records written before the parse contract was persisted load with the
+    // defined defaults and are rewritten once in the current format.
+    result.requiresRecordUpgrade =
+        snapshot.schemaVersion < SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+
     for (const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord : snapshot.sources) {
-        DecodedCatalog decoded =
-            decodeSourceCatalog(sourceRecord.payload, sourceRecord.binaryPayload, binarySchemaVersion);
+        DecodedCatalog decoded = decodeSourceCatalog(sourceRecord, binarySchemaVersion);
         appendRestoredSource(sourceRecord, std::move(decoded), result);
     }
     return result;
@@ -226,8 +245,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
     result.migratedLegacy = true;
 
     const auto appendRecord = [&](SkySettingsStore::CatalogSourceCacheRecord record) {
-        DecodedCatalog decoded =
-            decodeSourceCatalog(record.payload, record.binaryPayload, legacy.catalogBinarySchemaVersion);
+        DecodedCatalog decoded = decodeSourceCatalog(record, legacy.catalogBinarySchemaVersion);
         appendRestoredSource(record, std::move(decoded), result);
     };
 
@@ -248,6 +266,8 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
                 record.urls = descriptor->urls;
                 record.relatedDatasetUrls = descriptor->relatedDatasetUrls;
                 record.archiveSelector = descriptor->archiveSelector;
+                record.schemaHint = descriptor->schemaHint;
+                record.attribution = descriptor->attribution;
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(catalogUrlText);
@@ -284,6 +304,8 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
                 record.urls = descriptor->urls;
                 record.relatedDatasetUrls = descriptor->relatedDatasetUrls;
                 record.archiveSelector = descriptor->archiveSelector;
+                record.schemaHint = descriptor->schemaHint;
+                record.attribution = descriptor->attribution;
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(deepSkyCatalogUrlText);
@@ -350,6 +372,8 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
         record.urls = source.urls;
         record.relatedDatasetUrls = source.relatedDatasetUrls;
         record.archiveSelector = source.archiveSelector;
+        record.schemaHint = source.schemaHint;
+        record.attribution = source.attribution;
         record.policy = source.policy;
         record.enabled = source.enabled;
         record.payload = source.payload;

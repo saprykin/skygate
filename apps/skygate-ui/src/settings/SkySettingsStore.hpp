@@ -7,6 +7,7 @@
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/CatalogSourceType.hpp"
 #include "engine/EphemerisCorrectionFlags.hpp"
 #include "engine/EphemerisEngineKind.hpp"
 
@@ -101,6 +102,11 @@ public:
         QStringList urls;
         QStringList relatedDatasetUrls;
         QString archiveSelector;
+        // Parse contract and descriptor metadata required to reproduce the
+        // source. Records written before these fields existed load with the
+        // defaults: no schema hint, no attribution.
+        skygate::ephemeris::CatalogSourceType schemaHint = skygate::ephemeris::CatalogSourceType::Unknown;
+        QString attribution;
         skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
         bool enabled = true;
         int order = 0;
