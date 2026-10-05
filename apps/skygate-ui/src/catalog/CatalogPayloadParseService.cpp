@@ -1,11 +1,12 @@
 #include "CatalogPayloadParseService.hpp"
 
+#include "catalog/CatalogParseRequest.hpp"
+#include "catalog/CatalogPayloadParser.hpp"
+
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QThreadPool>
-
-#include "catalog/CatalogPayloadParser.hpp"
 
 #include <memory>
 #include <string_view>
@@ -14,7 +15,7 @@
 void CatalogPayloadParseService::parseAsync(
     QByteArray payload,
     QObject* callbackContext,
-    skygate::ephemeris::CatalogSelectionOptions selectionOptions,
+    CatalogParseOptions parseOptions,
     ProgressHandler progressHandler,
     CompletionHandler completionHandler
 ) const
@@ -22,7 +23,7 @@ void CatalogPayloadParseService::parseAsync(
     QPointer<QObject> safeContext(callbackContext);
     auto task = QRunnable::create([payload = std::move(payload),
                                    safeContext,
-                                   selectionOptions,
+                                   parseOptions = std::move(parseOptions),
                                    progressHandler = std::move(progressHandler),
                                    completionHandler = std::move(completionHandler)]() mutable {
         const auto reportProgress = [&safeContext, &progressHandler](const std::size_t parsedObjectCount) {
@@ -43,10 +44,17 @@ void CatalogPayloadParseService::parseAsync(
         };
 
         const std::string_view payloadView(payload.constData(), static_cast<std::size_t>(payload.size()));
+        skygate::ephemeris::CatalogParseRequest request;
+        request.payload = payloadView;
+        request.progressCallback = reportProgress;
+        request.selectionOptions = parseOptions.selectionOptions;
+        request.schemaHint = parseOptions.schemaHint;
+        if (!parseOptions.archiveMember.isEmpty()) {
+            request.memberSelector = parseOptions.archiveMember.toStdString();
+        }
+
         const skygate::ephemeris::CatalogPayloadParser parser;
-        const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(
-            parser.parseResult(payloadView, reportProgress, selectionOptions)
-        );
+        const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(parser.parseResult(request));
 
         QObject* const contextObject = safeContext.data();
         if (contextObject == nullptr) {

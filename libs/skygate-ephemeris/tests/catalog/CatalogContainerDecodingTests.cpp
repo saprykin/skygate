@@ -115,6 +115,7 @@ private slots:
     void selectsExplicitArchiveMember();
     void reportsAmbiguousArchiveMembers();
     void reportsMissingArchiveMember();
+    void validatesExplicitSchemaHint();
 };
 
 void CatalogContainerDecodingTests::hygProducesEquivalentBodiesAcrossContainers()
@@ -325,6 +326,62 @@ void CatalogContainerDecodingTests::reportsMissingArchiveMember()
     );
     QVERIFY(!result.isSuccess());
     QCOMPARE(result.errorCode, CatalogLoadResult::ErrorCode::ArchiveMemberNotFound);
+}
+
+void CatalogContainerDecodingTests::validatesExplicitSchemaHint()
+{
+    using namespace skygate::ephemeris;
+
+    const CatalogPayloadParser parser;
+    const std::string zipData = tests::makeZip({
+        tests::ZipEntrySpec{.path = "hyg.csv", .data = std::string(kHygCsv)},
+    });
+
+    const auto plainResult = parser.parseResult(
+        CatalogParseRequest{
+            .payload = kHygCsv,
+            .schemaHint = CatalogSourceType::HygCsv,
+        }
+    );
+    QCOMPARE(plainResult.detectedFormat, CatalogSourceType::HygCsv);
+    const std::string plainError = verifyHygResult(plainResult);
+    QVERIFY2(plainError.empty(), plainError.c_str());
+
+    const auto zipResult = parser.parseResult(
+        CatalogParseRequest{
+            .payload = zipData,
+            .schemaHint = CatalogSourceType::HygCsv,
+        }
+    );
+    QCOMPARE(zipResult.detectedFormat, CatalogSourceType::HygCsv);
+    const std::string zipError = verifyHygResult(zipResult);
+    QVERIFY2(zipError.empty(), zipError.c_str());
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload schema 'HYG CSV' does not match the expected schema hint "
+        "'OpenNGC CSV'."
+    );
+    const auto mismatchedResult = parser.parseResult(
+        CatalogParseRequest{
+            .payload = kHygCsv,
+            .schemaHint = CatalogSourceType::OpenNgcCsv,
+        }
+    );
+    QVERIFY(!mismatchedResult.isSuccess());
+    QCOMPARE(mismatchedResult.errorCode, CatalogLoadResult::ErrorCode::SchemaHintMismatch);
+
+    // A hint never overrides detection: an unrecognized payload stays
+    // unsupported even when the hint names a schema.
+    QTest::ignoreMessage(QtWarningMsg, "Catalog payload parse failed: Catalog payload format is not recognized.");
+    const auto unrecognizedResult = parser.parseResult(
+        CatalogParseRequest{
+            .payload = "not a catalog",
+            .schemaHint = CatalogSourceType::HygCsv,
+        }
+    );
+    QVERIFY(!unrecognizedResult.isSuccess());
+    QCOMPARE(unrecognizedResult.errorCode, CatalogLoadResult::ErrorCode::UnsupportedFormat);
 }
 
 QTEST_APPLESS_MAIN(CatalogContainerDecodingTests)

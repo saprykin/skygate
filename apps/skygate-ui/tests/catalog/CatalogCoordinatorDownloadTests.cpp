@@ -1,5 +1,7 @@
 #include "AsyncTestSupport.hpp"
+#include "BaseCelestialBody.hpp"
 #include "CatalogCoordinator.hpp"
+#include "CatalogParseOptions.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "FakeNetworkAccessManager.hpp"
 
@@ -7,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <utility>
 
 using namespace skygate::ui::tests;
@@ -19,6 +22,8 @@ private slots:
     void reportsParseFailureWithSourceUrl();
     void gzipWithUnknownInnerSchemaUsesFormatNeutralWording();
     void missingOpenNgcColumnsDoNotClaimHyg();
+    void loadsArchiveMemberNamedByParseOptions();
+    void reportsContradictorySchemaHintWithSourceUrl();
 };
 
 void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
@@ -32,6 +37,7 @@ void CatalogCoordinatorDownloadTests::parsesSuccessfulDownloadedCatalog()
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/catalog.csv"},
+            CatalogParseOptions{},
             this,
             [&statuses](const QString& status) { statuses.push_back(status); },
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
@@ -73,6 +79,7 @@ void CatalogCoordinatorDownloadTests::reportsParseFailureWithSourceUrl()
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/bad.csv"},
+            CatalogParseOptions{},
             this,
             [&statuses](const QString& status) { statuses.push_back(status); },
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
@@ -122,6 +129,7 @@ void CatalogCoordinatorDownloadTests::gzipWithUnknownInnerSchemaUsesFormatNeutra
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/missing-mag.csv.gz"},
+            CatalogParseOptions{},
             this,
             {},
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
@@ -153,6 +161,7 @@ void CatalogCoordinatorDownloadTests::missingOpenNgcColumnsDoNotClaimHyg()
     runAsync([&](QEventLoop& loop) {
         coordinator.downloadCatalogFromUrls(
             {"https://example.test/missing-dec.csv"},
+            CatalogParseOptions{},
             this,
             {},
             [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
@@ -166,6 +175,74 @@ void CatalogCoordinatorDownloadTests::missingOpenNgcColumnsDoNotClaimHyg()
     QVERIFY(finalResult.errorText.contains("unsupported format"));
     QVERIFY(!finalResult.errorText.contains("HYG"));
     QVERIFY(!finalResult.errorText.contains("OpenNGC"));
+}
+
+void CatalogCoordinatorDownloadTests::loadsArchiveMemberNamedByParseOptions()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse("https://example.test/catalogs.zip", {.payload = sampleTwoMemberCatalogZip()});
+    CatalogCoordinator coordinator(&networkAccessManager);
+
+    CatalogCoordinator::DownloadResult finalResult;
+    runAsync([&](QEventLoop& loop) {
+        coordinator.downloadCatalogFromUrls(
+            {"https://example.test/catalogs.zip"},
+            CatalogParseOptions{
+                .archiveMember = QStringLiteral("catalog/ngc.csv"),
+                .schemaHint = skygate::ephemeris::CatalogSourceType::OpenNgcCsv,
+            },
+            this,
+            {},
+            [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(finalResult.catalog != nullptr);
+    const auto bodies = finalResult.catalog->bodies();
+    QCOMPARE(bodies.size(), std::size_t{1});
+    QCOMPARE(QString::fromStdString(bodies.front()->id), QStringLiteral("messier_031"));
+    QVERIFY(finalResult.errorText.isEmpty());
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/catalogs.zip"));
+}
+
+void CatalogCoordinatorDownloadTests::reportsContradictorySchemaHintWithSourceUrl()
+{
+    FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse("https://example.test/stars.csv", {.payload = sampleHygCsvPayload()});
+    CatalogCoordinator coordinator(&networkAccessManager);
+
+    CatalogCoordinator::DownloadResult finalResult;
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload schema 'HYG CSV' does not match the expected schema hint "
+        "'OpenNGC CSV'."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog: Source https://example.test/stars.csv parse failed: schema hint mismatch (Catalog payload schema "
+        "'HYG CSV' does not match the expected schema hint 'OpenNGC CSV'.)"
+    );
+    runAsync([&](QEventLoop& loop) {
+        coordinator.downloadCatalogFromUrls(
+            {"https://example.test/stars.csv"},
+            CatalogParseOptions{.schemaHint = skygate::ephemeris::CatalogSourceType::OpenNgcCsv},
+            this,
+            {},
+            [&finalResult, &loop](CatalogCoordinator::DownloadResult result) {
+                finalResult = std::move(result);
+                loop.quit();
+            }
+        );
+    });
+
+    QVERIFY(finalResult.catalog == nullptr);
+    QVERIFY(finalResult.errorText.contains("schema hint mismatch"));
+    QVERIFY(finalResult.errorText.contains("HYG CSV"));
+    QVERIFY(finalResult.errorText.contains("OpenNGC CSV"));
+    QCOMPARE(finalResult.sourceUrl, QString("https://example.test/stars.csv"));
 }
 
 QTEST_GUILESS_MAIN(CatalogCoordinatorDownloadTests)

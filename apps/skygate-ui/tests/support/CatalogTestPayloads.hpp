@@ -1,6 +1,10 @@
 #pragma once
 
+#include "CatalogArchiveTestSupport.hpp"
+
 #include <QByteArray>
+
+#include <string>
 
 namespace skygate::ui::tests {
 
@@ -98,6 +102,24 @@ struct DeepSkyCatalogPayloadOptions final {
             }
         ]
     })";
+}
+
+// A ZIP archive with two supported catalog members. Without an explicit member
+// selector the core selector reports the archive as ambiguous; selecting one
+// member must load exactly that member and no object from the other one.
+[[nodiscard]] inline QByteArray sampleTwoMemberCatalogZip()
+{
+    const std::string zipData = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec{
+            .path = "catalog/hyg.csv",
+            .data = sampleHygCsvPayload().toStdString(),
+        },
+        skygate::ephemeris::tests::ZipEntrySpec{
+            .path = "catalog/ngc.csv",
+            .data = sampleOpenNgcCsvPayload().toStdString(),
+        },
+    });
+    return QByteArray(zipData.data(), static_cast<qsizetype>(zipData.size()));
 }
 
 }  // namespace skygate::ui::tests

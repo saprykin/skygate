@@ -152,6 +152,16 @@ CatalogLoadResult CatalogPayloadParser::parseResult(const CatalogParseRequest& r
         return result;
     }
 
+    if (request.schemaHint != CatalogSourceType::Unknown && request.schemaHint != schemaType) {
+        result.errorCode = CatalogLoadResult::ErrorCode::SchemaHintMismatch;
+        result.errorDetail = "Catalog payload schema '" + CatalogSchemaRegistry::diagnosticName(schemaType)
+                             + "' does not match the expected schema hint '"
+                             + CatalogSchemaRegistry::diagnosticName(request.schemaHint) + "'.";
+        qCWarning(skygateCatalogParseLog).noquote()
+            << "Catalog payload parse failed:" << QString::fromStdString(result.errorDetail);
+        return result;
+    }
+
     result = CatalogLoader::load(schemaType, schemaPayload, request.progressCallback, request.selectionOptions);
     result.detectedFormat = schemaType;
     return logSuccessfulParse(std::move(result));
