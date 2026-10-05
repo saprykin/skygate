@@ -1,4 +1,5 @@
 #include "SkyCatalogManager.hpp"
+#include "SkyCatalogConstellationStore.hpp"
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkyContextControllerSupport.hpp"
@@ -958,19 +959,22 @@ void SkyCatalogManager::persistCatalogCache() const
             }
         }
 
-        if (!source.bundled && source.policy == skygate::ephemeris::CatalogCompositionPolicy::Merge
-            && !entry.relatedDatasetUrls.isEmpty()) {
-            std::vector<skygate::ephemeris::ConstellationLineRef> lineRefs(
-                m_runtime->constellationLineRefs().begin(), m_runtime->constellationLineRefs().end()
-            );
-            std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups(
-                m_runtime->constellationAnchorGroups().begin(), m_runtime->constellationAnchorGroups().end()
-            );
-            entry.constellationLineRows = SkyContextCatalogCodec::serializeConstellationLineRows(lineRefs);
+        // Each source's related dataset is serialized from the dataset that
+        // source itself owns, so a restart attributes every line, anchor, and
+        // count to the source whose download produced it. A source that has
+        // not completed a related download keeps no related payload, and a
+        // disabled owner keeps its own payload even though it contributes
+        // nothing to the active view.
+        const SkyCatalogConstellationStore& ownedRelatedData = source.constellationData;
+        if (!source.bundled
+            && (!ownedRelatedData.lineRefVector().empty() || !ownedRelatedData.anchorGroupVector().empty()
+                || ownedRelatedData.count() > 0U)) {
+            entry.constellationLineRows =
+                SkyContextCatalogCodec::serializeConstellationLineRows(ownedRelatedData.lineRefVector());
             entry.constellationAnchorGroupRows =
-                SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(anchorGroups);
+                SkyContextCatalogCodec::serializeConstellationAnchorGroupRows(ownedRelatedData.anchorGroupVector());
             entry.constellationLineSchemaVersion = SkyContextControllerConstants::kConstellationLineCacheSchemaVersion;
-            entry.constellationCount = m_runtime->constellationCount();
+            entry.constellationCount = ownedRelatedData.count();
         }
         request.sources.push_back(std::move(entry));
     }
