@@ -2,13 +2,18 @@
 #include "CatalogSemanticFixtureCorpus.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "CelestialBodyState.hpp"
+#include "ConstellationTestSupport.hpp"
 #include "DistantCelestialBody.hpp"
 #include "EphemerisSnapshot.hpp"
+#include "FakeNetworkAccessManager.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "SettingsTestFixture.hpp"
+#include "SkyCatalogManager.hpp"
 #include "SkyObjectInspectorFormatters.hpp"
 #include "SkyObjectSearchModel.hpp"
 #include "SkyOverlayLayerVisibility.hpp"
 #include "SkyRenderBuilders.hpp"
+#include "SkySettingsStore.hpp"
 #include "SkyTheme.hpp"
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentifier.hpp"
@@ -97,6 +102,33 @@ filterBodies(const skygate::ephemeris::IStarCatalog& source, const BaseCelestial
     );
 }
 
+std::optional<std::size_t> bodyIndexById(const skygate::ephemeris::IStarCatalog* catalog, const std::string& id)
+{
+    if (catalog == nullptr) {
+        return std::nullopt;
+    }
+
+    const auto bodies = catalog->bodies();
+    for (std::size_t index = 0; index < bodies.size(); ++index) {
+        if (bodies[index] != nullptr && bodies[index]->id == id) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
+bool labelsContainText(const SkyRenderFrame& frame, const QString& text)
+{
+    return std::any_of(frame.labels.begin(), frame.labels.end(), [&text](const SkyRenderLabel& label) {
+        return label.text == text;
+    });
+}
+
+QByteArray payloadBytes(const std::string_view payload)
+{
+    return QByteArray(payload.data(), static_cast<qsizetype>(payload.size()));
+}
+
 skygate::ui::internal::SkyThemeRenderPalette makeRenderTheme()
 {
     skygate::ui::internal::SkyThemeRenderPalette theme;
@@ -112,7 +144,11 @@ skygate::ui::internal::SkyThemeRenderPalette makeRenderTheme()
     return theme;
 }
 
-SkyRenderFrame buildFrame(const skygate::ephemeris::IStarCatalog& catalog)
+SkyRenderFrame buildFrame(
+    const skygate::ephemeris::IStarCatalog& catalog,
+    const std::span<const skygate::ephemeris::ConstellationLineRef> lineRefs = {},
+    const std::span<const skygate::ephemeris::ConstellationAnchorGroup> anchorGroups = {}
+)
 {
     EphemerisSnapshot snapshot;
     snapshot.catalogBodies = std::make_shared<const CelestialBodyCatalog>(catalog.catalog());
@@ -132,7 +168,9 @@ SkyRenderFrame buildFrame(const skygate::ephemeris::IStarCatalog& catalog)
 
     SkyRenderFrameBuilder builder;
     SkyOverlayLayerVisibility overlayLayers;
-    return builder.buildFrame(snapshot, *projection, {}, {}, 9.0, 1000.0, 800.0, makeRenderTheme(), overlayLayers);
+    return builder.buildFrame(
+        snapshot, *projection, lineRefs, anchorGroups, 9.0, 1000.0, 800.0, makeRenderTheme(), overlayLayers
+    );
 }
 
 }  // namespace
@@ -142,18 +180,29 @@ class CatalogConsumerInterchangeabilityTests final : public QObject {
 
 private slots:
     void initTestCase();
+    void init();
     void renderInputsAgreeForEquivalentObjects();
     void searchTargetsAgreeForEquivalentObjects();
     void inspectorMetadataAgreesForEquivalentObjects();
     void ephemerisInputsAgreeForEquivalentObjects();
+    void consumersAgreeOnComposedCollectionSnapshot();
+
+private:
+    skygate::ui::tests::SettingsTestFixture m_settings;
 };
 
 void CatalogConsumerInterchangeabilityTests::initTestCase()
 {
+    QVERIFY(m_settings.initialize(QStringLiteral("CatalogConsumerInterchangeabilityTests")));
     QVERIFY(
         skygate::ephemeris::tests::CatalogSemanticFixtureAdapter::schemaType()
         != skygate::ephemeris::CatalogSourceType::Unknown
     );
+}
+
+void CatalogConsumerInterchangeabilityTests::init()
+{
+    m_settings.resetSettingsWithCatalogCachePaths();
 }
 
 void CatalogConsumerInterchangeabilityTests::renderInputsAgreeForEquivalentObjects()
@@ -343,6 +392,180 @@ void CatalogConsumerInterchangeabilityTests::ephemerisInputsAgreeForEquivalentOb
         findByExternalIdentifier(openNgc.catalog->bodies(), "messier", "057"),
         findByExternalIdentifier(semantic.catalog->bodies(), "messier", "057")
     );
+}
+
+void CatalogConsumerInterchangeabilityTests::consumersAgreeOnComposedCollectionSnapshot()
+{
+    using namespace skygate::ephemeris;
+    using namespace skygate::ephemeris::tests;
+    using namespace skygate::ui::internal;
+
+    const QString hygUrl = QStringLiteral("https://example.test/consumer-hyg.csv");
+    const QString semanticUrl = QStringLiteral("https://example.test/consumer-semantic.tsv");
+    const QString openNgcUrl = QStringLiteral("https://example.test/consumer-openngc.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/consumer-lines.json");
+
+    // The HYG encoding places the two stars where the semantic encoding does
+    // not, so the surviving object is observable in every consumer instead of
+    // only in the canonical identifier.
+    const QByteArray hygPayload = "id,hip,proper,bf,ra,dec,mag\n"
+                                  "1,32349,Sirius,Alpha Canis Majoris,1.0,2.0,-1.46\n"
+                                  "2,91262,Vega,Alpha Lyrae,3.0,4.0,0.03\n";
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(hygUrl, {.payload = hygPayload});
+    networkAccessManager.enqueueResponse(
+        semanticUrl, {.payload = payloadBytes(CatalogSemanticFixtureCorpus::semanticPayload())}
+    );
+    networkAccessManager.enqueueResponse(
+        openNgcUrl, {.payload = payloadBytes(CatalogSemanticFixtureCorpus::openNgcDeepSkyPayload())}
+    );
+    networkAccessManager.enqueueResponse(
+        relatedUrl,
+        {.payload =
+             skygate::ui::tests::stellariumConstellationIndexJsonPayload({{QStringLiteral("orion"), {32349, 91262}}})}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    // The bundled deep-sky fallback stays out of this fixture so the snapshot
+    // holds exactly the objects the configured sources supply.
+    manager.setDeepSkyCatalogPresetIndex(1);
+
+    SkyCatalogSourceInstance hygSource = SkyCatalogSourceInstance::createCustom(hygUrl);
+    hygSource.title = QStringLiteral("HYG Fixture");
+    hygSource.schemaHint = CatalogSourceType::HygCsv;
+    hygSource.relatedDatasetUrls = QStringList{relatedUrl};
+    manager.loadSource(hygSource, CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    // The bundled star source carries its own deep-sky objects, so it is
+    // removed once a configured source keeps the collection non-empty.
+    manager.removeSource(QStringLiteral("primary"));
+
+    SkyCatalogSourceInstance semanticSource = SkyCatalogSourceInstance::createCustom(semanticUrl);
+    semanticSource.title = QStringLiteral("Semantic Fixture");
+    semanticSource.schemaHint = CatalogSemanticFixtureAdapter::schemaType();
+
+    // The later semantic encoding wins the shared positions of both stars.
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression(QStringLiteral(
+            "Catalog composition kept the fixed coordinates of star_1 over conflicting fixed coordinates from "
+            "hip_32349\\."
+        ))
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        QRegularExpression(QStringLiteral(
+            "Catalog composition kept the fixed coordinates of star_2 over conflicting fixed coordinates from "
+            "hip_91262\\."
+        ))
+    );
+    manager.loadSource(semanticSource, CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    SkyCatalogSourceInstance openNgcSource = SkyCatalogSourceInstance::createCustom(openNgcUrl);
+    openNgcSource.title = QStringLiteral("OpenNGC Fixture");
+    openNgcSource.schemaHint = CatalogSourceType::OpenNgcCsv;
+    manager.loadSource(openNgcSource, CatalogCompositionPolicy::DeepSkyOnly);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationAnchorGroups().size(), std::size_t{1});
+
+    const IStarCatalog* const catalog = manager.starCatalog();
+    QVERIFY(catalog != nullptr);
+    const auto bodies = catalog->bodies();
+
+    // The composed survivor is the later catalog's object: the HYG spelling of
+    // the same star no longer addresses a body of the active snapshot.
+    const std::optional<std::size_t> starIndex = bodyIndexById(catalog, "star_1");
+    const std::optional<std::size_t> m31Index = bodyIndexById(catalog, "messier_031");
+    QVERIFY(starIndex.has_value());
+    QVERIFY(m31Index.has_value());
+    QVERIFY(bodyIndexById(catalog, "hip_32349") == std::nullopt);
+    QCOMPARE(manager.sourceIds()[*starIndex], semanticSource.instanceId);
+    QCOMPARE(
+        manager.contributorSourceIds()[*starIndex], QStringList({semanticSource.instanceId, hygSource.instanceId})
+    );
+    QCOMPARE(manager.sourceIds()[*m31Index], openNgcSource.instanceId);
+    QCOMPARE(
+        manager.contributorSourceIds()[*m31Index], QStringList({openNgcSource.instanceId, semanticSource.instanceId})
+    );
+
+    // Search resolves the surviving object through the common domain data.
+    SkyObjectSearchModel searchModel;
+    searchModel.setCatalogData(bodies, manager.resolvedConstellationAnchorGroups());
+    searchModel.setFilterText(QStringLiteral("sirius"));
+    QCOMPARE(searchModel.rowCount(), 1);
+    QCOMPARE(searchModel.index(0, 0).data(SkyObjectSearchModel::TargetIdRole).toString(), QStringLiteral("star_1"));
+    QCOMPARE(searchModel.index(0, 0).data(SkyObjectSearchModel::DisplayTextRole).toString(), QStringLiteral("Sirius"));
+    searchModel.setFilterText(QStringLiteral("andromeda"));
+    QCOMPARE(searchModel.rowCount(), 1);
+    QCOMPARE(
+        searchModel.index(0, 0).data(SkyObjectSearchModel::TargetIdRole).toString(), QStringLiteral("messier_031")
+    );
+
+    // Constellation resolution maps the catalog-specific HIP references of the
+    // owned dataset onto the surviving objects of the composed snapshot.
+    const std::span<const ConstellationLineRef> resolvedLines = manager.resolvedConstellationLineRefs();
+    const std::span<const ConstellationAnchorGroup> resolvedAnchors = manager.resolvedConstellationAnchorGroups();
+    QCOMPARE(resolvedLines.size(), std::size_t{1});
+    QCOMPARE(QString::fromStdString(resolvedLines.front().first), QStringLiteral("star_1"));
+    QCOMPARE(QString::fromStdString(resolvedLines.front().second), QStringLiteral("star_2"));
+    QCOMPARE(resolvedAnchors.size(), std::size_t{1});
+    QCOMPARE(QString::fromStdString(resolvedAnchors.front().first), QStringLiteral("Orion"));
+    QCOMPARE(resolvedAnchors.front().second, (std::vector<std::string>{"star_1", "star_2"}));
+
+    // The rendering-independent scene data built from that snapshot and the
+    // resolved related data references the same surviving objects and labels.
+    const SkyRenderFrame frame = buildFrame(*catalog, resolvedLines, resolvedAnchors);
+    QCOMPARE(frame.lines.size(), std::size_t{1});
+    const auto starPoint =
+        std::find_if(frame.points.begin(), frame.points.end(), [&starIndex](const SkyRenderPoint& point) {
+            return point.bodyIndex == *starIndex;
+        });
+    QVERIFY(starPoint != frame.points.end());
+    const auto m31Glyph =
+        std::find_if(frame.glyphs.begin(), frame.glyphs.end(), [&m31Index](const SkyRenderGlyph& glyph) {
+            return glyph.bodyIndex == *m31Index;
+        });
+    QVERIFY(m31Glyph != frame.glyphs.end());
+    QVERIFY(labelsContainText(frame, QStringLiteral("M31")));
+
+    // A consumer that kept using the raw catalog-specific spelling would draw
+    // no constellation segment at all: the spelling addresses no body of the
+    // composed snapshot.
+    const std::vector<ConstellationLineRef> rawLines{{"hip_32349", "hip_91262"}};
+    const SkyRenderFrame unresolvedFrame = buildFrame(*catalog, rawLines);
+    QVERIFY(unresolvedFrame.lines.empty());
+
+    // The inspector's source field reports the same surviving provenance.
+    QCOMPARE(
+        sourceLabelForBodyIndex(
+            manager.sourceIds(),
+            &manager.contributorSourceIds(),
+            manager.sourceTitles(),
+            static_cast<std::uint32_t>(*starIndex)
+        ),
+        QStringLiteral("Semantic Fixture + HYG Fixture")
+    );
+    QCOMPARE(
+        sourceLabelForBodyIndex(
+            manager.sourceIds(),
+            &manager.contributorSourceIds(),
+            manager.sourceTitles(),
+            static_cast<std::uint32_t>(*m31Index)
+        ),
+        QStringLiteral("OpenNGC Fixture + Semantic Fixture")
+    );
+
+    // The ephemeris input of the same surviving object uses the winner's own
+    // coordinates instead of the absorbed catalog's.
+    const SimpleBodyStateCalculator calculator;
+    const auto state = calculator.computeEquatorial(*bodies[*starIndex], skygate::core::UtcTimePoint{});
+    QVERIFY(state.has_value());
+    QVERIFY(nearEqual(state->rightAscensionHours, 6.7525, 1e-3));
+    QVERIFY(nearEqual(state->declinationDeg, -16.7161, 1e-2));
 }
 
 QTEST_GUILESS_MAIN(CatalogConsumerInterchangeabilityTests)
