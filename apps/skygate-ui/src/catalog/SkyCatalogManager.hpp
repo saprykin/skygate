@@ -177,11 +177,12 @@ private:
     );
     void handleConstellationLineImportStatus(const QString& catalogSummaryText, const QString& statusText);
     void handleConstellationLineImportFinished(
-        const QString& catalogSummaryText, skygate::ui::internal::SkyConstellationLineImportResult lineResult
+        const QString& instanceId,
+        const QString& catalogSummaryText,
+        skygate::ui::internal::SkyConstellationLineImportResult lineResult
     );
     [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeBuildOptions runtimeBuildOptions() const;
     void applyRuntimeResult(const skygate::ui::internal::SkyCatalogRuntimeResult& result);
-    void resetConstellationLineRefs();
     void persistCatalogCache() const;
 
 private:

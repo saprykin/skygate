@@ -9,6 +9,7 @@
 #include <QLocale>
 
 #include <algorithm>
+#include <unordered_set>
 #include <utility>
 
 namespace skygate::ui::internal {
@@ -22,6 +23,16 @@ QString normalizedTitle(const QString& title, const QString& fallback)
 {
     const QString normalized = title.trimmed();
     return normalized.isEmpty() ? fallback : normalized;
+}
+
+std::size_t
+countConstellationBodies(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies) noexcept
+{
+    return static_cast<std::size_t>(
+        std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->kind == skygate::ephemeris::BaseCelestialBody::Kind::Constellation;
+        })
+    );
 }
 
 }  // namespace
@@ -42,7 +53,6 @@ SkyCatalogRuntime::SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCa
             }
         );
     }
-    static_cast<void>(resetConstellationLineRefs());
 }
 
 const skygate::ephemeris::IStarCatalog* SkyCatalogRuntime::starCatalog() const noexcept
@@ -70,7 +80,7 @@ std::size_t SkyCatalogRuntime::bodyCount() const noexcept
 
 std::size_t SkyCatalogRuntime::constellationCount() const noexcept
 {
-    return m_constellationRefs.count();
+    return std::max(m_catalogConstellationCount, m_constellationRefs.count());
 }
 
 std::size_t SkyCatalogRuntime::deepSkyObjectCount() const noexcept
@@ -184,6 +194,10 @@ SkyCatalogRuntime::applySource(SkyCatalogSourceRecord source, const SkyCatalogRu
             return candidate.instanceId == source.instanceId;
         });
     if (existing != m_sources.end()) {
+        // The related dataset is owned by the instance and changes only
+        // through the explicit related-data operations, so replacing the
+        // catalog keeps it until its owner replaces or clears the dataset.
+        source.constellationData = std::move(existing->constellationData);
         *existing = std::move(source);
     } else {
         m_sources.push_back(std::move(source));
@@ -276,7 +290,12 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     }
 
     skygate::ephemeris::CatalogCompositionRequest request;
-    request.currentConstellationCount = m_constellationRefs.count();
+    std::vector<ConstellationLineRef> activeLineRefs;
+    std::vector<ConstellationAnchorGroup> activeAnchorGroups;
+    // The active related view is recomposed from the owned datasets of the
+    // enabled sources before composition, so the reported constellation count
+    // reflects the same collection state as the composed snapshot.
+    request.currentConstellationCount = buildActiveConstellationView(activeLineRefs, activeAnchorGroups);
 
     std::size_t knownDeepSkyObjectCount = 0;
     for (const SkyCatalogSourceRecord& source : m_sources) {
@@ -338,7 +357,10 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     m_starCatalog = std::move(composed.catalog);
     ++m_catalogRevision;
     m_bodyCount = composed.bodyCount;
-    m_constellationRefs.setCount(composed.constellationCount);
+    m_catalogConstellationCount = countConstellationBodies(m_starCatalog->bodies());
+    static_cast<void>(m_constellationRefs.setDataset(
+        std::move(activeLineRefs), std::move(activeAnchorGroups), request.currentConstellationCount
+    ));
     m_deepSkyObjectCount = composed.deepSkyObjectCount;
     m_deepSkyCatalogFoundObjectCount = composed.foundDeepSkyObjectCount;
     rebuildSourceProvenance(composed.sourceIds, composed.contributorSourceIds);
@@ -352,53 +374,36 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     };
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::resetConstellationLineRefs()
-{
-    m_constellationRefs.clear();
-    ++m_catalogRevision;
-    return SkyCatalogRuntimeResult{.catalogChanged = true};
-}
-
-SkyCatalogRuntimeResult SkyCatalogRuntime::setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs)
-{
-    if (lineRefs.empty()) {
-        return resetConstellationLineRefs();
-    }
-
-    m_constellationRefs.setLineRefs(std::move(lineRefs));
-    ++m_catalogRevision;
-    return SkyCatalogRuntimeResult{.catalogChanged = true};
-}
-
-SkyCatalogRuntimeResult
-SkyCatalogRuntime::setConstellationAnchorGroups(std::vector<ConstellationAnchorGroup> anchorGroups)
-{
-    m_constellationRefs.setAnchorGroups(std::move(anchorGroups));
-    ++m_catalogRevision;
-    return SkyCatalogRuntimeResult{.catalogChanged = true};
-}
-
-SkyCatalogRuntimeResult SkyCatalogRuntime::restoreConstellationRefs(
+SkyCatalogRuntimeResult SkyCatalogRuntime::setSourceConstellationRefs(
+    const QString& instanceId,
     std::vector<ConstellationLineRef> lineRefs,
     std::vector<ConstellationAnchorGroup> anchorGroups,
-    const std::optional<std::size_t> constellationCount
+    const std::size_t constellationCount
 )
 {
-    SkyCatalogRuntimeResult result = setConstellationLineRefs(std::move(lineRefs));
-    const SkyCatalogRuntimeResult labelResult = setConstellationAnchorGroups(std::move(anchorGroups));
-    result.catalogChanged = result.catalogChanged || labelResult.catalogChanged;
-
-    if (constellationCount.has_value() && constellationCount.value() != m_constellationRefs.count()) {
-        m_constellationRefs.setCount(constellationCount.value());
-        result.datasetInfoChanged = true;
+    SkyCatalogSourceRecord* source = findSource(instanceId);
+    if (source == nullptr
+        || !source->constellationData.setDataset(std::move(lineRefs), std::move(anchorGroups), constellationCount)) {
+        return SkyCatalogRuntimeResult{};
     }
-    return result;
+
+    return refreshActiveConstellationView();
+}
+
+SkyCatalogRuntimeResult SkyCatalogRuntime::clearSourceConstellationRefs(const QString& instanceId)
+{
+    SkyCatalogSourceRecord* source = findSource(instanceId);
+    if (source == nullptr || !source->constellationData.clear()) {
+        return SkyCatalogRuntimeResult{};
+    }
+
+    return refreshActiveConstellationView();
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& statusText)
 {
     m_bodyCount = 0;
-    m_constellationRefs.setCount(0);
+    m_catalogConstellationCount = 0;
     m_deepSkyObjectCount = 0;
     m_sourceTitles.clear();
     m_sourceIds.clear();
@@ -415,7 +420,7 @@ QString SkyCatalogRuntime::buildStatusText() const
             deepSkySourceLabel(),
             locale.toString(static_cast<qulonglong>(m_bodyCount)),
             locale.toString(static_cast<qulonglong>(m_deepSkyObjectCount)),
-            locale.toString(static_cast<qulonglong>(m_constellationRefs.count()))
+            locale.toString(static_cast<qulonglong>(constellationCount()))
         );
 }
 
@@ -427,6 +432,15 @@ QString SkyCatalogRuntime::deepSkySourceLabel() const
         return normalizedTitle(deepSky->title, QStringLiteral("Bundled Messier"));
     }
     return QStringLiteral("Bundled Messier");
+}
+
+SkyCatalogSourceRecord* SkyCatalogRuntime::findSource(const QString& instanceId)
+{
+    const auto it =
+        std::find_if(m_sources.begin(), m_sources.end(), [&instanceId](const SkyCatalogSourceRecord& candidate) {
+            return candidate.instanceId == instanceId;
+        });
+    return it != m_sources.end() ? &*it : nullptr;
 }
 
 const SkyCatalogSourceRecord* SkyCatalogRuntime::findSource(const QString& instanceId) const
@@ -500,6 +514,85 @@ void SkyCatalogRuntime::rebuildSourceProvenance(
         }
         m_contributorSourceIds.push_back(std::move(instanceIds));
     }
+}
+
+std::size_t SkyCatalogRuntime::buildActiveConstellationView(
+    std::vector<ConstellationLineRef>& lineRefs, std::vector<ConstellationAnchorGroup>& anchorGroups
+) const
+{
+    lineRefs.clear();
+    anchorGroups.clear();
+
+    std::unordered_set<std::string> seenSegments;
+    std::size_t declaredCount = 0U;
+    for (const SkyCatalogSourceRecord& source : m_sources) {
+        if (!source.enabled) {
+            continue;
+        }
+
+        const SkyCatalogConstellationStore& owned = source.constellationData;
+        if (owned.lineRefVector().empty() && owned.anchorGroupVector().empty() && owned.count() == 0U) {
+            continue;
+        }
+        if (owned.count() > 0U) {
+            declaredCount = owned.count();
+        }
+
+        for (const ConstellationLineRef& lineRef : owned.lineRefVector()) {
+            std::string segmentKey = lineRef.first;
+            segmentKey += '\n';
+            segmentKey += lineRef.second;
+            if (seenSegments.insert(segmentKey).second) {
+                lineRefs.push_back(lineRef);
+            }
+        }
+
+        for (const ConstellationAnchorGroup& anchorGroup : owned.anchorGroupVector()) {
+            if (anchorGroup.first.empty()) {
+                anchorGroups.push_back(anchorGroup);
+                continue;
+            }
+            const auto existing =
+                std::find_if(anchorGroups.begin(), anchorGroups.end(), [&anchorGroup](const auto& candidate) {
+                    return candidate.first == anchorGroup.first;
+                });
+            if (existing != anchorGroups.end()) {
+                existing->second = anchorGroup.second;
+            } else {
+                anchorGroups.push_back(anchorGroup);
+            }
+        }
+    }
+
+    const auto namedAnchorGroupCount = static_cast<std::size_t>(
+        std::count_if(anchorGroups.begin(), anchorGroups.end(), [](const ConstellationAnchorGroup& anchorGroup) {
+            return !anchorGroup.first.empty();
+        })
+    );
+    return std::max(declaredCount, namedAnchorGroupCount);
+}
+
+SkyCatalogRuntimeResult SkyCatalogRuntime::refreshActiveConstellationView()
+{
+    std::vector<ConstellationLineRef> lineRefs;
+    std::vector<ConstellationAnchorGroup> anchorGroups;
+    const std::size_t declaredCount = buildActiveConstellationView(lineRefs, anchorGroups);
+
+    const bool referencesChanged =
+        lineRefs != m_constellationRefs.lineRefVector() || anchorGroups != m_constellationRefs.anchorGroupVector();
+    const std::size_t previousCount = constellationCount();
+    if (!referencesChanged && declaredCount == m_constellationRefs.count()) {
+        return SkyCatalogRuntimeResult{};
+    }
+
+    static_cast<void>(m_constellationRefs.setDataset(std::move(lineRefs), std::move(anchorGroups), declaredCount));
+    SkyCatalogRuntimeResult result;
+    result.datasetInfoChanged = previousCount != constellationCount();
+    if (referencesChanged) {
+        ++m_catalogRevision;
+        result.catalogChanged = true;
+    }
+    return result;
 }
 
 void SkyCatalogRuntime::refreshResolvedConstellationRefs() const

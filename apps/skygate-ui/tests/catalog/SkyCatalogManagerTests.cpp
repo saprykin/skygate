@@ -1,6 +1,7 @@
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogDownloadWorkflowTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
+#include "ConstellationTestSupport.hpp"
 #include "FakeNetworkAccessManager.hpp"
 #include "SettingsTestFixture.hpp"
 #include "SkyCatalogManager.hpp"
@@ -77,6 +78,19 @@ QByteArray archiveMemberZip(const skygate::ui::tests::DeepSkyCatalogPayloadOptio
 
 constexpr int kStaleConstellationDelayMs = 500;
 
+// Finds the active related anchor group by constellation name. The returned
+// pointer stays valid until the next active-view mutation.
+const skygate::ephemeris::ConstellationAnchorGroup*
+findConstellationAnchorGroup(const SkyCatalogManager& manager, const std::string& name)
+{
+    for (const skygate::ephemeris::ConstellationAnchorGroup& anchorGroup : manager.constellationAnchorGroups()) {
+        if (anchorGroup.first == name) {
+            return &anchorGroup;
+        }
+    }
+    return nullptr;
+}
+
 const skygate::ui::internal::SkyCatalogSourceDescriptor kHygPreset =
     skygate::ui::internal::SkyCatalogPresets::starSourceDescriptor(QStringLiteral("hyg_v42")).value();
 
@@ -138,6 +152,8 @@ private slots:
     void interleavedBundledAndDownloadedSourcesPreserveOrderAndPrecedence();
     void unreadablePayloadKeepsConfiguredSourceWithoutErasingSiblings();
     void removedBundledSourceDoesNotReturnAfterRestart();
+    void relatedConstellationDatasetsStayOwnedByTheirSources();
+    void overlappingConstellationDatasetsFollowSourceOrder();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -1590,6 +1606,144 @@ void SkyCatalogManagerTests::unreadablePayloadKeepsConfiguredSourceWithoutErasin
     );
     QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("Recovered Star")));
     QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("Healthy Star")));
+}
+
+void SkyCatalogManagerTests::relatedConstellationDatasetsStayOwnedByTheirSources()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/related-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/related-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/related-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/related-b-lines.json");
+
+    const QByteArray sourceARelatedPayload =
+        skygate::ui::tests::stellariumConstellationIndexJsonPayload({{QStringLiteral("orion"), {27989, 25336, 25930}}});
+    const QByteArray sourceBRelatedPayload =
+        skygate::ui::tests::stellariumConstellationIndexJsonPayload({{QStringLiteral("lyra"), {26311, 26727, 24436}}});
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceARelatedUrl, {.payload = sourceARelatedPayload});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = sourceBRelatedPayload});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const auto loadRelatedSource = [&](const skygate::ui::internal::SkyCatalogSourceInstance& instance) {
+        manager.loadSource(instance, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+        QTRY_VERIFY(!manager.downloadingCatalog());
+    };
+
+    skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceAUrl);
+    sourceA.relatedDatasetUrls = QStringList{sourceARelatedUrl};
+    const QString sourceAId = sourceA.instanceId;
+    loadRelatedSource(sourceA);
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{1});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+
+    skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceBUrl);
+    sourceB.relatedDatasetUrls = QStringList{sourceBRelatedUrl};
+    const QString sourceBId = sourceB.instanceId;
+    loadRelatedSource(sourceB);
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+
+    // Two loaded sources retain distinct related datasets simultaneously.
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+
+    // Disabling one source removes only its owned dataset from the active
+    // view, including its anchors and its count contribution.
+    manager.disableSource(sourceAId);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{1});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+
+    // Re-enabling restores the retained dataset.
+    manager.enableSource(sourceAId);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{2});
+
+    // Removing one source does not remove the other source's dataset, and the
+    // surviving references still resolve against the active object identities.
+    manager.removeSource(sourceAId);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{1});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QCOMPARE(manager.resolvedConstellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.resolvedConstellationAnchorGroups().size(), std::size_t{1});
+    QVERIFY(manager.isSourceEnabled(sourceBId));
+}
+
+void SkyCatalogManagerTests::overlappingConstellationDatasetsFollowSourceOrder()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/overlap-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/overlap-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/overlap-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/overlap-b-lines.json");
+
+    // Source A declares three constellations but only two extract anchor
+    // groups, so the declared count and the composed group count differ.
+    const QByteArray sourceARelatedPayload = skygate::ui::tests::stellariumConstellationIndexJsonPayload(
+        {{QStringLiteral("orion"), {27989, 25336, 25930}},
+         {QStringLiteral("cepheus"), {26311, 26727, 24436}},
+         {QStringLiteral("draco"), {42}}}
+    );
+    const QByteArray sourceBRelatedPayload =
+        skygate::ui::tests::stellariumConstellationIndexJsonPayload({{QStringLiteral("orion"), {24436, 25930, 26727}}});
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceARelatedUrl, {.payload = sourceARelatedPayload});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = sourceBRelatedPayload});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const auto loadRelatedSource = [&](const skygate::ui::internal::SkyCatalogSourceInstance& instance) {
+        manager.loadSource(instance, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+        QTRY_VERIFY(!manager.downloadingCatalog());
+    };
+
+    skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceAUrl);
+    sourceA.relatedDatasetUrls = QStringList{sourceARelatedUrl};
+    const QString sourceAId = sourceA.instanceId;
+    loadRelatedSource(sourceA);
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{3});
+
+    skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceBUrl);
+    sourceB.relatedDatasetUrls = QStringList{sourceBRelatedUrl};
+    loadRelatedSource(sourceB);
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{6});
+
+    // The later enabled source owns the overlapping constellation name and the
+    // declared count follows the last enabled owner that declares one.
+    const auto* orionGroup = findConstellationAnchorGroup(manager, "Orion");
+    QVERIFY(orionGroup != nullptr);
+    QCOMPARE(orionGroup->second.front(), std::string("hip_24436"));
+    QCOMPARE(manager.constellationCount(), std::size_t{2});
+
+    // Reordering the collection changes both the winning anchors and the
+    // composed declared count.
+    manager.moveSource(sourceAId, 2);
+    orionGroup = findConstellationAnchorGroup(manager, "Orion");
+    QVERIFY(orionGroup != nullptr);
+    QCOMPARE(orionGroup->second.front(), std::string("hip_25336"));
+    QCOMPARE(manager.constellationCount(), std::size_t{3});
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{6});
 }
 
 void SkyCatalogManagerTests::removedBundledSourceDoesNotReturnAfterRestart()
