@@ -48,7 +48,9 @@ void SkySceneModelDeepSkyTests::deepSkyInspectorIncludesAliasesSizeAndSource()
     QCOMPARE(inspector.value("title").toString(), QString("M31"));
     QCOMPARE(inspectorFieldValue(inspector, "Type"), QString("Galaxy"));
     QVERIFY(inspectorFieldValue(inspector, "Angular size").contains("arcmin"));
-    QVERIFY(inspectorFieldValue(inspector, "Source").contains("Bundled Messier"));
+    // The configured source supplies this object, so the inspector names that
+    // source instead of a bundled deep-sky fallback.
+    QCOMPARE(inspectorFieldValue(inspector, "Source"), QString("Bundled"));
     QVERIFY(inspector.value("aliases").toString().contains("Andromeda Galaxy"));
 
     QVERIFY(controller.focusSearchTarget("body", "messier_031"));

@@ -623,10 +623,20 @@ bool participates(const CatalogCompositionPolicy policy, const BaseCelestialBody
         return body.kind == BaseCelestialBody::Kind::DeepSkyObject;
     case CatalogCompositionPolicy::AugmentCore:
         return body.kind != BaseCelestialBody::Kind::DeepSkyObject;
+    case CatalogCompositionPolicy::DeepSkyFallback:
+        return body.kind == BaseCelestialBody::Kind::DeepSkyObject;
     case CatalogCompositionPolicy::Merge:
         return true;
     }
     return true;
+}
+
+// Gap-fill policies never replace an existing survivor: a participating body is
+// appended only when no active body already claims its identity. AugmentCore
+// and DeepSkyFallback differ in which bodies they select, not in precedence.
+bool isGapFillPolicy(const CatalogCompositionPolicy policy)
+{
+    return policy == CatalogCompositionPolicy::AugmentCore || policy == CatalogCompositionPolicy::DeepSkyFallback;
 }
 
 bool hasAnyMatch(const CatalogIdentityIndex& index, const BaseCelestialBody& body)
@@ -772,10 +782,16 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             continue;
         }
 
-        if (source.policy == CatalogCompositionPolicy::AugmentCore) {
-            augmentCoreEnabled = true;
-            if (augmentCoreSourceId.empty()) {
-                augmentCoreSourceId = source.sourceId;
+        // Gap-fill sources contribute only the bodies their policy selects and
+        // never replace an earlier survivor. AugmentCore additionally enables
+        // the bundled bright-star fallback when no other source supplies a
+        // star; DeepSkyFallback fills missing deep-sky identities only.
+        if (isGapFillPolicy(source.policy)) {
+            if (source.policy == CatalogCompositionPolicy::AugmentCore) {
+                augmentCoreEnabled = true;
+                if (augmentCoreSourceId.empty()) {
+                    augmentCoreSourceId = source.sourceId;
+                }
             }
 
             for (const BaseCelestialBody* body : source.catalog->bodies()) {
