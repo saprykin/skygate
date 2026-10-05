@@ -80,6 +80,34 @@ QString readTrimmedStringSetting(QSettings& settings, const QString& key, const 
     return settings.value(key, fallback).toString().trimmed();
 }
 
+// A stored schema hint only means something when it names a schema this build
+// knows. A missing or garbled value falls back to "no hint" so detection
+// decides, instead of failing the source with a synthetic hint mismatch.
+skygate::ephemeris::CatalogSourceType readCatalogSourceSchemaHint(QSettings& settings, const QString& key)
+{
+    const auto noHint = skygate::ephemeris::CatalogSourceType::Unknown;
+    if (!settings.contains(key)) {
+        return noHint;
+    }
+
+    bool ok = false;
+    const int storedValue = settings.value(key).toInt(&ok);
+    if (ok) {
+        const auto storedType = static_cast<skygate::ephemeris::CatalogSourceType>(storedValue);
+        switch (storedType) {
+        case skygate::ephemeris::CatalogSourceType::Bundled:
+        case skygate::ephemeris::CatalogSourceType::HygCsv:
+        case skygate::ephemeris::CatalogSourceType::OpenNgcCsv:
+        case skygate::ephemeris::CatalogSourceType::Unknown:
+            return storedType;
+        }
+    }
+
+    qCWarning(skygateSettingsLog).noquote() << "Invalid catalog source schema hint" << key << "value"
+                                            << settings.value(key).toString() << "- using fallback: no schema hint";
+    return noHint;
+}
+
 QString catalogCollectionCacheDirectory(QSettings& settings)
 {
     const QString configuredPath = settings
@@ -194,6 +222,8 @@ void saveCatalogSourceRecord(
     settings.setValue(QStringLiteral("urls"), record.urls);
     settings.setValue(QStringLiteral("relatedDatasetUrls"), record.relatedDatasetUrls);
     settings.setValue(QStringLiteral("archiveSelector"), record.archiveSelector);
+    settings.setValue(QStringLiteral("schemaHint"), static_cast<int>(record.schemaHint));
+    settings.setValue(QStringLiteral("attribution"), record.attribution);
     settings.setValue(QStringLiteral("policy"), static_cast<int>(record.policy));
     settings.setValue(QStringLiteral("enabled"), record.enabled);
     settings.setValue(QStringLiteral("order"), record.order);
@@ -224,6 +254,8 @@ SkySettingsStore::CatalogSourceCacheRecord loadCatalogSourceRecord(QSettings& se
     record.urls = settings.value(QStringLiteral("urls")).toStringList();
     record.relatedDatasetUrls = settings.value(QStringLiteral("relatedDatasetUrls")).toStringList();
     record.archiveSelector = settings.value(QStringLiteral("archiveSelector")).toString();
+    record.schemaHint = readCatalogSourceSchemaHint(settings, QStringLiteral("schemaHint"));
+    record.attribution = settings.value(QStringLiteral("attribution")).toString();
     record.policy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(readIntSetting(
         settings, QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
     ));

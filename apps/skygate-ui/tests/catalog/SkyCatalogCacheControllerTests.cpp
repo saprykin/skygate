@@ -5,6 +5,7 @@
 #include "LogCapture.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyContextControllerSupport.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
 #include "catalog/CatalogFactory.hpp"
@@ -12,6 +13,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QtTest/QtTest>
 
@@ -22,11 +24,19 @@
 namespace {
 
 using skygate::ephemeris::CatalogCompositionPolicy;
+using skygate::ephemeris::CatalogSourceType;
 using skygate::ui::internal::SkyCatalogCacheController;
 using skygate::ui::internal::SkyCatalogCollectionPersistRequest;
 using skygate::ui::internal::SkyCatalogCollectionRestoreResult;
 using skygate::ui::internal::SkyCatalogSourcePersistEntry;
 using skygate::ui::internal::SkyCatalogSourceRestoreEntry;
+
+constexpr int kCurrentCollectionSchemaVersion =
+    skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+
+const QString kArchiveSourceUrl = QStringLiteral("https://example.test/catalogs.zip");
+const QString kStarsMember = QStringLiteral("catalog/hyg.csv");
+const QString kDeepSkyMember = QStringLiteral("catalog/ngc.csv");
 
 std::unique_ptr<skygate::ephemeris::IStarCatalog> makeStarCatalog(const std::string& id, const std::string& name)
 {
@@ -73,10 +83,77 @@ SkyCatalogCollectionPersistRequest makeCollectionPersistRequest()
     return request;
 }
 
+// A persisted source whose raw payload is the multi-member archive from
+// V2-05, with one member named by the descriptor's archive selection.
+SkySettingsStore::CatalogCollectionCacheSnapshot makeArchiveCollectionSnapshot()
+{
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
+    snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
+
+    SkySettingsStore::CatalogSourceCacheRecord archive;
+    archive.instanceId = QStringLiteral("custom:archive");
+    archive.descriptorId = QStringLiteral("archive_demo");
+    archive.title = QStringLiteral("Archive Catalog");
+    archive.version = QStringLiteral("v2026.1");
+    archive.urls = QStringList{kArchiveSourceUrl};
+    archive.archiveSelector = kDeepSkyMember;
+    archive.schemaHint = CatalogSourceType::OpenNgcCsv;
+    archive.attribution = QStringLiteral("Demo archive attribution");
+    archive.policy = CatalogCompositionPolicy::Merge;
+    archive.enabled = true;
+    archive.order = 0;
+    archive.payload = skygate::ui::tests::sampleTwoMemberCatalogZip();
+    snapshot.sources.push_back(std::move(archive));
+
+    return snapshot;
+}
+
+SkySettingsStore::CatalogSourceCacheRecord makeArchiveSourceRecord(const QString& instanceId)
+{
+    SkySettingsStore::CatalogSourceCacheRecord record;
+    record.instanceId = instanceId;
+    record.descriptorId = QStringLiteral("archive_demo");
+    record.title = QStringLiteral("Archive Catalog");
+    record.version = QStringLiteral("v2026.1");
+    record.urls = QStringList{kArchiveSourceUrl};
+    record.policy = CatalogCompositionPolicy::Merge;
+    record.enabled = true;
+    record.payload = skygate::ui::tests::sampleTwoMemberCatalogZip();
+    return record;
+}
+
+// Removes the keys a record written before the parse contract was persisted
+// cannot have, mirroring an older settings file.
+QStringList removePersistedParseOptions()
+{
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList recordGroups = settings.childGroups();
+    settings.endGroup();
+
+    for (const QString& group : recordGroups) {
+        settings.beginGroup(QStringLiteral("catalogSources/") + group);
+        settings.remove(QStringLiteral("schemaHint"));
+        settings.remove(QStringLiteral("attribution"));
+        settings.endGroup();
+    }
+    settings.sync();
+    return recordGroups;
+}
+
+QString firstBodyId(const skygate::ephemeris::IStarCatalog& catalog)
+{
+    const auto bodies = catalog.bodies();
+    return bodies.empty() ? QString() : QString::fromStdString(bodies.front()->id);
+}
+
+// A persisted collection in the current record format: two sources whose raw
+// payloads must be reparsed because they carry no binary sidecars.
 SkySettingsStore::CatalogCollectionCacheSnapshot makeCollectionSnapshot()
 {
     SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
-    snapshot.schemaVersion = 1;
+    snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
     snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
 
     SkySettingsStore::CatalogSourceCacheRecord star;
@@ -123,6 +200,8 @@ SkyCatalogCollectionPersistRequest persistRequestFromRestoreResult(const SkyCata
         persisted.urls = entry.instance.urls;
         persisted.relatedDatasetUrls = entry.instance.relatedDatasetUrls;
         persisted.archiveSelector = entry.instance.archiveSelector;
+        persisted.schemaHint = entry.instance.schemaHint;
+        persisted.attribution = entry.instance.attribution;
         persisted.policy = entry.record.policy;
         persisted.enabled = entry.record.enabled;
         persisted.catalog = entry.record.catalog.get();
@@ -145,6 +224,13 @@ private slots:
     void corruptBinaryPayloadFallsBackToCsvParsing();
     void legacyBinarySchemaVersionFallsBackToCsvParsing();
     void damagedSourceIsSkippedWithoutDiscardingSiblings();
+    void restoresSelectedArchiveMemberWhenBinaryCacheIsMissing();
+    void restoresSelectedArchiveMemberWhenBinaryCacheIsOutdated();
+    void restoresSelectedArchiveMemberWhenBinaryCacheIsCorrupt();
+    void parseOptionFailuresSkipDamagedRecordsAndKeepSiblings();
+    void unreadableSchemaHintFallsBackToDetection();
+    void roundTripsParseOptionsDescriptorMetadataAndAttribution();
+    void olderRecordFormatRestoresDefinedDefaults();
     void roundTripsThreeEnabledSourcesPlusDisabledSource();
     void clearSourceCacheVersusClearCollectionCache();
     void migratesLegacyBundledCustomAndMixedConfigurations();
@@ -301,6 +387,278 @@ void SkyCatalogCacheControllerTests::damagedSourceIsSkippedWithoutDiscardingSibl
     const auto stillPersisted = store.loadCatalogCollectionCache();
     QVERIFY(stillPersisted.has_value());
     QCOMPARE(stillPersisted->sources.size(), 2);
+}
+
+void SkyCatalogCacheControllerTests::restoresSelectedArchiveMemberWhenBinaryCacheIsMissing()
+{
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(makeArchiveCollectionSnapshot()));
+
+    const SkyCatalogCacheController controller(&store);
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+
+    QVERIFY(result.restored);
+    QVERIFY(!result.requiresRecordUpgrade);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    QVERIFY(result.sources[0].record.catalog != nullptr);
+    QVERIFY(result.sources[0].requiresBinaryUpgrade);
+    QCOMPARE(result.sources[0].record.catalog->bodies().size(), std::size_t{1});
+    QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
+}
+
+void SkyCatalogCacheControllerTests::restoresSelectedArchiveMemberWhenBinaryCacheIsOutdated()
+{
+    // A binary sidecar written by an older binary schema is not trusted, so the
+    // raw archive must be reparsed with the stored member selection. The
+    // outdated sidecar deliberately holds the other archive member.
+    auto snapshot = makeArchiveCollectionSnapshot();
+    const auto otherMemberCatalog = makeStarCatalog("hip_42", "Sirius");
+    snapshot.sources[0].binaryPayload =
+        skygate::ephemeris::CatalogBinaryCodec::serialize(otherMemberCatalog->catalog());
+    snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion) - 1;
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+
+    const SkyCatalogCacheController controller(&store);
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+
+    QVERIFY(result.restored);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    QVERIFY(result.sources[0].record.catalog != nullptr);
+    QVERIFY(result.sources[0].requiresBinaryUpgrade);
+    QCOMPARE(result.sources[0].record.catalog->bodies().size(), std::size_t{1});
+    QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
+}
+
+void SkyCatalogCacheControllerTests::restoresSelectedArchiveMemberWhenBinaryCacheIsCorrupt()
+{
+    auto snapshot = makeArchiveCollectionSnapshot();
+    snapshot.sources[0].binaryPayload = "corrupt archive binary payload";
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+
+    const SkyCatalogCacheController controller(&store);
+    QTest::ignoreMessage(QtWarningMsg, "Saved binary catalog source cache unreadable; falling back to payload parsing");
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+
+    QVERIFY(result.restored);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    QVERIFY(result.sources[0].record.catalog != nullptr);
+    QVERIFY(result.sources[0].requiresBinaryUpgrade);
+    QCOMPARE(result.sources[0].record.catalog->bodies().size(), std::size_t{1});
+    QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
+}
+
+void SkyCatalogCacheControllerTests::parseOptionFailuresSkipDamagedRecordsAndKeepSiblings()
+{
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
+    snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
+
+    SkySettingsStore::CatalogSourceCacheRecord missingMember =
+        makeArchiveSourceRecord(QStringLiteral("custom:missing"));
+    missingMember.archiveSelector = QStringLiteral("catalog/missing.csv");
+    missingMember.schemaHint = CatalogSourceType::OpenNgcCsv;
+    missingMember.order = 0;
+    snapshot.sources.push_back(std::move(missingMember));
+
+    SkySettingsStore::CatalogSourceCacheRecord hintMismatch =
+        makeArchiveSourceRecord(QStringLiteral("custom:hint-mismatch"));
+    hintMismatch.schemaHint = CatalogSourceType::OpenNgcCsv;
+    hintMismatch.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
+    hintMismatch.payload = skygate::ui::tests::sampleHygCsvPayload();
+    hintMismatch.order = 1;
+    snapshot.sources.push_back(std::move(hintMismatch));
+
+    SkySettingsStore::CatalogSourceCacheRecord valid = makeArchiveSourceRecord(QStringLiteral("custom:valid"));
+    valid.archiveSelector = kStarsMember;
+    valid.schemaHint = CatalogSourceType::HygCsv;
+    valid.order = 2;
+    snapshot.sources.push_back(std::move(valid));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+
+    const SkyCatalogCacheController controller(&store);
+    QTest::ignoreMessage(
+        QtWarningMsg, "Catalog ZIP parse failed: ZIP catalog payload does not contain member 'catalog/missing.csv'."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Saved catalog source cache unreadable; ignoring source: ZIP catalog payload does not contain member "
+        "'catalog/missing.csv'."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog payload parse failed: Catalog payload schema 'HYG CSV' does not match the expected schema hint "
+        "'OpenNGC CSV'."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Saved catalog source cache unreadable; ignoring source: Catalog payload schema 'HYG CSV' does not match the "
+        "expected schema hint 'OpenNGC CSV'."
+    );
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+
+    // Only the record whose stored parse contract matches its payload restores.
+    QVERIFY(result.restored);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    QCOMPARE(result.sources[0].record.instanceId, QString("custom:valid"));
+    QVERIFY(result.sources[0].record.catalog != nullptr);
+    QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("hip_42"));
+
+    // The failing records stay persisted; a bad parse does not erase them.
+    const auto stillPersisted = store.loadCatalogCollectionCache();
+    QVERIFY(stillPersisted.has_value());
+    QCOMPARE(stillPersisted->sources.size(), 3);
+}
+
+void SkyCatalogCacheControllerTests::unreadableSchemaHintFallsBackToDetection()
+{
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(makeArchiveCollectionSnapshot()));
+
+    // A garbled hint must fall back to "no hint" so the payload is still read
+    // by detection instead of failing with a synthetic mismatch.
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("catalogSources"));
+    const QStringList recordGroups = settings.childGroups();
+    settings.endGroup();
+    QCOMPARE(recordGroups.size(), 1);
+    settings.beginGroup(QStringLiteral("catalogSources/") + recordGroups.first());
+    settings.setValue(QStringLiteral("schemaHint"), 9);
+    settings.endGroup();
+    settings.sync();
+
+    const SkyCatalogCacheController controller(&store);
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid catalog source schema hint .*"));
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+
+    QVERIFY(result.restored);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    QCOMPARE(result.sources[0].instance.schemaHint, CatalogSourceType::Unknown);
+    QVERIFY(result.sources[0].record.catalog != nullptr);
+    QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
+}
+
+void SkyCatalogCacheControllerTests::roundTripsParseOptionsDescriptorMetadataAndAttribution()
+{
+    SkyCatalogCollectionPersistRequest request;
+    SkyCatalogSourcePersistEntry entry;
+    entry.instanceId = QStringLiteral("custom:archive");
+    entry.descriptorId = QStringLiteral("archive_demo");
+    entry.title = QStringLiteral("Archive Catalog");
+    entry.version = QStringLiteral("v2026.1");
+    entry.urls = QStringList{kArchiveSourceUrl};
+    entry.archiveSelector = kDeepSkyMember;
+    entry.schemaHint = CatalogSourceType::OpenNgcCsv;
+    entry.attribution = QStringLiteral("Demo archive attribution");
+    entry.policy = CatalogCompositionPolicy::Merge;
+    entry.enabled = true;
+    entry.payload = skygate::ui::tests::sampleTwoMemberCatalogZip();
+    request.sources.push_back(std::move(entry));
+
+    SkySettingsStore store;
+    const SkyCatalogCacheController controller(&store);
+    controller.persistCollection(request);
+
+    const auto stored = store.loadCatalogCollectionCache();
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->schemaVersion, kCurrentCollectionSchemaVersion);
+    QCOMPARE(stored->sources.size(), 1);
+    QCOMPARE(stored->sources[0].instanceId, QString("custom:archive"));
+    QCOMPARE(stored->sources[0].descriptorId, QString("archive_demo"));
+    QCOMPARE(stored->sources[0].version, QString("v2026.1"));
+    QCOMPARE(stored->sources[0].archiveSelector, kDeepSkyMember);
+    QCOMPARE(stored->sources[0].schemaHint, CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(stored->sources[0].attribution, QString("Demo archive attribution"));
+
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(result.restored);
+    QVERIFY(!result.requiresRecordUpgrade);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+
+    const SkyCatalogSourceRestoreEntry& restored = result.sources[0];
+    QCOMPARE(restored.instance.instanceId, QString("custom:archive"));
+    QCOMPARE(restored.instance.descriptorId, QString("archive_demo"));
+    QCOMPARE(restored.instance.version, QString("v2026.1"));
+    QCOMPARE(restored.instance.archiveSelector, kDeepSkyMember);
+    QCOMPARE(restored.instance.schemaHint, CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(restored.instance.attribution, QString("Demo archive attribution"));
+    QCOMPARE(restored.record.version, QString("v2026.1"));
+    QVERIFY(restored.record.catalog != nullptr);
+    QCOMPARE(restored.record.catalog->bodies().size(), std::size_t{1});
+    QCOMPARE(firstBodyId(*restored.record.catalog), QStringLiteral("messier_031"));
+}
+
+void SkyCatalogCacheControllerTests::olderRecordFormatRestoresDefinedDefaults()
+{
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = kCurrentCollectionSchemaVersion - 1;
+    snapshot.binarySchemaVersion = static_cast<int>(skygate::ephemeris::CatalogBinaryCodec::kSchemaVersion);
+
+    // Older records persisted the member selection but no schema hint. The
+    // descriptor identity matches the OpenNGC preset while the selected member
+    // is the HYG member, so resolving the current descriptor for this record
+    // would contradict the cached payload.
+    SkySettingsStore::CatalogSourceCacheRecord selected = makeArchiveSourceRecord(QStringLiteral("custom:selected"));
+    selected.descriptorId = QStringLiteral("open_ngc");
+    selected.archiveSelector = kStarsMember;
+    selected.order = 0;
+    snapshot.sources.push_back(std::move(selected));
+
+    SkySettingsStore::CatalogSourceCacheRecord ambiguous = makeArchiveSourceRecord(QStringLiteral("custom:ambiguous"));
+    ambiguous.descriptorId = QStringLiteral("open_ngc");
+    ambiguous.order = 1;
+    snapshot.sources.push_back(std::move(ambiguous));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+    QCOMPARE(removePersistedParseOptions().size(), 2);
+
+    const SkyCatalogCacheController controller(&store);
+    QTest::ignoreMessage(
+        QtWarningMsg, "Catalog ZIP parse failed: ZIP catalog payload contains multiple supported catalog members."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Saved catalog source cache unreadable; ignoring source: ZIP catalog payload contains multiple supported "
+        "catalog members."
+    );
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+
+    // The stored member selection is still honored, while the missing schema
+    // hint keeps its default instead of being resolved from a descriptor.
+    QVERIFY(result.restored);
+    QVERIFY(result.requiresRecordUpgrade);
+    QCOMPARE(result.sources.size(), std::size_t{1});
+    const SkyCatalogSourceRestoreEntry& restored = result.sources[0];
+    QCOMPARE(restored.instance.instanceId, QString("custom:selected"));
+    QCOMPARE(restored.instance.archiveSelector, kStarsMember);
+    QCOMPARE(restored.instance.schemaHint, CatalogSourceType::Unknown);
+    QVERIFY(restored.instance.attribution.isEmpty());
+    QVERIFY(restored.record.catalog != nullptr);
+    QCOMPARE(restored.record.catalog->bodies().size(), std::size_t{1});
+    QCOMPARE(firstBodyId(*restored.record.catalog), QStringLiteral("hip_42"));
+
+    // Rewriting the upgraded records records the defaults once and ends the
+    // migration boundary, mirroring the manager's persist after restore.
+    controller.persistCollection(persistRequestFromRestoreResult(result));
+    const auto upgraded = store.loadCatalogCollectionCache();
+    QVERIFY(upgraded.has_value());
+    QCOMPARE(upgraded->schemaVersion, kCurrentCollectionSchemaVersion);
+    QCOMPARE(upgraded->sources.size(), 1);
+    QCOMPARE(upgraded->sources[0].schemaHint, CatalogSourceType::Unknown);
+    QVERIFY(upgraded->sources[0].attribution.isEmpty());
+
+    const auto secondResult = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(secondResult.restored);
+    QVERIFY(!secondResult.requiresRecordUpgrade);
+    QCOMPARE(secondResult.sources.size(), std::size_t{1});
+    QVERIFY(secondResult.sources[0].record.catalog != nullptr);
+    QCOMPARE(firstBodyId(*secondResult.sources[0].record.catalog), QStringLiteral("hip_42"));
 }
 
 void SkyCatalogCacheControllerTests::roundTripsThreeEnabledSourcesPlusDisabledSource()

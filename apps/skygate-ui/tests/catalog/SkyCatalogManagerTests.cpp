@@ -9,14 +9,17 @@
 #include "SkyCatalogSourceInstance.hpp"
 #include "SkySettingsStore.hpp"
 
+#include <QDir>
 #include <QFile>
 #include <QPointer>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QUrl>
 #include <QtTest/QtTest>
 
 #include <algorithm>
+#include <string>
 
 namespace {
 
@@ -39,6 +42,36 @@ bool catalogContainsDisplayName(const skygate::ephemeris::IStarCatalog* catalog,
     return std::any_of(bodies.begin(), bodies.end(), [&displayName](const skygate::ephemeris::BaseCelestialBody* body) {
         return body != nullptr && QString::fromStdString(body->displayName) == displayName;
     });
+}
+
+bool catalogContainsId(const skygate::ephemeris::IStarCatalog* catalog, const QString& objectId)
+{
+    if (catalog == nullptr) {
+        return false;
+    }
+
+    const auto bodies = catalog->bodies();
+    return std::any_of(bodies.begin(), bodies.end(), [&objectId](const skygate::ephemeris::BaseCelestialBody* body) {
+        return body != nullptr && QString::fromStdString(body->id) == objectId;
+    });
+}
+
+constexpr const char* kArchiveStarsMember = "catalog/stars.csv";
+constexpr const char* kArchiveDeepSkyMember = "catalog/deep-sky.csv";
+
+// A two-member archive whose members hold distinguishable objects, so a test
+// can tell which member a restored source actually selected.
+QByteArray archiveMemberZip(const skygate::ui::tests::DeepSkyCatalogPayloadOptions& deepSky)
+{
+    const QByteArray starsMember =
+        skygate::ui::tests::sampleHygCsvPayload({.hip = 900101, .properName = "Archive Member Star", .mag = "1.0"});
+    const QByteArray deepSkyMember = skygate::ui::tests::sampleOpenNgcCsvPayload(deepSky);
+
+    const std::string zipData = skygate::ephemeris::tests::makeZip({
+        skygate::ephemeris::tests::ZipEntrySpec{.path = kArchiveStarsMember, .data = starsMember.toStdString()},
+        skygate::ephemeris::tests::ZipEntrySpec{.path = kArchiveDeepSkyMember, .data = deepSkyMember.toStdString()},
+    });
+    return QByteArray(zipData.data(), static_cast<qsizetype>(zipData.size()));
 }
 
 constexpr int kStaleConstellationDelayMs = 500;
@@ -97,6 +130,7 @@ private slots:
     void editingSourceAsUpdatePreservesInstanceId();
     void restoresLegacyPersistedInstanceIdsWithReferences();
     void legacyMigrationRenamesDuplicateInstanceIds();
+    void restoresArchiveSelectionAndSourceMetadataAfterBinaryCacheLoss();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -1142,6 +1176,84 @@ void SkyCatalogManagerTests::legacyMigrationRenamesDuplicateInstanceIds()
     SkyCatalogManager restoredManager(&store);
     QVERIFY(restoredManager.restoreCatalogCache());
     QCOMPARE(restoredManager.sourceInstanceIds(), restoredIds);
+}
+
+void SkyCatalogManagerTests::restoresArchiveSelectionAndSourceMetadataAfterBinaryCacheLoss()
+{
+    const QString cacheDirectory = m_settings.filePath(QStringLiteral("archive-restore-cache"));
+    QDir(cacheDirectory).removeRecursively();
+    QSettings settings;
+    settings.setValue(QStringLiteral("skyContext/catalogCollectionCachePath"), cacheDirectory);
+
+    const QString archiveUrl = QStringLiteral("https://example.test/members.zip");
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        archiveUrl,
+        {.payload = archiveMemberZip(
+             {.name = "NGC0991", .messier = "", .ngc = "0991", .identifiers = "PGC 9991", .commonName = "First"}
+         )}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(archiveUrl, QStringLiteral("v2026.1"));
+    const QString instanceId = source.instanceId;
+    source.descriptorId = QStringLiteral("archive_demo");
+    source.schemaHint = skygate::ephemeris::CatalogSourceType::OpenNgcCsv;
+    source.archiveSelector = QString::fromLatin1(kArchiveDeepSkyMember);
+    source.attribution = QStringLiteral("Demo archive attribution");
+
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(catalogContainsId(manager.starCatalog(), QStringLiteral("ngc_991")));
+    QVERIFY(!catalogContainsId(manager.starCatalog(), QStringLiteral("hip_900101")));
+
+    // The parse contract and descriptor metadata are persisted with the source.
+    const auto persisted = store.loadCatalogCollectionCache();
+    QVERIFY(persisted.has_value());
+    QCOMPARE(persisted->sources.size(), 1);
+    QCOMPARE(persisted->sources[0].instanceId, instanceId);
+    QCOMPARE(persisted->sources[0].descriptorId, QString("archive_demo"));
+    QCOMPARE(persisted->sources[0].version, QString("v2026.1"));
+    QCOMPARE(persisted->sources[0].archiveSelector, QString::fromLatin1(kArchiveDeepSkyMember));
+    QCOMPARE(persisted->sources[0].schemaHint, skygate::ephemeris::CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(persisted->sources[0].attribution, QString("Demo archive attribution"));
+
+    // Losing the binary sidecar must not lose the selected archive member.
+    const QDir cacheDir(cacheDirectory);
+    const QStringList binaryFiles =
+        cacheDir.entryList(QStringList{QStringLiteral("catalog-source-*.bin")}, QDir::Files);
+    QCOMPARE(binaryFiles.size(), 1);
+    QVERIFY(QFile::remove(cacheDir.filePath(binaryFiles.first())));
+
+    SkyCatalogManager restoredManager(&store, nullptr, nullptr, &networkAccessManager);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.sourceInstanceIds(), QStringList({instanceId}));
+    QVERIFY(catalogContainsId(restoredManager.starCatalog(), QStringLiteral("ngc_991")));
+    QVERIFY(!catalogContainsId(restoredManager.starCatalog(), QStringLiteral("hip_900101")));
+
+    // The raw-payload fallback rewrote the upgraded record with the same parse
+    // contract, and a reload keeps replaying the restored selection.
+    const auto upgraded = store.loadCatalogCollectionCache();
+    QVERIFY(upgraded.has_value());
+    QCOMPARE(upgraded->sources.size(), 1);
+    QCOMPARE(upgraded->sources[0].archiveSelector, QString::fromLatin1(kArchiveDeepSkyMember));
+    QCOMPARE(upgraded->sources[0].schemaHint, skygate::ephemeris::CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(upgraded->sources[0].attribution, QString("Demo archive attribution"));
+
+    networkAccessManager.enqueueResponse(
+        archiveUrl,
+        {.payload = archiveMemberZip(
+             {.name = "NGC0993", .messier = "", .ngc = "0993", .identifiers = "PGC 9993", .commonName = "Reloaded"}
+         )}
+    );
+    restoredManager.retrySource(instanceId);
+    QTRY_VERIFY(!restoredManager.downloadingCatalog());
+    QVERIFY(catalogContainsId(restoredManager.starCatalog(), QStringLiteral("ngc_993")));
+    QVERIFY(!catalogContainsId(restoredManager.starCatalog(), QStringLiteral("ngc_991")));
+    QVERIFY(!catalogContainsId(restoredManager.starCatalog(), QStringLiteral("hip_900101")));
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)

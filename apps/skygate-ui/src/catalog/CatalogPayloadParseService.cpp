@@ -44,14 +44,7 @@ void CatalogPayloadParseService::parseAsync(
         };
 
         const std::string_view payloadView(payload.constData(), static_cast<std::size_t>(payload.size()));
-        skygate::ephemeris::CatalogParseRequest request;
-        request.payload = payloadView;
-        request.progressCallback = reportProgress;
-        request.selectionOptions = parseOptions.selectionOptions;
-        request.schemaHint = parseOptions.schemaHint;
-        if (!parseOptions.archiveMember.isEmpty()) {
-            request.memberSelector = parseOptions.archiveMember.toStdString();
-        }
+        const skygate::ephemeris::CatalogParseRequest request = parseOptions.makeRequest(payloadView, reportProgress);
 
         const skygate::ephemeris::CatalogPayloadParser parser;
         const auto parsedResult = std::make_shared<skygate::ephemeris::CatalogLoadResult>(parser.parseResult(request));

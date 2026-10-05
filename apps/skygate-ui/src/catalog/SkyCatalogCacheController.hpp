@@ -4,6 +4,7 @@
 #include "SkyCatalogSourceRecord.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/CatalogSourceType.hpp"
 #include "catalog/IStarCatalog.hpp"
 #include "catalog/constellation/ConstellationData.hpp"
 
@@ -29,6 +30,11 @@ struct SkyCatalogCollectionRestoreResult final {
     std::vector<SkyCatalogSourceRestoreEntry> sources;
     bool restored = false;
     bool migratedLegacy = false;
+    // The persisted records predate the stored parse contract, so they were
+    // restored from the defined defaults (no schema hint, no attribution).
+    // The manager rewrites them in the current format to cross the boundary
+    // once instead of re-deriving options on every start.
+    bool requiresRecordUpgrade = false;
     QString statusText;
     std::vector<skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
     std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
@@ -45,6 +51,8 @@ struct SkyCatalogSourcePersistEntry final {
     QStringList urls;
     QStringList relatedDatasetUrls;
     QString archiveSelector;
+    skygate::ephemeris::CatalogSourceType schemaHint = skygate::ephemeris::CatalogSourceType::Unknown;
+    QString attribution;
     skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
     bool enabled = true;
     const skygate::ephemeris::IStarCatalog* catalog = nullptr;
@@ -82,7 +90,7 @@ private:
     };
 
     [[nodiscard]] DecodedCatalog
-    decodeSourceCatalog(const QByteArray& payload, const QByteArray& binaryPayload, int binarySchemaVersion) const;
+    decodeSourceCatalog(const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord, int binarySchemaVersion) const;
     void appendRestoredSource(
         const SkySettingsStore::CatalogSourceCacheRecord& sourceRecord,
         DecodedCatalog decoded,
