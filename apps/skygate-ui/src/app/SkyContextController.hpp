@@ -197,6 +197,11 @@ class SkyContextController final : public QObject {
         NOTIFY catalogDatasetInfoTextChanged
     )
     Q_PROPERTY(
+        QString catalogParticipationSummary
+        READ catalogParticipationSummary
+        NOTIFY catalogParticipationSummaryChanged
+    )
+    Q_PROPERTY(
         QString deepSkyCatalogInfoText
         READ deepSkyCatalogInfoText
         NOTIFY deepSkyCatalogInfoTextChanged
@@ -347,6 +352,7 @@ public:
     [[nodiscard]] bool ephemerisDataUpdateInProgress() const noexcept;
     [[nodiscard]] double ephemerisDataUpdateProgress() const noexcept;
     [[nodiscard]] QString catalogDatasetInfoText() const;
+    [[nodiscard]] QString catalogParticipationSummary() const;
     [[nodiscard]] QString deepSkyCatalogInfoText() const;
     [[nodiscard]] QAbstractItemModel* objectSearchModel() const noexcept;
     [[nodiscard]] QAbstractItemModel* catalogSourcePresetModel() const noexcept;
@@ -487,6 +493,7 @@ signals:
     void ephemerisEngineStatusTextChanged();
     void ephemerisDataChanged();
     void catalogDatasetInfoTextChanged();
+    void catalogParticipationSummaryChanged();
     void deepSkyCatalogInfoTextChanged();
     void downloadingCatalogChanged();
     void catalogProcessingChanged();

@@ -231,6 +231,17 @@ QStringList sourceModelInstanceIds(SkyContextController& controller)
     return instanceIds;
 }
 
+QString sourceModelRowStatus(SkyContextController& controller, const int row)
+{
+    skygate::ui::internal::SkyCatalogSourceCollectionModel* model = sourceCollectionModel(controller);
+    if (model == nullptr || row < 0 || row >= model->rowCount()) {
+        return {};
+    }
+
+    return model->data(model->index(row, 0), skygate::ui::internal::SkyCatalogSourceCollectionModel::StatusRole)
+        .toString();
+}
+
 int sourceModelRowWithError(SkyContextController& controller)
 {
     skygate::ui::internal::SkyCatalogSourceCollectionModel* model = sourceCollectionModel(controller);
@@ -285,6 +296,8 @@ private slots:
     void catalogSectionManagesSourcesOrderingAndRemoval();
     void catalogSectionReportsErrorsAndRetries();
     void catalogSectionRestoresCollectionAndPreservesIdentity();
+    void catalogSectionPresentsBundledFallbackParticipation();
+    void catalogSectionPresentsEnabledSourceRowsAndSummary();
     void ephemerisEngineControlsBindDraftAndVisibility();
     void ephemerisDataControlsShowFallbackAndUpdateMode();
     void ephemerisDataControlsShowInstalledStateAndClearCache();
@@ -682,6 +695,156 @@ void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndPreservesIde
             .toString(),
         starAId
     );
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferencesCatalogTests::catalogSectionPresentsBundledFallbackParticipation()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 620
+            PreferencesCatalogSection {
+                anchors.fill: parent
+                skyContextController: skyContext
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesCatalogSectionFallbackTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    ExposedQuickWindow exposed(root);
+
+    QQuickItem* summaryLabel = firstQuickItemWithObjectName(root, QStringLiteral("catalogParticipationSummaryLabel"));
+    QVERIFY(summaryLabel != nullptr);
+
+    // The bundled star source supplies the bundled deep-sky objects, so the
+    // enabled fallback is not presented as the active deep-sky source.
+    QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Bundled core"));
+    QVERIFY(!controller->catalogStatusText().contains(QStringLiteral("Bundled Messier")));
+
+    // Replacing the bundled star source with a star-only catalog lets the
+    // fallback supply the deep-sky objects, and the section presents it.
+    const QString starPath = m_settings.cachePath(QStringLiteral("fallback-presentation-star.csv"));
+    QVERIFY(writeFile(
+        starPath,
+        sampleHygCsvPayload(
+            {.id = 1,
+             .hip = 900501,
+             .properName = "Fallback Presentation Star",
+             .ra = "6.0",
+             .dec = "-16.0",
+             .mag = "1.0"}
+        )
+    ));
+    controller->downloadCatalogFromUrl(QUrl::fromLocalFile(starPath).toString());
+    QTRY_VERIFY(!controller->downloadingCatalog() && !controller->catalogProcessing());
+    QTRY_VERIFY(summaryLabel->property("text").toString().startsWith(QStringLiteral("Downloaded")));
+    QTRY_VERIFY(summaryLabel->property("text").toString().contains(QStringLiteral("Bundled Messier")));
+    QVERIFY(controller->catalogStatusText().contains(QStringLiteral("Bundled Messier")));
+
+    // Reloading the bundled star source removes the fallback's participation
+    // again, so the summary never keeps a stale bundled claim.
+    controller->loadCatalogPreset(QStringLiteral("bundled"));
+    QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Bundled core"));
+    QVERIFY(!controller->catalogStatusText().contains(QStringLiteral("Bundled Messier")));
+    QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
+}
+
+void QmlPreferencesCatalogTests::catalogSectionPresentsEnabledSourceRowsAndSummary()
+{
+    auto controller = makeController();
+    QVERIFY(controller != nullptr);
+
+    QQmlEngine engine;
+    setupEngine(engine, *controller);
+
+    const QmlWarningScope warnings;
+    auto object = createInlineComponent(
+        engine,
+        QStringLiteral(R"(
+        import QtQuick
+        Item {
+            id: root
+            width: 900
+            height: 620
+            PreferencesCatalogSection {
+                anchors.fill: parent
+                skyContextController: skyContext
+            }
+        }
+    )"),
+        QStringLiteral("PreferencesCatalogSectionParticipationTest.qml")
+    );
+    QVERIFY(object != nullptr);
+    auto* root = qobject_cast<QQuickItem*>(object.get());
+    QVERIFY(root != nullptr);
+    ExposedQuickWindow exposed(root);
+
+    QObject* presetCombo = firstObjectWithObjectName(root, QStringLiteral("catalogSourcePresetCombo"));
+    QVERIFY(presetCombo != nullptr);
+    QQuickItem* summaryLabel = firstQuickItemWithObjectName(root, QStringLiteral("catalogParticipationSummaryLabel"));
+    QVERIFY(summaryLabel != nullptr);
+
+    skygate::ui::internal::SkyCatalogSourceCollectionModel* model = sourceCollectionModel(*controller);
+    QVERIFY(model != nullptr);
+    QTRY_COMPARE(model->rowCount(), 1);
+
+    const QString starPath = m_settings.cachePath(QStringLiteral("participation-presentation-star.csv"));
+    QVERIFY(writeFile(
+        starPath,
+        sampleHygCsvPayload(
+            {.id = 2, .hip = 900502, .properName = "Participation Star", .ra = "6.1", .dec = "-16.1", .mag = "2.0"}
+        )
+    ));
+    addCustomCatalogSource(
+        root, exposed.window(), *controller, presetCombo, 2, QUrl::fromLocalFile(starPath).toString()
+    );
+
+    // The added source is named by the summary and its own row reports the
+    // active state.
+    QTRY_COMPARE(model->rowCount(), 2);
+    QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Downloaded"));
+    QCOMPARE(sourceModelRowStatus(*controller, 1), QStringLiteral("Active"));
+    QCOMPARE(sourceModelRowStatus(*controller, 0), QStringLiteral("Active"));
+
+    // Disabling the source removes it from the summary and marks only its row
+    // as disabled; the bundled participation fills the gap again.
+    QObject* enableCheckBox = firstObjectWithObjectName(root, QStringLiteral("catalogSourceEnableCheckBox_1"));
+    QVERIFY(enableCheckBox != nullptr);
+    QVERIFY(activateControl(enableCheckBox));
+    QTRY_COMPARE(sourceModelRowStatus(*controller, 1), QStringLiteral("Disabled"));
+    QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Bundled core"));
+    QVERIFY(!controller->catalogStatusText().contains(QStringLiteral("Downloaded")));
+    QCOMPARE(sourceModelRowStatus(*controller, 0), QStringLiteral("Active"));
+    QTRY_VERIFY(!catalogContainsDisplayName(controller->catalogBodies(), QStringLiteral("Participation Star")));
+
+    // Re-enabling restores the source's participation and its row state.
+    enableCheckBox = firstObjectWithObjectName(root, QStringLiteral("catalogSourceEnableCheckBox_1"));
+    QVERIFY(enableCheckBox != nullptr);
+    QVERIFY(activateControl(enableCheckBox));
+    QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Downloaded"));
+    QCOMPARE(sourceModelRowStatus(*controller, 1), QStringLiteral("Active"));
+
+    // Removing the source drops its row and its title from the summary.
+    QObject* removeButton = firstObjectWithObjectName(root, QStringLiteral("catalogSourceRemoveButton_1"));
+    QVERIFY(removeButton != nullptr);
+    QVERIFY(activateControl(removeButton));
+    QTRY_COMPARE(model->rowCount(), 1);
+    QTRY_COMPARE(summaryLabel->property("text").toString(), QStringLiteral("Bundled + Bundled core"));
     QVERIFY2(warnings.messages().isEmpty(), qPrintable(warnings.messages().join('\n')));
 }
 

@@ -28,6 +28,17 @@ Item {
                 }
 
                 Label {
+                    objectName: "catalogParticipationSummaryLabel"
+                    Layout.fillWidth: true
+                    text: skyContextController.catalogParticipationSummary
+                    color: skyContext.theme.listItemPrimaryText
+                    font.pixelSize: 11
+                    font.family: "Avenir Next"
+                    elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
                     Layout.fillWidth: true
                     text: skyContextController.catalogDatasetInfoText
                     color: skyContext.theme.listItemPrimaryText

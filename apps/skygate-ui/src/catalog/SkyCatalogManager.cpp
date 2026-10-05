@@ -95,6 +95,11 @@ QString SkyCatalogManager::sourceLabel() const
     return m_runtime->sourceLabel();
 }
 
+QString SkyCatalogManager::participationSummary() const
+{
+    return m_runtime->participationSummary();
+}
+
 std::size_t SkyCatalogManager::bodyCount() const noexcept
 {
     return m_runtime->bodyCount();
@@ -659,7 +664,10 @@ void SkyCatalogManager::applyBundledSource(
     const SkyCatalogRuntimeResult result = m_runtime->applySource(std::move(record), runtimeBuildOptions());
     operation.busy = false;
     operation.hasError = false;
-    operation.statusText = QStringLiteral("Active");
+    // A completed load leaves no operation status behind: the settled row state
+    // is the collection's own state, so disabling the source afterwards is
+    // presented as disabled instead of as the active source it once loaded.
+    operation.statusText.clear();
     persistCatalogCache();
     applyRuntimeResult(result);
 }
@@ -710,7 +718,10 @@ void SkyCatalogManager::handleSourceImportFinished(
     operation->payload = result.payload;
     operation->busy = false;
     operation->hasError = false;
-    operation->statusText = QStringLiteral("Active");
+    // A completed load leaves no operation status behind: the settled row state
+    // is the collection's own state, so disabling the source afterwards is
+    // presented as disabled instead of as the active source it once loaded.
+    operation->statusText.clear();
     const std::size_t foundObjectCount = result.foundObjectCount;
     const auto diagnostics = result.diagnostics;
     const QString sourceLabel = result.sourceLabel;

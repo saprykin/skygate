@@ -72,6 +72,9 @@ public:
     [[nodiscard]] int deepSkyCatalogPresetIndex() const noexcept;
     [[nodiscard]] QString deepSkyCatalogUrlText() const;
     [[nodiscard]] QString sourceLabel() const;
+    // Presentation summary of the active collection's participation, derived
+    // from the enabled sources and the provenance of the active snapshot.
+    [[nodiscard]] QString participationSummary() const;
     [[nodiscard]] std::size_t bodyCount() const noexcept;
     [[nodiscard]] std::size_t constellationCount() const noexcept;
     [[nodiscard]] std::uint64_t catalogRevision() const noexcept;

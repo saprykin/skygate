@@ -25,6 +25,11 @@ QString normalizedTitle(const QString& title, const QString& fallback)
     return normalized.isEmpty() ? fallback : normalized;
 }
 
+bool containsSourceId(const std::vector<QString>& sourceIds, const QString& instanceId)
+{
+    return std::find(sourceIds.begin(), sourceIds.end(), instanceId) != sourceIds.end();
+}
+
 std::size_t
 countConstellationBodies(const std::span<const skygate::ephemeris::BaseCelestialBody* const> bodies) noexcept
 {
@@ -62,15 +67,46 @@ const skygate::ephemeris::IStarCatalog* SkyCatalogRuntime::starCatalog() const n
 
 QString SkyCatalogRuntime::sourceLabel() const
 {
-    const SkyCatalogSourceRecord* primary =
-        firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy::Merge, false);
-    if (primary != nullptr) {
-        return normalizedTitle(primary->title, QStringLiteral("Bundled"));
+    for (const SkyCatalogSourceRecord& source : m_sources) {
+        if (source.enabled) {
+            return normalizedTitle(source.title, source.instanceId);
+        }
     }
-    if (!m_sources.empty()) {
-        return normalizedTitle(m_sources.front().title, QStringLiteral("Bundled"));
+
+    // No configured source participates: the implicit bundled contributions are
+    // the only sources left, so name the leading one instead of naming a
+    // configured source the user disabled.
+    if (!m_contributingSourceIds.empty()) {
+        return sourceTitle(m_contributingSourceIds.front());
     }
     return QStringLiteral("Bundled");
+}
+
+QString SkyCatalogRuntime::participationSummary() const
+{
+    QStringList titles;
+    titles.reserve(static_cast<int>(m_sources.size()) + 2);
+    for (const SkyCatalogSourceRecord& source : m_sources) {
+        if (!source.enabled) {
+            continue;
+        }
+        titles.push_back(normalizedTitle(source.title, source.instanceId));
+    }
+
+    // The bundled core augmentation and the bundled deep-sky fallback are not
+    // configured sources, so they are named only when they supplied objects to
+    // the active snapshot, in the precedence order the composition used.
+    for (const char* implicitSourceId : {kBundledCoreSourceId, kBundledDeepSkySourceId}) {
+        const QString instanceId = QString::fromLatin1(implicitSourceId);
+        if (containsSourceId(m_contributingSourceIds, instanceId)) {
+            titles.push_back(sourceTitle(instanceId));
+        }
+    }
+
+    if (titles.isEmpty()) {
+        return QStringLiteral("No active sources");
+    }
+    return titles.join(QStringLiteral(" + "));
 }
 
 std::size_t SkyCatalogRuntime::bodyCount() const noexcept
@@ -364,6 +400,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     m_deepSkyObjectCount = composed.deepSkyObjectCount;
     m_deepSkyCatalogFoundObjectCount = composed.foundDeepSkyObjectCount;
     rebuildSourceProvenance(composed.sourceIds, composed.contributorSourceIds);
+    rebuildSourceParticipation(composed.sourceOrder);
 
     return SkyCatalogRuntimeResult{
         .statusText = buildStatusText(),
@@ -407,6 +444,7 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& st
     m_deepSkyObjectCount = 0;
     m_sourceTitles.clear();
     m_sourceIds.clear();
+    m_contributingSourceIds.clear();
     m_contributorSourceIds.clear();
     return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .datasetInfoChanged = true};
 }
@@ -414,24 +452,13 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& st
 QString SkyCatalogRuntime::buildStatusText() const
 {
     const QLocale locale = QLocale::system();
-    return QStringLiteral("Catalog: %1 + %2 (%3 objects, %4 deep sky, %5 constellations)")
+    return QStringLiteral("Catalog: %1 (%2 objects, %3 deep sky, %4 constellations)")
         .arg(
-            sourceLabel(),
-            deepSkySourceLabel(),
+            participationSummary(),
             locale.toString(static_cast<qulonglong>(m_bodyCount)),
             locale.toString(static_cast<qulonglong>(m_deepSkyObjectCount)),
             locale.toString(static_cast<qulonglong>(constellationCount()))
         );
-}
-
-QString SkyCatalogRuntime::deepSkySourceLabel() const
-{
-    const SkyCatalogSourceRecord* deepSky =
-        firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly, false);
-    if (deepSky != nullptr) {
-        return normalizedTitle(deepSky->title, QStringLiteral("Bundled Messier"));
-    }
-    return QStringLiteral("Bundled Messier");
 }
 
 SkyCatalogSourceRecord* SkyCatalogRuntime::findSource(const QString& instanceId)
@@ -452,20 +479,13 @@ const SkyCatalogSourceRecord* SkyCatalogRuntime::findSource(const QString& insta
     return it != m_sources.end() ? &*it : nullptr;
 }
 
-const SkyCatalogSourceRecord* SkyCatalogRuntime::firstSourceWithPolicy(
-    const skygate::ephemeris::CatalogCompositionPolicy policy, const bool requireEnabled
-) const
+void SkyCatalogRuntime::rebuildSourceParticipation(const std::vector<std::string>& contributingSourceIds)
 {
-    for (const SkyCatalogSourceRecord& source : m_sources) {
-        if (source.policy != policy) {
-            continue;
-        }
-        if (requireEnabled && !source.enabled) {
-            continue;
-        }
-        return &source;
+    m_contributingSourceIds.clear();
+    m_contributingSourceIds.reserve(contributingSourceIds.size());
+    for (const std::string& sourceId : contributingSourceIds) {
+        m_contributingSourceIds.push_back(QString::fromStdString(sourceId));
     }
-    return nullptr;
 }
 
 void SkyCatalogRuntime::rebuildSourceProvenance(

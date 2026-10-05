@@ -513,6 +513,14 @@ SkyContextController::SkyContextController(
         this,
         &SkyContextController::catalogStatusTextChanged
     );
+    // The participation summary is part of the catalog status text, so every
+    // status update is also a summary update.
+    connect(
+        m_catalogManager.get(),
+        &SkyCatalogManager::statusTextChanged,
+        this,
+        &SkyContextController::catalogParticipationSummaryChanged
+    );
     connect(
         m_catalogManager.get(),
         &SkyCatalogManager::datasetInfoTextChanged,
@@ -985,6 +993,11 @@ double SkyContextController::ephemerisDataUpdateProgress() const noexcept
 QString SkyContextController::catalogDatasetInfoText() const
 {
     return m_catalogManager != nullptr ? m_catalogManager->datasetInfoText() : QString();
+}
+
+QString SkyContextController::catalogParticipationSummary() const
+{
+    return m_catalogManager != nullptr ? m_catalogManager->participationSummary() : QString();
 }
 
 QString SkyContextController::deepSkyCatalogInfoText() const
