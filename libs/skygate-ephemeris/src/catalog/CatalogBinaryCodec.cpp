@@ -87,6 +87,10 @@ void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& ident
     for (const std::string& alias : identity.aliases) {
         writeString(stream, alias);
     }
+    stream << static_cast<std::uint64_t>(identity.retainedCanonicalIds.size());
+    for (const std::string& retainedId : identity.retainedCanonicalIds) {
+        writeString(stream, retainedId);
+    }
 }
 
 [[nodiscard]] bool readObjectIdentity(QDataStream& stream, CatalogObjectIdentity& identity)
@@ -134,6 +138,21 @@ void writeObjectIdentity(QDataStream& stream, const CatalogObjectIdentity& ident
             return false;
         }
         identity.aliases.push_back(std::move(alias));
+    }
+
+    std::uint64_t retainedCanonicalIdCount = 0U;
+    stream >> retainedCanonicalIdCount;
+    if (stream.status() != QDataStream::Ok || retainedCanonicalIdCount > kMaxBodyCount) {
+        return false;
+    }
+    identity.retainedCanonicalIds.clear();
+    identity.retainedCanonicalIds.reserve(static_cast<std::size_t>(retainedCanonicalIdCount));
+    for (std::uint64_t index = 0; index < retainedCanonicalIdCount; ++index) {
+        std::string retainedId;
+        if (!readString(stream, retainedId) || retainedId.empty()) {
+            return false;
+        }
+        identity.retainedCanonicalIds.push_back(std::move(retainedId));
     }
     return true;
 }

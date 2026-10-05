@@ -19,9 +19,19 @@ void dedupeAndSort(std::vector<std::size_t>& values)
     values.erase(std::unique(values.begin(), values.end()), values.end());
 }
 
-std::string canonicalKey(const BaseCelestialBody& body)
+// Every canonical key the body is known by: its public canonical id plus the
+// canonical ids a replacement retained as equivalent. Retained ids resolve
+// like canonical ids, so they stay authoritative instead of degrading to a
+// weak display alias.
+std::vector<std::string> canonicalKeys(const BaseCelestialBody& body)
 {
-    return StringUtilities::normalizedLookupKey(body.id);
+    std::vector<std::string> keys;
+    keys.reserve(body.identity.retainedCanonicalIds.size() + 1U);
+    keys.push_back(StringUtilities::normalizedLookupKey(body.id));
+    for (const std::string& retainedId : body.identity.retainedCanonicalIds) {
+        keys.push_back(StringUtilities::normalizedLookupKey(retainedId));
+    }
+    return keys;
 }
 
 std::vector<std::string> externalIdentifierKeys(const BaseCelestialBody& body)
@@ -126,7 +136,9 @@ void CatalogIdentityIndex::registerKey(const std::size_t resultIndex, const KeyF
 
 void CatalogIdentityIndex::add(const BaseCelestialBody& body, const std::size_t resultIndex)
 {
-    registerKey(resultIndex, KeyFamily::Canonical, canonicalKey(body));
+    for (const std::string& key : canonicalKeys(body)) {
+        registerKey(resultIndex, KeyFamily::Canonical, key);
+    }
     for (const std::string& key : externalIdentifierKeys(body)) {
         registerKey(resultIndex, KeyFamily::ExternalIdentifier, key);
     }
@@ -172,7 +184,7 @@ CatalogIdentityIndex::Resolution CatalogIdentityIndex::resolve(const BaseCelesti
     Resolution resolution;
 
     std::vector<std::size_t> authoritative;
-    collectMatches(m_canonicalIndex, {canonicalKey(body)}, authoritative);
+    collectMatches(m_canonicalIndex, canonicalKeys(body), authoritative);
     const bool canonicalMatched = !authoritative.empty();
     collectMatches(m_identifierIndex, externalIdentifierKeys(body), authoritative);
 

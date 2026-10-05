@@ -60,6 +60,7 @@ OwnGalaxyCelestialBody makeStarWithIdentity()
         CatalogIdentifier::make("hyg", "1"),
     };
     body.identity.aliases = {"Alpha Star"};
+    body.identity.retainedCanonicalIds = {"original_star"};
     return body;
 }
 
@@ -80,6 +81,7 @@ DistantCelestialBody makeDeepSkyObjectWithIdentity()
         .kind = DeepSkyObjectInfo::Kind::Galaxy,
         .aliases = {"M 31", "Andromeda Galaxy"},
     };
+    body.identity.retainedCanonicalIds = {"open_ngc_m31"};
     return body;
 }
 
@@ -233,15 +235,19 @@ void CatalogObjectIdentityTests::copyPathsPreserveIdentity()
     QCOMPARE(QString::fromStdString(catalog.ownGalaxyBodies()[0].identity.sourceRecordId), QStringLiteral("1"));
     QVERIFY(hasIdentifier(catalog.ownGalaxyBodies()[0].identity, "hip", "1"));
     QVERIFY(hasAlias(catalog.ownGalaxyBodies()[0].identity.aliases, "Alpha Star"));
+    QCOMPARE(catalog.ownGalaxyBodies()[0].identity.retainedCanonicalIds, star.identity.retainedCanonicalIds);
     QCOMPARE(QString::fromStdString(catalog.distantBodies()[0].identity.sourceRecordId), QStringLiteral("NGC0224"));
     QVERIFY(hasIdentifier(catalog.distantBodies()[0].identity, "messier", "031"));
     QVERIFY(hasAlias(catalog.distantBodies()[0].identity.aliases, "Andromeda Galaxy"));
+    QCOMPARE(catalog.distantBodies()[0].identity.retainedCanonicalIds, deepSkyObject.identity.retainedCanonicalIds);
 
     const std::vector<const BaseCelestialBody*> bodies{&star, &deepSkyObject};
     const CelestialBodyCatalog spanCatalog(bodies);
     QCOMPARE(QString::fromStdString(spanCatalog.ownGalaxyBodies()[0].identity.sourceRecordId), QStringLiteral("1"));
     QCOMPARE(spanCatalog.ownGalaxyBodies()[0].identity.aliases, star.identity.aliases);
+    QCOMPARE(spanCatalog.ownGalaxyBodies()[0].identity.retainedCanonicalIds, star.identity.retainedCanonicalIds);
     QCOMPARE(spanCatalog.distantBodies()[0].identity.externalIdentifiers.size(), std::size_t{2});
+    QCOMPARE(spanCatalog.distantBodies()[0].identity.retainedCanonicalIds, deepSkyObject.identity.retainedCanonicalIds);
 }
 
 void CatalogObjectIdentityTests::binaryRoundTripPreservesIdentity()
@@ -271,6 +277,7 @@ void CatalogObjectIdentityTests::binaryRoundTripPreservesIdentity()
     QVERIFY(hasIdentifier(ownGalaxy[0].identity, "hip", "1"));
     QVERIFY(hasIdentifier(ownGalaxy[0].identity, "hyg", "1"));
     QCOMPARE(ownGalaxy[0].identity.aliases, star.identity.aliases);
+    QCOMPARE(ownGalaxy[0].identity.retainedCanonicalIds, star.identity.retainedCanonicalIds);
 
     const auto distant = restored->catalog().distantBodies();
     QCOMPARE(distant.size(), std::size_t{1});
@@ -278,17 +285,24 @@ void CatalogObjectIdentityTests::binaryRoundTripPreservesIdentity()
     QVERIFY(hasIdentifier(distant[0].identity, "messier", "031"));
     QVERIFY(hasIdentifier(distant[0].identity, "ngc", "224"));
     QCOMPARE(distant[0].identity.aliases, deepSkyObject.identity.aliases);
+    QCOMPARE(distant[0].identity.retainedCanonicalIds, deepSkyObject.identity.retainedCanonicalIds);
     QCOMPARE(distant[0].deepSkyObject->aliases, deepSkyObject.deepSkyObject->aliases);
 }
 
 void CatalogObjectIdentityTests::rejectsLegacyBinarySchemaVersion()
 {
-    QByteArray buffer;
-    QDataStream stream(&buffer, QIODevice::WriteOnly);
-    stream.setVersion(QDataStream::Qt_6_5);
-    stream.setByteOrder(QDataStream::LittleEndian);
-    stream << std::uint32_t{0x53474243U} << std::uint16_t{2U};
-    QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(buffer) == nullptr);
+    // Version 2 predates the identity payload and version 4 predates the
+    // retained canonical ids. Rejecting every non-current version is the
+    // established older-cache path: the cache layer falls back to raw payload
+    // parsing instead of trusting an older identity layout.
+    for (const std::uint16_t legacyVersion : {std::uint16_t{2U}, std::uint16_t{4U}}) {
+        QByteArray buffer;
+        QDataStream stream(&buffer, QIODevice::WriteOnly);
+        stream.setVersion(QDataStream::Qt_6_5);
+        stream.setByteOrder(QDataStream::LittleEndian);
+        stream << std::uint32_t{0x53474243U} << legacyVersion;
+        QVERIFY(skygate::ephemeris::CatalogBinaryCodec::deserialize(buffer) == nullptr);
+    }
 }
 
 QTEST_APPLESS_MAIN(CatalogObjectIdentityTests)

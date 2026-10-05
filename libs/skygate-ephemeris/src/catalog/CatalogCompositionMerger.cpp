@@ -202,6 +202,36 @@ void mergeIdentityInto(CatalogObjectIdentity& winner, const CatalogObjectIdentit
     mergeAliasesInto(winner.aliases, loser.aliases);
 }
 
+// Retains one authoritative canonical key of an absorbed body on the winner.
+// The winner's own public id and keys already retained are skipped, and keys
+// are compared case-insensitively like every other identity key. Retained keys
+// are canonical identity data, never display aliases, so a row carrying one
+// still resolves authoritatively to the survivor.
+void retainCanonicalId(
+    CatalogObjectIdentity& winner, const std::string_view winnerId, const std::string_view retainedId
+)
+{
+    const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(retainedId);
+    if (trimmed.empty() || StringUtilities::equalsIgnoreAsciiCase(trimmed, winnerId)) {
+        return;
+    }
+    StringUtilities::appendUniqueIgnoreAsciiCase(winner.retainedCanonicalIds, std::string{trimmed});
+}
+
+// Every canonical key the absorbed body was known by stays equivalent to the
+// winner: its own public canonical id and every canonical id it had already
+// retained. The equivalence therefore survives replacement and bridge chains,
+// later compositions, and snapshots serialized after a composition.
+void retainCanonicalEquivalences(
+    CatalogObjectIdentity& winner, const std::string_view winnerId, const BaseCelestialBody& loser
+)
+{
+    retainCanonicalId(winner, winnerId, loser.id);
+    for (const std::string& retainedId : loser.identity.retainedCanonicalIds) {
+        retainCanonicalId(winner, winnerId, retainedId);
+    }
+}
+
 // Namespaces whose canonical deep-sky ids are recognized designations:
 // ngc_<n>, ic_<n>, and messier_<nnn>.
 constexpr std::string_view kDeepSkyDesignationNamespaces[] = {"ngc", "ic", "messier"};
@@ -447,6 +477,7 @@ void mergeDistantInPlace(DistantCelestialBody& winner, const BaseCelestialBody& 
 
 void mergeSurvivorInPlace(BaseCelestialBody& winner, const BaseCelestialBody& loser)
 {
+    retainCanonicalEquivalences(winner.identity, winner.id, loser);
     if (winner.kind == BaseCelestialBody::Kind::DeepSkyObject) {
         mergeDistantInPlace(static_cast<DistantCelestialBody&>(winner), loser);
         return;
@@ -505,6 +536,9 @@ void absorbSurvivors(
 // authoritative identity or replaces an earlier source's survivor. Absorbed
 // positions are vacated and removed from the index before the winner is
 // registered, so later rows resolve to the winner and never to a vacated body.
+// Absorption retains each absorbed body's canonical id and canonical
+// equivalences on the winner, so the earlier keys keep resolving to the
+// survivor.
 std::size_t absorbSurvivorsAndAppend(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,

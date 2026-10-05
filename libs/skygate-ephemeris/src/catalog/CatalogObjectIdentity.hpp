@@ -34,6 +34,16 @@ namespace skygate::ephemeris {
 //     existing DSO consumers keep reading the legacy field; the body-level
 //     list is authoritative for identity resolution and merging.
 //
+//   - retainedCanonicalIds: canonical ids this body was already established
+//     to be the same object as, but which are no longer the public canonical
+//     id. A replacement keeps only its own BaseCelestialBody::id public while
+//     the absorbed body's canonical id, and every canonical id the absorbed
+//     body already retained, stay here. They are authoritative identity data,
+//     so later rows, later compositions, and restored snapshots still resolve
+//     them to this object; they are never registered as weak display-name
+//     aliases. A retained id is always global: composition qualifies a
+//     source-local canonical id before it is retained.
+//
 //   - idScope: whether the canonical id is a global astronomical identity or
 //     a record key that is only meaningful inside one source instance.
 struct CatalogObjectIdentity {
@@ -55,6 +65,7 @@ struct CatalogObjectIdentity {
     std::string sourceRecordId;
     std::vector<CatalogIdentifier> externalIdentifiers;
     std::vector<std::string> aliases;
+    std::vector<std::string> retainedCanonicalIds;
     IdScope idScope = IdScope::Global;
 };
 

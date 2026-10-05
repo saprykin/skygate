@@ -203,6 +203,7 @@ void writeIdentityWithScope(QDataStream& stream, const std::uint8_t idScope)
     stream << idScope;
     stream << static_cast<std::uint64_t>(0U);
     stream << static_cast<std::uint64_t>(0U);
+    stream << static_cast<std::uint64_t>(0U);
 }
 
 void writeEmptyIdentity(QDataStream& stream)
