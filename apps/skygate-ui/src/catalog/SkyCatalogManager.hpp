@@ -125,8 +125,9 @@ public:
     void disableSource(const QString& instanceId);
     void removeSource(const QString& instanceId);
     void moveSource(const QString& instanceId, int targetIndex);
-    // Reloads the active instance identified by instanceId from its stored
-    // configuration; the instance ID is never re-allocated by a reload.
+    // Reloads the active instance identified by instanceId from its last
+    // requested configuration, which may be a rejected or canceled attempt;
+    // the instance ID is never re-allocated by a reload.
     void retrySource(const QString& instanceId);
     void cancelCatalogDownload();
     bool clearCatalogCache();
@@ -145,9 +146,18 @@ signals:
 
 private:
     struct SourceOperation final {
+        // The configuration most recently requested for the instance,
+        // including an attempt the runtime rejected. A retry repeats it, and
+        // it is never serialized while it is only an attempt.
         skygate::ui::internal::SkyCatalogSourceInstance instance;
         skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
-        QByteArray payload;
+        // The source facts committed together when the runtime accepted the
+        // requested configuration: the descriptor and the bytes its catalog
+        // was built from. Ordinary persistence serializes these instead of the
+        // attempted configuration.
+        skygate::ui::internal::SkyCatalogSourceInstance acceptedInstance;
+        QByteArray acceptedPayload;
+        bool hasAcceptedInstance = false;
         std::uint64_t revision = 0;
         bool constellationPending = false;
         bool busy = false;
@@ -178,6 +188,11 @@ private:
     [[nodiscard]] const SourceOperation* findOperation(const QString& instanceId) const;
     void removeOperation(const QString& instanceId);
     [[nodiscard]] bool isOperationCurrent(const QString& instanceId, std::uint64_t revision) const;
+    // Commits the operation's requested configuration and the payload that was
+    // activated with it as the instance's accepted facts. Only a successful
+    // runtime transition may call this, so persistence never pairs attempted
+    // options with previously accepted bytes.
+    static void commitAcceptedSourceFacts(SourceOperation& operation, QByteArray payload);
     // Supersedes the pending work of one instance: callbacks already captured
     // for its current operation revision are rejected and its pending related
     // download is no longer tracked. Other instances keep their revisions and

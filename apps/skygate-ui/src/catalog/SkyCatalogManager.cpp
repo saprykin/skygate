@@ -584,7 +584,7 @@ bool SkyCatalogManager::restoreCatalogCache()
     for (std::size_t index = 0; index < restoreResult.sources.size(); ++index) {
         const SkyCatalogSourceRestoreEntry& entry = restoreResult.sources[index];
         SourceOperation* operation = upsertOperation(entry.instance, restoredPolicies[index]);
-        operation->payload = entry.payload;
+        commitAcceptedSourceFacts(*operation, entry.payload);
         if (unavailableInstanceIds.contains(entry.instance.instanceId)) {
             operation->busy = false;
             operation->hasError = true;
@@ -634,7 +634,6 @@ void SkyCatalogManager::loadSourceInstance(
     emit sourcesChanged();
 
     if (instance.urls.isEmpty()) {
-        operation->payload.clear();
         applyBundledSource(*operation, policy);
         return;
     }
@@ -726,10 +725,18 @@ void SkyCatalogManager::applyBundledSource(
     // is the collection's own state, so disabling the source afterwards is
     // presented as disabled instead of as the active source it once loaded.
     operation.statusText.clear();
+    // The bundled source has no payload, so its accepted facts are the
+    // configuration that was just activated.
+    commitAcceptedSourceFacts(operation, QByteArray());
     persistCatalogCache();
     applyRuntimeResult(result);
 }
 
+// Applies the parsed result to the runtime. Only a committed transition is
+// persisted; a rejected collection is not configuration and must not replace
+// the stored one. The caller commits the accepted descriptor and payload before
+// persisting, so neither an attempt nor a mixture of attempted options and
+// accepted bytes is ever serialized.
 SkyCatalogRuntimeResult SkyCatalogManager::applySourceResult(
     SkyCatalogSourceImportResult result, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
@@ -745,11 +752,6 @@ SkyCatalogRuntimeResult SkyCatalogManager::applySourceResult(
     record.foundObjectCount = result.foundObjectCount;
 
     const SkyCatalogRuntimeResult runtimeResult = m_runtime->applySource(std::move(record), runtimeBuildOptions());
-    if (runtimeResult.succeeded) {
-        // Only a committed transition is persisted; a rejected collection is
-        // not configuration and must not replace the stored one.
-        persistCatalogCache();
-    }
     return runtimeResult;
 }
 
@@ -777,13 +779,7 @@ void SkyCatalogManager::handleSourceImportFinished(
         return;
     }
 
-    operation->payload = result.payload;
-    operation->busy = false;
-    operation->hasError = false;
-    // A completed load leaves no operation status behind: the settled row state
-    // is the collection's own state, so disabling the source afterwards is
-    // presented as disabled instead of as the active source it once loaded.
-    operation->statusText.clear();
+    const QByteArray acceptedPayload = result.payload;
     const std::size_t foundObjectCount = result.foundObjectCount;
     const auto diagnostics = result.diagnostics;
     const QString sourceLabel = result.sourceLabel;
@@ -794,13 +790,24 @@ void SkyCatalogManager::handleSourceImportFinished(
         // transition: the source is not installed (or the previous record
         // stays) and the pending related dataset is left untouched, so the
         // operation reports the error instead of proceeding as if the source
-        // were active.
+        // were active. Nothing was accepted, so the previously accepted
+        // descriptor and payload stay in place together.
+        operation->busy = false;
         operation->hasError = true;
         operation->statusText = operationErrorText(runtimeResult.statusText);
         setDownloadingCatalog(false);
         applyRuntimeResult(runtimeResult);
         return;
     }
+
+    operation->busy = false;
+    operation->hasError = false;
+    // A completed load leaves no operation status behind: the settled row state
+    // is the collection's own state, so disabling the source afterwards is
+    // presented as disabled instead of as the active source it once loaded.
+    operation->statusText.clear();
+    commitAcceptedSourceFacts(*operation, acceptedPayload);
+    persistCatalogCache();
 
     applyRuntimeResult(runtimeResult);
 
@@ -1034,23 +1041,26 @@ void SkyCatalogManager::persistCatalogCache() const
         entry.enabled = source.enabled;
         entry.bundled = source.bundled;
 
-        // A source with its own download keeps its configured descriptor and
-        // payload. A source that needs no payload (bundled or synthesized) is
-        // persisted by configuration alone and reconstructed from the bundled
-        // factory on restore, so its identity, order, policy, and enabled
-        // state survive even when it has no operation record.
-        if (const SourceOperation* operation = findOperation(source.instanceId); operation != nullptr) {
-            entry.descriptorId = operation->instance.descriptorId;
-            entry.title = operation->instance.title;
-            entry.version = operation->instance.version;
-            entry.urls = operation->instance.urls;
-            entry.relatedDatasetUrls = operation->instance.relatedDatasetUrls;
-            entry.archiveSelector = operation->instance.archiveSelector;
-            entry.schemaHint = operation->instance.schemaHint;
-            entry.attribution = operation->instance.attribution;
+        // A source with its own download keeps its accepted descriptor and the
+        // payload that was activated with it, so an attempted update that never
+        // became active cannot leak its options into the stored record. A
+        // source that needs no payload (bundled or synthesized) is persisted by
+        // configuration alone and reconstructed from the bundled factory on
+        // restore, so its identity, order, policy, and enabled state survive
+        // even when it has no operation record.
+        if (const SourceOperation* operation = findOperation(source.instanceId);
+            operation != nullptr && operation->hasAcceptedInstance) {
+            entry.descriptorId = operation->acceptedInstance.descriptorId;
+            entry.title = operation->acceptedInstance.title;
+            entry.version = operation->acceptedInstance.version;
+            entry.urls = operation->acceptedInstance.urls;
+            entry.relatedDatasetUrls = operation->acceptedInstance.relatedDatasetUrls;
+            entry.archiveSelector = operation->acceptedInstance.archiveSelector;
+            entry.schemaHint = operation->acceptedInstance.schemaHint;
+            entry.attribution = operation->acceptedInstance.attribution;
             if (!source.bundled) {
                 entry.catalog = source.catalog.get();
-                entry.payload = operation->payload;
+                entry.payload = operation->acceptedPayload;
             }
         }
 
@@ -1080,6 +1090,9 @@ SkyCatalogManager::SourceOperation* SkyCatalogManager::upsertOperation(
     const SkyCatalogSourceInstance& source, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
 {
+    // Requesting a configuration records it as the instance's attempt without
+    // touching the accepted facts: an attempt that is never accepted must not
+    // replace what persistence and consumers still see as the source.
     SourceOperation* existing = findOperation(source.instanceId);
     if (existing != nullptr) {
         existing->instance = source;
@@ -1129,4 +1142,11 @@ bool SkyCatalogManager::isOperationCurrent(const QString& instanceId, const std:
 {
     const SourceOperation* operation = findOperation(instanceId);
     return operation != nullptr && operation->revision == revision;
+}
+
+void SkyCatalogManager::commitAcceptedSourceFacts(SourceOperation& operation, QByteArray payload)
+{
+    operation.acceptedInstance = operation.instance;
+    operation.acceptedPayload = std::move(payload);
+    operation.hasAcceptedInstance = true;
 }
