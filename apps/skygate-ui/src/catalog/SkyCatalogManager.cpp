@@ -23,17 +23,6 @@ namespace {
 constexpr const char* kPrimarySlotId = "primary";
 constexpr const char* kDeepSkySlotId = "deep-sky";
 
-QString stableSourceInstanceId(const SkyCatalogSourceInstance& instance)
-{
-    if (!instance.descriptorId.isEmpty()) {
-        return QStringLiteral("preset:") + instance.descriptorId;
-    }
-    if (!instance.urls.isEmpty()) {
-        return SkyCatalogSourceInstance::createCustom(instance.urls.first()).instanceId;
-    }
-    return instance.instanceId;
-}
-
 SkyCatalogRuntimeResult& operator|=(SkyCatalogRuntimeResult& target, const SkyCatalogRuntimeResult& source)
 {
     if (source.statusTextChanged) {
@@ -339,6 +328,9 @@ void SkyCatalogManager::downloadDeepSkyCatalogFromUrl(const QString& urlText)
     loadSourceInstance(source, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
 }
 
+// Adds the instance when its durable instance ID is not active yet and
+// reloads that instance in place when it is, so an explicit update targets the
+// stored instance ID instead of relying on preset/URL ID collisions.
 void SkyCatalogManager::loadSource(
     const SkyCatalogSourceInstance& source, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
@@ -469,10 +461,7 @@ bool SkyCatalogManager::clearCatalogCache()
             if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::Merge) {
                 continue;
             }
-            const SourceOperation* operation = findOperation(source.instanceId);
-            const QString persistedId =
-                operation != nullptr ? stableSourceInstanceId(operation->instance) : source.instanceId;
-            cacheCleared = m_cacheController->clearSourceCache(persistedId) && cacheCleared;
+            cacheCleared = m_cacheController->clearSourceCache(source.instanceId) && cacheCleared;
         }
         cacheCleared = m_cacheController->clearCatalogCache() && cacheCleared;
     }
@@ -495,10 +484,7 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
             if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
                 continue;
             }
-            const SourceOperation* operation = findOperation(source.instanceId);
-            const QString persistedId =
-                operation != nullptr ? stableSourceInstanceId(operation->instance) : source.instanceId;
-            cacheCleared = m_cacheController->clearSourceCache(persistedId) && cacheCleared;
+            cacheCleared = m_cacheController->clearSourceCache(source.instanceId) && cacheCleared;
         }
         cacheCleared = m_cacheController->clearDeepSkyCatalogCache() && cacheCleared;
     }
@@ -515,9 +501,7 @@ bool SkyCatalogManager::clearSourceCache(const QString& instanceId)
         return false;
     }
 
-    const SourceOperation* operation = findOperation(instanceId);
-    const QString persistedId = operation != nullptr ? stableSourceInstanceId(operation->instance) : instanceId;
-    const bool cacheCleared = m_cacheController != nullptr && m_cacheController->clearSourceCache(persistedId);
+    const bool cacheCleared = m_cacheController != nullptr && m_cacheController->clearSourceCache(instanceId);
     m_statusText = SkyCatalogText::sourceCacheClearResult(cacheCleared);
     emit statusTextChanged();
     return cacheCleared;
@@ -549,9 +533,9 @@ bool SkyCatalogManager::restoreCatalogCache()
         SourceOperation* operation = upsertOperation(entry.instance, entry.record.policy);
         operation->payload = entry.payload;
 
-        SkyCatalogSourceRecord record = std::move(entry.record);
-        record.instanceId = stableSourceInstanceId(entry.instance);
-        restoredSources.push_back(std::move(record));
+        // The restored record, operation, cache entry, and provenance all stay
+        // keyed by the stored instance ID; restore never re-derives it.
+        restoredSources.push_back(std::move(entry.record));
     }
 
     SkyCatalogRuntimeResult mergedResult = m_runtime->replaceSources(std::move(restoredSources), runtimeBuildOptions());
@@ -586,14 +570,21 @@ void SkyCatalogManager::loadSourceInstance(
         return;
     }
 
-    SourceOperation* operation = upsertOperation(source, policy);
+    // Adding an instance allocates its durable ID. Callers that already hold an
+    // ID (retry, restore, or an explicit update) keep it unchanged.
+    SkyCatalogSourceInstance instance = source;
+    if (instance.instanceId.isEmpty()) {
+        instance.instanceId = SkyCatalogSourceInstance::allocateInstanceId();
+    }
+
+    SourceOperation* operation = upsertOperation(instance, policy);
     invalidatePendingSourceWork();
     operation->busy = true;
     operation->hasError = false;
-    operation->statusText = source.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading...");
+    operation->statusText = instance.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading...");
     emit sourcesChanged();
 
-    if (source.urls.isEmpty()) {
+    if (instance.urls.isEmpty()) {
         operation->payload.clear();
         if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
             resetConstellationLineRefs();
@@ -612,20 +603,20 @@ void SkyCatalogManager::loadSourceInstance(
     }
 
     const std::uint64_t revision = operation->revision;
-    m_activeDownloadInstanceId = source.instanceId;
+    m_activeDownloadInstanceId = instance.instanceId;
     setCatalogProcessing(false);
     setDownloadingCatalog(true);
 
     m_importWorkflow->downloadSource(
-        source,
+        instance,
         policy,
         this,
-        [this, instanceId = source.instanceId, revision](const QString& statusText) {
+        [this, instanceId = instance.instanceId, revision](const QString& statusText) {
             if (isOperationCurrent(instanceId, revision)) {
                 handleCatalogImportStatus(instanceId, statusText);
             }
         },
-        [this, instanceId = source.instanceId, revision, policy, relatedDatasetUrls = source.relatedDatasetUrls](
+        [this, instanceId = instance.instanceId, revision, policy, relatedDatasetUrls = instance.relatedDatasetUrls](
             SkyCatalogSourceImportResult result
         ) {
             if (!isOperationCurrent(instanceId, revision)) {
@@ -914,7 +905,7 @@ void SkyCatalogManager::persistCatalogCache() const
         }
 
         SkyCatalogSourcePersistEntry entry;
-        entry.instanceId = stableSourceInstanceId(operation->instance);
+        entry.instanceId = operation->instance.instanceId;
         entry.descriptorId = operation->instance.descriptorId;
         entry.title = operation->instance.title;
         entry.version = operation->instance.version;

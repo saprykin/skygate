@@ -10,6 +10,7 @@
 
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace skygate::ui::internal {
 namespace {
@@ -45,6 +46,36 @@ QString savedLabel(const QString& sourceLabel, const QString& fallbackLabel)
         normalizedSourceLabel = fallbackLabel;
     }
     return QString("%1 (saved)").arg(normalizedSourceLabel);
+}
+
+// Two persisted records can share one instance ID (legacy two-slot migration
+// of two slots configured with the same URL, or an edited settings file).
+// Because the ID keys the settings group, payload sidecars, operations, and
+// provenance, later duplicates receive a deterministic suffix instead of
+// overwriting the first record or failing the whole restore.
+QString uniqueRestoredInstanceId(
+    const QString& storedInstanceId, const std::vector<SkyCatalogSourceRestoreEntry>& restoredSources
+)
+{
+    const auto isTaken = [&restoredSources](const QString& instanceId) {
+        for (const SkyCatalogSourceRestoreEntry& entry : restoredSources) {
+            if (entry.record.instanceId == instanceId) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    if (!isTaken(storedInstanceId)) {
+        return storedInstanceId;
+    }
+
+    int duplicateIndex = 2;
+    QString candidate;
+    do {
+        candidate = QString("%1#%2").arg(storedInstanceId).arg(duplicateIndex++);
+    } while (isTaken(candidate));
+    return candidate;
 }
 
 }  // namespace
@@ -119,7 +150,12 @@ void SkyCatalogCacheController::appendRestoredSource(
     }
 
     SkyCatalogSourceRestoreEntry entry;
-    entry.record.instanceId = sourceRecord.instanceId;
+    const QString restoredInstanceId = uniqueRestoredInstanceId(sourceRecord.instanceId, result.sources);
+    if (restoredInstanceId != sourceRecord.instanceId) {
+        qCWarning(skygateCatalogCacheLog).noquote() << "Duplicate persisted catalog source instance id"
+                                                    << sourceRecord.instanceId << "restored as" << restoredInstanceId;
+    }
+    entry.record.instanceId = restoredInstanceId;
     entry.record.title = savedLabel(sourceRecord.title, QStringLiteral("Saved"));
     entry.record.version = sourceRecord.version;
     entry.record.url = sourceRecord.url;
@@ -129,7 +165,7 @@ void SkyCatalogCacheController::appendRestoredSource(
     entry.record.foundObjectCount =
         skygate::ephemeris::CatalogIdentity::countDeepSkyObjects(entry.record.catalog->bodies());
 
-    entry.instance.instanceId = sourceRecord.instanceId;
+    entry.instance.instanceId = restoredInstanceId;
     entry.instance.descriptorId = sourceRecord.descriptorId;
     entry.instance.title = stripSavedSuffixes(sourceRecord.title);
     entry.instance.version = sourceRecord.version;
@@ -205,7 +241,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
                 SkyCatalogPresets::starSourceDescriptor(QStringLiteral("hyg_v42"));
             if (descriptor.has_value()) {
                 const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-                record.instanceId = instance.instanceId;
+                record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
                 record.descriptorId = descriptor->sourceId;
                 record.title = descriptor->title;
                 record.version = descriptor->version;
@@ -215,7 +251,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(catalogUrlText);
-            record.instanceId = instance.instanceId;
+            record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
             record.title = stripSavedSuffixes(legacy.sourceLabel);
             if (record.title.isEmpty()) {
                 record.title = instance.title;
@@ -241,7 +277,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
                 SkyCatalogPresets::deepSkySourceDescriptor(QStringLiteral("open_ngc"));
             if (descriptor.has_value()) {
                 const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(*descriptor);
-                record.instanceId = instance.instanceId;
+                record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
                 record.descriptorId = descriptor->sourceId;
                 record.title = descriptor->title;
                 record.version = descriptor->version;
@@ -251,7 +287,7 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::migrateLegacy(
             }
         } else {
             const SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::createCustom(deepSkyCatalogUrlText);
-            record.instanceId = instance.instanceId;
+            record.instanceId = SkyCatalogSourceInstance::migratedLegacyInstanceId(instance);
             record.title = stripSavedSuffixes(legacy.deepSkySourceLabel);
             if (record.title.isEmpty()) {
                 record.title = instance.title;

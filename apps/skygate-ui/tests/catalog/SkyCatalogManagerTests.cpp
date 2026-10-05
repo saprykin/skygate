@@ -92,6 +92,11 @@ private slots:
     void addSourcePresetUsesDescriptorPolicy();
     void moveSourceReordersActiveSources();
     void clearSourceCacheRemovesSingleRecord();
+    void sameDescriptorInstancesCoexistIndependently();
+    void sameUrlDifferentVersionsStayDistinct();
+    void editingSourceAsUpdatePreservesInstanceId();
+    void restoresLegacyPersistedInstanceIdsWithReferences();
+    void legacyMigrationRenamesDuplicateInstanceIds();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -553,6 +558,7 @@ void SkyCatalogManagerTests::collectionSourcesLoadEnableDisableAndRemoveIndepend
     QVERIFY(!sourceCUrl.isEmpty());
 
     loadLocalSource(sourceAUrl);
+    const QString sourceAId = manager.sourceInstanceIds().last();
     loadLocalSource(sourceBUrl);
     loadLocalSource(sourceCUrl);
 
@@ -560,8 +566,6 @@ void SkyCatalogManagerTests::collectionSourcesLoadEnableDisableAndRemoveIndepend
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star A")));
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star B")));
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Collection Star C")));
-
-    const QString sourceAId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(sourceAUrl).instanceId;
 
     manager.disableSource(sourceAId);
     QVERIFY(!manager.isSourceEnabled(sourceAId));
@@ -608,7 +612,6 @@ void SkyCatalogManagerTests::failedCollectionLoadPreservesPriorDataAndRetrySucce
 
     const QString retryPath = m_settings.filePath(QStringLiteral("retry-source-b.csv"));
     const QString retryUrl = QUrl::fromLocalFile(retryPath).toString();
-    const QString retrySourceId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(retryUrl).instanceId;
 
     QTest::ignoreMessage(
         QtWarningMsg, QRegularExpression("Catalog source failed file://.*/retry-source-b\\.csv .* HTTP 0")
@@ -618,6 +621,14 @@ void SkyCatalogManagerTests::failedCollectionLoadPreservesPriorDataAndRetrySucce
         skygate::ephemeris::CatalogCompositionPolicy::Merge
     );
     QTRY_VERIFY(!manager.downloadingCatalog());
+
+    const QVector<SkyCatalogManager::SourceViewEntry> failedView = manager.sourceViewEntries();
+    const auto retryEntry =
+        std::find_if(failedView.begin(), failedView.end(), [](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.hasError;
+        });
+    QVERIFY(retryEntry != failedView.end());
+    const QString retrySourceId = retryEntry->instanceId;
 
     // A failed source operation leaves the prior valid active data untouched.
     QCOMPARE(manager.catalogRevision(), revisionAfterA);
@@ -662,15 +673,15 @@ void SkyCatalogManagerTests::addSourceUrlAddsSameCategorySourcesWithStableIdenti
 
     manager.addSourceUrl(firstUrl, QStringLiteral("Star"));
     QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString firstId = manager.sourceInstanceIds().last();
     manager.addSourceUrl(secondUrl, QStringLiteral("Star"));
     QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString secondId = manager.sourceInstanceIds().last();
 
     QCOMPARE(manager.sourceCount(), std::size_t{3});
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Same Category A")));
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Same Category B")));
 
-    const QString firstId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(firstUrl).instanceId;
-    const QString secondId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(secondUrl).instanceId;
     QVERIFY(firstId != secondId);
     QVERIFY(manager.sourceInstanceIds().contains(firstId));
     QVERIFY(manager.sourceInstanceIds().contains(secondId));
@@ -709,14 +720,15 @@ void SkyCatalogManagerTests::addSourcePresetUsesDescriptorPolicy()
 
     manager.addSourcePreset(QStringLiteral("hyg_v42"));
     QTRY_VERIFY(!manager.downloadingCatalog());
-    const QString hygInstanceId = QStringLiteral("preset:hyg_v42");
+    const QString hygInstanceId = manager.sourceInstanceIds().last();
     QVERIFY(manager.sourceInstanceIds().contains(hygInstanceId));
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Preset HYG Star")));
 
     manager.addSourcePreset(QStringLiteral("open_ngc"));
     QTRY_VERIFY(!manager.downloadingCatalog());
-    const QString openNgcInstanceId = QStringLiteral("preset:open_ngc");
+    const QString openNgcInstanceId = manager.sourceInstanceIds().last();
     QVERIFY(manager.sourceInstanceIds().contains(openNgcInstanceId));
+    QVERIFY(hygInstanceId != openNgcInstanceId);
 
     const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
     const auto findViewEntry = [&view](const QString& instanceId) {
@@ -757,11 +769,10 @@ void SkyCatalogManagerTests::moveSourceReordersActiveSources()
 
     manager.addSourceUrl(aUrl, QStringLiteral("Star"));
     QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString aId = manager.sourceInstanceIds().last();
     manager.addSourceUrl(bUrl, QStringLiteral("Star"));
     QTRY_VERIFY(!manager.downloadingCatalog());
-
-    const QString aId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(aUrl).instanceId;
-    const QString bId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(bUrl).instanceId;
+    const QString bId = manager.sourceInstanceIds().last();
     QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), aId, bId}));
 
     manager.moveSource(bId, 1);
@@ -792,17 +803,345 @@ void SkyCatalogManagerTests::clearSourceCacheRemovesSingleRecord()
 
     manager.addSourceUrl(aUrl, QStringLiteral("Star"));
     QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString aId = manager.sourceInstanceIds().last();
     manager.addSourceUrl(bUrl, QStringLiteral("Star"));
     QTRY_VERIFY(!manager.downloadingCatalog());
-
-    const QString aId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(aUrl).instanceId;
-    const QString bId = skygate::ui::internal::SkyCatalogSourceInstance::createCustom(bUrl).instanceId;
+    const QString bId = manager.sourceInstanceIds().last();
 
     QVERIFY(manager.clearSourceCache(aId));
     const auto cacheAfterClear = store.loadCatalogCollectionCache();
     QVERIFY(cacheAfterClear.has_value());
     QCOMPARE(cacheAfterClear->sources.size(), 1);
     QCOMPARE(cacheAfterClear->sources[0].instanceId, bId);
+}
+
+void SkyCatalogManagerTests::sameDescriptorInstancesCoexistIndependently()
+{
+    const std::optional<skygate::ui::internal::SkyCatalogSourceDescriptor> openNgcPreset =
+        skygate::ui::internal::SkyCatalogPresets::deepSkySourceDescriptor(QStringLiteral("open_ngc"));
+    QVERIFY(openNgcPreset.has_value());
+    const QString openNgcUrl = openNgcPreset->urls.value(0);
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        openNgcUrl,
+        {.payload = skygate::ui::tests::sampleOpenNgcCsvPayload(
+             {.name = "NGC0991",
+              .type = "G",
+              .ra = "00:20:00.00",
+              .dec = "+10:00:00.0",
+              .messier = "",
+              .ngc = "0991",
+              .identifiers = "PGC 9991",
+              .commonName = "First Galaxy"}
+         )}
+    );
+    networkAccessManager.enqueueResponse(
+        openNgcUrl,
+        {.payload = skygate::ui::tests::sampleOpenNgcCsvPayload(
+             {.name = "NGC0992",
+              .type = "G",
+              .ra = "00:30:00.00",
+              .dec = "+11:00:00.0",
+              .messier = "",
+              .ngc = "0992",
+              .identifiers = "PGC 9992",
+              .commonName = "Second Galaxy"}
+         )}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    manager.addSourcePreset(QStringLiteral("open_ngc"));
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString firstId = manager.sourceInstanceIds().last();
+    manager.addSourcePreset(QStringLiteral("open_ngc"));
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString secondId = manager.sourceInstanceIds().last();
+
+    QVERIFY(firstId != secondId);
+    QCOMPARE(manager.sourceCount(), std::size_t{3});
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 991")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 992")));
+
+    // Each instance participates independently.
+    manager.disableSource(firstId);
+    QVERIFY(!manager.isSourceEnabled(firstId));
+    QVERIFY(manager.isSourceEnabled(secondId));
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 991")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 992")));
+    manager.enableSource(firstId);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 991")));
+
+    // Each instance reloads independently.
+    networkAccessManager.enqueueResponse(
+        openNgcUrl,
+        {.payload = skygate::ui::tests::sampleOpenNgcCsvPayload(
+             {.name = "NGC0993",
+              .type = "G",
+              .ra = "00:35:00.00",
+              .dec = "+11:30:00.0",
+              .messier = "",
+              .ngc = "0993",
+              .identifiers = "PGC 9993",
+              .commonName = "Reloaded Galaxy"}
+         )}
+    );
+    manager.retrySource(firstId);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), firstId, secondId}));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 993")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 992")));
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 991")));
+
+    // Each instance reorders independently.
+    manager.moveSource(secondId, 1);
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({QStringLiteral("primary"), secondId, firstId}));
+
+    // Restart restores both instances with their durable IDs and order.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.sourceInstanceIds(), QStringList({secondId, firstId}));
+    QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("NGC 993")));
+    QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("NGC 992")));
+
+    // Each instance removes independently.
+    restoredManager.removeSource(firstId);
+    QCOMPARE(restoredManager.sourceInstanceIds(), QStringList({secondId}));
+    QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("NGC 992")));
+    QVERIFY(!catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("NGC 993")));
+}
+
+void SkyCatalogManagerTests::sameUrlDifferentVersionsStayDistinct()
+{
+    const QString catalogPath = m_settings.filePath(QStringLiteral("versioned-star.csv"));
+    QVERIFY(writeFile(
+        catalogPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 903001, .hip = 903001, .properName = "Versioned Star", .mag = "1.0"}
+        )
+    ));
+    const QString catalogUrl = QUrl::fromLocalFile(catalogPath).toString();
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+
+    skygate::ui::internal::SkyCatalogSourceInstance first =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(catalogUrl, QStringLiteral("v1"));
+    first.archiveSelector = QStringLiteral("members/catalog-v1.csv");
+    skygate::ui::internal::SkyCatalogSourceInstance second =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(catalogUrl, QStringLiteral("v2"));
+    second.archiveSelector = QStringLiteral("members/catalog-v2.csv");
+
+    manager.loadSource(first, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    manager.loadSource(second, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    QVERIFY(first.instanceId != second.instanceId);
+    QCOMPARE(manager.sourceCount(), std::size_t{3});
+
+    const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
+    const auto findEntry = [&view](const QString& instanceId) {
+        return std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        });
+    };
+    const auto firstEntry = findEntry(first.instanceId);
+    const auto secondEntry = findEntry(second.instanceId);
+    QVERIFY(firstEntry != view.end());
+    QVERIFY(secondEntry != view.end());
+    QCOMPARE(firstEntry->version, QStringLiteral("v1"));
+    QCOMPARE(secondEntry->version, QStringLiteral("v2"));
+
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    QCOMPARE(snapshot->sources.size(), 2);
+    QCOMPARE(snapshot->sources[0].instanceId, first.instanceId);
+    QCOMPARE(snapshot->sources[0].version, QStringLiteral("v1"));
+    QCOMPARE(snapshot->sources[0].archiveSelector, QStringLiteral("members/catalog-v1.csv"));
+    QCOMPARE(snapshot->sources[1].instanceId, second.instanceId);
+    QCOMPARE(snapshot->sources[1].version, QStringLiteral("v2"));
+    QCOMPARE(snapshot->sources[1].archiveSelector, QStringLiteral("members/catalog-v2.csv"));
+
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.sourceInstanceIds(), QStringList({first.instanceId, second.instanceId}));
+}
+
+void SkyCatalogManagerTests::editingSourceAsUpdatePreservesInstanceId()
+{
+    const QString firstPath = m_settings.filePath(QStringLiteral("edit-source-v1.csv"));
+    QVERIFY(writeFile(
+        firstPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 903010, .hip = 903010, .properName = "Edit Star V1", .mag = "1.0"}
+        )
+    ));
+    const QString secondPath = m_settings.filePath(QStringLiteral("edit-source-v2.csv"));
+    QVERIFY(writeFile(
+        secondPath,
+        skygate::ui::tests::sampleHygCsvPayload(
+            {.id = 903011, .hip = 903011, .properName = "Edit Star V2", .mag = "2.0"}
+        )
+    ));
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(
+            QUrl::fromLocalFile(firstPath).toString(), QStringLiteral("v1")
+        );
+    source.title = QStringLiteral("Original Title");
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    const QString instanceId = source.instanceId;
+    QCOMPARE(manager.sourceCount(), std::size_t{2});
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Edit Star V1")));
+
+    // Editing title, URL, and version updates the same configured instance
+    // instead of adding another one with a new ID.
+    source.title = QStringLiteral("Updated Title");
+    source.urls = QStringList{QUrl::fromLocalFile(secondPath).toString()};
+    source.version = QStringLiteral("v2");
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    QCOMPARE(manager.sourceCount(), std::size_t{2});
+    QCOMPARE(manager.sourceInstanceIds().count(instanceId), 1);
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Edit Star V2")));
+    QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Edit Star V1")));
+
+    const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
+    const auto entry =
+        std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& candidate) {
+            return candidate.instanceId == instanceId;
+        });
+    QVERIFY(entry != view.end());
+    QCOMPARE(entry->title, QStringLiteral("Updated Title"));
+    QCOMPARE(entry->version, QStringLiteral("v2"));
+
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    QCOMPARE(snapshot->sources.size(), 1);
+    QCOMPARE(snapshot->sources[0].instanceId, instanceId);
+    QCOMPARE(snapshot->sources[0].version, QStringLiteral("v2"));
+}
+
+void SkyCatalogManagerTests::restoresLegacyPersistedInstanceIdsWithReferences()
+{
+    const QString legacyUrl = QStringLiteral("https://example.test/legacy-stars.csv");
+    const skygate::ui::internal::SkyCatalogSourceInstance legacyInstance =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(legacyUrl);
+    const QString legacyInstanceId =
+        skygate::ui::internal::SkyCatalogSourceInstance::migratedLegacyInstanceId(legacyInstance);
+    QVERIFY(legacyInstanceId.startsWith(QStringLiteral("custom:")));
+
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = 1;
+    SkySettingsStore::CatalogSourceCacheRecord record;
+    record.instanceId = legacyInstanceId;
+    record.title = QStringLiteral("Legacy Stars");
+    record.version = QStringLiteral("v1");
+    record.urls = QStringList{legacyUrl};
+    record.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    record.enabled = true;
+    record.order = 0;
+    record.payload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 904001, .hip = 904001, .properName = "Legacy Star", .mag = "1.0"}
+    );
+    snapshot.sources.push_back(std::move(record));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(
+        legacyUrl,
+        {.payload = skygate::ui::tests::sampleHygCsvPayload(
+             {.id = 904002, .hip = 904002, .properName = "Reloaded Legacy Star", .mag = "1.0"}
+         )}
+    );
+
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QVERIFY(manager.restoreCatalogCache());
+
+    // The legacy ID is adopted verbatim so settings groups, payload sidecars,
+    // operations, and provenance keep addressing the same instance.
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({legacyInstanceId}));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Legacy Star")));
+
+    QStringList composedSourceIds;
+    for (const QString& sourceId : manager.sourceIds()) {
+        composedSourceIds.push_back(sourceId);
+    }
+    QVERIFY(composedSourceIds.contains(legacyInstanceId));
+    bool hasLegacyContributor = false;
+    for (const QStringList& contributors : manager.contributorSourceIds()) {
+        hasLegacyContributor = hasLegacyContributor || contributors.contains(legacyInstanceId);
+    }
+    QVERIFY(hasLegacyContributor);
+
+    // Operation lookup and reload keep referring to the restored instance ID.
+    manager.retrySource(legacyInstanceId);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Reloaded Legacy Star")));
+    QCOMPARE(manager.sourceInstanceIds(), QStringList({legacyInstanceId}));
+
+    // Restart keeps the same legacy ID.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.sourceInstanceIds(), QStringList({legacyInstanceId}));
+}
+
+void SkyCatalogManagerTests::legacyMigrationRenamesDuplicateInstanceIds()
+{
+    const QString sharedUrl = QStringLiteral("https://example.test/shared-slot-catalog.csv");
+    SkySettingsStore::CatalogCacheSnapshot legacy;
+    legacy.sourceLabel = QStringLiteral("Legacy Stars");
+    legacy.catalogPayload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 905001, .hip = 905001, .properName = "Legacy Slot Star", .mag = "1.0"}
+    );
+    legacy.deepSkySourceLabel = QStringLiteral("Legacy Deep Sky");
+    legacy.deepSkyCatalogPayload = skygate::ui::tests::sampleOpenNgcCsvPayload(
+        {.name = "NGC0995",
+         .type = "G",
+         .ra = "00:40:00.00",
+         .dec = "+12:00:00.0",
+         .messier = "",
+         .ngc = "0995",
+         .identifiers = "PGC 9995",
+         .commonName = "Legacy Slot Galaxy"}
+    );
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCache(legacy));
+
+    SkyCatalogManager manager(&store);
+    manager.setCatalogPresetIndex(2);
+    manager.setCatalogUrlText(sharedUrl);
+    manager.setDeepSkyCatalogPresetIndex(2);
+    manager.setDeepSkyCatalogUrlText(sharedUrl);
+
+    // Both legacy slots name the same URL, so the legacy derivation maps them
+    // to one ID. The second record is deterministically renamed instead of
+    // overwriting the first or failing the restore.
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Duplicate persisted catalog source instance id"));
+    QVERIFY(manager.restoreCatalogCache());
+
+    const QStringList restoredIds = manager.sourceInstanceIds();
+    QCOMPARE(restoredIds.size(), 2);
+    QVERIFY(restoredIds[0].startsWith(QStringLiteral("custom:")));
+    QCOMPARE(restoredIds[1], restoredIds[0] + QStringLiteral("#2"));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Legacy Slot Star")));
+    QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("NGC 995")));
+
+    // The renamed IDs stay stable through the migration persist and restart.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.sourceInstanceIds(), restoredIds);
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)

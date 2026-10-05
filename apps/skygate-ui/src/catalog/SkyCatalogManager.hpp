@@ -97,6 +97,9 @@ public:
     void downloadCatalogFromUrl(const QString& urlText);
     void loadDeepSkyCatalogPreset(const QString& presetId);
     void downloadDeepSkyCatalogFromUrl(const QString& urlText);
+    // Adds the instance when its durable instance ID is not active yet. When
+    // the ID is already active this is the explicit reload/update action for
+    // that instance, and the target instance ID is preserved.
     void loadSource(
         const skygate::ui::internal::SkyCatalogSourceInstance& source,
         skygate::ephemeris::CatalogCompositionPolicy policy
@@ -107,6 +110,8 @@ public:
     void disableSource(const QString& instanceId);
     void removeSource(const QString& instanceId);
     void moveSource(const QString& instanceId, int targetIndex);
+    // Reloads the active instance identified by instanceId from its stored
+    // configuration; the instance ID is never re-allocated by a reload.
     void retrySource(const QString& instanceId);
     void cancelCatalogDownload();
     bool clearCatalogCache();

@@ -385,9 +385,11 @@ void SkyCatalogCacheControllerTests::migratesLegacyBundledCustomAndMixedConfigur
 
         QVERIFY(result.migratedLegacy);
         QCOMPARE(result.sources.size(), std::size_t{2});
+        const skygate::ui::internal::SkyCatalogSourceInstance customInstance =
+            skygate::ui::internal::SkyCatalogSourceInstance::createCustom(customUrl);
         QCOMPARE(
             result.sources[0].record.instanceId,
-            skygate::ui::internal::SkyCatalogSourceInstance::createCustom(customUrl).instanceId
+            skygate::ui::internal::SkyCatalogSourceInstance::migratedLegacyInstanceId(customInstance)
         );
         QCOMPARE(result.sources[0].record.title, QString("Custom (saved)"));
         QVERIFY(result.sources[0].record.catalog != nullptr);

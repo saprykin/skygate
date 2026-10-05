@@ -16,6 +16,8 @@ private slots:
     void legacyPresetIndexConversionPreserved();
     void presetAliasesResolveToStableIds();
     void renamingInstanceKeepsInstanceId();
+    void descriptorInstancesAllocateIndependentIds();
+    void legacyInstanceIdsMigrateDeterministically();
     void identicalLabelsDoNotCollapseCustomInstances();
     void customInstanceCarriesHonestMetadata();
     void descriptorCarriesArchiveAndRelatedDatasetHints();
@@ -124,11 +126,61 @@ void SkyCatalogSourceDescriptorTests::renamingInstanceKeepsInstanceId()
     descriptor.urls = QStringList{QStringLiteral("https://example.test/hyg.csv.gz")};
 
     SkyCatalogSourceInstance instance = SkyCatalogSourceInstance::fromDescriptor(descriptor);
-    QCOMPARE(instance.instanceId, QString("preset:hyg_v42"));
+    const QString allocatedInstanceId = instance.instanceId;
+    QVERIFY(!allocatedInstanceId.isEmpty());
+    QCOMPARE(instance.descriptorId, QString("hyg_v42"));
 
     instance.title = QStringLiteral("Renamed HYG Source");
-    QCOMPARE(instance.instanceId, QString("preset:hyg_v42"));
+    QCOMPARE(instance.instanceId, allocatedInstanceId);
     QCOMPARE(instance.title, QString("Renamed HYG Source"));
+}
+
+void SkyCatalogSourceDescriptorTests::descriptorInstancesAllocateIndependentIds()
+{
+    using skygate::ui::internal::SkyCatalogSourceDescriptor;
+    using skygate::ui::internal::SkyCatalogSourceInstance;
+
+    SkyCatalogSourceDescriptor descriptor;
+    descriptor.sourceId = QStringLiteral("open_ngc");
+    descriptor.title = QStringLiteral("OpenNGC");
+    descriptor.version = QStringLiteral("v20260307");
+    descriptor.urls = QStringList{QStringLiteral("https://example.test/NGC.csv")};
+
+    const SkyCatalogSourceInstance first = SkyCatalogSourceInstance::fromDescriptor(descriptor);
+    const SkyCatalogSourceInstance second = SkyCatalogSourceInstance::fromDescriptor(descriptor);
+
+    QVERIFY(!first.instanceId.isEmpty());
+    QVERIFY(!second.instanceId.isEmpty());
+    QVERIFY(first.instanceId != second.instanceId);
+    QCOMPARE(first.descriptorId, second.descriptorId);
+    QVERIFY(first.instanceId != first.descriptorId);
+    QVERIFY(!first.instanceId.contains(descriptor.urls.first()));
+}
+
+void SkyCatalogSourceDescriptorTests::legacyInstanceIdsMigrateDeterministically()
+{
+    using skygate::ui::internal::SkyCatalogSourceDescriptor;
+    using skygate::ui::internal::SkyCatalogSourceInstance;
+
+    SkyCatalogSourceDescriptor descriptor;
+    descriptor.sourceId = QStringLiteral("hyg_v42");
+    descriptor.urls = QStringList{QStringLiteral("https://example.test/hyg.csv.gz")};
+
+    const SkyCatalogSourceInstance presetInstance = SkyCatalogSourceInstance::fromDescriptor(descriptor);
+    const QString migratedPresetId = SkyCatalogSourceInstance::migratedLegacyInstanceId(presetInstance);
+    QCOMPARE(migratedPresetId, QString("preset:hyg_v42"));
+    QCOMPARE(SkyCatalogSourceInstance::migratedLegacyInstanceId(presetInstance), migratedPresetId);
+    QVERIFY(migratedPresetId != presetInstance.instanceId);
+
+    const SkyCatalogSourceInstance customInstance =
+        SkyCatalogSourceInstance::createCustom(QStringLiteral("https://example.test/custom.csv"));
+    const SkyCatalogSourceInstance sameUrlInstance =
+        SkyCatalogSourceInstance::createCustom(QStringLiteral("  https://example.test/custom.csv  "), QString("v2"));
+    const QString migratedCustomId = SkyCatalogSourceInstance::migratedLegacyInstanceId(customInstance);
+    QVERIFY(migratedCustomId.startsWith(QStringLiteral("custom:")));
+    QCOMPARE(SkyCatalogSourceInstance::migratedLegacyInstanceId(sameUrlInstance), migratedCustomId);
+    QVERIFY(migratedCustomId != customInstance.instanceId);
+    QVERIFY(migratedCustomId != sameUrlInstance.instanceId);
 }
 
 void SkyCatalogSourceDescriptorTests::identicalLabelsDoNotCollapseCustomInstances()
@@ -155,7 +207,8 @@ void SkyCatalogSourceDescriptorTests::customInstanceCarriesHonestMetadata()
         QStringLiteral("https://example.test/custom.csv.gz"), QStringLiteral("v9")
     );
 
-    QVERIFY(instance.instanceId.startsWith(QStringLiteral("custom:")));
+    QVERIFY(instance.instanceId.startsWith(QStringLiteral("src:")));
+    QVERIFY(instance.instanceId != SkyCatalogSourceInstance::migratedLegacyInstanceId(instance));
     QVERIFY(instance.descriptorId.isEmpty());
     QCOMPARE(instance.version, QString("v9"));
     QCOMPARE(instance.urls, QStringList{QStringLiteral("https://example.test/custom.csv.gz")});
