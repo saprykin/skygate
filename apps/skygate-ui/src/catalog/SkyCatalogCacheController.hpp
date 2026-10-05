@@ -28,6 +28,9 @@ struct SkyCatalogSourceRestoreEntry final {
 
 struct SkyCatalogCollectionRestoreResult final {
     std::vector<SkyCatalogSourceRestoreEntry> sources;
+    // True when a stored collection snapshot was applied, including an
+    // intentionally empty one, so it is distinguishable from the state where
+    // no collection was ever stored.
     bool restored = false;
     bool migratedLegacy = false;
     // The persisted records predate the stored parse contract, so they were

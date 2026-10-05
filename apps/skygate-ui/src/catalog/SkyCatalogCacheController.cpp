@@ -253,6 +253,11 @@ SkyCatalogCacheController::restoreFromRecords(const SkySettingsStore::CatalogCol
     SkyCatalogCollectionRestoreResult result;
     const int binarySchemaVersion = snapshot.binarySchemaVersion;
 
+    // A stored collection snapshot is a restored configuration even when it
+    // holds no source records: an intentionally empty collection must be
+    // distinguishable from a state where no collection was ever stored, which
+    // is what keeps the legacy cache fallback retired.
+    result.restored = true;
     // Records written before the parse contract was persisted load with the
     // defined defaults and are rewritten once in the current format.
     result.requiresRecordUpgrade =
@@ -406,10 +411,6 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
     if (m_settingsStore == nullptr) {
         return;
     }
-    if (request.sources.empty()) {
-        static_cast<void>(m_settingsStore->clearCatalogCollectionCache());
-        return;
-    }
 
     SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
@@ -443,6 +444,10 @@ void SkyCatalogCacheController::persistCollection(const SkyCatalogCollectionPers
         snapshot.sources.push_back(std::move(record));
     }
 
+    // An empty request is persisted as an intentionally empty collection so
+    // the committed configuration boundary survives. Clearing the collection
+    // cache is a separate reset operation, not something removing the last
+    // source may trigger.
     if (!m_settingsStore->saveCatalogCollectionCache(snapshot)) {
         qCWarning(skygateCatalogCacheLog).noquote() << "Failed to persist catalog source collection";
     }

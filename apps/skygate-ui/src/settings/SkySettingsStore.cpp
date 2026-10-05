@@ -586,10 +586,6 @@ std::optional<SkySettingsStore::CatalogCacheSnapshot> SkySettingsStore::loadCata
 
 bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSnapshot& snapshot) const
 {
-    if (snapshot.sources.isEmpty()) {
-        return clearCatalogCollectionCache();
-    }
-
     QSettings settings;
     const QString directory = catalogCollectionCacheDirectory(settings);
 
@@ -606,20 +602,36 @@ bool SkySettingsStore::saveCatalogCollectionCache(const CatalogCollectionCacheSn
         }
     }
 
+    // Replace the stored records first and commit them before writing the
+    // version marker. The marker is the durable boundary between "no new
+    // configuration exists" (absent) and "the user's collection, possibly
+    // intentionally empty" (set), so it must only acknowledge a snapshot whose
+    // records were actually stored. A failed or interrupted save leaves the
+    // marker untouched and the legacy cache fallback available instead of
+    // discarding recoverable data.
     settings.remove(QStringLiteral("catalogSources"));
-    settings.setValue(
-        SkyContextSettings::key("catalogCollectionVersion"),
-        snapshot.schemaVersion > 0 ? snapshot.schemaVersion
-                                   : SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
-    );
-    settings.setValue(SkyContextSettings::key("catalogBinarySchemaVersion"), snapshot.binarySchemaVersion);
-
     int order = 0;
     for (const CatalogSourceCacheRecord& record : snapshot.sources) {
         CatalogSourceCacheRecord orderedRecord = record;
         orderedRecord.order = order++;
         saveCatalogSourceRecord(settings, orderedRecord, directory);
     }
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(skygateCatalogCacheLog) << "Failed to save catalog collection cache settings";
+        return false;
+    }
+
+    // An empty collection keeps the marker: persisting zero sources is a
+    // committed configuration, not a cache clear, and must not re-enable the
+    // legacy two-slot fallback. Only clearCatalogCollectionCache resets the
+    // stored configuration and removes the marker.
+    settings.setValue(
+        SkyContextSettings::key("catalogCollectionVersion"),
+        snapshot.schemaVersion > 0 ? snapshot.schemaVersion
+                                   : SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+    );
+    settings.setValue(SkyContextSettings::key("catalogBinarySchemaVersion"), snapshot.binarySchemaVersion);
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         qCWarning(skygateCatalogCacheLog) << "Failed to save catalog collection cache settings";

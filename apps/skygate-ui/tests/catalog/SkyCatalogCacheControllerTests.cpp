@@ -238,6 +238,9 @@ private slots:
     void migratesLegacyBundledCustomAndMixedConfigurations();
     void derivesDeepSkyFoundCountFromMixedSourceAfterRestore();
     void repeatedMigrationIsIdempotent();
+    void emptyCollectionAfterMigrationDoesNotRestoreLegacySources();
+    void clearingPayloadCacheDoesNotReAddLegacySources();
+    void failedMigrationCommitKeepsLegacyCacheReadable();
     void failedCollectionWritePreservesPriorData();
     void logsCollectionLifecycleSummariesAtInfoLevel();
 
@@ -984,6 +987,131 @@ void SkyCatalogCacheControllerTests::repeatedMigrationIsIdempotent()
     QCOMPARE(secondResult.sources.size(), std::size_t{2});
     QCOMPARE(secondResult.sources[0].record.instanceId, firstResult.sources[0].record.instanceId);
     QCOMPARE(secondResult.sources[1].record.instanceId, firstResult.sources[1].record.instanceId);
+}
+
+void SkyCatalogCacheControllerTests::emptyCollectionAfterMigrationDoesNotRestoreLegacySources()
+{
+    SkySettingsStore store;
+    const SkyCatalogCacheController controller(&store);
+    const QString customUrl = QStringLiteral("https://example.test/custom-stars.csv");
+
+    // Baseline: without any stored configuration nothing is restored.
+    m_settings.setCatalogCachePaths(
+        m_settings.filePath(QStringLiteral("missing-legacy-star-cache.txt")),
+        m_settings.filePath(QStringLiteral("missing-legacy-deep-sky-cache.txt"))
+    );
+    const auto nothingStored = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(!nothingStored.restored);
+    QVERIFY(!nothingStored.migratedLegacy);
+    QVERIFY(nothingStored.sources.empty());
+    m_settings.resetCatalogCachePaths();
+
+    const SkySettingsStore::CatalogCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
+        {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
+    );
+    QVERIFY(store.saveCatalogCache(legacy));
+
+    const auto migrated = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(migrated.migratedLegacy);
+    QCOMPARE(migrated.sources.size(), std::size_t{2});
+
+    // Commit the migrated configuration, then remove every configured source.
+    controller.persistCollection(persistRequestFromRestoreResult(migrated));
+    controller.persistCollection(SkyCatalogCollectionPersistRequest{});
+
+    // The empty collection is stored explicitly, not cleared: the legacy data
+    // stays readable but is no longer a fallback.
+    const auto storedEmpty = store.loadCatalogCollectionCache();
+    QVERIFY(storedEmpty.has_value());
+    QVERIFY(storedEmpty->sources.isEmpty());
+    QVERIFY(store.loadCatalogCache().has_value());
+
+    // Neither restart resurrects a removed legacy source.
+    const auto firstRestart = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(firstRestart.restored);
+    QVERIFY(!firstRestart.migratedLegacy);
+    QVERIFY(firstRestart.sources.empty());
+
+    const auto secondRestart = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(secondRestart.restored);
+    QVERIFY(!secondRestart.migratedLegacy);
+    QVERIFY(secondRestart.sources.empty());
+}
+
+void SkyCatalogCacheControllerTests::clearingPayloadCacheDoesNotReAddLegacySources()
+{
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(makeCollectionSnapshot()));
+    // The pre-migration two-slot cache is still on disk.
+    QVERIFY(store.saveCatalogCache(
+        skygate::ui::tests::sampleCatalogCacheSnapshot(
+            {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+        )
+    ));
+
+    const SkyCatalogCacheController controller(&store);
+    // Clearing each source's payload cache removes its disposable payload and
+    // record. It is not a configuration reset and must not retire the
+    // committed configuration boundary.
+    QVERIFY(controller.clearSourceCache(QStringLiteral("preset:hyg_v42")));
+    QVERIFY(controller.clearSourceCache(QStringLiteral("preset:open_ngc")));
+    const auto afterClear = store.loadCatalogCollectionCache();
+    QVERIFY(afterClear.has_value());
+    QVERIFY(afterClear->sources.isEmpty());
+
+    controller.persistCollection(SkyCatalogCollectionPersistRequest{});
+
+    // No legacy source is re-added (and none is re-enabled) after the caches
+    // were cleared and the empty collection was persisted.
+    const auto restart =
+        controller.restoreCollection(2, 1, QStringLiteral("https://example.test/legacy.csv"), QString());
+    QVERIFY(restart.restored);
+    QVERIFY(!restart.migratedLegacy);
+    QVERIFY(restart.sources.empty());
+    QVERIFY(store.loadCatalogCache().has_value());
+}
+
+void SkyCatalogCacheControllerTests::failedMigrationCommitKeepsLegacyCacheReadable()
+{
+    SkySettingsStore store;
+    const SkySettingsStore::CatalogCacheSnapshot legacy = skygate::ui::tests::sampleCatalogCacheSnapshot(
+        {.sourceLabel = QStringLiteral("Custom"), .deepSkySourceLabel = QStringLiteral("OpenNGC")}
+    );
+    QVERIFY(store.saveCatalogCache(legacy));
+
+    // Block collection payload writes so committing the migrated records fails.
+    const QString blockerPath = m_settings.filePath(QStringLiteral("migration-blocker"));
+    QFile blocker(blockerPath);
+    QVERIFY(blocker.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    blocker.write("x");
+    blocker.close();
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("skyContext/catalogCollectionCachePath"), blockerPath + QStringLiteral("/nested/cache")
+    );
+
+    const SkyCatalogCacheController controller(&store);
+    const QString customUrl = QStringLiteral("https://example.test/custom-stars.csv");
+    const auto migrated = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(migrated.migratedLegacy);
+    QCOMPARE(migrated.sources.size(), std::size_t{2});
+
+    // The failed commit is not recorded as a completed migration and leaves the
+    // legacy cache readable.
+    controller.persistCollection(persistRequestFromRestoreResult(migrated));
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto legacyAfterFailure = store.loadCatalogCache();
+    QVERIFY(legacyAfterFailure.has_value());
+    QCOMPARE(legacyAfterFailure->sourceLabel, legacy.sourceLabel);
+    QCOMPARE(legacyAfterFailure->catalogPayload, legacy.catalogPayload);
+    QCOMPARE(legacyAfterFailure->deepSkyCatalogPayload, legacy.deepSkyCatalogPayload);
+
+    // The next start migrates the same readable legacy configuration again.
+    const auto retried = controller.restoreCollection(2, 1, customUrl, QString());
+    QVERIFY(retried.migratedLegacy);
+    QCOMPARE(retried.sources.size(), std::size_t{2});
+    QCOMPARE(retried.sources[0].record.instanceId, migrated.sources[0].record.instanceId);
+    QCOMPARE(retried.sources[1].record.instanceId, migrated.sources[1].record.instanceId);
 }
 
 void SkyCatalogCacheControllerTests::failedCollectionWritePreservesPriorData()
