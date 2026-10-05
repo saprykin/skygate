@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -95,6 +96,10 @@ struct MergeAccumulator final {
     std::vector<std::size_t> domainIndex;
     std::vector<bool> active;
 
+    // Appends a body owned by `sourceId`. The owning source heads the
+    // contributor list, followed by the prior contributors in the descending
+    // source precedence order the caller established. Prior ids are
+    // deduplicated, so a source absorbed through several paths is listed once.
     [[nodiscard]] std::size_t
     append(const BaseCelestialBody& body, std::string sourceId, std::vector<std::string> priorContributors = {})
     {
@@ -142,6 +147,37 @@ struct MergeAccumulator final {
         }
         return ownGalaxyBodies[domainIndex[position]];
     }
+};
+
+// Configured precedence of every source in a composition collection, keyed by
+// source instance id. A source's rank is its position in the configured
+// collection: a later source outranks every earlier source, exactly like a
+// replacement winner outranks the survivor it absorbs. The rank is never
+// derived from the accumulator position of a survivor, because replacement and
+// bridge absorption vacate accumulator positions and append the winner at a
+// new position, so position order stops matching source precedence after the
+// first replacement.
+class SourcePrecedence final {
+public:
+    void add(const std::string_view sourceId, const std::size_t rank)
+    {
+        m_ranks.insert_or_assign(std::string{sourceId}, rank);
+    }
+
+    [[nodiscard]] std::size_t rankOf(const std::string_view sourceId) const
+    {
+        const auto found = m_ranks.find(std::string{sourceId});
+        Q_ASSERT(found != m_ranks.end());
+        return found != m_ranks.end() ? found->second : 0U;
+    }
+
+    [[nodiscard]] bool outranks(const std::string_view lhsSourceId, const std::string_view rhsSourceId) const
+    {
+        return rankOf(lhsSourceId) > rankOf(rhsSourceId);
+    }
+
+private:
+    std::unordered_map<std::string, std::size_t> m_ranks;
 };
 
 struct MatchDecision final {
@@ -506,26 +542,58 @@ void logAmbiguousResolution(const CatalogIdentityIndex::Resolution& resolution, 
         << resolution.candidates.size() << "different bodies.";
 }
 
-// Contributor source ids of the absorbed positions in position order, so the
-// survivor records every absorbed body and each prior contributor.
-std::vector<std::string>
-collectContributors(const MergeAccumulator& accumulator, const std::vector<std::size_t>& positions)
+// Contributor source ids of the absorbed positions, ordered by configured
+// source precedence with the highest-precedence contributor first. Callers
+// prepend the winner's own source, which outranks every absorbed contributor,
+// so the result stays in descending precedence order. Each contributing source
+// is listed once even when several absorbed survivors name it. Accumulator
+// position order is deliberately not used: earlier replacements leave
+// contributor lists that interleave source ranks.
+std::vector<std::string> collectContributors(
+    const MergeAccumulator& accumulator,
+    const std::vector<std::size_t>& positions,
+    const SourcePrecedence& sourcePrecedence
+)
 {
     std::vector<std::string> contributors;
     for (const std::size_t position : positions) {
         for (const std::string& sourceId : accumulator.contributorSourceIds[position]) {
-            contributors.push_back(sourceId);
+            if (std::find(contributors.begin(), contributors.end(), sourceId) == contributors.end()) {
+                contributors.push_back(sourceId);
+            }
         }
     }
+
+    std::sort(
+        contributors.begin(), contributors.end(), [&sourcePrecedence](const std::string& lhs, const std::string& rhs) {
+            return sourcePrecedence.outranks(lhs, rhs);
+        }
+    );
     return contributors;
 }
 
-// Merges every absorbed survivor into `winner` in position order. Each merge
-// diagnoses the coordinate or metadata conflicts the winner overrides.
+// Merges every absorbed survivor into `winner` in configured source precedence
+// order, highest precedence first, so every missing winner value is filled
+// from the highest-priority contributor that supplies it. Absorbed survivors
+// of one source keep their accumulator order, which is the documented
+// within-source row order: the first row of a source is authoritative and its
+// later rows only fill it. Each merge diagnoses the coordinate or metadata
+// conflicts the winner overrides.
 void absorbSurvivors(
-    BaseCelestialBody& winner, const MergeAccumulator& accumulator, const std::vector<std::size_t>& positions
+    BaseCelestialBody& winner,
+    const MergeAccumulator& accumulator,
+    std::vector<std::size_t> positions,
+    const SourcePrecedence& sourcePrecedence
 )
 {
+    std::stable_sort(
+        positions.begin(),
+        positions.end(),
+        [&accumulator, &sourcePrecedence](const std::size_t lhs, const std::size_t rhs) {
+            return sourcePrecedence.outranks(accumulator.sourceIds[lhs], accumulator.sourceIds[rhs]);
+        }
+    );
+
     for (const std::size_t position : positions) {
         mergeSurvivorInPlace(winner, accumulator.at(position));
     }
@@ -538,20 +606,22 @@ void absorbSurvivors(
 // registered, so later rows resolve to the winner and never to a vacated body.
 // Absorption retains each absorbed body's canonical id and canonical
 // equivalences on the winner, so the earlier keys keep resolving to the
-// survivor.
+// survivor. Missing metadata and the contributor id order follow configured
+// source precedence rather than accumulator position order.
 std::size_t absorbSurvivorsAndAppend(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& incoming,
     const std::vector<std::size_t>& absorbedPositions,
-    std::string sourceId
+    std::string sourceId,
+    const SourcePrecedence& sourcePrecedence
 )
 {
-    std::vector<std::string> priorContributors = collectContributors(accumulator, absorbedPositions);
+    std::vector<std::string> priorContributors = collectContributors(accumulator, absorbedPositions, sourcePrecedence);
     std::size_t position = 0;
     if (incoming.kind == BaseCelestialBody::Kind::DeepSkyObject) {
         DistantCelestialBody winner = CelestialBodyCatalog::copyDistantBody(incoming);
-        absorbSurvivors(winner, accumulator, absorbedPositions);
+        absorbSurvivors(winner, accumulator, absorbedPositions, sourcePrecedence);
         for (const std::size_t absorbed : absorbedPositions) {
             accumulator.vacate(absorbed);
             index.remove(absorbed);
@@ -559,7 +629,7 @@ std::size_t absorbSurvivorsAndAppend(
         position = accumulator.append(winner, std::move(sourceId), std::move(priorContributors));
     } else {
         OwnGalaxyCelestialBody winner = CelestialBodyCatalog::copyOwnGalaxyBody(incoming);
-        absorbSurvivors(winner, accumulator, absorbedPositions);
+        absorbSurvivors(winner, accumulator, absorbedPositions, sourcePrecedence);
         for (const std::size_t absorbed : absorbedPositions) {
             accumulator.vacate(absorbed);
             index.remove(absorbed);
@@ -627,7 +697,8 @@ std::size_t appendDeduped(
     MergeAccumulator& accumulator,
     CatalogIdentityIndex& index,
     const BaseCelestialBody& incoming,
-    const std::string_view sourceId
+    const std::string_view sourceId,
+    const SourcePrecedence& sourcePrecedence
 )
 {
     const SourceScopedBody scoped{incoming, sourceId};
@@ -642,7 +713,9 @@ std::size_t appendDeduped(
     }
 
     if (decision.action == MatchDecision::Action::Bridge) {
-        return absorbSurvivorsAndAppend(accumulator, index, body, decision.bridgeCandidates, std::string(sourceId));
+        return absorbSurvivorsAndAppend(
+            accumulator, index, body, decision.bridgeCandidates, std::string(sourceId), sourcePrecedence
+        );
     }
 
     const std::size_t position = accumulator.append(body, std::string(sourceId));
@@ -807,6 +880,15 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
 {
     MergeAccumulator accumulator;
     CatalogIdentityIndex activeIndex;
+    // Rank every configured source by its collection position before merging:
+    // a later source has higher precedence than every earlier one. Disabled
+    // sources are ranked too so a source id lookup is total, but they never
+    // contribute bodies or metadata.
+    SourcePrecedence sourcePrecedence;
+    for (std::size_t index = 0; index < request.sources.size(); ++index) {
+        sourcePrecedence.add(request.sources[index].sourceId, index);
+    }
+
     bool augmentCoreEnabled = false;
     std::string augmentCoreSourceId;
     bool hasStar = false;
@@ -854,7 +936,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             if (body->kind == BaseCelestialBody::Kind::Star) {
                 hasStar = true;
             }
-            appendDeduped(sourceBodies, sourceIndex, *body, source.sourceId);
+            appendDeduped(sourceBodies, sourceIndex, *body, source.sourceId, sourcePrecedence);
         }
 
         // Positions from this pass start here, so a match at or above this
@@ -879,16 +961,16 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
 
                 // A later source wins over an earlier source's survivor and
                 // absorbs its non-conflicting identity and metadata.
-                static_cast<void>(
-                    absorbSurvivorsAndAppend(accumulator, activeIndex, body, {decision.matchIndex}, source.sourceId)
-                );
+                static_cast<void>(absorbSurvivorsAndAppend(
+                    accumulator, activeIndex, body, {decision.matchIndex}, source.sourceId, sourcePrecedence
+                ));
                 continue;
             }
 
             if (decision.action == MatchDecision::Action::Bridge) {
-                static_cast<void>(
-                    absorbSurvivorsAndAppend(accumulator, activeIndex, body, decision.bridgeCandidates, source.sourceId)
-                );
+                static_cast<void>(absorbSurvivorsAndAppend(
+                    accumulator, activeIndex, body, decision.bridgeCandidates, source.sourceId, sourcePrecedence
+                ));
                 continue;
             }
 

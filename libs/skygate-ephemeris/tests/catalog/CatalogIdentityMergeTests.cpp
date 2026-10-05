@@ -245,6 +245,12 @@ private slots:
     void bridgesAmbiguousAuthoritativeIdentifiersIntoSingleSurvivor();
     void keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors();
     void bridgesDeepSkyObjectsWithMetadataUnion();
+    void bridgeInheritsMissingMetadataFromTheLatestContributor();
+    void bridgeWinnerKeepsItsOwnMetadata();
+    void bridgeInheritsOptionalStarMetadataFromTheLatestContributor();
+    void reorderingBridgeSourcesChangesInheritedMetadata();
+    void bridgeAbsorptionUsesSourcePrecedenceAfterReplacements();
+    void multiStageBridgesRetainEveryContributorOnce();
     void retainsReplacedCanonicalIdentityAcrossLaterSources();
     void retainsBridgedCanonicalIdentitiesAcrossLaterSources();
     void retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition();
@@ -439,7 +445,7 @@ void CatalogIdentityMergeTests::keepsWinnerCoordinatesOverConflictingAstrometry(
 
 void CatalogIdentityMergeTests::rejectsLosingAstrometryThatContradictsTheWinningFixedPosition()
 {
-    // R4: the earlier source places the shared HIP 1 object at RA 1 with
+    // The earlier source places the shared HIP 1 object at RA 1 with
     // astrometry at the same default reference epoch. The later source fixes
     // the object at RA 10 and carries no astrometry. The later source wins the
     // position, so its fixed coordinates survive and the unrelated astrometry
@@ -1080,7 +1086,7 @@ void CatalogIdentityMergeTests::primaryDesignationSurvivesBinaryRoundTrip()
 
 void CatalogIdentityMergeTests::bridgesIdentifiersAcquiredEarlierInTheSameSourcePass()
 {
-    // R3: source A establishes that HIP 1 and HD 2 are one object. Source B's
+    // Source A establishes that HIP 1 and HD 2 are one object. Source B's
     // first record replaces A and acquires HD 2; its later record resolves
     // through that acquired identifier instead of appending a second survivor.
     const auto sourceA = createCatalog(
@@ -1144,6 +1150,15 @@ void CatalogIdentityMergeTests::bridgesAmbiguousAuthoritativeIdentifiersIntoSing
     // The bridging record carries both authoritative identifiers. It resolves
     // each of them to a different survivor of an earlier source, so it becomes
     // the single survivor of all three records instead of a third object.
+    //
+    // Contract correction: the bridge carries no display name of
+    // its own, so its missing name comes from the highest-priority contributor,
+    // and contributors are listed from the winner down to the lowest-priority
+    // source. Source precedence is the configured collection position, not the
+    // accumulator position of an absorbed survivor: source-c is configured
+    // after source-a, so `Gamma` wins over `Alpha` and source-c precedes
+    // source-a. The earlier version of this test asserted accumulator position
+    // order, which is not source precedence.
     const auto sourceA =
         createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
     const auto sourceC =
@@ -1177,9 +1192,9 @@ void CatalogIdentityMergeTests::bridgesAmbiguousAuthoritativeIdentifiersIntoSing
     QVERIFY(winner != nullptr);
     QVERIFY(hasIdentifier(*winner, "hip", "1"));
     QVERIFY(hasIdentifier(*winner, "hd", "2"));
-    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("Alpha"));
+    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("Gamma"));
     QCOMPARE(result.sourceIds.front(), std::string("source-b"));
-    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a", "source-c"}));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-c", "source-a"}));
 }
 
 void CatalogIdentityMergeTests::keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors()
@@ -1239,6 +1254,12 @@ void CatalogIdentityMergeTests::keepsIncompatibleKindsDistinctWhileBridgingSameK
 
 void CatalogIdentityMergeTests::bridgesDeepSkyObjectsWithMetadataUnion()
 {
+    // The bridge carries no display name and no major axis of its own, so the
+    // missing deep-sky metadata comes from the highest-priority contributor.
+    // Contract correction: source-c is configured after source-a,
+    // so `C Triangulum` and its major axis win over `A Andromeda` and 178.0,
+    // and source-c precedes source-a in the contributor list. Identifiers and
+    // aliases still union from every contributor.
     const auto sourceA = createCatalog(
         {},
         {makeDeepSkyObject(
@@ -1287,7 +1308,7 @@ void CatalogIdentityMergeTests::bridgesDeepSkyObjectsWithMetadataUnion()
     QVERIFY(winner != nullptr);
     QVERIFY(hasIdentifier(*winner, "ngc", "224"));
     QVERIFY(hasIdentifier(*winner, "messier", "031"));
-    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("A Andromeda"));
+    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("C Triangulum"));
     QVERIFY(hasAlias(winner->identity.aliases, "Andromeda Galaxy"));
     QVERIFY(hasAlias(winner->identity.aliases, "Triangulum"));
     QVERIFY(winner->fixedEquatorialValue().has_value());
@@ -1295,14 +1316,291 @@ void CatalogIdentityMergeTests::bridgesDeepSkyObjectsWithMetadataUnion()
     const auto* deepSkyInfo = winner->deepSkyObjectInfo();
     QVERIFY(deepSkyInfo != nullptr);
     QVERIFY(deepSkyInfo->majorAxisArcmin.has_value());
-    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 178.0);
+    QCOMPARE(*deepSkyInfo->majorAxisArcmin, 60.0);
     QCOMPARE(result.sourceIds.front(), std::string("source-b"));
-    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a", "source-c"}));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-c", "source-a"}));
+}
+
+void CatalogIdentityMergeTests::bridgeInheritsMissingMetadataFromTheLatestContributor()
+{
+    // The bridge resolves the shared object but carries no display name of
+    // its own, so its missing name must come from the highest-priority
+    // contributor (the later configured source) instead of the earliest
+    // accumulator position. Contributors are listed from the winner down to
+    // the lowest-priority source, each contributing source once.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Earlier A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd2", "Later B", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto sourceC = createCatalog(
+        {makeStar(
+            "c_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "a_hip1"), std::size_t{0});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "b_hd2"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "c_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Later B"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-c"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-c", "source-b", "source-a"}));
+}
+
+void CatalogIdentityMergeTests::bridgeWinnerKeepsItsOwnMetadata()
+{
+    // A value the bridge supplies itself stays authoritative
+    // even when every absorbed contributor carries its own value for it.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Earlier A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd2", "Later B", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto sourceC = createCatalog(
+        {makeStar(
+            "c_bridge",
+            "Bridge C",
+            {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")},
+            {},
+            1.0,
+            2.0
+        )},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "c_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Bridge C"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-c"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-c", "source-b", "source-a"}));
+}
+
+void CatalogIdentityMergeTests::bridgeInheritsOptionalStarMetadataFromTheLatestContributor()
+{
+    // Acceptance with optional domain metadata instead of the display name:
+    // the bridge owns no astrometry, so its missing fields come from the
+    // highest-priority contributor first and are only then completed by lower
+    // priority contributors. The later source supplies the proper motion and
+    // parallax, the earlier source only fills the radial velocity gap.
+    OwnGalaxyCelestialBody earlier =
+        makeStar("a_hip1", "Earlier A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0);
+    earlier.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlier.fixedEquatorial,
+        .stellarParallaxMas = 1.0,
+        .radialVelocityKmPerSecond = -1.0,
+    };
+    OwnGalaxyCelestialBody later = makeStar("b_hd2", "Later B", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0);
+    later.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *later.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 30.0,
+        .properMotionDeclinationMasPerYear = -40.0,
+        .stellarParallaxMas = 2.0,
+    };
+    const auto sourceA = createCatalog({earlier}, {});
+    const auto sourceB = createCatalog({later}, {});
+    const auto sourceC = createCatalog(
+        {makeStar(
+            "c_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "c_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(survivor->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *survivor->starAstrometryValue();
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 2.0);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 30.0);
+    QVERIFY(astrometry.properMotionDeclinationMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, -40.0);
+    QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, -1.0);
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-c", "source-b", "source-a"}));
+}
+
+void CatalogIdentityMergeTests::reorderingBridgeSourcesChangesInheritedMetadata()
+{
+    // The same records with sources A and B swapped. The source configured
+    // later is the higher-priority contributor, so the inherited name changes
+    // from `Later B` to `Earlier A` and the contributor list swaps accordingly.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Earlier A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd2", "Later B", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto sourceC = createCatalog(
+        {makeStar(
+            "c_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+    QVERIFY(sourceA != nullptr);
+    QVERIFY(sourceB != nullptr);
+    QVERIFY(sourceC != nullptr);
+
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "source-b", .enabled = true, .catalog = sourceB.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-a", .enabled = true, .catalog = sourceA.get(), .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "source-c", .enabled = true, .catalog = sourceC.get(), .policy = CatalogCompositionPolicy::Merge},
+    };
+
+    const CatalogCompositionResult result = CatalogComposer::composeCollection(request);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "a_hip1"), std::size_t{0});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "b_hd2"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "c_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Earlier A"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-c"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-c", "source-a", "source-b"}));
+}
+
+void CatalogIdentityMergeTests::bridgeAbsorptionUsesSourcePrecedenceAfterReplacements()
+{
+    // A replacement runs before the bridge: source-2 replaced source-0's HIP 1
+    // survivor, and the replacement's contributor list carries source-0, whose
+    // accumulator position is now vacated. The bridge must still inherit from
+    // source-2's replacement (the higher-precedence absorbed survivor) and
+    // list source-2 before source-1 before source-0. Absorbing in accumulator
+    // position order would instead use source-1's name and place source-1
+    // before source-2.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "Earlier A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd2", "Later B", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto replacement =
+        createCatalog({makeStar("c_hip1", "Replacement C", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto bridge = createCatalog(
+        {makeStar(
+            "d_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), replacement.get(), bridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "a_hip1"), std::size_t{0});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "b_hd2"), std::size_t{0});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "c_hip1"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "d_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Replacement C"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-3"));
+    QCOMPARE(
+        result.contributorSourceIds.front(), (std::vector<std::string>{"source-3", "source-2", "source-1", "source-0"})
+    );
+}
+
+void CatalogIdentityMergeTests::multiStageBridgesRetainEveryContributorOnce()
+{
+    // A second bridge absorbs the first bridge's survivor together with one
+    // more source. Every contributing source appears exactly once, ordered
+    // from the second bridge's source down to the earliest source, and the
+    // higher-priority contributor supplies the missing name.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip1", "A", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd2", "B", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto firstBridge = createCatalog(
+        {makeStar(
+            "c_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+    const auto sourceD =
+        createCatalog({makeStar("d_hyg3", "D", {CatalogIdentifier::make("hyg", "3")}, {}, 1.0, 2.0)}, {});
+    const auto secondBridge = createCatalog(
+        {makeStar(
+            "e_bridge", {}, {CatalogIdentifier::make("hd", "2"), CatalogIdentifier::make("hyg", "3")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+
+    const CatalogCompositionResult result =
+        composeAll({sourceA.get(), sourceB.get(), firstBridge.get(), sourceD.get(), secondBridge.get()});
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "c_bridge"), std::size_t{0});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "d_hyg3"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(result.catalog->bodies(), "e_bridge");
+    QVERIFY(survivor != nullptr);
+    QVERIFY(hasIdentifier(*survivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*survivor, "hd", "2"));
+    QVERIFY(hasIdentifier(*survivor, "hyg", "3"));
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("D"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-4"));
+    QCOMPARE(
+        result.contributorSourceIds.front(),
+        (std::vector<std::string>{"source-4", "source-3", "source-2", "source-1", "source-0"})
+    );
 }
 
 void CatalogIdentityMergeTests::retainsReplacedCanonicalIdentityAcrossLaterSources()
 {
-    // N1: A and B establish that both canonical keys identify the same object
+    // A and B establish that both canonical keys identify the same object
     // because they carry the same HIP cross-identifier. B replaces A, then C
     // arrives carrying A's canonical id without any cross-identifier. The
     // established equivalence must resolve C to the survivor instead of
@@ -1391,7 +1689,7 @@ void CatalogIdentityMergeTests::retainsBridgedCanonicalIdentitiesAcrossLaterSour
 
 void CatalogIdentityMergeTests::retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition()
 {
-    // N1 acceptance: the established equivalence survives binary
+    // The established equivalence survives binary
     // serialization, index reconstruction, and reuse of the already-composed
     // snapshot as a composition input.
     const auto sourceA =

@@ -823,7 +823,10 @@ void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepSingleWinnerAn
     // collection. Every order must produce one survivor whose contributor list
     // covers all three sources; which source wins follows the documented
     // precedence: because every source matches the established object, the
-    // last source of the order supplies the survivor.
+    // last source of the order supplies the survivor. Contributor ids are
+    // listed by configured source precedence, highest first, so the two
+    // ambiguous-bridge orders below list the higher-precedence donor before
+    // the lower one even though the lower one was appended first.
     const auto sourceA =
         createCatalog({makeStar("a_hip1", "Alpha", {CatalogIdentifier::make("hip", "1")}, 1.0, 2.0)}, {});
     const auto sourceB = createCatalog(
@@ -849,10 +852,10 @@ void CatalogCompositionCollectionTests::reorderedBridgeSourcesKeepSingleWinnerAn
     const std::vector<const skygate::ephemeris::IStarCatalog*> catalogs = {sourceA.get(), sourceB.get(), sourceC.get()};
     const std::vector<ExpectedOutcome> outcomes = {
         {{0U, 1U, 2U}, "c_hd2", {"source-c", "source-b", "source-a"}},
-        {{0U, 2U, 1U}, "b_bridge", {"source-b", "source-a", "source-c"}},
+        {{0U, 2U, 1U}, "b_bridge", {"source-b", "source-c", "source-a"}},
         {{1U, 0U, 2U}, "c_hd2", {"source-c", "source-a", "source-b"}},
         {{1U, 2U, 0U}, "a_hip1", {"source-a", "source-c", "source-b"}},
-        {{2U, 0U, 1U}, "b_bridge", {"source-b", "source-c", "source-a"}},
+        {{2U, 0U, 1U}, "b_bridge", {"source-b", "source-a", "source-c"}},
         {{2U, 1U, 0U}, "a_hip1", {"source-a", "source-b", "source-c"}},
     };
 
