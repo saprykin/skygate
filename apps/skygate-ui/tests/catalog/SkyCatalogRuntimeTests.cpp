@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -177,6 +178,56 @@ bool runtimeContainsBody(const skygate::ui::internal::SkyCatalogRuntime& runtime
     });
 }
 
+std::vector<QString> snapshotSourceIds(const skygate::ui::internal::SkyCatalogRuntime& runtime)
+{
+    const std::span<const QString> sourceIds = runtime.sourceIds();
+    return std::vector<QString>(sourceIds.begin(), sourceIds.end());
+}
+
+// Returns the first violated publication invariant, or nothing when the
+// runtime publishes one coherent state: the counts match the active snapshot
+// and the per-body provenance arrays are parallel to its bodies with every
+// winning source recorded as a contributor.
+std::optional<QString> publishedStateInconsistency(const skygate::ui::internal::SkyCatalogRuntime& runtime)
+{
+    const skygate::ephemeris::IStarCatalog* catalog = runtime.starCatalog();
+    if (catalog == nullptr) {
+        return QStringLiteral("the active snapshot is missing");
+    }
+
+    const auto bodies = catalog->bodies();
+    if (runtime.bodyCount() != bodies.size()) {
+        return QStringLiteral("bodyCount does not match the active snapshot");
+    }
+    if (runtime.sourceIds().size() != bodies.size() || runtime.contributorSourceIds().size() != bodies.size()) {
+        return QStringLiteral("the provenance arrays are not parallel to the active snapshot");
+    }
+
+    const std::size_t deepSkyBodyCount = static_cast<std::size_t>(
+        std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+        })
+    );
+    if (runtime.deepSkyObjectCount() != deepSkyBodyCount) {
+        return QStringLiteral("deepSkyObjectCount does not match the active snapshot");
+    }
+
+    for (std::size_t index = 0; index < bodies.size(); ++index) {
+        if (bodies[index] == nullptr) {
+            return QStringLiteral("the active snapshot holds an empty body");
+        }
+        const QString& winningSourceId = runtime.sourceIds()[index];
+        if (winningSourceId.isEmpty()) {
+            return QStringLiteral("a body has no winning source identity");
+        }
+        if (runtime.contributorSourceIds()[index].isEmpty()
+            || !runtime.contributorSourceIds()[index].contains(winningSourceId)) {
+            return QStringLiteral("a body's winning source is missing from its contributors");
+        }
+    }
+    return std::nullopt;
+}
+
 }  // namespace
 
 class SkyCatalogRuntimeTests final : public QObject {
@@ -186,7 +237,10 @@ private slots:
     void initializeBuildsActiveCatalogAndExposesSources();
     void sourceConstellationDataIsOwnedAndComposed();
     void resolvedRefsTrackIdentityAndInvalidateOnSourceChange();
-    void nullCatalogReportsFailureWithoutCatalogChange();
+    void nullCatalogPreservesLastGoodStateAndReportsFailure();
+    void rejectedCollectionPreservesLastGoodState();
+    void failedTransitionKeepsResolvedReferencesAndRevision();
+    void successfulTransitionsPublishAlignedState();
     void sourcesLoadReplaceEnableDisableAndRemoveIndependently();
     void moveSourceReordersAndClampsTarget();
     void provenanceKeepsStableIdentitiesBeyondByteRange();
@@ -202,7 +256,20 @@ private slots:
     void relatedDataDoesNotAffectOtherOwnersOrCatalogs();
     void resolvedRefsUseActiveIdentitiesFromWinningCatalog();
     void resolvedCacheInvalidatesWhenRelatedDataChanges();
+
+private:
+    // Fails the calling test when the runtime does not publish one coherent
+    // state after an accepted transition.
+    static void expectConsistentPublication(const skygate::ui::internal::SkyCatalogRuntime& runtime);
 };
+
+void SkyCatalogRuntimeTests::expectConsistentPublication(const skygate::ui::internal::SkyCatalogRuntime& runtime)
+{
+    const std::optional<QString> inconsistency = publishedStateInconsistency(runtime);
+    if (inconsistency.has_value()) {
+        QFAIL(qPrintable(*inconsistency));
+    }
+}
 
 void SkyCatalogRuntimeTests::initializeBuildsActiveCatalogAndExposesSources()
 {
@@ -301,11 +368,24 @@ void SkyCatalogRuntimeTests::resolvedRefsTrackIdentityAndInvalidateOnSourceChang
     QVERIFY(runtime.resolvedConstellationAnchorGroups().empty());
 }
 
-void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()
+void SkyCatalogRuntimeTests::nullCatalogPreservesLastGoodStateAndReportsFailure()
 {
     skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    QVERIFY(runtime.initialize({}).succeeded);
 
-    const auto result = runtime.applySource(
+    const skygate::ephemeris::IStarCatalog* const catalogBefore = runtime.starCatalog();
+    const std::uint64_t revisionBefore = runtime.catalogRevision();
+    const std::size_t bodyCountBefore = runtime.bodyCount();
+    const QStringList sourcesBefore = runtime.sourceInstanceIds();
+    const std::vector<QString> sourceIdsBefore = snapshotSourceIds(runtime);
+    const QHash<QString, QString> titlesBefore = runtime.sourceTitles();
+    QVERIFY(bodyCountBefore >= 2U);
+
+    // Documented contract: a source record without a catalog is rejected as an
+    // operation error. The last accepted configuration, snapshot, counts,
+    // provenance, and revision stay published together instead of a cleared
+    // metadata shell around an old snapshot.
+    const auto replacementResult = runtime.applySource(
         skygate::ui::internal::SkyCatalogSourceRecord{
             .instanceId = QStringLiteral("primary"),
             .title = QStringLiteral("Broken"),
@@ -318,11 +398,330 @@ void SkyCatalogRuntimeTests::nullCatalogReportsFailureWithoutCatalogChange()
         {}
     );
 
-    QVERIFY(result.statusTextChanged);
-    QVERIFY(result.datasetInfoChanged);
-    QVERIFY(!result.catalogChanged);
-    QCOMPARE(result.statusText, QString("Catalog: Failed to load"));
-    QCOMPARE(runtime.bodyCount(), 0U);
+    QVERIFY(!replacementResult.succeeded);
+    QVERIFY(replacementResult.statusTextChanged);
+    QVERIFY(!replacementResult.datasetInfoChanged);
+    QVERIFY(!replacementResult.deepSkyCatalogInfoChanged);
+    QVERIFY(!replacementResult.catalogChanged);
+    QCOMPARE(replacementResult.statusText, QString("Catalog: Failed to load"));
+
+    QCOMPARE(runtime.starCatalog(), catalogBefore);
+    QCOMPARE(runtime.catalogRevision(), revisionBefore);
+    QCOMPARE(runtime.bodyCount(), bodyCountBefore);
+    QCOMPARE(runtime.sourceInstanceIds(), sourcesBefore);
+    QCOMPARE(snapshotSourceIds(runtime), sourceIdsBefore);
+    QCOMPARE(runtime.sourceTitles(), titlesBefore);
+    QCOMPARE(runtime.sourceCount(), static_cast<std::size_t>(sourcesBefore.size()));
+    const auto sources = runtime.sources();
+    QCOMPARE(sources[0].title, QString("Bundled"));
+    QVERIFY(sources[0].catalog != nullptr);
+    expectConsistentPublication(runtime);
+
+    // A rejected addition is not installed either.
+    const auto additionResult = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("broken"),
+            .title = QStringLiteral("Broken"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = nullptr,
+            .foundObjectCount = 0,
+        },
+        {}
+    );
+    QVERIFY(!additionResult.succeeded);
+    QVERIFY(!runtime.hasSource(QStringLiteral("broken")));
+    QCOMPARE(runtime.sourceInstanceIds(), sourcesBefore);
+    QCOMPARE(runtime.catalogRevision(), revisionBefore);
+
+    // A runtime that never accepted an activation keeps its empty published
+    // state instead of inventing counts.
+    skygate::ui::internal::SkyCatalogRuntime emptyRuntime(nullptr);
+    const auto emptyResult = emptyRuntime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("primary"),
+            .title = QStringLiteral("Broken"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = nullptr,
+            .foundObjectCount = 0,
+        },
+        {}
+    );
+    QVERIFY(!emptyResult.succeeded);
+    QCOMPARE(emptyRuntime.starCatalog(), nullptr);
+    QCOMPARE(emptyRuntime.bodyCount(), 0U);
+    QCOMPARE(emptyRuntime.sourceCount(), 0U);
+}
+
+void SkyCatalogRuntimeTests::rejectedCollectionPreservesLastGoodState()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCrossIdentifiedCatalog());
+    const RuntimeBuildOptions options{};
+    QVERIFY(runtime.initialize(options).succeeded);
+    QVERIFY(applySingleStarSource(runtime, QStringLiteral("source-a"), "source_a_1", options).succeeded);
+    QVERIFY(
+        runtime.setSourceConstellationRefs(QStringLiteral("source-a"), {{"hip_1", "hip_2"}}, {{"Orion", {"hip_1"}}}, 1U)
+            .succeeded
+    );
+
+    const skygate::ephemeris::IStarCatalog* const catalogBefore = runtime.starCatalog();
+    const std::uint64_t revisionBefore = runtime.catalogRevision();
+    const std::size_t bodyCountBefore = runtime.bodyCount();
+    const QStringList sourcesBefore = runtime.sourceInstanceIds();
+    const std::vector<QString> sourceIdsBefore = snapshotSourceIds(runtime);
+    const QHash<QString, QString> titlesBefore = runtime.sourceTitles();
+    const std::size_t constellationCountBefore = runtime.constellationCount();
+    const std::size_t lineRefCountBefore = runtime.constellationLineRefs().size();
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].first == "catalog_a_1");
+
+    // A collection whose identities cannot compose is rejected as a whole: the
+    // candidate configuration is not installed and the last accepted snapshot
+    // keeps its configuration, counts, provenance, and related view.
+    std::vector<skygate::ui::internal::SkyCatalogSourceRecord> duplicatedIdentity;
+    duplicatedIdentity.push_back(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("duplicate"),
+            .title = QStringLiteral("First"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("duplicate_1", "First"),
+            .foundObjectCount = 0,
+        }
+    );
+    duplicatedIdentity.push_back(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("duplicate"),
+            .title = QStringLiteral("Second"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("duplicate_2", "Second"),
+            .foundObjectCount = 0,
+        }
+    );
+    const auto rejectedResult = runtime.replaceSources(std::move(duplicatedIdentity), options);
+    QVERIFY(!rejectedResult.succeeded);
+    QVERIFY(rejectedResult.statusTextChanged);
+    QVERIFY(rejectedResult.statusText.startsWith(QStringLiteral("Catalog: Collection rejected")));
+    QVERIFY(!rejectedResult.datasetInfoChanged);
+    QVERIFY(!rejectedResult.deepSkyCatalogInfoChanged);
+    QVERIFY(!rejectedResult.catalogChanged);
+
+    QCOMPARE(runtime.starCatalog(), catalogBefore);
+    QCOMPARE(runtime.catalogRevision(), revisionBefore);
+    QCOMPARE(runtime.bodyCount(), bodyCountBefore);
+    QCOMPARE(runtime.sourceInstanceIds(), sourcesBefore);
+    QCOMPARE(snapshotSourceIds(runtime), sourceIdsBefore);
+    QCOMPARE(runtime.sourceTitles(), titlesBefore);
+    QCOMPARE(runtime.constellationCount(), constellationCountBefore);
+    QCOMPARE(runtime.constellationLineRefs().size(), lineRefCountBefore);
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    expectConsistentPublication(runtime);
+
+    // An added record with an empty instance identity is rejected the same way.
+    const auto emptyIdentityResult = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QString(),
+            .title = QStringLiteral("Nameless"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("nameless_1", "Nameless"),
+            .foundObjectCount = 0,
+        },
+        options
+    );
+    QVERIFY(!emptyIdentityResult.succeeded);
+    QVERIFY(!emptyIdentityResult.catalogChanged);
+    QVERIFY(!runtime.hasSource(QString()));
+    QCOMPARE(runtime.sourceInstanceIds(), sourcesBefore);
+    QCOMPARE(snapshotSourceIds(runtime), sourceIdsBefore);
+    QCOMPARE(runtime.catalogRevision(), revisionBefore);
+
+    // Operations that select nothing stay successful no-ops.
+    QVERIFY(runtime.setSourceEnabled(QStringLiteral("missing"), false, options).succeeded);
+    QVERIFY(runtime.removeSource(QStringLiteral("missing"), options).succeeded);
+    QVERIFY(runtime.moveSource(QStringLiteral("missing"), 0U, options).succeeded);
+    QCOMPARE(runtime.sourceInstanceIds(), sourcesBefore);
+    QCOMPARE(runtime.catalogRevision(), revisionBefore);
+}
+
+void SkyCatalogRuntimeTests::failedTransitionKeepsResolvedReferencesAndRevision()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCrossIdentifiedCatalog());
+    QVERIFY(runtime.initialize({}).succeeded);
+    QVERIFY(runtime
+                .setSourceConstellationRefs(
+                    QStringLiteral("primary"), {{"hip_1", "hip_2"}}, {{"Orion", {"hip_1", "hip_2"}}}, 1U
+                )
+                .succeeded);
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].first == "catalog_a_1");
+    const std::uint64_t revisionWithResolvedRefs = runtime.catalogRevision();
+
+    // A rejected replacement reports the operation error while the resolved
+    // references keep belonging to the published revision.
+    const auto nullResult = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("primary"),
+            .title = QStringLiteral("Broken"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = nullptr,
+            .foundObjectCount = 0,
+        },
+        {}
+    );
+    QVERIFY(!nullResult.succeeded);
+    QCOMPARE(runtime.catalogRevision(), revisionWithResolvedRefs);
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].first == "catalog_a_1");
+
+    // A rejected collection replacement keeps the same snapshot and the same
+    // resolved references.
+    std::vector<skygate::ui::internal::SkyCatalogSourceRecord> duplicatedIdentity;
+    duplicatedIdentity.push_back(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("duplicate"),
+            .title = QStringLiteral("First"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("duplicate_1", "First"),
+            .foundObjectCount = 0,
+        }
+    );
+    duplicatedIdentity.push_back(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("duplicate"),
+            .title = QStringLiteral("Second"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("duplicate_2", "Second"),
+            .foundObjectCount = 0,
+        }
+    );
+    const auto rejectedResult = runtime.replaceSources(std::move(duplicatedIdentity), {});
+    QVERIFY(!rejectedResult.succeeded);
+    QCOMPARE(runtime.catalogRevision(), revisionWithResolvedRefs);
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].first == "catalog_a_1");
+
+    // An accepted replacement moves the revision and resolves the retained
+    // references against the new snapshot instead.
+    const auto replaceResult = runtime.applySource(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("primary"),
+            .title = QStringLiteral("Other"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeHipCrossIdentifiedCatalog("other_1", "other_2"),
+            .foundObjectCount = 0,
+        },
+        {}
+    );
+    QVERIFY(replaceResult.succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionWithResolvedRefs);
+    QCOMPARE(runtime.resolvedConstellationLineRefs().size(), 1U);
+    QVERIFY(runtime.resolvedConstellationLineRefs()[0].first == "other_1");
+}
+
+void SkyCatalogRuntimeTests::successfulTransitionsPublishAlignedState()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    const RuntimeBuildOptions options = bundledDeepSkyOptions(kFallbackBundledDeepSky);
+
+    std::uint64_t revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.initialize(options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(applySingleStarSource(runtime, QStringLiteral("source-a"), "source_a_1", options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    // Replacing a source keeps the arrays aligned with the new snapshot.
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime
+                .applySource(
+                    skygate::ui::internal::SkyCatalogSourceRecord{
+                        .instanceId = QStringLiteral("source-a"),
+                        .title = QStringLiteral("Source A"),
+                        .version = QString(),
+                        .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+                        .enabled = true,
+                        .catalog = makeSingleStarCatalog("source_a_2", "Replacement"),
+                        .foundObjectCount = 0,
+                    },
+                    options
+                )
+                .succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.setSourceEnabled(QStringLiteral("source-a"), false, options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.setSourceEnabled(QStringLiteral("source-a"), true, options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.moveSource(QStringLiteral("source-a"), 0U, options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.removeSource(QStringLiteral("source-a"), options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.rebuildActiveCatalog(options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    expectConsistentPublication(runtime);
+
+    // A whole-collection replacement publishes the same alignment.
+    std::vector<skygate::ui::internal::SkyCatalogSourceRecord> replacement;
+    replacement.push_back(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("alpha"),
+            .title = QStringLiteral("Alpha"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .catalog = makeSingleStarCatalog("alpha_1", "Alpha"),
+            .foundObjectCount = 0,
+        }
+    );
+    replacement.push_back(
+        skygate::ui::internal::SkyCatalogSourceRecord{
+            .instanceId = QStringLiteral("beta"),
+            .title = QStringLiteral("Beta"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly,
+            .enabled = true,
+            .catalog = makeMixedCatalog({}, {makeMessierBody("messier_031", "31", 1.0)}),
+            .foundObjectCount = 0,
+        }
+    );
+    revisionBefore = runtime.catalogRevision();
+    QVERIFY(runtime.replaceSources(std::move(replacement), options).succeeded);
+    QVERIFY(runtime.catalogRevision() > revisionBefore);
+    QCOMPARE(runtime.sourceInstanceIds(), QStringList({QStringLiteral("alpha"), QStringLiteral("beta")}));
+    expectConsistentPublication(runtime);
 }
 
 void SkyCatalogRuntimeTests::sourcesLoadReplaceEnableDisableAndRemoveIndependently()

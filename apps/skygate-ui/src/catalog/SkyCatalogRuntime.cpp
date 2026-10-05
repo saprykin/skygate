@@ -9,6 +9,7 @@
 #include <QLocale>
 
 #include <algorithm>
+#include <optional>
 #include <unordered_set>
 #include <utility>
 
@@ -63,6 +64,11 @@ SkyCatalogRuntime::SkyCatalogRuntime(std::unique_ptr<skygate::ephemeris::IStarCa
 const skygate::ephemeris::IStarCatalog* SkyCatalogRuntime::starCatalog() const noexcept
 {
     return m_starCatalog.get();
+}
+
+QString SkyCatalogRuntime::statusText() const
+{
+    return buildStatusText();
 }
 
 QString SkyCatalogRuntime::sourceLabel() const
@@ -222,23 +228,41 @@ SkyCatalogRuntimeResult
 SkyCatalogRuntime::applySource(SkyCatalogSourceRecord source, const SkyCatalogRuntimeBuildOptions& options)
 {
     if (source.catalog == nullptr) {
-        return failedCatalogResult(QStringLiteral("Catalog: Failed to load"));
+        // A source without a catalog is never installed: the last accepted
+        // collection stays active and the operation reports the error.
+        return activationFailureResult(QStringLiteral("Catalog: Failed to load"));
     }
 
     const auto existing =
         std::find_if(m_sources.begin(), m_sources.end(), [&source](const SkyCatalogSourceRecord& candidate) {
             return candidate.instanceId == source.instanceId;
         });
-    if (existing != m_sources.end()) {
-        // The related dataset is owned by the instance and changes only
-        // through the explicit related-data operations, so replacing the
-        // catalog keeps it until its owner replaces or clears the dataset.
-        source.constellationData = std::move(existing->constellationData);
-        *existing = std::move(source);
-    } else {
+    if (existing == m_sources.end()) {
         m_sources.push_back(std::move(source));
+        const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
+        if (!result.succeeded) {
+            // The rejected addition is not kept configured.
+            m_sources.pop_back();
+        }
+        return result;
     }
-    return rebuildActiveCatalog(options);
+
+    const std::size_t existingIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
+    SkyCatalogSourceRecord previous = std::move(m_sources[existingIndex]);
+    // The related dataset is owned by the instance and changes only through
+    // the explicit related-data operations, so replacing the catalog keeps it
+    // until its owner replaces or clears the dataset.
+    source.constellationData = std::move(previous.constellationData);
+    m_sources[existingIndex] = std::move(source);
+
+    const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
+    if (!result.succeeded) {
+        // The rejected replacement is not kept configured: the previous
+        // record, including its owned related dataset, stays in place.
+        previous.constellationData = std::move(m_sources[existingIndex].constellationData);
+        m_sources[existingIndex] = std::move(previous);
+    }
+    return result;
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::setSourceEnabled(
@@ -253,8 +277,14 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::setSourceEnabled(
         return SkyCatalogRuntimeResult{};
     }
 
-    existing->enabled = enabled;
-    return rebuildActiveCatalog(options);
+    const std::size_t existingIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
+    m_sources[existingIndex].enabled = enabled;
+    const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
+    if (!result.succeeded) {
+        // The rejected participation change is not kept configured.
+        m_sources[existingIndex].enabled = !enabled;
+    }
+    return result;
 }
 
 SkyCatalogRuntimeResult
@@ -268,8 +298,15 @@ SkyCatalogRuntime::removeSource(const QString& instanceId, const SkyCatalogRunti
         return SkyCatalogRuntimeResult{};
     }
 
-    m_sources.erase(existing);
-    return rebuildActiveCatalog(options);
+    const std::size_t existingIndex = static_cast<std::size_t>(std::distance(m_sources.begin(), existing));
+    SkyCatalogSourceRecord removed = std::move(m_sources[existingIndex]);
+    m_sources.erase(m_sources.begin() + static_cast<std::ptrdiff_t>(existingIndex));
+    const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
+    if (!result.succeeded) {
+        // The rejected removal restores the removed record at its position.
+        m_sources.insert(m_sources.begin() + static_cast<std::ptrdiff_t>(existingIndex), std::move(removed));
+    }
+    return result;
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::moveSource(
@@ -290,39 +327,65 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::moveSource(
         return SkyCatalogRuntimeResult{};
     }
 
-    SkyCatalogSourceRecord moved = std::move(*existing);
-    m_sources.erase(existing);
+    SkyCatalogSourceRecord moved = std::move(m_sources[currentIndex]);
+    m_sources.erase(m_sources.begin() + static_cast<std::ptrdiff_t>(currentIndex));
     m_sources.insert(m_sources.begin() + static_cast<std::ptrdiff_t>(clampedTarget), std::move(moved));
-    return rebuildActiveCatalog(options);
+    const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
+    if (!result.succeeded) {
+        // The rejected reorder restores the previous visible order.
+        SkyCatalogSourceRecord staged = std::move(m_sources[clampedTarget]);
+        m_sources.erase(m_sources.begin() + static_cast<std::ptrdiff_t>(clampedTarget));
+        m_sources.insert(m_sources.begin() + static_cast<std::ptrdiff_t>(currentIndex), std::move(staged));
+    }
+    return result;
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::replaceSources(
     std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options
 )
 {
+    std::vector<SkyCatalogSourceRecord> previousSources = std::move(m_sources);
     m_sources = std::move(sources);
-    return rebuildActiveCatalog(options);
+    const SkyCatalogRuntimeResult result = rebuildActiveCatalog(options);
+    if (!result.succeeded) {
+        // The rejected collection is not installed; the previous configuration
+        // keeps feeding the published snapshot.
+        m_sources = std::move(previousSources);
+    }
+    return result;
 }
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options)
 {
+    // The whole transition is staged: the implicit bundled source, the related
+    // view, the composition, and every derived count are built locally, and
+    // only an accepted composition commits them. A rejected composition
+    // reports the operation error and leaves the published state untouched.
+    std::optional<SkyCatalogSourceRecord> implicitBundledSource;
     if (m_sources.empty()) {
         auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
         if (bundledCatalog == nullptr) {
-            return failedCatalogResult(QStringLiteral("Catalog: Failed to load"));
+            return activationFailureResult(QStringLiteral("Catalog: Failed to load"));
         }
-        m_sources.push_back(
-            SkyCatalogSourceRecord{
-                .instanceId = QString::fromLatin1(kPrimarySourceId),
-                .title = QStringLiteral("Bundled"),
-                .version = QString(),
-                .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
-                .enabled = true,
-                .bundled = true,
-                .catalog = std::move(bundledCatalog),
-                .foundObjectCount = 0,
-            }
-        );
+        implicitBundledSource = SkyCatalogSourceRecord{
+            .instanceId = QString::fromLatin1(kPrimarySourceId),
+            .title = QStringLiteral("Bundled"),
+            .version = QString(),
+            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+            .enabled = true,
+            .bundled = true,
+            .catalog = std::move(bundledCatalog),
+            .foundObjectCount = 0,
+        };
+    }
+
+    std::vector<const SkyCatalogSourceRecord*> candidateSources;
+    candidateSources.reserve(m_sources.size() + (implicitBundledSource.has_value() ? 1U : 0U));
+    for (const SkyCatalogSourceRecord& source : m_sources) {
+        candidateSources.push_back(&source);
+    }
+    if (implicitBundledSource.has_value()) {
+        candidateSources.push_back(&*implicitBundledSource);
     }
 
     skygate::ephemeris::CatalogCompositionRequest request;
@@ -334,19 +397,19 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     request.currentConstellationCount = buildActiveConstellationView(activeLineRefs, activeAnchorGroups);
 
     std::size_t knownDeepSkyObjectCount = 0;
-    for (const SkyCatalogSourceRecord& source : m_sources) {
-        if (!source.enabled || source.catalog == nullptr) {
+    for (const SkyCatalogSourceRecord* source : candidateSources) {
+        if (!source->enabled || source->catalog == nullptr) {
             continue;
         }
-        if (source.policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
-            knownDeepSkyObjectCount += source.foundObjectCount;
+        if (source->policy == skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
+            knownDeepSkyObjectCount += source->foundObjectCount;
         }
         request.sources.push_back(
             skygate::ephemeris::CatalogCompositionSourceEntry{
-                .sourceId = source.instanceId.toStdString(),
+                .sourceId = source->instanceId.toStdString(),
                 .enabled = true,
-                .catalog = source.catalog.get(),
-                .policy = source.policy,
+                .catalog = source->catalog.get(),
+                .policy = source->policy,
             }
         );
     }
@@ -387,9 +450,18 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
     skygate::ephemeris::CatalogCompositionResult composed =
         skygate::ephemeris::CatalogComposer::composeCollection(request);
     if (!composed.isSuccess()) {
-        return failedCatalogResult(QStringLiteral("Catalog: Failed to load"));
+        const QString detail = QString::fromStdString(composed.errorDetail).trimmed();
+        return activationFailureResult(
+            detail.isEmpty() ? QStringLiteral("Catalog: Failed to load")
+                             : QStringLiteral("Catalog: Collection rejected: %1").arg(detail)
+        );
     }
 
+    // The composition is accepted: commit the candidate configuration and
+    // publish every derived value together.
+    if (implicitBundledSource.has_value()) {
+        m_sources.push_back(std::move(*implicitBundledSource));
+    }
     m_starCatalog = std::move(composed.catalog);
     ++m_catalogRevision;
     m_bodyCount = composed.bodyCount;
@@ -437,16 +509,12 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::clearSourceConstellationRefs(const QS
     return refreshActiveConstellationView();
 }
 
-SkyCatalogRuntimeResult SkyCatalogRuntime::failedCatalogResult(const QString& statusText)
+SkyCatalogRuntimeResult SkyCatalogRuntime::activationFailureResult(const QString& statusText)
 {
-    m_bodyCount = 0;
-    m_catalogConstellationCount = 0;
-    m_deepSkyObjectCount = 0;
-    m_sourceTitles.clear();
-    m_sourceIds.clear();
-    m_contributingSourceIds.clear();
-    m_contributorSourceIds.clear();
-    return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .datasetInfoChanged = true};
+    // A rejected transition publishes no state: the caller receives the
+    // operation error and the last accepted configuration, snapshot, counts,
+    // provenance, related view, and revision stay exactly as they were.
+    return SkyCatalogRuntimeResult{.statusText = statusText, .statusTextChanged = true, .succeeded = false};
 }
 
 QString SkyCatalogRuntime::buildStatusText() const
