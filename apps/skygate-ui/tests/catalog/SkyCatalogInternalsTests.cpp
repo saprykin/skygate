@@ -3,6 +3,7 @@
 
 #include <QtTest/QtTest>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -13,7 +14,7 @@ private slots:
     void catalogTextFormatsStableStatusMessages();
     void catalogTextComposesSummaryDetails();
     void constellationStoreKeepsCustomRefsAndCounts();
-    void constellationStoreClearsRefsWhenCustomLinesAreEmpty();
+    void constellationStoreClearDropsRefsAndCounts();
 };
 
 void SkyCatalogInternalsTests::catalogTextFormatsStableStatusMessages()
@@ -66,30 +67,35 @@ void SkyCatalogInternalsTests::constellationStoreKeepsCustomRefsAndCounts()
         {"Demo", {"hip_1", "hip_2"}},
     };
 
-    store.setLineRefs(lineRefs);
-    store.setAnchorGroups(anchorGroups);
-    store.setCount(42U);
-
+    QVERIFY(store.setDataset(lineRefs, anchorGroups, 42U));
+    QCOMPARE(store.revision(), std::uint64_t{1});
     QCOMPARE(store.count(), 42U);
     QCOMPARE(store.lineRefs().size(), 2U);
     QCOMPARE(store.anchorGroups().size(), 1U);
     QCOMPARE(store.lineRefVector().front().first, std::string("hip_1"));
     QCOMPARE(store.lineRefVector().front().second, std::string("hip_2"));
     QCOMPARE(store.anchorGroupVector().front().first, std::string("Demo"));
+
+    // Repeating the same content is not a data change.
+    QVERIFY(!store.setDataset(lineRefs, anchorGroups, 42U));
+    QCOMPARE(store.revision(), std::uint64_t{1});
 }
 
-void SkyCatalogInternalsTests::constellationStoreClearsRefsWhenCustomLinesAreEmpty()
+void SkyCatalogInternalsTests::constellationStoreClearDropsRefsAndCounts()
 {
     skygate::ui::internal::SkyCatalogConstellationStore store;
-    store.setLineRefs({{"custom_a", "custom_b"}});
-    store.setAnchorGroups({{"Custom", {"custom_a", "custom_b"}}});
-    store.setCount(1U);
+    QVERIFY(store.setDataset({{"custom_a", "custom_b"}}, {{"Custom", {"custom_a", "custom_b"}}}, 1U));
 
-    store.setLineRefs({});
+    QVERIFY(store.clear());
 
     QVERIFY(store.lineRefs().empty());
     QVERIFY(store.anchorGroups().empty());
     QCOMPARE(store.count(), 0U);
+    QCOMPARE(store.revision(), std::uint64_t{2});
+
+    // Clearing an already empty store is not a data change.
+    QVERIFY(!store.clear());
+    QCOMPARE(store.revision(), std::uint64_t{2});
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogInternalsTests)

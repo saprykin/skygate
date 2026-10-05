@@ -223,24 +223,25 @@ void SkyCatalogCacheController::appendRestoredSource(
     entry.payload = sourceRecord.payload;
     entry.requiresBinaryUpgrade = decoded.requiresBinaryUpgrade;
 
-    // Related constellation data belongs to the star source that declared it;
-    // restore it once alongside the matching source.
+    // Related constellation data belongs to the star source record that
+    // carries it, so restore installs it as the record's owned dataset instead
+    // of a collection-wide result.
     if (!sourceRecord.constellationLineRows.isEmpty()
         && sourceRecord.constellationLineSchemaVersion
                >= SkyContextControllerConstants::kConstellationLineCacheSchemaVersion) {
         auto parsedLineRefs =
             SkyContextCatalogCodec::parseConstellationLineRows(payloadView(sourceRecord.constellationLineRows));
         if (!parsedLineRefs.empty()) {
-            result.constellationLineRefs = std::move(parsedLineRefs);
+            std::vector<skygate::ephemeris::ConstellationAnchorGroup> anchorGroups;
             if (!sourceRecord.constellationAnchorGroupRows.isEmpty()) {
-                result.constellationAnchorGroups = SkyContextCatalogCodec::parseConstellationAnchorGroupRows(
+                anchorGroups = SkyContextCatalogCodec::parseConstellationAnchorGroupRows(
                     payloadView(sourceRecord.constellationAnchorGroupRows)
                 );
             }
-            result.constellationCount = sourceRecord.constellationCount;
+            static_cast<void>(entry.record.constellationData.setDataset(
+                std::move(parsedLineRefs), std::move(anchorGroups), sourceRecord.constellationCount
+            ));
         }
-    } else if (sourceRecord.constellationLineSchemaVersion > 0) {
-        result.resetConstellationLineRefs = true;
     }
 
     result.sources.push_back(std::move(entry));

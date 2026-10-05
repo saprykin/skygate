@@ -4,31 +4,39 @@
 
 namespace skygate::ui::internal {
 
-void SkyCatalogConstellationStore::clear()
+bool SkyCatalogConstellationStore::setDataset(
+    std::vector<ConstellationLineRef> lineRefs,
+    std::vector<ConstellationAnchorGroup> anchorGroups,
+    const std::size_t count
+)
 {
-    m_lineRefs.clear();
-    m_anchorGroups.clear();
-    m_count = 0;
-}
-
-void SkyCatalogConstellationStore::setLineRefs(std::vector<ConstellationLineRef> lineRefs)
-{
-    if (lineRefs.empty()) {
-        clear();
-        return;
+    if (m_lineRefs == lineRefs && m_anchorGroups == anchorGroups && m_count == count) {
+        return false;
     }
 
     m_lineRefs = std::move(lineRefs);
-}
-
-void SkyCatalogConstellationStore::setAnchorGroups(std::vector<ConstellationAnchorGroup> anchorGroups)
-{
     m_anchorGroups = std::move(anchorGroups);
+    m_count = count;
+    ++m_revision;
+    return true;
 }
 
-void SkyCatalogConstellationStore::setCount(const std::size_t count) noexcept
+bool SkyCatalogConstellationStore::clear()
 {
-    m_count = count;
+    if (m_lineRefs.empty() && m_anchorGroups.empty() && m_count == 0U) {
+        return false;
+    }
+
+    m_lineRefs.clear();
+    m_anchorGroups.clear();
+    m_count = 0U;
+    ++m_revision;
+    return true;
+}
+
+std::uint64_t SkyCatalogConstellationStore::revision() const noexcept
+{
+    return m_revision;
 }
 
 std::size_t SkyCatalogConstellationStore::count() const noexcept

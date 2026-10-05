@@ -6,7 +6,6 @@
 #include "catalog/CatalogCompositionPolicy.hpp"
 #include "catalog/CatalogSourceType.hpp"
 #include "catalog/IStarCatalog.hpp"
-#include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
 #include <QString>
@@ -14,7 +13,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace skygate::ui::internal {
@@ -39,10 +37,6 @@ struct SkyCatalogCollectionRestoreResult final {
     // once instead of re-deriving options on every start.
     bool requiresRecordUpgrade = false;
     QString statusText;
-    std::vector<skygate::ephemeris::ConstellationLineRef> constellationLineRefs;
-    std::vector<skygate::ephemeris::ConstellationAnchorGroup> constellationAnchorGroups;
-    std::optional<std::size_t> constellationCount;
-    bool resetConstellationLineRefs = false;
 };
 
 struct SkyCatalogSourcePersistEntry final {

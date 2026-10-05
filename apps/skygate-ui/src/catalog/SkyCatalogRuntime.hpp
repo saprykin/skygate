@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -44,6 +43,29 @@ struct SkyCatalogRuntimeResult final {
     bool catalogChanged = false;
 };
 
+// Owns the configured source collection, the active composed snapshot, and the
+// per-source related constellation datasets that feed the active related view.
+//
+// Related constellation data belongs to the source instance whose related
+// download produced it. The active view composes the owned datasets of the
+// enabled sources in visible collection order, the same order used for object
+// composition:
+//
+// - Line segments from every enabled contributor are kept in visible order; an
+//   exact duplicate segment from a later contributor is kept once.
+// - Anchor groups are identified by their constellation name. When two enabled
+//   contributors define the same name, the later contributor's definition
+//   replaces the earlier one, matching the later-wins precedence used for
+//   overlapping object identities.
+// - The declared constellation count of the active view is taken from the last
+//   enabled contributor that declares one, and is never lower than the number
+//   of distinct constellation names in the view.
+//
+// An owned dataset is retained while its source is disabled and is removed
+// with its source. References are resolved through the shared
+// ConstellationReferenceResolver against the active snapshot; the resolved
+// view is invalidated whenever either the snapshot or the active related view
+// changes.
 class SkyCatalogRuntime final {
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
@@ -85,23 +107,34 @@ public:
     [[nodiscard]] SkyCatalogRuntimeResult
     replaceSources(std::vector<SkyCatalogSourceRecord> sources, const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options);
-    [[nodiscard]] SkyCatalogRuntimeResult resetConstellationLineRefs();
-    [[nodiscard]] SkyCatalogRuntimeResult setConstellationLineRefs(std::vector<ConstellationLineRef> lineRefs);
-    [[nodiscard]] SkyCatalogRuntimeResult
-    setConstellationAnchorGroups(std::vector<ConstellationAnchorGroup> anchorGroups);
-    [[nodiscard]] SkyCatalogRuntimeResult restoreConstellationRefs(
+    // Replaces the related constellation dataset owned by instanceId. An
+    // unknown instance ID changes nothing. The dataset stays inactive while
+    // the owning source is disabled.
+    [[nodiscard]] SkyCatalogRuntimeResult setSourceConstellationRefs(
+        const QString& instanceId,
         std::vector<ConstellationLineRef> lineRefs,
         std::vector<ConstellationAnchorGroup> anchorGroups,
-        std::optional<std::size_t> constellationCount
+        std::size_t constellationCount
     );
+    // Drops the related constellation dataset owned by instanceId, used when
+    // the owner's catalog is reloaded or reset.
+    [[nodiscard]] SkyCatalogRuntimeResult clearSourceConstellationRefs(const QString& instanceId);
 
 private:
     [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
     [[nodiscard]] QString buildStatusText() const;
     [[nodiscard]] QString deepSkySourceLabel() const;
+    [[nodiscard]] SkyCatalogSourceRecord* findSource(const QString& instanceId);
     [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;
     [[nodiscard]] const SkyCatalogSourceRecord*
     firstSourceWithPolicy(skygate::ephemeris::CatalogCompositionPolicy policy, bool requireEnabled) const;
+    // Composes the active related view from the owned datasets of the enabled
+    // sources and returns the composed declared constellation count.
+    [[nodiscard]] std::size_t buildActiveConstellationView(
+        std::vector<ConstellationLineRef>& lineRefs, std::vector<ConstellationAnchorGroup>& anchorGroups
+    ) const;
+    // Recomposes the active related view after an owned dataset changed.
+    [[nodiscard]] SkyCatalogRuntimeResult refreshActiveConstellationView();
     void rebuildSourceProvenance(
         const std::vector<std::string>& composedSourceIds,
         const std::vector<std::vector<std::string>>& contributorSourceIds
@@ -113,6 +146,7 @@ private:
     std::vector<SkyCatalogSourceRecord> m_sources;
     std::uint64_t m_catalogRevision = 0;
     std::size_t m_bodyCount = 0;
+    std::size_t m_catalogConstellationCount = 0;
     std::size_t m_deepSkyObjectCount = 0;
     std::size_t m_deepSkyCatalogFoundObjectCount = 0;
     QHash<QString, QString> m_sourceTitles;

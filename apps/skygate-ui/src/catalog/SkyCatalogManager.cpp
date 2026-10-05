@@ -23,18 +23,6 @@ namespace {
 constexpr const char* kPrimarySlotId = "primary";
 constexpr const char* kDeepSkySlotId = "deep-sky";
 
-SkyCatalogRuntimeResult& operator|=(SkyCatalogRuntimeResult& target, const SkyCatalogRuntimeResult& source)
-{
-    if (source.statusTextChanged) {
-        target.statusText = source.statusText;
-        target.statusTextChanged = true;
-    }
-    target.datasetInfoChanged = target.datasetInfoChanged || source.datasetInfoChanged;
-    target.deepSkyCatalogInfoChanged = target.deepSkyCatalogInfoChanged || source.deepSkyCatalogInfoChanged;
-    target.catalogChanged = target.catalogChanged || source.catalogChanged;
-    return target;
-}
-
 }  // namespace
 
 SkyCatalogManager::SkyCatalogManager(
@@ -516,8 +504,7 @@ bool SkyCatalogManager::restoreCatalogCache()
     auto restoreResult = m_cacheController->restoreCollection(
         m_catalogPresetIndex, m_deepSkyCatalogPresetIndex, m_catalogUrlText, m_deepSkyCatalogUrlText
     );
-    if (restoreResult.sources.empty() && restoreResult.constellationLineRefs.empty()
-        && !restoreResult.resetConstellationLineRefs) {
+    if (restoreResult.sources.empty()) {
         return false;
     }
 
@@ -548,19 +535,10 @@ bool SkyCatalogManager::restoreCatalogCache()
         restoredSources.push_back(std::move(entry.record));
     }
 
+    // Each restored source record carries its own related constellation
+    // dataset, so replacing the collection installs the owned data in the same
+    // step as the catalogs and the active view is composed from it.
     SkyCatalogRuntimeResult mergedResult = m_runtime->replaceSources(std::move(restoredSources), runtimeBuildOptions());
-
-    if (!restoreResult.constellationLineRefs.empty()) {
-        mergedResult |= m_runtime->restoreConstellationRefs(
-            std::move(restoreResult.constellationLineRefs),
-            std::move(restoreResult.constellationAnchorGroups),
-            restoreResult.constellationCount
-        );
-    }
-
-    if (restoreResult.resetConstellationLineRefs) {
-        mergedResult |= m_runtime->resetConstellationLineRefs();
-    }
 
     const QString runtimeStatusText = mergedResult.statusText;
     applyRuntimeResult(mergedResult);
@@ -602,7 +580,9 @@ void SkyCatalogManager::loadSourceInstance(
     if (instance.urls.isEmpty()) {
         operation->payload.clear();
         if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
-            resetConstellationLineRefs();
+            // The bundled replacement drops the related dataset the instance
+            // may still own from its previous catalog.
+            static_cast<void>(m_runtime->clearSourceConstellationRefs(instance.instanceId));
         }
         applyBundledSource(*operation, policy);
         return;
@@ -743,7 +723,9 @@ void SkyCatalogManager::handleSourceImportFinished(
     setDownloadingCatalog(false);
 
     if (!relatedDatasetUrls.isEmpty()) {
-        resetConstellationLineRefs();
+        // A reloaded catalog replaces the owner's previous related dataset;
+        // other sources keep their own related datasets untouched.
+        static_cast<void>(m_runtime->clearSourceConstellationRefs(instanceId));
         downloadConstellationLinesAfterCatalog(instanceId, revision, relatedDatasetUrls, m_statusText);
     }
 }
@@ -782,7 +764,7 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
                 operation->constellationPending = false;
             }
             m_constellationDownloadPending = false;
-            handleConstellationLineImportFinished(catalogSummaryText, std::move(lineResult));
+            handleConstellationLineImportFinished(instanceId, catalogSummaryText, std::move(lineResult));
         }
     );
 }
@@ -795,15 +777,15 @@ void SkyCatalogManager::handleConstellationLineImportStatus(
 }
 
 void SkyCatalogManager::handleConstellationLineImportFinished(
-    const QString& catalogSummaryText, SkyConstellationLineImportResult lineResult
+    const QString& instanceId, const QString& catalogSummaryText, SkyConstellationLineImportResult lineResult
 )
 {
     if (lineResult.hasCustomLines()) {
-        const SkyCatalogRuntimeResult result = m_runtime->restoreConstellationRefs(
+        const SkyCatalogRuntimeResult result = m_runtime->setSourceConstellationRefs(
+            instanceId,
             std::move(lineResult.lineRefs),
             std::move(lineResult.anchorGroups),
-            lineResult.constellationCount > 0U ? std::optional<std::size_t>(lineResult.constellationCount)
-                                               : std::nullopt
+            lineResult.constellationCount
         );
         if (result.datasetInfoChanged) {
             emit datasetInfoTextChanged();
@@ -904,11 +886,6 @@ void SkyCatalogManager::applyRuntimeResult(const SkyCatalogRuntimeResult& result
         emit catalogChanged();
     }
     emit sourcesChanged();
-}
-
-void SkyCatalogManager::resetConstellationLineRefs()
-{
-    static_cast<void>(m_runtime->resetConstellationLineRefs());
 }
 
 void SkyCatalogManager::persistCatalogCache() const

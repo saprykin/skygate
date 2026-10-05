@@ -8,6 +8,9 @@
 #include "catalog/constellation/ConstellationData.hpp"
 
 #include <QByteArray>
+#include <QList>
+#include <QPair>
+#include <QString>
 
 #include <vector>
 
@@ -40,6 +43,32 @@ namespace skygate::ui::tests {
 [[nodiscard]] inline std::vector<skygate::ephemeris::ConstellationAnchorGroup> orionAnchorGroups()
 {
     return {{"Orion", {"hip_27989", "hip_25336", "hip_25930", "hip_26311", "hip_26727", "hip_24436"}}};
+}
+
+// A Stellarium constellation index with one entry per constellation. Each
+// entry is a constellation id and the HIP polyline that defines its lines; the
+// adapter derives the anchor label from the id exactly like the production
+// parser does, so a multi-entry index declares more constellations than it may
+// extract anchor groups for.
+[[nodiscard]] inline QByteArray
+stellariumConstellationIndexJsonPayload(const QList<QPair<QString, QList<int>>>& constellations)
+{
+    QString entries;
+    for (int index = 0; index < constellations.size(); ++index) {
+        if (index > 0) {
+            entries += QStringLiteral(",");
+        }
+        const QList<int>& hips = constellations.at(index).second;
+        QString hipList;
+        for (int hipIndex = 0; hipIndex < hips.size(); ++hipIndex) {
+            if (hipIndex > 0) {
+                hipList += QStringLiteral(",");
+            }
+            hipList += QString::number(hips.at(hipIndex));
+        }
+        entries += QStringLiteral(R"({"id":"%1","lines":[[%2]]})").arg(constellations.at(index).first, hipList);
+    }
+    return QStringLiteral(R"({"constellations":[%1]})").arg(entries).toUtf8();
 }
 
 [[nodiscard]] inline bool seedOrionConstellationCache()

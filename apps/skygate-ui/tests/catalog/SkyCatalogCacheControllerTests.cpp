@@ -289,12 +289,15 @@ void SkyCatalogCacheControllerTests::restoresCollectionSourcesAndConstellationLa
     QCOMPARE(result.sources[1].record.title, QString("OpenNGC (saved)"));
     QVERIFY(result.sources[1].record.catalog != nullptr);
 
-    QCOMPARE(result.constellationLineRefs.size(), 1U);
-    QCOMPARE(result.constellationLineRefs[0].first, std::string("hip_1"));
-    QCOMPARE(result.constellationLineRefs[0].second, std::string("hip_2"));
-    QCOMPARE(result.constellationAnchorGroups.size(), 1U);
-    QVERIFY(result.constellationCount.has_value());
-    QCOMPARE(*result.constellationCount, 1U);
+    // Related constellation data is owned by the record that stored it.
+    const skygate::ui::internal::SkyCatalogConstellationStore& starConstellationData =
+        result.sources[0].record.constellationData;
+    QCOMPARE(starConstellationData.lineRefs().size(), 1U);
+    QCOMPARE(starConstellationData.lineRefs()[0].first, std::string("hip_1"));
+    QCOMPARE(starConstellationData.lineRefs()[0].second, std::string("hip_2"));
+    QCOMPARE(starConstellationData.anchorGroups().size(), 1U);
+    QCOMPARE(starConstellationData.count(), 1U);
+    QVERIFY(result.sources[1].record.constellationData.lineRefs().empty());
 }
 
 void SkyCatalogCacheControllerTests::restoresBinaryCatalogPayloadsWithoutUpgrade()
@@ -888,7 +891,7 @@ void SkyCatalogCacheControllerTests::migratesLegacyBundledCustomAndMixedConfigur
         QVERIFY(result.sources[0].record.catalog != nullptr);
         QCOMPARE(result.sources[1].record.instanceId, QString("preset:open_ngc"));
         QCOMPARE(result.sources[1].record.title, QString("OpenNGC (saved)"));
-        QCOMPARE(result.constellationLineRefs.size(), 1U);
+        QCOMPARE(result.sources[0].record.constellationData.lineRefs().size(), 1U);
     }
 
     // Bundled star + OpenNGC deep-sky keeps both the materialized bundled
