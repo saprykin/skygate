@@ -33,6 +33,7 @@ using skygate::ephemeris::CatalogIdentifier;
 using skygate::ephemeris::CatalogStarAstrometry;
 using skygate::ephemeris::DistantCelestialBody;
 using skygate::ephemeris::EphemerisDateRange;
+using skygate::ephemeris::IStarCatalog;
 using skygate::ephemeris::OwnGalaxyCelestialBody;
 
 OwnGalaxyCelestialBody makeStar(
@@ -147,6 +148,24 @@ composeInOrder(const skygate::ephemeris::IStarCatalog& first, const skygate::eph
     return CatalogComposer::composeCollection(request);
 }
 
+// Composes every catalog in collection order as an enabled Merge source with a
+// position-derived source identity, so multi-stage replacement and bridge
+// chains stay readable.
+CatalogCompositionResult composeAll(const std::vector<const IStarCatalog*>& catalogs)
+{
+    CatalogCompositionRequest request;
+    request.sources.reserve(catalogs.size());
+    for (std::size_t index = 0; index < catalogs.size(); ++index) {
+        request.sources.push_back(
+            {.sourceId = "source-" + std::to_string(index),
+             .enabled = true,
+             .catalog = catalogs[index],
+             .policy = CatalogCompositionPolicy::Merge}
+        );
+    }
+    return CatalogComposer::composeCollection(request);
+}
+
 [[nodiscard]] AstronomicalEpoch j2000Epoch()
 {
     return {
@@ -187,6 +206,12 @@ bool hasAlias(const std::vector<std::string>& aliases, const std::string_view al
     return std::find(aliases.begin(), aliases.end(), alias) != aliases.end();
 }
 
+bool hasRetainedCanonicalId(const BaseCelestialBody& body, const std::string_view retainedId)
+{
+    return std::find(body.identity.retainedCanonicalIds.begin(), body.identity.retainedCanonicalIds.end(), retainedId)
+           != body.identity.retainedCanonicalIds.end();
+}
+
 }  // namespace
 
 class CatalogIdentityMergeTests final : public QObject {
@@ -220,6 +245,9 @@ private slots:
     void bridgesAmbiguousAuthoritativeIdentifiersIntoSingleSurvivor();
     void keepsIncompatibleKindsDistinctWhileBridgingSameKindSurvivors();
     void bridgesDeepSkyObjectsWithMetadataUnion();
+    void retainsReplacedCanonicalIdentityAcrossLaterSources();
+    void retainsBridgedCanonicalIdentitiesAcrossLaterSources();
+    void retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition();
 };
 
 void CatalogIdentityMergeTests::deduplicatesDuplicateHipStars()
@@ -1270,6 +1298,157 @@ void CatalogIdentityMergeTests::bridgesDeepSkyObjectsWithMetadataUnion()
     QCOMPARE(*deepSkyInfo->majorAxisArcmin, 178.0);
     QCOMPARE(result.sourceIds.front(), std::string("source-b"));
     QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-b", "source-a", "source-c"}));
+}
+
+void CatalogIdentityMergeTests::retainsReplacedCanonicalIdentityAcrossLaterSources()
+{
+    // N1: A and B establish that both canonical keys identify the same object
+    // because they carry the same HIP cross-identifier. B replaces A, then C
+    // arrives carrying A's canonical id without any cross-identifier. The
+    // established equivalence must resolve C to the survivor instead of
+    // appending a duplicate object.
+    const auto sourceA =
+        createCatalog({makeStar("original", "Original A", {CatalogIdentifier::make("hip", "99")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB = createCatalog(
+        {makeStar("replacement", "Replacement B", {CatalogIdentifier::make("hip", "99")}, {}, 1.0, 2.0)}, {}
+    );
+    const auto sourceC = createCatalog({makeStar("original", "Late C", {}, {}, 1.0, 2.0)}, {});
+
+    const CatalogCompositionResult result = composeAll({sourceA.get(), sourceB.get(), sourceC.get()});
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "original"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "replacement"), std::size_t{0});
+
+    const BaseCelestialBody* survivor = findBodyById(bodies, "original");
+    QVERIFY(survivor != nullptr);
+    // The later record C wins the public identity and inherits the absorbed
+    // cross-identifier.
+    QCOMPARE(QString::fromStdString(survivor->displayName), QStringLiteral("Late C"));
+    QVERIFY(hasIdentifier(*survivor, "hip", "99"));
+    // The replaced canonical id stays authoritative identity data, never a
+    // display alias.
+    QVERIFY(hasRetainedCanonicalId(*survivor, "replacement"));
+    QCOMPARE(survivor->identity.retainedCanonicalIds.size(), std::size_t{1});
+    QVERIFY(!hasAlias(survivor->identity.aliases, "replacement"));
+    QCOMPARE(result.sourceIds.front(), std::string("source-2"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"source-2", "source-1", "source-0"}));
+}
+
+void CatalogIdentityMergeTests::retainsBridgedCanonicalIdentitiesAcrossLaterSources()
+{
+    // A bridge absorbs every same-kind survivor it resolves, and later
+    // replacements keep every absorbed canonical id resolvable, including ids
+    // absorbed in an earlier composition stage.
+    const auto sourceA = createCatalog({makeStar("a_hip1", {}, {CatalogIdentifier::make("hip", "1")})}, {});
+    const auto sourceB = createCatalog({makeStar("b_hd2", {}, {CatalogIdentifier::make("hd", "2")})}, {});
+    const auto sourceBridge = createCatalog(
+        {makeStar("c_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")})}, {}
+    );
+    const auto sourceReplacement =
+        createCatalog({makeStar("d_hd2", "Later D", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto sourceOriginal = createCatalog({makeStar("a_hip1", "Latest A", {}, {}, 1.0, 2.0)}, {});
+
+    const CatalogCompositionResult bridged = composeAll({sourceA.get(), sourceB.get(), sourceBridge.get()});
+    QVERIFY(bridged.isSuccess());
+    QCOMPARE(bridged.bodyCount, std::size_t{1});
+    const BaseCelestialBody* bridgeSurvivor = findBodyById(bridged.catalog->bodies(), "c_bridge");
+    QVERIFY(bridgeSurvivor != nullptr);
+    QVERIFY(hasRetainedCanonicalId(*bridgeSurvivor, "a_hip1"));
+    QVERIFY(hasRetainedCanonicalId(*bridgeSurvivor, "b_hd2"));
+    QCOMPARE(bridgeSurvivor->identity.retainedCanonicalIds.size(), std::size_t{2});
+
+    const CatalogCompositionResult replaced =
+        composeAll({sourceA.get(), sourceB.get(), sourceBridge.get(), sourceReplacement.get()});
+    QVERIFY(replaced.isSuccess());
+    QCOMPARE(replaced.bodyCount, std::size_t{1});
+    const BaseCelestialBody* replacementSurvivor = findBodyById(replaced.catalog->bodies(), "d_hd2");
+    QVERIFY(replacementSurvivor != nullptr);
+    QVERIFY(hasIdentifier(*replacementSurvivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*replacementSurvivor, "hd", "2"));
+    QVERIFY(hasRetainedCanonicalId(*replacementSurvivor, "c_bridge"));
+    QVERIFY(hasRetainedCanonicalId(*replacementSurvivor, "a_hip1"));
+    QVERIFY(hasRetainedCanonicalId(*replacementSurvivor, "b_hd2"));
+    QCOMPARE(replacementSurvivor->identity.retainedCanonicalIds.size(), std::size_t{3});
+
+    // A row carrying a canonical id absorbed two stages earlier still resolves
+    // to the single survivor instead of appending a fourth object.
+    const CatalogCompositionResult lateOriginal =
+        composeAll({sourceA.get(), sourceB.get(), sourceBridge.get(), sourceReplacement.get(), sourceOriginal.get()});
+    QVERIFY(lateOriginal.isSuccess());
+    QCOMPARE(lateOriginal.bodyCount, std::size_t{1});
+    const BaseCelestialBody* finalSurvivor = findBodyById(lateOriginal.catalog->bodies(), "a_hip1");
+    QVERIFY(finalSurvivor != nullptr);
+    QCOMPARE(QString::fromStdString(finalSurvivor->displayName), QStringLiteral("Latest A"));
+    QVERIFY(hasIdentifier(*finalSurvivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*finalSurvivor, "hd", "2"));
+    QVERIFY(hasRetainedCanonicalId(*finalSurvivor, "d_hd2"));
+    QVERIFY(hasRetainedCanonicalId(*finalSurvivor, "c_bridge"));
+    QVERIFY(hasRetainedCanonicalId(*finalSurvivor, "b_hd2"));
+}
+
+void CatalogIdentityMergeTests::retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition()
+{
+    // N1 acceptance: the established equivalence survives binary
+    // serialization, index reconstruction, and reuse of the already-composed
+    // snapshot as a composition input.
+    const auto sourceA =
+        createCatalog({makeStar("original", "Original", {CatalogIdentifier::make("hip", "99")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB = createCatalog(
+        {makeStar("replacement", "Replacement", {CatalogIdentifier::make("hip", "99")}, {}, 1.0, 2.0)}, {}
+    );
+
+    const CatalogCompositionResult composed = composeInOrder(*sourceA, *sourceB);
+    QVERIFY(composed.isSuccess());
+    QCOMPARE(composed.bodyCount, std::size_t{1});
+    const BaseCelestialBody* composedSurvivor = findBodyById(composed.catalog->bodies(), "replacement");
+    QVERIFY(composedSurvivor != nullptr);
+    QVERIFY(hasRetainedCanonicalId(*composedSurvivor, "original"));
+
+    const QByteArray payload = skygate::ephemeris::CatalogBinaryCodec::serialize(composed.catalog->catalog());
+    QVERIFY(!payload.isEmpty());
+    const std::unique_ptr<IStarCatalog> restored = skygate::ephemeris::CatalogBinaryCodec::deserialize(payload);
+    QVERIFY(restored != nullptr);
+
+    const BaseCelestialBody* restoredSurvivor = findBodyById(restored->bodies(), "replacement");
+    QVERIFY(restoredSurvivor != nullptr);
+    QVERIFY(hasIdentifier(*restoredSurvivor, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*restoredSurvivor, "original"));
+
+    const auto laterOriginal = createCatalog({makeStar("original", "Late Original", {}, {}, 1.0, 2.0)}, {});
+
+    // The row carrying the earlier canonical id resolves to the restored
+    // survivor whether it arrives before or after the restored snapshot, so
+    // the rebuilt index resolves retained keys on both sides.
+    const CatalogCompositionResult restoredFirst = composeInOrder(*restored, *laterOriginal);
+    QVERIFY(restoredFirst.isSuccess());
+    QCOMPARE(restoredFirst.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(restoredFirst.catalog->bodies(), "replacement"), std::size_t{0});
+    const BaseCelestialBody* lateWinner = findBodyById(restoredFirst.catalog->bodies(), "original");
+    QVERIFY(lateWinner != nullptr);
+    QCOMPARE(QString::fromStdString(lateWinner->displayName), QStringLiteral("Late Original"));
+    QVERIFY(hasIdentifier(*lateWinner, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*lateWinner, "replacement"));
+
+    const CatalogCompositionResult restoredLast = composeInOrder(*laterOriginal, *restored);
+    QVERIFY(restoredLast.isSuccess());
+    QCOMPARE(restoredLast.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(restoredLast.catalog->bodies(), "original"), std::size_t{0});
+    const BaseCelestialBody* snapshotWinner = findBodyById(restoredLast.catalog->bodies(), "replacement");
+    QVERIFY(snapshotWinner != nullptr);
+    QVERIFY(hasIdentifier(*snapshotWinner, "hip", "99"));
+    QVERIFY(hasRetainedCanonicalId(*snapshotWinner, "original"));
+
+    // The composed snapshot used directly as a composition input behaves the
+    // same way as the serialized one.
+    const CatalogCompositionResult composedAsInput = composeInOrder(*laterOriginal, *composed.catalog);
+    QVERIFY(composedAsInput.isSuccess());
+    QCOMPARE(composedAsInput.bodyCount, std::size_t{1});
+    const BaseCelestialBody* composedWinner = findBodyById(composedAsInput.catalog->bodies(), "replacement");
+    QVERIFY(composedWinner != nullptr);
+    QVERIFY(hasRetainedCanonicalId(*composedWinner, "original"));
 }
 
 QTEST_APPLESS_MAIN(CatalogIdentityMergeTests)

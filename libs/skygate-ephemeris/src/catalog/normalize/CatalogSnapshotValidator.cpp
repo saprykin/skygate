@@ -77,6 +77,16 @@ void normalizeIdentity(CatalogObjectIdentity& identity)
     }
     identity.externalIdentifiers = std::move(identifiers);
     normalizeAliases(identity.aliases);
+
+    std::vector<std::string> retainedCanonicalIds;
+    retainedCanonicalIds.reserve(identity.retainedCanonicalIds.size());
+    for (const std::string& retainedId : identity.retainedCanonicalIds) {
+        const std::string_view trimmed = StringUtilities::trimAsciiWhitespace(retainedId);
+        if (!trimmed.empty()) {
+            retainedCanonicalIds.emplace_back(trimmed);
+        }
+    }
+    identity.retainedCanonicalIds = std::move(retainedCanonicalIds);
 }
 
 void normalizeOwnGalaxyBody(OwnGalaxyCelestialBody& body)
@@ -107,6 +117,12 @@ void normalizeDistantBody(DistantCelestialBody& body)
     for (const CatalogIdentifier& identifier : body.identity.externalIdentifiers) {
         if (identifier.empty()) {
             errorDetail = "catalog body '" + body.id + "' has an incomplete external identifier.";
+            return false;
+        }
+    }
+    for (const std::string& retainedId : body.identity.retainedCanonicalIds) {
+        if (StringUtilities::trimAsciiWhitespace(retainedId).empty()) {
+            errorDetail = "catalog body '" + body.id + "' has an empty retained canonical id.";
             return false;
         }
     }

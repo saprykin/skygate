@@ -14,10 +14,15 @@ namespace skygate::ephemeris {
 //
 // Each registered body contributes three families of keys:
 //
-//   - canonical id keys (case/whitespace-normalized body.id),
+//   - canonical id keys (case/whitespace-normalized body.id plus every
+//     retained canonical id of its CatalogObjectIdentity),
 //   - external identifier keys ("<namespace>:<value>", see CatalogIdentifier),
 //   - deep-sky alias keys (alphanumeric-normalized alias strings plus the
 //     alphanumeric-normalized canonical id).
+//
+// Retained canonical ids stay in the authoritative canonical family: a
+// replacement keeps its earlier canonical keys resolvable without demoting
+// them to weak display aliases.
 //
 // Display names and sky positions are deliberately excluded so unrelated
 // same-named objects stay distinct. A key can map to several result positions:
@@ -76,8 +81,8 @@ public:
     void reserve(std::size_t bodyCount);
 
     // Resolves `body` against the bodies registered so far. Authoritative keys
-    // (canonical id and external identifiers) are preferred over deep-sky
-    // aliases.
+    // (canonical id, retained canonical ids, and external identifiers) are
+    // preferred over deep-sky aliases.
     [[nodiscard]] Resolution resolve(const BaseCelestialBody& body) const;
 
     // Reports the authoritative keys registered for several positions, sorted

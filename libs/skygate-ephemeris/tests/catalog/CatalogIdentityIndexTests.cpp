@@ -41,6 +41,22 @@ DistantCelestialBody makeDeepSkyObject(
     return body;
 }
 
+OwnGalaxyCelestialBody makeStarWithRetainedCanonicalIds(std::string id, std::vector<std::string> retainedCanonicalIds)
+{
+    OwnGalaxyCelestialBody body = makeStar(std::move(id));
+    body.identity.retainedCanonicalIds = std::move(retainedCanonicalIds);
+    return body;
+}
+
+DistantCelestialBody makeDeepSkyObjectWithRetainedCanonicalIds(
+    std::string id, std::vector<std::string> aliases, std::vector<std::string> retainedCanonicalIds
+)
+{
+    DistantCelestialBody body = makeDeepSkyObject(std::move(id), std::move(aliases));
+    body.identity.retainedCanonicalIds = std::move(retainedCanonicalIds);
+    return body;
+}
+
 }  // namespace
 
 class CatalogIdentityIndexTests final : public QObject {
@@ -55,6 +71,10 @@ private slots:
     void reportsAmbiguousAuthoritativeMatch();
     void reportsAmbiguousAliasMatch();
     void resolvesIdentifierChainsIncrementally();
+    void resolvesRetainedCanonicalIds();
+    void resolvesRetainedCanonicalIdsOfIncomingBody();
+    void prefersRetainedCanonicalIdOverAlias();
+    void reportsDuplicateRetainedCanonicalIdentities();
     void ignoresBodiesWithoutIdentity();
     void removesVacatedPositionKeys();
     void keepsOtherPositionsWhenRemovingSharedKey();
@@ -191,6 +211,72 @@ void CatalogIdentityIndexTests::resolvesIdentifierChainsIncrementally()
     QVERIFY(thirdResolution.hasSingleMatch());
     QVERIFY(thirdResolution.isAuthoritative());
     QCOMPARE(thirdResolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::resolvesRetainedCanonicalIds()
+{
+    const OwnGalaxyCelestialBody registered = makeStarWithRetainedCanonicalIds("replacement", {"original"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStar("original");
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QVERIFY(resolution.isAuthoritative());
+    QVERIFY(!resolution.isAmbiguous());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::resolvesRetainedCanonicalIdsOfIncomingBody()
+{
+    // A restored composed body still carries the canonical key of the record
+    // it absorbed. That key resolves to the earlier survivor when the restored
+    // snapshot is used as a composition input.
+    CatalogIdentityIndex index;
+    index.add(makeStar("original"), 0U);
+
+    const OwnGalaxyCelestialBody incoming = makeStarWithRetainedCanonicalIds("replacement", {"original"});
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QVERIFY(resolution.isAuthoritative());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::prefersRetainedCanonicalIdOverAlias()
+{
+    // A retained canonical id stays authoritative even when an unrelated body
+    // lists the same text as a weak display alias. Demoting retained ids to
+    // aliases would turn this resolution into an ambiguous alias match.
+    const DistantCelestialBody registered = makeDeepSkyObjectWithRetainedCanonicalIds("replacement", {}, {"original"});
+    const DistantCelestialBody aliasHolder = makeDeepSkyObject("other", {"original"});
+    CatalogIdentityIndex index;
+    index.add(registered, 0U);
+    index.add(aliasHolder, 1U);
+
+    const DistantCelestialBody incoming = makeDeepSkyObject("original");
+    const CatalogIdentityIndex::Resolution resolution = index.resolve(incoming);
+
+    QVERIFY(resolution.hasSingleMatch());
+    QVERIFY(resolution.isAuthoritative());
+    QVERIFY(!resolution.isAmbiguous());
+    QCOMPARE(resolution.kind, CatalogIdentityIndex::Resolution::MatchKind::CanonicalId);
+    QCOMPARE(resolution.index, std::size_t{0});
+}
+
+void CatalogIdentityIndexTests::reportsDuplicateRetainedCanonicalIdentities()
+{
+    CatalogIdentityIndex index;
+    index.add(makeStarWithRetainedCanonicalIds("replacement_a", {"original"}), 0U);
+    index.add(makeStarWithRetainedCanonicalIds("replacement_b", {"original"}), 1U);
+
+    const std::vector<CatalogIdentityIndex::DuplicateIdentity> duplicates = index.duplicateAuthoritativeIdentities();
+    QCOMPARE(duplicates.size(), std::size_t{1});
+    QCOMPARE(duplicates.front().key, std::string("original"));
+    QCOMPARE(duplicates.front().positions, (std::vector<std::size_t>{0U, 1U}));
 }
 
 void CatalogIdentityIndexTests::ignoresBodiesWithoutIdentity()

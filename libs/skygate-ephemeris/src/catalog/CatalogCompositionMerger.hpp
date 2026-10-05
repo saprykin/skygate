@@ -27,6 +27,16 @@ namespace skygate::ephemeris {
 // before the next record resolves. Later records can therefore match
 // identifiers an earlier record acquired in the same source pass.
 //
+// A replacement or bridge never forgets an authoritative canonical
+// equivalence. The absorbed body's canonical id, and every canonical id it
+// already retained, stay on the survivor as
+// CatalogObjectIdentity::retainedCanonicalIds. The chosen public canonical id
+// (BaseCelestialBody::id) stays the winner's own, while an earlier id still
+// resolves to the survivor through later rows, later compositions, restored
+// snapshots, and a snapshot fed back as a composition input. Retained keys are
+// authoritative identity data: they resolve like canonical ids, set the same
+// ambiguity rules, and are never demoted to weak display aliases.
+//
 // A record whose authoritative identifiers (external identifiers and
 // recognized deep-sky designations) match several survivors of the same kind
 // bridges them: the bridging record becomes the single survivor and absorbs
