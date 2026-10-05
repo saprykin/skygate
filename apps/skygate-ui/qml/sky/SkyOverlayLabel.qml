@@ -17,7 +17,7 @@ Item {
     // Keep the label inside the overlay layer when the projected body sits at
     // the viewport edge. Without clamping the label rendered partially outside
     // the window and the main-window rendering bounds check failed at scene
-    // times that placed a bright star near the 560x640 window edge (V2-18).
+    // times that placed a bright star near the 560x640 window edge.
     readonly property real layerWidth: parent ? parent.width : labelWidth
     readonly property real layerHeight: parent ? parent.height : labelHeight
     readonly property real labelX: Math.max(

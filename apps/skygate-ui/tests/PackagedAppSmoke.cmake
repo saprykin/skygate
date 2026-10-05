@@ -21,7 +21,7 @@ endif()
 # roughly 3x margin for cold caches and parallel load while still failing a
 # startup that never reaches the readiness log lines. This is a deadline, not
 # a retry: the captured output must contain both the "SkyGate started:" line
-# and the "Loaded ephemeris data manifest" line (V2-18).
+# and the "Loaded ephemeris data manifest" line.
 if(NOT DEFINED SKYGATE_SMOKE_TIMEOUT_SECONDS)
     set(SKYGATE_SMOKE_TIMEOUT_SECONDS 20)
 endif()

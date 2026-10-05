@@ -85,8 +85,8 @@ SkyCatalogCollectionPersistRequest makeCollectionPersistRequest()
     return request;
 }
 
-// A persisted source whose raw payload is the multi-member archive from
-// V2-05, with one member named by the descriptor's archive selection.
+// A persisted source whose raw payload is a multi-member archive, with one
+// member named by the descriptor's archive selection.
 SkySettingsStore::CatalogCollectionCacheSnapshot makeArchiveCollectionSnapshot()
 {
     SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
