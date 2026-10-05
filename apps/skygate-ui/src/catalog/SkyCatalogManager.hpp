@@ -152,7 +152,7 @@ private:
         skygate::ephemeris::CatalogCompositionPolicy policy
     );
     void applyBundledSource(SourceOperation& operation, skygate::ephemeris::CatalogCompositionPolicy policy);
-    void applySourceResult(
+    [[nodiscard]] skygate::ui::internal::SkyCatalogRuntimeResult applySourceResult(
         skygate::ui::internal::SkyCatalogSourceImportResult result, skygate::ephemeris::CatalogCompositionPolicy policy
     );
     void handleSourceImportFinished(

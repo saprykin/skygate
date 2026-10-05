@@ -203,6 +203,7 @@ private slots:
     void init();
     void unknownPresetsUpdateStatus();
     void bundledPresetResetsCatalogAndConstellationRefs();
+    void bundledReplacementDropsOwnerDataAndReportsFreshCounts();
     void bundledDeepSkyPresetRebuildsActiveCatalog();
     void customDeepSkyDownloadUsesGenericSourceLabel();
     void clearCacheReportsStatusAndSignals();
@@ -231,6 +232,7 @@ private slots:
     void restoredBundledDeepSkySourceKeepsFreshObjectCount();
     void interleavedBundledAndDownloadedSourcesPreserveOrderAndPrecedence();
     void unreadablePayloadKeepsConfiguredSourceWithoutErasingSiblings();
+    void rejectedRestoreKeepsPreviousCollectionAndReportsError();
     void removedBundledSourceDoesNotReturnAfterRestart();
     void relatedConstellationDatasetsStayOwnedByTheirSources();
     void overlappingConstellationDatasetsFollowSourceOrder();
@@ -303,6 +305,40 @@ void SkyCatalogManagerTests::bundledPresetResetsCatalogAndConstellationRefs()
     QVERIFY(manager.constellationLineRefs().empty());
     QVERIFY(manager.constellationAnchorGroups().empty());
     QVERIFY(catalogSpy.count() >= 1);
+}
+
+void SkyCatalogManagerTests::bundledReplacementDropsOwnerDataAndReportsFreshCounts()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/bundled-replacement-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/bundled-replacement-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    // The legacy primary slot owns a related dataset before the bundled preset
+    // replaces its catalog.
+    skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    source.instanceId = QStringLiteral("primary");
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(!manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationCount() > 0U);
+
+    manager.loadCatalogPreset("bundled");
+
+    // The bundled replacement drops the owned related dataset, and the status
+    // text of that committed replacement reports the post-clear counts instead
+    // of the pre-clear ones.
+    QVERIFY(manager.constellationLineRefs().empty());
+    QCOMPARE(manager.constellationCount(), std::size_t{0});
+    const QLocale locale = QLocale::system();
+    QVERIFY(manager.statusText().endsWith(
+        QStringLiteral("%1 constellations)").arg(locale.toString(static_cast<qulonglong>(manager.constellationCount())))
+    ));
 }
 
 void SkyCatalogManagerTests::bundledDeepSkyPresetRebuildsActiveCatalog()
@@ -1699,6 +1735,70 @@ void SkyCatalogManagerTests::unreadablePayloadKeepsConfiguredSourceWithoutErasin
     );
     QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("Recovered Star")));
     QVERIFY(catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("Healthy Star")));
+}
+
+void SkyCatalogManagerTests::rejectedRestoreKeepsPreviousCollectionAndReportsError()
+{
+    // A persisted instance identity colliding with the implicit bundled core
+    // source makes the restored collection uncomposable. The rejected restore
+    // must report the operation error and keep the previous configuration,
+    // snapshot, source rows, and stored cache instead of half-applying the
+    // staged collection.
+    const QString collidingUrl = QStringLiteral("https://example.test/colliding-stars.csv");
+
+    SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
+    snapshot.schemaVersion = skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+
+    SkySettingsStore::CatalogSourceCacheRecord colliding;
+    colliding.instanceId = QStringLiteral("bundled-core");
+    colliding.title = QStringLiteral("Colliding Source");
+    colliding.urls = QStringList{collidingUrl};
+    colliding.policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
+    colliding.enabled = true;
+    colliding.order = 0;
+    colliding.payload = skygate::ui::tests::sampleHygCsvPayload(
+        {.id = 907001, .hip = 907001, .properName = "Colliding Star", .mag = "1.0"}
+    );
+    snapshot.sources.push_back(std::move(colliding));
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCollectionCache(snapshot));
+
+    SkyCatalogManager manager(&store);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy datasetSpy(&manager, &SkyCatalogManager::datasetInfoTextChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    const QStringList sourcesBefore = manager.sourceInstanceIds();
+    const std::size_t bodyCountBefore = manager.bodyCount();
+    const std::uint64_t revisionBefore = manager.catalogRevision();
+    const int sourceRowCountBefore = manager.sourceViewEntries().size();
+
+    QVERIFY(!manager.restoreCatalogCache());
+
+    // The operation error is reported through the normal status signal, and
+    // the failed transition publishes no catalog or dataset change.
+    QCOMPARE(statusSpy.count(), 1);
+    QVERIFY(manager.statusText().startsWith(QStringLiteral("Catalog: Collection rejected")));
+    QCOMPARE(catalogSpy.count(), 0);
+    QCOMPARE(datasetSpy.count(), 0);
+
+    QCOMPARE(manager.sourceInstanceIds(), sourcesBefore);
+    QCOMPARE(manager.bodyCount(), bodyCountBefore);
+    QCOMPARE(manager.catalogRevision(), revisionBefore);
+    QVERIFY(manager.starCatalog() != nullptr);
+
+    // No staged row appears for the rejected collection.
+    const QVector<SkyCatalogManager::SourceViewEntry> rows = manager.sourceViewEntries();
+    QCOMPARE(rows.size(), sourceRowCountBefore);
+    QCOMPARE(rows.first().instanceId, QStringLiteral("primary"));
+    QVERIFY(!rows.first().hasError);
+
+    // The rejected collection is not persisted in place of the stored cache.
+    const auto persisted = store.loadCatalogCollectionCache();
+    QVERIFY(persisted.has_value());
+    QVERIFY(collectionContainsInstanceId(*persisted, QStringLiteral("bundled-core")));
+    QVERIFY(!collectionContainsInstanceId(*persisted, QStringLiteral("primary")));
 }
 
 void SkyCatalogManagerTests::relatedConstellationDatasetsStayOwnedByTheirSources()

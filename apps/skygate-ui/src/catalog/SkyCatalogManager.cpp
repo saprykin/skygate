@@ -24,6 +24,15 @@ namespace {
 constexpr const char* kPrimarySlotId = "primary";
 constexpr const char* kDeepSkySlotId = "deep-sky";
 
+// Source-row status text for a rejected runtime transition: the row reports the
+// operation error without the statusText's own "Catalog: " prefix, matching
+// the other per-source failure rows.
+QString operationErrorText(const QString& statusText)
+{
+    const QString prefix = QStringLiteral("Catalog: ");
+    return statusText.startsWith(prefix) ? statusText.mid(prefix.size()) : statusText;
+}
+
 }  // namespace
 
 SkyCatalogManager::SkyCatalogManager(
@@ -381,12 +390,19 @@ void SkyCatalogManager::removeSource(const QString& instanceId)
         return;
     }
 
+    const SkyCatalogRuntimeResult result = m_runtime->removeSource(instanceId, runtimeBuildOptions());
+    if (!result.succeeded) {
+        applyRuntimeResult(result);
+        return;
+    }
+
     // Dropping the operation rejects every callback already captured for this
     // incarnation; a later instance with the same ID receives a fresh revision
     // instead of inheriting the removed one. Completed references are removed
-    // together with the runtime record that owns them.
+    // together with the runtime record that owns them. The operation is
+    // dropped only after the runtime committed the removal, so a rejected
+    // removal keeps its pending work and its reported status.
     removeOperation(instanceId);
-    const SkyCatalogRuntimeResult result = m_runtime->removeSource(instanceId, runtimeBuildOptions());
     persistCatalogCache();
     applyRuntimeResult(result);
 }
@@ -399,7 +415,9 @@ void SkyCatalogManager::moveSource(const QString& instanceId, const int targetIn
 
     const SkyCatalogRuntimeResult result =
         m_runtime->moveSource(instanceId, static_cast<std::size_t>(targetIndex), runtimeBuildOptions());
-    persistCatalogCache();
+    if (result.succeeded) {
+        persistCatalogCache();
+    }
     applyRuntimeResult(result);
 }
 
@@ -519,24 +537,27 @@ bool SkyCatalogManager::restoreCatalogCache()
 
     // Apply every restored source into a single runtime replacement and emit
     // the change signals once, so the controller does not rebuild the
-    // ephemeris engine and search model per restored source.
+    // ephemeris engine and search model per restored source. The records are
+    // staged before the runtime transition; the owner-bound operations, their
+    // payloads, and the cache are committed only when the transition is
+    // accepted, so a rejected collection leaves the previous configuration,
+    // operations, and cache untouched.
     std::vector<SkyCatalogSourceRecord> restoredSources;
     restoredSources.reserve(restoreResult.sources.size());
+    // Facts the operation commit needs after the records are moved into the
+    // runtime, kept in restore order.
+    std::vector<skygate::ephemeris::CatalogCompositionPolicy> restoredPolicies;
+    restoredPolicies.reserve(restoreResult.sources.size());
+    QStringList unavailableInstanceIds;
     bool requiresPersist = restoreResult.migratedLegacy || restoreResult.requiresRecordUpgrade;
-    std::size_t unavailableSourceCount = 0U;
     for (SkyCatalogSourceRestoreEntry& entry : restoreResult.sources) {
         requiresPersist = requiresPersist || entry.requiresBinaryUpgrade;
-
-        SourceOperation* operation = upsertOperation(entry.instance, entry.record.policy);
-        operation->payload = entry.payload;
+        restoredPolicies.push_back(entry.record.policy);
         if (entry.record.catalog == nullptr) {
             // The configured source keeps its identity, order, policy, and
             // participation state; only its payload is unavailable, so it is
             // restored as an explicit error instead of being omitted.
-            operation->busy = false;
-            operation->hasError = true;
-            operation->statusText = SkyCatalogText::sourcePayloadUnavailable();
-            ++unavailableSourceCount;
+            unavailableInstanceIds.push_back(entry.instance.instanceId);
         }
 
         // The restored record, operation, cache entry, and provenance all stay
@@ -547,11 +568,28 @@ bool SkyCatalogManager::restoreCatalogCache()
     // Each restored source record carries its own related constellation
     // dataset, so replacing the collection installs the owned data in the same
     // step as the catalogs and the active view is composed from it.
-    SkyCatalogRuntimeResult mergedResult = m_runtime->replaceSources(std::move(restoredSources), runtimeBuildOptions());
+    const SkyCatalogRuntimeResult mergedResult =
+        m_runtime->replaceSources(std::move(restoredSources), runtimeBuildOptions());
+    if (!mergedResult.succeeded) {
+        applyRuntimeResult(mergedResult);
+        return false;
+    }
+
+    for (std::size_t index = 0; index < restoreResult.sources.size(); ++index) {
+        const SkyCatalogSourceRestoreEntry& entry = restoreResult.sources[index];
+        SourceOperation* operation = upsertOperation(entry.instance, restoredPolicies[index]);
+        operation->payload = entry.payload;
+        if (unavailableInstanceIds.contains(entry.instance.instanceId)) {
+            operation->busy = false;
+            operation->hasError = true;
+            operation->statusText = SkyCatalogText::sourcePayloadUnavailable();
+        }
+    }
 
     const QString runtimeStatusText = mergedResult.statusText;
     applyRuntimeResult(mergedResult);
 
+    const std::size_t unavailableSourceCount = static_cast<std::size_t>(unavailableInstanceIds.size());
     if (unavailableSourceCount > 0U) {
         setStatusText(SkyCatalogText::unavailableSourceSummary(runtimeStatusText, unavailableSourceCount));
     }
@@ -591,11 +629,6 @@ void SkyCatalogManager::loadSourceInstance(
 
     if (instance.urls.isEmpty()) {
         operation->payload.clear();
-        if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
-            // The bundled replacement drops the related dataset the instance
-            // may still own from its previous catalog.
-            static_cast<void>(m_runtime->clearSourceConstellationRefs(instance.instanceId));
-        }
         applyBundledSource(*operation, policy);
         return;
     }
@@ -661,9 +694,28 @@ void SkyCatalogManager::applyBundledSource(
     record.catalog = std::move(bundledCatalog);
     record.foundObjectCount = 0;
 
-    const SkyCatalogRuntimeResult result = m_runtime->applySource(std::move(record), runtimeBuildOptions());
+    SkyCatalogRuntimeResult result = m_runtime->applySource(std::move(record), runtimeBuildOptions());
     operation.busy = false;
+    if (!result.succeeded) {
+        // The runtime refused the transition: the row reports the operation
+        // error and the committed collection stays active.
+        operation.hasError = true;
+        operation.statusText = operationErrorText(result.statusText);
+        applyRuntimeResult(result);
+        return;
+    }
+
     operation.hasError = false;
+    if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge) {
+        // The bundled replacement drops the related dataset the instance may
+        // still own from its previous catalog. The dataset is cleared only
+        // after the replacement is committed, so a rejected transition keeps
+        // the previous catalog and its owned related data together.
+        static_cast<void>(m_runtime->clearSourceConstellationRefs(operation.instance.instanceId));
+        // The clear is part of the same committed replacement, so the
+        // published summary is re-read instead of keeping the pre-clear counts.
+        result.statusText = m_runtime->statusText();
+    }
     // A completed load leaves no operation status behind: the settled row state
     // is the collection's own state, so disabling the source afterwards is
     // presented as disabled instead of as the active source it once loaded.
@@ -672,7 +724,7 @@ void SkyCatalogManager::applyBundledSource(
     applyRuntimeResult(result);
 }
 
-void SkyCatalogManager::applySourceResult(
+SkyCatalogRuntimeResult SkyCatalogManager::applySourceResult(
     SkyCatalogSourceImportResult result, const skygate::ephemeris::CatalogCompositionPolicy policy
 )
 {
@@ -687,8 +739,12 @@ void SkyCatalogManager::applySourceResult(
     record.foundObjectCount = result.foundObjectCount;
 
     const SkyCatalogRuntimeResult runtimeResult = m_runtime->applySource(std::move(record), runtimeBuildOptions());
-    persistCatalogCache();
-    applyRuntimeResult(runtimeResult);
+    if (runtimeResult.succeeded) {
+        // Only a committed transition is persisted; a rejected collection is
+        // not configuration and must not replace the stored one.
+        persistCatalogCache();
+    }
+    return runtimeResult;
 }
 
 void SkyCatalogManager::handleSourceImportFinished(
@@ -726,7 +782,21 @@ void SkyCatalogManager::handleSourceImportFinished(
     const auto diagnostics = result.diagnostics;
     const QString sourceLabel = result.sourceLabel;
 
-    applySourceResult(std::move(result), policy);
+    const SkyCatalogRuntimeResult runtimeResult = applySourceResult(std::move(result), policy);
+    if (!runtimeResult.succeeded) {
+        // The catalog was parsed but the runtime refused the collection
+        // transition: the source is not installed (or the previous record
+        // stays) and the pending related dataset is left untouched, so the
+        // operation reports the error instead of proceeding as if the source
+        // were active.
+        operation->hasError = true;
+        operation->statusText = operationErrorText(runtimeResult.statusText);
+        setDownloadingCatalog(false);
+        applyRuntimeResult(runtimeResult);
+        return;
+    }
+
+    applyRuntimeResult(runtimeResult);
 
     if (policy == skygate::ephemeris::CatalogCompositionPolicy::Merge && diagnostics.truncatedBodyCount > 0U) {
         setStatusText(
@@ -852,16 +922,24 @@ void SkyCatalogManager::setSourceEnabled(const QString& instanceId, const bool e
         return;
     }
 
+    const SkyCatalogRuntimeResult result = m_runtime->setSourceEnabled(instanceId, enabled, runtimeBuildOptions());
+    if (!result.succeeded) {
+        applyRuntimeResult(result);
+        return;
+    }
+
     if (!enabled) {
         // Disabling an owner supersedes its own in-flight related work: a
         // response completing after the disable is discarded instead of
         // replacing the owner's dataset. Data that completed before the
         // disable stays owned and inactive, and re-enabling the owner restores
-        // only that retained data. Other sources are unaffected.
+        // only that retained data. Other sources are unaffected. The pending
+        // work is superseded only after the runtime committed the disable, so
+        // a rejected transition does not discard a response for an owner that
+        // is still enabled.
         invalidatePendingSourceWork(instanceId);
     }
 
-    const SkyCatalogRuntimeResult result = m_runtime->setSourceEnabled(instanceId, enabled, runtimeBuildOptions());
     persistCatalogCache();
     applyRuntimeResult(result);
 }

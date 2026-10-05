@@ -41,6 +41,11 @@ struct SkyCatalogRuntimeResult final {
     bool datasetInfoChanged = false;
     bool deepSkyCatalogInfoChanged = false;
     bool catalogChanged = false;
+    // False when the requested transition was rejected and nothing was
+    // published: statusText reports the operation error. The last accepted
+    // configuration, snapshot, counts, provenance, related view, and revision
+    // are unchanged.
+    bool succeeded = true;
 };
 
 // Owns the configured source collection, the active composed snapshot, and the
@@ -66,6 +71,16 @@ struct SkyCatalogRuntimeResult final {
 // ConstellationReferenceResolver against the active snapshot; the resolved
 // view is invalidated whenever either the snapshot or the active related view
 // changes.
+//
+// Activation is a single transition. A source mutation or rebuild composes the
+// candidate configuration and every derived value before anything is
+// published, so the configured sources, active snapshot, counts, provenance,
+// related view, and revision only change together, and only for an accepted
+// composition. A rejected transition - a null catalog, a composition
+// rejection, or a missing bundled catalog - reports the operation error through
+// the result and keeps the last accepted configuration and snapshot exactly as
+// they were; the rejected configuration is not installed. Every accepted
+// transition increments catalogRevision() and reports catalogChanged.
 class SkyCatalogRuntime final {
 public:
     using ConstellationLineRef = skygate::ephemeris::ConstellationLineRef;
@@ -79,6 +94,9 @@ public:
     // configured source is disabled this is the leading implicit bundled
     // contribution, so a disabled source is never presented as the active one.
     [[nodiscard]] QString sourceLabel() const;
+    // Composition summary of the currently published state, in the same form a
+    // successful transition result carries.
+    [[nodiscard]] QString statusText() const;
     // Presentation summary of the collection's actual participation: the
     // enabled configured sources in visible collection order, followed by the
     // bundled contributions whose objects survive in the active snapshot.
@@ -133,7 +151,9 @@ public:
     [[nodiscard]] SkyCatalogRuntimeResult clearSourceConstellationRefs(const QString& instanceId);
 
 private:
-    [[nodiscard]] SkyCatalogRuntimeResult failedCatalogResult(const QString& statusText);
+    // Builds the result of a rejected transition: it reports the operation
+    // error without publishing or discarding any state.
+    [[nodiscard]] SkyCatalogRuntimeResult activationFailureResult(const QString& statusText);
     [[nodiscard]] QString buildStatusText() const;
     [[nodiscard]] SkyCatalogSourceRecord* findSource(const QString& instanceId);
     [[nodiscard]] const SkyCatalogSourceRecord* findSource(const QString& instanceId) const;
