@@ -34,6 +34,14 @@ struct SkyConstellationLineImportResult;
 struct SkyCatalogSourceInstance;
 }  // namespace skygate::ui::internal
 
+// QML-facing owner of the configured catalog source collection.
+//
+// One operation record per source instance carries a monotonic operation
+// revision, so a response captured for a superseded incarnation can never
+// apply to its successor while unrelated instances keep their pending work.
+// Active composition and related-data ownership live in SkyCatalogRuntime;
+// persistence and legacy migration live in SkyCatalogCacheController. Only an
+// accepted transition persists state and emits catalogChanged.
 class SkyCatalogManager final : public QObject {
     Q_OBJECT
 

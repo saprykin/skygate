@@ -43,6 +43,12 @@ struct SkyConstellationLineImportResult final {
     [[nodiscard]] bool hasCustomLines() const noexcept;
 };
 
+// Downloads and parses one configured source instance.
+//
+// The instance's schema hint and archive member selector travel with the
+// download so the core parser applies the same parse contract as the
+// configured source. Failures are reported through the completion result
+// instead of being retried against a different source.
 class SkyCatalogImportWorkflow final {
 public:
     using StatusHandler = std::function<void(const QString&)>;
