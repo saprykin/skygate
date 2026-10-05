@@ -125,6 +125,11 @@ public:
     [[nodiscard]] std::span<const ConstellationLineRef> resolvedConstellationLineRefs() const;
     [[nodiscard]] std::span<const ConstellationAnchorGroup> resolvedConstellationAnchorGroups() const;
 
+    // Composes the active snapshot from the current configuration. The first
+    // call installs the bundled default source when no source is configured
+    // yet, because first use has no saved configuration; later calls and
+    // rebuilds never reinstate it, so a deliberate removal or an intentionally
+    // empty replacement stays empty.
     [[nodiscard]] SkyCatalogRuntimeResult initialize(const SkyCatalogRuntimeBuildOptions& options);
     [[nodiscard]] SkyCatalogRuntimeResult
     applySource(SkyCatalogSourceRecord source, const SkyCatalogRuntimeBuildOptions& options);
@@ -190,6 +195,10 @@ private:
     mutable std::vector<ConstellationLineRef> m_resolvedLineRefs;
     mutable std::vector<ConstellationAnchorGroup> m_resolvedAnchorGroups;
     mutable std::uint64_t m_resolvedRevision = 0U;
+    // True until initialize() has considered the first-use default source. A
+    // saved - possibly empty - configuration is installed after that, so the
+    // default is never reinstated by a rebuild of an empty collection.
+    bool m_firstUseDefaultsPending = true;
 };
 
 }  // namespace skygate::ui::internal

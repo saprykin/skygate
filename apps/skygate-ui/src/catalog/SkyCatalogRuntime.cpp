@@ -9,7 +9,6 @@
 #include <QLocale>
 
 #include <algorithm>
-#include <optional>
 #include <unordered_set>
 #include <utility>
 
@@ -221,6 +220,34 @@ SkyCatalogRuntime::resolvedConstellationAnchorGroups() const
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::initialize(const SkyCatalogRuntimeBuildOptions& options)
 {
+    // First use has no saved configuration, so the initial activation installs
+    // the bundled source as the collection's default. The default is considered
+    // only here: rebuilding the current configuration never reinstates it, so a
+    // deliberate removal or an intentionally empty replacement stays empty.
+    if (m_firstUseDefaultsPending) {
+        m_firstUseDefaultsPending = false;
+        if (m_sources.empty()) {
+            auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+            if (bundledCatalog == nullptr) {
+                return activationFailureResult(QStringLiteral("Catalog: Failed to load"));
+            }
+
+            return applySource(
+                SkyCatalogSourceRecord{
+                    .instanceId = QString::fromLatin1(kPrimarySourceId),
+                    .title = QStringLiteral("Bundled"),
+                    .version = QString(),
+                    .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
+                    .enabled = true,
+                    .bundled = true,
+                    .catalog = std::move(bundledCatalog),
+                    .foundObjectCount = 0,
+                },
+                options
+            );
+        }
+    }
+
     return rebuildActiveCatalog(options);
 }
 
@@ -357,35 +384,16 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::replaceSources(
 
 SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalogRuntimeBuildOptions& options)
 {
-    // The whole transition is staged: the implicit bundled source, the related
-    // view, the composition, and every derived count are built locally, and
-    // only an accepted composition commits them. A rejected composition
-    // reports the operation error and leaves the published state untouched.
-    std::optional<SkyCatalogSourceRecord> implicitBundledSource;
-    if (m_sources.empty()) {
-        auto bundledCatalog = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
-        if (bundledCatalog == nullptr) {
-            return activationFailureResult(QStringLiteral("Catalog: Failed to load"));
-        }
-        implicitBundledSource = SkyCatalogSourceRecord{
-            .instanceId = QString::fromLatin1(kPrimarySourceId),
-            .title = QStringLiteral("Bundled"),
-            .version = QString(),
-            .policy = skygate::ephemeris::CatalogCompositionPolicy::Merge,
-            .enabled = true,
-            .bundled = true,
-            .catalog = std::move(bundledCatalog),
-            .foundObjectCount = 0,
-        };
-    }
-
+    // The whole transition is staged: the related view, the composition, and
+    // every derived count are built locally, and only an accepted composition
+    // commits them. A rejected composition reports the operation error and
+    // leaves the published state untouched. The bundled core augmentation is a
+    // derived contribution that is never part of the configured collection, so
+    // recomposing an empty collection does not recreate a configured source.
     std::vector<const SkyCatalogSourceRecord*> candidateSources;
-    candidateSources.reserve(m_sources.size() + (implicitBundledSource.has_value() ? 1U : 0U));
+    candidateSources.reserve(m_sources.size());
     for (const SkyCatalogSourceRecord& source : m_sources) {
         candidateSources.push_back(&source);
-    }
-    if (implicitBundledSource.has_value()) {
-        candidateSources.push_back(&*implicitBundledSource);
     }
 
     skygate::ephemeris::CatalogCompositionRequest request;
@@ -459,9 +467,6 @@ SkyCatalogRuntimeResult SkyCatalogRuntime::rebuildActiveCatalog(const SkyCatalog
 
     // The composition is accepted: commit the candidate configuration and
     // publish every derived value together.
-    if (implicitBundledSource.has_value()) {
-        m_sources.push_back(std::move(*implicitBundledSource));
-    }
     m_starCatalog = std::move(composed.catalog);
     ++m_catalogRevision;
     m_bodyCount = composed.bodyCount;

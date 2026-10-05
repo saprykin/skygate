@@ -587,6 +587,9 @@ private slots:
     void crossSourceHipBridgesSurviveBinaryCollectionRestore();
     void collectionLifecycleKeepsSnapshotAndIdentitiesAcrossRestart();
     void legacySourcesStayRetiredAfterMigratedCollectionIsEmptied();
+    void missingConfigurationKeepsFirstUseDefaults();
+    void removingSoleSourceLeavesEmptyCollection();
+    void savedEmptyCollectionRestoresEmptyAcrossRestarts();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -3791,26 +3794,30 @@ void SkyCatalogManagerTests::legacySourcesStayRetiredAfterMigratedCollectionIsEm
         QVERIFY(manager.statusText().contains(QStringLiteral("Legacy")));
 
         // Removing every migrated source commits the collection boundary; the
-        // legacy cache itself stays readable instead of being deleted.
+        // legacy cache itself stays readable instead of being deleted. The
+        // last removal leaves the collection deliberately empty instead of
+        // reinstating an implicit default source.
         const QStringList migratedInstanceIds = manager.sourceInstanceIds();
         for (const QString& instanceId : migratedInstanceIds) {
             manager.removeSource(instanceId);
         }
-        QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+        QVERIFY(manager.sourceInstanceIds().isEmpty());
+        QVERIFY(manager.sourceViewEntries().isEmpty());
         QVERIFY(!catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Legacy Star")));
         QVERIFY(store.loadCatalogCache().has_value());
         const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> persisted =
             store.loadCatalogCollectionCache();
         QVERIFY(persisted.has_value());
-        QCOMPARE(persisted->sources.size(), 1);
-        QCOMPARE(persisted->sources[0].instanceId, QStringLiteral("primary"));
+        QVERIFY(persisted->sources.isEmpty());
     }
 
-    // The restart reads the committed collection instead of resurrecting the
-    // still-readable legacy two-slot cache.
+    // The restart reads the committed empty collection instead of resurrecting
+    // the still-readable legacy two-slot cache, and the bundled default source
+    // is not reinstated.
     SkyCatalogManager restoredManager(&store);
     QVERIFY(restoredManager.restoreCatalogCache());
-    QCOMPARE(restoredManager.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(restoredManager.sourceInstanceIds().isEmpty());
+    QVERIFY(restoredManager.sourceViewEntries().isEmpty());
     QVERIFY(!catalogContainsDisplayName(restoredManager.starCatalog(), QStringLiteral("Legacy Star")));
     QVERIFY(!restoredManager.sourceTitles().values().contains(QStringLiteral("Legacy Custom")));
     QVERIFY(!restoredManager.sourceTitles().values().contains(QStringLiteral("Legacy OpenNGC")));
@@ -3819,8 +3826,9 @@ void SkyCatalogManagerTests::legacySourcesStayRetiredAfterMigratedCollectionIsEm
 
     // An explicitly empty persisted collection - what remains after every
     // source of a migrated collection was removed - is a committed
-    // configuration as well: the restart has nothing to restore and never
-    // falls back to the legacy two-slot cache that is still readable.
+    // configuration as well: the restart restores it as an empty collection of
+    // zero sources and never falls back to the legacy two-slot cache that is
+    // still readable.
     SkySettingsStore::CatalogCollectionCacheSnapshot emptyCollection;
     emptyCollection.schemaVersion =
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
@@ -3828,12 +3836,147 @@ void SkyCatalogManagerTests::legacySourcesStayRetiredAfterMigratedCollectionIsEm
     QVERIFY(store.saveCatalogCollectionCache(emptyCollection));
 
     SkyCatalogManager emptyCollectionManager(&store);
-    QVERIFY(!emptyCollectionManager.restoreCatalogCache());
-    QCOMPARE(emptyCollectionManager.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(emptyCollectionManager.restoreCatalogCache());
+    QVERIFY(emptyCollectionManager.sourceInstanceIds().isEmpty());
+    QVERIFY(emptyCollectionManager.sourceViewEntries().isEmpty());
     QVERIFY(!catalogContainsDisplayName(emptyCollectionManager.starCatalog(), QStringLiteral("Legacy Star")));
     QVERIFY(!emptyCollectionManager.sourceTitles().values().contains(QStringLiteral("Legacy Custom")));
     QVERIFY(!emptyCollectionManager.sourceTitles().values().contains(QStringLiteral("Legacy OpenNGC")));
     QVERIFY(store.loadCatalogCache().has_value());
+}
+
+void SkyCatalogManagerTests::missingConfigurationKeepsFirstUseDefaults()
+{
+    // This scenario needs a settings state with no stored configuration at all,
+    // so its cache paths are isolated from the shared per-suite cache files.
+    m_settings.resetForCurrentTest();
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+
+    // First use has no stored configuration, so the bundled default source is
+    // configured and composes the initial snapshot.
+    QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(manager.isSourceEnabled(QStringLiteral("primary")));
+    QVERIFY(manager.starCatalog() != nullptr);
+    QVERIFY(manager.bodyCount() > 0U);
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+
+    // Nothing was ever stored: restore reports that and keeps the first-use
+    // default instead of clearing the collection.
+    QVERIFY(!manager.restoreCatalogCache());
+    QCOMPARE(manager.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+
+    // A fresh manager over the still empty configuration receives the same
+    // first-use default.
+    SkyCatalogManager restarted(&store);
+    QVERIFY(!restarted.restoreCatalogCache());
+    QCOMPARE(restarted.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(restarted.isSourceEnabled(QStringLiteral("primary")));
+    QVERIFY(restarted.starCatalog() != nullptr);
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+}
+
+void SkyCatalogManagerTests::removingSoleSourceLeavesEmptyCollection()
+{
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store);
+    QCOMPARE(manager.sourceCount(), std::size_t{1});
+    QSignalSpy sourcesSpy(&manager, &SkyCatalogManager::sourcesChanged);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy datasetSpy(&manager, &SkyCatalogManager::datasetInfoTextChanged);
+
+    manager.removeSource(QStringLiteral("primary"));
+
+    // The removed instance is neither recreated nor replaced by an implicit
+    // preset row, and the removal is published to the UI.
+    QCOMPARE(manager.sourceCount(), std::size_t{0});
+    QVERIFY(manager.sourceInstanceIds().isEmpty());
+    QVERIFY(manager.sourceViewEntries().isEmpty());
+    QVERIFY(!manager.sourceTitles().contains(QStringLiteral("primary")));
+    QVERIFY(catalogSpy.count() >= 1);
+    QVERIFY(datasetSpy.count() >= 1);
+    QVERIFY(sourcesSpy.count() >= 1);
+
+    // The active snapshot is the documented bundled augmentation: the bundled
+    // core and the bundled deep-sky fallback participate under their own
+    // provenance without a configured source row.
+    QVERIFY(manager.starCatalog() != nullptr);
+    QVERIFY(manager.bodyCount() > 0U);
+    const auto bodies = manager.starCatalog()->bodies();
+    const std::size_t deepSkyBodyCount = static_cast<std::size_t>(
+        std::count_if(bodies.begin(), bodies.end(), [](const skygate::ephemeris::BaseCelestialBody* body) {
+            return body != nullptr && body->kind == skygate::ephemeris::BaseCelestialBody::Kind::DeepSkyObject;
+        })
+    );
+    QVERIFY(deepSkyBodyCount > 0U);
+    QCOMPARE(manager.sourceLabel(), QStringLiteral("Bundled core"));
+    QCOMPARE(manager.participationSummary(), QStringLiteral("Bundled core + Bundled Messier"));
+    QVERIFY(manager.statusText().startsWith(QStringLiteral("Catalog: Bundled core + Bundled Messier")));
+    const std::span<const QString> composedSourceIds = manager.sourceIds();
+    QVERIFY(!composedSourceIds.empty());
+    QVERIFY(std::all_of(composedSourceIds.begin(), composedSourceIds.end(), [](const QString& sourceId) {
+        return sourceId == QStringLiteral("bundled-core") || sourceId == QStringLiteral("bundled-deep-sky");
+    }));
+
+    // Removing the last source commits the empty collection instead of
+    // clearing the configuration back to first use.
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> persisted =
+        store.loadCatalogCollectionCache();
+    QVERIFY(persisted.has_value());
+    QVERIFY(persisted->sources.isEmpty());
+}
+
+void SkyCatalogManagerTests::savedEmptyCollectionRestoresEmptyAcrossRestarts()
+{
+    SkySettingsStore store;
+    {
+        SkyCatalogManager manager(&store);
+        QCOMPARE(manager.sourceCount(), std::size_t{1});
+        manager.removeSource(QStringLiteral("primary"));
+        QCOMPARE(manager.sourceCount(), std::size_t{0});
+
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> persisted =
+            store.loadCatalogCollectionCache();
+        QVERIFY(persisted.has_value());
+        QVERIFY(persisted->sources.isEmpty());
+    }
+
+    // Restart 1: the stored empty snapshot restores successfully and stays
+    // empty; the first-use default is not reinstated over it.
+    {
+        SkyCatalogManager firstRestart(&store);
+        QSignalSpy sourcesSpy(&firstRestart, &SkyCatalogManager::sourcesChanged);
+        QSignalSpy catalogSpy(&firstRestart, &SkyCatalogManager::catalogChanged);
+        QVERIFY(firstRestart.restoreCatalogCache());
+        QCOMPARE(firstRestart.sourceCount(), std::size_t{0});
+        QVERIFY(firstRestart.sourceInstanceIds().isEmpty());
+        QVERIFY(firstRestart.sourceViewEntries().isEmpty());
+        QCOMPARE(firstRestart.participationSummary(), QStringLiteral("Bundled core + Bundled Messier"));
+        QVERIFY(catalogSpy.count() >= 1);
+        QVERIFY(sourcesSpy.count() >= 1);
+
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> persisted =
+            store.loadCatalogCollectionCache();
+        QVERIFY(persisted.has_value());
+        QVERIFY(persisted->sources.isEmpty());
+    }
+
+    // Restart 2: the configuration is still empty and no default source has
+    // crept back into the stored snapshot.
+    {
+        SkyCatalogManager secondRestart(&store);
+        QVERIFY(secondRestart.restoreCatalogCache());
+        QCOMPARE(secondRestart.sourceCount(), std::size_t{0});
+        QVERIFY(secondRestart.sourceInstanceIds().isEmpty());
+        QVERIFY(secondRestart.sourceViewEntries().isEmpty());
+
+        const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> persisted =
+            store.loadCatalogCollectionCache();
+        QVERIFY(persisted.has_value());
+        QVERIFY(persisted->sources.isEmpty());
+    }
 }
 
 QTEST_GUILESS_MAIN(SkyCatalogManagerTests)

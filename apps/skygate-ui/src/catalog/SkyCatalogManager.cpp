@@ -531,7 +531,13 @@ bool SkyCatalogManager::restoreCatalogCache()
     auto restoreResult = m_cacheController->restoreCollection(
         m_catalogPresetIndex, m_deepSkyCatalogPresetIndex, m_catalogUrlText, m_deepSkyCatalogUrlText
     );
-    if (restoreResult.sources.empty()) {
+    // A stored snapshot is a restored configuration even when it holds no
+    // source: the cache controller distinguishes an intentionally empty
+    // collection from "no collection was ever stored". First-use defaults
+    // therefore remain only when nothing was stored, and an empty collection
+    // is installed through the same staged replacement as a populated one, so
+    // a rejected composition leaves the previous configuration untouched.
+    if (!restoreResult.restored) {
         return false;
     }
 

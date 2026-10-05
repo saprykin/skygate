@@ -256,6 +256,9 @@ private slots:
     void relatedDataDoesNotAffectOtherOwnersOrCatalogs();
     void resolvedRefsUseActiveIdentitiesFromWinningCatalog();
     void resolvedCacheInvalidatesWhenRelatedDataChanges();
+    void initialActivationInstallsFirstUseDefaultSource();
+    void removingSoleConfiguredSourceLeavesEmptyConfiguration();
+    void emptyReplacementDoesNotRecreateConfiguredSource();
 
 private:
     // Fails the calling test when the runtime does not publish one coherent
@@ -1589,6 +1592,95 @@ void SkyCatalogRuntimeTests::resolvedCacheInvalidatesWhenRelatedDataChanges()
     QVERIFY(runtime.catalogRevision() > revisionAfterRelatedData);
     QVERIFY(runtime.resolvedConstellationLineRefs().empty());
     QVERIFY(runtime.resolvedConstellationAnchorGroups().empty());
+}
+
+void SkyCatalogRuntimeTests::initialActivationInstallsFirstUseDefaultSource()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(nullptr);
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{};
+
+    const auto result = runtime.initialize(options);
+    QVERIFY(result.succeeded);
+    QVERIFY(result.catalogChanged);
+    QCOMPARE(runtime.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+    QVERIFY(runtime.isSourceEnabled(QStringLiteral("primary")));
+    QVERIFY(runtime.starCatalog() != nullptr);
+    QVERIFY(runtime.bodyCount() >= 1U);
+
+    // The first-use default is considered only by the initial activation: an
+    // intentionally emptied collection is not repopulated by a later
+    // initialization of the same runtime.
+    QVERIFY(runtime.removeSource(QStringLiteral("primary"), options).catalogChanged);
+    QCOMPARE(runtime.sourceCount(), std::size_t{0});
+    QVERIFY(runtime.initialize(options).succeeded);
+    QCOMPARE(runtime.sourceCount(), std::size_t{0});
+    QVERIFY(runtime.sourceInstanceIds().isEmpty());
+}
+
+void SkyCatalogRuntimeTests::removingSoleConfiguredSourceLeavesEmptyConfiguration()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{};
+    QVERIFY(runtime.initialize(options).succeeded);
+    QCOMPARE(runtime.sourceInstanceIds(), QStringList{QStringLiteral("primary")});
+
+    const auto removalResult = runtime.removeSource(QStringLiteral("primary"), options);
+    QVERIFY(removalResult.succeeded);
+    QVERIFY(removalResult.catalogChanged);
+
+    // The removed source is neither recreated nor replaced by an implicit
+    // preset row.
+    QCOMPARE(runtime.sourceCount(), std::size_t{0});
+    QVERIFY(runtime.sourceInstanceIds().isEmpty());
+    QVERIFY(runtime.sources().empty());
+    QVERIFY(!runtime.hasSource(QStringLiteral("primary")));
+
+    // The active snapshot is the documented bundled core augmentation, under
+    // its own provenance instead of a configured source.
+    QVERIFY(runtime.starCatalog() != nullptr);
+    QVERIFY(runtime.bodyCount() >= 1U);
+    const std::span<const QString> composedSourceIds = runtime.sourceIds();
+    QCOMPARE(composedSourceIds.size(), runtime.bodyCount());
+    QVERIFY(std::all_of(composedSourceIds.begin(), composedSourceIds.end(), [](const QString& sourceId) {
+        return sourceId == QStringLiteral("bundled-core");
+    }));
+    QCOMPARE(runtime.sourceLabel(), QStringLiteral("Bundled core"));
+    QCOMPARE(runtime.participationSummary(), QStringLiteral("Bundled core"));
+    expectConsistentPublication(runtime);
+
+    // Recomposing the accepted empty configuration does not resurrect the
+    // removed source either.
+    QVERIFY(runtime.rebuildActiveCatalog(options).catalogChanged);
+    QCOMPARE(runtime.sourceCount(), std::size_t{0});
+    QVERIFY(runtime.sourceInstanceIds().isEmpty());
+    QCOMPARE(runtime.participationSummary(), QStringLiteral("Bundled core"));
+    expectConsistentPublication(runtime);
+}
+
+void SkyCatalogRuntimeTests::emptyReplacementDoesNotRecreateConfiguredSource()
+{
+    skygate::ui::internal::SkyCatalogRuntime runtime(makeCatalog());
+    const skygate::ui::internal::SkyCatalogRuntimeBuildOptions options{};
+    QVERIFY(runtime.initialize(options).succeeded);
+    QVERIFY(applySingleStarSource(runtime, QStringLiteral("source-a"), "source_a_1", options).catalogChanged);
+    QCOMPARE(runtime.sourceCount(), std::size_t{2});
+
+    const auto replacementResult = runtime.replaceSources({}, options);
+    QVERIFY(replacementResult.succeeded);
+    QVERIFY(replacementResult.catalogChanged);
+    QCOMPARE(runtime.sourceCount(), std::size_t{0});
+    QVERIFY(runtime.sourceInstanceIds().isEmpty());
+    QVERIFY(!runtime.hasSource(QStringLiteral("primary")));
+    QVERIFY(!runtime.hasSource(QStringLiteral("source-a")));
+    QVERIFY(runtime.starCatalog() != nullptr);
+    QVERIFY(runtime.bodyCount() >= 1U);
+    QCOMPARE(runtime.participationSummary(), QStringLiteral("Bundled core"));
+    expectConsistentPublication(runtime);
+
+    // The accepted empty collection is a valid base for a later addition.
+    QVERIFY(applySingleStarSource(runtime, QStringLiteral("source-b"), "source_b_1", options).catalogChanged);
+    QCOMPARE(runtime.sourceInstanceIds(), QStringList{QStringLiteral("source-b")});
+    expectConsistentPublication(runtime);
 }
 
 QTEST_APPLESS_MAIN(SkyCatalogRuntimeTests)
