@@ -19,7 +19,12 @@ namespace skygate::ephemeris {
 // bundled bright-star fallback when no star is present; DeepSkyFallback
 // sources contribute only deep-sky bodies as a gap-fill. Gap-fill sources
 // never replace an earlier survivor, so a configured source's body always
-// keeps precedence over bundled fallback data.
+// keeps precedence over bundled fallback data. Every policy shares the same
+// identity decision: a gap-fill body is only skipped when its identity
+// resolves to an existing survivor through the same kind, designation, and
+// ambiguity checks as a replacing source, and a contradicted or ambiguous
+// weak alias match keeps the body as an independent object with the normal
+// diagnostic.
 //
 // The identity-to-survivor index stays current while the collection is merged:
 // a replacement vacates the earlier survivor's index entries and registers the

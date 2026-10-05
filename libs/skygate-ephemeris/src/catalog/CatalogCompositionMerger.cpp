@@ -738,18 +738,35 @@ bool participates(const CatalogCompositionPolicy policy, const BaseCelestialBody
     return true;
 }
 
-// Gap-fill policies never replace an existing survivor: a participating body is
-// appended only when no active body already claims its identity. AugmentCore
-// and DeepSkyFallback differ in which bodies they select, not in precedence.
+// Gap-fill policies never replace an existing survivor: a body whose shared
+// identity decision resolves it to an existing equivalent is preserved
+// instead of appended. AugmentCore and DeepSkyFallback differ in which bodies
+// they select, not in precedence.
 bool isGapFillPolicy(const CatalogCompositionPolicy policy)
 {
     return policy == CatalogCompositionPolicy::AugmentCore || policy == CatalogCompositionPolicy::DeepSkyFallback;
 }
 
-bool hasAnyMatch(const CatalogIdentityIndex& index, const BaseCelestialBody& body)
+// Applies the shared identity decision to one body of a gap-fill source and
+// appends it only when its identity is not already established. A proven
+// equivalence keeps the earlier survivor untouched; a contradicted or
+// ambiguous weak alias match appends the body as an independent object with
+// the normal keep-distinct diagnostics. Only replacement-versus-preservation
+// is policy-specific, never the identity decision itself.
+void appendGapFillBody(
+    MergeAccumulator& accumulator,
+    CatalogIdentityIndex& index,
+    const BaseCelestialBody& body,
+    const std::string_view sourceId
+)
 {
-    const CatalogIdentityIndex::Resolution resolution = index.resolve(body);
-    return resolution.hasSingleMatch() || resolution.isAmbiguous();
+    const MatchDecision decision = evaluateMatch(accumulator, index, body);
+    if (decision.action != MatchDecision::Action::Append) {
+        return;
+    }
+
+    const std::size_t position = accumulator.append(body, std::string(sourceId));
+    index.add(accumulator.at(position), position);
 }
 
 // Positions in `positions` that share their object kind with another position.
@@ -898,10 +915,12 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
             continue;
         }
 
-        // Gap-fill sources contribute only the bodies their policy selects and
-        // never replace an earlier survivor. AugmentCore additionally enables
-        // the bundled bright-star fallback when no other source supplies a
-        // star; DeepSkyFallback fills missing deep-sky identities only.
+        // Gap-fill sources contribute only the bodies their policy selects,
+        // and the shared identity decision decides which of those are already
+        // established. No gap-fill body ever replaces an earlier survivor.
+        // AugmentCore additionally enables the bundled bright-star fallback
+        // when no other source supplies a star; DeepSkyFallback fills missing
+        // deep-sky identities only.
         if (isGapFillPolicy(source.policy)) {
             if (source.policy == CatalogCompositionPolicy::AugmentCore) {
                 augmentCoreEnabled = true;
@@ -918,11 +937,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     hasStar = true;
                 }
                 const SourceScopedBody scoped{*body, source.sourceId};
-                if (hasAnyMatch(activeIndex, scoped.body())) {
-                    continue;
-                }
-                const std::size_t position = accumulator.append(scoped.body(), source.sourceId);
-                activeIndex.add(accumulator.at(position), position);
+                appendGapFillBody(accumulator, activeIndex, scoped.body(), source.sourceId);
             }
             continue;
         }
@@ -981,11 +996,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
 
     if (augmentCoreEnabled && !hasStar) {
         for (const OwnGalaxyCelestialBody& brightStar : CoreBodyCatalogAugmenter::bundledBrightStars()) {
-            if (hasAnyMatch(activeIndex, brightStar)) {
-                continue;
-            }
-            const std::size_t position = accumulator.append(brightStar, augmentCoreSourceId);
-            activeIndex.add(accumulator.at(position), position);
+            appendGapFillBody(accumulator, activeIndex, brightStar, augmentCoreSourceId);
         }
     }
 

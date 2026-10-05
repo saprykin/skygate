@@ -135,6 +135,23 @@ CatalogCompositionResult composePrimaryWithDeepSky(
     return CatalogComposer::composeCollection(request);
 }
 
+// Composes one replacing source with one gap-fill source of the given policy.
+// The gap-fill source is configured after the replacing source, so it never
+// outranks the survivor it is supposed to fill gaps around.
+CatalogCompositionResult composeWithGapFill(
+    const skygate::ephemeris::IStarCatalog& source,
+    const skygate::ephemeris::IStarCatalog& gapFill,
+    const CatalogCompositionPolicy gapFillPolicy
+)
+{
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "primary", .enabled = true, .catalog = &source, .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "gap-fill", .enabled = true, .catalog = &gapFill, .policy = gapFillPolicy},
+    };
+    return CatalogComposer::composeCollection(request);
+}
+
 // Composes the two sources in collection order; the second source owns the
 // higher merge precedence.
 CatalogCompositionResult
@@ -237,6 +254,11 @@ private slots:
     void preservesStableOrdering();
     void mergesLargeFixtureWithoutAllPairsScan();
     void keepsSharedCommonNameDesignationsDistinct();
+    void keepsFallbackDesignationsDistinctWhenOnlyTheCommonNameMatches();
+    void matchingFallbackRowPreservesConfiguredWinnerValues();
+    void keepsFallbackIncompatibleKindDistinct();
+    void augmentCoreKeepsBundledBodyDistinctFromConfiguredDeepSkyObject();
+    void keepsAmbiguousFallbackAliasMatchDistinct();
     void matchesCaseAndPaddingDesignationVariants();
     void keepsSuffixDesignationsDistinct();
     void mergesExplicitCrossIdentifications();
@@ -965,6 +987,204 @@ void CatalogIdentityMergeTests::keepsSharedCommonNameDesignationsDistinct()
     QVERIFY(second->fixedEquatorialValue().has_value());
     QCOMPARE(first->fixedEquatorialValue()->rightAscensionHours, 1.0);
     QCOMPARE(second->fixedEquatorialValue()->rightAscensionHours, 10.0);
+}
+
+void CatalogIdentityMergeTests::keepsFallbackDesignationsDistinctWhenOnlyTheCommonNameMatches()
+{
+    // Both records carry a recognized NGC designation and share only the
+    // descriptive common name, so the fallback row describes a different
+    // object. A gap-fill policy must apply the same contradiction check as a
+    // replacing source and append the fallback row instead of dropping it.
+    const auto primary = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::OpenNgcCsv,
+        "Name;Type;RA;Dec;Common names\n"
+        "NGC0001;G;01:00:00;+02:00:00;Shared region\n"
+    );
+    const auto fallback = skygate::ephemeris::CatalogLoader::load(
+        skygate::ephemeris::CatalogSourceType::OpenNgcCsv,
+        "Name;Type;RA;Dec;Common names\n"
+        "NGC0002;G;10:00:00;+20:00:00;Shared region\n"
+    );
+    QVERIFY(primary.isSuccess());
+    QVERIFY(fallback.isSuccess());
+    QVERIFY(primary.catalog != nullptr);
+    QVERIFY(fallback.catalog != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept ngc_2 distinct from ngc_1 because their shared alias is ambiguous across "
+        "authoritative identifiers."
+    );
+    const auto result =
+        composeWithGapFill(*primary.catalog, *fallback.catalog, CatalogCompositionPolicy::DeepSkyFallback);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{2});
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(countBodiesById(bodies, "ngc_1"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "ngc_2"), std::size_t{1});
+
+    const BaseCelestialBody* configured = findBodyById(bodies, "ngc_1");
+    const BaseCelestialBody* appended = findBodyById(bodies, "ngc_2");
+    QVERIFY(configured != nullptr);
+    QVERIFY(appended != nullptr);
+    QVERIFY(hasIdentifier(*configured, "ngc", "1"));
+    QVERIFY(hasIdentifier(*appended, "ngc", "2"));
+    QVERIFY(configured->fixedEquatorialValue().has_value());
+    QVERIFY(appended->fixedEquatorialValue().has_value());
+    QCOMPARE(configured->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(appended->fixedEquatorialValue()->rightAscensionHours, 10.0);
+    QCOMPARE(result.sourceIds.front(), std::string("primary"));
+    QCOMPARE(result.sourceIds.back(), std::string("gap-fill"));
+}
+
+void CatalogIdentityMergeTests::matchingFallbackRowPreservesConfiguredWinnerValues()
+{
+    // The fallback row carries the same authoritative designation, so the
+    // shared identity decision proves both records describe one object.
+    // Gap-fill preserves the configured survivor: the fallback's conflicting
+    // values, alias, and provenance never replace or corrupt the winner.
+    const auto primary = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "ngc_224", "Configured Andromeda", {"M31"}, {CatalogIdentifier::make("ngc", "224")}, 1.0, 2.0, 100.0
+        )}
+    );
+    const auto fallback = createCatalog(
+        {},
+        {makeDeepSkyObject(
+            "ngc_224",
+            "Bundled Andromeda",
+            {"M31", "Bundled alias"},
+            {CatalogIdentifier::make("ngc", "224")},
+            10.0,
+            20.0,
+            5.0
+        )}
+    );
+    QVERIFY(primary != nullptr);
+    QVERIFY(fallback != nullptr);
+
+    const auto result = composeWithGapFill(*primary, *fallback, CatalogCompositionPolicy::DeepSkyFallback);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(bodies.size(), std::size_t{1});
+
+    const BaseCelestialBody* winner = findBodyById(bodies, "ngc_224");
+    QVERIFY(winner != nullptr);
+    QCOMPARE(QString::fromStdString(winner->displayName), QStringLiteral("Configured Andromeda"));
+    QVERIFY(winner->fixedEquatorialValue().has_value());
+    QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(winner->fixedEquatorialValue()->declinationDeg, 2.0);
+    const auto* info = winner->deepSkyObjectInfo();
+    QVERIFY(info != nullptr);
+    QVERIFY(info->majorAxisArcmin.has_value());
+    QCOMPARE(*info->majorAxisArcmin, 100.0);
+    QVERIFY(!hasAlias(winner->identity.aliases, "Bundled alias"));
+    QCOMPARE(result.sourceIds.front(), std::string("primary"));
+    QCOMPARE(result.contributorSourceIds.front(), (std::vector<std::string>{"primary"}));
+}
+
+void CatalogIdentityMergeTests::keepsFallbackIncompatibleKindDistinct()
+{
+    // The fallback deep-sky row resolves through an authoritative identifier
+    // shared with a configured star. Incompatible kinds stay distinct with
+    // the normal diagnostic instead of silently suppressing the fallback row.
+    const auto primary =
+        createCatalog({makeStar("hip_123", "Configured star", {CatalogIdentifier::make("hip", "123")})}, {});
+    const auto fallback = createCatalog(
+        {}, {makeDeepSkyObject("fallback_shared_hip", "Fallback row", {}, {CatalogIdentifier::make("hip", "123")})}
+    );
+    QVERIFY(primary != nullptr);
+    QVERIFY(fallback != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept fallback_shared_hip distinct from hip_123 because the shared identity is used by "
+        "incompatible object kinds."
+    );
+    const auto result = composeWithGapFill(*primary, *fallback, CatalogCompositionPolicy::DeepSkyFallback);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.starCount, std::size_t{1});
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "hip_123"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "fallback_shared_hip"), std::size_t{1});
+
+    const BaseCelestialBody* star = findBodyById(bodies, "hip_123");
+    const BaseCelestialBody* deepSky = findBodyById(bodies, "fallback_shared_hip");
+    QVERIFY(star != nullptr);
+    QVERIFY(deepSky != nullptr);
+    QCOMPARE(star->kind, BaseCelestialBody::Kind::Star);
+    QCOMPARE(deepSky->kind, BaseCelestialBody::Kind::DeepSkyObject);
+}
+
+void CatalogIdentityMergeTests::augmentCoreKeepsBundledBodyDistinctFromConfiguredDeepSkyObject()
+{
+    // A configured deep-sky record whose canonical id collides with a bundled
+    // core body of another kind must not suppress the bundled augmentation.
+    const auto primary = createCatalog({}, {makeDeepSkyObject("Mars", "Mars deep sky", {"Mars region"})});
+    const auto bundledCore = skygate::ephemeris::CatalogFactory::createBundledStarCatalog();
+    QVERIFY(primary != nullptr);
+    QVERIFY(bundledCore != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept mars distinct from Mars because the shared identity is used by incompatible "
+        "object kinds."
+    );
+    const auto result = composeWithGapFill(*primary, *bundledCore, CatalogCompositionPolicy::AugmentCore);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(countBodiesById(bodies, "Mars"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "mars"), std::size_t{1});
+
+    const BaseCelestialBody* configured = findBodyById(bodies, "Mars");
+    const BaseCelestialBody* bundled = findBodyById(bodies, "mars");
+    QVERIFY(configured != nullptr);
+    QVERIFY(bundled != nullptr);
+    QCOMPARE(configured->kind, BaseCelestialBody::Kind::DeepSkyObject);
+    QCOMPARE(bundled->kind, BaseCelestialBody::Kind::Planet);
+}
+
+void CatalogIdentityMergeTests::keepsAmbiguousFallbackAliasMatchDistinct()
+{
+    // The configured collection already has two different objects sharing one
+    // weak alias, so a fallback row resolving only through that alias cannot
+    // be proven equivalent to either. The row stays a distinct object with the
+    // same diagnostic the normal merge path reports for an ambiguous match.
+    const auto primary = createCatalog(
+        {},
+        {
+            makeDeepSkyObject("ngc_224", "Andromeda", {"M31"}, {CatalogIdentifier::make("ngc", "224")}),
+            makeDeepSkyObject("ngc_598", "Triangulum", {"M31"}, {CatalogIdentifier::make("ngc", "598")}),
+        }
+    );
+    const auto fallback = createCatalog({}, {makeDeepSkyObject("fallback_shared_alias", "Fallback row", {"M31"})});
+    QVERIFY(primary != nullptr);
+    QVERIFY(fallback != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept ngc_598 distinct from ngc_224 because their shared alias is ambiguous across "
+        "authoritative identifiers."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept fallback_shared_alias distinct because its identity matched 2 different bodies."
+    );
+    const auto result = composeWithGapFill(*primary, *fallback, CatalogCompositionPolicy::DeepSkyFallback);
+
+    QVERIFY(result.isSuccess());
+    const std::span<const BaseCelestialBody* const> bodies = result.catalog->bodies();
+    QCOMPARE(result.deepSkyObjectCount, std::size_t{3});
+    QCOMPARE(countBodiesById(bodies, "ngc_224"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "ngc_598"), std::size_t{1});
+    QCOMPARE(countBodiesById(bodies, "fallback_shared_alias"), std::size_t{1});
 }
 
 void CatalogIdentityMergeTests::matchesCaseAndPaddingDesignationVariants()
