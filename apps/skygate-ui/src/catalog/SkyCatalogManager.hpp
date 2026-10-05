@@ -107,6 +107,10 @@ public:
     void addSourcePreset(const QString& presetId);
     void addSourceUrl(const QString& urlText, const QString& category);
     void enableSource(const QString& instanceId);
+    // Disabling a source supersedes its own in-flight related request: a
+    // response completing after the disable is discarded. Data that completed
+    // before the disable stays owned and inactive, and re-enabling restores
+    // only that retained data.
     void disableSource(const QString& instanceId);
     void removeSource(const QString& instanceId);
     void moveSource(const QString& instanceId, int targetIndex);
@@ -163,7 +167,14 @@ private:
     [[nodiscard]] const SourceOperation* findOperation(const QString& instanceId) const;
     void removeOperation(const QString& instanceId);
     [[nodiscard]] bool isOperationCurrent(const QString& instanceId, std::uint64_t revision) const;
-    void invalidatePendingSourceWork();
+    // Supersedes the pending work of one instance: callbacks already captured
+    // for its current operation revision are rejected and its pending related
+    // download is no longer tracked. Other instances keep their revisions and
+    // their in-flight work.
+    void invalidatePendingSourceWork(const QString& instanceId);
+    // Supersedes every instance's pending work; only the global cancel does.
+    void invalidateAllPendingSourceWork();
+    [[nodiscard]] bool hasPendingConstellationWork() const;
     void setSourceEnabled(const QString& instanceId, bool enabled);
     void setStatusText(const QString& statusText);
     void setDownloadingCatalog(bool downloadingCatalog);
@@ -197,7 +208,11 @@ private:
     QString m_deepSkyCatalogUrlText;
     bool m_downloadingCatalog = false;
     bool m_catalogProcessing = false;
-    bool m_constellationDownloadPending = false;
     QString m_activeDownloadInstanceId;
     QVector<SourceOperation> m_sourceOperations;
+    // Monotonic source of operation revisions. A revision is never reused, so
+    // a callback captured for one incarnation of an instance can never match
+    // the operation that supersedes it, not even when the same instance ID is
+    // removed and added again.
+    std::uint64_t m_nextOperationRevision = 0;
 };

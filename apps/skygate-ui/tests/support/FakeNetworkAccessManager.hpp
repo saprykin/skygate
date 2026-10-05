@@ -25,6 +25,10 @@ struct FakeNetworkResponse final {
     QString errorText;
     int httpStatusCode = 200;
     int delayMs = 0;
+    // When true the reply stays open until the test completes it with
+    // FakeNetworkReply::finishNow(), so a controlled reply can be delivered at
+    // an exact point in a sequence instead of after a fixed delay.
+    bool manualFinish = false;
 };
 
 class FakeNetworkReply final : public QNetworkReply {
@@ -41,7 +45,17 @@ public:
         }
         open(QIODevice::ReadOnly | QIODevice::Unbuffered);
 
-        QTimer::singleShot(response.delayMs, this, [this] { finish(); });
+        if (!response.manualFinish) {
+            QTimer::singleShot(response.delayMs, this, [this] { finish(); });
+        }
+    }
+
+    // Completes this reply. A reply registered with
+    // FakeNetworkResponse::manualFinish stays open until this is called; for an
+    // automatic reply it completes it early. No-op once finished.
+    void finishNow()
+    {
+        finish();
     }
 
     void abort() override

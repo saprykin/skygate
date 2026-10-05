@@ -13,6 +13,8 @@
 
 #include <QDir>
 #include <QFile>
+#include <QList>
+#include <QPair>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QSettings>
@@ -77,6 +79,47 @@ QByteArray archiveMemberZip(const skygate::ui::tests::DeepSkyCatalogPayloadOptio
 }
 
 constexpr int kStaleConstellationDelayMs = 500;
+
+// A source instance configured with one related constellation dataset, so a
+// test can drive the owner-bound related-data lifecycle with fake replies.
+skygate::ui::internal::SkyCatalogSourceInstance
+relatedDatasetInstance(const QString& catalogUrl, const QString& relatedUrl)
+{
+    skygate::ui::internal::SkyCatalogSourceInstance instance =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(catalogUrl);
+    instance.relatedDatasetUrls = QStringList{relatedUrl};
+    return instance;
+}
+
+// One related constellation dataset with a single two-segment constellation,
+// distinguishable per owner by its constellation id and anchor name.
+QByteArray relatedDatasetPayload(const QString& constellationId, const QList<int>& hips)
+{
+    return skygate::ui::tests::stellariumConstellationIndexJsonPayload({{constellationId, hips}});
+}
+
+QByteArray orionRelatedDatasetPayload()
+{
+    return relatedDatasetPayload(QStringLiteral("orion"), {27989, 25336, 25930});
+}
+
+QByteArray lyraRelatedDatasetPayload()
+{
+    return relatedDatasetPayload(QStringLiteral("lyra"), {26311, 26727, 24436});
+}
+
+bool collectionContainsInstanceId(
+    const SkySettingsStore::CatalogCollectionCacheSnapshot& snapshot, const QString& instanceId
+)
+{
+    return std::any_of(
+        snapshot.sources.begin(),
+        snapshot.sources.end(),
+        [&instanceId](const SkySettingsStore::CatalogSourceCacheRecord& record) {
+            return record.instanceId == instanceId;
+        }
+    );
+}
 
 // Finds the active related anchor group by constellation name. The returned
 // pointer stays valid until the next active-view mutation.
@@ -154,6 +197,12 @@ private slots:
     void removedBundledSourceDoesNotReturnAfterRestart();
     void relatedConstellationDatasetsStayOwnedByTheirSources();
     void overlappingConstellationDatasetsFollowSourceOrder();
+    void lateRelatedResponseAfterOwnerRemovalIsIgnored();
+    void readdedOwnerRejectsPreviousIncarnationResponse();
+    void disablingOwnerSupersedesItsPendingRelatedResponse();
+    void lateRelatedFailureStatusFromSupersededOwnerIsIgnored();
+    void outOfOrderRelatedRepliesPopulateTheirOwnSources();
+    void reloadingOrRemovingAnotherSourceKeepsPendingOwnerResponse();
 
 private:
     SkySettingsStore::CatalogCacheSnapshot makeCacheSnapshot() const;
@@ -1744,6 +1793,406 @@ void SkyCatalogManagerTests::overlappingConstellationDatasetsFollowSourceOrder()
     QCOMPARE(orionGroup->second.front(), std::string("hip_25336"));
     QCOMPARE(manager.constellationCount(), std::size_t{3});
     QCOMPARE(manager.constellationLineRefs().size(), std::size_t{6});
+}
+
+void SkyCatalogManagerTests::lateRelatedResponseAfterOwnerRemovalIsIgnored()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/removed-owner-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/removed-owner-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/removed-owner-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/removed-owner-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        sourceARelatedUrl, {.payload = orionRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    const QString sourceAId = sourceA.instanceId;
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(sourceARelatedUrl));
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> relatedReply =
+        findReplyForUrl(networkAccessManager, sourceARelatedUrl);
+    QVERIFY(!relatedReply.isNull());
+    QVERIFY(!relatedReply->isFinished());
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+
+    manager.removeSource(sourceAId);
+    QVERIFY(!manager.sourceInstanceIds().contains(sourceAId));
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+
+    const auto revisionAfterRemoval = manager.catalogRevision();
+    const int catalogChangesAfterRemoval = catalogSpy.count();
+    const QString statusAfterRemoval = manager.statusText();
+    const int statusChangesAfterRemoval = statusSpy.count();
+
+    const auto entriesAfterRemoval = manager.sourceViewEntries();
+    const auto siblingAfterRemoval = std::find_if(
+        entriesAfterRemoval.begin(),
+        entriesAfterRemoval.end(),
+        [&sourceBId](const SkyCatalogManager::SourceViewEntry& entry) { return entry.instanceId == sourceBId; }
+    );
+    QVERIFY(siblingAfterRemoval != entriesAfterRemoval.end());
+    QVERIFY(!siblingAfterRemoval->busy);
+    QVERIFY(!siblingAfterRemoval->hasError);
+    QCOMPARE(siblingAfterRemoval->statusText, QStringLiteral("Active"));
+
+    const auto persistedAfterRemoval = store.loadCatalogCollectionCache();
+    QVERIFY(persistedAfterRemoval.has_value());
+    QVERIFY(!collectionContainsInstanceId(*persistedAfterRemoval, sourceAId));
+
+    QVERIFY(!relatedReply.isNull());
+    relatedReply->finishNow();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    // The removed owner's delayed response is discarded: no active lines or
+    // counts, no catalog change, no status change, and no persisted owner data.
+    // The retained sibling keeps its own dataset and status.
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+    QCOMPARE(manager.catalogRevision(), revisionAfterRemoval);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterRemoval);
+    QCOMPARE(manager.statusText(), statusAfterRemoval);
+    QCOMPARE(statusSpy.count(), statusChangesAfterRemoval);
+
+    const auto entriesAfterReply = manager.sourceViewEntries();
+    const auto siblingAfterReply = std::find_if(
+        entriesAfterReply.begin(),
+        entriesAfterReply.end(),
+        [&sourceBId](const SkyCatalogManager::SourceViewEntry& entry) { return entry.instanceId == sourceBId; }
+    );
+    QVERIFY(siblingAfterReply != entriesAfterReply.end());
+    QVERIFY(!siblingAfterReply->busy);
+    QVERIFY(!siblingAfterReply->hasError);
+    QCOMPARE(siblingAfterReply->statusText, QStringLiteral("Active"));
+
+    const auto persistedAfterReply = store.loadCatalogCollectionCache();
+    QVERIFY(persistedAfterReply.has_value());
+    QCOMPARE(persistedAfterReply->sources.size(), persistedAfterRemoval->sources.size());
+    QVERIFY(!collectionContainsInstanceId(*persistedAfterReply, sourceAId));
+}
+
+void SkyCatalogManagerTests::readdedOwnerRejectsPreviousIncarnationResponse()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/readded-owner-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/readded-owner-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = lyraRelatedDatasetPayload(), .manualFinish = true});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance first = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString sourceId = first.instanceId;
+    manager.loadSource(first, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(relatedUrl));
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> staleReply = findReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!staleReply.isNull());
+    QVERIFY(!staleReply->isFinished());
+
+    // Replace the owner with a new incarnation of the same durable instance
+    // ID; only this incarnation's revision may accept the related response.
+    manager.removeSource(sourceId);
+    QVERIFY(!manager.sourceInstanceIds().contains(sourceId));
+
+    skygate::ui::internal::SkyCatalogSourceInstance second = relatedDatasetInstance(catalogUrl, relatedUrl);
+    second.instanceId = sourceId;
+    manager.loadSource(second, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+
+    const auto revisionAfterCurrent = manager.catalogRevision();
+    const int catalogChangesAfterCurrent = catalogSpy.count();
+    const QString statusAfterCurrent = manager.statusText();
+    const int statusChangesAfterCurrent = statusSpy.count();
+
+    const auto persistedAfterCurrent = store.loadCatalogCollectionCache();
+    QVERIFY(persistedAfterCurrent.has_value());
+    const auto currentRecord = std::find_if(
+        persistedAfterCurrent->sources.begin(),
+        persistedAfterCurrent->sources.end(),
+        [&sourceId](const SkySettingsStore::CatalogSourceCacheRecord& record) { return record.instanceId == sourceId; }
+    );
+    QVERIFY(currentRecord != persistedAfterCurrent->sources.end());
+    const QByteArray persistedLineRows = currentRecord->constellationLineRows;
+    QVERIFY(!persistedLineRows.isEmpty());
+
+    QVERIFY(!staleReply.isNull());
+    staleReply->finishNow();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    // The previous incarnation's delayed response cannot replace the current
+    // owner's dataset, its counts, its status, or the persisted collection.
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") == nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+    QCOMPARE(manager.catalogRevision(), revisionAfterCurrent);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterCurrent);
+    QCOMPARE(manager.statusText(), statusAfterCurrent);
+    QCOMPARE(statusSpy.count(), statusChangesAfterCurrent);
+
+    const auto persistedAfterStale = store.loadCatalogCollectionCache();
+    QVERIFY(persistedAfterStale.has_value());
+    const auto staleRecord = std::find_if(
+        persistedAfterStale->sources.begin(),
+        persistedAfterStale->sources.end(),
+        [&sourceId](const SkySettingsStore::CatalogSourceCacheRecord& record) { return record.instanceId == sourceId; }
+    );
+    QVERIFY(staleRecord != persistedAfterStale->sources.end());
+    QCOMPARE(staleRecord->constellationLineRows, persistedLineRows);
+}
+
+void SkyCatalogManagerTests::disablingOwnerSupersedesItsPendingRelatedResponse()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/disabled-owner-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/disabled-owner-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload(), .manualFinish = true});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy catalogSpy(&manager, &SkyCatalogManager::catalogChanged);
+    QSignalSpy datasetSpy(&manager, &SkyCatalogManager::datasetInfoTextChanged);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString sourceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(relatedUrl));
+    QVERIFY(manager.constellationLineRefs().empty());
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> relatedReply = findReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!relatedReply.isNull());
+    QVERIFY(!relatedReply->isFinished());
+
+    manager.disableSource(sourceId);
+    QVERIFY(!manager.isSourceEnabled(sourceId));
+
+    const auto revisionAfterDisable = manager.catalogRevision();
+    const int catalogChangesAfterDisable = catalogSpy.count();
+    const int datasetChangesAfterDisable = datasetSpy.count();
+    const QString statusAfterDisable = manager.statusText();
+    const int statusChangesAfterDisable = statusSpy.count();
+
+    QVERIFY(!relatedReply.isNull());
+    relatedReply->finishNow();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    // Disabling supersedes the owner's in-flight related work: the response is
+    // discarded and cannot activate references or change counts or status.
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.catalogRevision(), revisionAfterDisable);
+    QCOMPARE(catalogSpy.count(), catalogChangesAfterDisable);
+    QCOMPARE(datasetSpy.count(), datasetChangesAfterDisable);
+    QCOMPARE(manager.statusText(), statusAfterDisable);
+    QCOMPARE(statusSpy.count(), statusChangesAfterDisable);
+
+    // Re-enabling restores only data that completed before the disable.
+    manager.enableSource(sourceId);
+    QVERIFY(manager.isSourceEnabled(sourceId));
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.constellationCount(), std::size_t{0});
+}
+
+void SkyCatalogManagerTests::lateRelatedFailureStatusFromSupersededOwnerIsIgnored()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/failed-owner-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/failed-owner-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        relatedUrl,
+        {.error = QNetworkReply::HostNotFoundError,
+         .errorText = QStringLiteral("No fake response registered"),
+         .httpStatusCode = 404,
+         .manualFinish = true}
+    );
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    QSignalSpy statusSpy(&manager, &SkyCatalogManager::statusTextChanged);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString sourceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(relatedUrl));
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> relatedReply = findReplyForUrl(networkAccessManager, relatedUrl);
+    QVERIFY(!relatedReply.isNull());
+    QVERIFY(!relatedReply->isFinished());
+
+    manager.disableSource(sourceId);
+    const QString statusAfterDisable = manager.statusText();
+    const int statusChangesAfterDisable = statusSpy.count();
+
+    QVERIFY(!relatedReply.isNull());
+    relatedReply->finishNow();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+
+    // The failure status callback of the superseded request reports nothing.
+    QCOMPARE(manager.statusText(), statusAfterDisable);
+    QCOMPARE(statusSpy.count(), statusChangesAfterDisable);
+}
+
+void SkyCatalogManagerTests::outOfOrderRelatedRepliesPopulateTheirOwnSources()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/out-of-order-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/out-of-order-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/out-of-order-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/out-of-order-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        sourceARelatedUrl, {.payload = orionRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    const QString sourceAId = sourceA.instanceId;
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(sourceARelatedUrl));
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> firstReply =
+        findReplyForUrl(networkAccessManager, sourceARelatedUrl);
+    QVERIFY(!firstReply.isNull());
+    QVERIFY(!firstReply->isFinished());
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+
+    // Source B's later request completes first; loading it did not discard
+    // source A's pending response.
+    QTRY_VERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+
+    // Source A's earlier request completes after, into A's own record.
+    QVERIFY(!firstReply.isNull());
+    firstReply->finishNow();
+    QCoreApplication::processEvents();
+    QTRY_VERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+    QCOMPARE(manager.constellationCount(), std::size_t{2});
+
+    // Each dataset stays with the owner whose response delivered it.
+    manager.disableSource(sourceAId);
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    manager.enableSource(sourceAId);
+    manager.disableSource(sourceBId);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+}
+
+void SkyCatalogManagerTests::reloadingOrRemovingAnotherSourceKeepsPendingOwnerResponse()
+{
+    const QString sourceAUrl = QStringLiteral("https://example.test/pending-owner-a-stars.csv");
+    const QString sourceARelatedUrl = QStringLiteral("https://example.test/pending-owner-a-lines.json");
+    const QString sourceBUrl = QStringLiteral("https://example.test/pending-owner-b-stars.csv");
+    const QString sourceBRelatedUrl = QStringLiteral("https://example.test/pending-owner-b-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(sourceAUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(
+        sourceARelatedUrl, {.payload = orionRelatedDatasetPayload(), .manualFinish = true}
+    );
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(sourceBUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(sourceBRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceA =
+        relatedDatasetInstance(sourceAUrl, sourceARelatedUrl);
+    manager.loadSource(sourceA, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(networkAccessManager.requestedUrls().contains(sourceARelatedUrl));
+
+    QPointer<skygate::ui::tests::FakeNetworkReply> pendingReply =
+        findReplyForUrl(networkAccessManager, sourceARelatedUrl);
+    QVERIFY(!pendingReply.isNull());
+    QVERIFY(!pendingReply->isFinished());
+
+    const skygate::ui::internal::SkyCatalogSourceInstance sourceB =
+        relatedDatasetInstance(sourceBUrl, sourceBRelatedUrl);
+    const QString sourceBId = sourceB.instanceId;
+    manager.loadSource(sourceB, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_VERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+
+    // Reloading and removing another source while the owner's response is
+    // still pending must not supersede that response.
+    manager.retrySource(sourceBId);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    manager.removeSource(sourceBId);
+    QVERIFY(!manager.sourceInstanceIds().contains(sourceBId));
+    QVERIFY(!pendingReply.isNull());
+    QVERIFY(!pendingReply->isFinished());
+
+    pendingReply->finishNow();
+    QCoreApplication::processEvents();
+    QTRY_VERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") == nullptr);
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
 }
 
 void SkyCatalogManagerTests::removedBundledSourceDoesNotReturnAfterRestart()

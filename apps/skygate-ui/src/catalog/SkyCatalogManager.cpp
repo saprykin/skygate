@@ -375,7 +375,10 @@ void SkyCatalogManager::removeSource(const QString& instanceId)
         return;
     }
 
-    invalidatePendingSourceWork();
+    // Dropping the operation rejects every callback already captured for this
+    // incarnation; a later instance with the same ID receives a fresh revision
+    // instead of inheriting the removed one. Completed references are removed
+    // together with the runtime record that owns them.
     removeOperation(instanceId);
     const SkyCatalogRuntimeResult result = m_runtime->removeSource(instanceId, runtimeBuildOptions());
     persistCatalogCache();
@@ -409,11 +412,11 @@ void SkyCatalogManager::retrySource(const QString& instanceId)
 
 void SkyCatalogManager::cancelCatalogDownload()
 {
-    if (!m_downloadingCatalog && !m_constellationDownloadPending) {
+    if (!m_downloadingCatalog && !hasPendingConstellationWork()) {
         return;
     }
 
-    invalidatePendingSourceWork();
+    invalidateAllPendingSourceWork();
     const QString activeInstanceId = m_activeDownloadInstanceId;
     m_activeDownloadInstanceId.clear();
     if (m_networkAccessManager != nullptr) {
@@ -571,7 +574,10 @@ void SkyCatalogManager::loadSourceInstance(
     }
 
     SourceOperation* operation = upsertOperation(instance, policy);
-    invalidatePendingSourceWork();
+    // Loading or updating this instance supersedes the work of its previous
+    // incarnation only: every other source keeps its pending requests, its
+    // revisions, and its reported status.
+    invalidatePendingSourceWork(instance.instanceId);
     operation->busy = true;
     operation->hasError = false;
     operation->statusText = instance.urls.isEmpty() ? QStringLiteral("Loading...") : QStringLiteral("Downloading...");
@@ -747,7 +753,6 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
     }
 
     operation->constellationPending = true;
-    m_constellationDownloadPending = true;
     m_importWorkflow->downloadConstellationLines(
         constellationLineUrlTexts,
         this,
@@ -763,7 +768,6 @@ void SkyCatalogManager::downloadConstellationLinesAfterCatalog(
             if (SourceOperation* operation = findOperation(instanceId)) {
                 operation->constellationPending = false;
             }
-            m_constellationDownloadPending = false;
             handleConstellationLineImportFinished(instanceId, catalogSummaryText, std::move(lineResult));
         }
     );
@@ -801,19 +805,48 @@ void SkyCatalogManager::handleConstellationLineImportFinished(
     persistCatalogCache();
 }
 
-void SkyCatalogManager::invalidatePendingSourceWork()
+void SkyCatalogManager::invalidatePendingSourceWork(const QString& instanceId)
+{
+    SourceOperation* operation = findOperation(instanceId);
+    if (operation == nullptr) {
+        return;
+    }
+
+    operation->revision = ++m_nextOperationRevision;
+    operation->constellationPending = false;
+}
+
+void SkyCatalogManager::invalidateAllPendingSourceWork()
 {
     for (SourceOperation& operation : m_sourceOperations) {
-        ++operation.revision;
+        operation.revision = ++m_nextOperationRevision;
         operation.constellationPending = false;
     }
-    m_constellationDownloadPending = false;
+}
+
+bool SkyCatalogManager::hasPendingConstellationWork() const
+{
+    for (const SourceOperation& operation : m_sourceOperations) {
+        if (operation.constellationPending) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void SkyCatalogManager::setSourceEnabled(const QString& instanceId, const bool enabled)
 {
     if (m_downloadingCatalog) {
         return;
+    }
+
+    if (!enabled) {
+        // Disabling an owner supersedes its own in-flight related work: a
+        // response completing after the disable is discarded instead of
+        // replacing the owner's dataset. Data that completed before the
+        // disable stays owned and inactive, and re-enabling the owner restores
+        // only that retained data. Other sources are unaffected.
+        invalidatePendingSourceWork(instanceId);
     }
 
     const SkyCatalogRuntimeResult result = m_runtime->setSourceEnabled(instanceId, enabled, runtimeBuildOptions());
@@ -958,6 +991,7 @@ SkyCatalogManager::SourceOperation* SkyCatalogManager::upsertOperation(
     SourceOperation operation;
     operation.instance = source;
     operation.policy = policy;
+    operation.revision = ++m_nextOperationRevision;
     m_sourceOperations.push_back(std::move(operation));
     return &m_sourceOperations.back();
 }
