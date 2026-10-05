@@ -45,6 +45,20 @@ namespace skygate::ephemeris {
 // weak deep-sky alias matches that contradict recognized designations or match
 // several survivors.
 //
+// Absorption follows configured source precedence, never accumulator
+// insertion order. The winner's own present values stay authoritative; a
+// value it is missing is taken from the highest-precedence absorbed
+// contributor, because a later source outranks every earlier source. A
+// survivor's contributor source ids are listed in that same descending
+// precedence order: the winner's source first, then each remaining contributor
+// highest first, with every contributing source listed once. Equal source
+// precedence (several absorbed survivors of one source) keeps that source's
+// documented row order, where the first row of a source is authoritative and
+// its later rows only fill it. Accumulator positions are not source ranks:
+// replacement and bridge absorption vacate positions and append the winner at
+// a new one, so position order stops matching precedence after the first
+// replacement.
+//
 // After the merge, an authoritative identity shared by two active survivors of
 // the same kind is an internal merge error and is reported by the merge
 // validation. A shared authoritative identity across incompatible kinds is a
