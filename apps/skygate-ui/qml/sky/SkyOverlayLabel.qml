@@ -14,18 +14,37 @@ Item {
         : theme.overlayLabelText
     readonly property real labelWidth: overlayLabel.implicitWidth + 12
     readonly property real labelHeight: overlayLabel.implicitHeight + 6
-    readonly property real labelX: modelData.x - (labelWidth * 0.5)
+    // Keep the label inside the overlay layer when the projected body sits at
+    // the viewport edge. Without clamping the label rendered partially outside
+    // the window and the main-window rendering bounds check failed at scene
+    // times that placed a bright star near the 560x640 window edge (V2-18).
+    readonly property real layerWidth: parent ? parent.width : labelWidth
+    readonly property real layerHeight: parent ? parent.height : labelHeight
+    readonly property real labelX: Math.max(
+        0,
+        Math.min(
+            modelData.x - (labelWidth * 0.5),
+            layerWidth - labelWidth
+        )
+    )
     readonly property real labelPreferredY: modelData.y - labelHeight - 8
+    readonly property real labelY: Math.max(
+        0,
+        Math.min(
+            isCardinal
+                ? avoidance.adjustedYToAvoidItems(
+                    labelX,
+                    labelPreferredY,
+                    labelWidth,
+                    labelHeight
+                )
+                : labelPreferredY,
+            layerHeight - labelHeight
+        )
+    )
 
     x: labelX
-    y: isCardinal
-            ? avoidance.adjustedYToAvoidItems(
-                labelX,
-                labelPreferredY,
-                labelWidth,
-                labelHeight
-            )
-            : labelPreferredY
+    y: labelY
     width: labelWidth
     height: labelHeight
     visible: isCardinal

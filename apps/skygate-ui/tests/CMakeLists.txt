@@ -82,10 +82,14 @@ add_test(
             -P ${CMAKE_CURRENT_SOURCE_DIR}/PackagedAppSmoke.cmake
 )
 
+# Must exceed the execute_process readiness budget in PackagedAppSmoke.cmake
+# (20s for a measured 5.4-6.1s Debug startup) plus process spawn overhead, so a
+# slow start is still reported as a missing readiness log line rather than as a
+# ctest timeout that hides the captured output (V2-18).
 set_tests_properties(skygate-ui-packaged-app-smoke PROPERTIES
     LABELS "integration;platform"
     SKIP_REGULAR_EXPRESSION "SKYGATE_SMOKE_SKIP:"
-    TIMEOUT 15
+    TIMEOUT 60
 )
 
 set(skygateQmlTestEnvironment

@@ -41,75 +41,101 @@ void QmlMainWindowRenderingTests::mainWindowsRenderNonBlankAndKeepVisibleControl
     QVERIFY(rootWindow != nullptr);
     (void)QTest::qWaitForWindowExposed(rootWindow);
 
-    for (const QSize size : {QSize(1100, 760), QSize(560, 640)}) {
-        rootWindow->resize(size);
-        QCoreApplication::processEvents();
-        QTRY_VERIFY(windowHasMultipleSampledColors(*rootWindow));
-        QString failure;
-        bool itemsFit = false;
-        for (int attempt = 0; attempt < 30 && !itemsFit; ++attempt) {
-            failure.clear();
-            itemsFit = visibleQuickItemsFitWithinWindow(*rootWindow, &failure);
-            if (!itemsFit) {
-                QTest::qWait(10);
-                QCoreApplication::processEvents();
+    // Scene times pinned for the deterministic regression: the bounds check
+    // used to fail at some times of day because sky positions followed the
+    // wall clock and a star label drifted outside the 560x640 window (V2-18).
+    // 2026-05-06T06:00Z reproduces that out-of-bounds label on demand; the
+    // remaining instants sample the sky rotation across one day.
+    const QList<QDateTime> sceneTimes = {
+        FixedTimeSource::defaultUtc(),
+        QDateTime(QDate(2026, 5, 6), QTime(0, 0, 0), QTimeZone::UTC),
+        QDateTime(QDate(2026, 5, 6), QTime(6, 0, 0), QTimeZone::UTC),
+        QDateTime(QDate(2026, 5, 6), QTime(12, 0, 0), QTimeZone::UTC),
+        QDateTime(QDate(2026, 5, 6), QTime(18, 0, 0), QTimeZone::UTC),
+    };
+
+    for (const QDateTime& sceneTime : sceneTimes) {
+        QVERIFY(controller->setUtcDateTimeText(
+            sceneTime.date().toString(QStringLiteral("yyyy-MM-dd")),
+            sceneTime.time().toString(QStringLiteral("HH:mm:ss"))
+        ));
+
+        for (const QSize size : {QSize(1100, 760), QSize(560, 640)}) {
+            rootWindow->resize(size);
+            QCoreApplication::processEvents();
+            QTRY_VERIFY(windowHasMultipleSampledColors(*rootWindow));
+            QString failure;
+            bool itemsFit = false;
+            for (int attempt = 0; attempt < 30 && !itemsFit; ++attempt) {
+                failure.clear();
+                itemsFit = visibleQuickItemsFitWithinWindow(*rootWindow, &failure);
+                if (!itemsFit) {
+                    QTest::qWait(10);
+                    QCoreApplication::processEvents();
+                }
             }
-        }
-        QVERIFY2(itemsFit, qPrintable(failure));
+            QVERIFY2(itemsFit, qPrintable(failure));
 
-        const QImage windowImage = rootWindow->grabWindow();
-        QVERIFY(!windowImage.isNull());
-        QObject* theme = controller->theme();
-        QVERIFY(theme != nullptr);
-        auto* footer = firstQuickItemWithObjectName(rootWindow, QStringLiteral("statusFooter"));
-        QVERIFY(footer != nullptr);
-        QCOMPARE(footer->height(), 48.0);
-        QVERIFY2(
-            renderingScenePointIsColorNear(
-                *rootWindow,
-                windowImage,
-                footer->mapToScene(QPointF(4.0, footer->height() * 0.5)),
-                theme->property("footerBackground").value<QColor>(),
-                4
-            ),
-            "Status footer did not paint the expected background at a stable empty edge"
-        );
-
-        for (const QString& objectName : {
-                 QStringLiteral("appMenuButton"),
-                 QStringLiteral("searchToolbarToggle"),
-                 QStringLiteral("timelineToolbarToggle"),
-             }) {
-            auto* toggle = firstQuickItemWithObjectName(rootWindow, objectName);
-            QVERIFY(toggle != nullptr);
+            const QImage windowImage = rootWindow->grabWindow();
+            QVERIFY(!windowImage.isNull());
+            QObject* theme = controller->theme();
+            QVERIFY(theme != nullptr);
+            auto* footer = firstQuickItemWithObjectName(rootWindow, QStringLiteral("statusFooter"));
+            QVERIFY(footer != nullptr);
+            QCOMPARE(footer->height(), 48.0);
             QVERIFY2(
-                renderingItemRegionContainsColorNear(
-                    *rootWindow, windowImage, *toggle, theme->property("toolbarToggleBorder").value<QColor>(), 24
+                renderingScenePointIsColorNear(
+                    *rootWindow,
+                    windowImage,
+                    footer->mapToScene(QPointF(4.0, footer->height() * 0.5)),
+                    theme->property("footerBackground").value<QColor>(),
+                    4
                 ),
-                qPrintable(QStringLiteral("%1 did not paint its toggle border").arg(objectName))
+                "Status footer did not paint the expected background at a stable empty edge"
+            );
+
+            for (const QString& objectName : {
+                     QStringLiteral("appMenuButton"),
+                     QStringLiteral("searchToolbarToggle"),
+                     QStringLiteral("timelineToolbarToggle"),
+                 }) {
+                auto* toggle = firstQuickItemWithObjectName(rootWindow, objectName);
+                QVERIFY(toggle != nullptr);
+                QVERIFY2(
+                    renderingItemRegionContainsColorNear(
+                        *rootWindow, windowImage, *toggle, theme->property("toolbarToggleBorder").value<QColor>(), 24
+                    ),
+                    qPrintable(QStringLiteral("%1 did not paint its toggle border").arg(objectName))
+                );
+            }
+
+            auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
+            auto* searchToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("searchToolbarToggle"));
+            auto* timelineToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("timelineToolbarToggle"));
+            auto* viewport = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyViewport"));
+            QVERIFY(appMenuButton != nullptr);
+            QVERIFY(searchToggle != nullptr);
+            QVERIFY(timelineToggle != nullptr);
+            QVERIFY(viewport != nullptr);
+            QVERIFY(renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*viewport)));
+            QVERIFY(renderingQuickItemSceneRect(*searchToggle).intersects(renderingQuickItemSceneRect(*viewport)));
+            QVERIFY(renderingQuickItemSceneRect(*timelineToggle).intersects(renderingQuickItemSceneRect(*viewport)));
+            QVERIFY(
+                !renderingQuickItemSceneRect(*searchToggle).intersects(renderingQuickItemSceneRect(*timelineToggle))
+            );
+            QVERIFY(
+                !renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*searchToggle))
+            );
+            QVERIFY(
+                !renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*timelineToggle))
+            );
+            QVERIFY(
+                std::abs(
+                    renderingQuickItemSceneRect(*appMenuButton).top() - renderingQuickItemSceneRect(*searchToggle).top()
+                )
+                < 0.5
             );
         }
-
-        auto* appMenuButton = firstQuickItemWithObjectName(rootWindow, QStringLiteral("appMenuButton"));
-        auto* searchToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("searchToolbarToggle"));
-        auto* timelineToggle = firstQuickItemWithObjectName(rootWindow, QStringLiteral("timelineToolbarToggle"));
-        auto* viewport = firstQuickItemWithObjectName(rootWindow, QStringLiteral("skyViewport"));
-        QVERIFY(appMenuButton != nullptr);
-        QVERIFY(searchToggle != nullptr);
-        QVERIFY(timelineToggle != nullptr);
-        QVERIFY(viewport != nullptr);
-        QVERIFY(renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*viewport)));
-        QVERIFY(renderingQuickItemSceneRect(*searchToggle).intersects(renderingQuickItemSceneRect(*viewport)));
-        QVERIFY(renderingQuickItemSceneRect(*timelineToggle).intersects(renderingQuickItemSceneRect(*viewport)));
-        QVERIFY(!renderingQuickItemSceneRect(*searchToggle).intersects(renderingQuickItemSceneRect(*timelineToggle)));
-        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*searchToggle)));
-        QVERIFY(!renderingQuickItemSceneRect(*appMenuButton).intersects(renderingQuickItemSceneRect(*timelineToggle)));
-        QVERIFY(
-            std::abs(
-                renderingQuickItemSceneRect(*appMenuButton).top() - renderingQuickItemSceneRect(*searchToggle).top()
-            )
-            < 0.5
-        );
     }
 
     QObject* aboutItem = firstObjectWithObjectName(rootWindow, QStringLiteral("aboutMenuItem"));
