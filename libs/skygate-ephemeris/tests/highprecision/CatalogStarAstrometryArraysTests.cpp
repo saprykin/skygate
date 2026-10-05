@@ -1,15 +1,31 @@
 #include "engine/highprecision/CatalogStarAstrometryArrays.hpp"
 #include "CelestialBodyCatalog.hpp"
 #include "DistantCelestialBody.hpp"
+#include "EphemerisRequest.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
+#include "catalog/CatalogComposer.hpp"
+#include "catalog/CatalogCompositionPolicy.hpp"
+#include "catalog/CatalogCompositionRequest.hpp"
+#include "catalog/CatalogCompositionResult.hpp"
+#include "catalog/CatalogFactory.hpp"
+#include "catalog/CatalogIdentifier.hpp"
+#include "catalog/IStarCatalog.hpp"
+#include "engine/EphemerisCorrectionFlags.hpp"
+#include "engine/highprecision/HighPrecisionCalculatorResult.hpp"
+#include "engine/highprecision/HighPrecisionComputationInput.hpp"
+#include "engine/highprecision/StarAstrometryCalculator.hpp"
 
 #include <QtTest/QtTest>
 
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <span>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -136,6 +152,50 @@ using namespace skygate::core;
     return body;
 }
 
+[[nodiscard]] OwnGalaxyCelestialBody
+makeSharedHipStar(std::string id, const double rightAscensionHours, const double declinationDeg)
+{
+    OwnGalaxyCelestialBody body;
+    body.id = std::move(id);
+    body.displayName = body.id;
+    body.kind = BaseCelestialBody::Kind::Star;
+    body.fixedEquatorial = EquatorialCoordinate{
+        .rightAscensionHours = rightAscensionHours,
+        .declinationDeg = declinationDeg,
+    };
+    body.identity.externalIdentifiers.push_back(CatalogIdentifier::make("hip", "1"));
+    return body;
+}
+
+[[nodiscard]] std::unique_ptr<IStarCatalog> makeSourceCatalog(std::vector<OwnGalaxyCelestialBody> bodies)
+{
+    return CatalogFactory::createStarCatalogFromBodies(std::move(bodies));
+}
+
+// Composes the two sources in collection order; the second source owns the
+// higher merge precedence.
+[[nodiscard]] CatalogCompositionResult composeInOrder(const IStarCatalog& first, const IStarCatalog& second)
+{
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "first", .enabled = true, .catalog = &first, .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "second", .enabled = true, .catalog = &second, .policy = CatalogCompositionPolicy::Merge},
+    };
+    return CatalogComposer::composeCollection(request);
+}
+
+// Observable position the astrometry consumer reports for one body at the
+// fixed reference time, with no corrections applied.
+[[nodiscard]] HighPrecisionCalculatorResult positionAtReferenceTime(const BaseCelestialBody& body)
+{
+    EphemerisRequest request;
+    request.epoch = referenceEpoch();
+    request.options.setCorrectionFlags(EphemerisCorrectionFlags::noCorrections());
+
+    const StarAstrometryCalculator calculator;
+    return calculator.calculate(HighPrecisionComputationInput{.request = request, .body = body, .bodyIndex = 0U});
+}
+
 }  // namespace
 
 class CatalogStarAstrometryArraysTests final : public QObject {
@@ -146,6 +206,8 @@ private slots:
     void batchesFixedCoordinateNonStarBodies();
     void preservesMixedCatalogOrderingAndFiltersUnsupportedBodies();
     void masksOnlyUsableNumericAstrometryValues();
+    void mergedConflictingCoordinatesExposeOnlyTheWinningPosition();
+    void mergedCompatibleAstrometryKeepsOneReferencePosition();
     void optionalAccessorsHandleOutOfRangeIndexes();
     void copiesCatalogDataAndSurvivesSourceLifetimeChanges();
 };
@@ -308,6 +370,99 @@ void CatalogStarAstrometryArraysTests::masksOnlyUsableNumericAstrometryValues()
     QVERIFY(std::isinf(arrays.properMotionDeclinationMasPerYearValues()[0]));
     QCOMPARE(arrays.stellarParallaxMasValues()[0], 0.0);
     QVERIFY(std::isinf(arrays.radialVelocityKmPerSecondValues()[0]));
+}
+
+void CatalogStarAstrometryArraysTests::mergedConflictingCoordinatesExposeOnlyTheWinningPosition()
+{
+    // R4: the later source fixes the shared HIP 1 object at RA 10 while the
+    // earlier source offers astrometry at RA 1. The winning fixed position and
+    // the fallback seen by this consumer must agree; the unrelated reference
+    // position must not survive.
+    OwnGalaxyCelestialBody earlier = makeSharedHipStar("star_low", 1.0, 2.0);
+    earlier.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlier.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+        .stellarParallaxMas = 7.5,
+    };
+    OwnGalaxyCelestialBody later = makeSharedHipStar("star_high", 10.0, 20.0);
+
+    const std::unique_ptr<IStarCatalog> earlierSource = makeSourceCatalog({earlier});
+    const std::unique_ptr<IStarCatalog> laterSource = makeSourceCatalog({later});
+    QVERIFY(earlierSource != nullptr);
+    QVERIFY(laterSource != nullptr);
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of star_high over conflicting fixed coordinates from star_low."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of star_high and rejected the incompatible astrometry of "
+        "star_low."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*earlierSource, *laterSource);
+    QVERIFY(result.isSuccess());
+
+    const CatalogStarAstrometryArrays arrays(result.catalog->bodies());
+    QCOMPARE(arrays.size(), 1U);
+    QVERIFY(!arrays.hasCatalogAstrometry(0U));
+    QVERIFY(arrays.hasFixedEquatorialFallback(0U));
+    QCOMPARE(arrays.referenceEquatorial(0U).rightAscensionHours, 10.0);
+    QCOMPARE(arrays.referenceEquatorial(0U).declinationDeg, 20.0);
+    QVERIFY(arrays.fixedEquatorialFallback(0U).has_value());
+    QCOMPARE(arrays.fixedEquatorialFallback(0U)->rightAscensionHours, 10.0);
+    QCOMPARE(arrays.fixedEquatorialFallback(0U)->declinationDeg, 20.0);
+
+    const HighPrecisionCalculatorResult calculation = positionAtReferenceTime(*result.catalog->bodies().front());
+    QVERIFY(calculation.equatorial.has_value());
+    QCOMPARE(calculation.equatorial->rightAscensionHours, 10.0);
+    QCOMPARE(calculation.equatorial->declinationDeg, 20.0);
+}
+
+void CatalogStarAstrometryArraysTests::mergedCompatibleAstrometryKeepsOneReferencePosition()
+{
+    // Compatible losing astrometry enriches the winning fixed position, and
+    // the consumer then sees the same direction through both the reference
+    // position and the fixed fallback while retaining the motion data.
+    OwnGalaxyCelestialBody donor = makeSharedHipStar("star_donor", 4.0, -15.0);
+    donor.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *donor.fixedEquatorial,
+        .referenceEpoch = referenceEpoch(),
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+        .stellarParallaxMas = 7.5,
+    };
+    OwnGalaxyCelestialBody fixedOnly = makeSharedHipStar("star_fixed", 4.0, -15.0);
+
+    const std::unique_ptr<IStarCatalog> donorSource = makeSourceCatalog({donor});
+    const std::unique_ptr<IStarCatalog> fixedSource = makeSourceCatalog({fixedOnly});
+    QVERIFY(donorSource != nullptr);
+    QVERIFY(fixedSource != nullptr);
+
+    const CatalogCompositionResult result = composeInOrder(*donorSource, *fixedSource);
+    QVERIFY(result.isSuccess());
+
+    const CatalogStarAstrometryArrays arrays(result.catalog->bodies());
+    QCOMPARE(arrays.size(), 1U);
+    QVERIFY(arrays.hasCatalogAstrometry(0U));
+    QVERIFY(arrays.hasFixedEquatorialFallback(0U));
+    QCOMPARE(arrays.referenceEquatorial(0U).rightAscensionHours, 4.0);
+    QCOMPARE(arrays.referenceEquatorial(0U).declinationDeg, -15.0);
+    QCOMPARE(arrays.fixedEquatorialFallback(0U)->rightAscensionHours, 4.0);
+    QCOMPARE(arrays.fixedEquatorialFallback(0U)->declinationDeg, -15.0);
+    QVERIFY(arrays.properMotionRightAscensionMasPerYear(0U).has_value());
+    QCOMPARE(*arrays.properMotionRightAscensionMasPerYear(0U), 125.0);
+    QVERIFY(arrays.properMotionDeclinationMasPerYear(0U).has_value());
+    QCOMPARE(*arrays.properMotionDeclinationMasPerYear(0U), -55.0);
+    QVERIFY(arrays.stellarParallaxMas(0U).has_value());
+    QCOMPARE(*arrays.stellarParallaxMas(0U), 7.5);
+
+    const HighPrecisionCalculatorResult calculation = positionAtReferenceTime(*result.catalog->bodies().front());
+    QVERIFY(calculation.equatorial.has_value());
+    QCOMPARE(calculation.equatorial->rightAscensionHours, 4.0);
+    QCOMPARE(calculation.equatorial->declinationDeg, -15.0);
 }
 
 void CatalogStarAstrometryArraysTests::optionalAccessorsHandleOutOfRangeIndexes()

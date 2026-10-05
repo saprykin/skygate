@@ -1,6 +1,7 @@
 #include "CatalogCompositionMerger.hpp"
 
 #include "StringUtilities.hpp"
+#include "catalog/CatalogCoordinateModel.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogIdentityIndex.hpp"
 #include "catalog/CatalogObjectIdentity.hpp"
@@ -291,35 +292,122 @@ bool coordinatesConflict(const skygate::core::EquatorialCoordinate& lhs, const s
            || std::abs(lhs.declinationDeg - rhs.declinationDeg) > kCoordinateTolerance;
 }
 
-void mergeOwnGalaxyInPlace(OwnGalaxyCelestialBody& winner, const BaseCelestialBody& loser, bool& conflict)
+void logFixedCoordinateConflict(const BaseCelestialBody& winner, const BaseCelestialBody& loser)
 {
-    mergeIdentityInto(winner.identity, loser.identity);
-    if (winner.displayName.empty() && !loser.displayName.empty()) {
-        winner.displayName = loser.displayName;
-    }
+    const QString message =
+        QStringLiteral(
+            "Catalog composition kept the fixed coordinates of %1 over conflicting fixed coordinates from %2."
+        )
+            .arg(bodyLabel(winner), bodyLabel(loser));
+    qCWarning(skygateCatalogCompositionLog).noquote() << message;
+}
 
+void logRejectedAstrometry(const BaseCelestialBody& winner, const BaseCelestialBody& loser, const QString& keptModel)
+{
+    const QString message =
+        QStringLiteral("Catalog composition kept the %1 of %2 and rejected the incompatible astrometry of %3.")
+            .arg(keptModel, bodyLabel(winner), bodyLabel(loser));
+    qCWarning(skygateCatalogCompositionLog).noquote() << message;
+}
+
+void logRejectedFixedCoordinates(const BaseCelestialBody& winner, const BaseCelestialBody& loser)
+{
+    const QString message = QStringLiteral(
+                                "Catalog composition kept the reference coordinates of %1 and rejected the "
+                                "incompatible fixed coordinates of %2."
+    )
+                                .arg(bodyLabel(winner), bodyLabel(loser));
+    qCWarning(skygateCatalogCompositionLog).noquote() << message;
+}
+
+// Merges the losing fixed position into the winning coordinate model. The
+// winner's own fixed position always wins; a losing fixed position only fills
+// a missing winner position, and it is rejected when the winner's astrometry
+// already anchors the object at a different direction. A fixed position
+// carries no reference epoch, so the comparison against a reference position
+// has no epoch conversion to apply.
+void mergeFixedEquatorialInPlace(OwnGalaxyCelestialBody& winner, const BaseCelestialBody& loser)
+{
     const skygate::core::EquatorialCoordinate* loserFixed = loser.fixedEquatorialCoordinate();
-    if (!winner.fixedEquatorial.has_value() && loserFixed != nullptr) {
-        winner.fixedEquatorial = *loserFixed;
-    } else if (
-        winner.fixedEquatorial.has_value() && loserFixed != nullptr
-        && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)
-    ) {
-        conflict = true;
+    if (loserFixed == nullptr) {
+        return;
     }
 
-    const CatalogStarAstrometry* loserAstrometry = loser.catalogStarAstrometry();
-    if (!winner.starAstrometry.has_value() && loserAstrometry != nullptr) {
-        winner.starAstrometry = *loserAstrometry;
-    } else if (
-        winner.starAstrometry.has_value() && loserAstrometry != nullptr
-        && coordinatesConflict(winner.starAstrometry->referenceEquatorial, loserAstrometry->referenceEquatorial)
-    ) {
-        conflict = true;
+    if (!winner.fixedEquatorial.has_value()) {
+        if (winner.starAstrometry.has_value()
+            && !CatalogCoordinateModel::sameDirection(winner.starAstrometry->referenceEquatorial, *loserFixed)) {
+            logRejectedFixedCoordinates(winner, loser);
+            return;
+        }
+        winner.fixedEquatorial = *loserFixed;
+        return;
+    }
+
+    if (coordinatesConflict(*winner.fixedEquatorial, *loserFixed)) {
+        logFixedCoordinateConflict(winner, loser);
     }
 }
 
-void mergeDistantInPlace(DistantCelestialBody& winner, const BaseCelestialBody& loser, bool& conflict)
+// Merges the losing astrometry into the winning coordinate model. The
+// winner's reference position and reference epoch are authoritative. A losing
+// astrometry only enters the record when it agrees with the surviving model:
+// directly against a fixed position, or against the winning reference
+// position after the losing proper motion accounts for the reference-epoch
+// difference. Compatible losing astrometry fills only the fields the winner
+// is missing; incompatible astrometry is rejected and diagnosed instead of
+// producing a record with two contradictory coordinate descriptions.
+void mergeStarAstrometryInPlace(OwnGalaxyCelestialBody& winner, const BaseCelestialBody& loser)
+{
+    const CatalogStarAstrometry* loserAstrometry = loser.catalogStarAstrometry();
+    if (loserAstrometry == nullptr) {
+        return;
+    }
+
+    if (!winner.starAstrometry.has_value()) {
+        if (winner.fixedEquatorial.has_value()
+            && !CatalogCoordinateModel::sameDirection(*winner.fixedEquatorial, loserAstrometry->referenceEquatorial)) {
+            logRejectedAstrometry(winner, loser, QStringLiteral("fixed coordinates"));
+            return;
+        }
+        winner.starAstrometry = *loserAstrometry;
+        return;
+    }
+
+    if (!CatalogCoordinateModel::sameAstrometry(*winner.starAstrometry, *loserAstrometry)) {
+        logRejectedAstrometry(winner, loser, QStringLiteral("reference coordinates"));
+        return;
+    }
+
+    CatalogStarAstrometry& merged = *winner.starAstrometry;
+    if (!merged.properMotionRightAscensionMasPerYear.has_value()) {
+        merged.properMotionRightAscensionMasPerYear = loserAstrometry->properMotionRightAscensionMasPerYear;
+    }
+    if (!merged.properMotionDeclinationMasPerYear.has_value()) {
+        merged.properMotionDeclinationMasPerYear = loserAstrometry->properMotionDeclinationMasPerYear;
+    }
+    if (!merged.stellarParallaxMas.has_value()) {
+        merged.stellarParallaxMas = loserAstrometry->stellarParallaxMas;
+    }
+    if (!merged.radialVelocityKmPerSecond.has_value()) {
+        merged.radialVelocityKmPerSecond = loserAstrometry->radialVelocityKmPerSecond;
+    }
+    if (!merged.validityRange.has_value()) {
+        merged.validityRange = loserAstrometry->validityRange;
+    }
+}
+
+void mergeOwnGalaxyInPlace(OwnGalaxyCelestialBody& winner, const BaseCelestialBody& loser)
+{
+    mergeIdentityInto(winner.identity, loser.identity);
+    if (winner.displayName.empty() && !loser.displayName.empty()) {
+        winner.displayName = loser.displayName;
+    }
+
+    mergeFixedEquatorialInPlace(winner, loser);
+    mergeStarAstrometryInPlace(winner, loser);
+}
+
+void mergeDistantInPlace(DistantCelestialBody& winner, const BaseCelestialBody& loser)
 {
     mergeIdentityInto(winner.identity, loser.identity);
     if (winner.displayName.empty() && !loser.displayName.empty()) {
@@ -333,7 +421,7 @@ void mergeDistantInPlace(DistantCelestialBody& winner, const BaseCelestialBody& 
         winner.fixedEquatorial.has_value() && loserFixed != nullptr
         && coordinatesConflict(*winner.fixedEquatorial, *loserFixed)
     ) {
-        conflict = true;
+        logFixedCoordinateConflict(winner, loser);
     }
 
     const DeepSkyObjectInfo* loserDeepSky = loser.deepSkyObjectInfo();
@@ -357,13 +445,13 @@ void mergeDistantInPlace(DistantCelestialBody& winner, const BaseCelestialBody& 
     }
 }
 
-void mergeSurvivorInPlace(BaseCelestialBody& winner, const BaseCelestialBody& loser, bool& conflict)
+void mergeSurvivorInPlace(BaseCelestialBody& winner, const BaseCelestialBody& loser)
 {
     if (winner.kind == BaseCelestialBody::Kind::DeepSkyObject) {
-        mergeDistantInPlace(static_cast<DistantCelestialBody&>(winner), loser, conflict);
+        mergeDistantInPlace(static_cast<DistantCelestialBody&>(winner), loser);
         return;
     }
-    mergeOwnGalaxyInPlace(static_cast<OwnGalaxyCelestialBody&>(winner), loser, conflict);
+    mergeOwnGalaxyInPlace(static_cast<OwnGalaxyCelestialBody&>(winner), loser);
 }
 
 void logIncompatibleKind(const BaseCelestialBody& existing, const BaseCelestialBody& incoming)
@@ -387,13 +475,6 @@ void logAmbiguousResolution(const CatalogIdentityIndex::Resolution& resolution, 
         << resolution.candidates.size() << "different bodies.";
 }
 
-void logConflictingAstrometry(const BaseCelestialBody& winner, const BaseCelestialBody& loser)
-{
-    qCWarning(skygateCatalogCompositionLog).noquote()
-        << "Catalog composition kept the coordinates of" << bodyLabel(winner) << "over conflicting astrometry from"
-        << bodyLabel(loser) << ".";
-}
-
 // Contributor source ids of the absorbed positions in position order, so the
 // survivor records every absorbed body and each prior contributor.
 std::vector<std::string>
@@ -408,19 +489,14 @@ collectContributors(const MergeAccumulator& accumulator, const std::vector<std::
     return contributors;
 }
 
-// Merges every absorbed survivor into `winner` in position order, reporting the
-// metadata conflicts that the winner overrides.
+// Merges every absorbed survivor into `winner` in position order. Each merge
+// diagnoses the coordinate or metadata conflicts the winner overrides.
 void absorbSurvivors(
     BaseCelestialBody& winner, const MergeAccumulator& accumulator, const std::vector<std::size_t>& positions
 )
 {
     for (const std::size_t position : positions) {
-        const BaseCelestialBody& loser = accumulator.at(position);
-        bool conflict = false;
-        mergeSurvivorInPlace(winner, loser, conflict);
-        if (conflict) {
-            logConflictingAstrometry(winner, loser);
-        }
+        mergeSurvivorInPlace(winner, accumulator.at(position));
     }
 }
 
@@ -524,11 +600,7 @@ std::size_t appendDeduped(
     const BaseCelestialBody& body = scoped.body();
     const MatchDecision decision = evaluateMatch(accumulator, index, body);
     if (decision.action == MatchDecision::Action::Merge) {
-        bool conflict = false;
-        mergeSurvivorInPlace(accumulator.at(decision.matchIndex), body, conflict);
-        if (conflict) {
-            logConflictingAstrometry(accumulator.at(decision.matchIndex), body);
-        }
+        mergeSurvivorInPlace(accumulator.at(decision.matchIndex), body);
         // Registers the merged record's keys as well, so a later record with
         // the same record key resolves to this survivor.
         index.add(body, decision.matchIndex);
@@ -750,11 +822,7 @@ CatalogCompositionMergeResult CatalogCompositionMerger::mergeCollection(const Ca
                     // This pass already produced the survivor: the first record
                     // of a source is authoritative and later records of the
                     // same pass only fill its missing metadata.
-                    bool conflict = false;
-                    mergeSurvivorInPlace(accumulator.at(decision.matchIndex), body, conflict);
-                    if (conflict) {
-                        logConflictingAstrometry(accumulator.at(decision.matchIndex), body);
-                    }
+                    mergeSurvivorInPlace(accumulator.at(decision.matchIndex), body);
                     activeIndex.add(body, decision.matchIndex);
                     continue;
                 }

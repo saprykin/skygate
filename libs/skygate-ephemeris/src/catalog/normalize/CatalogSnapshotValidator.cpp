@@ -5,6 +5,7 @@
 #include "EquatorialCoordinate.hpp"
 #include "OwnGalaxyCelestialBody.hpp"
 #include "StringUtilities.hpp"
+#include "catalog/CatalogCoordinateModel.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogStarAstrometry.hpp"
 #include "time/AstronomicalEpoch.hpp"
@@ -123,6 +124,19 @@ void normalizeDistantBody(DistantCelestialBody& body)
         }
         if (!isValidEpoch(astrometry->referenceEpoch)) {
             errorDetail = "catalog body '" + body.id + "' has an invalid astrometry reference epoch.";
+            return false;
+        }
+        // A reference position that declares no epoch claims the same epoch as
+        // the body's fixed position, so a different direction is two unrelated
+        // coordinate descriptions rather than an epoch change. A declared
+        // reference epoch can legitimately differ from the fixed position's
+        // unstated epoch, so it is left to the composition merge instead of
+        // being rejected here.
+        if (const skygate::core::EquatorialCoordinate* fixed = body.fixedEquatorialCoordinate();
+            fixed != nullptr && !astrometry->referenceEpoch.hasExplicit()
+            && !CatalogCoordinateModel::sameDirection(*fixed, astrometry->referenceEquatorial)) {
+            errorDetail = "catalog body '" + body.id
+                          + "' mixes a fixed position with an unrelated astrometry reference position.";
             return false;
         }
         if (!isValidOptionalFiniteDouble(astrometry->properMotionRightAscensionMasPerYear)
