@@ -106,6 +106,7 @@ private slots:
     void validatorRejectsOutOfRangeAndUnknownOrderEntries();
     void validatorRejectsEmptyCanonicalIds();
     void validatorRejectsInvalidNumericDomains();
+    void validatorRejectsFixedPositionMixedWithUnrelatedAstrometry();
     void validatorAllowsAbsentOptionalMetadata();
     void cacheDeserializationRejectsInvalidNumericAndIdentityData();
 };
@@ -236,6 +237,48 @@ void CatalogSnapshotValidatorTests::validatorRejectsInvalidNumericDomains()
     negativeExtent.deepSkyObject->majorAxisArcmin = -5.0;
     const CatalogSnapshotValidator::Report extentReport = validateVectors({}, {std::move(negativeExtent)});
     QVERIFY(!extentReport.ok);
+}
+
+void CatalogSnapshotValidatorTests::validatorRejectsFixedPositionMixedWithUnrelatedAstrometry()
+{
+    // The astrometry declares no reference epoch, so its reference position
+    // claims the same epoch as the fixed position; a different direction is
+    // then two unrelated coordinate descriptions in one body.
+    OwnGalaxyCelestialBody unrelated = makeStar("hip_unrelated");
+    unrelated.fixedEquatorial = EquatorialCoordinate{.rightAscensionHours = 10.0, .declinationDeg = 20.0};
+    unrelated.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+    };
+    const CatalogSnapshotValidator::Report unrelatedReport = validateVectors({std::move(unrelated)});
+    QVERIFY(!unrelatedReport.ok);
+    QCOMPARE(
+        QString::fromStdString(unrelatedReport.errorDetail),
+        QStringLiteral(
+            "catalog body 'hip_unrelated' mixes a fixed position with an unrelated astrometry reference position."
+        )
+    );
+
+    // A matching reference position is coherent and stays valid.
+    OwnGalaxyCelestialBody matching = makeStar("hip_matching");
+    matching.fixedEquatorial = EquatorialCoordinate{.rightAscensionHours = 10.0, .declinationDeg = 20.0};
+    matching.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 10.0, .declinationDeg = 20.0},
+        .stellarParallaxMas = 7.5,
+    };
+    QVERIFY(validateVectors({std::move(matching)}).ok);
+
+    // A declared reference epoch can describe a different epoch than the fixed
+    // position, so a differing position alone is not rejected here; the
+    // composition merge reconciles declared epochs through proper motion.
+    OwnGalaxyCelestialBody declaredEpoch = makeStar("hip_declared_epoch");
+    declaredEpoch.fixedEquatorial = EquatorialCoordinate{.rightAscensionHours = 10.0, .declinationDeg = 20.0};
+    declaredEpoch.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 10.0002, .declinationDeg = 20.0001},
+        .referenceEpoch = referenceEpoch(),
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+    };
+    QVERIFY(validateVectors({std::move(declaredEpoch)}).ok);
 }
 
 void CatalogSnapshotValidatorTests::validatorAllowsAbsentOptionalMetadata()

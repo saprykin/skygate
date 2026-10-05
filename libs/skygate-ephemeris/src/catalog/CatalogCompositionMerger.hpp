@@ -49,6 +49,20 @@ namespace skygate::ephemeris {
 // messier_<nnn>) both count as authoritative, so two distinct recognized
 // designations that share a common name stay distinct instead of one being
 // dropped.
+//
+// Coordinates are merged as one coherent model per survivor. The winner's
+// fixed position and its astrometry reference position and epoch are
+// authoritative. A losing fixed position only fills a missing winner position
+// and only when it agrees with the surviving model, because a fixed position
+// carries no reference epoch to convert; a losing astrometry only enters the
+// record when its reference position agrees with the surviving model, either
+// directly against a fixed position or against the winning reference position
+// after the losing proper motion accounts for the reference-epoch difference.
+// Compatible losing astrometry fills only missing proper motion, parallax,
+// radial velocity, and validity fields without overwriting winner values.
+// Incompatible losing coordinates are rejected with a diagnostic that names
+// the kept model, so a survivor never combines contradictory coordinate
+// descriptions.
 class CatalogCompositionMerger final {
 public:
     [[nodiscard]] static CatalogCompositionMergeResult mergeCollection(const CatalogCompositionRequest& request);

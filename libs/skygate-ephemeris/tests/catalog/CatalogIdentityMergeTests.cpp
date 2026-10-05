@@ -3,7 +3,9 @@
 #include "catalog/CatalogFactory.hpp"
 #include "catalog/CatalogIdentifier.hpp"
 #include "catalog/CatalogLoader.hpp"
+#include "catalog/CatalogStarAstrometry.hpp"
 #include "catalog/IStarCatalog.hpp"
+#include "time/EphemerisDateRange.hpp"
 
 #include <QtTest/QtTest>
 
@@ -19,13 +21,18 @@
 
 namespace {
 
+using skygate::core::AstronomicalEpoch;
+using skygate::core::EquatorialCoordinate;
+using skygate::core::TimeScale;
 using skygate::ephemeris::BaseCelestialBody;
 using skygate::ephemeris::CatalogComposer;
 using skygate::ephemeris::CatalogCompositionPolicy;
 using skygate::ephemeris::CatalogCompositionRequest;
 using skygate::ephemeris::CatalogCompositionResult;
 using skygate::ephemeris::CatalogIdentifier;
+using skygate::ephemeris::CatalogStarAstrometry;
 using skygate::ephemeris::DistantCelestialBody;
+using skygate::ephemeris::EphemerisDateRange;
 using skygate::ephemeris::OwnGalaxyCelestialBody;
 
 OwnGalaxyCelestialBody makeStar(
@@ -127,6 +134,28 @@ CatalogCompositionResult composePrimaryWithDeepSky(
     return CatalogComposer::composeCollection(request);
 }
 
+// Composes the two sources in collection order; the second source owns the
+// higher merge precedence.
+CatalogCompositionResult
+composeInOrder(const skygate::ephemeris::IStarCatalog& first, const skygate::ephemeris::IStarCatalog& second)
+{
+    CatalogCompositionRequest request;
+    request.sources = {
+        {.sourceId = "first", .enabled = true, .catalog = &first, .policy = CatalogCompositionPolicy::Merge},
+        {.sourceId = "second", .enabled = true, .catalog = &second, .policy = CatalogCompositionPolicy::Merge},
+    };
+    return CatalogComposer::composeCollection(request);
+}
+
+[[nodiscard]] AstronomicalEpoch j2000Epoch()
+{
+    return {
+        .julianDatePart1 = 2'451'545.0,
+        .julianDatePart2 = 0.0,
+        .timeScale = TimeScale::Tt,
+    };
+}
+
 const BaseCelestialBody* findBodyById(const std::span<const BaseCelestialBody* const> bodies, const std::string_view id)
 {
     const auto it = std::find_if(bodies.begin(), bodies.end(), [id](const BaseCelestialBody* body) {
@@ -172,6 +201,13 @@ private slots:
     void resolvesIdentifierChainsWithinSource();
     void keepsIncompatibleKindsDistinct();
     void keepsWinnerCoordinatesOverConflictingAstrometry();
+    void rejectsLosingAstrometryThatContradictsTheWinningFixedPosition();
+    void keepsOneCoherentCoordinateModelWhenConflictingSourcesAreReordered();
+    void adoptsCompatibleLosingAstrometryForAFixedPositionWinner();
+    void fillsMissingAstrometryFieldsAcrossCompatibleEpochs();
+    void fillsMissingAstrometryFieldsFromAnUndeclaredEpoch();
+    void rejectsLosingAstrometryThatDisagreesAfterEpochConversion();
+    void rejectsLosingFixedCoordinatesThatContradictWinningAstrometry();
     void fillsMissingMetadataWithoutDiscardingWinnerValues();
     void preservesStableOrdering();
     void mergesLargeFixtureWithoutAllPairsScan();
@@ -371,6 +407,360 @@ void CatalogIdentityMergeTests::keepsWinnerCoordinatesOverConflictingAstrometry(
     QVERIFY(merged->fixedEquatorialValue().has_value());
     QCOMPARE(merged->fixedEquatorialValue()->rightAscensionHours, 1.0);
     QCOMPARE(merged->fixedEquatorialValue()->declinationDeg, 2.0);
+}
+
+void CatalogIdentityMergeTests::rejectsLosingAstrometryThatContradictsTheWinningFixedPosition()
+{
+    // R4: the earlier source places the shared HIP 1 object at RA 1 with
+    // astrometry at the same default reference epoch. The later source fixes
+    // the object at RA 10 and carries no astrometry. The later source wins the
+    // position, so its fixed coordinates survive and the unrelated astrometry
+    // is rejected instead of being copied beside them.
+    OwnGalaxyCelestialBody earlier = makeStar("star_low", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0);
+    earlier.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *earlier.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+        .stellarParallaxMas = 7.5,
+    };
+    OwnGalaxyCelestialBody later = makeStar("star_high", {}, {CatalogIdentifier::make("hip", "1")}, {}, 10.0, 20.0);
+
+    const auto earlierSource = createCatalog({earlier}, {});
+    const auto laterSource = createCatalog({later}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of star_high over conflicting fixed coordinates from star_low."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of star_high and rejected the incompatible astrometry of "
+        "star_low."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*earlierSource, *laterSource);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "star_high"), std::size_t{1});
+    QCOMPARE(countBodiesById(result.catalog->bodies(), "star_low"), std::size_t{0});
+
+    const BaseCelestialBody* winner = findBodyById(result.catalog->bodies(), "star_high");
+    QVERIFY(winner != nullptr);
+    QVERIFY(winner->fixedEquatorialValue().has_value());
+    QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 10.0);
+    QCOMPARE(winner->fixedEquatorialValue()->declinationDeg, 20.0);
+    QVERIFY(!winner->starAstrometryValue().has_value());
+}
+
+void CatalogIdentityMergeTests::keepsOneCoherentCoordinateModelWhenConflictingSourcesAreReordered()
+{
+    // The same two records in the opposite collection order: the later source
+    // now owns the coherent fixed plus astrometry model, so it wins whole and
+    // only the losing fixed coordinates are rejected. Reordering sources never
+    // publishes a survivor whose fixed position and reference position
+    // disagree.
+    OwnGalaxyCelestialBody astrometric = makeStar("star_low", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0);
+    astrometric.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *astrometric.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+        .stellarParallaxMas = 7.5,
+    };
+    OwnGalaxyCelestialBody fixedOnly = makeStar("star_high", {}, {CatalogIdentifier::make("hip", "1")}, {}, 10.0, 20.0);
+
+    const auto fixedSource = createCatalog({fixedOnly}, {});
+    const auto astrometricSource = createCatalog({astrometric}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the fixed coordinates of star_low over conflicting fixed coordinates from star_high."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*fixedSource, *astrometricSource);
+
+    QVERIFY(result.isSuccess());
+    QCOMPARE(result.bodyCount, std::size_t{1});
+
+    const BaseCelestialBody* winner = findBodyById(result.catalog->bodies(), "star_low");
+    QVERIFY(winner != nullptr);
+    QVERIFY(winner->fixedEquatorialValue().has_value());
+    QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 1.0);
+    QCOMPARE(winner->fixedEquatorialValue()->declinationDeg, 2.0);
+    QVERIFY(winner->starAstrometryValue().has_value());
+    QCOMPARE(winner->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(winner->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
+    QCOMPARE(*winner->starAstrometryValue()->properMotionRightAscensionMasPerYear, 125.0);
+}
+
+void CatalogIdentityMergeTests::adoptsCompatibleLosingAstrometryForAFixedPositionWinner()
+{
+    // The winner's fixed position and the losing reference position agree, so
+    // the losing astrometry enriches the survivor instead of being dropped.
+    OwnGalaxyCelestialBody donor = makeStar("star_donor", {}, {CatalogIdentifier::make("hip", "2")}, {}, 5.0, -10.0);
+    donor.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *donor.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = 125.0,
+        .properMotionDeclinationMasPerYear = -55.0,
+        .stellarParallaxMas = 7.5,
+        .radialVelocityKmPerSecond = -5.5,
+        .validityRange = EphemerisDateRange{
+            .id = "donor-validity",
+            .displayName = "Donor validity",
+            .start = j2000Epoch(),
+            .end = AstronomicalEpoch{
+                .julianDatePart1 = 2'452'545.0,
+                .julianDatePart2 = 0.0,
+                .timeScale = TimeScale::Tt,
+            },
+        },
+    };
+    OwnGalaxyCelestialBody fixedOnly =
+        makeStar("star_fixed", {}, {CatalogIdentifier::make("hip", "2")}, {}, 5.0, -10.0);
+
+    const auto donorSource = createCatalog({donor}, {});
+    const auto fixedSource = createCatalog({fixedOnly}, {});
+
+    const CatalogCompositionResult result = composeInOrder(*donorSource, *fixedSource);
+
+    QVERIFY(result.isSuccess());
+    const BaseCelestialBody* winner = findBodyById(result.catalog->bodies(), "star_fixed");
+    QVERIFY(winner != nullptr);
+    QVERIFY(winner->fixedEquatorialValue().has_value());
+    QCOMPARE(winner->fixedEquatorialValue()->rightAscensionHours, 5.0);
+    QCOMPARE(winner->fixedEquatorialValue()->declinationDeg, -10.0);
+
+    QVERIFY(winner->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *winner->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 5.0);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, -10.0);
+    QCOMPARE(astrometry.referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QCOMPARE(astrometry.referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 125.0);
+    QVERIFY(astrometry.properMotionDeclinationMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, -55.0);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 7.5);
+    QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, -5.5);
+    QVERIFY(astrometry.validityRange.has_value());
+    QCOMPARE(QString::fromStdString(astrometry.validityRange->id), QStringLiteral("donor-validity"));
+}
+
+void CatalogIdentityMergeTests::fillsMissingAstrometryFieldsAcrossCompatibleEpochs()
+{
+    // The donor reference position lies 50 years of proper motion away from the
+    // winner reference position, expressed in the catalog's mas/year units.
+    // The losing proper motion reconciles the epoch difference, so the losing
+    // optional fields are adopted while the winner's reference position, epoch,
+    // and existing proper motion stay authoritative. A rate-unit error (for
+    // example reading mas/year as arcseconds per year) would leave a residual
+    // many degrees wide and reject this compatible model.
+    constexpr double kEpochGapYears = 50.0;
+    constexpr double kProperMotionRaMasPerYear = 1'000.0;
+    constexpr double kProperMotionDecMasPerYear = -500.0;
+    const double donorRaOffsetHours = kProperMotionRaMasPerYear * kEpochGapYears / 3'600'000.0 / 15.0;
+    const double donorDecOffsetDeg = kProperMotionDecMasPerYear * kEpochGapYears / 3'600'000.0;
+
+    OwnGalaxyCelestialBody donor = makeStar("star_donor", {}, {CatalogIdentifier::make("hip", "3")}, {}, 1.0, 0.0);
+    donor.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial =
+            EquatorialCoordinate{.rightAscensionHours = 1.0 + donorRaOffsetHours, .declinationDeg = donorDecOffsetDeg},
+        .referenceEpoch =
+            AstronomicalEpoch{
+                .julianDatePart1 = j2000Epoch().julianDatePart1,
+                .julianDatePart2 = kEpochGapYears * 365.25,
+                .timeScale = TimeScale::Tt,
+            },
+        .properMotionRightAscensionMasPerYear = kProperMotionRaMasPerYear,
+        .properMotionDeclinationMasPerYear = kProperMotionDecMasPerYear,
+        .stellarParallaxMas = 5.0,
+        .radialVelocityKmPerSecond = 10.0,
+        .validityRange = EphemerisDateRange{
+            .id = "donor-validity",
+            .displayName = "Donor validity",
+            .start = j2000Epoch(),
+            .end = AstronomicalEpoch{
+                .julianDatePart1 = 2'452'545.0,
+                .julianDatePart2 = 0.0,
+                .timeScale = TimeScale::Tt,
+            },
+        },
+    };
+    OwnGalaxyCelestialBody winner = makeStar("star_winner", {}, {CatalogIdentifier::make("hip", "3")}, {}, 1.0, 0.0);
+    winner.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *winner.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = kProperMotionRaMasPerYear,
+    };
+
+    const auto donorSource = createCatalog({donor}, {});
+    const auto winnerSource = createCatalog({winner}, {});
+
+    const CatalogCompositionResult result = composeInOrder(*donorSource, *winnerSource);
+
+    QVERIFY(result.isSuccess());
+    const BaseCelestialBody* merged = findBodyById(result.catalog->bodies(), "star_winner");
+    QVERIFY(merged != nullptr);
+    QVERIFY(merged->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *merged->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(astrometry.referenceEquatorial.declinationDeg, 0.0);
+    QCOMPARE(astrometry.referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QCOMPARE(astrometry.referenceEpoch.julianDatePart2, j2000Epoch().julianDatePart2);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, kProperMotionRaMasPerYear);
+    QVERIFY(astrometry.properMotionDeclinationMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionDeclinationMasPerYear, kProperMotionDecMasPerYear);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 5.0);
+    QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, 10.0);
+    QVERIFY(astrometry.validityRange.has_value());
+    QCOMPARE(QString::fromStdString(astrometry.validityRange->id), QStringLiteral("donor-validity"));
+}
+
+void CatalogIdentityMergeTests::fillsMissingAstrometryFieldsFromAnUndeclaredEpoch()
+{
+    // A reference position that declares no epoch claims the same epoch as the
+    // winner's declared reference epoch, so no epoch conversion applies and
+    // agreeing positions still enrich the winner.
+    OwnGalaxyCelestialBody donor = makeStar("star_donor", {}, {CatalogIdentifier::make("hip", "5")}, {}, 2.0, 3.0);
+    donor.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *donor.fixedEquatorial,
+        .properMotionRightAscensionMasPerYear = 500.0,
+        .stellarParallaxMas = 6.0,
+        .radialVelocityKmPerSecond = -3.0,
+    };
+    OwnGalaxyCelestialBody winner = makeStar("star_winner", {}, {CatalogIdentifier::make("hip", "5")}, {}, 2.0, 3.0);
+    winner.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *winner.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = 250.0,
+    };
+
+    const auto donorSource = createCatalog({donor}, {});
+    const auto winnerSource = createCatalog({winner}, {});
+
+    const CatalogCompositionResult result = composeInOrder(*donorSource, *winnerSource);
+
+    QVERIFY(result.isSuccess());
+    const BaseCelestialBody* merged = findBodyById(result.catalog->bodies(), "star_winner");
+    QVERIFY(merged != nullptr);
+    QVERIFY(merged->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *merged->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEpoch.julianDatePart1, j2000Epoch().julianDatePart1);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, 250.0);
+    QVERIFY(astrometry.stellarParallaxMas.has_value());
+    QCOMPARE(*astrometry.stellarParallaxMas, 6.0);
+    QVERIFY(astrometry.radialVelocityKmPerSecond.has_value());
+    QCOMPARE(*astrometry.radialVelocityKmPerSecond, -3.0);
+}
+
+void CatalogIdentityMergeTests::rejectsLosingAstrometryThatDisagreesAfterEpochConversion()
+{
+    // Same epoch gap and reference offset as the compatible case, but the
+    // losing proper motion is twice the rate the offset implies. The epoch
+    // conversion leaves a 50 arcsecond residual, so the models describe
+    // different directions and the losing astrometry does not enrich the
+    // winner.
+    constexpr double kEpochGapYears = 50.0;
+    constexpr double kImpliedProperMotionRaMasPerYear = 1'000.0;
+    const double donorRaOffsetHours = kImpliedProperMotionRaMasPerYear * kEpochGapYears / 3'600'000.0 / 15.0;
+
+    OwnGalaxyCelestialBody donor = makeStar("star_donor", {}, {CatalogIdentifier::make("hip", "3")}, {}, 1.0, 0.0);
+    donor.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial =
+            EquatorialCoordinate{.rightAscensionHours = 1.0 + donorRaOffsetHours, .declinationDeg = 0.0},
+        .referenceEpoch =
+            AstronomicalEpoch{
+                .julianDatePart1 = j2000Epoch().julianDatePart1,
+                .julianDatePart2 = kEpochGapYears * 365.25,
+                .timeScale = TimeScale::Tt,
+            },
+        .properMotionRightAscensionMasPerYear = 2.0 * kImpliedProperMotionRaMasPerYear,
+        .properMotionDeclinationMasPerYear = -500.0,
+        .stellarParallaxMas = 5.0,
+        .radialVelocityKmPerSecond = 10.0,
+        .validityRange = EphemerisDateRange{
+            .id = "donor-validity",
+            .displayName = "Donor validity",
+            .start = j2000Epoch(),
+            .end = AstronomicalEpoch{
+                .julianDatePart1 = 2'452'545.0,
+                .julianDatePart2 = 0.0,
+                .timeScale = TimeScale::Tt,
+            },
+        },
+    };
+    OwnGalaxyCelestialBody winner = makeStar("star_winner", {}, {CatalogIdentifier::make("hip", "3")}, {}, 1.0, 0.0);
+    winner.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = *winner.fixedEquatorial,
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = kImpliedProperMotionRaMasPerYear,
+    };
+
+    const auto donorSource = createCatalog({donor}, {});
+    const auto winnerSource = createCatalog({winner}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of star_winner and rejected the incompatible astrometry of "
+        "star_donor."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*donorSource, *winnerSource);
+
+    QVERIFY(result.isSuccess());
+    const BaseCelestialBody* merged = findBodyById(result.catalog->bodies(), "star_winner");
+    QVERIFY(merged != nullptr);
+    QVERIFY(merged->starAstrometryValue().has_value());
+    const CatalogStarAstrometry& astrometry = *merged->starAstrometryValue();
+    QCOMPARE(astrometry.referenceEquatorial.rightAscensionHours, 1.0);
+    QVERIFY(astrometry.properMotionRightAscensionMasPerYear.has_value());
+    QCOMPARE(*astrometry.properMotionRightAscensionMasPerYear, kImpliedProperMotionRaMasPerYear);
+    QVERIFY(!astrometry.properMotionDeclinationMasPerYear.has_value());
+    QVERIFY(!astrometry.stellarParallaxMas.has_value());
+    QVERIFY(!astrometry.radialVelocityKmPerSecond.has_value());
+    QVERIFY(!astrometry.validityRange.has_value());
+}
+
+void CatalogIdentityMergeTests::rejectsLosingFixedCoordinatesThatContradictWinningAstrometry()
+{
+    // The winner (later source) carries astrometry at RA 1 and no fixed
+    // position. The losing record's fixed position at RA 10 is unrelated, so it
+    // is rejected instead of contradicting the winning reference coordinates.
+    OwnGalaxyCelestialBody fixedOnly =
+        makeStar("star_fixed", {}, {CatalogIdentifier::make("hip", "4")}, {}, 10.0, 20.0);
+    OwnGalaxyCelestialBody astrometric = makeStar("star_astrometric", {}, {CatalogIdentifier::make("hip", "4")});
+    astrometric.fixedEquatorial.reset();
+    astrometric.starAstrometry = CatalogStarAstrometry{
+        .referenceEquatorial = EquatorialCoordinate{.rightAscensionHours = 1.0, .declinationDeg = 2.0},
+        .referenceEpoch = j2000Epoch(),
+        .properMotionRightAscensionMasPerYear = 125.0,
+    };
+
+    const auto fixedSource = createCatalog({fixedOnly}, {});
+    const auto astrometricSource = createCatalog({astrometric}, {});
+
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Catalog composition kept the reference coordinates of star_astrometric and rejected the incompatible fixed "
+        "coordinates of star_fixed."
+    );
+
+    const CatalogCompositionResult result = composeInOrder(*fixedSource, *astrometricSource);
+
+    QVERIFY(result.isSuccess());
+    const BaseCelestialBody* winner = findBodyById(result.catalog->bodies(), "star_astrometric");
+    QVERIFY(winner != nullptr);
+    QVERIFY(!winner->fixedEquatorialValue().has_value());
+    QVERIFY(winner->starAstrometryValue().has_value());
+    QCOMPARE(winner->starAstrometryValue()->referenceEquatorial.rightAscensionHours, 1.0);
+    QCOMPARE(winner->starAstrometryValue()->referenceEquatorial.declinationDeg, 2.0);
 }
 
 void CatalogIdentityMergeTests::fillsMissingMetadataWithoutDiscardingWinnerValues()
