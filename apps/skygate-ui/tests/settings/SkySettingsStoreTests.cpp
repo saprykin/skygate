@@ -1,6 +1,7 @@
 #include "CatalogCacheTestSupport.hpp"
 #include "CatalogTestPayloads.hpp"
 #include "SettingsTestFixture.hpp"
+#include "SkyContextControllerSupport.hpp"
 #include "SkyLogging.hpp"
 #include "SkySettingsStore.hpp"
 #include "catalog/CatalogBinaryCodec.hpp"
@@ -77,6 +78,8 @@ private slots:
     void partialStateAndUnknownOverlayKeysAreTolerated();
     void savesLoadsAndClearsCatalogCachesIndependently();
     void savesLoadsAndClearsCatalogCollectionCache();
+    void emptyCatalogCollectionCacheIsExplicitlyPersisted();
+    void failedCollectionSaveKeepsLegacyCacheUnmigrated();
     void clearCatalogSourceCacheKeepsPeerRecords();
     void partialCatalogCacheSavePreservesConfiguredPeerPath();
     void missingCacheFilesAndMalformedCacheMetadataAreTolerated();
@@ -403,6 +406,84 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCollectionCache()
 
     QVERIFY(store.clearCatalogCollectionCache());
     QVERIFY(!store.loadCatalogCollectionCache().has_value());
+}
+
+void SkySettingsStoreTests::emptyCatalogCollectionCacheIsExplicitlyPersisted()
+{
+    m_settings.resetSettingsWithCatalogCachePaths();
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("skyContext/catalogCollectionCachePath"), m_settings.filePath(QStringLiteral("collection-cache"))
+    );
+    QDir(m_settings.filePath(QStringLiteral("collection-cache"))).removeRecursively();
+
+    SkySettingsStore store;
+    QVERIFY(store.saveCatalogCache(skygate::ui::tests::sampleCatalogCacheSnapshot()));
+
+    SkySettingsStore::CatalogCollectionCacheSnapshot emptySnapshot;
+    emptySnapshot.schemaVersion =
+        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
+    QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
+
+    // An intentionally empty collection is stored, not erased: the version
+    // marker distinguishes it from "no collection was ever stored" and keeps
+    // the legacy two-slot cache retired.
+    const auto loadedSnapshot = store.loadCatalogCollectionCache();
+    QVERIFY(loadedSnapshot.has_value());
+    QVERIFY(loadedSnapshot->sources.isEmpty());
+    QCOMPARE(
+        loadedSnapshot->schemaVersion,
+        skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
+    );
+
+    // A second restart persists the same intentionally empty configuration.
+    QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
+    const auto reloadedSnapshot = store.loadCatalogCollectionCache();
+    QVERIFY(reloadedSnapshot.has_value());
+    QVERIFY(reloadedSnapshot->sources.isEmpty());
+
+    // The legacy cache stays readable; the marker retires the fallback without
+    // deleting recoverable data.
+    QVERIFY(store.loadCatalogCache().has_value());
+
+    // Resetting the stored configuration is the operation that removes the
+    // marker again.
+    QVERIFY(store.clearCatalogCollectionCache());
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+}
+
+void SkySettingsStoreTests::failedCollectionSaveKeepsLegacyCacheUnmigrated()
+{
+    m_settings.resetSettingsWithCatalogCachePaths();
+
+    SkySettingsStore store;
+    const auto legacySnapshot = skygate::ui::tests::sampleCatalogCacheSnapshot(
+        {.sourceLabel = QStringLiteral("Legacy custom"), .deepSkySourceLabel = QStringLiteral("Legacy OpenNGC")}
+    );
+    QVERIFY(store.saveCatalogCache(legacySnapshot));
+
+    // Point the collection cache directory under a regular file so the payload
+    // sidecar write fails before any collection metadata is committed.
+    const QString blockerPath = m_settings.filePath(QStringLiteral("collection-blocker"));
+    QFile blocker(blockerPath);
+    QVERIFY(blocker.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    blocker.write("x");
+    blocker.close();
+    QSettings settings;
+    settings.setValue(
+        QStringLiteral("skyContext/catalogCollectionCachePath"), blockerPath + QStringLiteral("/nested/cache")
+    );
+
+    QVERIFY(!store.saveCatalogCollectionCache(sampleCollectionSnapshot()));
+
+    // The failed save neither records a completed migration nor destroys the
+    // last readable legacy data.
+    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto stillReadable = store.loadCatalogCache();
+    QVERIFY(stillReadable.has_value());
+    QCOMPARE(stillReadable->sourceLabel, legacySnapshot.sourceLabel);
+    QCOMPARE(stillReadable->catalogPayload, legacySnapshot.catalogPayload);
+    QCOMPARE(stillReadable->deepSkyCatalogPayload, legacySnapshot.deepSkyCatalogPayload);
 }
 
 void SkySettingsStoreTests::clearCatalogSourceCacheKeepsPeerRecords()

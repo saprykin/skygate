@@ -121,6 +121,9 @@ public:
         std::size_t constellationCount = 0;
     };
 
+    // Saved even when sources are empty: a stored snapshot is a committed
+    // configuration, so an intentionally empty collection stays distinct from
+    // "no collection was ever stored" (a nullopt from load).
     struct CatalogCollectionCacheSnapshot final {
         int schemaVersion = 0;
         int binarySchemaVersion = 0;
