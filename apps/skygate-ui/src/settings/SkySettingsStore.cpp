@@ -226,6 +226,7 @@ void saveCatalogSourceRecord(
     settings.setValue(QStringLiteral("attribution"), record.attribution);
     settings.setValue(QStringLiteral("policy"), static_cast<int>(record.policy));
     settings.setValue(QStringLiteral("enabled"), record.enabled);
+    settings.setValue(QStringLiteral("bundled"), record.bundled);
     settings.setValue(QStringLiteral("order"), record.order);
     settings.setValue(
         QStringLiteral("payloadPath"),
@@ -260,6 +261,7 @@ SkySettingsStore::CatalogSourceCacheRecord loadCatalogSourceRecord(QSettings& se
         settings, QStringLiteral("policy"), static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge)
     ));
     record.enabled = readBoolSetting(settings, QStringLiteral("enabled"), true);
+    record.bundled = readBoolSetting(settings, QStringLiteral("bundled"), false);
     record.order = readIntSetting(settings, QStringLiteral("order"), 0);
     record.constellationLineRows = settings.value(QStringLiteral("constellationLineRows")).toByteArray();
     record.constellationAnchorGroupRows = settings.value(QStringLiteral("constellationAnchorGroupRows")).toByteArray();

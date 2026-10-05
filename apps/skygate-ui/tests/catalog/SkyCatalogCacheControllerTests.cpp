@@ -204,6 +204,7 @@ SkyCatalogCollectionPersistRequest persistRequestFromRestoreResult(const SkyCata
         persisted.attribution = entry.instance.attribution;
         persisted.policy = entry.record.policy;
         persisted.enabled = entry.record.enabled;
+        persisted.bundled = entry.record.bundled;
         persisted.catalog = entry.record.catalog.get();
         persisted.payload = entry.payload;
         request.sources.push_back(std::move(persisted));
@@ -223,13 +224,14 @@ private slots:
     void restoresBinaryCatalogPayloadsWithoutUpgrade();
     void corruptBinaryPayloadFallsBackToCsvParsing();
     void legacyBinarySchemaVersionFallsBackToCsvParsing();
-    void damagedSourceIsSkippedWithoutDiscardingSiblings();
+    void damagedSourceKeepsConfigurationWithoutDiscardingSiblings();
     void restoresSelectedArchiveMemberWhenBinaryCacheIsMissing();
     void restoresSelectedArchiveMemberWhenBinaryCacheIsOutdated();
     void restoresSelectedArchiveMemberWhenBinaryCacheIsCorrupt();
-    void parseOptionFailuresSkipDamagedRecordsAndKeepSiblings();
+    void parseOptionFailuresKeepDamagedRecordsAsConfiguration();
     void unreadableSchemaHintFallsBackToDetection();
     void roundTripsParseOptionsDescriptorMetadataAndAttribution();
+    void persistsAndRestoresBundledRecordsFromFactory();
     void olderRecordFormatRestoresDefinedDefaults();
     void roundTripsThreeEnabledSourcesPlusDisabledSource();
     void clearSourceCacheVersusClearCollectionCache();
@@ -361,7 +363,7 @@ void SkyCatalogCacheControllerTests::legacyBinarySchemaVersionFallsBackToCsvPars
     QCOMPARE(result.sources[0].record.catalog->bodies().size(), std::size_t{1});
 }
 
-void SkyCatalogCacheControllerTests::damagedSourceIsSkippedWithoutDiscardingSiblings()
+void SkyCatalogCacheControllerTests::damagedSourceKeepsConfigurationWithoutDiscardingSiblings()
 {
     auto snapshot = makeCollectionSnapshot();
     snapshot.sources[1].payload = "this is not a catalog";
@@ -373,15 +375,23 @@ void SkyCatalogCacheControllerTests::damagedSourceIsSkippedWithoutDiscardingSibl
     const SkyCatalogCacheController controller(&store);
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Saved catalog source cache unreadable; ignoring source: Catalog payload format is not recognized."
+        "Saved catalog source cache unreadable; restoring configuration without payload: Catalog payload format is not "
+        "recognized."
     );
     const auto result = controller.restoreCollection(0, 0, QString(), QString());
 
-    // The healthy star source survives; the damaged deep-sky source is skipped.
+    // The healthy star source restores with its catalog; the damaged deep-sky
+    // source keeps its identity, order, policy, and participation state as an
+    // explicit payload-less record instead of being dropped.
     QVERIFY(result.restored);
-    QCOMPARE(result.sources.size(), std::size_t{1});
+    QCOMPARE(result.sources.size(), std::size_t{2});
     QCOMPARE(result.sources[0].record.instanceId, QString("preset:hyg_v42"));
     QVERIFY(result.sources[0].record.catalog != nullptr);
+    QCOMPARE(result.sources[1].record.instanceId, QString("preset:open_ngc"));
+    QCOMPARE(result.sources[1].record.policy, CatalogCompositionPolicy::DeepSkyOnly);
+    QVERIFY(result.sources[1].record.enabled);
+    QVERIFY(result.sources[1].record.catalog == nullptr);
+    QCOMPARE(result.sources[1].instance.urls, QStringList{QStringLiteral("https://example.test/NGC.csv")});
 
     // The damaged record remains persisted rather than being erased silently.
     const auto stillPersisted = store.loadCatalogCollectionCache();
@@ -451,7 +461,7 @@ void SkyCatalogCacheControllerTests::restoresSelectedArchiveMemberWhenBinaryCach
     QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("messier_031"));
 }
 
-void SkyCatalogCacheControllerTests::parseOptionFailuresSkipDamagedRecordsAndKeepSiblings()
+void SkyCatalogCacheControllerTests::parseOptionFailuresKeepDamagedRecordsAsConfiguration()
 {
     SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
     snapshot.schemaVersion = kCurrentCollectionSchemaVersion;
@@ -487,8 +497,8 @@ void SkyCatalogCacheControllerTests::parseOptionFailuresSkipDamagedRecordsAndKee
     );
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Saved catalog source cache unreadable; ignoring source: ZIP catalog payload does not contain member "
-        "'catalog/missing.csv'."
+        "Saved catalog source cache unreadable; restoring configuration without payload: ZIP catalog payload does "
+        "not contain member 'catalog/missing.csv'."
     );
     QTest::ignoreMessage(
         QtWarningMsg,
@@ -497,17 +507,25 @@ void SkyCatalogCacheControllerTests::parseOptionFailuresSkipDamagedRecordsAndKee
     );
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Saved catalog source cache unreadable; ignoring source: Catalog payload schema 'HYG CSV' does not match the "
-        "expected schema hint 'OpenNGC CSV'."
+        "Saved catalog source cache unreadable; restoring configuration without payload: Catalog payload schema "
+        "'HYG CSV' does not match the expected schema hint 'OpenNGC CSV'."
     );
     const auto result = controller.restoreCollection(0, 0, QString(), QString());
 
-    // Only the record whose stored parse contract matches its payload restores.
+    // The records whose stored parse contract does not match their payload
+    // keep their configuration in place; only the valid record restores a
+    // catalog.
     QVERIFY(result.restored);
-    QCOMPARE(result.sources.size(), std::size_t{1});
-    QCOMPARE(result.sources[0].record.instanceId, QString("custom:valid"));
-    QVERIFY(result.sources[0].record.catalog != nullptr);
-    QCOMPARE(firstBodyId(*result.sources[0].record.catalog), QStringLiteral("hip_42"));
+    QCOMPARE(result.sources.size(), std::size_t{3});
+    QCOMPARE(result.sources[0].record.instanceId, QString("custom:missing"));
+    QVERIFY(result.sources[0].record.catalog == nullptr);
+    QCOMPARE(result.sources[0].instance.urls, QStringList{kArchiveSourceUrl});
+    QCOMPARE(result.sources[1].record.instanceId, QString("custom:hint-mismatch"));
+    QVERIFY(result.sources[1].record.catalog == nullptr);
+    QCOMPARE(result.sources[1].instance.urls, QStringList{QStringLiteral("https://example.test/stars.csv")});
+    QCOMPARE(result.sources[2].record.instanceId, QString("custom:valid"));
+    QVERIFY(result.sources[2].record.catalog != nullptr);
+    QCOMPARE(firstBodyId(*result.sources[2].record.catalog), QStringLiteral("hip_42"));
 
     // The failing records stay persisted; a bad parse does not erase them.
     const auto stillPersisted = store.loadCatalogCollectionCache();
@@ -593,6 +611,108 @@ void SkyCatalogCacheControllerTests::roundTripsParseOptionsDescriptorMetadataAnd
     QCOMPARE(firstBodyId(*restored.record.catalog), QStringLiteral("messier_031"));
 }
 
+void SkyCatalogCacheControllerTests::persistsAndRestoresBundledRecordsFromFactory()
+{
+    auto bundledCatalog = makeStarCatalog("hip_42", "Sirius");
+    auto downloadedCatalog = makeStarCatalog("hip_43", "Vega");
+
+    SkyCatalogCollectionPersistRequest request;
+
+    SkyCatalogSourcePersistEntry bundled;
+    bundled.instanceId = QStringLiteral("preset:bundled");
+    bundled.descriptorId = QStringLiteral("bundled");
+    bundled.title = QStringLiteral("Bundled");
+    bundled.policy = CatalogCompositionPolicy::Merge;
+    bundled.enabled = false;
+    bundled.bundled = true;
+    // A bundled record is configuration only: a supplied payload or catalog
+    // must not be persisted as durable data.
+    bundled.payload = QByteArray("stale bundled payload");
+    bundled.catalog = bundledCatalog.get();
+    request.sources.push_back(std::move(bundled));
+
+    SkyCatalogSourcePersistEntry downloaded;
+    downloaded.instanceId = QStringLiteral("custom:stars");
+    downloaded.title = QStringLiteral("Custom stars");
+    downloaded.urls = QStringList{QStringLiteral("https://example.test/stars.csv")};
+    downloaded.policy = CatalogCompositionPolicy::DeepSkyOnly;
+    downloaded.enabled = true;
+    downloaded.catalog = downloadedCatalog.get();
+    downloaded.payload = skygate::ui::tests::sampleHygCsvPayload({.hip = 43, .properName = "Vega"});
+    request.sources.push_back(std::move(downloaded));
+
+    SkySettingsStore store;
+    const SkyCatalogCacheController controller(&store);
+    controller.persistCollection(request);
+
+    const auto stored = store.loadCatalogCollectionCache();
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->sources.size(), 2);
+    QVERIFY(stored->sources[0].bundled);
+    QVERIFY(stored->sources[0].payload.isEmpty());
+    QVERIFY(stored->sources[0].binaryPayload.isEmpty());
+    QCOMPARE(stored->sources[0].policy, CatalogCompositionPolicy::Merge);
+    QVERIFY(!stored->sources[0].enabled);
+    QVERIFY(!stored->sources[1].bundled);
+    QVERIFY(!stored->sources[1].payload.isEmpty());
+    QVERIFY(!stored->sources[1].binaryPayload.isEmpty());
+
+    const auto result = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(result.restored);
+    QCOMPARE(result.sources.size(), std::size_t{2});
+
+    // The bundled record is rebuilt from the bundled factory, not from the
+    // ignored payload, and keeps its participation state and position.
+    const SkyCatalogSourceRestoreEntry& restoredBundled = result.sources[0];
+    QCOMPARE(restoredBundled.record.instanceId, QString("preset:bundled"));
+    QCOMPARE(restoredBundled.record.title, QString("Bundled"));
+    QCOMPARE(restoredBundled.record.policy, CatalogCompositionPolicy::Merge);
+    QVERIFY(!restoredBundled.record.enabled);
+    QVERIFY(restoredBundled.record.bundled);
+    QVERIFY(restoredBundled.record.catalog != nullptr);
+    QVERIFY(!restoredBundled.record.catalog->bodies().empty());
+    // The rebuilt bundled catalog does not report its own deep-sky objects:
+    // the live add path leaves the count empty and lets the bundled fallback
+    // participation supply it, so the restored record must match.
+    QCOMPARE(restoredBundled.record.foundObjectCount, std::size_t{0});
+    QCOMPARE(restoredBundled.instance.instanceId, QString("preset:bundled"));
+    QCOMPARE(restoredBundled.instance.descriptorId, QString("bundled"));
+    QVERIFY(restoredBundled.payload.isEmpty());
+
+    // The downloaded sibling keeps its own catalog and payload.
+    const SkyCatalogSourceRestoreEntry& restoredDownloaded = result.sources[1];
+    QCOMPARE(restoredDownloaded.record.instanceId, QString("custom:stars"));
+    QVERIFY(!restoredDownloaded.record.bundled);
+    QVERIFY(restoredDownloaded.record.catalog != nullptr);
+    QCOMPARE(firstBodyId(*restoredDownloaded.record.catalog), QStringLiteral("hip_43"));
+
+    // A configured record without any payload stays in the collection with its
+    // identity, order, policy, and enabled state instead of being dropped.
+    SkySettingsStore::CatalogCollectionCacheSnapshot noPayload;
+    noPayload.schemaVersion = kCurrentCollectionSchemaVersion;
+    SkySettingsStore::CatalogSourceCacheRecord noPayloadRecord;
+    noPayloadRecord.instanceId = QStringLiteral("custom:missing-payload");
+    noPayloadRecord.title = QStringLiteral("Missing payload");
+    noPayloadRecord.urls = QStringList{QStringLiteral("https://example.test/missing.csv")};
+    noPayloadRecord.policy = CatalogCompositionPolicy::Merge;
+    noPayloadRecord.enabled = true;
+    noPayload.sources.push_back(std::move(noPayloadRecord));
+    QVERIFY(store.saveCatalogCollectionCache(noPayload));
+
+    QTest::ignoreMessage(
+        QtWarningMsg, "Saved catalog source cache has no payload; restoring configuration only: custom:missing-payload"
+    );
+    const auto noPayloadResult = controller.restoreCollection(0, 0, QString(), QString());
+    QVERIFY(noPayloadResult.restored);
+    QCOMPARE(noPayloadResult.sources.size(), std::size_t{1});
+    QCOMPARE(noPayloadResult.sources[0].record.instanceId, QString("custom:missing-payload"));
+    QCOMPARE(noPayloadResult.sources[0].record.title, QString("Missing payload"));
+    QCOMPARE(noPayloadResult.sources[0].record.policy, CatalogCompositionPolicy::Merge);
+    QVERIFY(noPayloadResult.sources[0].record.enabled);
+    QVERIFY(noPayloadResult.sources[0].record.catalog == nullptr);
+    QCOMPARE(noPayloadResult.sources[0].instance.urls, QStringList{QStringLiteral("https://example.test/missing.csv")});
+}
+
 void SkyCatalogCacheControllerTests::olderRecordFormatRestoresDefinedDefaults()
 {
     SkySettingsStore::CatalogCollectionCacheSnapshot snapshot;
@@ -624,16 +744,17 @@ void SkyCatalogCacheControllerTests::olderRecordFormatRestoresDefinedDefaults()
     );
     QTest::ignoreMessage(
         QtWarningMsg,
-        "Saved catalog source cache unreadable; ignoring source: ZIP catalog payload contains multiple supported "
-        "catalog members."
+        "Saved catalog source cache unreadable; restoring configuration without payload: ZIP catalog payload "
+        "contains multiple supported catalog members."
     );
     const auto result = controller.restoreCollection(0, 0, QString(), QString());
 
     // The stored member selection is still honored, while the missing schema
-    // hint keeps its default instead of being resolved from a descriptor.
+    // hint keeps its default instead of being resolved from a descriptor. The
+    // record that cannot be parsed keeps its configuration without a catalog.
     QVERIFY(result.restored);
     QVERIFY(result.requiresRecordUpgrade);
-    QCOMPARE(result.sources.size(), std::size_t{1});
+    QCOMPARE(result.sources.size(), std::size_t{2});
     const SkyCatalogSourceRestoreEntry& restored = result.sources[0];
     QCOMPARE(restored.instance.instanceId, QString("custom:selected"));
     QCOMPARE(restored.instance.archiveSelector, kStarsMember);
@@ -642,6 +763,8 @@ void SkyCatalogCacheControllerTests::olderRecordFormatRestoresDefinedDefaults()
     QVERIFY(restored.record.catalog != nullptr);
     QCOMPARE(restored.record.catalog->bodies().size(), std::size_t{1});
     QCOMPARE(firstBodyId(*restored.record.catalog), QStringLiteral("hip_42"));
+    QCOMPARE(result.sources[1].record.instanceId, QString("custom:ambiguous"));
+    QVERIFY(result.sources[1].record.catalog == nullptr);
 
     // Rewriting the upgraded records records the defaults once and ends the
     // migration boundary, mirroring the manager's persist after restore.
@@ -649,16 +772,25 @@ void SkyCatalogCacheControllerTests::olderRecordFormatRestoresDefinedDefaults()
     const auto upgraded = store.loadCatalogCollectionCache();
     QVERIFY(upgraded.has_value());
     QCOMPARE(upgraded->schemaVersion, kCurrentCollectionSchemaVersion);
-    QCOMPARE(upgraded->sources.size(), 1);
+    QCOMPARE(upgraded->sources.size(), 2);
     QCOMPARE(upgraded->sources[0].schemaHint, CatalogSourceType::Unknown);
     QVERIFY(upgraded->sources[0].attribution.isEmpty());
 
+    QTest::ignoreMessage(
+        QtWarningMsg, "Catalog ZIP parse failed: ZIP catalog payload contains multiple supported catalog members."
+    );
+    QTest::ignoreMessage(
+        QtWarningMsg,
+        "Saved catalog source cache unreadable; restoring configuration without payload: ZIP catalog payload "
+        "contains multiple supported catalog members."
+    );
     const auto secondResult = controller.restoreCollection(0, 0, QString(), QString());
     QVERIFY(secondResult.restored);
     QVERIFY(!secondResult.requiresRecordUpgrade);
-    QCOMPARE(secondResult.sources.size(), std::size_t{1});
+    QCOMPARE(secondResult.sources.size(), std::size_t{2});
     QVERIFY(secondResult.sources[0].record.catalog != nullptr);
     QCOMPARE(firstBodyId(*secondResult.sources[0].record.catalog), QStringLiteral("hip_42"));
+    QVERIFY(secondResult.sources[1].record.catalog == nullptr);
 }
 
 void SkyCatalogCacheControllerTests::roundTripsThreeEnabledSourcesPlusDisabledSource()
@@ -756,7 +888,8 @@ void SkyCatalogCacheControllerTests::migratesLegacyBundledCustomAndMixedConfigur
         QCOMPARE(result.constellationLineRefs.size(), 1U);
     }
 
-    // Bundled star + OpenNGC deep-sky keeps the deep-sky selection only.
+    // Bundled star + OpenNGC deep-sky keeps both the materialized bundled
+    // star slot and the deep-sky selection.
     {
         resetSettings();
         SkySettingsStore store;
@@ -769,8 +902,15 @@ void SkyCatalogCacheControllerTests::migratesLegacyBundledCustomAndMixedConfigur
         const auto result = controller.restoreCollection(0, 1, QString(), QString());
 
         QVERIFY(result.migratedLegacy);
-        QCOMPARE(result.sources.size(), std::size_t{1});
-        QCOMPARE(result.sources[0].record.instanceId, QString("preset:open_ngc"));
+        QCOMPARE(result.sources.size(), std::size_t{2});
+        QCOMPARE(result.sources[0].record.instanceId, QString("preset:bundled"));
+        QVERIFY(result.sources[0].record.bundled);
+        QCOMPARE(result.sources[0].record.policy, CatalogCompositionPolicy::Merge);
+        QVERIFY(result.sources[0].record.enabled);
+        QVERIFY(result.sources[0].record.catalog != nullptr);
+        QCOMPARE(result.sources[0].record.title, QString("Bundled"));
+        QCOMPARE(result.sources[1].record.instanceId, QString("preset:open_ngc"));
+        QVERIFY(!result.sources[1].record.bundled);
     }
 }
 

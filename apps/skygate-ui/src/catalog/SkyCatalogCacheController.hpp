@@ -55,6 +55,9 @@ struct SkyCatalogSourcePersistEntry final {
     QString attribution;
     skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
     bool enabled = true;
+    // Marks a record whose catalog is reconstructed from the bundled factory
+    // instead of a payload sidecar.
+    bool bundled = false;
     const skygate::ephemeris::IStarCatalog* catalog = nullptr;
     QByteArray payload;
     QByteArray constellationLineRows;

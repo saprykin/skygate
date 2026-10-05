@@ -634,6 +634,7 @@ void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndPreservesIde
 
     QTRY_COMPARE(sourceModelInstanceIds(*controller).size(), 4);
     const QStringList addedIds = sourceModelInstanceIds(*controller);
+    const QString bundledId = addedIds[0];
     const QString starAId = addedIds[1];
     const QString starBId = addedIds[2];
     const QString deepSkyId = addedIds[3];
@@ -651,8 +652,11 @@ void QmlPreferencesCatalogTests::catalogSectionRestoresCollectionAndPreservesIde
 
     skygate::ui::internal::SkyCatalogSourceCollectionModel* restoredModel = sourceCollectionModel(*restoredController);
     QVERIFY(restoredModel != nullptr);
-    QTRY_COMPARE(restoredModel->rowCount(), 3);
+    // The bundled source is restored with its position and participation next
+    // to the three downloaded sources.
+    QTRY_COMPARE(restoredModel->rowCount(), 4);
     const QStringList restoredIds = sourceModelInstanceIds(*restoredController);
+    QCOMPARE(restoredIds[0], bundledId);
     QVERIFY(restoredIds.contains(starAId));
     QVERIFY(restoredIds.contains(starBId));
     QVERIFY(restoredIds.contains(deepSkyId));

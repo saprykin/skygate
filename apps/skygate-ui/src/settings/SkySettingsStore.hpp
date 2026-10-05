@@ -109,6 +109,9 @@ public:
         QString attribution;
         skygate::ephemeris::CatalogCompositionPolicy policy = skygate::ephemeris::CatalogCompositionPolicy::Merge;
         bool enabled = true;
+        // The source's catalog comes from the bundled factory rather than a
+        // stored payload, so the record is configuration only.
+        bool bundled = false;
         int order = 0;
         QByteArray payload;
         QByteArray binaryPayload;
