@@ -784,7 +784,7 @@ void SkyCatalogManager::handleSourceImportFinished(
     const auto diagnostics = result.diagnostics;
     const QString sourceLabel = result.sourceLabel;
 
-    const SkyCatalogRuntimeResult runtimeResult = applySourceResult(std::move(result), policy);
+    SkyCatalogRuntimeResult runtimeResult = applySourceResult(std::move(result), policy);
     if (!runtimeResult.succeeded) {
         // The catalog was parsed but the runtime refused the collection
         // transition: the source is not installed (or the previous record
@@ -798,6 +798,22 @@ void SkyCatalogManager::handleSourceImportFinished(
         setDownloadingCatalog(false);
         applyRuntimeResult(runtimeResult);
         return;
+    }
+
+    // A successful reload supersedes the owner's catalog and the related
+    // dataset that was attached to the replaced catalog. The accepted
+    // related-data state is therefore cleared as part of the same transition,
+    // before the reload is published or persisted: while the replacement
+    // download is pending the owner holds no dataset, and a replacement
+    // becomes owned only when its own download completes successfully. Other
+    // owners keep their own datasets untouched.
+    if (!relatedDatasetUrls.isEmpty()) {
+        const SkyCatalogRuntimeResult clearResult = m_runtime->clearSourceConstellationRefs(instanceId);
+        runtimeResult.catalogChanged = runtimeResult.catalogChanged || clearResult.catalogChanged;
+        runtimeResult.datasetInfoChanged = runtimeResult.datasetInfoChanged || clearResult.datasetInfoChanged;
+        // The clear is part of the committed replacement, so every published
+        // summary is re-read instead of keeping the pre-clear counts.
+        runtimeResult.statusText = m_runtime->statusText();
     }
 
     operation->busy = false;
@@ -824,9 +840,9 @@ void SkyCatalogManager::handleSourceImportFinished(
     setDownloadingCatalog(false);
 
     if (!relatedDatasetUrls.isEmpty()) {
-        // A reloaded catalog replaces the owner's previous related dataset;
-        // other sources keep their own related datasets untouched.
-        static_cast<void>(m_runtime->clearSourceConstellationRefs(instanceId));
+        // The replacement dataset is requested only after the accepted
+        // related-data state has been published and persisted, so its pending
+        // interval starts from the state observers already saw.
         downloadConstellationLinesAfterCatalog(instanceId, revision, relatedDatasetUrls, m_statusText);
     }
 }
