@@ -595,16 +595,37 @@ bool SkyCatalogManager::restoreCatalogCache()
         return false;
     }
 
+    // The accepted restore replaces the whole operation collection together
+    // with the runtime: every restored instance starts an operation revision
+    // that was never handed out, and an operation omitted from the restored
+    // collection is dropped. A reply captured for a superseded incarnation
+    // therefore finds no current operation and can no longer apply its source
+    // to the replacement, not even when a restored instance reuses its ID or
+    // when the reply belongs to a pending related download.
+    QVector<SourceOperation> restoredOperations;
+    restoredOperations.reserve(static_cast<qsizetype>(restoreResult.sources.size()));
     for (std::size_t index = 0; index < restoreResult.sources.size(); ++index) {
         const SkyCatalogSourceRestoreEntry& entry = restoreResult.sources[index];
-        SourceOperation* operation = upsertOperation(entry.instance, restoredPolicies[index]);
-        commitAcceptedSourceFacts(*operation, entry.payload);
+        SourceOperation operation;
+        operation.instance = entry.instance;
+        operation.policy = restoredPolicies[index];
+        operation.revision = ++m_nextOperationRevision;
+        commitAcceptedSourceFacts(operation, entry.payload);
         if (unavailableInstanceIds.contains(entry.instance.instanceId)) {
-            operation->busy = false;
-            operation->hasError = true;
-            operation->statusText = SkyCatalogText::sourcePayloadUnavailable();
+            operation.hasError = true;
+            operation.statusText = SkyCatalogText::sourcePayloadUnavailable();
         }
+        restoredOperations.push_back(std::move(operation));
     }
+    m_sourceOperations = std::move(restoredOperations);
+
+    // The replaced collection owns no in-flight work: import or related replies
+    // of a superseded source are discarded by the revision guards above, so the
+    // download state is reset with the collection instead of continuing to
+    // report work that can no longer be accepted.
+    m_activeDownloadInstanceId.clear();
+    setDownloadingCatalog(false);
+    setCatalogProcessing(false);
 
     const QString runtimeStatusText = mergedResult.statusText;
     applyRuntimeResult(mergedResult);

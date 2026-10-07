@@ -152,6 +152,11 @@ public:
     // back; only a later successful load repopulates it. Removing the source
     // stays the separate configuration-deletion operation.
     bool clearSourceCache(const QString& instanceId);
+    // Applies a stored collection when one was committed. An accepted restore
+    // replaces the runtime collection and the operation/accepted-facts state in
+    // one step: work captured for a superseded incarnation is rejected, so a
+    // late reply can neither repopulate an omitted source nor mutate a restored
+    // instance that reuses its ID.
     bool restoreCatalogCache();
 
 signals:
