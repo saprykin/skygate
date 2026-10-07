@@ -300,6 +300,7 @@ private slots:
     void absentAndZeroDeepSkyValuesKeepTheirMeaning();
     void inheritedAstrometryValuesKeepTheirSupplyingSource();
     void inheritedFixedCoordinatesFollowTheirSupplyingSource();
+    void reorderedReplacementChainChangesTheInheritedName();
     void retainsReplacedCanonicalIdentityAcrossLaterSources();
     void retainsBridgedCanonicalIdentitiesAcrossLaterSources();
     void retainedCanonicalIdentitySurvivesBinaryRoundTripAndRecomposition();
@@ -2165,6 +2166,53 @@ void CatalogIdentityMergeTests::inheritedFixedCoordinatesFollowTheirSupplyingSou
     QVERIFY(survivor->fixedEquatorialValue().has_value());
     QCOMPARE(survivor->fixedEquatorialValue()->rightAscensionHours, 5.0);
     QCOMPARE(survivor->fixedEquatorialValue()->declinationDeg, 6.0);
+}
+
+void CatalogIdentityMergeTests::reorderedReplacementChainChangesTheInheritedName()
+{
+    // The HIP 1 object is named by the source that first supplies it, and the
+    // record that replaces it later carries no name of its own, so the name it
+    // holds was supplied by that earliest source. The HD 2 object supplies its
+    // own name. The replacement and the bridge never name the body, so the
+    // winning name comes from whichever of the two supplying sources ranks
+    // higher. Composing the HIP 1 source first lets the explicit HD 2 name
+    // win; swapping only the two supplying sources makes the inherited HIP 1
+    // name the higher-precedence contribution. The name therefore follows its
+    // actual supplying source through both replacement and reordering.
+    const auto sourceA =
+        createCatalog({makeStar("a_hip_1", "A inherited", {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto sourceB =
+        createCatalog({makeStar("b_hd_2", "B explicit", {CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0)}, {});
+    const auto replacement =
+        createCatalog({makeStar("c_hip_1", {}, {CatalogIdentifier::make("hip", "1")}, {}, 1.0, 2.0)}, {});
+    const auto bridge = createCatalog(
+        {makeStar(
+            "d_bridge", {}, {CatalogIdentifier::make("hip", "1"), CatalogIdentifier::make("hd", "2")}, {}, 1.0, 2.0
+        )},
+        {}
+    );
+
+    const CatalogCompositionResult explicitSourceHigher =
+        composeAll({sourceA.get(), sourceB.get(), replacement.get(), bridge.get()});
+
+    QVERIFY(explicitSourceHigher.isSuccess());
+    QCOMPARE(explicitSourceHigher.bodyCount, std::size_t{1});
+    const BaseCelestialBody* explicitSurvivor = findBodyById(explicitSourceHigher.catalog->bodies(), "d_bridge");
+    QVERIFY(explicitSurvivor != nullptr);
+    QVERIFY(hasIdentifier(*explicitSurvivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*explicitSurvivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(explicitSurvivor->displayName), QStringLiteral("B explicit"));
+
+    const CatalogCompositionResult inheritedSourceHigher =
+        composeAll({sourceB.get(), sourceA.get(), replacement.get(), bridge.get()});
+
+    QVERIFY(inheritedSourceHigher.isSuccess());
+    QCOMPARE(inheritedSourceHigher.bodyCount, std::size_t{1});
+    const BaseCelestialBody* inheritedSurvivor = findBodyById(inheritedSourceHigher.catalog->bodies(), "d_bridge");
+    QVERIFY(inheritedSurvivor != nullptr);
+    QVERIFY(hasIdentifier(*inheritedSurvivor, "hip", "1"));
+    QVERIFY(hasIdentifier(*inheritedSurvivor, "hd", "2"));
+    QCOMPARE(QString::fromStdString(inheritedSurvivor->displayName), QStringLiteral("A inherited"));
 }
 
 void CatalogIdentityMergeTests::retainsReplacedCanonicalIdentityAcrossLaterSources()
