@@ -693,6 +693,10 @@ private slots:
     void updateRemovingRelatedDeclarationRetiresOwnedData();
     void failedUpdateAttemptingToRemoveRelatedDeclarationKeepsDataset();
     void lateReplyToRemovedRelatedDeclarationIsRejected();
+    void bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy_data();
+    void bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy();
+    void payloadOriginSwitchesFollowTheAcceptedRelatedDeclaration();
+    void rejectedBundledUpdateKeepsOwnedRelatedData();
     void relatedDatasetsRoundTripToTheirOwnSources();
     void disabledOwnerRelatedDataStaysOwnedButInactiveAfterRestart();
     void removedOwnerRelatedDataDoesNotReturnAfterRestart();
@@ -5327,6 +5331,245 @@ void SkyCatalogManagerTests::lateReplyToRemovedRelatedDeclarationIsRejected()
     QVERIFY(manager.constellationAnchorGroups().empty());
     QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
     QVERIFY(catalogContainsDisplayName(manager.starCatalog(), QStringLiteral("Late Update Star")));
+}
+
+void SkyCatalogManagerTests::bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy_data()
+{
+    QTest::addColumn<int>("policy");
+    QTest::addRow("merge") << static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTest::addRow("deep-sky-only") << static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QTest::addRow("deep-sky-fallback") << static_cast<int>(
+        skygate::ephemeris::CatalogCompositionPolicy::DeepSkyFallback
+    );
+    QTest::addRow("augment-core") << static_cast<int>(skygate::ephemeris::CatalogCompositionPolicy::AugmentCore);
+}
+
+void SkyCatalogManagerTests::bundledUpdateRetiresOwnedRelatedDataUnderEveryPolicy()
+{
+    QFETCH(int, policy);
+    const auto bundledPolicy = static_cast<skygate::ephemeris::CatalogCompositionPolicy>(policy);
+
+    const QString catalogUrl = QStringLiteral("https://example.test/bundled-policy-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/bundled-policy-lines.json");
+    const QString siblingUrl = QStringLiteral("https://example.test/bundled-policy-sibling-stars.csv");
+    const QString siblingRelatedUrl = QStringLiteral("https://example.test/bundled-policy-sibling-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+    networkAccessManager.enqueueResponse(siblingUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(siblingRelatedUrl, {.payload = lyraRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    std::vector<CatalogNotificationState> observations;
+    observeCatalogNotifications(manager, observations);
+
+    const skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+
+    // A second owner keeps its own dataset throughout, so the retirement stays
+    // scoped to the instance whose accepted declaration changed.
+    const skygate::ui::internal::SkyCatalogSourceInstance sibling =
+        relatedDatasetInstance(siblingUrl, siblingRelatedUrl);
+    manager.loadSource(sibling, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{4});
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+
+    // The update keeps the durable instance ID but activates bundled content
+    // whose declaration selects no related dataset.
+    skygate::ui::internal::SkyCatalogSourceInstance update = source;
+    update.title = QStringLiteral("Bundled Policy Update");
+    update.version = QStringLiteral("v2");
+    update.urls.clear();
+    update.relatedDatasetUrls.clear();
+    manager.loadSource(update, bundledPolicy);
+
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(manager.constellationAnchorGroups().size(), std::size_t{1});
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(manager, "Lyra") != nullptr);
+    QVERIFY(!observations.empty());
+    QCOMPARE(observations.back().lineRefCount, std::size_t{2});
+    QCOMPARE(observations.back().anchorGroupCount, std::size_t{1});
+    QCOMPARE(observations.back().constellationCount, std::size_t{1});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
+    const auto updatedEntry =
+        std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        });
+    QVERIFY(updatedEntry != view.end());
+    QVERIFY(updatedEntry->bundled);
+    QVERIFY(!updatedEntry->hasError);
+
+    // The accepted declaration and the retired dataset are persisted together,
+    // and the sibling record keeps its own payload.
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* updatedRecord = findCollectionRecord(*snapshot, instanceId);
+    const SkySettingsStore::CatalogSourceCacheRecord* siblingRecord =
+        findCollectionRecord(*snapshot, sibling.instanceId);
+    QVERIFY(updatedRecord != nullptr);
+    QVERIFY(siblingRecord != nullptr);
+    QVERIFY(updatedRecord->relatedDatasetUrls.isEmpty());
+    QVERIFY(updatedRecord->constellationLineRows.isEmpty());
+    QVERIFY(updatedRecord->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(updatedRecord->bundled, true);
+    QCOMPARE(siblingRecord->relatedDatasetUrls, QStringList{siblingRelatedUrl});
+    QVERIFY(!siblingRecord->constellationLineRows.isEmpty());
+    QVERIFY(!siblingRecord->constellationAnchorGroupRows.isEmpty());
+
+    // A restart agrees with the live state instead of resurrecting the retired
+    // dataset.
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QCOMPARE(restoredManager.constellationLineRefs().size(), std::size_t{2});
+    QCOMPARE(restoredManager.constellationCount(), std::size_t{1});
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Orion") == nullptr);
+    QVERIFY(findConstellationAnchorGroup(restoredManager, "Lyra") != nullptr);
+}
+
+void SkyCatalogManagerTests::payloadOriginSwitchesFollowTheAcceptedRelatedDeclaration()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/origin-switch-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/origin-switch-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    std::vector<CatalogNotificationState> observations;
+    observeCatalogNotifications(manager, observations);
+
+    // The instance starts as bundled content and owns no related dataset.
+    skygate::ui::internal::SkyCatalogSourceInstance source =
+        skygate::ui::internal::SkyCatalogSourceInstance::createCustom(catalogUrl);
+    source.title = QStringLiteral("Origin Switch Source");
+    source.urls.clear();
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QVERIFY(!manager.downloadingCatalog());
+    QVERIFY(manager.constellationLineRefs().empty());
+
+    // A downloaded update of the same instance declares its own related
+    // dataset, which becomes owned once its own reply completes.
+    skygate::ui::internal::SkyCatalogSourceInstance downloaded = source;
+    downloaded.version = QStringLiteral("v2");
+    downloaded.urls = QStringList{catalogUrl};
+    downloaded.relatedDatasetUrls = QStringList{relatedUrl};
+    manager.loadSource(downloaded, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+
+    // Switching the same instance back to bundled content retires the dataset
+    // exactly like a downloaded update that removes the declaration.
+    skygate::ui::internal::SkyCatalogSourceInstance bundled = downloaded;
+    bundled.version = QStringLiteral("v3");
+    bundled.urls.clear();
+    bundled.relatedDatasetUrls.clear();
+    manager.loadSource(bundled, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+    QVERIFY(manager.constellationLineRefs().empty());
+    QVERIFY(manager.constellationAnchorGroups().empty());
+    QCOMPARE(manager.constellationCount(), std::size_t{0});
+    QVERIFY(!observations.empty());
+    QCOMPARE(observations.back().lineRefCount, std::size_t{0});
+    QCOMPARE(observations.back().anchorGroupCount, std::size_t{0});
+    QCOMPARE(observations.back().constellationCount, std::size_t{0});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+    QVERIFY(record != nullptr);
+    QVERIFY(record->relatedDatasetUrls.isEmpty());
+    QVERIFY(record->constellationLineRows.isEmpty());
+    QVERIFY(record->constellationAnchorGroupRows.isEmpty());
+
+    SkyCatalogManager restoredManager(&store);
+    QVERIFY(restoredManager.restoreCatalogCache());
+    QVERIFY(restoredManager.constellationLineRefs().empty());
+    QVERIFY(restoredManager.constellationAnchorGroups().empty());
+    QCOMPARE(restoredManager.constellationCount(), std::size_t{0});
+}
+
+void SkyCatalogManagerTests::rejectedBundledUpdateKeepsOwnedRelatedData()
+{
+    const QString catalogUrl = QStringLiteral("https://example.test/rejected-bundled-stars.csv");
+    const QString relatedUrl = QStringLiteral("https://example.test/rejected-bundled-lines.json");
+
+    skygate::ui::tests::FakeNetworkAccessManager networkAccessManager;
+    networkAccessManager.enqueueResponse(catalogUrl, {.payload = skygate::ui::tests::orionHygCsvPayload()});
+    networkAccessManager.enqueueResponse(relatedUrl, {.payload = orionRelatedDatasetPayload()});
+
+    SkySettingsStore store;
+    SkyCatalogManager manager(&store, nullptr, nullptr, &networkAccessManager);
+    std::vector<CatalogNotificationState> observations;
+    observeCatalogNotifications(manager, observations);
+
+    // The bundled deep-sky fallback is disabled while the source loads, so its
+    // reserved identity is available to the configured source. Re-enabling the
+    // fallback later makes any transition of that source collide with the
+    // implicit entry.
+    manager.setDeepSkyCatalogPresetIndex(1);
+
+    skygate::ui::internal::SkyCatalogSourceInstance source = relatedDatasetInstance(catalogUrl, relatedUrl);
+    source.instanceId = QStringLiteral("bundled-deep-sky");
+    source.title = QStringLiteral("Rejected Bundled Source");
+    const QString instanceId = source.instanceId;
+    manager.loadSource(source, skygate::ephemeris::CatalogCompositionPolicy::Merge);
+    QTRY_VERIFY(!manager.downloadingCatalog());
+    QTRY_COMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+
+    manager.setDeepSkyCatalogPresetIndex(0);
+
+    // The bundled update cannot compose against the enabled fallback, so the
+    // replacement is rejected and the accepted dataset stays published.
+    skygate::ui::internal::SkyCatalogSourceInstance update = source;
+    update.title = QStringLiteral("Rejected Bundled Update");
+    update.version = QStringLiteral("v2");
+    update.urls.clear();
+    update.relatedDatasetUrls.clear();
+    manager.loadSource(update, skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly);
+
+    const QVector<SkyCatalogManager::SourceViewEntry> view = manager.sourceViewEntries();
+    const auto updatedEntry =
+        std::find_if(view.begin(), view.end(), [&instanceId](const SkyCatalogManager::SourceViewEntry& entry) {
+            return entry.instanceId == instanceId;
+        });
+    QVERIFY(updatedEntry != view.end());
+    QVERIFY(updatedEntry->hasError);
+    QVERIFY(updatedEntry->statusText.contains(QStringLiteral("rejected")));
+    QCOMPARE(manager.constellationLineRefs().size(), std::size_t{2});
+    QVERIFY(findConstellationAnchorGroup(manager, "Orion") != nullptr);
+    QCOMPARE(manager.constellationCount(), std::size_t{1});
+    QVERIFY(!observations.empty());
+    QCOMPARE(observations.back().lineRefCount, std::size_t{2});
+    assertObservedStateMatchesRuntime(manager, observations.back());
+
+    // The rejected attempt leaves the accepted declaration and its dataset in
+    // the persisted record.
+    manager.setDeepSkyCatalogPresetIndex(1);
+    manager.moveSource(instanceId, 0);
+    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> snapshot = store.loadCatalogCollectionCache();
+    QVERIFY(snapshot.has_value());
+    const SkySettingsStore::CatalogSourceCacheRecord* record = findCollectionRecord(*snapshot, instanceId);
+    QVERIFY(record != nullptr);
+    QCOMPARE(record->relatedDatasetUrls, QStringList{relatedUrl});
+    QVERIFY(!record->constellationLineRows.isEmpty());
+    QVERIFY(!record->constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(record->bundled, false);
 }
 
 void SkyCatalogManagerTests::combinedAcceptedFactsSurviveRelatedReplacementRejectionReorderAndRawRestart()
