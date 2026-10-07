@@ -144,6 +144,13 @@ public:
     void cancelCatalogDownload();
     bool clearCatalogCache();
     bool clearDeepSkyCatalogCache();
+    // Evicts the source's disposable payload files while its configured record
+    // stays durable. The accepted in-memory snapshot remains active until the
+    // source is reloaded or the application restarts; after a restart the
+    // source is configured and reports an unavailable payload with retry
+    // state. Ordinary metadata persistence never writes the retained payload
+    // back; only a later successful load repopulates it. Removing the source
+    // stays the separate configuration-deletion operation.
     bool clearSourceCache(const QString& instanceId);
     bool restoreCatalogCache();
 
@@ -170,6 +177,11 @@ private:
         skygate::ui::internal::SkyCatalogSourceInstance acceptedInstance;
         QByteArray acceptedPayload;
         bool hasAcceptedInstance = false;
+        // A payload eviction dropped this instance's disposable payload files
+        // from its configured record. The accepted runtime snapshot stays
+        // active for the session, but ordinary persistence must not write the
+        // retained bytes back; only a later accepted load repopulates them.
+        bool payloadEvicted = false;
         std::uint64_t revision = 0;
         bool constellationPending = false;
         bool busy = false;
@@ -199,6 +211,9 @@ private:
     [[nodiscard]] SourceOperation* findOperation(const QString& instanceId);
     [[nodiscard]] const SourceOperation* findOperation(const QString& instanceId) const;
     void removeOperation(const QString& instanceId);
+    // Marks the instance's retained in-memory payload as evicted so ordinary
+    // persistence keeps its configured record without writing its bytes back.
+    void markSourcePayloadEvicted(const QString& instanceId);
     [[nodiscard]] bool isOperationCurrent(const QString& instanceId, std::uint64_t revision) const;
     // Commits the operation's requested configuration and the payload that was
     // activated with it as the instance's accepted facts. Only a successful

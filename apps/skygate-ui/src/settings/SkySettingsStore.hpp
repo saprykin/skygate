@@ -162,6 +162,12 @@ public:
     [[nodiscard]] bool saveCatalogCollectionCache(const CatalogCollectionCacheSnapshot& snapshot) const;
     [[nodiscard]] std::optional<CatalogCollectionCacheSnapshot> loadCatalogCollectionCache() const;
     [[nodiscard]] bool clearCatalogCollectionCache() const;
+    // Evicts the source's disposable payload files and the payload references
+    // in its record while every configuration field stays durable: identity,
+    // order, enabled state, descriptor, and parse contract. A restart restores
+    // the source as configured with an unavailable payload; only a later
+    // accepted load writes payload references again. Removing the source stays
+    // the separate configuration-deletion operation.
     [[nodiscard]] bool clearCatalogSourceCache(const QString& instanceId) const;
     [[nodiscard]] bool saveEphemerisDataCache(const EphemerisDataCacheSnapshot& snapshot) const;
     [[nodiscard]] EphemerisDataCacheSnapshot loadEphemerisDataCache() const;

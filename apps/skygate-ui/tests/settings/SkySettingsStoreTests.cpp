@@ -172,7 +172,7 @@ private slots:
     void savesLoadsAndClearsCatalogCollectionCache();
     void emptyCatalogCollectionCacheIsExplicitlyPersisted();
     void failedCollectionSaveKeepsLegacyCacheUnmigrated();
-    void clearCatalogSourceCacheKeepsPeerRecords();
+    void clearCatalogSourceCacheEvictsPayloadAndKeepsConfiguration();
     void legacyFlatCollectionRecordsStillLoad();
     void emptyLegacyCollectionStillLoadsWithoutGenerationArtifacts();
     void missingManifestWithGenerationRecordsDoesNotLoadEmptyCollection();
@@ -589,24 +589,54 @@ void SkySettingsStoreTests::failedCollectionSaveKeepsLegacyCacheUnmigrated()
     QCOMPARE(stillReadable->deepSkyCatalogPayload, legacySnapshot.deepSkyCatalogPayload);
 }
 
-void SkySettingsStoreTests::clearCatalogSourceCacheKeepsPeerRecords()
+void SkySettingsStoreTests::clearCatalogSourceCacheEvictsPayloadAndKeepsConfiguration()
 {
-    m_settings.resetSettingsWithCatalogCachePaths();
-    QSettings settings;
-    settings.setValue(
-        QStringLiteral("skyContext/catalogCollectionCachePath"), m_settings.filePath(QStringLiteral("collection-cache"))
-    );
-    QDir(m_settings.filePath(QStringLiteral("collection-cache"))).removeRecursively();
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
 
     SkySettingsStore store;
-    QVERIFY(store.saveCatalogCollectionCache(sampleCollectionSnapshot()));
+    const auto savedSnapshot = sampleCollectionSnapshot();
+    QVERIFY(store.saveCatalogCollectionCache(savedSnapshot));
+
+    const QDir cacheDir(directory);
+    QCOMPARE(cacheDir.entryList(QStringList{QStringLiteral("catalog-source-*")}, QDir::Files).size(), 4);
+
     QVERIFY(store.clearCatalogSourceCache(QStringLiteral("preset:hyg_v42")));
+
+    // Only the cleared source's payload sidecars are gone; the peer keeps both
+    // of its files.
+    QCOMPARE(cacheDir.entryList(QStringList{QStringLiteral("catalog-source-*")}, QDir::Files).size(), 2);
 
     const auto loadedSnapshot = store.loadCatalogCollectionCache();
     QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->sources.size(), 1);
-    QCOMPARE(loadedSnapshot->sources[0].instanceId, QString("preset:open_ngc"));
-    QCOMPARE(loadedSnapshot->sources[0].payload, skygate::ui::tests::sampleCompactOpenNgcCsvPayload());
+    QCOMPARE(loadedSnapshot->sources.size(), 2);
+
+    // The cleared source keeps every configuration field and drops only its
+    // disposable payload references and the related dataset they carry.
+    const auto& loadedStar = loadedSnapshot->sources[0];
+    QCOMPARE(loadedStar.instanceId, savedSnapshot.sources[0].instanceId);
+    QCOMPARE(loadedStar.descriptorId, savedSnapshot.sources[0].descriptorId);
+    QCOMPARE(loadedStar.title, savedSnapshot.sources[0].title);
+    QCOMPARE(loadedStar.version, savedSnapshot.sources[0].version);
+    QCOMPARE(loadedStar.url, savedSnapshot.sources[0].url);
+    QCOMPARE(loadedStar.urls, savedSnapshot.sources[0].urls);
+    QCOMPARE(loadedStar.relatedDatasetUrls, savedSnapshot.sources[0].relatedDatasetUrls);
+    QCOMPARE(loadedStar.archiveSelector, savedSnapshot.sources[0].archiveSelector);
+    QCOMPARE(loadedStar.schemaHint, savedSnapshot.sources[0].schemaHint);
+    QCOMPARE(loadedStar.attribution, savedSnapshot.sources[0].attribution);
+    QCOMPARE(loadedStar.policy, savedSnapshot.sources[0].policy);
+    QCOMPARE(loadedStar.enabled, savedSnapshot.sources[0].enabled);
+    QCOMPARE(loadedStar.bundled, savedSnapshot.sources[0].bundled);
+    QCOMPARE(loadedStar.order, savedSnapshot.sources[0].order);
+    QVERIFY(loadedStar.payload.isEmpty());
+    QVERIFY(loadedStar.binaryPayload.isEmpty());
+    QVERIFY(loadedStar.constellationLineRows.isEmpty());
+    QVERIFY(loadedStar.constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(loadedStar.constellationCount, std::size_t{0});
+
+    // The peer record and its payload are untouched.
+    QCOMPARE(loadedSnapshot->sources[1].instanceId, savedSnapshot.sources[1].instanceId);
+    QCOMPARE(loadedSnapshot->sources[1].payload, savedSnapshot.sources[1].payload);
+    QCOMPARE(loadedSnapshot->sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
 }
 
 void SkySettingsStoreTests::legacyFlatCollectionRecordsStillLoad()

@@ -83,6 +83,9 @@ public:
 
     [[nodiscard]] bool clearCatalogCache() const;
     [[nodiscard]] bool clearDeepSkyCatalogCache() const;
+    // Evicts the source's disposable payload while its configured record
+    // stays durable; the accepted in-memory snapshot remains active until a
+    // reload or restart.
     [[nodiscard]] bool clearSourceCache(const QString& instanceId) const;
     [[nodiscard]] bool clearCollectionCache() const;
     [[nodiscard]] SkyCatalogCollectionRestoreResult restoreCollection(

@@ -476,7 +476,11 @@ bool SkyCatalogManager::clearCatalogCache()
             if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::Merge) {
                 continue;
             }
-            cacheCleared = m_cacheController->clearSourceCache(source.instanceId) && cacheCleared;
+            const bool sourceCleared = m_cacheController->clearSourceCache(source.instanceId);
+            if (sourceCleared) {
+                markSourcePayloadEvicted(source.instanceId);
+            }
+            cacheCleared = sourceCleared && cacheCleared;
         }
         cacheCleared = m_cacheController->clearCatalogCache() && cacheCleared;
     }
@@ -499,7 +503,11 @@ bool SkyCatalogManager::clearDeepSkyCatalogCache()
             if (source.policy != skygate::ephemeris::CatalogCompositionPolicy::DeepSkyOnly) {
                 continue;
             }
-            cacheCleared = m_cacheController->clearSourceCache(source.instanceId) && cacheCleared;
+            const bool sourceCleared = m_cacheController->clearSourceCache(source.instanceId);
+            if (sourceCleared) {
+                markSourcePayloadEvicted(source.instanceId);
+            }
+            cacheCleared = sourceCleared && cacheCleared;
         }
         cacheCleared = m_cacheController->clearDeepSkyCatalogCache() && cacheCleared;
     }
@@ -517,6 +525,12 @@ bool SkyCatalogManager::clearSourceCache(const QString& instanceId)
     }
 
     const bool cacheCleared = m_cacheController != nullptr && m_cacheController->clearSourceCache(instanceId);
+    if (cacheCleared) {
+        // The runtime keeps displaying the accepted snapshot, but its bytes
+        // must not return to the configured record through a later unrelated
+        // persistence; only an accepted reload may write them again.
+        markSourcePayloadEvicted(instanceId);
+    }
     m_statusText = SkyCatalogText::sourceCacheClearResult(cacheCleared);
     emit statusTextChanged();
     return cacheCleared;
@@ -1069,9 +1083,12 @@ void SkyCatalogManager::persistCatalogCache() const
         // source that needs no payload (bundled or synthesized) is persisted by
         // configuration alone and reconstructed from the bundled factory on
         // restore, so its identity, order, policy, and enabled state survive
-        // even when it has no operation record.
-        if (const SourceOperation* operation = findOperation(source.instanceId);
-            operation != nullptr && operation->hasAcceptedInstance) {
+        // even when it has no operation record. An evicted payload stays out
+        // of the record even though the accepted in-memory snapshot still
+        // carries it: only an accepted load repopulates the payload.
+        const SourceOperation* operation = findOperation(source.instanceId);
+        const bool payloadEvicted = operation != nullptr && operation->payloadEvicted;
+        if (operation != nullptr && operation->hasAcceptedInstance) {
             entry.descriptorId = operation->acceptedInstance.descriptorId;
             entry.title = operation->acceptedInstance.title;
             entry.version = operation->acceptedInstance.version;
@@ -1080,7 +1097,7 @@ void SkyCatalogManager::persistCatalogCache() const
             entry.archiveSelector = operation->acceptedInstance.archiveSelector;
             entry.schemaHint = operation->acceptedInstance.schemaHint;
             entry.attribution = operation->acceptedInstance.attribution;
-            if (!source.bundled) {
+            if (!source.bundled && !payloadEvicted) {
                 entry.catalog = source.catalog.get();
                 entry.payload = operation->acceptedPayload;
             }
@@ -1091,9 +1108,11 @@ void SkyCatalogManager::persistCatalogCache() const
         // count to the source whose download produced it. A source that has
         // not completed a related download keeps no related payload, and a
         // disabled owner keeps its own payload even though it contributes
-        // nothing to the active view.
+        // nothing to the active view. The related dataset is payload of the
+        // same source, so it stays out of an evicted record until a later
+        // accepted load commits a payload again.
         const SkyCatalogConstellationStore& ownedRelatedData = source.constellationData;
-        if (!source.bundled
+        if (!source.bundled && !payloadEvicted
             && (!ownedRelatedData.lineRefVector().empty() || !ownedRelatedData.anchorGroupVector().empty()
                 || ownedRelatedData.count() > 0U)) {
             entry.constellationLineRows =
@@ -1160,6 +1179,13 @@ void SkyCatalogManager::removeOperation(const QString& instanceId)
     }
 }
 
+void SkyCatalogManager::markSourcePayloadEvicted(const QString& instanceId)
+{
+    if (SourceOperation* operation = findOperation(instanceId)) {
+        operation->payloadEvicted = true;
+    }
+}
+
 bool SkyCatalogManager::isOperationCurrent(const QString& instanceId, const std::uint64_t revision) const
 {
     const SourceOperation* operation = findOperation(instanceId);
@@ -1171,4 +1197,7 @@ void SkyCatalogManager::commitAcceptedSourceFacts(SourceOperation& operation, QB
     operation.acceptedInstance = operation.instance;
     operation.acceptedPayload = std::move(payload);
     operation.hasAcceptedInstance = true;
+    // A successful activation supersedes an earlier payload eviction: the
+    // accepted facts now describe a payload that may be persisted again.
+    operation.payloadEvicted = false;
 }
