@@ -598,8 +598,8 @@ void SkyCatalogCacheControllerTests::damagedSourceKeepsConfigurationWithoutDisca
 
     // The damaged record remains persisted rather than being erased silently.
     const auto stillPersisted = store.loadCatalogCollectionCache();
-    QVERIFY(stillPersisted.has_value());
-    QCOMPARE(stillPersisted->sources.size(), 2);
+    QVERIFY(stillPersisted.isLoaded());
+    QCOMPARE(stillPersisted.snapshot.sources.size(), 2);
 }
 
 void SkyCatalogCacheControllerTests::restoresSelectedArchiveMemberWhenBinaryCacheIsMissing()
@@ -732,8 +732,8 @@ void SkyCatalogCacheControllerTests::parseOptionFailuresKeepDamagedRecordsAsConf
 
     // The failing records stay persisted; a bad parse does not erase them.
     const auto stillPersisted = store.loadCatalogCollectionCache();
-    QVERIFY(stillPersisted.has_value());
-    QCOMPARE(stillPersisted->sources.size(), 3);
+    QVERIFY(stillPersisted.isLoaded());
+    QCOMPARE(stillPersisted.snapshot.sources.size(), 3);
 }
 
 void SkyCatalogCacheControllerTests::unreadableSchemaHintFallsBackToDetection()
@@ -784,15 +784,15 @@ void SkyCatalogCacheControllerTests::roundTripsParseOptionsDescriptorMetadataAnd
     controller.persistCollection(request);
 
     const auto stored = store.loadCatalogCollectionCache();
-    QVERIFY(stored.has_value());
-    QCOMPARE(stored->schemaVersion, kCurrentCollectionSchemaVersion);
-    QCOMPARE(stored->sources.size(), 1);
-    QCOMPARE(stored->sources[0].instanceId, QString("custom:archive"));
-    QCOMPARE(stored->sources[0].descriptorId, QString("archive_demo"));
-    QCOMPARE(stored->sources[0].version, QString("v2026.1"));
-    QCOMPARE(stored->sources[0].archiveSelector, kDeepSkyMember);
-    QCOMPARE(stored->sources[0].schemaHint, CatalogSourceType::OpenNgcCsv);
-    QCOMPARE(stored->sources[0].attribution, QString("Demo archive attribution"));
+    QVERIFY(stored.isLoaded());
+    QCOMPARE(stored.snapshot.schemaVersion, kCurrentCollectionSchemaVersion);
+    QCOMPARE(stored.snapshot.sources.size(), 1);
+    QCOMPARE(stored.snapshot.sources[0].instanceId, QString("custom:archive"));
+    QCOMPARE(stored.snapshot.sources[0].descriptorId, QString("archive_demo"));
+    QCOMPARE(stored.snapshot.sources[0].version, QString("v2026.1"));
+    QCOMPARE(stored.snapshot.sources[0].archiveSelector, kDeepSkyMember);
+    QCOMPARE(stored.snapshot.sources[0].schemaHint, CatalogSourceType::OpenNgcCsv);
+    QCOMPARE(stored.snapshot.sources[0].attribution, QString("Demo archive attribution"));
 
     const auto result = controller.restoreCollection(0, 0, QString(), QString());
     QVERIFY(result.restored);
@@ -847,16 +847,16 @@ void SkyCatalogCacheControllerTests::persistsAndRestoresBundledRecordsFromFactor
     controller.persistCollection(request);
 
     const auto stored = store.loadCatalogCollectionCache();
-    QVERIFY(stored.has_value());
-    QCOMPARE(stored->sources.size(), 2);
-    QVERIFY(stored->sources[0].bundled);
-    QVERIFY(stored->sources[0].payload.isEmpty());
-    QVERIFY(stored->sources[0].binaryPayload.isEmpty());
-    QCOMPARE(stored->sources[0].policy, CatalogCompositionPolicy::Merge);
-    QVERIFY(!stored->sources[0].enabled);
-    QVERIFY(!stored->sources[1].bundled);
-    QVERIFY(!stored->sources[1].payload.isEmpty());
-    QVERIFY(!stored->sources[1].binaryPayload.isEmpty());
+    QVERIFY(stored.isLoaded());
+    QCOMPARE(stored.snapshot.sources.size(), 2);
+    QVERIFY(stored.snapshot.sources[0].bundled);
+    QVERIFY(stored.snapshot.sources[0].payload.isEmpty());
+    QVERIFY(stored.snapshot.sources[0].binaryPayload.isEmpty());
+    QCOMPARE(stored.snapshot.sources[0].policy, CatalogCompositionPolicy::Merge);
+    QVERIFY(!stored.snapshot.sources[0].enabled);
+    QVERIFY(!stored.snapshot.sources[1].bundled);
+    QVERIFY(!stored.snapshot.sources[1].payload.isEmpty());
+    QVERIFY(!stored.snapshot.sources[1].binaryPayload.isEmpty());
 
     const auto result = controller.restoreCollection(0, 0, QString(), QString());
     QVERIFY(result.restored);
@@ -971,11 +971,11 @@ void SkyCatalogCacheControllerTests::olderRecordFormatRestoresDefinedDefaults()
     // migration boundary, mirroring the manager's persist after restore.
     controller.persistCollection(persistRequestFromRestoreResult(result));
     const auto upgraded = store.loadCatalogCollectionCache();
-    QVERIFY(upgraded.has_value());
-    QCOMPARE(upgraded->schemaVersion, kCurrentCollectionSchemaVersion);
-    QCOMPARE(upgraded->sources.size(), 2);
-    QCOMPARE(upgraded->sources[0].schemaHint, CatalogSourceType::Unknown);
-    QVERIFY(upgraded->sources[0].attribution.isEmpty());
+    QVERIFY(upgraded.isLoaded());
+    QCOMPARE(upgraded.snapshot.schemaVersion, kCurrentCollectionSchemaVersion);
+    QCOMPARE(upgraded.snapshot.sources.size(), 2);
+    QCOMPARE(upgraded.snapshot.sources[0].schemaHint, CatalogSourceType::Unknown);
+    QVERIFY(upgraded.snapshot.sources[0].attribution.isEmpty());
 
     QTest::ignoreMessage(
         QtWarningMsg, "Catalog ZIP parse failed: ZIP catalog payload contains multiple supported catalog members."
@@ -1044,26 +1044,28 @@ void SkyCatalogCacheControllerTests::clearSourceCacheVersusClearCollectionCache(
     // Evicting one source's payload keeps its configured record and the peer
     // record unchanged; only the cleared payload references are dropped.
     auto remaining = store.loadCatalogCollectionCache();
-    QVERIFY(remaining.has_value());
-    QCOMPARE(remaining->sources.size(), 2);
-    QCOMPARE(remaining->sources[0].instanceId, QString("preset:hyg_v42"));
-    QCOMPARE(remaining->sources[0].descriptorId, QString("hyg_v42"));
-    QCOMPARE(remaining->sources[0].title, QString("HYG v4.2"));
-    QCOMPARE(remaining->sources[0].urls, QStringList{QStringLiteral("https://example.test/hyg.csv.gz")});
-    QCOMPARE(remaining->sources[0].relatedDatasetUrls, QStringList{QStringLiteral("https://example.test/lines.json")});
-    QCOMPARE(remaining->sources[0].policy, CatalogCompositionPolicy::Merge);
-    QCOMPARE(remaining->sources[0].enabled, true);
-    QCOMPARE(remaining->sources[0].order, 0);
-    QVERIFY(remaining->sources[0].payload.isEmpty());
-    QVERIFY(remaining->sources[0].binaryPayload.isEmpty());
-    QVERIFY(remaining->sources[0].constellationLineRows.isEmpty());
-    QVERIFY(remaining->sources[0].constellationAnchorGroupRows.isEmpty());
-    QCOMPARE(remaining->sources[0].constellationCount, std::size_t{0});
-    QCOMPARE(remaining->sources[1].instanceId, QString("preset:open_ngc"));
-    QCOMPARE(remaining->sources[1].payload, skygate::ui::tests::sampleCompactOpenNgcCsvPayload());
+    QVERIFY(remaining.isLoaded());
+    QCOMPARE(remaining.snapshot.sources.size(), 2);
+    QCOMPARE(remaining.snapshot.sources[0].instanceId, QString("preset:hyg_v42"));
+    QCOMPARE(remaining.snapshot.sources[0].descriptorId, QString("hyg_v42"));
+    QCOMPARE(remaining.snapshot.sources[0].title, QString("HYG v4.2"));
+    QCOMPARE(remaining.snapshot.sources[0].urls, QStringList{QStringLiteral("https://example.test/hyg.csv.gz")});
+    QCOMPARE(
+        remaining.snapshot.sources[0].relatedDatasetUrls, QStringList{QStringLiteral("https://example.test/lines.json")}
+    );
+    QCOMPARE(remaining.snapshot.sources[0].policy, CatalogCompositionPolicy::Merge);
+    QCOMPARE(remaining.snapshot.sources[0].enabled, true);
+    QCOMPARE(remaining.snapshot.sources[0].order, 0);
+    QVERIFY(remaining.snapshot.sources[0].payload.isEmpty());
+    QVERIFY(remaining.snapshot.sources[0].binaryPayload.isEmpty());
+    QVERIFY(remaining.snapshot.sources[0].constellationLineRows.isEmpty());
+    QVERIFY(remaining.snapshot.sources[0].constellationAnchorGroupRows.isEmpty());
+    QCOMPARE(remaining.snapshot.sources[0].constellationCount, std::size_t{0});
+    QCOMPARE(remaining.snapshot.sources[1].instanceId, QString("preset:open_ngc"));
+    QCOMPARE(remaining.snapshot.sources[1].payload, skygate::ui::tests::sampleCompactOpenNgcCsvPayload());
 
     QVERIFY(controller.clearCollectionCache());
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
 }
 
 void SkyCatalogCacheControllerTests::migratesLegacyBundledCustomAndMixedConfigurations()
@@ -1236,8 +1238,8 @@ void SkyCatalogCacheControllerTests::emptyCollectionAfterMigrationDoesNotRestore
     // The empty collection is stored explicitly, not cleared: the legacy data
     // stays readable but is no longer a fallback.
     const auto storedEmpty = store.loadCatalogCollectionCache();
-    QVERIFY(storedEmpty.has_value());
-    QVERIFY(storedEmpty->sources.isEmpty());
+    QVERIFY(storedEmpty.isLoaded());
+    QVERIFY(storedEmpty.snapshot.sources.isEmpty());
     QVERIFY(store.loadCatalogCache().has_value());
 
     // Neither restart resurrects a removed legacy source.
@@ -1270,10 +1272,10 @@ void SkyCatalogCacheControllerTests::clearingPayloadCacheDoesNotReAddLegacySourc
     QVERIFY(controller.clearSourceCache(QStringLiteral("preset:hyg_v42")));
     QVERIFY(controller.clearSourceCache(QStringLiteral("preset:open_ngc")));
     const auto afterClear = store.loadCatalogCollectionCache();
-    QVERIFY(afterClear.has_value());
-    QCOMPARE(afterClear->sources.size(), 2);
-    QVERIFY(afterClear->sources[0].payload.isEmpty());
-    QVERIFY(afterClear->sources[1].payload.isEmpty());
+    QVERIFY(afterClear.isLoaded());
+    QCOMPARE(afterClear.snapshot.sources.size(), 2);
+    QVERIFY(afterClear.snapshot.sources[0].payload.isEmpty());
+    QVERIFY(afterClear.snapshot.sources[1].payload.isEmpty());
 
     controller.persistCollection(SkyCatalogCollectionPersistRequest{});
 
@@ -1315,7 +1317,7 @@ void SkyCatalogCacheControllerTests::failedMigrationCommitKeepsLegacyCacheReadab
     // The failed commit is not recorded as a completed migration and leaves the
     // legacy cache readable.
     controller.persistCollection(persistRequestFromRestoreResult(migrated));
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    QVERIFY(!store.loadCatalogCollectionCache().isLoaded());
     const auto legacyAfterFailure = store.loadCatalogCache();
     QVERIFY(legacyAfterFailure.has_value());
     QCOMPARE(legacyAfterFailure->sourceLabel, legacy.sourceLabel);
@@ -1381,16 +1383,16 @@ void SkyCatalogCacheControllerTests::failedCollectionWritePreservesPriorData()
     // Every previously committed source keeps its original metadata, raw
     // bytes, and binary bytes; nothing from the staged update is visible.
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    QCOMPARE(loaded->sources.size(), 2);
-    QCOMPARE(loaded->sources[0].title, oldSnapshot.sources[0].title);
-    QCOMPARE(loaded->sources[0].payload, oldSnapshot.sources[0].payload);
-    QCOMPARE(loaded->sources[0].binaryPayload, oldSnapshot.sources[0].binaryPayload);
-    QCOMPARE(loaded->sources[1].title, oldSnapshot.sources[1].title);
-    QCOMPARE(loaded->sources[1].payload, oldSnapshot.sources[1].payload);
-    QCOMPARE(loaded->sources[1].binaryPayload, oldSnapshot.sources[1].binaryPayload);
-    QVERIFY(loaded->sources[0].payload != updatedSnapshot.sources[0].payload);
-    QVERIFY(loaded->sources[0].binaryPayload != updatedSnapshot.sources[0].binaryPayload);
+    QVERIFY(loaded.isLoaded());
+    QCOMPARE(loaded.snapshot.sources.size(), 2);
+    QCOMPARE(loaded.snapshot.sources[0].title, oldSnapshot.sources[0].title);
+    QCOMPARE(loaded.snapshot.sources[0].payload, oldSnapshot.sources[0].payload);
+    QCOMPARE(loaded.snapshot.sources[0].binaryPayload, oldSnapshot.sources[0].binaryPayload);
+    QCOMPARE(loaded.snapshot.sources[1].title, oldSnapshot.sources[1].title);
+    QCOMPARE(loaded.snapshot.sources[1].payload, oldSnapshot.sources[1].payload);
+    QCOMPARE(loaded.snapshot.sources[1].binaryPayload, oldSnapshot.sources[1].binaryPayload);
+    QVERIFY(loaded.snapshot.sources[0].payload != updatedSnapshot.sources[0].payload);
+    QVERIFY(loaded.snapshot.sources[0].binaryPayload != updatedSnapshot.sources[0].binaryPayload);
 
     // A restart exposes the complete old catalogs, not old metadata with new
     // objects.

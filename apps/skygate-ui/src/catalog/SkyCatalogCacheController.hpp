@@ -72,8 +72,8 @@ struct SkyCatalogCollectionPersistRequest final {
 // Durable configuration is stored in QSettings as a versioned snapshot while
 // raw payloads and binary snapshots are disposable per-instance sidecar
 // files. A stored snapshot with no sources is a committed, intentionally
-// empty collection, distinct from "no collection was ever stored" (a nullopt
-// restore). The legacy two-slot cache is read only to migrate existing
+// empty collection, distinct from "no collection was ever stored" (the Absent
+// load state). The legacy two-slot cache is read only to migrate existing
 // installations once, and that data stays readable until the new
 // configuration is committed. Related constellation datasets are restored per
 // owning source before the active related view is composed.

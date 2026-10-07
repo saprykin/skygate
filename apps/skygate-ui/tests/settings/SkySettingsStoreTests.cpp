@@ -170,13 +170,19 @@ private slots:
     void partialStateAndUnknownOverlayKeysAreTolerated();
     void savesLoadsAndClearsCatalogCachesIndependently();
     void savesLoadsAndClearsCatalogCollectionCache();
+    void freshStoreReportsNoCommittedCollection();
     void emptyCatalogCollectionCacheIsExplicitlyPersisted();
     void failedCollectionSaveKeepsLegacyCacheUnmigrated();
     void clearCatalogSourceCacheEvictsPayloadAndKeepsConfiguration();
+    void unreadableSourcePayloadIsReportedDistinctlyFromEviction();
     void legacyFlatCollectionRecordsStillLoad();
     void emptyLegacyCollectionStillLoadsWithoutGenerationArtifacts();
     void missingManifestWithGenerationRecordsDoesNotLoadEmptyCollection();
     void missingManifestWithGenerationSidecarsLogsManifestLoss();
+    void lostManifestAfterCommittedCollectionIsNotFirstUse();
+    void stageOnlyGenerationIsNotProofOfCommit();
+    void truncatedManifestIsUnusableButRecoverable();
+    void missingCommittedGenerationRecordsAreUnusable();
     void failedLaterSourceRawWriteKeepsCommittedSnapshot();
     void failedLaterSourceBinaryWriteKeepsCommittedSnapshot();
     void failedMetadataPublicationKeepsCommittedSnapshot();
@@ -487,28 +493,44 @@ void SkySettingsStoreTests::savesLoadsAndClearsCatalogCollectionCache()
     const auto savedSnapshot = sampleCollectionSnapshot();
     QVERIFY(store.saveCatalogCollectionCache(savedSnapshot));
 
-    const auto loadedSnapshot = store.loadCatalogCollectionCache();
-    QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->schemaVersion, savedSnapshot.schemaVersion);
-    QCOMPARE(loadedSnapshot->binarySchemaVersion, savedSnapshot.binarySchemaVersion);
-    QCOMPARE(loadedSnapshot->sources.size(), 2);
-    QCOMPARE(loadedSnapshot->sources[0].instanceId, savedSnapshot.sources[0].instanceId);
-    QCOMPARE(loadedSnapshot->sources[0].descriptorId, savedSnapshot.sources[0].descriptorId);
-    QCOMPARE(loadedSnapshot->sources[0].title, savedSnapshot.sources[0].title);
-    QCOMPARE(loadedSnapshot->sources[0].urls, savedSnapshot.sources[0].urls);
-    QCOMPARE(loadedSnapshot->sources[0].relatedDatasetUrls, savedSnapshot.sources[0].relatedDatasetUrls);
-    QCOMPARE(static_cast<int>(loadedSnapshot->sources[0].policy), static_cast<int>(savedSnapshot.sources[0].policy));
-    QCOMPARE(loadedSnapshot->sources[0].enabled, savedSnapshot.sources[0].enabled);
-    QCOMPARE(loadedSnapshot->sources[0].payload, savedSnapshot.sources[0].payload);
-    QCOMPARE(loadedSnapshot->sources[0].binaryPayload, savedSnapshot.sources[0].binaryPayload);
-    QCOMPARE(loadedSnapshot->sources[0].constellationLineRows, savedSnapshot.sources[0].constellationLineRows);
-    QCOMPARE(loadedSnapshot->sources[0].constellationCount, savedSnapshot.sources[0].constellationCount);
-    QCOMPARE(loadedSnapshot->sources[1].instanceId, savedSnapshot.sources[1].instanceId);
-    QCOMPARE(loadedSnapshot->sources[1].payload, savedSnapshot.sources[1].payload);
-    QCOMPARE(loadedSnapshot->sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
+    const SkySettingsStore::CatalogCollectionCacheLoadResult loaded = store.loadCatalogCollectionCache();
+    QVERIFY(loaded.isLoaded());
+    const auto& loadedSnapshot = loaded.snapshot;
+    QCOMPARE(loadedSnapshot.schemaVersion, savedSnapshot.schemaVersion);
+    QCOMPARE(loadedSnapshot.binarySchemaVersion, savedSnapshot.binarySchemaVersion);
+    QCOMPARE(loadedSnapshot.sources.size(), 2);
+    QCOMPARE(loadedSnapshot.sources[0].instanceId, savedSnapshot.sources[0].instanceId);
+    QCOMPARE(loadedSnapshot.sources[0].descriptorId, savedSnapshot.sources[0].descriptorId);
+    QCOMPARE(loadedSnapshot.sources[0].title, savedSnapshot.sources[0].title);
+    QCOMPARE(loadedSnapshot.sources[0].urls, savedSnapshot.sources[0].urls);
+    QCOMPARE(loadedSnapshot.sources[0].relatedDatasetUrls, savedSnapshot.sources[0].relatedDatasetUrls);
+    QCOMPARE(static_cast<int>(loadedSnapshot.sources[0].policy), static_cast<int>(savedSnapshot.sources[0].policy));
+    QCOMPARE(loadedSnapshot.sources[0].enabled, savedSnapshot.sources[0].enabled);
+    QCOMPARE(loadedSnapshot.sources[0].payload, savedSnapshot.sources[0].payload);
+    QCOMPARE(loadedSnapshot.sources[0].binaryPayload, savedSnapshot.sources[0].binaryPayload);
+    QCOMPARE(loadedSnapshot.sources[0].constellationLineRows, savedSnapshot.sources[0].constellationLineRows);
+    QCOMPARE(loadedSnapshot.sources[0].constellationCount, savedSnapshot.sources[0].constellationCount);
+    QCOMPARE(loadedSnapshot.sources[1].instanceId, savedSnapshot.sources[1].instanceId);
+    QCOMPARE(loadedSnapshot.sources[1].payload, savedSnapshot.sources[1].payload);
+    QCOMPARE(loadedSnapshot.sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
+    QVERIFY(loaded.unreadablePayloadInstanceIds.isEmpty());
 
     QVERIFY(store.clearCatalogCollectionCache());
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto afterClear = store.loadCatalogCollectionCache();
+    QCOMPARE(afterClear.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+}
+
+void SkySettingsStoreTests::freshStoreReportsNoCommittedCollection()
+{
+    prepareCollectionCacheDirectory(m_settings);
+
+    const SkySettingsStore store;
+    const auto firstUse = store.loadCatalogCollectionCache();
+    QCOMPARE(firstUse.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(firstUse.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    QVERIFY(firstUse.diagnostic.isEmpty());
+    QVERIFY(firstUse.snapshot.sources.isEmpty());
+    QVERIFY(firstUse.unreadablePayloadInstanceIds.isEmpty());
 }
 
 void SkySettingsStoreTests::emptyCatalogCollectionCacheIsExplicitlyPersisted()
@@ -528,31 +550,33 @@ void SkySettingsStoreTests::emptyCatalogCollectionCacheIsExplicitlyPersisted()
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion;
     QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
 
-    // An intentionally empty collection is stored, not erased: the version
-    // marker distinguishes it from "no collection was ever stored" and keeps
+    // An intentionally empty collection is stored, not erased: the committed
+    // manifest distinguishes it from "no collection was ever stored" and keeps
     // the legacy two-slot cache retired.
-    const auto loadedSnapshot = store.loadCatalogCollectionCache();
-    QVERIFY(loadedSnapshot.has_value());
-    QVERIFY(loadedSnapshot->sources.isEmpty());
+    const auto loaded = store.loadCatalogCollectionCache();
+    QCOMPARE(loaded.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Loaded);
+    QVERIFY(loaded.snapshot.sources.isEmpty());
     QCOMPARE(
-        loadedSnapshot->schemaVersion,
+        loaded.snapshot.schemaVersion,
         skygate::ui::internal::SkyContextControllerConstants::kCatalogCollectionCacheSchemaVersion
     );
 
     // A second restart persists the same intentionally empty configuration.
     QVERIFY(store.saveCatalogCollectionCache(emptySnapshot));
-    const auto reloadedSnapshot = store.loadCatalogCollectionCache();
-    QVERIFY(reloadedSnapshot.has_value());
-    QVERIFY(reloadedSnapshot->sources.isEmpty());
+    const auto reloaded = store.loadCatalogCollectionCache();
+    QCOMPARE(reloaded.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Loaded);
+    QVERIFY(reloaded.snapshot.sources.isEmpty());
 
-    // The legacy cache stays readable; the marker retires the fallback without
-    // deleting recoverable data.
+    // The legacy cache stays readable; the committed collection retires the
+    // fallback without deleting recoverable data.
     QVERIFY(store.loadCatalogCache().has_value());
 
     // Resetting the stored configuration is the operation that removes the
-    // marker again.
+    // committed collection again.
     QVERIFY(store.clearCatalogCollectionCache());
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    QCOMPARE(
+        store.loadCatalogCollectionCache().state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent
+    );
 }
 
 void SkySettingsStoreTests::failedCollectionSaveKeepsLegacyCacheUnmigrated()
@@ -581,7 +605,9 @@ void SkySettingsStoreTests::failedCollectionSaveKeepsLegacyCacheUnmigrated()
 
     // The failed save neither records a completed migration nor destroys the
     // last readable legacy data.
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto failedLoad = store.loadCatalogCollectionCache();
+    QCOMPARE(failedLoad.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(failedLoad.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
     const auto stillReadable = store.loadCatalogCache();
     QVERIFY(stillReadable.has_value());
     QCOMPARE(stillReadable->sourceLabel, legacySnapshot.sourceLabel);
@@ -606,13 +632,14 @@ void SkySettingsStoreTests::clearCatalogSourceCacheEvictsPayloadAndKeepsConfigur
     // of its files.
     QCOMPARE(cacheDir.entryList(QStringList{QStringLiteral("catalog-source-*")}, QDir::Files).size(), 2);
 
-    const auto loadedSnapshot = store.loadCatalogCollectionCache();
-    QVERIFY(loadedSnapshot.has_value());
-    QCOMPARE(loadedSnapshot->sources.size(), 2);
+    const auto evicted = store.loadCatalogCollectionCache();
+    QVERIFY(evicted.isLoaded());
+    QCOMPARE(evicted.snapshot.sources.size(), 2);
 
     // The cleared source keeps every configuration field and drops only its
-    // disposable payload references and the related dataset they carry.
-    const auto& loadedStar = loadedSnapshot->sources[0];
+    // disposable payload references and the related dataset they carry. The
+    // eviction is deliberate, so the missing payload is not corrupt data.
+    const auto& loadedStar = evicted.snapshot.sources[0];
     QCOMPARE(loadedStar.instanceId, savedSnapshot.sources[0].instanceId);
     QCOMPARE(loadedStar.descriptorId, savedSnapshot.sources[0].descriptorId);
     QCOMPARE(loadedStar.title, savedSnapshot.sources[0].title);
@@ -634,9 +661,45 @@ void SkySettingsStoreTests::clearCatalogSourceCacheEvictsPayloadAndKeepsConfigur
     QCOMPARE(loadedStar.constellationCount, std::size_t{0});
 
     // The peer record and its payload are untouched.
-    QCOMPARE(loadedSnapshot->sources[1].instanceId, savedSnapshot.sources[1].instanceId);
-    QCOMPARE(loadedSnapshot->sources[1].payload, savedSnapshot.sources[1].payload);
-    QCOMPARE(loadedSnapshot->sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
+    QCOMPARE(evicted.snapshot.sources[1].instanceId, savedSnapshot.sources[1].instanceId);
+    QCOMPARE(evicted.snapshot.sources[1].payload, savedSnapshot.sources[1].payload);
+    QCOMPARE(evicted.snapshot.sources[1].binaryPayload, savedSnapshot.sources[1].binaryPayload);
+    QVERIFY(evicted.unreadablePayloadInstanceIds.isEmpty());
+}
+
+void SkySettingsStoreTests::unreadableSourcePayloadIsReportedDistinctlyFromEviction()
+{
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
+
+    SkySettingsStore store;
+    const auto savedSnapshot = sampleCollectionSnapshot();
+    QVERIFY(store.saveCatalogCollectionCache(savedSnapshot));
+    const quint64 committedGeneration = skygate::ui::tests::committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    // Remove one source's raw sidecar while its record keeps the reference. The
+    // other record stays intact, so only the corrupt one is reported.
+    const QString corruptedRawPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
+        directory, committedGeneration, QStringLiteral("preset:hyg_v42"), QStringLiteral(".txt")
+    );
+    QVERIFY(QFile::remove(corruptedRawPath));
+
+    const auto corrupted = store.loadCatalogCollectionCache();
+    QVERIFY(corrupted.isLoaded());
+    QCOMPARE(corrupted.snapshot.sources.size(), 2);
+    QVERIFY(corrupted.snapshot.sources[0].payload.isEmpty());
+    QCOMPARE(corrupted.snapshot.sources[0].binaryPayload, savedSnapshot.sources[0].binaryPayload);
+    QCOMPARE(corrupted.snapshot.sources[1].payload, savedSnapshot.sources[1].payload);
+    QCOMPARE(corrupted.unreadablePayloadInstanceIds, QStringList{QStringLiteral("preset:hyg_v42")});
+
+    // A deliberate eviction drops the payload references, so the record stays
+    // readable without being reported as corrupt data.
+    QVERIFY(store.clearCatalogSourceCache(QStringLiteral("preset:open_ngc")));
+    const auto evicted = store.loadCatalogCollectionCache();
+    QVERIFY(evicted.isLoaded());
+    QVERIFY(evicted.snapshot.sources[1].payload.isEmpty());
+    QVERIFY(evicted.snapshot.sources[1].binaryPayload.isEmpty());
+    QCOMPARE(evicted.unreadablePayloadInstanceIds, QStringList{QStringLiteral("preset:hyg_v42")});
 }
 
 void SkySettingsStoreTests::legacyFlatCollectionRecordsStillLoad()
@@ -666,13 +729,13 @@ void SkySettingsStoreTests::legacyFlatCollectionRecordsStillLoad()
     skygate::ui::tests::LogCapture capture;
     SkySettingsStore store;
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    QCOMPARE(loaded->schemaVersion, 2);
-    QCOMPARE(loaded->binarySchemaVersion, 7);
-    QCOMPARE(loaded->sources.size(), 1);
-    QCOMPARE(loaded->sources[0].instanceId, QString("custom:legacy"));
-    QCOMPARE(loaded->sources[0].title, QString("Legacy title"));
-    QCOMPARE(loaded->sources[0].payload, QByteArray("legacy raw payload"));
+    QVERIFY(loaded.isLoaded());
+    QCOMPARE(loaded.snapshot.schemaVersion, 2);
+    QCOMPARE(loaded.snapshot.binarySchemaVersion, 7);
+    QCOMPARE(loaded.snapshot.sources.size(), 1);
+    QCOMPARE(loaded.snapshot.sources[0].instanceId, QString("custom:legacy"));
+    QCOMPARE(loaded.snapshot.sources[0].title, QString("Legacy title"));
+    QCOMPARE(loaded.snapshot.sources[0].payload, QByteArray("legacy raw payload"));
 
     // This settings file has no generation-format artifacts, so the absent
     // manifest is the normal pre-generation state and must stay quiet.
@@ -698,9 +761,9 @@ void SkySettingsStoreTests::emptyLegacyCollectionStillLoadsWithoutGenerationArti
     skygate::ui::tests::LogCapture capture;
     const SkySettingsStore store;
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    QVERIFY(loaded->sources.isEmpty());
-    QCOMPARE(loaded->schemaVersion, 3);
+    QVERIFY(loaded.isLoaded());
+    QVERIFY(loaded.snapshot.sources.isEmpty());
+    QCOMPARE(loaded.snapshot.schemaVersion, 3);
     QVERIFY(!capture.joinedMessages().contains(QStringLiteral("Catalog collection manifest is missing")));
 }
 
@@ -748,11 +811,21 @@ void SkySettingsStoreTests::missingManifestWithGenerationRecordsDoesNotLoadEmpty
     QVERIFY(QFile::remove(manifestPath));
 
     // Without the manifest the stale marker points at flat records the
-    // migration already replaced. Reporting an empty collection instead of no
-    // snapshot would let its caller commit that emptiness over the committed
-    // generation.
+    // migration already replaced. Settings written before commit knowledge
+    // existed carry no record of the committed generation, so only the stale
+    // marker remains; reporting an empty collection instead of an unusable
+    // committed state would let its caller commit that emptiness over the
+    // committed generation.
+    {
+        QSettings settings;
+        settings.remove(QStringLiteral("skyContext/catalogCollectionCommittedGeneration"));
+        settings.sync();
+    }
     skygate::ui::tests::LogCapture capture;
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto unreadable = store.loadCatalogCollectionCache();
+    QCOMPARE(unreadable.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(unreadable.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::LegacyRecordsReplaced);
+    QVERIFY(!unreadable.diagnostic.isEmpty());
     const QString messages = capture.joinedMessages();
     QVERIFY(messages.contains(QStringLiteral("Catalog collection manifest is missing")));
     QVERIFY(messages.contains(QStringLiteral("stale catalog collection version marker")));
@@ -772,14 +845,14 @@ void SkySettingsStoreTests::missingManifestWithGenerationRecordsDoesNotLoadEmpty
     }
 
     // Restoring the manifest alone brings the committed collection back,
-    // proving the empty result above left nothing else behind.
+    // proving the unusable result above left nothing else behind.
     QFile restoredManifest(manifestPath);
     QVERIFY(restoredManifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
     QCOMPARE(restoredManifest.write(committedManifest), qint64(committedManifest.size()));
     restoredManifest.close();
     const auto reloaded = store.loadCatalogCollectionCache();
-    QVERIFY(reloaded.has_value());
-    compareCollectionRecords(*reloaded, committed);
+    QVERIFY(reloaded.isLoaded());
+    compareCollectionRecords(reloaded.snapshot, committed);
 }
 
 void SkySettingsStoreTests::missingManifestWithGenerationSidecarsLogsManifestLoss()
@@ -789,19 +862,177 @@ void SkySettingsStoreTests::missingManifestWithGenerationSidecarsLogsManifestLos
     SkySettingsStore store;
     QVERIFY(store.saveCatalogCollectionCache(oldCollectionSnapshot()));
 
-    // A settings reset can remove the generation records while the sidecar
-    // files survive. With no marker and no records left, the files alone must
-    // still make the lost manifest visible.
+    // A settings reset can remove the generation records and the commit record
+    // while the sidecar files survive. The leftover files are not proof that a
+    // collection was committed, so the outcome stays first use, but the data
+    // that was ignored must not be silent.
     {
         QSettings settings;
         settings.remove(QStringLiteral("catalogSources"));
+        settings.remove(QStringLiteral("skyContext/catalogCollectionCommittedGeneration"));
         settings.sync();
     }
     QVERIFY(QFile::remove(skygate::ui::tests::catalogCollectionManifestFilePath(directory)));
 
     skygate::ui::tests::LogCapture capture;
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto stagedLeftovers = store.loadCatalogCollectionCache();
+    QCOMPARE(stagedLeftovers.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QVERIFY(!stagedLeftovers.diagnostic.isEmpty());
     QVERIFY(capture.joinedMessages().contains(QStringLiteral("Catalog collection manifest is missing")));
+}
+
+void SkySettingsStoreTests::lostManifestAfterCommittedCollectionIsNotFirstUse()
+{
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
+
+    SkySettingsStore store;
+    const auto committed = oldCollectionSnapshot();
+    QVERIFY(store.saveCatalogCollectionCache(committed));
+    const quint64 committedGeneration = skygate::ui::tests::committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    // The commit record survives on its own and names the published generation.
+    {
+        QSettings settings;
+        QCOMPARE(
+            settings.value(QStringLiteral("skyContext/catalogCollectionCommittedGeneration")).toULongLong(),
+            committedGeneration
+        );
+    }
+
+    const QString manifestPath = skygate::ui::tests::catalogCollectionManifestFilePath(directory);
+    QFile committedManifest(manifestPath);
+    QVERIFY(committedManifest.open(QIODevice::ReadOnly));
+    const QByteArray committedManifestContent = committedManifest.readAll();
+    committedManifest.close();
+    QVERIFY(QFile::remove(manifestPath));
+
+    const auto lostManifest = store.loadCatalogCollectionCache();
+    QCOMPARE(lostManifest.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(
+        lostManifest.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing
+    );
+    QVERIFY(lostManifest.diagnostic.contains(QStringLiteral("recorded as committed")));
+
+    // The recorded generation is a proven recovery point: restoring the
+    // manifest brings the committed collection back unchanged.
+    QFile restoredManifest(manifestPath);
+    QVERIFY(restoredManifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(restoredManifest.write(committedManifestContent), qint64(committedManifestContent.size()));
+    restoredManifest.close();
+    const auto recovered = store.loadCatalogCollectionCache();
+    QVERIFY(recovered.isLoaded());
+    compareCollectionRecords(recovered.snapshot, committed);
+}
+
+void SkySettingsStoreTests::stageOnlyGenerationIsNotProofOfCommit()
+{
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
+    QVERIFY(QDir().mkpath(directory));
+
+    // A first save interrupted before its manifest was published leaves staged
+    // records and a sidecar behind. Nothing proves that a collection was ever
+    // committed, so the outcome stays first use.
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("catalogSources/4/recordsStored"), true);
+        settings.beginGroup(QStringLiteral("catalogSources/4/catalog-source-staged"));
+        settings.setValue(QStringLiteral("instanceId"), QStringLiteral("custom:staged"));
+        settings.endGroup();
+        settings.sync();
+    }
+    QFile stagedSidecar(
+        skygate::ui::tests::stagedCatalogSourceSidecarPath(
+            directory, 4, QStringLiteral("custom:staged"), QStringLiteral(".txt")
+        )
+    );
+    QVERIFY(stagedSidecar.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(stagedSidecar.write("staged raw payload"), qint64(18));
+    stagedSidecar.close();
+
+    SkySettingsStore store;
+    const auto firstUse = store.loadCatalogCollectionCache();
+    QCOMPARE(firstUse.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(firstUse.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    QVERIFY(!firstUse.diagnostic.isEmpty());
+
+    // Once a manifest has committed a generation, losing it is unusable
+    // committed configuration instead of first use.
+    QVERIFY(store.saveCatalogCollectionCache(oldCollectionSnapshot()));
+    QVERIFY(QFile::remove(skygate::ui::tests::catalogCollectionManifestFilePath(directory)));
+    const auto lostCommitted = store.loadCatalogCollectionCache();
+    QCOMPARE(lostCommitted.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(
+        lostCommitted.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::CommittedManifestMissing
+    );
+}
+
+void SkySettingsStoreTests::truncatedManifestIsUnusableButRecoverable()
+{
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
+
+    SkySettingsStore store;
+    const auto committed = oldCollectionSnapshot();
+    QVERIFY(store.saveCatalogCollectionCache(committed));
+
+    const QString manifestPath = skygate::ui::tests::catalogCollectionManifestFilePath(directory);
+    QFile committedManifest(manifestPath);
+    QVERIFY(committedManifest.open(QIODevice::ReadOnly));
+    const QByteArray committedManifestContent = committedManifest.readAll();
+    committedManifest.close();
+
+    // A truncated manifest is committed configuration that cannot be read, not
+    // first use, even while the committed generation itself stays intact.
+    const QByteArray truncatedContent = QByteArrayLiteral("schemaVersion=1\nbinarySchemaVersion=4\ngenera");
+    QFile truncatedManifest(manifestPath);
+    QVERIFY(truncatedManifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(truncatedManifest.write(truncatedContent), qint64(truncatedContent.size()));
+    truncatedManifest.close();
+
+    skygate::ui::tests::LogCapture capture;
+    const auto truncated = store.loadCatalogCollectionCache();
+    QCOMPARE(truncated.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(truncated.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::ManifestUnreadable);
+    QVERIFY(!truncated.diagnostic.isEmpty());
+    QVERIFY(capture.joinedMessages().contains(QStringLiteral("Unreadable catalog collection manifest")));
+
+    // Restoring the manifest recovers the committed collection unchanged.
+    QFile restoredManifest(manifestPath);
+    QVERIFY(restoredManifest.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(restoredManifest.write(committedManifestContent), qint64(committedManifestContent.size()));
+    restoredManifest.close();
+    const auto recovered = store.loadCatalogCollectionCache();
+    QVERIFY(recovered.isLoaded());
+    compareCollectionRecords(recovered.snapshot, committed);
+}
+
+void SkySettingsStoreTests::missingCommittedGenerationRecordsAreUnusable()
+{
+    const QString directory = prepareCollectionCacheDirectory(m_settings);
+
+    SkySettingsStore store;
+    const auto committed = oldCollectionSnapshot();
+    QVERIFY(store.saveCatalogCollectionCache(committed));
+    const quint64 committedGeneration = skygate::ui::tests::committedCatalogCollectionGeneration(directory);
+    QVERIFY(committedGeneration > 0U);
+
+    // The manifest survives while the generation it names lost its records, as
+    // after a partial settings reset; the payload files alone are not a
+    // collection.
+    {
+        QSettings settings;
+        settings.remove(QStringLiteral("catalogSources/%1").arg(committedGeneration));
+        settings.sync();
+    }
+
+    skygate::ui::tests::LogCapture capture;
+    const auto missingRecords = store.loadCatalogCollectionCache();
+    QCOMPARE(missingRecords.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Unusable);
+    QCOMPARE(
+        missingRecords.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::CommittedGenerationMissing
+    );
+    QVERIFY(missingRecords.diagnostic.contains(QString::number(committedGeneration)));
+    QVERIFY(capture.joinedMessages().contains(QStringLiteral("names a generation without stored records")));
 }
 
 void SkySettingsStoreTests::failedLaterSourceRawWriteKeepsCommittedSnapshot()
@@ -826,9 +1057,9 @@ void SkySettingsStoreTests::failedLaterSourceRawWriteKeepsCommittedSnapshot()
     QVERIFY(!store.saveCatalogCollectionCache(update));
 
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    compareCollectionRecords(*loaded, committed);
-    QVERIFY(loaded->sources[0].payload != update.sources[0].payload);
+    QVERIFY(loaded.isLoaded());
+    compareCollectionRecords(loaded.snapshot, committed);
+    QVERIFY(loaded.snapshot.sources[0].payload != update.sources[0].payload);
 }
 
 void SkySettingsStoreTests::failedLaterSourceBinaryWriteKeepsCommittedSnapshot()
@@ -851,9 +1082,9 @@ void SkySettingsStoreTests::failedLaterSourceBinaryWriteKeepsCommittedSnapshot()
     QVERIFY(!store.saveCatalogCollectionCache(update));
 
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    compareCollectionRecords(*loaded, committed);
-    QVERIFY(loaded->sources[0].binaryPayload != update.sources[0].binaryPayload);
+    QVERIFY(loaded.isLoaded());
+    compareCollectionRecords(loaded.snapshot, committed);
+    QVERIFY(loaded.snapshot.sources[0].binaryPayload != update.sources[0].binaryPayload);
 }
 
 void SkySettingsStoreTests::failedMetadataPublicationKeepsCommittedSnapshot()
@@ -893,9 +1124,9 @@ void SkySettingsStoreTests::failedMetadataPublicationKeepsCommittedSnapshot()
     QVERIFY(!store.saveCatalogCollectionCache(update));
 
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    compareCollectionRecords(*loaded, committed);
-    QVERIFY(loaded->sources[0].title != update.sources[0].title);
+    QVERIFY(loaded.isLoaded());
+    compareCollectionRecords(loaded.snapshot, committed);
+    QVERIFY(loaded.snapshot.sources[0].title != update.sources[0].title);
 }
 
 void SkySettingsStoreTests::failedManifestPublicationKeepsCommittedGenerationIntact()
@@ -929,8 +1160,8 @@ void SkySettingsStoreTests::failedManifestPublicationKeepsCommittedGenerationInt
     restoredManifest.close();
 
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    compareCollectionRecords(*loaded, committed);
+    QVERIFY(loaded.isLoaded());
+    compareCollectionRecords(loaded.snapshot, committed);
     const QString stagedPath = skygate::ui::tests::stagedCatalogSourceSidecarPath(
         directory, committedGeneration + 1U, QStringLiteral("custom:alpha"), QStringLiteral(".txt")
     );
@@ -957,7 +1188,14 @@ void SkySettingsStoreTests::failedFirstCollectionPublicationKeepsLegacyCacheRead
         QStringLiteral("custom:alpha"), QStringLiteral("Alpha"), QByteArray("raw alpha"), QByteArray("binary alpha")
     )});
     QVERIFY(!store.saveCatalogCollectionCache(firstCollection));
-    QVERIFY(!store.loadCatalogCollectionCache().has_value());
+    const auto failedFirstSave = store.loadCatalogCollectionCache();
+    QCOMPARE(failedFirstSave.state, SkySettingsStore::CatalogCollectionCacheLoadResult::State::Absent);
+    QCOMPARE(failedFirstSave.failure, SkySettingsStore::CatalogCollectionCacheLoadResult::Failure::None);
+    // A failed first publication leaves no commit record behind either.
+    {
+        QSettings settings;
+        QVERIFY(!settings.contains(QStringLiteral("skyContext/catalogCollectionCommittedGeneration")));
+    }
 
     const auto legacyAfterFailure = store.loadCatalogCache();
     QVERIFY(legacyAfterFailure.has_value());
@@ -970,9 +1208,9 @@ void SkySettingsStoreTests::failedFirstCollectionPublicationKeepsLegacyCacheRead
     QVERIFY(QDir(manifestPath).removeRecursively());
     QVERIFY(store.saveCatalogCollectionCache(firstCollection));
     const auto committed = store.loadCatalogCollectionCache();
-    QVERIFY(committed.has_value());
-    QCOMPARE(committed->sources.size(), 1);
-    QCOMPARE(committed->sources[0].title, QString("Alpha"));
+    QVERIFY(committed.isLoaded());
+    QCOMPARE(committed.snapshot.sources.size(), 1);
+    QCOMPARE(committed.snapshot.sources[0].title, QString("Alpha"));
     QVERIFY(store.loadCatalogCache().has_value());
 }
 
@@ -990,8 +1228,8 @@ void SkySettingsStoreTests::successfulCollectionUpdateReplacesCommittedGeneratio
     QVERIFY(store.saveCatalogCollectionCache(update));
 
     const auto loaded = store.loadCatalogCollectionCache();
-    QVERIFY(loaded.has_value());
-    compareCollectionRecords(*loaded, update);
+    QVERIFY(loaded.isLoaded());
+    compareCollectionRecords(loaded.snapshot, update);
 
     // The committed snapshot is exactly the new generation: its payloads are
     // present and the previous generation's sidecars were removed.
