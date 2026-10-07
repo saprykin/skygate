@@ -51,18 +51,30 @@ namespace skygate::ephemeris {
 // several survivors.
 //
 // Absorption follows configured source precedence, never accumulator
-// insertion order. The winner's own present values stay authoritative; a
-// value it is missing is taken from the highest-precedence absorbed
-// contributor, because a later source outranks every earlier source. A
-// survivor's contributor source ids are listed in that same descending
-// precedence order: the winner's source first, then each remaining contributor
-// highest first, with every contributing source listed once. Equal source
-// precedence (several absorbed survivors of one source) keeps that source's
-// documented row order, where the first row of a source is authoritative and
-// its later rows only fill it. Accumulator positions are not source ranks:
-// replacement and bridge absorption vacate positions and append the winner at
-// a new one, so position order stops matching precedence after the first
-// replacement.
+// insertion order, and it applies per field: every enriched field keeps the
+// source rank of the source that actually supplied its value, so an
+// intermediate survivor never promotes a value it inherited to its own,
+// higher rank. A value is therefore taken from the highest-precedence source
+// that supplied it, whether the winner supplied it itself or absorbed it, and
+// only that value replaces a lower-precedence one. A field of equal
+// precedence keeps the value it already has, absent fields stay absent, and a
+// valid zero is a value like any other. A survivor's contributor source ids
+// are listed in that same descending precedence order: the winner's source
+// first, then each remaining contributor highest first, with every
+// contributing source listed once. Equal source precedence (several absorbed
+// survivors of one source) keeps that source's documented row order, where the
+// first row of a source is authoritative and its later rows only fill it; a
+// record of the currently merged source that resolves to a survivor this same
+// source pass already produced only fills that survivor's missing fields, so
+// the merged source's field origins stay the ones it inherited. Accumulator
+// positions are not source ranks: replacement and bridge absorption vacate
+// positions and append the winner at a new one, so position order stops
+// matching precedence after the first replacement.
+//
+// Field origins are part of one merge run and are not carried by a body: an
+// already composed snapshot enters a later composition as one source, so every
+// value it holds counts as supplied by that source and earlier field history
+// is not recovered.
 //
 // After the merge, an authoritative identity shared by two active survivors of
 // the same kind is an internal merge error and is reported by the merge
@@ -82,18 +94,22 @@ namespace skygate::ephemeris {
 // designations that share a common name stay distinct instead of one being
 // dropped.
 //
-// Coordinates are merged as one coherent model per survivor. The winner's
-// fixed position and its astrometry reference position and epoch are
-// authoritative. A losing fixed position only fills a missing winner position
-// and only when it agrees with the surviving model, because a fixed position
-// carries no reference epoch to convert; a losing astrometry only enters the
-// record when its reference position agrees with the surviving model, either
-// directly against a fixed position or against the winning reference position
-// after the losing proper motion accounts for the reference-epoch difference.
-// Compatible losing astrometry fills only missing proper motion, parallax,
-// radial velocity, and validity fields without overwriting winner values.
-// Incompatible losing coordinates are rejected with a diagnostic that names
-// the kept model, so a survivor never combines contradictory coordinate
+// Coordinates are merged as one coherent model per survivor. The astrometry
+// reference position and reference epoch are authoritative, and the fixed
+// position of the highest-precedence source that supplies one wins. A losing
+// fixed position therefore fills a missing winner position and replaces a
+// position the winner only inherited from a lower-precedence source, and it
+// does either only when it agrees with the surviving model, because a fixed
+// position carries no reference epoch to convert; a losing astrometry only
+// enters the record when its reference position agrees with the surviving
+// model, either directly against a fixed position or against the winning
+// reference position after the losing proper motion accounts for the
+// reference-epoch difference. Compatible losing astrometry fills missing
+// proper motion, parallax, radial velocity, and validity fields and replaces a
+// field the winner only inherited from a lower-precedence source, while
+// a value the winner carries from a higher-precedence source than the
+// absorbed contributor is never overwritten. Incompatible losing coordinates are rejected with a diagnostic that
+// names the kept model, so a survivor never combines contradictory coordinate
 // descriptions.
 class CatalogCompositionMerger final {
 public:
