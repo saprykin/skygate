@@ -447,12 +447,13 @@ SkyCatalogCollectionRestoreResult SkyCatalogCacheController::restoreCollection(
         return {};
     }
 
-    const std::optional<SkySettingsStore::CatalogCollectionCacheSnapshot> collection =
-        m_settingsStore->loadCatalogCollectionCache();
-    if (collection.has_value()) {
-        return restoreFromRecords(*collection);
+    const SkySettingsStore::CatalogCollectionCacheLoadResult collection = m_settingsStore->loadCatalogCollectionCache();
+    if (collection.isLoaded()) {
+        return restoreFromRecords(collection.snapshot);
     }
 
+    // Neither an absent nor an unusable stored collection yields sources here,
+    // so the legacy two-slot cache stays the fallback for both outcomes.
     const std::optional<SkySettingsStore::CatalogCacheSnapshot> legacy = m_settingsStore->loadCatalogCache();
     if (!legacy.has_value()) {
         return {};
